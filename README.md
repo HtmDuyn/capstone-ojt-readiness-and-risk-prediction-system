@@ -395,22 +395,6 @@ Including:
 
 ---
 
-# Current Progress
-
-- ✅ Proposal
-- ✅ Literature Review
-- ✅ Requirement Analysis
-- ✅ Business Process Analysis
-- ⏳ UI/UX Design
-- ⏳ Database Design
-- ⏳ Backend Development
-- ⏳ Frontend Development
-- ⏳ AI Model Development
-- ⏳ AI Integration
-- ⏳ Testing
-- ⏳ Deployment
-
----
 
 # Research Contribution
 
