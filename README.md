@@ -1,2 +1,2 @@
-# capstone-ojt-risk-prediction-system
+# capstone-ojt-readines-and-risk-prediction-system
 Graduation Capstone Project | FPT University (Information Systems, 2026).
