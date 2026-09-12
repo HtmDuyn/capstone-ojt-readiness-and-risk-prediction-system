@@ -1,21 +1,20 @@
 import React from 'react';
-import { TrendUpIcon, ClockIcon } from './icons/DashboardIcons';
+import { TrendUpIcon } from './icons/DashboardIcons';
 import type { StudentProfile } from '../../types/students/studentDashboardTypes';
 
 interface StatCardsProps {
   student: StudentProfile;
 }
 
+const CARD_BASE = 'card-glass p-5 flex flex-col justify-between';
+
 export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
-  const creditPercent = Math.min(
-    100,
-    Math.round((student.earnedCredits / student.totalCredits) * 100)
-  );
+  const creditPercent = Math.min(100, Math.round((student.earnedCredits / student.totalCredits) * 100));
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      {/* Card 1: GPA HIỆN TẠI */}
-      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
+      {/* GPA */}
+      <div className={CARD_BASE}>
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             GPA Hiện tại
@@ -24,7 +23,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
             {student.gpa.toFixed(2)}
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
+        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold">
           <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
             <TrendUpIcon size={12} />
             <span>+{student.gpaChange.toFixed(2)}</span>
@@ -33,8 +32,8 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
         </div>
       </div>
 
-      {/* Card 2: TÍN CHỈ TÍCH LŨY */}
-      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
+      {/* Tín chỉ tích lũy */}
+      <div className={CARD_BASE}>
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             Tín chỉ tích lũy
@@ -43,18 +42,16 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
             {student.earnedCredits}/{student.totalCredits}
           </div>
         </div>
-        <div className="mt-4">
-          <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-1000 ease-out shadow-xs shadow-orange-500/30"
-              style={{ width: `${creditPercent}%` }}
-            />
-          </div>
+        <div className="mt-4 w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-1000 ease-out"
+            style={{ width: `${creditPercent}%` }}
+          />
         </div>
       </div>
 
-      {/* Card 3: TÍN CHỈ CÒN THIẾU */}
-      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
+      {/* Tín chỉ còn thiếu */}
+      <div className={CARD_BASE}>
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             Tín chỉ còn thiếu
@@ -63,30 +60,25 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
             {student.missingCredits}
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-orange-600">
-          <ClockIcon size={13} className="text-orange-500" />
-          <span>Ước tính: {student.estimatedSemestersRemaining} kỳ</span>
-        </div>
+        <p className="mt-4 text-[11px] font-medium text-orange-600">
+          Ước tính: {student.estimatedSemestersRemaining} kỳ học
+        </p>
       </div>
 
-      {/* Card 4: ĐIỀU KIỆN OJT */}
-      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
+      {/* Điều kiện OJT */}
+      <div className={CARD_BASE}>
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             Điều kiện OJT
           </span>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-100 animate-pulse" />
-            <span className="text-xl sm:text-2xl font-bold text-emerald-600 tracking-tight">
-              Đủ điều kiện
-            </span>
+            <span className="text-lg sm:text-xl font-bold text-emerald-600">Đủ điều kiện</span>
           </div>
         </div>
-        <div className="mt-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Đã xác thực bởi {student.ojtVerifiedBy}
-          </span>
-        </div>
+        <p className="mt-4 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          Xác thực bởi {student.ojtVerifiedBy}
+        </p>
       </div>
     </div>
   );

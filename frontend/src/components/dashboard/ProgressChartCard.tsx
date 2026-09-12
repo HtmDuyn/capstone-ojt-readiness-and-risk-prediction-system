@@ -219,7 +219,7 @@ export const ProgressChartCard: React.FC<ProgressChartCardProps> = ({ data }) =>
   }, [displayItems]);
 
   return (
-    <div className="bg-white/75 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-white/80 shadow-md">
+    <div className="card-glass p-5 sm:p-6">
       {/* Card Header & Toggle Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div>

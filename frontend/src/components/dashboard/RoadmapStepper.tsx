@@ -46,7 +46,7 @@ export const RoadmapStepper: React.FC<RoadmapStepperProps> = ({ steps }) => {
   };
 
   return (
-    <div className="bg-white/75 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-white/80 shadow-md">
+    <div className="card-glass p-5 sm:p-6">
       <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight font-outfit mb-6">
         Lộ trình đến học kỳ OJT
       </h2>

@@ -35,12 +35,17 @@ const DashboardMainContent: React.FC = () => {
           {/* Hero Welcome Banner */}
           <WelcomeBanner
             student={mockStudentProfile}
-            onRegisterOjt={() =>
-              openAIConsult('Cổng đăng ký OJT sẽ mở tiếp nhận hồ sơ doanh nghiệp khi nào?')
-            }
-            onViewRoadmap={() =>
-              openAIConsult('Đang xem lộ trình chi tiết các môn học và điều kiện OJT.')
-            }
+            menuId="dashboard"
+            primaryAction={{
+              label: 'Đăng ký OJT',
+              onClick: () =>
+                openAIConsult('Cổng đăng ký OJT sẽ mở tiếp nhận hồ sơ doanh nghiệp khi nào?'),
+            }}
+            secondaryAction={{
+              label: 'Xem lộ trình OJT',
+              onClick: () =>
+                openAIConsult('Đang xem lộ trình chi tiết các môn học và điều kiện OJT.'),
+            }}
           />
 
           {/* 4 Metric Stats Cards */}

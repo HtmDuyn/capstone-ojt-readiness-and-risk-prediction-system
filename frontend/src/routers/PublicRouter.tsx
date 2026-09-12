@@ -9,7 +9,8 @@ import LoginPage from "../pages/LoginPage";
 import PrivateRoute from "./PrivateRouter";
 
 import StudentDashboard from "../pages/Students/StudentDashboard";
-import StudentAcademicProfile from "../pages/Students/StudentAcademicProfile";
+import StudentAcademicProfile from "../pages/Students/StudentProfile";
+import StudentFeaturePage from "../pages/Students/StudentFeaturePage";
 
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from public-only pages (login/register).
@@ -41,6 +42,13 @@ const router = createBrowserRouter([
     children: [
       { path: "/dashboard", element: <StudentDashboard /> },
       { path: "/academic-profile", element: <StudentAcademicProfile /> },
+      { path: "/risk-prediction", element: <StudentFeaturePage /> },
+      { path: "/roadmap-consulting", element: <StudentFeaturePage /> },
+      { path: "/ojt-registration", element: <StudentFeaturePage /> },
+      { path: "/ojt-profile", element: <StudentFeaturePage /> },
+      { path: "/internship-progress", element: <StudentFeaturePage /> },
+      { path: "/evaluation-results", element: <StudentFeaturePage /> },
+      { path: "/notifications", element: <StudentFeaturePage /> },
     ],
   },
 

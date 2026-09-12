@@ -2,29 +2,10 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FptLogoIcon,
-  DashboardGridIcon,
-  AcademicCapIcon,
-  RiskAnalyticsIcon,
-  RoadmapConsultingIcon,
-  OjtRegisterIcon,
-  OjtProfileIcon,
-  InternshipProgressIcon,
-  EvaluationResultsIcon,
-  NotificationBellIcon,
-  BotSparkleIcon,
-  HelpCircleIcon,
   CloseIcon,
   SignOutIcon,
 } from './icons/DashboardIcons';
-
-interface NavItem {
-  id: string;
-  label: string;
-  path: string;
-  icon: React.ReactNode;
-  hasBadge?: boolean;
-  badgeDot?: boolean;
-}
+import { STUDENT_NAV_ITEMS } from '../../config/studentMenuConfig';
 
 interface SidebarProps {
   isOpenMobile?: boolean;
@@ -43,65 +24,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Expanded if mouse is hovering (desktop) or mobile menu is explicitly open
   const isExpanded = isHovered || isOpenMobile;
-
-  const navItems: NavItem[] = [
-    {
-      id: 'dashboard',
-      label: 'Dashboard',
-      path: '/dashboard',
-      icon: <DashboardGridIcon size={20} />,
-    },
-    {
-      id: 'academic-profile',
-      label: 'Hồ sơ học tập',
-      path: '/academic-profile',
-      icon: <AcademicCapIcon size={20} />,
-    },
-    {
-      id: 'risk-prediction',
-      label: 'AI Dự báo rủi ro',
-      path: '/risk-prediction',
-      icon: <RiskAnalyticsIcon size={20} />,
-    },
-    {
-      id: 'roadmap-consulting',
-      label: 'AI Tư vấn lộ trình',
-      path: '/roadmap-consulting',
-      icon: <RoadmapConsultingIcon size={20} />,
-    },
-    {
-      id: 'ojt-registration',
-      label: 'Đăng ký OJT',
-      path: '/ojt-registration',
-      icon: <OjtRegisterIcon size={20} />,
-    },
-    {
-      id: 'ojt-profile',
-      label: 'Hồ sơ OJT',
-      path: '/ojt-profile',
-      icon: <OjtProfileIcon size={20} />,
-    },
-    {
-      id: 'internship-progress',
-      label: 'Tiến độ thực tập',
-      path: '/internship-progress',
-      icon: <InternshipProgressIcon size={20} />,
-    },
-    {
-      id: 'evaluation-results',
-      label: 'Kết quả đánh giá',
-      path: '/evaluation-results',
-      icon: <EvaluationResultsIcon size={20} />,
-    },
-    {
-      id: 'notifications',
-      label: 'Thông báo',
-      path: '/notifications',
-      icon: <NotificationBellIcon size={20} />,
-      hasBadge: true,
-      badgeDot: true,
-    },
-  ];
 
   return (
     <>
@@ -158,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation List */}
         <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1.5 custom-scrollbar overflow-x-hidden">
-          {navItems.map((item) => {
+          {STUDENT_NAV_ITEMS.map((item) => {
             const isActive =
               location.pathname === item.path ||
               (item.id === 'dashboard' && (location.pathname === '/dashboard' || location.pathname === '/dashboard/student'));
@@ -170,11 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title={!isExpanded ? item.label : undefined}
                 onClick={() => {
                   if (onCloseMobile) onCloseMobile();
-                  if (item.path === '/academic-profile' || item.path === '/dashboard') {
-                    navigate(item.path);
-                  } else {
-                    alert(`Tính năng "${item.label}" đang được phát triển trong giai đoạn tiếp theo!`);
-                  }
+                  navigate(item.path);
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${isActive
                     ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-600/30 font-semibold'

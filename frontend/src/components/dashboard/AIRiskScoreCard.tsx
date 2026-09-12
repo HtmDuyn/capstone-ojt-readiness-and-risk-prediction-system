@@ -123,7 +123,7 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
   }, [data, riskTheme.primary]);
 
   return (
-    <div className="bg-white/75 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-white/80 shadow-md flex flex-col items-center relative">
+    <div className="card-glass p-5 sm:p-6 flex flex-col items-center relative">
       {/* Header with Title and Info Tooltip */}
       <div className="w-full flex items-center justify-between mb-2">
         <h3 className="text-sm sm:text-base font-bold text-slate-900 font-outfit">

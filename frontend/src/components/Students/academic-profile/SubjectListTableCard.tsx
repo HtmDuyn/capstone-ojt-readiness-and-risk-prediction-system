@@ -1,171 +1,151 @@
 import React, { useState, useMemo } from 'react';
-import type { SubjectItem, SubjectStatus } from '../../../types/students/academicProfileTypes';
+import type { SubjectStatus } from '../../../types/students/academicProfileTypes';
 import { mockSubjectList } from '../../../data/mockAcademicProfileData';
-import {
-  DownloadIcon,
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from '../../dashboard/icons/DashboardIcons';
+import { DownloadIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '../../dashboard/icons/DashboardIcons';
+import { useStudentAIConsult } from '../../../layouts/StudentLayout';
 
+/* ─── Status Badge ─────────────────────────────────────────── */
+const STATUS_CONFIG: Record<SubjectStatus, { label: string; dot: string; pill: string }> = {
+  in_progress: {
+    label: 'Đang học',
+    dot: 'bg-orange-500 animate-pulse',
+    pill: 'bg-orange-100/80 text-orange-700 border-orange-200',
+  },
+  completed: {
+    label: 'Hoàn thành',
+    dot: 'bg-emerald-500',
+    pill: 'bg-emerald-100/80 text-emerald-700 border-emerald-200',
+  },
+  failed: {
+    label: 'Chưa đạt',
+    dot: 'bg-rose-500',
+    pill: 'bg-rose-100/80 text-rose-700 border-rose-200',
+  },
+  not_started: {
+    label: 'Chưa học',
+    dot: 'bg-slate-400',
+    pill: 'bg-slate-100 text-slate-600 border-slate-200',
+  },
+};
+
+const StatusBadge: React.FC<{ status: SubjectStatus }> = ({ status }) => {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.not_started;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs ${cfg.pill}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+};
+
+/* ─── Filter Options ───────────────────────────────────────── */
+const FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'Tất cả trạng thái' },
+  { value: 'in_progress', label: 'Đang học' },
+  { value: 'completed', label: 'Hoàn thành' },
+  { value: 'failed', label: 'Chưa đạt' },
+  { value: 'not_started', label: 'Chưa học' },
+];
+
+const ITEMS_PER_PAGE = 5;
+const MAX_PAGE_VISIBLE = 4;
+
+/* ─── Component ────────────────────────────────────────────── */
 export const SubjectListTableCard: React.FC = () => {
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 5;
+  const { openAIConsult } = useStudentAIConsult();
+  const [filter, setFilter] = useState<string>('all');
+  const [page, setPage] = useState<number>(1);
 
-  // Filter subjects based on selected dropdown value
-  const filteredSubjects = useMemo(() => {
-    if (selectedStatusFilter === 'all') return mockSubjectList;
-    return mockSubjectList.filter((sub) => sub.status === selectedStatusFilter);
-  }, [selectedStatusFilter]);
+  const filtered = useMemo(
+    () => (filter === 'all' ? mockSubjectList : mockSubjectList.filter((s) => s.status === filter)),
+    [filter]
+  );
 
-  const totalPages = Math.ceil(filteredSubjects.length / itemsPerPage) || 1;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const currentItems = useMemo(
+    () => filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE),
+    [filtered, page]
+  );
 
-  // Paginated items for current page
-  const currentItems = useMemo(() => {
-    const startIdx = (currentPage - 1) * itemsPerPage;
-    return filteredSubjects.slice(startIdx, startIdx + itemsPerPage);
-  }, [filteredSubjects, currentPage]);
+  const pageNumbers = useMemo(() => {
+    let start = Math.max(1, page - 1);
+    const end = Math.min(totalPages, start + MAX_PAGE_VISIBLE - 1);
+    if (end - start + 1 < MAX_PAGE_VISIBLE) start = Math.max(1, end - MAX_PAGE_VISIBLE + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, [page, totalPages]);
 
-  const renderStatusBadge = (status: SubjectStatus) => {
-    switch (status) {
-      case 'in_progress':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-100/80 text-orange-700 border border-orange-200 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-            Đang học
-          </span>
-        );
-      case 'completed':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100/80 text-emerald-700 border border-emerald-200 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Hoàn thành
-          </span>
-        );
-      case 'failed':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100/80 text-rose-700 border border-rose-200 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            Chưa đạt
-          </span>
-        );
-      case 'not_started':
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-            Chưa học
-          </span>
-        );
-    }
-  };
-
-  // Generate pagination numbers (window of pages around current page)
-  const paginationPages = useMemo(() => {
-    const pages: number[] = [];
-    const maxVisible = 4;
-    let start = Math.max(1, currentPage - 1);
-    let end = Math.min(totalPages, start + maxVisible - 1);
-
-    if (end - start + 1 < maxVisible) {
-      start = Math.max(1, end - maxVisible + 1);
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-    return pages;
-  }, [currentPage, totalPages]);
+  const handleFilterChange = (v: string) => { setFilter(v); setPage(1); };
 
   return (
-    <div className="bg-white/75 backdrop-blur-xl border border-white/80 rounded-2xl p-5 sm:p-6 shadow-md shadow-slate-200/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between h-full">
+    <div className="card-glass p-5 sm:p-6 flex flex-col h-full">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <h3 className="text-base sm:text-lg font-bold text-slate-800 font-outfit tracking-tight">
           Danh sách môn học
         </h3>
 
-        <div className="flex items-center gap-2.5">
-          {/* Status Filter Dropdown */}
+        <div className="flex items-center gap-2">
+          {/* Filter Dropdown */}
           <div className="relative">
             <select
-              value={selectedStatusFilter}
-              onChange={(e) => {
-                setSelectedStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-2 pr-9 text-xs sm:text-sm font-semibold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 shadow-2xs font-outfit cursor-pointer"
+              value={filter}
+              onChange={(e) => handleFilterChange(e.target.value)}
+              className="appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-2 pr-8 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 shadow-2xs font-outfit cursor-pointer"
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="in_progress">Đang học</option>
-              <option value="completed">Hoàn thành</option>
-              <option value="failed">Chưa đạt</option>
-              <option value="not_started">Chưa học</option>
+              {FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
             </select>
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <ChevronDownIcon size={14} />
-            </div>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+              <ChevronDownIcon size={13} />
+            </span>
           </div>
 
-          {/* Export / Download Button */}
+          {/* Export Button */}
           <button
             type="button"
-            onClick={() => alert('Xuất danh sách môn học dưới dạng CSV / Excel!')}
-            className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors shadow-2xs cursor-pointer"
-            title="Tải xuống danh sách môn học"
+            onClick={() =>
+              openAIConsult('Tôi muốn xuất danh sách môn học ra file Excel/CSV. Hướng dẫn cách thực hiện?')
+            }
+            className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 rounded-xl transition-colors shadow-2xs cursor-pointer"
+            title="Xuất danh sách"
           >
-            <DownloadIcon size={18} />
+            <DownloadIcon size={17} />
           </button>
         </div>
       </div>
 
-      {/* Table Area (Horizontal scroll on mobile with min-w-[620px]) */}
-      <div className="overflow-x-auto custom-scrollbar rounded-xl border border-slate-200/60 bg-white/40">
-        <table className="w-full text-left border-collapse min-w-[620px]">
+      {/* Table */}
+      <div className="flex-1 overflow-x-auto rounded-xl border border-slate-200/60 bg-white/40">
+        <table className="w-full text-left border-collapse min-w-[580px]">
           <thead>
-            <tr className="border-b border-slate-200/70 bg-slate-50/60 text-[11px] sm:text-xs font-bold text-slate-600 tracking-wider font-outfit">
-              <th className="py-3.5 px-4">MÃ MÔN</th>
-              <th className="py-3.5 px-4">TÊN MÔN</th>
-              <th className="py-3.5 px-4 text-center">SỐ TÍN CHỈ</th>
-              <th className="py-3.5 px-4 text-center">TRẠNG THÁI</th>
-              <th className="py-3.5 px-4">ĐIỀU KIỆN TIÊN QUYẾT</th>
+            <tr className="border-b border-slate-200/70 bg-slate-50/70 text-[11px] font-bold text-slate-500 tracking-wider font-outfit uppercase">
+              <th className="py-3 px-4">Mã môn</th>
+              <th className="py-3 px-4">Tên môn học</th>
+              <th className="py-3 px-4 text-center">TC</th>
+              <th className="py-3 px-4 text-center">Trạng thái</th>
+              <th className="py-3 px-4">Tiên quyết</th>
             </tr>
           </thead>
-
           <tbody className="divide-y divide-slate-100 text-xs sm:text-sm font-outfit">
-            {currentItems.map((subject) => (
-              <tr key={subject.id} className="hover:bg-orange-50/30 transition-colors">
-                {/* Code */}
-                <td className="py-4 px-4 font-bold text-amber-700 tracking-tight whitespace-nowrap">
-                  {subject.code}
+            {currentItems.map((s) => (
+              <tr key={s.id} className="hover:bg-orange-50/30 transition-colors">
+                <td className="py-3.5 px-4 font-bold text-amber-700 tracking-tight whitespace-nowrap">
+                  {s.code}
                 </td>
-
-                {/* Name */}
-                <td className="py-4 px-4 font-semibold text-slate-800">
-                  {subject.name}
+                <td className="py-3.5 px-4 font-semibold text-slate-800">{s.name}</td>
+                <td className="py-3.5 px-4 text-center font-bold text-slate-700">{s.credits}</td>
+                <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                  <StatusBadge status={s.status} />
                 </td>
-
-                {/* Credits */}
-                <td className="py-4 px-4 text-center font-bold text-slate-700">
-                  {subject.credits}
-                </td>
-
-                {/* Status */}
-                <td className="py-4 px-4 text-center whitespace-nowrap">
-                  {renderStatusBadge(subject.status)}
-                </td>
-
-                {/* Prerequisites */}
-                <td className="py-4 px-4 text-slate-600 font-medium">
-                  {subject.prerequisites.length > 0 ? subject.prerequisites.join(', ') : '—'}
+                <td className="py-3.5 px-4 text-slate-500 font-medium">
+                  {s.prerequisites.length > 0 ? s.prerequisites.join(', ') : '—'}
                 </td>
               </tr>
             ))}
-
             {currentItems.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400 italic">
+                <td colSpan={5} className="py-10 text-center text-slate-400 italic text-sm">
                   Không tìm thấy môn học nào phù hợp.
                 </td>
               </tr>
@@ -174,48 +154,46 @@ export const SubjectListTableCard: React.FC = () => {
         </table>
       </div>
 
-      {/* Table Footer & Pagination */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 pt-2 text-xs text-slate-500 font-outfit">
-        <div>
-          Hiển thị <span className="font-bold text-slate-800">{currentItems.length}</span> trên{' '}
-          <span className="font-bold text-slate-800">{filteredSubjects.length}</span> môn học
-        </div>
+      {/* Pagination */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-1 text-xs text-slate-500 font-outfit">
+        <span>
+          Hiển thị <strong className="text-slate-800">{currentItems.length}</strong> / <strong className="text-slate-800">{filtered.length}</strong> môn học
+        </span>
 
-        {/* Pagination Buttons */}
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
             className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="Trang trước"
           >
-            <ChevronLeftIcon size={14} />
+            <ChevronLeftIcon size={13} />
           </button>
 
-          {paginationPages.map((page) => (
+          {pageNumbers.map((n) => (
             <button
-              key={page}
+              key={n}
               type="button"
-              onClick={() => setCurrentPage(page)}
+              onClick={() => setPage(n)}
               className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold font-outfit transition-all cursor-pointer ${
-                currentPage === page
+                page === n
                   ? 'bg-amber-700 text-white shadow-xs'
                   : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
-              {page}
+              {n}
             </button>
           ))}
 
           <button
             type="button"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
             className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="Trang sau"
           >
-            <ChevronRightIcon size={14} />
+            <ChevronRightIcon size={13} />
           </button>
         </div>
       </div>
