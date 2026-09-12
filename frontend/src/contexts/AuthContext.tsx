@@ -5,28 +5,13 @@ import React, {
   useCallback,
   type ReactNode,
 } from "react";
+import type {
+  UserRole,
+  AuthUser,
+  AuthContextValue,
+} from "../types/auth.types";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export type UserRole = "student" | "education" | "qh" | "enterprise" | "admin";
-
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  avatar?: string;
-}
-
-export interface AuthContextValue {
-  user: AuthUser | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (token: string, user: AuthUser) => void;
-  logout: () => void;
-  updateUser: (partial: Partial<AuthUser>) => void;
-}
+export type { UserRole, AuthUser, AuthContextValue };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 

@@ -1,103 +1,69 @@
-import React from "react";
-import {
-  createBrowserRouter,
-  Navigate,
-  Outlet,
-} from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
-import LoginPage from "../pages/LoginPage";
-import PrivateRoute from "./PrivateRouter";
+import React from 'react';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
+import { GuestRoute, PrivateRoute } from './PrivateRouter';
+import { BaseLayout } from '@/layouts/BaseLayout';
+import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
+import LoginPage from '@/pages/auth/LoginPage';
+import StudentDashboard from '@/pages/student/StudentDashboard';
+import StudentAcademicProfile from '@/pages/student/StudentAcademicProfile';
+import StudentFeaturePage from '@/pages/student/StudentFeaturePage';
 
-import StudentDashboard from "../pages/Students/StudentDashboard";
-import StudentAcademicProfile from "../pages/Students/StudentProfile";
-import StudentFeaturePage from "../pages/Students/StudentFeaturePage";
+// Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
+const studentRoutes: RouteObject = {
+  element: (
+    <BaseLayout
+      navItems={STUDENT_NAV_ITEMS}
+      homePath="/student/dashboard"
+      brandSubtitle="Cổng Sinh viên"
+    />
+  ),
+  children: [
+    // Route chính của sinh viên.
+    { path: '/student', element: <Navigate to="/student/dashboard" replace /> },
+    { path: '/student/dashboard', element: <StudentDashboard /> },
+    { path: '/student/academic-profile', element: <StudentAcademicProfile /> },
+    { path: '/student/risk-prediction', element: <StudentFeaturePage /> },
+    { path: '/student/roadmap-consulting', element: <StudentFeaturePage /> },
+    { path: '/student/ojt-registration', element: <StudentFeaturePage /> },
+    { path: '/student/ojt-profile', element: <StudentFeaturePage /> },
+    { path: '/student/internship-progress', element: <StudentFeaturePage /> },
+    { path: '/student/evaluation-results', element: <StudentFeaturePage /> },
+    { path: '/student/notifications', element: <StudentFeaturePage /> },
 
-// ─── GuestRoute ───────────────────────────────────────────────────────────────
-// Redirects already-authenticated users away from public-only pages (login/register).
-
-const GuestRoute: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) return null; // Avoid flicker during hydration
-
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />;
+    // Alias giữ tương thích với các đường dẫn cũ.
+    { path: '/dashboard', element: <Navigate to="/student/dashboard" replace /> },
+    { path: '/dashboard/student', element: <Navigate to="/student/dashboard" replace /> },
+    { path: '/dashboard/academic-profile', element: <Navigate to="/student/academic-profile" replace /> },
+    { path: '/academic-profile', element: <Navigate to="/student/academic-profile" replace /> },
+    { path: '/risk-prediction', element: <Navigate to="/student/risk-prediction" replace /> },
+    { path: '/roadmap-consulting', element: <Navigate to="/student/roadmap-consulting" replace /> },
+    { path: '/ojt-registration', element: <Navigate to="/student/ojt-registration" replace /> },
+    { path: '/ojt-profile', element: <Navigate to="/student/ojt-profile" replace /> },
+    { path: '/internship-progress', element: <Navigate to="/student/internship-progress" replace /> },
+    { path: '/evaluation-results', element: <Navigate to="/student/evaluation-results" replace /> },
+    { path: '/notifications', element: <Navigate to="/student/notifications" replace /> },
+  ],
 };
 
-// ─── Router ───────────────────────────────────────────────────────────────────
-
-const router = createBrowserRouter([
-  // ── Public / Guest routes (redirect to /dashboard if already logged in) ──
+export const router = createBrowserRouter([
+  // Route công khai: người đã đăng nhập sẽ được chuyển về dashboard theo role.
   {
     element: <GuestRoute />,
     children: [
       { index: true, element: <Navigate to="/login" replace /> },
-      { path: "/login", element: <LoginPage /> },
-      { path: "/register", element: <LoginPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <LoginPage /> },
     ],
   },
 
-  // ── Protected routes (require authentication) ──────────────────────────────
+  // Route sinh viên: chỉ tài khoản student được phép truy cập.
   {
-    element: <PrivateRoute />, // any authenticated role
-    children: [
-      { path: "/dashboard", element: <StudentDashboard /> },
-      { path: "/academic-profile", element: <StudentAcademicProfile /> },
-      { path: "/risk-prediction", element: <StudentFeaturePage /> },
-      { path: "/roadmap-consulting", element: <StudentFeaturePage /> },
-      { path: "/ojt-registration", element: <StudentFeaturePage /> },
-      { path: "/ojt-profile", element: <StudentFeaturePage /> },
-      { path: "/internship-progress", element: <StudentFeaturePage /> },
-      { path: "/evaluation-results", element: <StudentFeaturePage /> },
-      { path: "/notifications", element: <StudentFeaturePage /> },
-    ],
+    element: <PrivateRoute allowedRoles={['student']} />,
+    children: [studentRoutes],
   },
 
-  // ── Student-only routes ────────────────────────────────────────────────────
-  {
-    element: <PrivateRoute allowedRoles={["student"]} />,
-    children: [
-      { path: "/dashboard/student", element: <StudentDashboard /> },
-      { path: "/dashboard/academic-profile", element: <StudentAcademicProfile /> },
-    ],
-  },
-
-  // ── Education staff routes ─────────────────────────────────────────────────
-  {
-    element: <PrivateRoute allowedRoles={["education"]} />,
-    children: [
-      // TODO: Add education routes here
-    ],
-  },
-
-  // ── Enterprise routes ──────────────────────────────────────────────────────
-  {
-    element: <PrivateRoute allowedRoles={["enterprise"]} />,
-    children: [
-      // TODO: Add enterprise routes here
-    ],
-  },
-
-  // ── Quan hệ doanh nghiệp routes ────────────────────────────────────────────
-  {
-    element: <PrivateRoute allowedRoles={["qh"]} />,
-    children: [
-      // TODO: Add qh routes here
-    ],
-  },
-
-  // ── Admin routes ───────────────────────────────────────────────────────────
-  {
-    element: <PrivateRoute allowedRoles={["admin"]} unauthorizedRedirectTo="/dashboard" />,
-    children: [
-      // TODO: Add admin routes here
-    ],
-  },
-
-  // ── 404 Fallback ───────────────────────────────────────────────────────────
-  {
-    path: "*",
-    element: <Navigate to="/login" replace />,
-  },
+  // Các nhóm route role khác sẽ được bổ sung tại đây.
+  // Mỗi role nên có một PrivateRoute với allowedRoles riêng.
 ]);
 
 export default router;
