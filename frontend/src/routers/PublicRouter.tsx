@@ -2,17 +2,61 @@ import React from 'react';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { GuestRoute, PrivateRoute } from './PrivateRouter';
 import { BaseLayout } from '@/layouts/BaseLayout';
-import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
+import { getMenuByRole } from '@/config';
 import LoginPage from '@/pages/auth/LoginPage';
 import StudentDashboard from '@/pages/student/StudentDashboard';
 import StudentAcademicProfile from '@/pages/student/StudentAcademicProfile';
 import StudentFeaturePage from '@/pages/student/StudentFeaturePage';
+import type { UserRole } from '@/types/auth.types';
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  student: 'Sinh viên',
+  admin: 'Quản trị viên',
+  education: 'Phòng Đào tạo',
+  enterprise: 'Doanh nghiệp',
+  qhdn: 'Phòng Quan hệ Doanh nghiệp',
+};
+
+// Màn hình tạm thời cho các phân hệ chưa có trang nghiệp vụ riêng.
+const RolePlaceholderPage: React.FC<{ role: UserRole }> = ({ role }) => (
+  <div className="card-glass p-8 sm:p-12 text-center min-h-[360px] flex flex-col items-center justify-center">
+    <div className="w-16 h-16 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-2xl font-bold">
+      {ROLE_LABELS[role].charAt(0)}
+    </div>
+    <h1 className="mt-5 text-2xl font-extrabold text-slate-900">
+      Cổng {ROLE_LABELS[role]}
+    </h1>
+    <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">
+      Phân hệ này đang được hoàn thiện. Bạn đã đăng nhập đúng vai trò và có thể sử dụng menu bên trái khi các chức năng được triển khai.
+    </p>
+  </div>
+);
+
+// Tạo route dùng chung cho các role chưa có dashboard nghiệp vụ hoàn chỉnh.
+const createRoleRoutes = (role: Exclude<UserRole, 'student'>): RouteObject => {
+  const navItems = getMenuByRole(role);
+
+  return {
+    element: (
+      <BaseLayout
+        navItems={navItems}
+        homePath={navItems[0]?.path || `/${role}/dashboard`}
+        brandSubtitle={ROLE_LABELS[role]}
+        showAIConsult={false}
+      />
+    ),
+    children: navItems.map((item) => ({
+      path: item.path,
+      element: <RolePlaceholderPage role={role} />,
+    })),
+  };
+};
 
 // Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
 const studentRoutes: RouteObject = {
   element: (
     <BaseLayout
-      navItems={STUDENT_NAV_ITEMS}
+      navItems={getMenuByRole('student')}
       homePath="/student/dashboard"
       brandSubtitle="Cổng Sinh viên"
     />
@@ -62,8 +106,29 @@ export const router = createBrowserRouter([
     children: [studentRoutes],
   },
 
-  // Các nhóm route role khác sẽ được bổ sung tại đây.
-  // Mỗi role nên có một PrivateRoute với allowedRoles riêng.
+  // Các role còn lại dùng layout chung và trang tạm trong khi chờ nghiệp vụ.
+  {
+    element: <PrivateRoute allowedRoles={['admin']} />,
+    children: [createRoleRoutes('admin')],
+  },
+  {
+    element: <PrivateRoute allowedRoles={['education']} />,
+    children: [createRoleRoutes('education')],
+  },
+  {
+    element: <PrivateRoute allowedRoles={['qhdn']} />,
+    children: [createRoleRoutes('qhdn')],
+  },
+  {
+    element: <PrivateRoute allowedRoles={['enterprise']} />,
+    children: [createRoleRoutes('enterprise')],
+  },
+
+  // URL không tồn tại luôn quay về login thay vì hiển thị trang 404 mặc định.
+  {
+    path: '*',
+    element: <Navigate to="/login" replace />,
+  },
 ]);
 
 export default router;

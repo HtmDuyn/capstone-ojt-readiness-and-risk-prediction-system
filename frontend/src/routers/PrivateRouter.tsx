@@ -48,16 +48,17 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
 
   if (isLoading) return <AuthLoadingScreen />;
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    if (unauthorizedRedirectTo) {
-      return <Navigate to={unauthorizedRedirectTo} replace />;
-    }
-
-    return <Navigate to={getDashboardByRole(user.role)} replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return (
+      <Navigate
+        to={unauthorizedRedirectTo || getDashboardByRole(user.role)}
+        replace
+      />
+    );
   }
 
   return <Outlet />;

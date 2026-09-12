@@ -8,7 +8,6 @@ import { AIConsultModal } from '@/components/common/AIConsultModal';
 import { BotSparkleIcon } from '@/components/common/icons/AppIcons';
 import { mockStudentProfile } from '@/data/student/mockStudentData';
 import type { NavItem } from '@/types/common.types';
-import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
 
 interface BaseLayoutContextType {
   openAIConsult: (query?: string) => void;
@@ -23,7 +22,7 @@ export const useBaseLayout = () => useContext(BaseLayoutContext);
 export const useStudentAIConsult = useBaseLayout;
 
 export interface BaseLayoutProps {
-  navItems?: NavItem[];
+  navItems: NavItem[];
   homePath?: string;
   brandTitle?: string;
   brandSubtitle?: string;
@@ -33,7 +32,7 @@ export interface BaseLayoutProps {
 }
 
 export const BaseLayout: React.FC<BaseLayoutProps> = ({
-  navItems = STUDENT_NAV_ITEMS,
+  navItems,
   homePath = '/student/dashboard',
   brandTitle = 'FPT University',
   brandSubtitle = 'Hệ thống quản lý',
@@ -145,12 +144,5 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
     </BaseLayoutContext.Provider>
   );
 };
-
-// Also export StudentLayout wrapper for backwards compatibility
-export const StudentLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
-  <BaseLayout navItems={STUDENT_NAV_ITEMS} homePath="/student/dashboard">
-    {children}
-  </BaseLayout>
-);
 
 export default BaseLayout;

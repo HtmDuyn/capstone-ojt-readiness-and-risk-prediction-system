@@ -6,10 +6,9 @@ import {
   SignOutIcon,
 } from './icons/AppIcons';
 import type { NavItem } from '@/types/common.types';
-import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
 
 interface SidebarProps {
-  navItems?: NavItem[];
+  navItems: NavItem[];
   title?: string;
   subtitle?: string;
   homePath?: string;
@@ -19,7 +18,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  navItems = STUDENT_NAV_ITEMS,
+  navItems,
   title = 'FPT University',
   subtitle = 'Hệ thống quản lý',
   homePath = '/student/dashboard',
@@ -94,9 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1.5 custom-scrollbar overflow-x-hidden">
           {navItems.map((item) => {
             const currentPath = location.pathname;
-            const isActive =
-              currentPath === item.path ||
-              (item.id === 'dashboard' && (currentPath === '/dashboard' || currentPath === '/dashboard/student' || currentPath === '/student/dashboard'));
+            const isActive = currentPath === item.path;
 
             return (
               <button
