@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RecentActivity } from '../../types/studentDashboardTypes';
+import type { RecentActivity } from '../../types/students/studentDashboardTypes';
 
 interface RecentActivityCardProps {
   activities: RecentActivity[];
@@ -13,7 +13,7 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
       case 'green':
         return 'bg-emerald-500 ring-4 ring-emerald-100';
       case 'blue':
-        return 'bg-blue-600 ring-4 ring-blue-100';
+        return 'bg-purple-600 ring-4 ring-purple-100';
       case 'orange':
         return 'bg-orange-500 ring-4 ring-orange-100';
       default:
@@ -22,14 +22,14 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs">
+    <div className="bg-white/75 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-white/80 shadow-md">
       <h3 className="text-sm sm:text-base font-bold text-slate-900 font-outfit mb-4">
         Hoạt động gần đây
       </h3>
 
       <div className="relative pl-6 space-y-4">
         {/* Continuous vertical timeline connector line */}
-        <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-slate-200" />
+        <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-slate-200/80" />
 
         {activities.map((act) => (
           <div key={act.id} className="relative flex items-start">

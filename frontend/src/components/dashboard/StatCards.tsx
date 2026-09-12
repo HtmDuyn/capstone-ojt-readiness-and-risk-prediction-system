@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendUpIcon, ClockIcon } from './icons/DashboardIcons';
-import type { StudentProfile } from '../../types/studentDashboardTypes';
+import type { StudentProfile } from '../../types/students/studentDashboardTypes';
 
 interface StatCardsProps {
   student: StudentProfile;
@@ -15,7 +15,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {/* Card 1: GPA HIỆN TẠI */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             GPA Hiện tại
@@ -25,7 +25,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
           </div>
         </div>
         <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600">
-          <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+          <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
             <TrendUpIcon size={12} />
             <span>+{student.gpaChange.toFixed(2)}</span>
           </span>
@@ -34,7 +34,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
       </div>
 
       {/* Card 2: TÍN CHỈ TÍCH LŨY */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             Tín chỉ tích lũy
@@ -46,7 +46,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
         <div className="mt-4">
           <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full rounded-full bg-blue-600 transition-all duration-1000 ease-out"
+              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-1000 ease-out shadow-xs shadow-orange-500/30"
               style={{ width: `${creditPercent}%` }}
             />
           </div>
@@ -54,7 +54,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
       </div>
 
       {/* Card 3: TÍN CHỈ CÒN THIẾU */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             Tín chỉ còn thiếu
@@ -70,7 +70,7 @@ export const StatCards: React.FC<StatCardsProps> = ({ student }) => {
       </div>
 
       {/* Card 4: ĐIỀU KIỆN OJT */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+      <div className="bg-white/75 backdrop-blur-xl rounded-2xl p-5 border border-white/80 shadow-md hover:shadow-xl hover:border-orange-300/80 transition-all flex flex-col justify-between">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-outfit">
             Điều kiện OJT

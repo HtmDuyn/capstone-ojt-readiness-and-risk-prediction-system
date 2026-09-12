@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DeadlineItem } from '../../types/studentDashboardTypes';
+import type { DeadlineItem } from '../../types/students/studentDashboardTypes';
 
 interface UpcomingDeadlinesCardProps {
   deadlines: DeadlineItem[];
@@ -15,7 +15,7 @@ export const UpcomingDeadlinesCard: React.FC<UpcomingDeadlinesCardProps> = ({
       case 'orange':
         return 'bg-orange-50 text-orange-600 border-orange-200';
       case 'blue':
-        return 'bg-blue-50 text-blue-600 border-blue-200';
+        return 'bg-purple-50 text-purple-600 border-purple-200';
       case 'slate':
       default:
         return 'bg-slate-100 text-slate-600 border-slate-200';
@@ -23,7 +23,7 @@ export const UpcomingDeadlinesCard: React.FC<UpcomingDeadlinesCardProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs">
+    <div className="bg-white/75 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-white/80 shadow-md">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm sm:text-base font-bold text-slate-900 font-outfit">
@@ -32,7 +32,7 @@ export const UpcomingDeadlinesCard: React.FC<UpcomingDeadlinesCardProps> = ({
         <button
           type="button"
           onClick={onViewAll}
-          className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline transition-colors"
+          className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline transition-colors cursor-pointer"
         >
           Xem tất cả
         </button>
@@ -43,7 +43,7 @@ export const UpcomingDeadlinesCard: React.FC<UpcomingDeadlinesCardProps> = ({
         {deadlines.map((item) => (
           <div
             key={item.id}
-            className="flex items-start gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors"
+            className="flex items-start gap-3 p-2 rounded-xl hover:bg-orange-50/50 transition-colors"
           >
             {/* Calendar Date Block */}
             <div

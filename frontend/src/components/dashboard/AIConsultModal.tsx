@@ -4,7 +4,7 @@ import {
   CloseIcon,
   LightningIcon,
 } from './icons/DashboardIcons';
-import type { StudentProfile } from '../../types/studentDashboardTypes';
+import type { StudentProfile } from '../../types/students/studentDashboardTypes';
 
 interface AIConsultModalProps {
   isOpen: boolean;
@@ -72,12 +72,12 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/80 flex flex-col max-h-[85vh] overflow-hidden text-slate-800">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-gradient-to-r from-orange-500 via-amber-500 to-purple-600 text-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs border border-white/20">
               <BotSparkleIcon size={22} className="text-white" />
             </div>
             <div>
@@ -92,28 +92,28 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/20 text-white/90 transition-colors"
+            className="p-1.5 rounded-full hover:bg-white/20 text-white/90 transition-colors cursor-pointer"
           >
             <CloseIcon size={20} />
           </button>
         </div>
 
         {/* Quick Suggestion Chips */}
-        <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2 overflow-x-auto text-xs custom-scrollbar">
-          <span className="text-slate-400 text-[11px] font-semibold flex items-center gap-1">
+        <div className="p-3 bg-orange-50/50 border-b border-orange-100/60 flex items-center gap-2 overflow-x-auto text-xs custom-scrollbar">
+          <span className="text-slate-500 text-[11px] font-semibold flex items-center gap-1">
             <LightningIcon size={12} className="text-amber-500" /> Gợi ý:
           </span>
           <button
             type="button"
             onClick={() => handleSend('Tại sao điểm rủi ro của tôi là 72?')}
-            className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-600 whitespace-nowrap transition-colors"
+            className="px-2.5 py-1 rounded-full bg-white border border-orange-200/80 text-slate-700 hover:border-orange-500 hover:text-orange-600 whitespace-nowrap transition-colors cursor-pointer shadow-2xs"
           >
             Giải thích điểm rủi ro 72
           </button>
           <button
             type="button"
             onClick={() => handleSend('Tư vấn kỹ năng còn thiếu')}
-            className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-600 whitespace-nowrap transition-colors"
+            className="px-2.5 py-1 rounded-full bg-white border border-orange-200/80 text-slate-700 hover:border-orange-500 hover:text-orange-600 whitespace-nowrap transition-colors cursor-pointer shadow-2xs"
           >
             Kỹ năng cần bổ sung
           </button>
@@ -127,11 +127,10 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
               className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${
-                  m.sender === 'user'
-                    ? 'bg-[#ea580c] text-white rounded-br-none shadow-md shadow-orange-500/20'
-                    : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none shadow-xs'
-                }`}
+                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${m.sender === 'user'
+                  ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white rounded-br-none shadow-md shadow-orange-500/20 font-medium'
+                  : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none shadow-xs'
+                  }`}
               >
                 {m.text}
               </div>
@@ -157,7 +156,7 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           />
           <button
             type="submit"
-            className="px-4 py-2 rounded-full bg-[#ea580c] hover:bg-[#d94806] text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
+            className="btn-login px-5 py-2 rounded-full text-white text-xs sm:text-sm font-bold shadow-md shadow-orange-500/25 transition-transform active:scale-95 cursor-pointer"
           >
             Gửi
           </button>

@@ -19,9 +19,21 @@ import {
   Briefcase,
   Clock,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   LogOut,
+  Star,
+  Hourglass,
+  BookOpen,
+  Lock,
+  Download,
+  Filter,
+  ArrowRight,
+  ExternalLink,
+  MoreVertical,
+  CheckCircle2,
   LucideProps,
 } from 'lucide-react';
 
@@ -153,3 +165,52 @@ export const CloseIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 2, ...
 export const SignOutIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
   <LogOut size={size} strokeWidth={strokeWidth} {...props} />
 );
+
+export const StarIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Star size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const HourglassIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Hourglass size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const BookOpenIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <BookOpen size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const LockIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 1.8, ...props }) => (
+  <Lock size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const DownloadIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...props }) => (
+  <Download size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const FilterIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...props }) => (
+  <Filter size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const ArrowRightIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
+  <ArrowRight size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const ExternalLinkIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
+  <ExternalLink size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const MoreVerticalIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <MoreVertical size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const CheckCircleIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 2, ...props }) => (
+  <CheckCircle2 size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const ChevronRightIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
+  <ChevronRight size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const ChevronLeftIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
+  <ChevronLeft size={size} strokeWidth={strokeWidth} {...props} />
+);
+

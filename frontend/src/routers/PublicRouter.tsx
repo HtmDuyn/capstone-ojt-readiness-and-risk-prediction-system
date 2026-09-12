@@ -9,6 +9,7 @@ import LoginPage from "../pages/LoginPage";
 import PrivateRoute from "./PrivateRouter";
 
 import StudentDashboard from "../pages/Students/StudentDashboard";
+import StudentAcademicProfile from "../pages/Students/StudentAcademicProfile";
 
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from public-only pages (login/register).
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
     element: <PrivateRoute />, // any authenticated role
     children: [
       { path: "/dashboard", element: <StudentDashboard /> },
+      { path: "/academic-profile", element: <StudentAcademicProfile /> },
     ],
   },
 
@@ -47,6 +49,7 @@ const router = createBrowserRouter([
     element: <PrivateRoute allowedRoles={["student"]} />,
     children: [
       { path: "/dashboard/student", element: <StudentDashboard /> },
+      { path: "/dashboard/academic-profile", element: <StudentAcademicProfile /> },
     ],
   },
 

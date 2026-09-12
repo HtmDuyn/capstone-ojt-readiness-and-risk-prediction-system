@@ -5,7 +5,7 @@ import {
   GlobeIcon,
   MenuIcon,
 } from './icons/DashboardIcons';
-import type { StudentProfile } from '../../types/studentDashboardTypes';
+import type { StudentProfile } from '../../types/students/studentDashboardTypes';
 
 interface HeaderProps {
   student: StudentProfile;
@@ -34,13 +34,13 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-8 py-3.5 bg-white/80 backdrop-blur-md border-b border-slate-200/80">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-8 py-3.5 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow-xs text-slate-800">
       {/* Left: Mobile menu toggle + Search bar */}
       <div className="flex items-center gap-3 flex-1 max-w-xl">
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden focus:outline-none"
+          className="p-2 rounded-xl text-slate-600 hover:bg-orange-50 lg:hidden focus:outline-none"
           aria-label="Open menu"
         >
           <MenuIcon size={22} />
@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm kiếm tài liệu, lộ trình, OJT..."
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200/90 rounded-full placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all duration-200 shadow-2xs"
+            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-white/80 border border-orange-200/80 rounded-full placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all duration-200 shadow-2xs"
           />
         </div>
       </div>
@@ -66,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Notification Bell */}
         <button
           type="button"
-          className="relative p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+          className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors cursor-pointer"
           title="Thông báo"
         >
           <NotificationBellIcon size={20} />
@@ -77,21 +77,21 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={() => setLang((prev) => (prev === 'VI' ? 'EN' : 'VI'))}
-          className="p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors flex items-center gap-1 text-xs font-semibold"
+          className="p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
           title="Đổi ngôn ngữ"
         >
           <GlobeIcon size={18} />
           <span className="hidden sm:inline">{lang}</span>
         </button>
 
-        <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+        <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />
 
         {/* User Profile Info & Avatar */}
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setProfileOpen(!profileOpen)}
-            className="flex items-center gap-3 p-1 sm:px-2 sm:py-1 rounded-full sm:rounded-xl hover:bg-slate-100 transition-all text-left"
+            className="flex items-center gap-3 p-1 sm:px-2 sm:py-1 rounded-full sm:rounded-xl hover:bg-white/60 transition-all text-left cursor-pointer"
           >
             <div className="hidden md:block text-right">
               <div className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
@@ -106,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
               <img
                 src={student.avatar}
                 alt={student.fullName}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/30 shadow-xs"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/40 shadow-xs"
               />
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
             </div>
@@ -114,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Profile Dropdown */}
           {profileOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute right-0 mt-2 w-64 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="px-4 py-3 border-b border-slate-100">
                 <div className="font-bold text-slate-900 text-sm">{student.fullName}</div>
                 <div className="text-xs text-slate-500 truncate">{student.email}</div>

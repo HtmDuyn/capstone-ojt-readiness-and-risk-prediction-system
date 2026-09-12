@@ -7,7 +7,7 @@ import {
   TooltipItem,
 } from 'chart.js';
 import { InfoIcon } from './icons/DashboardIcons';
-import type { AIRiskScoreData } from '../../types/studentDashboardTypes';
+import type { AIRiskScoreData } from '../../types/students/studentDashboardTypes';
 
 ChartJS.register(ArcElement, DoughnutController, Tooltip);
 
@@ -26,16 +26,16 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
       case 'low':
         return {
           primary: '#10b981',
-          bg: '#ecfdf5',
-          text: 'text-emerald-600',
+          bg: 'bg-emerald-50',
+          text: 'text-emerald-700',
           border: 'border-emerald-200',
           glow: 'shadow-emerald-500/20',
         };
       case 'medium':
         return {
           primary: '#ea580c',
-          bg: '#fff7ed',
-          text: 'text-orange-600',
+          bg: 'bg-orange-50',
+          text: 'text-orange-700',
           border: 'border-orange-200',
           glow: 'shadow-orange-500/20',
         };
@@ -43,8 +43,8 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
       default:
         return {
           primary: '#ef4444',
-          bg: '#fef2f2',
-          text: 'text-red-600',
+          bg: 'bg-red-50',
+          text: 'text-red-700',
           border: 'border-red-200',
           glow: 'shadow-red-500/20',
         };
@@ -73,7 +73,7 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
           {
             data: [data.score, remaining],
             backgroundColor: [riskTheme.primary, '#f1f5f9'],
-            hoverBackgroundColor: [riskTheme.primary, '#f1f5f9'],
+            hoverBackgroundColor: [riskTheme.primary, '#e2e8f0'],
             borderWidth: 0,
             borderRadius: [10, 0],
           },
@@ -123,7 +123,7 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
   }, [data, riskTheme.primary]);
 
   return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col items-center relative">
+    <div className="bg-white/75 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-white/80 shadow-md flex flex-col items-center relative">
       {/* Header with Title and Info Tooltip */}
       <div className="w-full flex items-center justify-between mb-2">
         <h3 className="text-sm sm:text-base font-bold text-slate-900 font-outfit">
@@ -186,10 +186,10 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
               <span className="text-slate-500 font-medium">{f.label}</span>
               <span
                 className={`font-semibold ${f.impact === 'positive'
-                    ? 'text-emerald-600'
-                    : f.impact === 'negative'
-                      ? 'text-red-500'
-                      : 'text-slate-600'
+                  ? 'text-emerald-600'
+                  : f.impact === 'negative'
+                    ? 'text-red-500'
+                    : 'text-slate-600'
                   }`}
               >
                 {f.value}

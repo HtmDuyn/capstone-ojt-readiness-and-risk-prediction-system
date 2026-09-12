@@ -6,7 +6,7 @@ import type {
   AIRecommendation,
   DeadlineItem,
   RecentActivity,
-} from '../types/studentDashboardTypes';
+} from '../types/students/studentDashboardTypes';
 
 export const mockStudentProfile: StudentProfile = {
   id: 'stu-se150000',
