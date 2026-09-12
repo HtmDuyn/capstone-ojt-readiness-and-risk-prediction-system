@@ -5,11 +5,11 @@ import { getDashboardByRole } from "@/hooks/useRoleRedirect";
 import type { UserRole } from "@/types/auth.types";
 
 interface PrivateRouteProps {
-  /** Optional whitelist of roles allowed to access this route. */
+  /** Danh sách các vai trò được phép truy cập route này (tùy chọn). */
   allowedRoles?: UserRole[];
-  /** Where to redirect unauthenticated users (default: "/login"). */
+  /** Nơi chuyển hướng người dùng chưa xác thực (mặc định: "/login"). */
   redirectTo?: string;
-  /** Where to redirect users who lack the required role. */
+  /** Nơi chuyển hướng người dùng không có vai trò phù hợp. */
   unauthorizedRedirectTo?: string;
 }
 
@@ -24,7 +24,7 @@ const AuthLoadingScreen: React.FC = () => (
   </div>
 );
 
-/** Redirects authenticated users away from guest-only routes. */
+/** Chuyển hướng người dùng đã xác thực khỏi các route chỉ dành cho khách. */
 export const GuestRoute: React.FC = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -37,7 +37,7 @@ export const GuestRoute: React.FC = () => {
   );
 };
 
-/** Protects routes that require authentication and optionally a specific role. */
+/** Bảo vệ các route yêu cầu xác thực và tùy chọn yêu cầu một vai trò cụ thể. */
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({
   allowedRoles,
   redirectTo = "/login",

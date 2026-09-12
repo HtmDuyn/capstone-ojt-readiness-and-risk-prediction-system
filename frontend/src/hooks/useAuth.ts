@@ -2,8 +2,8 @@ import { useContext } from "react";
 import { AuthContext, type AuthContextValue } from "../contexts/AuthContext";
 
 /**
- * Custom hook to access the authentication context.
- * Must be used inside <AuthProvider>.
+ * Custom hook để truy cập ngữ cảnh xác thực (authentication context).
+ * Phải được sử dụng bên trong <AuthProvider>.
  */
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);

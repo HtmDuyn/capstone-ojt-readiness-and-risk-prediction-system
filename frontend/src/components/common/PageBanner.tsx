@@ -12,30 +12,30 @@ export interface BannerAction {
 }
 
 export interface PageBannerProps {
-  /** Student profile or user for personalized greeting and data */
+  /** Thông tin sinh viên dùng cho lời chào và nội dung cá nhân hóa. */
   student?: StudentProfile;
-  /** Explicit menu key corresponding to sidebar item */
+  /** ID menu dùng để lấy nội dung banner mặc định. */
   menuId?: string;
-  /** Custom title (supports string or ReactNode). Overrides preset title */
+  /** Tiêu đề tùy chỉnh, được ưu tiên hơn tiêu đề trong cấu hình menu. */
   title?: React.ReactNode;
-  /** Custom description. Overrides preset description */
+  /** Mô tả tùy chỉnh, được ưu tiên hơn mô tả trong cấu hình menu. */
   description?: React.ReactNode;
-  /** Optional breadcrumb elements displayed above the title */
+  /** Nội dung breadcrumb hiển thị phía trên tiêu đề. */
   breadcrumb?: React.ReactNode;
-  /** Optional badge pill displayed next to the title */
+  /** Badge hiển thị cạnh tiêu đề. */
   badge?: React.ReactNode;
-  /** Primary action button */
+  /** Nút hành động chính. */
   primaryAction?: BannerAction;
-  /** Secondary action button */
+  /** Nút hành động phụ. */
   secondaryAction?: BannerAction;
-  /** Extra slot placed on the right */
+  /** Khu vực mở rộng hiển thị bên phải banner. */
   extra?: React.ReactNode;
-  /** Custom children elements inside banner */
+  /** Nội dung bổ sung bên trong banner. */
   children?: React.ReactNode;
-  /** Additional custom CSS class */
+  /** Class CSS bổ sung cho banner. */
   className?: string;
 
-  // Backward compatibility props
+  // Props cũ được giữ lại để tương thích với các màn hình hiện tại.
   onRegisterOjt?: () => void;
   onViewRoadmap?: () => void;
 }
@@ -58,38 +58,40 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   const location = useLocation();
   const { openAIConsult } = useBaseLayout();
 
-  // Determine preset config: from menuId, or automatically deduced from current pathname
+  // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
   const preset = menuId
     ? getStudentMenuItemById(menuId)
     : getStudentMenuItemByPath(location.pathname) || getStudentMenuItemById('dashboard');
+  const presetBanner = preset?.banner;
 
-  // Extract student display name
+  // Rút gọn tên hiển thị, ưu tiên hai từ cuối trong họ tên.
   const displayName = student?.fullName
-    ? (student.fullName.trim().split(' ').length > 1
-        ? student.fullName.trim().split(' ').slice(-2).join(' ')
-        : student.fullName.trim())
+    ? (() => {
+        const nameParts = student.fullName.trim().split(/\s+/);
+        return nameParts.length > 1 ? nameParts.slice(-2).join(' ') : nameParts[0];
+      })()
     : 'bạn';
 
-  // Resolve Title
+  // Xác định tiêu đề hiển thị.
   const renderedTitle = title ?? (
-    typeof preset?.banner?.title === 'function'
-      ? preset.banner.title(displayName)
-      : (preset?.banner?.title ?? `Chào mừng bạn trở lại, ${displayName}!`)
+    typeof presetBanner?.title === 'function'
+      ? presetBanner.title(displayName)
+      : (presetBanner?.title ?? `Chào mừng bạn trở lại, ${displayName}!`)
   );
 
-  // Resolve Description
-  const renderedDescription = description !== undefined ? description : preset?.banner?.description;
+  // Xác định mô tả hiển thị.
+  const renderedDescription = description !== undefined ? description : presetBanner?.description;
 
-  // Resolve Badge
+  // Xác định badge hiển thị.
   const renderedBadge = badge !== undefined ? badge : (
-    preset?.banner?.badge ? (
+    presetBanner?.badge ? (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-amber-300 border border-white/15 backdrop-blur-xs">
-        {preset.banner.badge}
+        {presetBanner.badge}
       </span>
     ) : null
   );
 
-  // Resolve Primary Action
+  // Xác định hành động chính theo độ ưu tiên: props, tương thích cũ, cấu hình menu.
   let resolvedPrimary: BannerAction | null = null;
   if (primaryAction) {
     resolvedPrimary = primaryAction;
@@ -98,18 +100,18 @@ export const PageBanner: React.FC<PageBannerProps> = ({
       label: 'Đăng ký OJT',
       onClick: onRegisterOjt,
     };
-  } else if (preset?.banner?.primaryActionLabel) {
+  } else if (presetBanner?.primaryActionLabel) {
     resolvedPrimary = {
-      label: preset.banner.primaryActionLabel,
+      label: presetBanner.primaryActionLabel,
       onClick: () => {
-        if (preset.banner?.defaultAiPrompt && openAIConsult) {
-          openAIConsult(preset.banner.defaultAiPrompt);
+        if (presetBanner.defaultAiPrompt) {
+          openAIConsult(presetBanner.defaultAiPrompt);
         }
       },
     };
   }
 
-  // Resolve Secondary Action
+  // Xác định hành động phụ.
   let resolvedSecondary: BannerAction | null = null;
   if (secondaryAction) {
     resolvedSecondary = secondaryAction;
@@ -124,17 +126,17 @@ export const PageBanner: React.FC<PageBannerProps> = ({
     <div
       className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300 ${className}`}
     >
-      {/* Decorative background glow accents */}
+      {/* Hiệu ứng phát sáng trang trí ở hai góc banner. */}
       <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
       <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
 
-      {/* Content wrapper */}
+      {/* Khối nội dung chính. */}
       <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="max-w-3xl space-y-3">
-          {/* Breadcrumb if provided */}
+          {/* Breadcrumb nếu được truyền vào. */}
           {breadcrumb && <div className="mb-2">{breadcrumb}</div>}
 
-          {/* Title & Badge */}
+          {/* Tiêu đề và badge. */}
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight font-outfit text-white flex items-center gap-2">
               {renderedTitle}
@@ -142,14 +144,14 @@ export const PageBanner: React.FC<PageBannerProps> = ({
             {renderedBadge}
           </div>
 
-          {/* Description */}
+          {/* Mô tả banner. */}
           {renderedDescription && (
             <div className="text-xs sm:text-sm text-purple-100 leading-relaxed font-normal">
               {renderedDescription}
             </div>
           )}
 
-          {/* Action Buttons */}
+          {/* Các nút hành động. */}
           {(resolvedPrimary || resolvedSecondary) && (
             <div className="pt-2 flex flex-wrap items-center gap-3">
               {resolvedPrimary && (
@@ -179,7 +181,7 @@ export const PageBanner: React.FC<PageBannerProps> = ({
           {children}
         </div>
 
-        {/* Right side extra slot */}
+        {/* Khu vực mở rộng bên phải. */}
         {extra && (
           <div className="flex-shrink-0 flex items-center self-start lg:self-center">
             {extra}

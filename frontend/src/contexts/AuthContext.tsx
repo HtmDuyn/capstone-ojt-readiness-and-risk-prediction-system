@@ -13,18 +13,18 @@ import type {
 
 export type { UserRole, AuthUser, AuthContextValue };
 
-// ─── Context ─────────────────────────────────────────────────────────────────
+// ─── Context (Ngữ cảnh) ───────────────────────────────────────────────────────
 
 export const AuthContext = createContext<AuthContextValue | undefined>(
   undefined
 );
 
-// ─── Storage Keys ────────────────────────────────────────────────────────────
+// ─── Khóa lưu trữ (Storage Keys) ───────────────────────────────────────────────
 
 const TOKEN_KEY = "ojt_auth_token";
 const USER_KEY = "ojt_auth_user";
 
-// ─── Provider ────────────────────────────────────────────────────────────────
+// ─── Provider (Nhà cung cấp) ───────────────────────────────────────────────────
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Hydrate auth state from localStorage on mount
+  // Khôi phục trạng thái xác thực từ localStorage khi khởi chạy
   useEffect(() => {
     try {
       const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(JSON.parse(storedUser) as AuthUser);
       }
     } catch {
-      // Corrupted storage — clear it
+      // Dữ liệu lưu trữ bị lỗi — xóa nó
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
     } finally {
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  /** Called after a successful login API response. */
+  /** Được gọi sau khi nhận phản hồi đăng nhập thành công từ API. */
   const login = useCallback((newToken: string, newUser: AuthUser) => {
     localStorage.setItem(TOKEN_KEY, newToken);
     localStorage.setItem(USER_KEY, JSON.stringify(newUser));
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(newUser);
   }, []);
 
-  /** Clears all auth state and persisted data. */
+  /** Xóa tất cả trạng thái xác thực và dữ liệu đã lưu. */
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null);
   }, []);
 
-  /** Allows updating profile fields without a full re-login. */
+  /** Cho phép cập nhật các trường hồ sơ mà không cần đăng nhập lại. */
   const updateUser = useCallback((partial: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return prev;

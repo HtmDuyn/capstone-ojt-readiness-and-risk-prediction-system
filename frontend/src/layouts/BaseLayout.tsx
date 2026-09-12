@@ -18,7 +18,7 @@ const BaseLayoutContext = createContext<BaseLayoutContextType>({
 });
 
 export const useBaseLayout = () => useContext(BaseLayoutContext);
-// Backward compatibility alias
+// Alias để tương thích ngược (Backward compatibility)
 export const useStudentAIConsult = useBaseLayout;
 
 export interface BaseLayoutProps {
@@ -68,7 +68,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   return (
     <BaseLayoutContext.Provider value={{ openAIConsult: handleOpenAIConsult }}>
       <div className="min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col font-outfit antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
-        {/* Ambient background matching theme */}
+        {/* Nền xung quanh phù hợp với giao diện (theme) */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <img
             src="/login_bg.jpg"
@@ -81,7 +81,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           <div className="absolute bottom-[-5%] right-[-5%] w-[45vw] h-[45vw] rounded-full bg-pink-300/20 blur-[130px]" />
         </div>
 
-        {/* Sidebar Navigation */}
+        {/* Điều hướng Sidebar */}
         <Sidebar
           navItems={navItems}
           title={brandTitle}
@@ -92,9 +92,9 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           onLogout={handleLogout}
         />
 
-        {/* Main Content Area */}
+        {/* Khu vực nội dung chính */}
         <div className="lg:pl-[76px] flex flex-col min-h-screen flex-1 transition-all duration-300">
-          {/* Top Header */}
+          {/* Header trên cùng */}
           <Header
             student={mockStudentProfile}
             user={resolvedUserSummary}
@@ -102,16 +102,16 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
             onLogout={handleLogout}
           />
 
-          {/* Unified Main Container across Dashboard & Modules */}
+          {/* Container chính thống nhất qua Dashboard & Modules */}
           <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1520px] mx-auto space-y-6">
             {children || <Outlet />}
 
-            {/* Dashboard Footer */}
+            {/* Footer của Dashboard */}
             <Footer />
           </main>
         </div>
 
-        {/* Floating AI Consultation Button (Bottom Right) */}
+        {/* Nút tư vấn AI nổi (Góc dưới bên phải) */}
         {showAIConsult && (
           <div className="fixed bottom-6 right-6 z-40">
             <span className="absolute -inset-1 rounded-full bg-orange-500/30 blur-sm animate-pulse pointer-events-none" />
@@ -133,7 +133,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           </div>
         )}
 
-        {/* AI Consult Modal */}
+        {/* Modal tư vấn AI */}
         <AIConsultModal
           isOpen={aiModalOpen}
           onClose={() => setAiModalOpen(false)}

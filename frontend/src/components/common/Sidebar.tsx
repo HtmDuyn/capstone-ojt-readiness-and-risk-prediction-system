@@ -30,12 +30,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
   const [isHovered, setIsHovered] = React.useState(false);
 
-  // Expanded if mouse is hovering (desktop) or mobile menu is explicitly open
+  // Mở rộng nếu chuột đang hover (desktop) hoặc menu trên thiết bị di động được mở
   const isExpanded = isHovered || isOpenMobile;
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Phông nền mờ trên thiết bị di động */}
       {isOpenMobile && (
         <div
           className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden transition-opacity"
@@ -43,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Sidebar Container with Smooth Expand / Collapse Hover Interaction */}
+      {/* Container của Sidebar với Tương tác Hover Mở rộng / Thu gọn mượt mà */}
       <aside
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           : 'lg:w-[76px]'
         }`}
       >
-        {/* Brand Header */}
+        {/* Header Thương hiệu */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 h-[73px] overflow-hidden">
           <div
             className="flex items-center gap-3 min-w-0 cursor-pointer"
@@ -79,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* Close button on mobile */}
+          {/* Nút đóng trên thiết bị di động */}
           <button
             type="button"
             onClick={onCloseMobile}
@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Navigation List */}
+        {/* Danh sách Điều hướng */}
         <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1.5 custom-scrollbar overflow-x-hidden">
           {navItems.map((item) => {
             const currentPath = location.pathname;
@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {item.label}
                 </span>
 
-                {/* Red notification dot */}
+                {/* Chấm đỏ thông báo */}
                 {item.hasBadge && (
                   <span
                     className={`rounded-full bg-red-500 ring-2 ring-[#111827] animate-pulse transition-all duration-200 ${isExpanded
@@ -139,9 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Bottom Actions */}
+        {/* Các hành động ở dưới cùng */}
         <div className="p-2.5 border-t border-white/10 space-y-2 overflow-hidden">
-          {/* Đăng xuất hệ thống Button */}
+          {/* Nút Đăng xuất hệ thống */}
           <button
             type="button"
             onClick={onLogout}

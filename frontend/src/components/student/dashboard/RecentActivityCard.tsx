@@ -20,7 +20,7 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({ activiti
       </h3>
 
       <div className="relative pl-6 space-y-4">
-        {/* Vertical timeline line */}
+        {/* Đường thời gian (timeline) dọc */}
         <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-slate-200/80" />
 
         {activities.map((act) => (

@@ -29,7 +29,7 @@ export const RoadmapStepper: React.FC<RoadmapStepperProps> = ({ steps }) => {
       );
     }
 
-    // Upcoming / future
+    // Sắp tới / tương lai
     if (step.iconType === 'briefcase') {
       return (
         <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-purple-50/80 text-purple-400 border border-purple-100 flex items-center justify-center">
@@ -51,11 +51,11 @@ export const RoadmapStepper: React.FC<RoadmapStepperProps> = ({ steps }) => {
         Lộ trình đến học kỳ OJT
       </h2>
 
-      {/* Stepper horizontal flow */}
+      {/* Luồng stepper theo chiều ngang */}
       <div className="relative flex items-start justify-between px-2 sm:px-6">
-        {/* Connector Line behind nodes */}
+        {/* Đường nối phía sau các nút */}
         <div className="absolute top-5 sm:top-5.5 left-6 right-6 sm:left-10 sm:right-10 h-[2px] bg-slate-200/80 -z-0">
-          {/* Progress fill up to current step (step 3) */}
+          {/* Điền tiến độ đến bước hiện tại (bước 3) */}
           <div className="h-full bg-gradient-to-r from-orange-500 to-purple-500 w-1/2 shadow-xs" />
         </div>
 
@@ -68,12 +68,12 @@ export const RoadmapStepper: React.FC<RoadmapStepperProps> = ({ steps }) => {
               key={step.id}
               className="relative z-10 flex flex-col items-center text-center flex-1 max-w-[130px]"
             >
-              {/* Icon Container */}
+              {/* Container chứa Icon */}
               <div className="transition-transform duration-200 hover:scale-105">
                 {renderStepIcon(step)}
               </div>
 
-              {/* Step Title */}
+              {/* Tiêu đề Bước */}
               <div className="mt-3">
                 <span
                   className={`text-[11px] sm:text-xs leading-snug font-semibold block ${isCurrent
