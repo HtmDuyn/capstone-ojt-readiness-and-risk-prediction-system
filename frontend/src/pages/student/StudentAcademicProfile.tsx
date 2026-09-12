@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBaseLayout } from '@/layouts/BaseLayout';
+import { useBaseLayout } from '../../layouts/BaseLayout';
 import { ChevronDownIcon } from '@/components/common/icons/AppIcons';
 import { PageBanner } from '@/components/common/PageBanner';
 import { mockStudentProfile } from '@/data/student/mockStudentData';

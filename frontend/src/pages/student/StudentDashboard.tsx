@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBaseLayout } from '@/layouts/BaseLayout';
+import { useBaseLayout } from '../../layouts/BaseLayout';
 import { PageBanner } from '@/components/common/PageBanner';
 import { StatCards } from '@/components/student/dashboard/StatCards';
 import { ProgressChartCard } from '@/components/student/dashboard/ProgressChartCard';

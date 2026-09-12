@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useBaseLayout } from '@/layouts/BaseLayout';
+import { useBaseLayout } from '../../layouts/BaseLayout';
 import { PageBanner } from '@/components/common/PageBanner';
 import { mockStudentProfile } from '@/data/student/mockStudentData';
 import { getStudentMenuItemByPath } from '@/config/menus/studentMenu';

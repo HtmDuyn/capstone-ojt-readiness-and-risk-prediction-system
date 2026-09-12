@@ -1,6 +1,6 @@
 import React from 'react';
 import { mockCourseCategories } from '@/data/student/mockAcademicProfileData';
-import { useStudentAIConsult } from '@/layouts/BaseLayout';
+import { useStudentAIConsult } from '../../../layouts/BaseLayout';
 
 export const CourseDistributionCard: React.FC = () => {
   const { openAIConsult } = useStudentAIConsult();

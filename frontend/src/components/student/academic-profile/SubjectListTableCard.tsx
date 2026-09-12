@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { SubjectStatus } from '@/types/student/academicProfileTypes';
 import { mockSubjectList } from '@/data/student/mockAcademicProfileData';
 import { DownloadIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/common/icons/AppIcons';
-import { useStudentAIConsult } from '@/layouts/BaseLayout';
+import { useStudentAIConsult } from '../../../layouts/BaseLayout';
 
 /* ─── Status Badge ─────────────────────────────────────────── */
 const STATUS_CONFIG: Record<SubjectStatus, { label: string; dot: string; pill: string }> = {

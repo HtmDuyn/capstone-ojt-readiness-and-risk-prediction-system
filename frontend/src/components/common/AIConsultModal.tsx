@@ -45,7 +45,7 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setInputVal('');
 
-    // Generate responsive AI answer based on keywords
+    // Tạo câu trả lời AI dựa trên từ khóa trong câu hỏi
     setTimeout(() => {
       let reply =
         'Hệ thống AI đang phân tích dữ liệu thị trường và yêu cầu doanh nghiệp OJT... Bạn có cơ hội đậu cao vào các doanh nghiệp phần mềm như FPT Software, TMA Solutions, KMS Technology!';
@@ -74,7 +74,7 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/80 flex flex-col max-h-[85vh] overflow-hidden text-slate-800">
-        {/* Modal Header */}
+        {/* Phần tiêu đề hộp thoại */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-gradient-to-r from-orange-500 via-amber-500 to-purple-600 text-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs border border-white/20">
@@ -98,7 +98,7 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           </button>
         </div>
 
-        {/* Quick Suggestion Chips */}
+        {/* Các gợi ý nhanh */}
         <div className="p-3 bg-orange-50/50 border-b border-orange-100/60 flex items-center gap-2 overflow-x-auto text-xs custom-scrollbar">
           <span className="text-slate-500 text-[11px] font-semibold flex items-center gap-1">
             <LightningIcon size={12} className="text-amber-500" /> Gợi ý:
@@ -119,7 +119,7 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           </button>
         </div>
 
-        {/* Message Thread */}
+        {/* Danh sách hội thoại */}
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50/50">
           {messages.map((m, i) => (
             <div
@@ -139,7 +139,7 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           ))}
         </div>
 
-        {/* Chat Input */}
+        {/* Ô nhập tin nhắn */}
         <form
           onSubmit={(e) => {
             e.preventDefault();

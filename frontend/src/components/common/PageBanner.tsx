@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import type { StudentProfile } from '@/types/student/studentDashboardTypes';
 import { getStudentMenuItemById, getStudentMenuItemByPath } from '@/config/menus/studentMenu';
-import { useBaseLayout } from '@/layouts/BaseLayout';
+import { useBaseLayout } from '../../layouts/BaseLayout';
 
 export interface BannerAction {
   label: string;
