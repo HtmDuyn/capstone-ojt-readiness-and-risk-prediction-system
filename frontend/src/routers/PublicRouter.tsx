@@ -11,6 +11,8 @@ import PrivateRoute from "./PrivateRouter";
 import StudentDashboard from "../pages/Students/StudentDashboard";
 import StudentAcademicProfile from "../pages/Students/StudentProfile";
 import StudentFeaturePage from "../pages/Students/StudentFeaturePage";
+import TrainingDepartmentDashboard from "../pages/TrainingDepartment/TrainingDepartmentDashboard";
+import TrainingDepartmentFeaturePage from "../pages/TrainingDepartment/TrainingDepartmentFeaturePage";
 
 // ─── GuestRoute ───────────────────────────────────────────────────────────────
 // Redirects already-authenticated users away from public-only pages (login/register).
@@ -65,7 +67,13 @@ const router = createBrowserRouter([
   {
     element: <PrivateRoute allowedRoles={["education"]} />,
     children: [
-      // TODO: Add education routes here
+      { path: "/training-department", element: <TrainingDepartmentDashboard /> },
+      { path: "/training-department/dashboard", element: <TrainingDepartmentDashboard /> },
+      { path: "/training-department/students", element: <TrainingDepartmentFeaturePage /> },
+      { path: "/training-department/monitoring", element: <TrainingDepartmentFeaturePage /> },
+      { path: "/training-department/reports", element: <TrainingDepartmentFeaturePage /> },
+      { path: "/training-department/ojt-requests", element: <TrainingDepartmentFeaturePage /> },
+      { path: "/training-department/notifications", element: <TrainingDepartmentFeaturePage /> },
     ],
   },
 
