@@ -1,16 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ─── Reset & Base ─────────────────────────────────────────── */
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
+* {
+  font-family: 'Inter', sans-serif;
+}
 html,
 body,
 #root {
@@ -18,7 +22,7 @@ body,
   padding: 0;
   width: 100%;
   min-height: 100%;
-  font-family: 'Outfit', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
@@ -28,15 +32,13 @@ body {
 }
 
 /* ─── Font Utilities ───────────────────────────────────────── */
+
 .font-cinematic {
   font-family: 'Playfair Display', Georgia, serif;
 }
 
-.font-outfit {
-  font-family: 'Outfit', sans-serif;
-}
-
 /* ─── Custom Scrollbar ─────────────────────────────────────── */
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -57,58 +59,136 @@ body {
 
 @layer utilities {
   /* ─── Animations ─────────────────────────────────────────── */
+
   @keyframes floatUp {
-    0%   { transform: translateY(0) scale(1); opacity: 0; }
-    10%  { opacity: 1; }
-    90%  { opacity: 0.5; }
-    100% { transform: translateY(-600px) scale(0.5); opacity: 0; }
+    0% {
+      transform: translateY(0) scale(1);
+      opacity: 0;
+    }
+
+    10% {
+      opacity: 1;
+    }
+
+    90% {
+      opacity: 0.5;
+    }
+
+    100% {
+      transform: translateY(-600px) scale(0.5);
+      opacity: 0;
+    }
   }
 
   @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
-    50%       { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+    }
+
+    50% {
+      box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+    }
   }
 
   @keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-50px); }
-    to   { opacity: 1; transform: translateX(0); }
+    from {
+      opacity: 0;
+      transform: translateX(-50px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(50px); }
-    to   { opacity: 1; transform: translateX(0); }
+    from {
+      opacity: 0;
+      transform: translateX(50px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   @keyframes spin360 {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   @keyframes dashboardFloat {
-    0%, 100% { transform: translateY(0px) rotate(-0.5deg); }
-    50%       { transform: translateY(-10px) rotate(0.5deg); }
+    0%,
+    100% {
+      transform: translateY(0px) rotate(-0.5deg);
+    }
+
+    50% {
+      transform: translateY(-10px) rotate(0.5deg);
+    }
   }
 
   @keyframes blobMorph {
-    0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-    50%       { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+    0%,
+    100% {
+      border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    }
+
+    50% {
+      border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+    }
   }
 
   @keyframes authFadeIn {
-    from { opacity: 0; transform: translateY(12px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   /* ─── Animation Classes ──────────────────────────────────── */
-  .left-panel     { animation: slideInLeft 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-  .right-panel    { animation: slideInRight 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-  .dashboard-card { animation: dashboardFloat 5s ease-in-out infinite; }
-  .blob-1         { animation: blobMorph 9s ease-in-out infinite; }
-  .blob-2         { animation: blobMorph 11s ease-in-out infinite reverse; }
-  .auth-form-enter { animation: authFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+  .left-panel {
+    animation: slideInLeft 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .right-panel {
+    animation: slideInRight 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .dashboard-card {
+    animation: dashboardFloat 5s ease-in-out infinite;
+  }
+
+  .blob-1 {
+    animation: blobMorph 9s ease-in-out infinite;
+  }
+
+  .blob-2 {
+    animation: blobMorph 11s ease-in-out infinite reverse;
+  }
+
+  .auth-form-enter {
+    animation: authFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
 
   /* ─── Card Component ─────────────────────────────────────── */
+
   /* Glassmorphic card base — used across all dashboard/academic cards */
+
   .card-glass {
     background: #fff;
     backdrop-filter: blur(24px) saturate(180%);
@@ -124,8 +204,14 @@ body {
   }
 
   /* ─── Button: Primary Orange ─────────────────────────────── */
+
   .btn-login {
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%);
+    background: linear-gradient(
+      135deg,
+      #f97316 0%,
+      #ea580c 50%,
+      #dc2626 100%
+    );
     background-size: 200% auto;
     transition: all 0.4s ease;
     position: relative;
@@ -139,11 +225,18 @@ body {
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.25),
+      transparent
+    );
     transition: left 0.6s ease;
   }
 
-  .btn-login:hover::before { left: 100%; }
+  .btn-login:hover::before {
+    left: 100%;
+  }
 
   .btn-login:hover {
     background-position: right center;
@@ -157,6 +250,7 @@ body {
   }
 
   /* ─── Button: Secondary Ghost ────────────────────────────── */
+
   .btn-ghost {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -172,14 +266,18 @@ body {
   }
 
   /* ─── Role Card (Login) ──────────────────────────────────── */
+
   .role-card {
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     cursor: pointer;
   }
 
-  .role-card:hover { transform: translateY(-4px); }
+  .role-card:hover {
+    transform: translateY(-4px);
+  }
 
   /* ─── Social Login Button ────────────────────────────────── */
+
   .social-btn {
     transition: all 0.3s ease;
     position: relative;
@@ -193,84 +291,160 @@ body {
   }
 
   /* ─── Input Field ────────────────────────────────────────── */
-  .input-field { transition: all 0.3s ease; }
-  .input-field:focus-within { transform: translateY(-1px); }
+
+  .input-field {
+    transition: all 0.3s ease;
+  }
+
+  .input-field:focus-within {
+    transform: translateY(-1px);
+  }
 
   /* ─── Footer Feature ─────────────────────────────────────── */
-  .footer-feature { transition: all 0.3s ease; }
-  .footer-feature:hover .footer-icon { transform: scale(1.15) rotate(5deg); }
-  .footer-icon { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+  .footer-feature {
+    transition: all 0.3s ease;
+  }
+
+  .footer-feature:hover .footer-icon {
+    transform: scale(1.15) rotate(5deg);
+  }
+
+  .footer-icon {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
 
   /* ─── Login Panel Glassmorphism ──────────────────────────── */
+
   .glass-card {
     background: rgba(255, 255, 255, 0.38);
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.55);
-    box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.22), 0 0 40px rgba(249, 115, 22, 0.12);
+    box-shadow:
+      0 30px 60px -12px rgba(0, 0, 0, 0.22),
+      0 0 40px rgba(249, 115, 22, 0.12);
   }
 
   .glass-panel-left {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 237, 213, 0.35) 40%, rgba(254, 215, 170, 0.25) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 237, 213, 0.35) 40%,
+      rgba(254, 215, 170, 0.25) 100%
+    );
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
 
   /* ─── Diagonal Stripe Accents ────────────────────────────── */
-  .stripe-pattern { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+  .stripe-pattern {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
 
   .stripe-band-1 {
-    position: absolute; top: -25%; left: -35%;
-    width: 150%; height: 65%;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 237, 213, 0.25) 100%);
-    transform: rotate(-25deg); border-radius: 70px;
+    position: absolute;
+    top: -25%;
+    left: -35%;
+    width: 150%;
+    height: 65%;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 237, 213, 0.25) 100%
+    );
+    transform: rotate(-25deg);
+    border-radius: 70px;
   }
 
   .stripe-band-2 {
-    position: absolute; top: 15%; left: -40%;
-    width: 160%; height: 70%;
-    background: linear-gradient(135deg, rgba(253, 186, 116, 0.25) 0%, rgba(249, 115, 22, 0.15) 100%);
-    transform: rotate(-25deg); border-radius: 80px;
+    position: absolute;
+    top: 15%;
+    left: -40%;
+    width: 160%;
+    height: 70%;
+    background: linear-gradient(
+      135deg,
+      rgba(253, 186, 116, 0.25) 0%,
+      rgba(249, 115, 22, 0.15) 100%
+    );
+    transform: rotate(-25deg);
+    border-radius: 80px;
   }
 
   .stripe-band-3 {
-    position: absolute; top: 55%; left: -20%;
-    width: 140%; height: 65%;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(254, 215, 170, 0.2) 100%);
-    transform: rotate(-25deg); border-radius: 60px;
+    position: absolute;
+    top: 55%;
+    left: -20%;
+    width: 140%;
+    height: 65%;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(254, 215, 170, 0.2) 100%
+    );
+    transform: rotate(-25deg);
+    border-radius: 60px;
   }
 
   /* ─── Notch & Tab ────────────────────────────────────────── */
+
   .tab-notch-container {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .notch-boundary-wrapper {
-    position: absolute; right: 0; top: 68%;
-    transform: translateY(-50%); z-index: 30;
-    display: flex; flex-direction: column; align-items: flex-end; width: 140px;
+    position: absolute;
+    right: 0;
+    top: 68%;
+    transform: translateY(-50%);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    width: 140px;
   }
 
   .notch-pill-active {
-    position: absolute; right: 0;
-    width: 135px; height: 48px;
+    position: absolute;
+    right: 0;
+    width: 135px;
+    height: 48px;
     background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border-top-left-radius: 24px; border-bottom-left-radius: 24px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top-left-radius: 24px;
+    border-bottom-left-radius: 24px;
     box-shadow: -6px 4px 20px rgba(0, 0, 0, 0.08);
     transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .notch-pill-active::before {
-    content: ''; position: absolute; top: -16px; right: 0;
-    width: 16px; height: 16px; border-bottom-right-radius: 16px;
-    box-shadow: 6px 6px 0 6px rgba(255, 255, 255, 0.75); pointer-events: none;
+    content: '';
+    position: absolute;
+    top: -16px;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    border-bottom-right-radius: 16px;
+    box-shadow: 6px 6px 0 6px rgba(255, 255, 255, 0.75);
+    pointer-events: none;
   }
 
   .notch-pill-active::after {
-    content: ''; position: absolute; bottom: -16px; right: 0;
-    width: 16px; height: 16px; border-top-right-radius: 16px;
-    box-shadow: 6px -6px 0 6px rgba(255, 255, 255, 0.75); pointer-events: none;
+    content: '';
+    position: absolute;
+    bottom: -16px;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    border-top-right-radius: 16px;
+    box-shadow: 6px -6px 0 6px rgba(255, 255, 255, 0.75);
+    pointer-events: none;
   }
 }

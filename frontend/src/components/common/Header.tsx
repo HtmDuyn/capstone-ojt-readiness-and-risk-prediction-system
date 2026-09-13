@@ -22,6 +22,7 @@ interface HeaderProps {
   user?: HeaderUserSummary;
   onOpenMobileMenu: () => void;
   onLogout?: () => void;
+  showSearch?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   user,
   onOpenMobileMenu,
   onLogout,
+  showSearch = true,
 }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [lang, setLang] = useState<'VI' | 'EN'>('VI');
@@ -73,6 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         {/* Search Input Bar */}
+        {showSearch && (
         <div className="relative w-full max-w-md">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
             <SearchIcon size={18} />
@@ -85,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-white/80 border border-orange-200/80 rounded-full placeholder-slate-400 text-slate-800 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all duration-200 shadow-2xs"
           />
         </div>
+        )}
       </div>
 
       {/* Right: Notification, Language, User profile */}

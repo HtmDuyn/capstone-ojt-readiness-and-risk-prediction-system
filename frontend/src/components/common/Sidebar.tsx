@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#111827] text-slate-300 shadow-2xl transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpenMobile
+        className={`peer fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#111827] text-slate-300 shadow-2xl transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpenMobile
           ? 'translate-x-0 w-[260px]'
           : '-translate-x-full lg:translate-x-0'
         } ${isHovered
