@@ -12,6 +12,10 @@ import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
 import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
 import EducationDashboard from "@/pages/education/EducationDashboard";
+import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
+import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
+import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
+import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -171,7 +175,18 @@ export const router = createBrowserRouter([
             .filter((item) => item.path !== "/education/dashboard")
             .map((item) => ({
               path: item.path,
-              element: <RolePlaceholderPage role="education" />,
+              element:
+                item.path === "/education/ojt-eligibility" ? (
+                  <EducationOjtEligibility />
+                ) : item.path === "/education/academic-alerts" ? (
+                  <EducationAcademicAlerts />
+                ) : item.path === "/education/curriculum-plan" ? (
+                  <EducationCurriculumPlan />
+                ) : item.path === "/education/graduation-review" ? (
+                  <EducationGraduationReview />
+                ) : (
+                  <RolePlaceholderPage role="education" />
+                ),
             })),
         ],
       },
