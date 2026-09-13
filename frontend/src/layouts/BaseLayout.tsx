@@ -67,7 +67,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
 
   return (
     <BaseLayoutContext.Provider value={{ openAIConsult: handleOpenAIConsult }}>
-      <div className="min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col font-outfit antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
         {/* Nền xung quanh phù hợp với giao diện (theme) */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <img
@@ -93,13 +93,14 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         />
 
         {/* Khu vực nội dung chính */}
-        <div className="lg:pl-[76px] flex flex-col min-h-screen flex-1 transition-all duration-300">
+        <div className="lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
             student={mockStudentProfile}
             user={resolvedUserSummary}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
+            showSearch={brandSubtitle !== 'Phòng Đào tạo'}
           />
 
           {/* Container chính thống nhất qua Dashboard & Modules */}
@@ -124,7 +125,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
               <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-xs group-hover:rotate-12 transition-transform shadow-inner">
                 <BotSparkleIcon size={18} className="text-white" />
               </span>
-              <span className="tracking-tight font-outfit">Tư vấn AI ngay</span>
+              <span className="tracking-tight">Tư vấn AI ngay</span>
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-200 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />

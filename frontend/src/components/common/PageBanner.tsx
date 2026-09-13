@@ -61,7 +61,7 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
   const preset = menuId
     ? getStudentMenuItemById(menuId)
-    : getStudentMenuItemByPath(location.pathname) || getStudentMenuItemById('dashboard');
+    : getStudentMenuItemByPath(location.pathname);
   const presetBanner = preset?.banner;
 
   // Rút gọn tên hiển thị, ưu tiên hai từ cuối trong họ tên.
@@ -138,7 +138,7 @@ export const PageBanner: React.FC<PageBannerProps> = ({
 
           {/* Tiêu đề và badge. */}
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight font-outfit text-white flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight text-white flex items-center gap-2">
               {renderedTitle}
             </h1>
             {renderedBadge}
