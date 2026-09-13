@@ -93,7 +93,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         />
 
         {/* Khu vực nội dung chính */}
-        <div className="lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
+        <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
             student={mockStudentProfile}
@@ -104,7 +104,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           />
 
           {/* Container chính thống nhất qua Dashboard & Modules */}
-          <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1520px] mx-auto space-y-6">
+          <main className="relative z-10 flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1520px] mx-auto space-y-6">
             {children || <Outlet />}
 
             {/* Footer của Dashboard */}
