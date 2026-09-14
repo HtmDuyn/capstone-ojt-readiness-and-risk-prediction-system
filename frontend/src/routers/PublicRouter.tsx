@@ -16,6 +16,12 @@ import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
+import AdminDataSync from "@/pages/admin/AdminDataSync";
+import AdminAiConfig from "@/pages/admin/AdminAiConfig";
+import AdminSettings from "@/pages/admin/AdminSettings";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -152,7 +158,43 @@ export const router = createBrowserRouter([
   // Các role còn lại dùng layout chung và trang tạm trong khi chờ nghiệp vụ.
   {
     element: <PrivateRoute allowedRoles={["admin"]} />,
-    children: [createRoleRoutes("admin")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("admin")}
+            homePath="/admin/dashboard"
+            brandSubtitle="Quản trị viên"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          {
+            path: "/admin/dashboard",
+            element: <AdminDashboard />,
+          },
+          ...getMenuByRole("admin")
+            .filter((item) => item.path !== "/admin/dashboard")
+            .map((item) => ({
+              path: item.path,
+              element:
+                item.path === "/admin/users" ? (
+                  <AdminUsers />
+                ) : item.path === "/admin/metrics" ? (
+                  <AdminSystemMetrics />
+                ) : item.path === "/admin/data-sync" ? (
+                  <AdminDataSync />
+                ) : item.path === "/admin/ai-config" ? (
+                  <AdminAiConfig />
+                ) : item.path === "/admin/settings" ? (
+                  <AdminSettings />
+                ) : (
+                  <RolePlaceholderPage role="admin" />
+                ),
+            })),
+        ],
+      },
+    ],
   },
   {
     element: <PrivateRoute allowedRoles={["education"]} />,

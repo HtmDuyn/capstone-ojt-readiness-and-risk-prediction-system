@@ -1,10 +1,9 @@
 import React from 'react';
 import {
   DashboardGridIcon,
-  RiskAnalyticsIcon,
   NotificationBellIcon,
 } from '@/components/common/icons/AppIcons';
-import { ShieldAlert, Users, Settings, Database, Activity } from 'lucide-react';
+import { ShieldAlert, Users, Settings, Database, Activity, Bot } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const ADMIN_NAV_ITEMS: NavItem[] = [
@@ -60,7 +59,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     id: 'ai-config',
     label: 'Cấu hình AI Engine',
     path: '/admin/ai-config',
-    icon: <RiskAnalyticsIcon size={20} />,
+    icon: <Bot size={20} />,
     banner: {
       title: 'Cấu hình Ngưỡng Rủi ro & Mô hình AI',
       description: 'Điều chỉnh trọng số đánh giá rủi ro trượt môn và tiêu chí phân bổ OJT.',
