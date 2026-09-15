@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Bell, CheckCircle2, Globe, Settings, Shield } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  Globe,
+  Info,
+  Settings,
+  Shield,
+} from "lucide-react";
 import { PageBanner } from "@/components/common/PageBanner";
 
 const AdminSettings: React.FC = () => {
@@ -119,11 +126,39 @@ const AdminSettings: React.FC = () => {
                 </th>
 
                 <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Thông báo trong hệ thống
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>Thông báo trong hệ thống</span>
+
+                    <span className="group relative inline-flex">
+                      <Info
+                        size={14}
+                        className="cursor-help text-slate-400 transition hover:text-orange-500"
+                      />
+
+                      <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-64 -translate-x-1/2 rounded-lg bg-slate-800 px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed text-white shadow-lg group-hover:block">
+                        Hiển thị thông báo trực tiếp trên hệ thống cho người
+                        dùng khi có sự kiện hoặc cập nhật liên quan.
+                      </span>
+                    </span>
+                  </div>
                 </th>
 
                 <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Thông báo Email
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>Thông báo Email</span>
+
+                    <span className="group relative inline-flex">
+                      <Info
+                        size={14}
+                        className="cursor-help text-slate-400 transition hover:text-orange-500"
+                      />
+
+                      <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden w-64 rounded-lg bg-slate-800 px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed text-white shadow-lg group-hover:block">
+                        Gửi thông báo đến địa chỉ email của người dùng khi có sự
+                        kiện hoặc cập nhật liên quan.
+                      </span>
+                    </span>
+                  </div>
                 </th>
               </tr>
             </thead>
