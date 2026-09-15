@@ -1,19 +1,33 @@
-import React, { useState } from 'react';
-import {
-  Bell,
-  CheckCircle2,
-  Globe,
-  Settings,
-  Shield,
-} from 'lucide-react';
-import { PageBanner } from '@/components/common/PageBanner';
+import React, { useState } from "react";
+import { Bell, CheckCircle2, Globe, Settings, Shield } from "lucide-react";
+import { PageBanner } from "@/components/common/PageBanner";
 
 const AdminSettings: React.FC = () => {
-  const [systemName, setSystemName] = useState('OJT Readiness');
-  const [language, setLanguage] = useState('Tiếng Việt');
-  const [emailNotification, setEmailNotification] = useState(true);
-  const [systemNotification, setSystemNotification] = useState(true);
+  const [systemName, setSystemName] = useState("OJT Readiness");
+  const [language, setLanguage] = useState("Tiếng Việt");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState({
+    "Sinh viên": {
+      system: true,
+      email: true,
+    },
+    "Phòng Đào tạo": {
+      system: true,
+      email: true,
+    },
+    "Phòng Quan hệ Doanh nghiệp": {
+      system: true,
+      email: true,
+    },
+    "Doanh nghiệp": {
+      system: true,
+      email: true,
+    },
+    "Quản trị viên": {
+      system: true,
+      email: false,
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -78,7 +92,7 @@ const AdminSettings: React.FC = () => {
         </div>
       </section>
 
-      {/* Thông báo */}
+      {/* Cấu hình thông báo */}
       <section className="card-glass rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
@@ -87,67 +101,94 @@ const AdminSettings: React.FC = () => {
 
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Thông báo hệ thống
+              Cấu hình thông báo
             </h2>
 
             <p className="text-sm text-slate-500">
-              Cấu hình các kênh thông báo chung.
+              Cấu hình kênh thông báo cho từng vai trò người dùng.
             </p>
           </div>
         </div>
 
-        <div className="mt-6 divide-y divide-slate-100">
-          <div className="flex items-center justify-between gap-4 py-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">
-                Thông báo Email
-              </p>
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full min-w-[700px] border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 text-left">
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Vai trò
+                </th>
 
-              <p className="mt-1 text-xs text-slate-500">
-                Cho phép hệ thống gửi thông báo qua email.
-              </p>
-            </div>
+                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Thông báo trong hệ thống
+                </th>
 
-            <button
-              type="button"
-              onClick={() => setEmailNotification(!emailNotification)}
-              className={`relative h-6 w-11 rounded-full transition ${
-                emailNotification ? 'bg-orange-500' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                  emailNotification ? 'left-6' : 'left-1'
-                }`}
-              />
-            </button>
-          </div>
+                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Thông báo Email
+                </th>
+              </tr>
+            </thead>
 
-          <div className="flex items-center justify-between gap-4 py-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">
-                Thông báo trong hệ thống
-              </p>
+            <tbody>
+              {Object.entries(notificationSettings).map(([role, settings]) => (
+                <tr
+                  key={role}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td className="px-4 py-4 text-sm font-semibold text-slate-800">
+                    {role}
+                  </td>
 
-              <p className="mt-1 text-xs text-slate-500">
-                Hiển thị thông báo trực tiếp trên hệ thống.
-              </p>
-            </div>
+                  <td className="px-4 py-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          [role]: {
+                            ...prev[role as keyof typeof prev],
+                            system: !settings.system,
+                          },
+                        }))
+                      }
+                      className={`relative h-6 w-11 rounded-full transition ${
+                        settings.system ? "bg-orange-500" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                          settings.system ? "left-6" : "left-1"
+                        }`}
+                      />
+                    </button>
+                  </td>
 
-            <button
-              type="button"
-              onClick={() => setSystemNotification(!systemNotification)}
-              className={`relative h-6 w-11 rounded-full transition ${
-                systemNotification ? 'bg-orange-500' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                  systemNotification ? 'left-6' : 'left-1'
-                }`}
-              />
-            </button>
-          </div>
+                  <td className="px-4 py-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotificationSettings((prev) => ({
+                          ...prev,
+                          [role]: {
+                            ...prev[role as keyof typeof prev],
+                            email: !settings.email,
+                          },
+                        }))
+                      }
+                      className={`relative h-6 w-11 rounded-full transition ${
+                        settings.email ? "bg-orange-500" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                          settings.email ? "left-6" : "left-1"
+                        }`}
+                      />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -185,12 +226,12 @@ const AdminSettings: React.FC = () => {
               type="button"
               onClick={() => setMaintenanceMode(!maintenanceMode)}
               className={`relative h-6 w-11 rounded-full transition ${
-                maintenanceMode ? 'bg-orange-500' : 'bg-slate-300'
+                maintenanceMode ? "bg-orange-500" : "bg-slate-300"
               }`}
             >
               <span
                 className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                  maintenanceMode ? 'left-6' : 'left-1'
+                  maintenanceMode ? "left-6" : "left-1"
                 }`}
               />
             </button>
@@ -200,14 +241,14 @@ const AdminSettings: React.FC = () => {
             <CheckCircle2
               size={17}
               className={
-                maintenanceMode ? 'text-orange-500' : 'text-emerald-500'
+                maintenanceMode ? "text-orange-500" : "text-emerald-500"
               }
             />
 
             <span className="text-sm font-medium text-slate-600">
               {maintenanceMode
-                ? 'Hệ thống đang ở chế độ bảo trì'
-                : 'Hệ thống đang hoạt động bình thường'}
+                ? "Hệ thống đang ở chế độ bảo trì"
+                : "Hệ thống đang hoạt động bình thường"}
             </span>
           </div>
         </div>

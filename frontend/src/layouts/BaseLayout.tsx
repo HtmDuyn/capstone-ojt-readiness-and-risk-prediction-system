@@ -1,20 +1,20 @@
-import React, { createContext, useContext, useState } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { Sidebar } from '@/components/common/Sidebar';
-import { Header, type HeaderUserSummary } from '@/components/common/Header';
-import { Footer } from '@/components/common/Footer';
-import { AIConsultModal } from '@/components/common/AIConsultModal';
-import { BotSparkleIcon } from '@/components/common/icons/AppIcons';
-import { mockStudentProfile } from '@/data/student/mockStudentData';
-import type { NavItem } from '@/types/common.types';
+import React, { createContext, useContext, useState } from "react";
+import { useNavigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Sidebar } from "@/components/common/Sidebar";
+import { Header, type HeaderUserSummary } from "@/components/common/Header";
+import { Footer } from "@/components/common/Footer";
+import { AIConsultModal } from "@/components/common/AIConsultModal";
+import { BotSparkleIcon } from "@/components/common/icons/AppIcons";
+import { mockStudentProfile } from "@/data/student/mockStudentData";
+import type { NavItem } from "@/types/common.types";
 
 interface BaseLayoutContextType {
   openAIConsult: (query?: string) => void;
 }
 
 const BaseLayoutContext = createContext<BaseLayoutContextType>({
-  openAIConsult: () => { },
+  openAIConsult: () => {},
 });
 
 export const useBaseLayout = () => useContext(BaseLayoutContext);
@@ -33,9 +33,9 @@ export interface BaseLayoutProps {
 
 export const BaseLayout: React.FC<BaseLayoutProps> = ({
   navItems,
-  homePath = '/student/dashboard',
-  brandTitle = 'FPT University',
-  brandSubtitle = 'Hệ thống quản lý',
+  homePath = "/student/dashboard",
+  brandTitle = "FPT University",
+  brandSubtitle = "Hệ thống quản lý",
   userSummary,
   showAIConsult = true,
   children,
@@ -44,14 +44,14 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [initialAiQuery, setInitialAiQuery] = useState('');
+  const [initialAiQuery, setInitialAiQuery] = useState("");
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
-  const handleOpenAIConsult = (query = '') => {
+  const handleOpenAIConsult = (query = "") => {
     setInitialAiQuery(query);
     setAiModalOpen(true);
   };
@@ -60,9 +60,12 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
     fullName: user?.name || mockStudentProfile.fullName,
     email: user?.email || mockStudentProfile.email,
     code: user?.id || mockStudentProfile.studentCode,
-    subtitle: user?.role === 'student' ? `${mockStudentProfile.studentCode} - ${mockStudentProfile.semester}` : user?.role?.toUpperCase(),
+    subtitle:
+      user?.role === "student"
+        ? `${mockStudentProfile.studentCode} - ${mockStudentProfile.semester}`
+        : user?.role?.toUpperCase(),
     avatar: user?.avatar || mockStudentProfile.avatar,
-    department: user?.role === 'student' ? mockStudentProfile.major : undefined,
+    department: user?.role === "student" ? mockStudentProfile.major : undefined,
   };
 
   return (
@@ -100,7 +103,10 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
             user={resolvedUserSummary}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
-            showSearch={brandSubtitle !== 'Phòng Đào tạo'}
+            showSearch={
+              brandSubtitle !== "Phòng Đào tạo" &&
+              brandSubtitle !== "Quản trị viên"
+            }
           />
 
           {/* Container chính thống nhất qua Dashboard & Modules */}
