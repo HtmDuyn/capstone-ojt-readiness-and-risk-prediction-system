@@ -1,4 +1,5 @@
-import React from 'react';
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   CheckCircle2,
@@ -12,9 +13,11 @@ import {
   ArrowRight,
   School,
   Bot,
-} from 'lucide-react';
+} from "lucide-react";
 
 export const EducationDashboard: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       {/* ==================== HEADER ==================== */}
@@ -40,7 +43,6 @@ export const EducationDashboard: React.FC = () => {
           >
             Xuất báo cáo
           </button>
-
         </div>
       </div>
 
@@ -101,9 +103,7 @@ export const EducationDashboard: React.FC = () => {
                 Chưa đủ điều kiện
               </p>
 
-              <p className="mt-2 text-2xl font-extrabold text-red-600">
-                1,390
-              </p>
+              <p className="mt-2 text-2xl font-extrabold text-red-600">1,390</p>
 
               <p className="mt-2 text-xs font-medium text-red-500">
                 Cần theo dõi điều kiện OJT
@@ -124,9 +124,7 @@ export const EducationDashboard: React.FC = () => {
                 Hồ sơ chờ duyệt
               </p>
 
-              <p className="mt-2 text-2xl font-extrabold text-slate-900">
-                175
-              </p>
+              <p className="mt-2 text-2xl font-extrabold text-slate-900">175</p>
 
               <p className="mt-2 text-xs font-medium text-orange-600">
                 Đang chờ Phòng Đào tạo xử lý
@@ -146,12 +144,8 @@ export const EducationDashboard: React.FC = () => {
         <div className="card-glass border-l-4 border-red-500 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-500">
-                Risk cao
-              </p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">
-                150
-              </p>
+              <p className="text-xs font-medium text-slate-500">Risk cao</p>
+              <p className="mt-1 text-xl font-extrabold text-slate-900">150</p>
             </div>
 
             <ShieldAlert className="text-red-500" size={22} />
@@ -165,9 +159,7 @@ export const EducationDashboard: React.FC = () => {
               <p className="text-xs font-medium text-slate-500">
                 Risk trung bình
               </p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">
-                420
-              </p>
+              <p className="mt-1 text-xl font-extrabold text-slate-900">420</p>
             </div>
 
             <AlertTriangle className="text-orange-500" size={22} />
@@ -178,9 +170,7 @@ export const EducationDashboard: React.FC = () => {
         <div className="card-glass border-l-4 border-green-500 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-500">
-                Risk thấp
-              </p>
+              <p className="text-xs font-medium text-slate-500">Risk thấp</p>
               <p className="mt-1 text-xl font-extrabold text-slate-900">
                 4,670
               </p>
@@ -194,12 +184,8 @@ export const EducationDashboard: React.FC = () => {
         <div className="card-glass border-l-4 border-blue-500 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-slate-500">
-                Lớp hỗ trợ
-              </p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">
-                12
-              </p>
+              <p className="text-xs font-medium text-slate-500">Lớp hỗ trợ</p>
+              <p className="mt-1 text-xl font-extrabold text-slate-900">12</p>
             </div>
 
             <School className="text-blue-500" size={22} />
@@ -229,13 +215,13 @@ export const EducationDashboard: React.FC = () => {
 
           <div className="mt-6 flex h-48 items-end gap-3 border-b border-slate-200 px-2">
             {[
-              { label: 'Spr 23', value: 42 },
-              { label: 'Sum 23', value: 51 },
-              { label: 'Fall 23', value: 47 },
-              { label: 'Spr 24', value: 68 },
-              { label: 'Sum 24', value: 61 },
-              { label: 'Fall 24', value: 82 },
-              { label: 'Spr 25', value: 74 },
+              { label: "Spr 23", value: 42 },
+              { label: "Sum 23", value: 51 },
+              { label: "Fall 23", value: 47 },
+              { label: "Spr 24", value: 68 },
+              { label: "Sum 24", value: 61 },
+              { label: "Fall 24", value: 82 },
+              { label: "Spr 25", value: 74 },
             ].map((item) => (
               <div
                 key={item.label}
@@ -252,9 +238,7 @@ export const EducationDashboard: React.FC = () => {
                   }}
                 />
 
-                <span className="text-[9px] text-slate-400">
-                  {item.label}
-                </span>
+                <span className="text-[9px] text-slate-400">{item.label}</span>
               </div>
             ))}
           </div>
@@ -278,7 +262,7 @@ export const EducationDashboard: React.FC = () => {
               className="relative flex h-44 w-44 items-center justify-center rounded-full"
               style={{
                 background:
-                  'conic-gradient(#22c55e 0deg 321deg, #f97316 321deg 350deg, #dc2626 350deg 360deg)',
+                  "conic-gradient(#22c55e 0deg 321deg, #f97316 321deg 350deg, #dc2626 350deg 360deg)",
               }}
             >
               <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-white">
@@ -286,9 +270,7 @@ export const EducationDashboard: React.FC = () => {
                   5.2k
                 </span>
 
-                <span className="text-xs text-slate-500">
-                  Tổng cộng
-                </span>
+                <span className="text-xs text-slate-500">Tổng cộng</span>
               </div>
             </div>
 
@@ -298,9 +280,7 @@ export const EducationDashboard: React.FC = () => {
                   <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
                   Risk thấp
                 </span>
-                <span className="font-bold text-slate-900">
-                  89.1%
-                </span>
+                <span className="font-bold text-slate-900">89.1%</span>
               </div>
 
               <div className="flex items-center justify-between gap-8 text-xs">
@@ -308,9 +288,7 @@ export const EducationDashboard: React.FC = () => {
                   <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
                   Risk trung bình
                 </span>
-                <span className="font-bold text-slate-900">
-                  8.0%
-                </span>
+                <span className="font-bold text-slate-900">8.0%</span>
               </div>
 
               <div className="flex items-center justify-between gap-8 text-xs">
@@ -318,9 +296,7 @@ export const EducationDashboard: React.FC = () => {
                   <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
                   Risk cao
                 </span>
-                <span className="font-bold text-slate-900">
-                  2.9%
-                </span>
+                <span className="font-bold text-slate-900">2.9%</span>
               </div>
             </div>
           </div>
@@ -347,9 +323,9 @@ export const EducationDashboard: React.FC = () => {
 
           <div className="mt-6 space-y-5">
             {[
-              { label: 'Khóa 18 (K18)', value: 98 },
-              { label: 'Khóa 17 (K17)', value: 75 },
-              { label: 'Khóa 18 (K18)', value: 42 },
+              { label: "Khóa 18 (K18)", value: 98 },
+              { label: "Khóa 17 (K17)", value: 75 },
+              { label: "Khóa 18 (K18)", value: 42 },
             ].map((item) => (
               <div key={item.label}>
                 <div className="mb-2 flex items-center justify-between">
@@ -396,15 +372,13 @@ export const EducationDashboard: React.FC = () => {
                   Đủ điều kiện
                 </span>
 
-                <span className="font-bold text-green-600">
-                  3,850
-                </span>
+                <span className="font-bold text-green-600">3,850</span>
               </div>
 
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-green-500"
-                  style={{ width: '73.5%' }}
+                  style={{ width: "73.5%" }}
                 />
               </div>
             </div>
@@ -415,15 +389,13 @@ export const EducationDashboard: React.FC = () => {
                   Chưa đủ điều kiện
                 </span>
 
-                <span className="font-bold text-red-600">
-                  1,390
-                </span>
+                <span className="font-bold text-red-600">1,390</span>
               </div>
 
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-red-500"
-                  style={{ width: '26.5%' }}
+                  style={{ width: "26.5%" }}
                 />
               </div>
             </div>
@@ -448,6 +420,7 @@ export const EducationDashboard: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => navigate("/education/risk-students")}
               className="text-xs font-semibold text-orange-600 hover:text-orange-700"
             >
               Xem tất cả
@@ -483,25 +456,25 @@ export const EducationDashboard: React.FC = () => {
               <tbody>
                 {[
                   {
-                    name: 'Nguyễn Thành Phương',
-                    id: 'SE161234',
-                    risk: '92/100',
-                    issue: 'Thiếu chứng chỉ OJT',
-                    action: 'Gửi mail',
+                    name: "Nguyễn Thành Phương",
+                    id: "SE161234",
+                    risk: "92/100",
+                    issue: "Thiếu chứng chỉ OJT",
+                    action: "Gửi mail",
                   },
                   {
-                    name: 'Phan Lan Anh',
-                    id: 'SE161458',
-                    risk: '78/100',
-                    issue: 'GPA chuyển ngành thấp',
-                    action: 'Tư vấn',
+                    name: "Phan Lan Anh",
+                    id: "SE161458",
+                    risk: "78/100",
+                    issue: "GPA chuyển ngành thấp",
+                    action: "Tư vấn",
                   },
                   {
-                    name: 'Trần Hùng Dũng',
-                    id: 'SE161789',
-                    risk: '80/100',
-                    issue: 'Nợ môn tiên quyết',
-                    action: 'Đăng ký lớp',
+                    name: "Trần Hùng Dũng",
+                    id: "SE161789",
+                    risk: "80/100",
+                    issue: "Nợ môn tiên quyết",
+                    action: "Đăng ký lớp",
                   },
                 ].map((student) => (
                   <tr
@@ -593,6 +566,7 @@ export const EducationDashboard: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => navigate("/education/risk-alerts")}
               className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-orange-600"
             >
               Xem cảnh báo
@@ -628,7 +602,13 @@ export const EducationDashboard: React.FC = () => {
                   </p>
                 </div>
 
-                <ArrowRight size={15} className="text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => navigate("/education/ai-class-proposals")}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-50 hover:text-orange-500"
+                >
+                  <ArrowRight size={15} />
+                </button>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
@@ -642,7 +622,13 @@ export const EducationDashboard: React.FC = () => {
                   </p>
                 </div>
 
-                <ArrowRight size={15} className="text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => navigate("/education/ai-class-proposals")}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-50 hover:text-orange-500"
+                >
+                  <ArrowRight size={15} />
+                </button>
               </div>
             </div>
           </div>
