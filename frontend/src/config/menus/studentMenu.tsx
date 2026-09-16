@@ -3,7 +3,6 @@ import {
   DashboardGridIcon,
   AcademicCapIcon,
   RiskAnalyticsIcon,
-  RoadmapConsultingIcon,
   OjtRegisterIcon,
   OjtProfileIcon,
   InternshipProgressIcon,
@@ -67,23 +66,6 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
     },
   },
   {
-    id: 'roadmap-consulting',
-    label: 'AI Tư vấn lộ trình',
-    path: '/student/roadmap-consulting',
-    icon: <RoadmapConsultingIcon size={20} />,
-    banner: {
-      title: 'AI Tư vấn lộ trình học tập & OJT',
-      description: (
-        <>
-          Xây dựng lộ trình học tập cá nhân hóa chuẩn bị kiến thức thực chiến, tối ưu kỹ năng phù hợp với tiêu chuẩn doanh nghiệp đối tác.
-        </>
-      ),
-      badge: 'Cố vấn lộ trình 24/7',
-      primaryActionLabel: 'Tạo lộ trình mới',
-      defaultAiPrompt: 'Tư vấn lộ trình học tập chi tiết để sẵn sàng đi OJT tại doanh nghiệp Tier-1.',
-    },
-  },
-  {
     id: 'ojt-registration',
     label: 'Đăng ký OJT',
     path: '/student/ojt-registration',
@@ -100,23 +82,7 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
       defaultAiPrompt: 'Hướng dẫn quy trình và các giấy tờ cần thiết để nộp hồ sơ đăng ký OJT.',
     },
   },
-  {
-    id: 'ojt-profile',
-    label: 'Hồ sơ OJT',
-    path: '/student/ojt-profile',
-    icon: <OjtProfileIcon size={20} />,
-    banner: {
-      title: 'Hồ sơ OJT & Portfolio số',
-      description: (
-        <>
-          Quản lý CV số hóa, portfolio dự án, chứng chỉ kỹ năng công nghệ và hồ sơ năng lực gửi đến các đối tác doanh nghiệp.
-        </>
-      ),
-      badge: 'CV Hoàn thiện 85%',
-      primaryActionLabel: 'Cập nhật hồ sơ CV',
-      defaultAiPrompt: 'Hãy gợi ý cách cải thiện CV và Portfolio để tăng tỷ lệ trúng tuyển OJT.',
-    },
-  },
+
   {
     id: 'internship-progress',
     label: 'Tiến độ thực tập',

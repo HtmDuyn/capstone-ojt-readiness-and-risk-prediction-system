@@ -11,6 +11,8 @@ import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
 import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
+import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
+import StudentAIRiskPrediction from "@/pages/student/StudentAIRiskPrediction";
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
@@ -76,9 +78,9 @@ const studentRoutes: RouteObject = {
     { path: "/student", element: <Navigate to="/student/dashboard" replace /> },
     { path: "/student/dashboard", element: <StudentDashboard /> },
     { path: "/student/academic-profile", element: <StudentAcademicProfile /> },
-    { path: "/student/risk-prediction", element: <StudentFeaturePage /> },
+    { path: "/student/risk-prediction", element: <StudentAIRiskPrediction /> },
     { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
-    { path: "/student/ojt-registration", element: <StudentFeaturePage /> },
+    { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
     { path: "/student/ojt-profile", element: <StudentFeaturePage /> },
     { path: "/student/internship-progress", element: <StudentFeaturePage /> },
     { path: "/student/evaluation-results", element: <StudentFeaturePage /> },
