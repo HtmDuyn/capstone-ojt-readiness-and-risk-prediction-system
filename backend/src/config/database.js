@@ -1,4 +1,6 @@
 const path = require("path");
+const { Pool } = require("pg");
+
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -25,4 +27,24 @@ const databaseConfig = {
   ssl: process.env.DB_SSL === "true" || isProduction ? { rejectUnauthorized: false } : false,
 };
 
-module.exports = databaseConfig;
+const connectionString = databaseConfig.url;
+const pool = connectionString ? new Pool({
+  connectionString,
+  ssl: databaseConfig.ssl === true || (databaseConfig.ssl && databaseConfig.ssl.rejectUnauthorized === false)
+    ? { rejectUnauthorized: false }
+    : false
+}) : null;
+
+const query = async (text, params) => {
+  if (!pool) {
+    throw new Error("Database is not configured. Set LOCAL_DATABASE_URL or DATABASE_URL.");
+  }
+
+  return pool.query(text, params);
+};
+
+module.exports = {
+  ...databaseConfig,
+  pool,
+  query
+};
