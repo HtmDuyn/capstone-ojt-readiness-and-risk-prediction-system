@@ -9,9 +9,7 @@ import {
   ShieldAlert,
   UserCheck,
   BookOpen,
-  Bell,
   ArrowRight,
-  Upload,
   School,
   Bot,
 } from 'lucide-react';
@@ -43,13 +41,6 @@ export const EducationDashboard: React.FC = () => {
             Xuất báo cáo
           </button>
 
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
-          >
-            <Clock3 size={16} />
-            Khởi tạo kỳ OJT
-          </button>
         </div>
       </div>
 
@@ -655,73 +646,6 @@ export const EducationDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ==================== HOẠT ĐỘNG + ACTION ==================== */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(240px,0.8fr)]">
-        {/* Hoạt động */}
-        <div className="card-glass p-5">
-          <div className="flex items-center gap-2">
-            <Bell className="text-orange-500" size={19} />
-
-            <h2 className="text-base font-bold text-slate-900">
-              Hoạt động gần đây
-            </h2>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <div className="flex gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-600">
-                <Upload size={15} />
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-800">
-                  Import dữ liệu sinh viên thành công
-                </p>
-
-                <p className="mt-1 text-[10px] text-slate-500">
-                  Đã cập nhật dữ liệu sinh viên cho kỳ OJT hiện tại.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                <CheckCircle2 size={15} />
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-800">
-                  Hoàn tất kiểm tra điều kiện OJT
-                </p>
-
-                <p className="mt-1 text-[10px] text-slate-500">
-                  Danh sách sinh viên đủ điều kiện đã được cập nhật.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action */}
-        <div className="flex flex-col gap-3">
-          <button
-            type="button"
-            className="flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-white px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
-          >
-            <Upload size={17} />
-            Import sinh viên
-          </button>
-
-          <button
-            type="button"
-            className="flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-white px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
-          >
-            <School size={17} />
-            Tạo lớp hỗ trợ
-          </button>
         </div>
       </div>
     </div>

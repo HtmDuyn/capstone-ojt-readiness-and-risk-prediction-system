@@ -15,6 +15,7 @@ import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
+import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -178,7 +179,9 @@ export const router = createBrowserRouter([
               group.children!.map((item) => ({
                 path: item.path,
                 element:
-                  item.path === "/education/ojt-eligibility" ? (
+                  item.path === "/education/academic-year" ? (
+                    <EducationAcademicYear />
+                  ) : item.path === "/education/ojt-eligibility" ? (
                     <EducationOjtEligibility />
                   ) : item.path === "/education/academic-alerts" ? (
                     <EducationAcademicAlerts />

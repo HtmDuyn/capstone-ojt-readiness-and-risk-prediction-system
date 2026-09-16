@@ -60,18 +60,6 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
         },
       },
       {
-        id: 'ojt-period',
-        label: 'Khởi tạo kỳ OJT',
-        path: '/education/ojt-period',
-        icon: <CalendarDays size={20} />,
-        banner: {
-          title: 'Khởi tạo Kỳ OJT',
-          description:
-            'Quản lý và khởi tạo các kỳ OJT trong hệ thống.',
-          badge: 'Quản lý dữ liệu',
-        },
-      },
-      {
         id: 'student-import',
         label: 'Import dữ liệu sinh viên',
         path: '/education/student-import',
