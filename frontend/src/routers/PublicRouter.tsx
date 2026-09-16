@@ -17,6 +17,7 @@ import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
 import EducationStudentImport from "@/pages/education/EducationStudentImport";
+import EducationOjtConditions from '@/pages/education/EducationOjtConditions';
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -190,6 +191,8 @@ export const router = createBrowserRouter([
                     <EducationAcademicAlerts />
                   ) : item.path === "/education/curriculum-plan" ? (
                     <EducationCurriculumPlan />
+                  ) : item.path === "/education/ojt-conditions" ? (
+                    <EducationOjtConditions />
                   ) : (
                     <RolePlaceholderPage role="education" />
                   ),
