@@ -138,21 +138,19 @@ export const StudentOjtRegistration: React.FC = () => {
         {/* Tabs */}
         <div className="flex border-b border-slate-100 bg-slate-50/50 px-4 pt-4">
           <button
-            className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors duration-200 ${
-              activeTab === 'companies'
+            className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors duration-200 ${activeTab === 'companies'
                 ? 'border-orange-500 text-orange-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
+              }`}
             onClick={() => setActiveTab('companies')}
           >
             Danh sách Doanh nghiệp
           </button>
           <button
-            className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors duration-200 ${
-              activeTab === 'my-application'
+            className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors duration-200 ${activeTab === 'my-application'
                 ? 'border-orange-500 text-orange-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
+              }`}
             onClick={() => setActiveTab('my-application')}
           >
             Tiến độ nộp hồ sơ
@@ -189,7 +187,7 @@ export const StudentOjtRegistration: React.FC = () => {
                           <LocationIcon size={12} className="text-slate-400" />
                           {company.location}
                         </div>
-                        
+
                         <div className="flex items-center gap-4 mt-3">
                           <div className="flex items-center gap-1 text-sm font-medium text-slate-700">
                             <UsersIcon size={14} className="text-blue-500" />
@@ -203,7 +201,7 @@ export const StudentOjtRegistration: React.FC = () => {
                         <div className="mt-3 text-xs text-slate-600">
                           <span className="font-semibold">Vị trí:</span> {company.roles.join(', ')}
                         </div>
-                        
+
                         <div className="flex flex-wrap gap-2 mt-3">
                           {company.tags.map(tag => (
                             <span key={tag} className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md">
@@ -213,7 +211,7 @@ export const StudentOjtRegistration: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="mt-5 pt-4 border-t border-slate-100 flex gap-3">
                       <button className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-xl text-sm transition-colors text-center shadow-lg shadow-orange-500/20 transform hover:-translate-y-0.5">
                         Đăng ký NV
@@ -238,20 +236,19 @@ export const StudentOjtRegistration: React.FC = () => {
               {/* Custom Stepper */}
               <div className="relative">
                 <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-100"></div>
-                
+
                 <div className="space-y-6">
                   {applicationSteps.map((step, index) => {
                     const isCompleted = step.status === 'completed';
                     const isCurrent = step.status === 'current';
-                    
+
                     return (
                       <div key={step.id} className="relative flex items-start gap-6">
-                        <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm border-4 border-white shadow-sm transition-colors duration-300 ${
-                          isCompleted ? 'bg-green-500 text-white' : isCurrent ? 'bg-orange-500 text-white animate-pulse' : 'bg-slate-200 text-slate-500'
-                        }`}>
+                        <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm border-4 border-white shadow-sm transition-colors duration-300 ${isCompleted ? 'bg-green-500 text-white' : isCurrent ? 'bg-orange-500 text-white animate-pulse' : 'bg-slate-200 text-slate-500'
+                          }`}>
                           {isCompleted ? <CheckCircleIcon size={20} /> : step.id}
                         </div>
-                        
+
                         <div className={`pt-3 flex-1 ${isCurrent ? 'opacity-100' : 'opacity-70'}`}>
                           <h4 className={`text-base font-bold ${isCurrent ? 'text-orange-600' : 'text-slate-800'}`}>
                             {step.name}
@@ -259,12 +256,12 @@ export const StudentOjtRegistration: React.FC = () => {
                           <p className="text-sm text-slate-500 mt-1">
                             {isCompleted ? `Hoàn thành lúc: ${step.date}` : isCurrent ? step.desc : step.desc}
                           </p>
-                          
+
                           {isCurrent && (
                             <div className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-100 flex items-start gap-3">
                               <BotSparkleIcon size={20} className="text-orange-500 mt-0.5" />
                               <div className="text-sm text-slate-700">
-                                <strong>AI Gợi ý:</strong> Trong lúc chờ trường điều phối, bạn có thể xem lại kiến thức về ReactJS và chuẩn bị cho vòng phỏng vấn. 
+                                <strong>AI Gợi ý:</strong> Trong lúc chờ trường điều phối, bạn có thể xem lại kiến thức về ReactJS và chuẩn bị cho vòng phỏng vấn.
                                 <button onClick={() => openAIConsult('Mô phỏng phỏng vấn Frontend Developer cho tôi.')} className="ml-1 text-orange-600 font-semibold hover:underline">
                                   Bắt đầu mock interview ngay.
                                 </button>
@@ -295,7 +292,7 @@ export const StudentOjtRegistration: React.FC = () => {
                 <CloseIcon size={20} />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-8">
               {/* Profile Header */}
               <div className="flex gap-6 items-center">
@@ -354,10 +351,10 @@ export const StudentOjtRegistration: React.FC = () => {
                 <div className="w-full h-[400px] bg-slate-100 rounded-2xl border border-slate-200 flex flex-col items-center justify-center text-slate-400 gap-3">
                   <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 11V17L11 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M9 17L7 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V9C2 4 4 2 9 2H14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M22 10H18C15 10 14 9 14 6V2L22 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M9 11V17L11 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M9 17L7 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V9C2 4 4 2 9 2H14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M22 10H18C15 10 14 9 14 6V2L22 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   <p className="font-medium text-sm">NguyenVanA_CV_Frontend.pdf</p>

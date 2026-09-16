@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   BotSparkleIcon,
   CloseIcon,
@@ -29,6 +29,14 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
     },
   ]);
   const [inputVal, setInputVal] = useState(initialQuery);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (isOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen]);
 
   if (!isOpen) return null;
 
@@ -73,9 +81,10 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/80 flex flex-col max-h-[85vh] overflow-hidden text-slate-800">
-        {/* Phần tiêu đề hộp thoại */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-gradient-to-r from-orange-500 via-amber-500 to-purple-600 text-white">
+      {/* Fixed height container (h-[580px] max-h-[85vh]) */}
+      <div className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/80 flex flex-col h-[580px] max-h-[85vh] overflow-hidden text-slate-800">
+        {/* Phần tiêu đề hộp thoại (Fixed Header) */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-gradient-to-r from-orange-500 via-amber-500 to-purple-600 text-white flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs border border-white/20">
               <BotSparkleIcon size={22} className="text-white" />
@@ -98,8 +107,8 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           </button>
         </div>
 
-        {/* Các gợi ý nhanh */}
-        <div className="p-3 bg-orange-50/50 border-b border-orange-100/60 flex items-center gap-2 overflow-x-auto text-xs custom-scrollbar">
+        {/* Các gợi ý nhanh (Fixed Suggestions Bar) */}
+        <div className="p-3 bg-orange-50/50 border-b border-orange-100/60 flex items-center gap-2 overflow-x-auto text-xs custom-scrollbar flex-shrink-0">
           <span className="text-slate-500 text-[11px] font-semibold flex items-center gap-1">
             <LightningIcon size={12} className="text-amber-500" /> Gợi ý:
           </span>
@@ -119,33 +128,35 @@ export const AIConsultModal: React.FC<AIConsultModalProps> = ({
           </button>
         </div>
 
-        {/* Danh sách hội thoại */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50/50">
+        {/* Danh sách hội thoại (Scrollable Messages Area) */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50/50 min-h-0">
           {messages.map((m, i) => (
             <div
               key={i}
               className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${m.sender === 'user'
-                  ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white rounded-br-none shadow-md shadow-orange-500/20 font-medium'
-                  : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none shadow-xs'
-                  }`}
+                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${
+                  m.sender === 'user'
+                    ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white rounded-br-none shadow-md shadow-orange-500/20 font-medium'
+                    : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none shadow-xs'
+                }`}
               >
                 {m.text}
               </div>
               <span className="text-[10px] text-slate-400 mt-1 px-1">{m.time}</span>
             </div>
           ))}
+          <div ref={chatEndRef} />
         </div>
 
-        {/* Ô nhập tin nhắn */}
+        {/* Ô nhập tin nhắn (Fixed Footer Input) */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSend();
           }}
-          className="p-3 bg-white border-t border-slate-100 flex items-center gap-2"
+          className="p-3 bg-white border-t border-slate-100 flex items-center gap-2 flex-shrink-0"
         >
           <input
             type="text"

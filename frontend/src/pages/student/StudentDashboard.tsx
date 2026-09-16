@@ -29,25 +29,26 @@ export const StudentDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Hero Page Banner - Display Full Width at Top */}
+      <PageBanner
+        student={mockStudentProfile}
+        menuId="dashboard"
+        primaryAction={{
+          label: 'Đăng ký OJT',
+          onClick: () =>
+            openAIConsult('Cổng đăng ký OJT sẽ mở tiếp nhận hồ sơ doanh nghiệp khi nào?'),
+        }}
+        secondaryAction={{
+          label: 'Xem lộ trình OJT',
+          onClick: () =>
+            openAIConsult('Đang xem lộ trình chi tiết các môn học và điều kiện OJT.'),
+        }}
+      />
+
+      {/* Main Grid Section (Placed below PageBanner) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Left & Middle Main Section (8 cols on XL) */}
         <div className="xl:col-span-8 space-y-6">
-          {/* Hero Page Banner */}
-          <PageBanner
-            student={mockStudentProfile}
-            menuId="dashboard"
-            primaryAction={{
-              label: 'Đăng ký OJT',
-              onClick: () =>
-                openAIConsult('Cổng đăng ký OJT sẽ mở tiếp nhận hồ sơ doanh nghiệp khi nào?'),
-            }}
-            secondaryAction={{
-              label: 'Xem lộ trình OJT',
-              onClick: () =>
-                openAIConsult('Đang xem lộ trình chi tiết các môn học và điều kiện OJT.'),
-            }}
-          />
-
           {/* 4 Metric Stats Cards */}
           <StatCards student={mockStudentProfile} />
 
@@ -58,7 +59,7 @@ export const StudentDashboard: React.FC = () => {
           <RoadmapStepper steps={mockRoadmapSteps} />
         </div>
 
-        {/* Right Sidebar Section (4 cols on XL) */}
+        {/* Right Sidebar Section (4 cols on XL) - Located under Banner */}
         <div className="xl:col-span-4 space-y-6">
           {/* AI Risk Score Donut Gauge */}
           <AIRiskScoreCard data={mockAIRiskScore} />

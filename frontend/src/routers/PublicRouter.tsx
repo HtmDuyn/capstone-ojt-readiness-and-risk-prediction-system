@@ -9,10 +9,13 @@ import { BaseLayout } from "@/layouts/BaseLayout";
 import { getMenuByRole } from "@/config";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
-import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
-import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
+import StudentAcademicProfile from "@/pages/student/StudentProfile";
+import StudentFeaturePage from "@/pages/student/StudentFeature";
 import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
-import StudentAIRiskPrediction from "@/pages/student/StudentAIRiskPrediction";
+import StudentAIRiskPrediction from "@/pages/student/StudentAIRisk";
+import StudentInternshipProgress from "@/pages/student/StudentOJTProgress";
+import StudentEvaluationResults from "@/pages/student/StudentResults";
+import StudentNotifications from "@/pages/student/StudentNotifications";
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
@@ -82,9 +85,9 @@ const studentRoutes: RouteObject = {
     { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
     { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
     { path: "/student/ojt-profile", element: <StudentFeaturePage /> },
-    { path: "/student/internship-progress", element: <StudentFeaturePage /> },
-    { path: "/student/evaluation-results", element: <StudentFeaturePage /> },
-    { path: "/student/notifications", element: <StudentFeaturePage /> },
+    { path: "/student/internship-progress", element: <StudentInternshipProgress /> },
+    { path: "/student/evaluation-results", element: <StudentEvaluationResults /> },
+    { path: "/student/notifications", element: <StudentNotifications /> },
 
     // Alias giữ tương thích với các đường dẫn cũ.
     {
