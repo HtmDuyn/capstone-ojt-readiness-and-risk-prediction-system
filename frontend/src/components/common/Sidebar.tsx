@@ -1,11 +1,9 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  FptLogoIcon,
-  CloseIcon,
-  SignOutIcon,
-} from './icons/AppIcons';
-import type { NavItem } from '@/types/common.types';
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { FptLogoIcon, CloseIcon, SignOutIcon } from "./icons/AppIcons";
+
+import { ChevronDown, ChevronRight } from "lucide-react";
+import type { NavItem } from "@/types/common.types";
 
 interface SidebarProps {
   navItems: NavItem[];
@@ -19,9 +17,9 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   navItems,
-  title = 'FPT University',
-  subtitle = 'Hệ thống quản lý',
-  homePath = '/student/dashboard',
+  title = "FPT University",
+  subtitle = "Hệ thống quản lý",
+  homePath = "/student/dashboard",
   isOpenMobile = false,
   onCloseMobile,
   onLogout,
@@ -29,9 +27,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [isHovered, setIsHovered] = React.useState(false);
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>(
+    {},
+  );
 
   // Mở rộng nếu chuột đang hover (desktop) hoặc menu trên thiết bị di động được mở
   const isExpanded = isHovered || isOpenMobile;
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   return (
     <>
@@ -47,12 +54,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`peer fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#111827] text-slate-300 shadow-2xl transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpenMobile
-          ? 'translate-x-0 w-[260px]'
-          : '-translate-x-full lg:translate-x-0'
-        } ${isHovered
-          ? 'w-[260px] shadow-2xl shadow-black/70 ring-1 ring-white/10'
-          : 'lg:w-[76px]'
+        className={`peer fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#111827] text-slate-300 shadow-2xl transition-all duration-300 ease-in-out lg:translate-x-0 ${
+          isOpenMobile
+            ? "translate-x-0 w-[260px]"
+            : "-translate-x-full lg:translate-x-0"
+        } ${
+          isHovered
+            ? "w-[260px] shadow-2xl shadow-black/70 ring-1 ring-white/10"
+            : "lg:w-[76px]"
         }`}
       >
         {/* Header Thương hiệu */}
@@ -65,9 +74,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <FptLogoIcon size={28} />
             </div>
             <div
-              className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${isExpanded
-                ? 'opacity-100 max-w-[180px] translate-x-0'
-                : 'opacity-0 max-w-0 -translate-x-4 pointer-events-none'
+              className={`transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                isExpanded
+                  ? "opacity-100 max-w-[180px] translate-x-0"
+                  : "opacity-0 max-w-0 -translate-x-4 pointer-events-none"
               }`}
             >
               <div className="text-white font-bold text-base leading-tight tracking-tight font-outfit">
@@ -93,8 +103,115 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1.5 custom-scrollbar overflow-x-hidden">
           {navItems.map((item) => {
             const currentPath = location.pathname;
+            const hasChildren = Boolean(item.children?.length);
+
             const isActive = currentPath === item.path;
 
+            const hasActiveChild = item.children?.some(
+              (child) => child.path === currentPath,
+            );
+
+            const isGroupOpen = openGroups[item.id] || Boolean(hasActiveChild);
+
+            // =========================
+            // MENU CHA
+            // =========================
+            if (hasChildren) {
+              return (
+                <div key={item.id}>
+                  <button
+                    type="button"
+                    title={!isExpanded ? item.label : undefined}
+                    onClick={() => toggleGroup(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${
+                      hasActiveChild
+                        ? "text-white bg-white/10"
+                        : "text-slate-300 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span
+                      className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-200 ${
+                        hasActiveChild ? "text-orange-400" : "text-slate-400"
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+
+                    <span
+                      className={`truncate transition-all duration-300 whitespace-nowrap ${
+                        isExpanded
+                          ? "opacity-100 max-w-[180px] translate-x-0"
+                          : "opacity-0 max-w-0 -translate-x-2 pointer-events-none"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+
+                    {isExpanded && (
+                      <span className="ml-auto flex-shrink-0 text-slate-400">
+                        {isGroupOpen ? (
+                          <ChevronDown size={17} />
+                        ) : (
+                          <ChevronRight size={17} />
+                        )}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* =========================
+            MENU CON
+        ========================= */}
+                  {isGroupOpen && isExpanded && (
+                    <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-2">
+                      {item.children?.map((child) => {
+                        const isChildActive = currentPath === child.path;
+
+                        return (
+                          <button
+                            key={child.id}
+                            type="button"
+                            title={child.label}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+
+                              navigate(child.path);
+
+                              if (onCloseMobile) {
+                                onCloseMobile();
+                              }
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 text-left ${
+                              isChildActive
+                                ? "bg-[#ea580c] text-white shadow-lg shadow-orange-600/20 font-semibold"
+                                : "text-slate-400 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            <span
+                              className={`flex-shrink-0 w-5 h-5 flex items-center justify-center ${
+                                isChildActive ? "text-white" : "text-slate-500"
+                              }`}
+                            >
+                              {child.icon}
+                            </span>
+
+                            <span className="truncate">{child.label}</span>
+
+                            {child.hasBadge && (
+                              <span className="ml-auto h-2 w-2 rounded-full bg-red-500" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // =========================
+            // MENU KHÔNG CÓ CHILDREN
+            // =========================
             return (
               <button
                 key={item.id}
@@ -104,33 +221,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   if (onCloseMobile) onCloseMobile();
                   navigate(item.path);
                 }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${isActive
-                  ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-600/30 font-semibold'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${
+                  isActive
+                    ? "bg-[#ea580c] text-white shadow-lg shadow-orange-600/30 font-semibold"
+                    : "text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1"
                 }`}
               >
                 <span
-                  className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-200 group-hover/item:scale-110 ${isActive ? 'text-white' : 'text-slate-400'
+                  className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-200 group-hover/item:scale-110 ${
+                    isActive ? "text-white" : "text-slate-400"
                   }`}
                 >
                   {item.icon}
                 </span>
 
                 <span
-                  className={`truncate transition-all duration-300 whitespace-nowrap ${isExpanded
-                    ? 'opacity-100 max-w-[180px] translate-x-0'
-                    : 'opacity-0 max-w-0 -translate-x-2 pointer-events-none'
+                  className={`truncate transition-all duration-300 whitespace-nowrap ${
+                    isExpanded
+                      ? "opacity-100 max-w-[180px] translate-x-0"
+                      : "opacity-0 max-w-0 -translate-x-2 pointer-events-none"
                   }`}
                 >
                   {item.label}
                 </span>
 
-                {/* Chấm đỏ thông báo */}
                 {item.hasBadge && (
                   <span
-                    className={`rounded-full bg-red-500 ring-2 ring-[#111827] animate-pulse transition-all duration-200 ${isExpanded
-                      ? 'w-2 h-2 ml-auto relative'
-                      : 'w-2 h-2 absolute top-2 right-2'
+                    className={`rounded-full bg-red-500 ring-2 ring-[#111827] animate-pulse transition-all duration-200 ${
+                      isExpanded
+                        ? "w-2 h-2 ml-auto relative"
+                        : "w-2 h-2 absolute top-2 right-2"
                     }`}
                   />
                 )}
@@ -145,16 +265,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={onLogout}
-            title={!isExpanded ? 'Đăng xuất hệ thống' : undefined}
+            title={!isExpanded ? "Đăng xuất hệ thống" : undefined}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs sm:text-sm font-semibold transition-all duration-200 group overflow-hidden cursor-pointer"
           >
             <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center group-hover:-translate-x-0.5 transition-transform">
               <SignOutIcon size={18} className="text-rose-400" />
             </span>
             <span
-              className={`truncate transition-all duration-300 whitespace-nowrap ${isExpanded
-                ? 'opacity-100 max-w-[180px] translate-x-0'
-                : 'opacity-0 max-w-0 -translate-x-2 pointer-events-none'
+              className={`truncate transition-all duration-300 whitespace-nowrap ${
+                isExpanded
+                  ? "opacity-100 max-w-[180px] translate-x-0"
+                  : "opacity-0 max-w-0 -translate-x-2 pointer-events-none"
               }`}
             >
               Đăng xuất hệ thống

@@ -13,6 +13,10 @@ export interface NavItem {
   label: string;
   path: string;
   icon: React.ReactNode;
+
+  // Menu con
+  children?: NavItem[];
+
   hasBadge?: boolean;
   badgeDot?: boolean;
   badgeText?: string;
