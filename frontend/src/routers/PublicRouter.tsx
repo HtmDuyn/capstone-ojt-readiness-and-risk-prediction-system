@@ -22,7 +22,11 @@ import EducationStudentProgress from "@/pages/education/EducationStudentProgress
 import EducationOjtApplicationReview from "@/pages/education/EducationOjtApplicationReview";
 import EducationRiskStudents from "@/pages/education/EducationRiskStudents";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
-
+import EducationOjtStatistics from "@/pages/education/EducationOjtStatistics";
+import EducationAiClassProposals from "@/pages/education/EducationAiClassProposals";
+import EducationSupportClasses from "@/pages/education/EducationSupportClasses";
+import EducationClassNotifications from "@/pages/education/EducationClassNotifications";
+import EducationClassStudents from "@/pages/education/EducationClassStudents";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -206,6 +210,18 @@ export const router = createBrowserRouter([
                     <EducationStudentStatus />
                   ) : item.path === "/education/risk-students" ? (
                     <EducationRiskStudents />
+                  ) : item.path === "/education/risk-alerts" ? (
+                    <EducationAcademicAlerts />
+                  ) : item.path === "/education/ojt-statistics" ? (
+                    <EducationOjtStatistics />
+                  ) : item.path === "/education/ai-class-proposals" ? (
+                    <EducationAiClassProposals />
+                  ) : item.path === "/education/support-classes" ? (
+                    <EducationSupportClasses />
+                  ) : item.path === "/education/class-notifications" ? (
+                    <EducationClassNotifications />
+                  ) : item.path === "/education/class-students" ? (
+                    <EducationClassStudents />
                   ) : (
                     <RolePlaceholderPage role="education" />
                   ),

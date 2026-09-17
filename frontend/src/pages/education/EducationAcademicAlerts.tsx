@@ -1,314 +1,678 @@
-import React, { useMemo, useState } from 'react';
+import React from "react";
 import {
   AlertTriangle,
+  BellRing,
+  BrainCircuit,
+  CalendarClock,
   CheckCircle2,
-  Search,
-  TrendingDown,
-} from 'lucide-react';
-import { PageBanner } from '@/components/common/PageBanner';
+  ChevronRight,
+  Clock3,
+  Eye,
+  GraduationCap,
+  X,
+} from "lucide-react";
 
-type RiskLevel = 'Cao' | 'Trung bình' | 'Thấp';
+import { PageBanner } from "@/components/common/PageBanner";
 
-interface AcademicRiskStudent {
+/* =========================================================
+   TYPES
+   ========================================================= */
+
+type AlertStatus = "Mới" | "Đã xem" | "Đang theo dõi";
+
+interface RiskAlert {
   id: string;
+
   studentCode: string;
   fullName: string;
-  gpa: number;
-  completedCredits: number;
-  failedSubjects: number;
-  riskLevel: RiskLevel;
-  riskReason: string;
+  cohort: string;
+  studentClass: string;
+  currentSemester: number;
+
+  riskScore: number;
+
+  plannedOjtTerm: string;
+  estimatedOjtTerm: string;
+  delayTerms: number;
+
+  title: string;
+  reason: string;
+
+  detectedAt: string;
+  status: AlertStatus;
 }
 
-const MOCK_RISK_STUDENTS: AcademicRiskStudent[] = [
+/* =========================================================
+   MOCK ALERT DATA
+
+   Sau này:
+   AI/BE phát hiện Risk cao
+        ↓
+   Backend tạo cảnh báo
+        ↓
+   Frontend chỉ hiển thị
+
+   Frontend hiện tại KHÔNG tự chạy model Risk.
+   ========================================================= */
+
+const INITIAL_ALERTS: RiskAlert[] = [
   {
-    id: '1',
-    studentCode: 'SE170001',
-    fullName: 'Nguyễn Văn An',
-    gpa: 2.1,
-    completedCredits: 75,
-    failedSubjects: 3,
-    riskLevel: 'Cao',
-    riskReason: 'GPA thấp và còn nhiều môn chưa đạt',
+    id: "alert-001",
+
+    studentCode: "SE181666",
+    fullName: "Nguyễn Khánh Ly",
+
+    cohort: "K18",
+    studentClass: "K18D-19A",
+    currentSemester: 5,
+
+    riskScore: 86,
+
+    plannedOjtTerm: "Summer 2026",
+    estimatedOjtTerm: "Fall 2026",
+    delayTerms: 1,
+
+    title: "Nguy cơ chậm kỳ OJT",
+
+    reason:
+      "Tiến độ tín chỉ hiện tại có nguy cơ không đáp ứng kỳ OJT theo kế hoạch. Kỳ OJT dự kiến đã dịch từ Summer 2026 sang Fall 2026.",
+
+    detectedAt: "15/09/2026 09:30",
+
+    status: "Mới",
   },
+
   {
-    id: '2',
-    studentCode: 'SE170002',
-    fullName: 'Trần Minh Anh',
-    gpa: 2.65,
-    completedCredits: 82,
-    failedSubjects: 2,
-    riskLevel: 'Trung bình',
-    riskReason: 'Còn môn chưa đạt',
+    id: "alert-002",
+
+    studentCode: "SE181402",
+    fullName: "Đặng Hoàng Nam",
+
+    cohort: "K18",
+    studentClass: "K18D-19B",
+    currentSemester: 5,
+
+    riskScore: 81,
+
+    plannedOjtTerm: "Summer 2026",
+    estimatedOjtTerm: "Fall 2026",
+    delayTerms: 1,
+
+    title: "Tiến độ học tập có nguy cơ ảnh hưởng OJT",
+
+    reason:
+      "Sinh viên còn các học phần cần hoàn thành và tiến độ hiện tại có khả năng làm thay đổi kỳ OJT dự kiến.",
+
+    detectedAt: "14/09/2026 14:20",
+
+    status: "Đang theo dõi",
   },
+
   {
-    id: '3',
-    studentCode: 'SE170003',
-    fullName: 'Lê Hoàng Nam',
-    gpa: 3.05,
-    completedCredits: 90,
-    failedSubjects: 1,
-    riskLevel: 'Thấp',
-    riskReason: 'Có một môn chưa đạt',
-  },
-  {
-    id: '4',
-    studentCode: 'SE170004',
-    fullName: 'Phạm Minh Đức',
-    gpa: 1.95,
-    completedCredits: 68,
-    failedSubjects: 5,
-    riskLevel: 'Cao',
-    riskReason: 'Tiến độ tín chỉ thấp và nhiều môn chưa đạt',
+    id: "alert-003",
+
+    studentCode: "SE181934",
+    fullName: "Phan Minh Hoàng",
+
+    cohort: "K18",
+    studentClass: "K18D-19A",
+    currentSemester: 5,
+
+    riskScore: 78,
+
+    plannedOjtTerm: "Fall 2026",
+    estimatedOjtTerm: "Spring 2027",
+    delayTerms: 1,
+
+    title: "Kỳ OJT dự kiến bị dịch chuyển",
+
+    reason:
+      "Dữ liệu tiến độ hiện tại cho thấy sinh viên có nguy cơ không tham gia OJT vào Fall 2026 như kế hoạch.",
+
+    detectedAt: "12/09/2026 10:05",
+
+    status: "Đã xem",
   },
 ];
 
-const RISK_STYLES: Record<RiskLevel, string> = {
-  Cao: 'bg-red-50 text-red-700 border border-red-200',
-  'Trung bình': 'bg-amber-50 text-amber-700 border border-amber-200',
-  Thấp: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+const STATUS_STYLE: Record<AlertStatus, string> = {
+  Mới: "border-red-200 bg-red-50 text-red-700",
+
+  "Đã xem":
+    "border-slate-200 bg-slate-50 text-slate-600",
+
+  "Đang theo dõi":
+    "border-amber-200 bg-amber-50 text-amber-700",
 };
 
+const STATUS_ICON: Record<
+  AlertStatus,
+  React.ReactNode
+> = {
+  Mới: <BellRing size={14} />,
+
+  "Đã xem": <CheckCircle2 size={14} />,
+
+  "Đang theo dõi": <Eye size={14} />,
+};
+
+/* =========================================================
+   COMPONENT
+   ========================================================= */
+
 const EducationAcademicAlerts: React.FC = () => {
-  const [search, setSearch] = useState('');
-  const [riskFilter, setRiskFilter] = useState<'all' | RiskLevel>('all');
+  const [alerts, setAlerts] =
+    React.useState<RiskAlert[]>(INITIAL_ALERTS);
 
-  const filteredStudents = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const [selectedAlert, setSelectedAlert] =
+    React.useState<RiskAlert | null>(null);
 
-    return MOCK_RISK_STUDENTS.filter((student) => {
-      const matchesSearch =
-        !keyword ||
-        student.studentCode.toLowerCase().includes(keyword) ||
-        student.fullName.toLowerCase().includes(keyword);
-
-      const matchesRisk =
-        riskFilter === 'all' || student.riskLevel === riskFilter;
-
-      return matchesSearch && matchesRisk;
-    });
-  }, [search, riskFilter]);
-
-  const highRiskCount = MOCK_RISK_STUDENTS.filter(
-    (student) => student.riskLevel === 'Cao',
+  const newCount = alerts.filter(
+    (alert) => alert.status === "Mới",
   ).length;
 
-  const mediumRiskCount = MOCK_RISK_STUDENTS.filter(
-    (student) => student.riskLevel === 'Trung bình',
+  const trackingCount = alerts.filter(
+    (alert) => alert.status === "Đang theo dõi",
   ).length;
 
-  const lowRiskCount = MOCK_RISK_STUDENTS.filter(
-    (student) => student.riskLevel === 'Thấp',
-  ).length;
+  /* =======================================================
+     ACTIONS
+     ======================================================= */
+
+  const updateAlertStatus = (
+    id: string,
+    status: AlertStatus,
+  ) => {
+    setAlerts((current) =>
+      current.map((alert) =>
+        alert.id === id
+          ? {
+              ...alert,
+              status,
+            }
+          : alert,
+      ),
+    );
+
+    setSelectedAlert((current) =>
+      current?.id === id
+        ? {
+            ...current,
+            status,
+          }
+        : current,
+    );
+  };
+
+  const openAlert = (alert: RiskAlert) => {
+    if (alert.status === "Mới") {
+      updateAlertStatus(alert.id, "Đã xem");
+
+      setSelectedAlert({
+        ...alert,
+        status: "Đã xem",
+      });
+
+      return;
+    }
+
+    setSelectedAlert(alert);
+  };
+
+  /* =======================================================
+     UI
+     ======================================================= */
 
   return (
     <div className="space-y-6">
       <PageBanner
-        title="Phân tích AI Cảnh báo Học vụ"
-        description="Danh sách sinh viên có nguy cơ trễ tiến độ hoặc gặp vấn đề trong quá trình học tập."
-        badge="AI Detection Engine"
+        title="Cảnh báo Sinh viên Nguy cơ cao"
+        description="Theo dõi các cảnh báo được tạo khi hệ thống phát hiện sinh viên có Risk cao ảnh hưởng đến tiến độ OJT."
+        badge="AI & Dashboard"
       />
 
-      {/* Tổng quan mức độ rủi ro */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card-glass p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Rủi ro cao</p>
-              <p className="text-2xl font-bold text-red-600 mt-1">
-                {highRiskCount}
-              </p>
+      {/* ===================================================
+          ALERT CENTER HEADER
+          =================================================== */}
+
+      <section className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 via-orange-50 to-white p-6 shadow-sm">
+        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+          <div className="flex gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+              <BellRing size={24} />
             </div>
 
-            <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">
+                Trung tâm cảnh báo Risk
+              </h2>
+
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                Chỉ hiển thị các trường hợp đã được xác định ở
+                mức Risk cao và cần Phòng Đào tạo chú ý.
+              </p>
             </div>
           </div>
-        </div>
 
-        <div className="card-glass p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Rủi ro trung bình</p>
-              <p className="text-2xl font-bold text-amber-600 mt-1">
-                {mediumRiskCount}
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-xl border border-red-200 bg-white px-4 py-3">
+              <p className="text-xs text-slate-400">
+                Cảnh báo mới
+              </p>
+
+              <p className="mt-1 text-xl font-black text-red-600">
+                {newCount}
               </p>
             </div>
 
-            <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center">
-              <TrendingDown className="w-5 h-5 text-amber-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="card-glass p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Rủi ro thấp</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">
-                {lowRiskCount}
+            <div className="rounded-xl border border-amber-200 bg-white px-4 py-3">
+              <p className="text-xs text-slate-400">
+                Đang theo dõi
               </p>
-            </div>
 
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <p className="mt-1 text-xl font-black text-amber-600">
+                {trackingCount}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Bộ lọc */}
-      <section className="card-glass p-5 sm:p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* ===================================================
+          ALERT FEED
+          =================================================== */}
+
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-800">
-              Danh sách cảnh báo
+            <h2 className="font-bold text-slate-800">
+              Cảnh báo gần đây
             </h2>
 
-            <p className="text-sm text-slate-500 mt-1">
-              Theo dõi các sinh viên có dấu hiệu rủi ro học vụ.
+            <p className="mt-1 text-sm text-slate-500">
+              {alerts.length} cảnh báo Risk cao.
             </p>
           </div>
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm mã SV hoặc họ tên..."
-                className="w-full sm:w-64 pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-              />
-            </div>
-
-            <select
-              value={riskFilter}
-              onChange={(event) =>
-                setRiskFilter(event.target.value as 'all' | RiskLevel)
-              }
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:ring-2 focus:ring-orange-200"
+        <div className="space-y-3">
+          {alerts.map((alert) => (
+            <article
+              key={alert.id}
+              className={`group overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                alert.status === "Mới"
+                  ? "border-red-200"
+                  : "border-slate-200"
+              }`}
             >
-              <option value="all">Tất cả mức độ</option>
-              <option value="Cao">Rủi ro cao</option>
-              <option value="Trung bình">Rủi ro trung bình</option>
-              <option value="Thấp">Rủi ro thấp</option>
-            </select>
-          </div>
+              <div className="flex flex-col lg:flex-row">
+                {/* ALERT INDICATOR */}
+
+                <div
+                  className={`w-full lg:w-1.5 ${
+                    alert.status === "Mới"
+                      ? "bg-red-500"
+                      : alert.status ===
+                          "Đang theo dõi"
+                        ? "bg-amber-400"
+                        : "bg-slate-200"
+                  }`}
+                />
+
+                <div className="flex-1 p-5">
+                  <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
+                    {/* LEFT */}
+
+                    <div className="flex min-w-0 gap-4">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                          alert.status === "Mới"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        <AlertTriangle size={21} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-bold text-slate-800">
+                            {alert.title}
+                          </h3>
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              STATUS_STYLE[alert.status]
+                            }`}
+                          >
+                            {STATUS_ICON[alert.status]}
+                            {alert.status}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                          <span className="font-semibold text-slate-700">
+                            {alert.fullName}
+                          </span>
+
+                          <span className="text-slate-300">
+                            •
+                          </span>
+
+                          <span className="font-semibold text-orange-600">
+                            {alert.studentCode}
+                          </span>
+
+                          <span className="text-slate-300">
+                            •
+                          </span>
+
+                          <span className="text-slate-500">
+                            {alert.cohort}
+                          </span>
+
+                          <span className="text-slate-300">
+                            •
+                          </span>
+
+                          <span className="text-slate-500">
+                            Kỳ {alert.currentSemester}
+                          </span>
+                        </div>
+
+                        <p className="mt-3 line-clamp-2 max-w-3xl text-sm leading-6 text-slate-500">
+                          {alert.reason}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* RIGHT */}
+
+                    <div className="flex shrink-0 flex-wrap items-center gap-5 xl:justify-end">
+                      <div>
+                        <p className="text-xs text-slate-400">
+                          Risk
+                        </p>
+
+                        <p className="mt-1 text-xl font-black text-red-600">
+                          {alert.riskScore}%
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-slate-400">
+                          Phát hiện
+                        </p>
+
+                        <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-600">
+                          <Clock3 size={14} />
+                          {alert.detectedAt}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => openAlert(alert)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-500"
+                      >
+                        Xem cảnh báo
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 
-      {/* Bảng cảnh báo */}
-      <section className="card-glass overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px]">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-5 py-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Sinh viên
-                </th>
+      {/* ===================================================
+          NOTE
+          =================================================== */}
 
-                <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  GPA
-                </th>
+      <section className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+        <div className="flex gap-3">
+          <BrainCircuit
+            size={19}
+            className="mt-0.5 shrink-0 text-violet-600"
+          />
 
-                <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Tín chỉ
-                </th>
+          <p className="text-sm leading-6 text-violet-700">
+            Dữ liệu cảnh báo hiện là mock frontend. Khi tích hợp
+            AI và backend, cảnh báo sẽ được tạo từ kết quả Risk
+            thay vì được frontend tự sinh.
+          </p>
+        </div>
+      </section>
 
-                <th className="text-center px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Môn chưa đạt
-                </th>
+      {/* ===================================================
+          DETAIL MODAL
+          =================================================== */}
 
-                <th className="text-left px-4 py-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Nguyên nhân
-                </th>
+      {selectedAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+            {/* HEADER */}
 
-                <th className="text-center px-5 py-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Mức độ
-                </th>
-              </tr>
-            </thead>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+              <div className="flex gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                  <AlertTriangle size={23} />
+                </div>
 
-            <tbody className="divide-y divide-slate-100">
-              {filteredStudents.map((student) => (
-                <tr
-                  key={student.id}
-                  className="hover:bg-slate-50/70 transition-colors"
-                >
-                  <td className="px-5 py-4">
-                    <div className="font-semibold text-slate-800">
-                      {student.fullName}
-                    </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-bold text-slate-800">
+                      {selectedAlert.title}
+                    </h2>
 
-                    <div className="text-xs text-slate-500 mt-1">
-                      {student.studentCode}
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4 text-center">
                     <span
-                      className={`font-semibold ${
-                        student.gpa < 2
-                          ? 'text-red-600'
-                          : student.gpa < 2.5
-                            ? 'text-amber-600'
-                            : 'text-slate-700'
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                        STATUS_STYLE[
+                          selectedAlert.status
+                        ]
                       }`}
                     >
-                      {student.gpa.toFixed(2)}
+                      {
+                        STATUS_ICON[
+                          selectedAlert.status
+                        ]
+                      }
+
+                      {selectedAlert.status}
                     </span>
-                  </td>
+                  </div>
 
-                  <td className="px-4 py-4 text-center text-sm text-slate-700">
-                    {student.completedCredits}
-                  </td>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Phát hiện lúc{" "}
+                    {selectedAlert.detectedAt}
+                  </p>
+                </div>
+              </div>
 
-                  <td className="px-4 py-4 text-center text-sm text-slate-700">
-                    {student.failedSubjects}
-                  </td>
+              <button
+                type="button"
+                onClick={() => setSelectedAlert(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-                  <td className="px-4 py-4 text-sm text-slate-600">
-                    {student.riskReason}
-                  </td>
+            <div className="space-y-6 p-6">
+              {/* STUDENT */}
 
-                  <td className="px-5 py-4 text-center">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${RISK_STYLES[student.riskLevel]}`}
-                    >
-                      {student.riskLevel === 'Cao' && (
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                      )}
+              <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-orange-500">
+                    <GraduationCap size={22} />
+                  </div>
 
-                      {student.riskLevel === 'Trung bình' && (
-                        <TrendingDown className="w-3.5 h-3.5" />
-                      )}
+                  <div>
+                    <h3 className="font-bold text-slate-800">
+                      {selectedAlert.fullName}
+                    </h3>
 
-                      {student.riskLevel === 'Thấp' && (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      )}
+                    <p className="mt-1 text-sm">
+                      <span className="font-semibold text-orange-600">
+                        {selectedAlert.studentCode}
+                      </span>
 
-                      {student.riskLevel}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                      <span className="text-slate-400">
+                        {" "}
+                        · {selectedAlert.cohort} ·{" "}
+                        {selectedAlert.studentClass} · Kỳ{" "}
+                        {selectedAlert.currentSemester}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </section>
 
-              {filteredStudents.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-5 py-12 text-center text-sm text-slate-500"
+              {/* RISK */}
+
+              <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-500">
+                    Risk score
+                  </p>
+
+                  <p className="mt-2 text-4xl font-black text-red-700">
+                    {selectedAlert.riskScore}%
+                  </p>
+
+                  <p className="mt-2 text-sm font-semibold text-red-600">
+                    Risk cao
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock
+                      size={18}
+                      className="text-orange-500"
+                    />
+
+                    <p className="font-semibold text-slate-700">
+                      Ảnh hưởng đến OJT
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <div>
+                      <p className="text-xs text-slate-400">
+                        Kế hoạch
+                      </p>
+
+                      <p className="mt-1 font-semibold text-slate-700">
+                        {selectedAlert.plannedOjtTerm}
+                      </p>
+                    </div>
+
+                    <ChevronRight
+                      size={18}
+                      className="text-red-400"
+                    />
+
+                    <div>
+                      <p className="text-xs text-slate-400">
+                        Dự kiến
+                      </p>
+
+                      <p className="mt-1 font-bold text-red-600">
+                        {selectedAlert.estimatedOjtTerm}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedAlert.delayTerms > 0 && (
+                    <p className="mt-4 text-sm font-semibold text-red-600">
+                      Nguy cơ chậm{" "}
+                      {selectedAlert.delayTerms} kỳ
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {/* REASON */}
+
+              <section>
+                <div className="flex items-center gap-2">
+                  <BrainCircuit
+                    size={20}
+                    className="text-violet-600"
+                  />
+
+                  <h3 className="font-bold text-slate-800">
+                    Nội dung cảnh báo
+                  </h3>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-violet-100 bg-violet-50 p-5">
+                  <p className="text-sm leading-7 text-slate-700">
+                    {selectedAlert.reason}
+                  </p>
+                </div>
+              </section>
+
+              {/* STATUS */}
+
+              <section>
+                <h3 className="font-bold text-slate-800">
+                  Trạng thái cảnh báo
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Trạng thái này chỉ dùng để PĐT theo dõi cảnh
+                  báo, không thay đổi Risk score của sinh viên.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateAlertStatus(
+                        selectedAlert.id,
+                        "Đã xem",
+                      )
+                    }
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                      selectedAlert.status === "Đã xem"
+                        ? "border-slate-700 bg-slate-700 text-white"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
                   >
-                    Không tìm thấy sinh viên phù hợp.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    Đã xem
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateAlertStatus(
+                        selectedAlert.id,
+                        "Đang theo dõi",
+                      )
+                    }
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                      selectedAlert.status ===
+                      "Đang theo dõi"
+                        ? "border-amber-500 bg-amber-500 text-white"
+                        : "border-amber-200 text-amber-700 hover:bg-amber-50"
+                    }`}
+                  >
+                    Đang theo dõi
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
     </div>
   );
 };
