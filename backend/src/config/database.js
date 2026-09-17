@@ -1,28 +1,57 @@
 const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
+const sql = require("mssql");
 
-const isProduction = process.env.NODE_ENV === "production";
-
-const localDatabaseUrl =
-  process.env.LOCAL_DATABASE_URL ||
-  (process.env.DB_USER && process.env.DB_PASSWORD
-    ? `postgresql://${process.env.DB_USER}:${encodeURIComponent(
-        process.env.DB_PASSWORD
-      )}@${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || 5432}/${
-        process.env.DB_NAME || "ojt_db"
-      }`
-    : "");
+require("dotenv").config({
+    path: path.resolve(__dirname, "../../.env"),
+});
 
 const databaseConfig = {
-  url: isProduction
-    ? process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL || localDatabaseUrl
-    : process.env.LOCAL_DATABASE_URL || localDatabaseUrl,
-  host: process.env.DB_HOST || "localhost",
-  port: Number(process.env.DB_PORT || 5432),
-  name: process.env.DB_NAME || "ojt_db",
-  user: process.env.DB_USER || "",
-  password: process.env.DB_PASSWORD || "",
-  ssl: process.env.DB_SSL === "true" || isProduction ? { rejectUnauthorized: false } : false,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_HOST || "127.0.0.1",
+    port: Number(process.env.DB_PORT || 1433),
+    database: process.env.DB_NAME || "ojt_rpa_db",
+
+    options: {
+        encrypt: process.env.DB_ENCRYPT === "true",
+        trustServerCertificate:
+            process.env.DB_TRUST_SERVER_CERTIFICATE !== "false",
+    },
+
+    pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000,
+    },
 };
 
-module.exports = databaseConfig;
+let pool = null;
+
+async function connectDatabase() {
+    if (pool && pool.connected) {
+        return pool;
+    }
+
+    pool = await new sql.ConnectionPool(databaseConfig).connect();
+
+    console.log(
+        `Database connected: ${databaseConfig.database} @ ${databaseConfig.server}:${databaseConfig.port}`
+    );
+
+    return pool;
+}
+
+function getPool() {
+    if (!pool || !pool.connected) {
+        throw new Error("Database is not connected");
+    }
+
+    return pool;
+}
+
+module.exports = {
+    sql,
+    databaseConfig,
+    connectDatabase,
+    getPool,
+};
