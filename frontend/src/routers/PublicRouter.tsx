@@ -17,7 +17,8 @@ import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
 import EducationStudentImport from "@/pages/education/EducationStudentImport";
-import EducationOjtConditions from '@/pages/education/EducationOjtConditions';
+import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
+import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -193,6 +194,8 @@ export const router = createBrowserRouter([
                     <EducationCurriculumPlan />
                   ) : item.path === "/education/ojt-conditions" ? (
                     <EducationOjtConditions />
+                  ) : item.path === "/education/student-progress" ? (
+                    <EducationStudentProgress />
                   ) : (
                     <RolePlaceholderPage role="education" />
                   ),
