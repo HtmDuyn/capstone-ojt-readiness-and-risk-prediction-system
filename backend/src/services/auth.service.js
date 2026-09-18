@@ -2,6 +2,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const database = require("../config/database");
+console.log("AUTH SERVICE DATABASE HOST:", database.host);
+console.log("AUTH SERVICE DATABASE POOL:", !!database.pool);
 
 const JWT_SECRET = process.env.JWT_SECRET || "ojt-dev-secret";
 
