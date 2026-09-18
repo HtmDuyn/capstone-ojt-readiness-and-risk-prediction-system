@@ -1,72 +1,57 @@
 import React from 'react';
 import {
   DashboardGridIcon,
-  OjtRegisterIcon,
-  RoadmapConsultingIcon,
-  EvaluationResultsIcon,
 } from '@/components/common/icons/AppIcons';
-import { Building2, Handshake, BarChart3, MailCheck } from 'lucide-react';
+import { Building2, Handshake, Award } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const QHDN_NAV_ITEMS: NavItem[] = [
   {
     id: 'dashboard',
-    label: 'Tổng quan QHDN',
+    label: 'Tổng quan & Thống kê',
     path: '/qhdn/dashboard',
     icon: <DashboardGridIcon size={20} />,
     banner: {
-      title: 'Cổng Quản lý Quan hệ Doanh nghiệp',
-      description: 'Điều phối kết nối hợp tác doanh nghiệp, phân bổ sinh viên OJT và quản lý mạng lưới đối tác.',
+      title: 'Cổng Quan hệ Doanh nghiệp',
+      description: 'Theo dõi chỉ số tiếp nhận OJT, phản hồi của doanh nghiệp đối tác và thống kê theo từng học kỳ.',
       badge: 'Phòng QHDN',
-      primaryActionLabel: 'Thêm doanh nghiệp đối tác',
+      primaryActionLabel: 'Xuất báo cáo OJT',
     },
   },
   {
-    id: 'partner-enterprises',
-    label: 'Mạng lưới đối tác',
-    path: '/qhdn/partners',
+    id: 'enterprises',
+    label: 'Quản lý Doanh nghiệp',
+    path: '/qhdn/enterprises',
     icon: <Building2 size={20} />,
     banner: {
-      title: 'Danh bạ Doanh nghiệp Đối tác Chiến lược',
-      description: 'Quản lý thỏa thuận hợp tác MOU, chỉ tiêu tiếp nhận OJT và thông tin liên hệ đầu mối.',
-      badge: 'Tier-1 & Tier-2',
-      primaryActionLabel: 'Ký kết hợp tác mới',
+      title: 'Quản lý Doanh nghiệp & Vị trí Thực tập',
+      description: 'Quản lý danh sách doanh nghiệp liên kết, vị trí thực tập tuyển dụng và chỉ tiêu số lượng tiếp nhận (quota).',
+      badge: 'Đối tác & Quota',
+      primaryActionLabel: 'Thêm doanh nghiệp mới',
     },
   },
   {
-    id: 'ojt-matching',
-    label: 'Điều phối & Ghép cặp OJT',
-    path: '/qhdn/matching',
+    id: 'coordination',
+    label: 'Điều phối OJT',
+    path: '/qhdn/coordination',
     icon: <Handshake size={20} />,
     banner: {
-      title: 'AI Ghép cặp Nguyện vọng Sinh viên & Doanh nghiệp',
-      description: 'Hệ thống gợi ý phân bổ sinh viên vào các vị trí thực tập phù hợp với năng lực kỹ thuật.',
-      badge: 'AI Matching Engine',
-      primaryActionLabel: 'Chạy phân bổ tự động',
+      title: 'Điều phối & Ghép cặp Sinh viên OJT',
+      description: 'Nhận danh sách sinh viên đủ điều kiện từ PĐT, phân bổ sinh viên vào doanh nghiệp và xử lý điều phối lại sinh viên bị từ chối.',
+      badge: 'Luồng Điều phối',
+      primaryActionLabel: 'Điều phối tự động',
     },
   },
   {
-    id: 'interview-schedules',
-    label: 'Lịch phỏng vấn OJT',
-    path: '/qhdn/interviews',
-    icon: <MailCheck size={20} />,
+    id: 'evaluations',
+    label: 'Đánh giá từ Doanh nghiệp',
+    path: '/qhdn/evaluations',
+    icon: <Award size={20} />,
     banner: {
-      title: 'Điều phối Lịch Phỏng vấn & Tiếp nhận',
-      description: 'Theo dõi tiến trình phỏng vấn giữa nhà tuyển dụng và sinh viên kỳ này.',
-      badge: 'Lịch tuần này',
-      primaryActionLabel: 'Tạo ca phỏng vấn',
-    },
-  },
-  {
-    id: 'internship-analytics',
-    label: 'Báo cáo thống kê OJT',
-    path: '/qhdn/analytics',
-    icon: <BarChart3 size={20} />,
-    banner: {
-      title: 'Thống kê Hiệu quả Thực tập Doanh nghiệp',
-      description: 'Tỷ lệ sinh viên có việc làm sau OJT, mức độ hài lòng của doanh nghiệp đối tác.',
-      badge: 'Báo cáo Thường niên',
-      primaryActionLabel: 'Xuất báo cáo PDF',
+      title: 'Xem Đánh giá Thực tập Doanh nghiệp',
+      description: 'Tổng hợp kết quả đánh giá kỹ năng chuyên môn, thái độ và điểm thực tập OJT từ người hướng dẫn doanh nghiệp.',
+      badge: 'Kết quả OJT',
+      primaryActionLabel: 'Tải bảng đánh giá',
     },
   },
 ];

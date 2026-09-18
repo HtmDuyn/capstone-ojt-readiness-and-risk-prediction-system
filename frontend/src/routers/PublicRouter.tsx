@@ -16,6 +16,10 @@ import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
+import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
+import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterpriseManagement";
+import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoordination";
+import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEnterpriseEvaluations";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -194,7 +198,29 @@ export const router = createBrowserRouter([
   },
   {
     element: <PrivateRoute allowedRoles={["qhdn"]} />,
-    children: [createRoleRoutes("qhdn")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("qhdn")}
+            homePath="/qhdn/dashboard"
+            brandSubtitle="Phòng Quan hệ Doanh nghiệp"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
+          { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
+          { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
+          { path: "/qhdn/partners", element: <Navigate to="/qhdn/enterprises" replace /> },
+          { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
+          { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
+          { path: "/qhdn/evaluations", element: <QhdnEnterpriseEvaluations /> },
+          { path: "/qhdn/analytics", element: <Navigate to="/qhdn/dashboard" replace /> },
+          { path: "/qhdn/interviews", element: <Navigate to="/qhdn/coordination" replace /> },
+        ],
+      },
+    ],
   },
   {
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
