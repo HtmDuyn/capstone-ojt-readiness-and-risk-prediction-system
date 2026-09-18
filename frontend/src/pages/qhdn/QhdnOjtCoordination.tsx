@@ -22,7 +22,7 @@ import {
   MOCK_ELIGIBLE_STUDENTS,
   MOCK_ENTERPRISE_PARTNERS,
   MOCK_INTERNSHIP_POSITIONS,
-} from '@/data/qhdnMockData';
+} from '@/data/qhdn/qhdnMockData';
 import type { EligibleStudent, EnterprisePartner, InternshipPosition } from '@/types/qhdn/qhdnTypes';
 
 export const QhdnOjtCoordination: React.FC = () => {
@@ -129,11 +129,10 @@ export const QhdnOjtCoordination: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeFilter === 'ALL'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeFilter === 'ALL'
                 ? 'bg-white text-orange-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Tất cả ({students.length})
           </button>
@@ -141,11 +140,10 @@ export const QhdnOjtCoordination: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveFilter('Unassigned')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeFilter === 'Unassigned'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeFilter === 'Unassigned'
                 ? 'bg-white text-orange-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Chưa điều phối ({unassignedCount})
           </button>
@@ -153,11 +151,10 @@ export const QhdnOjtCoordination: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveFilter('Pending Response')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeFilter === 'Pending Response'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeFilter === 'Pending Response'
                 ? 'bg-white text-orange-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Chờ DN duyệt
           </button>
@@ -165,11 +162,10 @@ export const QhdnOjtCoordination: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveFilter('Accepted')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeFilter === 'Accepted'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeFilter === 'Accepted'
                 ? 'bg-white text-emerald-600 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             Đã tiếp nhận
           </button>
@@ -177,11 +173,10 @@ export const QhdnOjtCoordination: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveFilter('Rejected')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-              activeFilter === 'Rejected'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${activeFilter === 'Rejected'
                 ? 'bg-red-500 text-white shadow-xs font-extrabold'
                 : 'text-red-600 hover:bg-red-50'
-            }`}
+              }`}
           >
             <RefreshCw size={12} />
             Cần điều phối lại ({rejectedCount})
@@ -243,13 +238,12 @@ export const QhdnOjtCoordination: React.FC = () => {
                   {/* Readiness Score */}
                   <td className="p-3.5 text-center">
                     <span
-                      className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
-                        std.readinessScore >= 85
+                      className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${std.readinessScore >= 85
                           ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                           : std.readinessScore >= 75
-                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                          : 'bg-red-100 text-red-800 border border-red-200'
-                      }`}
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                        }`}
                     >
                       {std.readinessScore} / 100
                     </span>

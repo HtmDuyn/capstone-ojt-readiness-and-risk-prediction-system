@@ -33,7 +33,7 @@ import {
   MOCK_SEMESTER_STATS,
   MOCK_ELIGIBLE_STUDENTS,
   MOCK_ENTERPRISE_PARTNERS,
-} from '@/data/qhdnMockData';
+} from '@/data/qhdn/qhdnMockData';
 import type { SemesterOption } from '@/types/qhdn/qhdnTypes';
 
 ChartJS.register(
@@ -284,11 +284,10 @@ export const QhdnDashboard: React.FC = () => {
               key={sem}
               type="button"
               onClick={() => setSelectedSemester(sem)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                selectedSemester === sem
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${selectedSemester === sem
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20 font-bold'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               {sem}
             </button>
@@ -519,15 +518,14 @@ export const QhdnDashboard: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      std.coordinationStatus === 'Accepted'
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${std.coordinationStatus === 'Accepted'
                         ? 'bg-green-100 text-green-600'
                         : std.coordinationStatus === 'Pending Response'
-                        ? 'bg-orange-100 text-orange-600'
-                        : std.coordinationStatus === 'Interviewing'
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-red-100 text-red-600'
-                    }`}
+                          ? 'bg-orange-100 text-orange-600'
+                          : std.coordinationStatus === 'Interviewing'
+                            ? 'bg-blue-100 text-blue-600'
+                            : 'bg-red-100 text-red-600'
+                      }`}
                   >
                     {std.coordinationStatus === 'Accepted' && <CheckCircle2 size={18} />}
                     {std.coordinationStatus === 'Pending Response' && <Clock size={18} />}
@@ -546,15 +544,14 @@ export const QhdnDashboard: React.FC = () => {
                 </div>
 
                 <span
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
-                    std.coordinationStatus === 'Accepted'
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${std.coordinationStatus === 'Accepted'
                       ? 'bg-green-100 text-green-700'
                       : std.coordinationStatus === 'Pending Response'
-                      ? 'bg-orange-100 text-orange-700'
-                      : std.coordinationStatus === 'Interviewing'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}
+                        ? 'bg-orange-100 text-orange-700'
+                        : std.coordinationStatus === 'Interviewing'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-red-100 text-red-700'
+                    }`}
                 >
                   {std.coordinationStatus === 'Accepted' && 'Đã tiếp nhận'}
                   {std.coordinationStatus === 'Pending Response' && 'Chờ phản hồi'}
