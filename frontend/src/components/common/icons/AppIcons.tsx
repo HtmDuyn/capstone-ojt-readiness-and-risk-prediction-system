@@ -34,6 +34,11 @@ import {
   ExternalLink,
   MoreVertical,
   CheckCircle2,
+  Building,
+  Users,
+  MapPin,
+  Plus,
+  FileText,
   LucideProps,
 } from 'lucide-react';
 
@@ -215,4 +220,25 @@ export const ChevronRightIcon: React.FC<IconProps> = ({ size = 16, strokeWidth =
 export const ChevronLeftIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
   <ChevronLeft size={size} strokeWidth={strokeWidth} {...props} />
 );
+
+export const BuildingIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Building size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const UsersIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Users size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const LocationIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.8, ...props }) => (
+  <MapPin size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const PlusIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...props }) => (
+  <Plus size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const FileTextIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.8, ...props }) => (
+  <FileText size={size} strokeWidth={strokeWidth} {...props} />
+);
+
 

@@ -16,6 +16,11 @@ import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
+import EnterpriseDashboard from "@/pages/enterprise/EnterpriseDashboard";
+import EnterpriseJobs from "@/pages/enterprise/EnterpriseJobs";
+import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
+import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
+import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -198,7 +203,44 @@ export const router = createBrowserRouter([
   },
   {
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
-    children: [createRoleRoutes("enterprise")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("enterprise")}
+            homePath="/enterprise/dashboard"
+            brandSubtitle="Đối tác Doanh nghiệp"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          {
+            path: "/enterprise",
+            element: <Navigate to="/enterprise/dashboard" replace />,
+          },
+          {
+            path: "/enterprise/dashboard",
+            element: <EnterpriseDashboard />,
+          },
+          {
+            path: "/enterprise/jobs",
+            element: <EnterpriseJobs />,
+          },
+          {
+            path: "/enterprise/candidates",
+            element: <EnterpriseCandidates />,
+          },
+          {
+            path: "/enterprise/interns",
+            element: <EnterpriseInterns />,
+          },
+          {
+            path: "/enterprise/evaluation",
+            element: <EnterpriseEvaluation />,
+          },
+        ],
+      },
+    ],
   },
 
   // URL không tồn tại luôn quay về login thay vì hiển thị trang 404 mặc định.
