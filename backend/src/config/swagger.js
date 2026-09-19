@@ -10,10 +10,6 @@ const options = {
         },
         servers: [
             {
-                url: "https://capstone-ojt-readiness-and-risk.onrender.com",
-                description: "Production Server"
-            },
-            {
                 url: "http://localhost:3000",
                 description: "Local Development"
             }
