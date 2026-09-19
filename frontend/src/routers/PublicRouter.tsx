@@ -19,7 +19,6 @@ import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
 import EducationStudentImport from "@/pages/education/EducationStudentImport";
 import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
-import EducationOjtApplicationReview from "@/pages/education/EducationOjtApplicationReview";
 import EducationRiskStudents from "@/pages/education/EducationRiskStudents";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
 import EducationOjtStatistics from "@/pages/education/EducationOjtStatistics";
@@ -204,8 +203,6 @@ export const router = createBrowserRouter([
                     <EducationOjtConditions />
                   ) : item.path === "/education/student-progress" ? (
                     <EducationStudentProgress />
-                  ) : item.path === "/education/ojt-application-review" ? (
-                    <EducationOjtApplicationReview />
                   ) : item.path === "/education/student-status" ? (
                     <EducationStudentStatus />
                   ) : item.path === "/education/risk-students" ? (

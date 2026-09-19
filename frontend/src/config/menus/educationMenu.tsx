@@ -132,18 +132,6 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
         },
       },
       {
-        id: 'ojt-application-review',
-        label: 'Duyệt hồ sơ đăng ký OJT',
-        path: '/education/ojt-application-review',
-        icon: <FileCheck size={20} />,
-        banner: {
-          title: 'Duyệt Hồ sơ Đăng ký OJT',
-          description:
-            'Xem và duyệt hồ sơ đăng ký OJT của sinh viên.',
-          badge: 'Quản lý sinh viên',
-        },
-      },
-      {
         id: 'student-status',
         label: 'Theo dõi trạng thái sinh viên',
         path: '/education/student-status',

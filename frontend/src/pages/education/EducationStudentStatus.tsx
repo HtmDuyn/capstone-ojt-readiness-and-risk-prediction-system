@@ -2,19 +2,17 @@ import React from "react";
 import {
   Search,
   Eye,
-  ArrowLeft,
-  GraduationCap,
-  Building2,
   CalendarDays,
-  CheckCircle2,
-  Circle,
-  Clock3,
   AlertTriangle,
-  BriefcaseBusiness,
   Users,
+  X,
 } from "lucide-react";
 
 import { PageBanner } from "@/components/common/PageBanner";
+
+/* =========================================================
+   TYPES
+   ========================================================= */
 
 type EligibilityStatus =
   | "Đủ điều kiện"
@@ -79,7 +77,6 @@ interface StudentOjtStatus {
   company?: string;
   position?: string;
 
-  // Ngày thực tập riêng của từng sinh viên.
   startDate?: string;
   endDate?: string;
 
@@ -91,9 +88,6 @@ interface StudentOjtStatus {
    ========================================================= */
 
 const INITIAL_STUDENTS: StudentOjtStatus[] = [
-  // ========================================================
-  // FALL 2026
-  // ========================================================
   {
     id: "student-status-1",
     studentCode: "SE182521",
@@ -181,8 +175,6 @@ const INITIAL_STUDENTS: StudentOjtStatus[] = [
     eligibilityStatus: "Chưa đủ điều kiện",
     progressStatus: "Chậm tiến độ",
 
-    // Theo kế hoạch Ly phải đi Summer 2026,
-    // nhưng chưa đủ điều kiện nên chuyển sang batch Fall 2026.
     plannedOjtTerm: "Summer 2026",
     ojtTerm: "Fall 2026",
     delayTerms: 1,
@@ -370,7 +362,6 @@ const INITIAL_STUDENTS: StudentOjtStatus[] = [
     company: "FPT Software",
     position: "Business Intelligence Intern",
 
-    // Cùng Fall 2026 nhưng bắt đầu muộn hơn Nhật.
     startDate: "15/10/2026",
     endDate: "15/01/2027",
 
@@ -422,11 +413,6 @@ const INITIAL_STUDENTS: StudentOjtStatus[] = [
     ],
   },
 
-  // ========================================================
-  // SUMMER 2026
-  // Sinh viên này thuộc batch khác.
-  // Khi chọn Fall 2026 sẽ không xuất hiện.
-  // ========================================================
   {
     id: "student-status-6",
     studentCode: "SE180932",
@@ -503,10 +489,8 @@ const INITIAL_STUDENTS: StudentOjtStatus[] = [
 const ELIGIBILITY_STYLE: Record<EligibilityStatus, string> = {
   "Đủ điều kiện":
     "border-emerald-200 bg-emerald-50 text-emerald-700",
-
   "Dự kiến đủ điều kiện":
     "border-amber-200 bg-amber-50 text-amber-700",
-
   "Chưa đủ điều kiện":
     "border-red-200 bg-red-50 text-red-700",
 };
@@ -514,7 +498,6 @@ const ELIGIBILITY_STYLE: Record<EligibilityStatus, string> = {
 const PROGRESS_STYLE: Record<ProgressStatus, string> = {
   "Đúng tiến độ":
     "border-emerald-200 bg-emerald-50 text-emerald-700",
-
   "Chậm tiến độ":
     "border-red-200 bg-red-50 text-red-700",
 };
@@ -556,34 +539,21 @@ const EducationStudentStatus: React.FC = () => {
   const [selectedStudent, setSelectedStudent] =
     React.useState<StudentOjtStatus | null>(null);
 
-  /*
-   * Một lần theo dõi tập trung vào một đợt OJT.
-   * Fall 2026 và Summer 2026 không trộn chung.
-   */
   const [ojtTermFilter, setOjtTermFilter] =
     React.useState("Fall 2026");
 
   const [search, setSearch] = React.useState("");
-
   const [cohortFilter, setCohortFilter] =
     React.useState("all");
-
   const [classFilter, setClassFilter] =
     React.useState("all");
-
   const [semesterFilter, setSemesterFilter] =
     React.useState("all");
-
   const [eligibilityFilter, setEligibilityFilter] =
     React.useState("all");
-
   const [progressFilter, setProgressFilter] =
     React.useState("all");
-
   const [ojtStatusFilter, setOjtStatusFilter] =
-    React.useState("all");
-
-  const [companyFilter, setCompanyFilter] =
     React.useState("all");
 
   /* =======================================================
@@ -591,20 +561,20 @@ const EducationStudentStatus: React.FC = () => {
      ======================================================= */
 
   const ojtTerms = Array.from(
-    new Set(INITIAL_STUDENTS.map((student) => student.ojtTerm)),
+    new Set(
+      INITIAL_STUDENTS.map((student) => student.ojtTerm),
+    ),
   );
 
   const studentsInSelectedTerm = INITIAL_STUDENTS.filter(
     (student) => student.ojtTerm === ojtTermFilter,
   );
 
-  /*
-   * Các filter phía dưới chỉ lấy dữ liệu trong batch đang chọn.
-   * Ví dụ đang xem Fall thì không lấy company/lớp của Summer.
-   */
   const cohorts = Array.from(
     new Set(
-      studentsInSelectedTerm.map((student) => student.cohort),
+      studentsInSelectedTerm.map(
+        (student) => student.cohort,
+      ),
     ),
   );
 
@@ -613,16 +583,6 @@ const EducationStudentStatus: React.FC = () => {
       studentsInSelectedTerm.map(
         (student) => student.studentClass,
       ),
-    ),
-  );
-
-  const companies = Array.from(
-    new Set(
-      studentsInSelectedTerm
-        .map((student) => student.company)
-        .filter(
-          (company): company is string => Boolean(company),
-        ),
     ),
   );
 
@@ -636,8 +596,12 @@ const EducationStudentStatus: React.FC = () => {
 
       const matchesSearch =
         !keyword ||
-        student.studentCode.toLowerCase().includes(keyword) ||
-        student.fullName.toLowerCase().includes(keyword);
+        student.studentCode
+          .toLowerCase()
+          .includes(keyword) ||
+        student.fullName
+          .toLowerCase()
+          .includes(keyword);
 
       const matchesCohort =
         cohortFilter === "all" ||
@@ -649,11 +613,13 @@ const EducationStudentStatus: React.FC = () => {
 
       const matchesSemester =
         semesterFilter === "all" ||
-        student.currentSemester === Number(semesterFilter);
+        student.currentSemester ===
+          Number(semesterFilter);
 
       const matchesEligibility =
         eligibilityFilter === "all" ||
-        student.eligibilityStatus === eligibilityFilter;
+        student.eligibilityStatus ===
+          eligibilityFilter;
 
       const matchesProgress =
         progressFilter === "all" ||
@@ -663,10 +629,6 @@ const EducationStudentStatus: React.FC = () => {
         ojtStatusFilter === "all" ||
         student.ojtStatus === ojtStatusFilter;
 
-      const matchesCompany =
-        companyFilter === "all" ||
-        student.company === companyFilter;
-
       return (
         matchesSearch &&
         matchesCohort &&
@@ -674,8 +636,7 @@ const EducationStudentStatus: React.FC = () => {
         matchesSemester &&
         matchesEligibility &&
         matchesProgress &&
-        matchesOjtStatus &&
-        matchesCompany
+        matchesOjtStatus
       );
     },
   );
@@ -685,7 +646,8 @@ const EducationStudentStatus: React.FC = () => {
      ======================================================= */
 
   const delayedCount = studentsInSelectedTerm.filter(
-    (student) => student.progressStatus === "Chậm tiến độ",
+    (student) =>
+      student.progressStatus === "Chậm tiến độ",
   ).length;
 
   const waitingEnterpriseCount =
@@ -700,7 +662,7 @@ const EducationStudentStatus: React.FC = () => {
   ).length;
 
   /* =======================================================
-     ACTION
+     ACTIONS
      ======================================================= */
 
   const resetFilters = () => {
@@ -711,16 +673,11 @@ const EducationStudentStatus: React.FC = () => {
     setEligibilityFilter("all");
     setProgressFilter("all");
     setOjtStatusFilter("all");
-    setCompanyFilter("all");
   };
 
   const handleChangeOjtTerm = (term: string) => {
     setOjtTermFilter(term);
 
-    /*
-     * Khi đổi batch thì reset filter phụ để tránh
-     * giữ lại company/lớp không tồn tại trong batch mới.
-     */
     setSearch("");
     setCohortFilter("all");
     setClassFilter("all");
@@ -728,403 +685,17 @@ const EducationStudentStatus: React.FC = () => {
     setEligibilityFilter("all");
     setProgressFilter("all");
     setOjtStatusFilter("all");
-    setCompanyFilter("all");
   };
 
   /* =======================================================
-     DETAIL
-     ======================================================= */
-
-  if (selectedStudent) {
-    const student = selectedStudent;
-
-    return (
-      <div className="space-y-6">
-        <button
-          type="button"
-          onClick={() => setSelectedStudent(null)}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-orange-500"
-        >
-          <ArrowLeft size={18} />
-          Quay lại danh sách sinh viên
-        </button>
-
-        <PageBanner
-          title="Chi tiết Trạng thái Sinh viên"
-          description="Theo dõi tiến trình của sinh viên trong đợt OJT."
-          badge="Quản lý sinh viên"
-        />
-
-        {/* =================================================
-            STUDENT INFORMATION
-            ================================================= */}
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
-            <div className="flex gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-500">
-                <GraduationCap size={27} />
-              </div>
-
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">
-                  {student.fullName}
-                </h2>
-
-                <p className="mt-1 font-semibold text-orange-600">
-                  {student.studentCode}
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                    {student.cohort}
-                  </span>
-
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                    {student.studentClass}
-                  </span>
-
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                    Kỳ {student.currentSemester}
-                  </span>
-
-                  <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
-                    {student.curriculumCode}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-start gap-2 lg:items-end">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Trạng thái hiện tại
-              </span>
-
-              <span
-                className={`w-fit rounded-full border px-3 py-1.5 text-sm font-semibold ${
-                  OJT_STATUS_STYLE[student.ojtStatus]
-                }`}
-              >
-                {student.ojtStatus}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 md:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <p className="text-xs text-slate-400">
-                Ngành
-              </p>
-
-              <p className="mt-1 font-medium text-slate-700">
-                {student.major}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-400">
-                Điều kiện OJT
-              </p>
-
-              <span
-                className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                  ELIGIBILITY_STYLE[
-                    student.eligibilityStatus
-                  ]
-                }`}
-              >
-                {student.eligibilityStatus}
-              </span>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-400">
-                Tiến độ học tập
-              </p>
-
-              <span
-                className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                  PROGRESS_STYLE[student.progressStatus]
-                }`}
-              >
-                {student.progressStatus}
-              </span>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-400">
-                Hồ sơ đăng ký OJT
-              </p>
-
-              <p className="mt-1 font-medium text-slate-700">
-                {student.applicationStatus}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* =================================================
-            OJT TERM + COMPANY
-            ================================================= */}
-
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          {/* OJT TERM */}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <CalendarDays
-                size={20}
-                className="text-orange-500"
-              />
-
-              <h3 className="font-semibold text-slate-800">
-                Tiến độ OJT
-              </h3>
-            </div>
-
-            <div className="mt-5 space-y-4">
-              <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
-                <span className="text-sm text-slate-500">
-                  Kỳ OJT theo kế hoạch
-                </span>
-
-                <span className="font-semibold text-slate-700">
-                  {student.plannedOjtTerm}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
-                <span className="text-sm text-slate-500">
-                  Đợt OJT thực tế
-                </span>
-
-                <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-700">
-                  {student.ojtTerm}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-slate-500">
-                  Độ trễ
-                </span>
-
-                {student.delayTerms === 0 ? (
-                  <span className="font-semibold text-emerald-600">
-                    Không trễ
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-2 font-semibold text-red-600">
-                    <AlertTriangle size={16} />
-                    {student.delayTerms} kỳ
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {student.delayTerms > 0 && (
-              <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4">
-                <div className="flex gap-3">
-                  <AlertTriangle
-                    size={19}
-                    className="mt-0.5 shrink-0 text-red-500"
-                  />
-
-                  <div>
-                    <p className="text-sm font-semibold text-red-700">
-                      Sinh viên bị chậm tiến độ OJT
-                    </p>
-
-                    <p className="mt-1 text-sm leading-6 text-red-600">
-                      Theo kế hoạch sinh viên tham gia{" "}
-                      {student.plannedOjtTerm}, nhưng hiện được
-                      chuyển sang đợt {student.ojtTerm}.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* COMPANY */}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <Building2
-                size={20}
-                className="text-orange-500"
-              />
-
-              <h3 className="font-semibold text-slate-800">
-                Thông tin thực tập
-              </h3>
-            </div>
-
-            {student.company ? (
-              <div className="mt-5 space-y-4">
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Doanh nghiệp
-                  </p>
-
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {student.company}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Vị trí thực tập
-                  </p>
-
-                  <p className="mt-1 flex items-center gap-2 font-medium text-slate-700">
-                    <BriefcaseBusiness size={16} />
-                    {student.position || "—"}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Ngày bắt đầu
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-                      {student.startDate || "Chưa xác định"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Ngày kết thúc
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-                      {student.endDate || "Chưa xác định"}
-                    </p>
-                  </div>
-                </div>
-
-                {!student.startDate && (
-                  <div className="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-700">
-                    Sinh viên đã có doanh nghiệp/vị trí mong muốn
-                    hoặc đang được xử lý với doanh nghiệp, nhưng
-                    chưa xác định lịch thực tập chính thức.
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-xl bg-slate-50 p-5">
-                <p className="text-sm font-medium text-slate-600">
-                  Chưa có doanh nghiệp thực tập
-                </p>
-
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Sinh viên chưa có thông tin doanh nghiệp tiếp
-                  nhận trong đợt OJT này.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* =================================================
-            TIMELINE
-            ================================================= */}
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div>
-            <h3 className="font-semibold text-slate-800">
-              Timeline OJT
-            </h3>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Theo dõi sinh viên đang ở bước nào trong đợt{" "}
-              {student.ojtTerm}.
-            </p>
-          </div>
-
-          <div className="mt-7 space-y-0">
-            {student.timeline.map((item, index) => {
-              const isLast =
-                index === student.timeline.length - 1;
-
-              return (
-                <div
-                  key={item.id}
-                  className="relative flex gap-4"
-                >
-                  {!isLast && (
-                    <div className="absolute left-[11px] top-6 h-full w-px bg-slate-200" />
-                  )}
-
-                  <div className="relative z-10 mt-0.5 shrink-0 bg-white">
-                    {item.completed ? (
-                      <CheckCircle2
-                        size={23}
-                        className="text-emerald-500"
-                      />
-                    ) : item.current ? (
-                      <Clock3
-                        size={23}
-                        className="text-orange-500"
-                      />
-                    ) : (
-                      <Circle
-                        size={23}
-                        className="text-slate-300"
-                      />
-                    )}
-                  </div>
-
-                  <div className="pb-7">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p
-                        className={`font-semibold ${
-                          item.current
-                            ? "text-orange-700"
-                            : "text-slate-700"
-                        }`}
-                      >
-                        {item.title}
-                      </p>
-
-                      {item.current && (
-                        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-600">
-                          Hiện tại
-                        </span>
-                      )}
-                    </div>
-
-                    {item.date && (
-                      <p className="mt-1 text-xs font-medium text-slate-400">
-                        {item.date}
-                      </p>
-                    )}
-
-                    {item.description && (
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-    );
-  }
-
-  /* =======================================================
-     LIST PAGE
+     RENDER
      ======================================================= */
 
   return (
     <div className="space-y-6">
       <PageBanner
         title="Theo dõi Trạng thái Sinh viên"
-        description="Theo dõi tình trạng điều kiện, hồ sơ, doanh nghiệp và quá trình tham gia OJT của sinh viên theo từng đợt."
+        description="Theo dõi tình trạng điều kiện và quá trình tham gia OJT của sinh viên theo từng đợt."
         badge="Quản lý sinh viên"
       />
 
@@ -1149,9 +720,8 @@ const EducationStudentStatus: React.FC = () => {
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-slate-500">
-                Sinh viên trong cùng một đợt có thể được doanh
-                nghiệp tiếp nhận và bắt đầu OJT ở các thời điểm
-                khác nhau.
+                Sinh viên trong cùng một đợt có thể bắt đầu
+                và kết thúc OJT ở các thời điểm khác nhau.
               </p>
             </div>
           </div>
@@ -1256,8 +826,6 @@ const EducationStudentStatus: React.FC = () => {
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {/* COHORT */}
-
           <select
             value={cohortFilter}
             onChange={(event) =>
@@ -1265,21 +833,14 @@ const EducationStudentStatus: React.FC = () => {
             }
             className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-400"
           >
-            <option value="all">
-              Tất cả khóa
-            </option>
+            <option value="all">Tất cả khóa</option>
 
             {cohorts.map((cohort) => (
-              <option
-                key={cohort}
-                value={cohort}
-              >
+              <option key={cohort} value={cohort}>
                 {cohort}
               </option>
             ))}
           </select>
-
-          {/* STUDENT CLASS */}
 
           <select
             value={classFilter}
@@ -1302,8 +863,6 @@ const EducationStudentStatus: React.FC = () => {
             ))}
           </select>
 
-          {/* CURRICULUM SEMESTER */}
-
           <select
             value={semesterFilter}
             onChange={(event) =>
@@ -1314,7 +873,6 @@ const EducationStudentStatus: React.FC = () => {
             <option value="all">
               Tất cả kỳ chương trình
             </option>
-
             <option value="4">Kỳ 4</option>
             <option value="5">Kỳ 5</option>
             <option value="6">Kỳ 6</option>
@@ -1322,8 +880,6 @@ const EducationStudentStatus: React.FC = () => {
             <option value="8">Kỳ 8</option>
             <option value="9">Kỳ 9</option>
           </select>
-
-          {/* ELIGIBILITY */}
 
           <select
             value={eligibilityFilter}
@@ -1335,21 +891,16 @@ const EducationStudentStatus: React.FC = () => {
             <option value="all">
               Tất cả điều kiện OJT
             </option>
-
             <option value="Đủ điều kiện">
               Đủ điều kiện
             </option>
-
             <option value="Dự kiến đủ điều kiện">
               Dự kiến đủ điều kiện
             </option>
-
             <option value="Chưa đủ điều kiện">
               Chưa đủ điều kiện
             </option>
           </select>
-
-          {/* PROGRESS */}
 
           <select
             value={progressFilter}
@@ -1361,17 +912,13 @@ const EducationStudentStatus: React.FC = () => {
             <option value="all">
               Tất cả tiến độ
             </option>
-
             <option value="Đúng tiến độ">
               Đúng tiến độ
             </option>
-
             <option value="Chậm tiến độ">
               Chậm tiến độ
             </option>
           </select>
-
-          {/* OJT STATUS */}
 
           <select
             value={ojtStatusFilter}
@@ -1395,31 +942,6 @@ const EducationStudentStatus: React.FC = () => {
               ),
             )}
           </select>
-
-          {/* COMPANY */}
-
-          <select
-            value={companyFilter}
-            onChange={(event) =>
-              setCompanyFilter(event.target.value)
-            }
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-400"
-          >
-            <option value="all">
-              Tất cả doanh nghiệp
-            </option>
-
-            {companies.map((company) => (
-              <option
-                key={company}
-                value={company}
-              >
-                {company}
-              </option>
-            ))}
-          </select>
-
-          {/* RESET */}
 
           <button
             type="button"
@@ -1450,46 +972,46 @@ const EducationStudentStatus: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1400px] text-left text-sm">
+          <table className="w-full min-w-[1450px] text-left text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Sinh viên
                 </th>
 
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Kỳ hiện tại
                 </th>
 
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Điều kiện OJT
                 </th>
 
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Tiến độ
                 </th>
 
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Đợt OJT
                 </th>
 
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Hồ sơ
                 </th>
 
-                <th className="px-5 py-3">
+                <th className="whitespace-nowrap px-5 py-3">
                   Trạng thái hiện tại
                 </th>
 
-                <th className="px-5 py-3">
-                  Doanh nghiệp
+                <th className="whitespace-nowrap px-5 py-3">
+                  Ngày bắt đầu
                 </th>
 
-                <th className="px-5 py-3">
-                  Thời gian OJT
+                <th className="whitespace-nowrap px-5 py-3">
+                  Ngày kết thúc
                 </th>
 
-                <th className="px-5 py-3 text-right">
+                <th className="whitespace-nowrap px-5 py-3 text-right">
                   Chi tiết
                 </th>
               </tr>
@@ -1504,15 +1026,15 @@ const EducationStudentStatus: React.FC = () => {
                   {/* STUDENT */}
 
                   <td className="px-5 py-4">
-                    <p className="font-semibold text-slate-800">
+                    <p className="whitespace-nowrap font-semibold text-slate-800">
                       {student.fullName}
                     </p>
 
-                    <p className="mt-1 text-xs font-semibold text-orange-600">
+                    <p className="mt-1 whitespace-nowrap text-xs font-semibold text-orange-600">
                       {student.studentCode}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 whitespace-nowrap text-xs text-slate-400">
                       {student.cohort} ·{" "}
                       {student.studentClass}
                     </p>
@@ -1520,15 +1042,15 @@ const EducationStudentStatus: React.FC = () => {
 
                   {/* SEMESTER */}
 
-                  <td className="px-5 py-4 font-semibold text-slate-700">
+                  <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-700">
                     Kỳ {student.currentSemester}
                   </td>
 
                   {/* ELIGIBILITY */}
 
-                  <td className="px-5 py-4">
+                  <td className="whitespace-nowrap px-5 py-4">
                     <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
                         ELIGIBILITY_STYLE[
                           student.eligibilityStatus
                         ]
@@ -1540,9 +1062,9 @@ const EducationStudentStatus: React.FC = () => {
 
                   {/* PROGRESS */}
 
-                  <td className="px-5 py-4">
+                  <td className="whitespace-nowrap px-5 py-4">
                     <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
                         PROGRESS_STYLE[
                           student.progressStatus
                         ]
@@ -1550,40 +1072,27 @@ const EducationStudentStatus: React.FC = () => {
                     >
                       {student.progressStatus}
                     </span>
-
-                    {student.delayTerms > 0 && (
-                      <p className="mt-1 text-xs font-medium text-red-500">
-                        Trễ {student.delayTerms} kỳ
-                      </p>
-                    )}
                   </td>
 
                   {/* OJT TERM */}
 
-                  <td className="px-5 py-4">
-                    <p className="font-semibold text-slate-700">
+                  <td className="whitespace-nowrap px-5 py-4">
+                    <span className="font-semibold text-slate-700">
                       {student.ojtTerm}
-                    </p>
-
-                    {student.delayTerms > 0 && (
-                      <p className="mt-1 text-xs text-red-500">
-                        Kế hoạch:{" "}
-                        {student.plannedOjtTerm}
-                      </p>
-                    )}
+                    </span>
                   </td>
 
                   {/* APPLICATION */}
 
-                  <td className="px-5 py-4 text-slate-600">
+                  <td className="whitespace-nowrap px-5 py-4 text-slate-600">
                     {student.applicationStatus}
                   </td>
 
                   {/* CURRENT STATUS */}
 
-                  <td className="px-5 py-4">
+                  <td className="whitespace-nowrap px-5 py-4">
                     <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
                         OJT_STATUS_STYLE[
                           student.ojtStatus
                         ]
@@ -1593,41 +1102,27 @@ const EducationStudentStatus: React.FC = () => {
                     </span>
                   </td>
 
-                  {/* COMPANY */}
+                  {/* START DATE */}
 
-                  <td className="px-5 py-4">
-                    {student.company ? (
-                      <>
-                        <p className="font-semibold text-slate-700">
-                          {student.company}
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-400">
-                          {student.position}
-                        </p>
-                      </>
+                  <td className="whitespace-nowrap px-5 py-4">
+                    {student.startDate ? (
+                      <span className="font-medium text-slate-700">
+                        {student.startDate}
+                      </span>
                     ) : (
-                      <span className="text-slate-400">
-                        —
+                      <span className="text-xs text-slate-400">
+                        Chưa xác định
                       </span>
                     )}
                   </td>
 
-                  {/* OJT DATES */}
+                  {/* END DATE */}
 
-                  <td className="px-5 py-4">
-                    {student.startDate ? (
-                      <>
-                        <p className="font-medium text-slate-700">
-                          {student.startDate}
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-400">
-                          đến{" "}
-                          {student.endDate ||
-                            "Chưa xác định"}
-                        </p>
-                      </>
+                  <td className="whitespace-nowrap px-5 py-4">
+                    {student.endDate ? (
+                      <span className="font-medium text-slate-700">
+                        {student.endDate}
+                      </span>
                     ) : (
                       <span className="text-xs text-slate-400">
                         Chưa xác định
@@ -1637,13 +1132,13 @@ const EducationStudentStatus: React.FC = () => {
 
                   {/* DETAIL */}
 
-                  <td className="px-5 py-4 text-right">
+                  <td className="whitespace-nowrap px-5 py-4 text-right">
                     <button
                       type="button"
                       onClick={() =>
                         setSelectedStudent(student)
                       }
-                      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-semibold text-orange-600 transition hover:bg-orange-50"
+                      className="inline-flex items-center gap-2 rounded-xl px-3 py-2 font-semibold text-orange-600 transition hover:bg-orange-50"
                     >
                       <Eye size={16} />
                       Xem
@@ -1672,6 +1167,293 @@ const EducationStudentStatus: React.FC = () => {
           </table>
         </div>
       </section>
+
+      {/* ===================================================
+          STUDENT DETAIL MODAL
+          =================================================== */}
+
+      {selectedStudent && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]"
+          onClick={() => setSelectedStudent(null)}
+        >
+          <div
+            className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            {/* HEADER */}
+
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">
+                  Chi tiết trạng thái sinh viên
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Theo dõi tiến độ và trạng thái OJT
+                  hiện tại.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedStudent(null)
+                }
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* BODY */}
+
+            <div className="overflow-y-auto px-6 py-6">
+              {/* STUDENT */}
+
+              <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Sinh viên
+                    </p>
+
+                    <h3 className="mt-1 text-xl font-black text-slate-900">
+                      {selectedStudent.fullName}
+                    </h3>
+
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                      <span className="font-bold text-orange-600">
+                        {selectedStudent.studentCode}
+                      </span>
+
+                      <span className="text-slate-500">
+                        {selectedStudent.cohort}
+                      </span>
+
+                      <span className="text-slate-500">
+                        {selectedStudent.studentClass}
+                      </span>
+
+                      <span className="text-slate-500">
+                        {selectedStudent.major}
+                      </span>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`inline-flex w-fit whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold ${
+                      OJT_STATUS_STYLE[
+                        selectedStudent.ojtStatus
+                      ]
+                    }`}
+                  >
+                    {selectedStudent.ojtStatus}
+                  </span>
+                </div>
+              </section>
+
+              {/* CURRENT INFORMATION */}
+
+              <section className="mt-5">
+                <h3 className="text-base font-black text-slate-800">
+                  Thông tin hiện tại
+                </h3>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Kỳ hiện tại
+                    </p>
+
+                    <p className="mt-2 font-bold text-slate-800">
+                      Kỳ{" "}
+                      {selectedStudent.currentSemester}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Điều kiện OJT
+                    </p>
+
+                    <span
+                      className={`mt-2 inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                        ELIGIBILITY_STYLE[
+                          selectedStudent
+                            .eligibilityStatus
+                        ]
+                      }`}
+                    >
+                      {
+                        selectedStudent.eligibilityStatus
+                      }
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Tiến độ
+                    </p>
+
+                    <span
+                      className={`mt-2 inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                        PROGRESS_STYLE[
+                          selectedStudent
+                            .progressStatus
+                        ]
+                      }`}
+                    >
+                      {selectedStudent.progressStatus}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              {/* OJT PROGRESS */}
+
+              <section className="mt-6">
+                <h3 className="text-base font-black text-slate-800">
+                  Tiến độ OJT
+                </h3>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Kỳ OJT theo kế hoạch
+                    </p>
+
+                    <p className="mt-2 whitespace-nowrap font-bold text-slate-800">
+                      {
+                        selectedStudent.plannedOjtTerm
+                      }
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Đợt OJT hiện tại
+                    </p>
+
+                    <p className="mt-2 whitespace-nowrap font-bold text-slate-800">
+                      {selectedStudent.ojtTerm}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Độ trễ
+                    </p>
+
+                    <p
+                      className={`mt-2 font-bold ${
+                        selectedStudent.delayTerms >
+                        0
+                          ? "text-red-600"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      {selectedStudent.delayTerms > 0
+                        ? `${selectedStudent.delayTerms} kỳ`
+                        : "Không trễ"}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedStudent.delayTerms > 0 && (
+                  <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+                    <div className="flex gap-3">
+                      <AlertTriangle
+                        size={19}
+                        className="mt-0.5 shrink-0 text-red-500"
+                      />
+
+                      <div>
+                        <p className="font-bold text-red-700">
+                          Sinh viên đang chậm tiến độ
+                          OJT
+                        </p>
+
+                        <p className="mt-1 text-sm leading-6 text-red-600">
+                          Theo kế hoạch sinh viên tham
+                          gia OJT vào{" "}
+                          <strong>
+                            {
+                              selectedStudent.plannedOjtTerm
+                            }
+                          </strong>
+                          , nhưng hiện được theo dõi ở
+                          đợt{" "}
+                          <strong>
+                            {selectedStudent.ojtTerm}
+                          </strong>
+                          . Sinh viên đang trễ{" "}
+                          <strong>
+                            {
+                              selectedStudent.delayTerms
+                            }{" "}
+                            kỳ
+                          </strong>
+                          .
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* OJT DATES */}
+
+              <section className="mt-6">
+                <h3 className="text-base font-black text-slate-800">
+                  Thời gian OJT
+                </h3>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Ngày bắt đầu
+                    </p>
+
+                    <p className="mt-2 font-bold text-slate-800">
+                      {selectedStudent.startDate ||
+                        "Chưa xác định"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <p className="text-xs font-semibold text-slate-400">
+                      Ngày kết thúc
+                    </p>
+
+                    <p className="mt-2 font-bold text-slate-800">
+                      {selectedStudent.endDate ||
+                        "Chưa xác định"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* FOOTER */}
+
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedStudent(null)
+                }
+                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
