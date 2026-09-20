@@ -44,14 +44,13 @@ interface TermConfig {
   breakStartDate: string;
   breakEndDate: string;
   holidays: Holiday[];
-  status: TermStatus;
 }
 
 /* =========================================================
    MOCK DATA
    ========================================================= */
 
-const INITIAL_TERMS: TermConfig[] = [
+const INITIAL_TERMS_2026: TermConfig[] = [
   {
     id: "spring",
     name: "Spring",
@@ -59,7 +58,6 @@ const INITIAL_TERMS: TermConfig[] = [
     endDate: "2026-04-26",
     breakStartDate: "2026-04-27",
     breakEndDate: "2026-05-10",
-    status: "Đã kết thúc",
     holidays: [
       {
         id: "holiday-spring-1",
@@ -77,7 +75,6 @@ const INITIAL_TERMS: TermConfig[] = [
     endDate: "",
     breakStartDate: "",
     breakEndDate: "",
-    status: "Đang chuẩn bị",
     holidays: [],
   },
   {
@@ -87,7 +84,36 @@ const INITIAL_TERMS: TermConfig[] = [
     endDate: "",
     breakStartDate: "",
     breakEndDate: "",
-    status: "Chưa cấu hình",
+    holidays: [],
+  },
+];
+
+const createEmptyTerms = (): TermConfig[] => [
+  {
+    id: "spring",
+    name: "Spring",
+    startDate: "",
+    endDate: "",
+    breakStartDate: "",
+    breakEndDate: "",
+    holidays: [],
+  },
+  {
+    id: "summer",
+    name: "Summer",
+    startDate: "",
+    endDate: "",
+    breakStartDate: "",
+    breakEndDate: "",
+    holidays: [],
+  },
+  {
+    id: "fall",
+    name: "Fall",
+    startDate: "",
+    endDate: "",
+    breakStartDate: "",
+    breakEndDate: "",
     holidays: [],
   },
 ];
@@ -144,6 +170,12 @@ const TERM_VIEW_STYLE: Record<
    HELPERS
    ========================================================= */
 
+const TERM_ORDER: Record<TermConfig["name"], number> = {
+  Spring: 0,
+  Summer: 1,
+  Fall: 2,
+};
+
 const formatDate = (date: string) => {
   if (!date) return "Chưa thiết lập";
 
@@ -166,6 +198,103 @@ const addOneDay = (dateString: string) => {
   return `${nextYear}-${nextMonth}-${nextDay}`;
 };
 
+/**
+ * Lấy ngày local của máy đang chạy ứng dụng.
+ * Không dùng toISOString() vì toISOString() dùng UTC.
+ */
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Tính trạng thái kỳ theo thời gian thực.
+ *
+ * Quy tắc:
+ * 1. Nếu đã cấu hình startDate + endDate:
+ *    - chưa tới startDate => Đang chuẩn bị
+ *    - nằm trong khoảng => Đang diễn ra
+ *    - qua endDate => Đã kết thúc
+ *
+ * 2. Nếu chưa cấu hình ngày:
+ *    - năm quá khứ => Đã kết thúc
+ *    - năm tương lai => Chưa cấu hình
+ *    - năm hiện tại:
+ *       tháng 1-4  => Spring
+ *       tháng 5-8  => Summer
+ *       tháng 9-12 => Fall
+ */
+const getTermStatus = (
+  term: TermConfig,
+  year: string,
+  today: string,
+): TermStatus => {
+  /* =========================================
+     ĐÃ CÓ NGÀY CẤU HÌNH
+     ========================================= */
+
+  if (term.startDate && term.endDate) {
+    if (today < term.startDate) {
+      return "Đang chuẩn bị";
+    }
+
+    if (today > term.endDate) {
+      return "Đã kết thúc";
+    }
+
+    return "Đang diễn ra";
+  }
+
+  /* =========================================
+     CHƯA CẤU HÌNH NGÀY
+     ========================================= */
+
+  const currentYear = Number(today.slice(0, 4));
+  const targetYear = Number(year);
+
+  if (targetYear < currentYear) {
+    return "Đã kết thúc";
+  }
+
+  if (targetYear > currentYear) {
+    return "Chưa cấu hình";
+  }
+
+  /* =========================================
+     NĂM HIỆN TẠI
+     ========================================= */
+
+  const currentMonth = Number(today.slice(5, 7));
+
+  let currentTerm: TermConfig["name"];
+
+  if (currentMonth >= 9) {
+    currentTerm = "Fall";
+  } else if (currentMonth >= 5) {
+    currentTerm = "Summer";
+  } else {
+    currentTerm = "Spring";
+  }
+
+  const currentTermIndex = TERM_ORDER[currentTerm];
+  const termIndex = TERM_ORDER[term.name];
+
+  if (termIndex < currentTermIndex) {
+    return "Đã kết thúc";
+  }
+
+  if (termIndex === currentTermIndex) {
+    return "Đang diễn ra";
+  }
+
+  return "Chưa cấu hình";
+};
+
 /* =========================================================
    COMPONENT
    ========================================================= */
@@ -173,32 +302,60 @@ const addOneDay = (dateString: string) => {
 const EducationAcademicYear: React.FC = () => {
   const [academicYear, setAcademicYear] = React.useState("2026");
 
-  const [terms, setTerms] =
-    React.useState<TermConfig[]>(INITIAL_TERMS);
+  /*
+   * Ngày hiện tại.
+   * Tự kiểm tra lại mỗi phút để nếu app mở qua 00:00
+   * thì trạng thái kỳ tự cập nhật.
+   */
+  const [today, setToday] = React.useState(() => getLocalDateString());
 
-  const [selectedTermId, setSelectedTermId] =
-    React.useState<string | null>(null);
+  React.useEffect(() => {
+    const updateCurrentDate = () => {
+      setToday(getLocalDateString());
+    };
 
-  const [showInitializedYears, setShowInitializedYears] =
-    React.useState(false);
+    updateCurrentDate();
+
+    const intervalId = window.setInterval(updateCurrentDate, 60 * 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  /*
+   * Dữ liệu kỳ tách riêng theo từng năm.
+   *
+   * Sau này có API thì phần này có thể được thay bằng dữ liệu
+   * GET từ Spring Boot mà phần UI phía dưới không phải đổi nhiều.
+   */
+  const [termsByYear, setTermsByYear] = React.useState<
+    Record<string, TermConfig[]>
+  >({
+    "2026": INITIAL_TERMS_2026,
+  });
+
+  const [selectedTermId, setSelectedTermId] = React.useState<string | null>(
+    null,
+  );
+
+  const [showInitializedYears, setShowInitializedYears] = React.useState(false);
 
   const [initializedYears, setInitializedYears] = React.useState<string[]>([
     "2026",
   ]);
 
   /* YEAR ACTION */
-  const [yearAction, setYearAction] =
-    React.useState<YearAction>(null);
+  const [yearAction, setYearAction] = React.useState<YearAction>(null);
 
-  const [selectedYear, setSelectedYear] =
-    React.useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
 
   /* HOLIDAY */
-  const [showHolidayModal, setShowHolidayModal] =
-    React.useState(false);
+  const [showHolidayModal, setShowHolidayModal] = React.useState(false);
 
-  const [editingHolidayId, setEditingHolidayId] =
-    React.useState<string | null>(null);
+  const [editingHolidayId, setEditingHolidayId] = React.useState<string | null>(
+    null,
+  );
 
   const [holidayForm, setHolidayForm] = React.useState({
     name: "",
@@ -207,21 +364,46 @@ const EducationAcademicYear: React.FC = () => {
     note: "",
   });
 
-  const selectedTerm =
-    terms.find((term) => term.id === selectedTermId) ?? null;
+  /* =======================================================
+     YEAR DATA HELPERS
+     ======================================================= */
 
-  const configuredTermCount = terms.filter(
-    (term) => term.startDate && term.endDate,
-  ).length;
+  const getTermsForYear = (year: string): TermConfig[] => {
+    return termsByYear[year] ?? createEmptyTerms();
+  };
+
+  const updateTermsForYear = (
+    year: string,
+    updater: (current: TermConfig[]) => TermConfig[],
+  ) => {
+    setTermsByYear((current) => {
+      const currentTerms = current[year] ?? createEmptyTerms();
+
+      return {
+        ...current,
+        [year]: updater(currentTerms),
+      };
+    });
+  };
+
+  const terms = getTermsForYear(academicYear);
+
+  const selectedYearTerms = selectedYear ? getTermsForYear(selectedYear) : [];
+
+  const selectedTerm = terms.find((term) => term.id === selectedTermId) ?? null;
+
+  const getConfiguredTermCount = (year: string) => {
+    return getTermsForYear(year).filter(
+      (term) => term.startDate && term.endDate,
+    ).length;
+  };
 
   /* =======================================================
      TERM RULES
      ======================================================= */
 
   const getPreviousTerm = (termId: string) => {
-    const currentIndex = terms.findIndex(
-      (term) => term.id === termId,
-    );
+    const currentIndex = terms.findIndex((term) => term.id === termId);
 
     if (currentIndex <= 0) {
       return null;
@@ -241,10 +423,18 @@ const EducationAcademicYear: React.FC = () => {
       return "";
     }
 
+    /*
+     * Nếu kỳ trước có nghỉ/chuyển kỳ,
+     * kỳ sau phải bắt đầu sau ngày nghỉ cuối cùng.
+     */
     if (previousTerm.breakEndDate) {
       return addOneDay(previousTerm.breakEndDate);
     }
 
+    /*
+     * Nếu không có nghỉ/chuyển kỳ,
+     * kỳ sau bắt đầu sau ngày kết thúc học.
+     */
     return addOneDay(previousTerm.endDate);
   };
 
@@ -253,16 +443,12 @@ const EducationAcademicYear: React.FC = () => {
      ======================================================= */
 
   const updateSelectedTerm = (
-    field:
-      | "startDate"
-      | "endDate"
-      | "breakStartDate"
-      | "breakEndDate",
+    field: "startDate" | "endDate" | "breakStartDate" | "breakEndDate",
     value: string,
   ) => {
     if (!selectedTermId) return;
 
-    setTerms((current) =>
+    updateTermsForYear(academicYear, (current) =>
       current.map((term) =>
         term.id === selectedTermId
           ? {
@@ -285,6 +471,10 @@ const EducationAcademicYear: React.FC = () => {
   const handleSaveTerm = () => {
     if (!selectedTerm) return;
 
+    /* =========================================
+       1. THỜI GIAN HỌC
+       ========================================= */
+
     if (!selectedTerm.startDate || !selectedTerm.endDate) {
       alert("Vui lòng nhập ngày bắt đầu và ngày kết thúc học.");
       return;
@@ -294,6 +484,10 @@ const EducationAcademicYear: React.FC = () => {
       alert("Ngày kết thúc học phải sau ngày bắt đầu học.");
       return;
     }
+
+    /* =========================================
+       2. KHÔNG ĐƯỢC CHỒNG KỲ TRƯỚC
+       ========================================= */
 
     const previousTerm = getPreviousTerm(selectedTerm.id);
 
@@ -305,13 +499,9 @@ const EducationAcademicYear: React.FC = () => {
         return;
       }
 
-      const minimumStartDate =
-        getMinimumStartDate(selectedTerm.id);
+      const minimumStartDate = getMinimumStartDate(selectedTerm.id);
 
-      if (
-        minimumStartDate &&
-        selectedTerm.startDate < minimumStartDate
-      ) {
+      if (minimumStartDate && selectedTerm.startDate < minimumStartDate) {
         alert(
           `${selectedTerm.name} ${academicYear} phải bắt đầu từ ${formatDate(
             minimumStartDate,
@@ -321,11 +511,13 @@ const EducationAcademicYear: React.FC = () => {
       }
     }
 
+    /* =========================================
+       3. NGHỈ / CHUYỂN KỲ
+       ========================================= */
+
     if (
-      (selectedTerm.breakStartDate &&
-        !selectedTerm.breakEndDate) ||
-      (!selectedTerm.breakStartDate &&
-        selectedTerm.breakEndDate)
+      (selectedTerm.breakStartDate && !selectedTerm.breakEndDate) ||
+      (!selectedTerm.breakStartDate && selectedTerm.breakEndDate)
     ) {
       alert(
         "Vui lòng nhập đầy đủ ngày bắt đầu và ngày kết thúc nghỉ/chuyển kỳ.",
@@ -337,23 +529,24 @@ const EducationAcademicYear: React.FC = () => {
       selectedTerm.breakStartDate &&
       selectedTerm.breakStartDate <= selectedTerm.endDate
     ) {
-      alert(
-        "Ngày bắt đầu nghỉ/chuyển kỳ phải sau ngày kết thúc học.",
-      );
+      alert("Ngày bắt đầu nghỉ/chuyển kỳ phải sau ngày kết thúc học.");
       return;
     }
 
     if (
       selectedTerm.breakStartDate &&
       selectedTerm.breakEndDate &&
-      selectedTerm.breakEndDate <
-        selectedTerm.breakStartDate
+      selectedTerm.breakEndDate < selectedTerm.breakStartDate
     ) {
       alert(
         "Ngày kết thúc nghỉ/chuyển kỳ phải bằng hoặc sau ngày bắt đầu nghỉ/chuyển kỳ.",
       );
       return;
     }
+
+    /* =========================================
+       4. NGÀY NGHỈ TRONG KỲ
+       ========================================= */
 
     const invalidHoliday = selectedTerm.holidays.find(
       (holiday) =>
@@ -368,23 +561,14 @@ const EducationAcademicYear: React.FC = () => {
       return;
     }
 
-    setTerms((current) =>
-      current.map((term) =>
-        term.id === selectedTerm.id
-          ? {
-              ...term,
-              status:
-                term.status === "Chưa cấu hình"
-                  ? "Đang chuẩn bị"
-                  : term.status,
-            }
-          : term,
-      ),
-    );
+    /*
+     * Không cần set status.
+     *
+     * Status được tính tự động bởi getTermStatus()
+     * dựa trên startDate / endDate / ngày hiện tại.
+     */
 
-    alert(
-      `Đã lưu cấu hình ${selectedTerm.name} ${academicYear} (UI mock).`,
-    );
+    alert(`Đã lưu cấu hình ${selectedTerm.name} ${academicYear} (UI mock).`);
 
     handleCloseTerm();
   };
@@ -442,9 +626,7 @@ const EducationAcademicYear: React.FC = () => {
       !holidayForm.startDate ||
       !holidayForm.endDate
     ) {
-      alert(
-        "Vui lòng nhập tên ngày nghỉ, ngày bắt đầu và ngày kết thúc.",
-      );
+      alert("Vui lòng nhập tên ngày nghỉ, ngày bắt đầu và ngày kết thúc.");
       return;
     }
 
@@ -453,9 +635,7 @@ const EducationAcademicYear: React.FC = () => {
       return;
     }
 
-    const currentTerm = terms.find(
-      (term) => term.id === selectedTermId,
-    );
+    const currentTerm = terms.find((term) => term.id === selectedTermId);
 
     if (!currentTerm?.startDate || !currentTerm.endDate) {
       alert(
@@ -474,7 +654,7 @@ const EducationAcademicYear: React.FC = () => {
       return;
     }
 
-    setTerms((current) =>
+    updateTermsForYear(academicYear, (current) =>
       current.map((term) => {
         if (term.id !== selectedTermId) {
           return term;
@@ -512,13 +692,11 @@ const EducationAcademicYear: React.FC = () => {
   const handleDeleteHoliday = (holidayId: string) => {
     if (!selectedTermId) return;
 
-    const confirmed = window.confirm(
-      "Bạn có chắc muốn xóa ngày nghỉ này?",
-    );
+    const confirmed = window.confirm("Bạn có chắc muốn xóa ngày nghỉ này?");
 
     if (!confirmed) return;
 
-    setTerms((current) =>
+    updateTermsForYear(academicYear, (current) =>
       current.map((term) =>
         term.id === selectedTermId
           ? {
@@ -567,10 +745,11 @@ const EducationAcademicYear: React.FC = () => {
   };
 
   const handleEditTermFromYearPopup = (termId: string) => {
-    if (selectedYear) {
-      setAcademicYear(selectedYear);
-    }
+    if (!selectedYear) return;
 
+    const year = selectedYear;
+
+    setAcademicYear(year);
     setYearAction(null);
     setSelectedYear(null);
     setSelectedTermId(termId);
@@ -588,7 +767,10 @@ const EducationAcademicYear: React.FC = () => {
         badge="Quản lý dữ liệu"
       />
 
-      {/* YEAR */}
+      {/* ===================================================
+          YEAR
+          =================================================== */}
+
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -604,9 +786,7 @@ const EducationAcademicYear: React.FC = () => {
 
           <button
             type="button"
-            onClick={() =>
-              setShowInitializedYears((current) => !current)
-            }
+            onClick={() => setShowInitializedYears((current) => !current)}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <List size={18} />
@@ -630,9 +810,10 @@ const EducationAcademicYear: React.FC = () => {
 
             <select
               value={academicYear}
-              onChange={(event) =>
-                setAcademicYear(event.target.value)
-              }
+              onChange={(event) => {
+                setAcademicYear(event.target.value);
+                setSelectedTermId(null);
+              }}
               className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             >
               <option value="2026">2026</option>
@@ -645,7 +826,10 @@ const EducationAcademicYear: React.FC = () => {
         </div>
       </section>
 
-      {/* TERMS */}
+      {/* ===================================================
+          TERMS
+          =================================================== */}
+
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-slate-800">
           Các kỳ trong năm {academicYear}
@@ -656,73 +840,78 @@ const EducationAcademicYear: React.FC = () => {
         </p>
 
         <div className="mt-5 space-y-3">
-          {terms.map((term) => (
-            <div
-              key={term.id}
-              className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-5 transition hover:border-orange-200 hover:bg-orange-50/20 lg:flex-row lg:items-center lg:justify-between"
-            >
-              <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-                  <CalendarDays size={21} />
-                </div>
+          {terms.map((term) => {
+            const realtimeStatus = getTermStatus(term, academicYear, today);
 
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-slate-800">
-                      {term.name} {academicYear}
-                    </h3>
-
-                    <span
-                      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                        STATUS_STYLE[term.status]
-                      }`}
-                    >
-                      {term.status}
-                    </span>
+            return (
+              <div
+                key={term.id}
+                className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-5 transition hover:border-orange-200 hover:bg-orange-50/20 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                    <CalendarDays size={21} />
                   </div>
 
-                  {term.startDate && term.endDate ? (
-                    <p className="mt-2 text-sm text-slate-500">
-                      Thời gian học:{" "}
-                      <strong className="font-semibold text-slate-700">
-                        {formatDate(term.startDate)}
-                      </strong>{" "}
-                      →{" "}
-                      <strong className="font-semibold text-slate-700">
-                        {formatDate(term.endDate)}
-                      </strong>
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-sm text-slate-400">
-                      Chưa thiết lập thời gian học.
-                    </p>
-                  )}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-slate-800">
+                        {term.name} {academicYear}
+                      </h3>
 
-                  {term.holidays.length > 0 && (
-                    <p className="mt-1 text-xs text-slate-400">
-                      {term.holidays.length} kỳ nghỉ/ngày nghỉ đã thiết lập
-                    </p>
-                  )}
+                      <span
+                        className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                          STATUS_STYLE[realtimeStatus]
+                        }`}
+                      >
+                        {realtimeStatus}
+                      </span>
+                    </div>
+
+                    {term.startDate && term.endDate ? (
+                      <p className="mt-2 text-sm text-slate-500">
+                        Thời gian học:{" "}
+                        <strong className="font-semibold text-slate-700">
+                          {formatDate(term.startDate)}
+                        </strong>{" "}
+                        →{" "}
+                        <strong className="font-semibold text-slate-700">
+                          {formatDate(term.endDate)}
+                        </strong>
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-400">
+                        Chưa thiết lập thời gian học.
+                      </p>
+                    )}
+
+                    {term.holidays.length > 0 && (
+                      <p className="mt-1 text-xs text-slate-400">
+                        {term.holidays.length} kỳ nghỉ/ngày nghỉ đã thiết lập
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenTerm(term.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
+                >
+                  {term.startDate ? "Xem / chỉnh sửa" : "Thiết lập kỳ"}
+
+                  <ChevronRight size={17} />
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => handleOpenTerm(term.id)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
-              >
-                {term.startDate
-                  ? "Xem / chỉnh sửa"
-                  : "Thiết lập kỳ"}
-
-                <ChevronRight size={17} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
-      {/* INITIALIZED YEARS */}
+      {/* ===================================================
+          INITIALIZED YEARS
+          =================================================== */}
+
       {showInitializedYears && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold text-slate-800">
@@ -734,10 +923,11 @@ const EducationAcademicYear: React.FC = () => {
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-4 py-3">Năm học</th>
-                  <th className="px-4 py-3">
-                    Số kỳ đã cấu hình
-                  </th>
+
+                  <th className="px-4 py-3">Số kỳ đã cấu hình</th>
+
                   <th className="px-4 py-3">Trạng thái</th>
+
                   <th className="px-4 py-3">Thao tác</th>
                 </tr>
               </thead>
@@ -750,7 +940,7 @@ const EducationAcademicYear: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-3 text-slate-600">
-                      {configuredTermCount} kỳ
+                      {getConfiguredTermCount(year)} kỳ
                     </td>
 
                     <td className="px-4 py-3">
@@ -798,7 +988,10 @@ const EducationAcademicYear: React.FC = () => {
         </section>
       )}
 
-      {/* YEAR ACTION MODAL */}
+      {/* ===================================================
+          YEAR ACTION MODAL
+          =================================================== */}
+
       {yearAction && selectedYear && (
         <div
           className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/40 p-6 backdrop-blur-[2px]"
@@ -809,6 +1002,7 @@ const EducationAcademicYear: React.FC = () => {
             onClick={(event) => event.stopPropagation()}
           >
             {/* HEADER */}
+
             <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <h2 className="text-xl font-black text-slate-900">
@@ -838,13 +1032,19 @@ const EducationAcademicYear: React.FC = () => {
             </div>
 
             {/* ================= VIEW YEAR ================= */}
+
             {yearAction === "view" && (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                   <div className="space-y-4">
-                    {terms.map((term) => {
-                      const termStyle =
-                        TERM_VIEW_STYLE[term.name];
+                    {selectedYearTerms.map((term) => {
+                      const termStyle = TERM_VIEW_STYLE[term.name];
+
+                      const realtimeStatus = getTermStatus(
+                        term,
+                        selectedYear,
+                        today,
+                      );
 
                       return (
                         <div
@@ -852,11 +1052,13 @@ const EducationAcademicYear: React.FC = () => {
                           className={`relative overflow-hidden rounded-2xl border bg-white shadow-sm ${termStyle.border}`}
                         >
                           {/* LEFT ACCENT */}
+
                           <div
                             className={`absolute bottom-0 left-0 top-0 w-1.5 ${termStyle.accent}`}
                           />
 
                           {/* TERM HEADER */}
+
                           <div
                             className={`border-b px-5 py-4 pl-6 ${termStyle.header} ${termStyle.border}`}
                           >
@@ -877,12 +1079,10 @@ const EducationAcademicYear: React.FC = () => {
 
                                   <span
                                     className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                                      STATUS_STYLE[
-                                        term.status
-                                      ]
+                                      STATUS_STYLE[realtimeStatus]
                                     }`}
                                   >
-                                    {term.status}
+                                    {realtimeStatus}
                                   </span>
                                 </div>
                               </div>
@@ -890,6 +1090,7 @@ const EducationAcademicYear: React.FC = () => {
                           </div>
 
                           {/* TERM BODY */}
+
                           <div className="px-5 py-4 pl-6">
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                               <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
@@ -898,13 +1099,10 @@ const EducationAcademicYear: React.FC = () => {
                                 </p>
 
                                 <p className="mt-1 whitespace-nowrap text-sm font-semibold text-slate-700">
-                                  {term.startDate &&
-                                  term.endDate
+                                  {term.startDate && term.endDate
                                     ? `${formatDate(
                                         term.startDate,
-                                      )} → ${formatDate(
-                                        term.endDate,
-                                      )}`
+                                      )} → ${formatDate(term.endDate)}`
                                     : "Chưa thiết lập"}
                                 </p>
                               </div>
@@ -915,13 +1113,10 @@ const EducationAcademicYear: React.FC = () => {
                                 </p>
 
                                 <p className="mt-1 whitespace-nowrap text-sm font-semibold text-slate-700">
-                                  {term.breakStartDate &&
-                                  term.breakEndDate
+                                  {term.breakStartDate && term.breakEndDate
                                     ? `${formatDate(
                                         term.breakStartDate,
-                                      )} → ${formatDate(
-                                        term.breakEndDate,
-                                      )}`
+                                      )} → ${formatDate(term.breakEndDate)}`
                                     : "Chưa thiết lập"}
                                 </p>
                               </div>
@@ -944,36 +1139,29 @@ const EducationAcademicYear: React.FC = () => {
                                 </p>
 
                                 <div className="space-y-2">
-                                  {term.holidays.map(
-                                    (holiday) => (
-                                      <div
-                                        key={holiday.id}
-                                        className="flex flex-col gap-2 rounded-xl border border-orange-100 bg-orange-50/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                                      >
-                                        <div>
-                                          <p className="text-sm font-semibold text-slate-700">
-                                            {holiday.name}
+                                  {term.holidays.map((holiday) => (
+                                    <div
+                                      key={holiday.id}
+                                      className="flex flex-col gap-2 rounded-xl border border-orange-100 bg-orange-50/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                      <div>
+                                        <p className="text-sm font-semibold text-slate-700">
+                                          {holiday.name}
+                                        </p>
+
+                                        {holiday.note && (
+                                          <p className="mt-0.5 text-xs text-slate-400">
+                                            {holiday.note}
                                           </p>
-
-                                          {holiday.note && (
-                                            <p className="mt-0.5 text-xs text-slate-400">
-                                              {holiday.note}
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        <span className="whitespace-nowrap text-xs font-semibold text-slate-500">
-                                          {formatDate(
-                                            holiday.startDate,
-                                          )}{" "}
-                                          →{" "}
-                                          {formatDate(
-                                            holiday.endDate,
-                                          )}
-                                        </span>
+                                        )}
                                       </div>
-                                    ),
-                                  )}
+
+                                      <span className="whitespace-nowrap text-xs font-semibold text-slate-500">
+                                        {formatDate(holiday.startDate)} →{" "}
+                                        {formatDate(holiday.endDate)}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             )}
@@ -999,54 +1187,57 @@ const EducationAcademicYear: React.FC = () => {
             )}
 
             {/* ================= EDIT YEAR ================= */}
+
             {yearAction === "edit" && (
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 <div className="space-y-3">
-                  {terms.map((term) => (
-                    <div
-                      key={term.id}
-                      className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-slate-800">
-                            {term.name} {selectedYear}
-                          </p>
+                  {selectedYearTerms.map((term) => {
+                    const realtimeStatus = getTermStatus(
+                      term,
+                      selectedYear,
+                      today,
+                    );
 
-                          <span
-                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                              STATUS_STYLE[term.status]
-                            }`}
-                          >
-                            {term.status}
-                          </span>
+                    return (
+                      <div
+                        key={term.id}
+                        className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-slate-800">
+                              {term.name} {selectedYear}
+                            </p>
+
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                                STATUS_STYLE[realtimeStatus]
+                              }`}
+                            >
+                              {realtimeStatus}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-sm text-slate-500">
+                            {term.startDate && term.endDate
+                              ? `${formatDate(term.startDate)} → ${formatDate(
+                                  term.endDate,
+                                )}`
+                              : "Chưa thiết lập thời gian học"}
+                          </p>
                         </div>
 
-                        <p className="mt-2 text-sm text-slate-500">
-                          {term.startDate && term.endDate
-                            ? `${formatDate(
-                                term.startDate,
-                              )} → ${formatDate(
-                                term.endDate,
-                              )}`
-                            : "Chưa thiết lập thời gian học"}
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleEditTermFromYearPopup(term.id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-600 transition hover:bg-orange-100"
+                        >
+                          <Pencil size={16} />
+                          Chỉnh sửa kỳ
+                        </button>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleEditTermFromYearPopup(
-                            term.id,
-                          )
-                        }
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-600 transition hover:bg-orange-100"
-                      >
-                        <Pencil size={16} />
-                        Chỉnh sửa kỳ
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="mt-6 flex justify-end">
@@ -1062,6 +1253,7 @@ const EducationAcademicYear: React.FC = () => {
             )}
 
             {/* ================= DELETE YEAR ================= */}
+
             {yearAction === "delete" && (
               <div className="p-6">
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
@@ -1072,8 +1264,7 @@ const EducationAcademicYear: React.FC = () => {
 
                     <div>
                       <p className="font-bold text-red-700">
-                        Bạn có chắc muốn xóa năm học{" "}
-                        {selectedYear}?
+                        Bạn có chắc muốn xóa năm học {selectedYear}?
                       </p>
 
                       <p className="mt-1 text-sm leading-6 text-red-600">
@@ -1107,7 +1298,10 @@ const EducationAcademicYear: React.FC = () => {
         </div>
       )}
 
-      {/* TERM CONFIG MODAL */}
+      {/* ===================================================
+          TERM CONFIG MODAL
+          =================================================== */}
+
       {selectedTerm && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]"
@@ -1120,8 +1314,7 @@ const EducationAcademicYear: React.FC = () => {
             <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <h2 className="text-xl font-black text-slate-900">
-                  Thiết lập {selectedTerm.name}{" "}
-                  {academicYear}
+                  Thiết lập {selectedTerm.name} {academicYear}
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
@@ -1140,54 +1333,34 @@ const EducationAcademicYear: React.FC = () => {
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               {/* STUDY PERIOD */}
+
               <section>
                 <div className="flex items-center gap-2">
-                  <CalendarDays
-                    size={19}
-                    className="text-orange-500"
-                  />
+                  <CalendarDays size={19} className="text-orange-500" />
 
-                  <h3 className="font-bold text-slate-800">
-                    1. Thời gian học
-                  </h3>
+                  <h3 className="font-bold text-slate-800">1. Thời gian học</h3>
                 </div>
 
                 {getPreviousTerm(selectedTerm.id) && (
                   <div className="mt-4 rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
-                    {getMinimumStartDate(
-                      selectedTerm.id,
-                    ) ? (
+                    {getMinimumStartDate(selectedTerm.id) ? (
                       <p className="text-sm text-slate-600">
-                        {selectedTerm.name}{" "}
-                        {academicYear} được bắt đầu sớm nhất từ{" "}
+                        {selectedTerm.name} {academicYear} được bắt đầu sớm nhất
+                        từ{" "}
                         <strong className="text-orange-700">
-                          {formatDate(
-                            getMinimumStartDate(
-                              selectedTerm.id,
-                            ),
-                          )}
+                          {formatDate(getMinimumStartDate(selectedTerm.id))}
                         </strong>
                         , sau thời gian đã cấu hình của{" "}
-                        {
-                          getPreviousTerm(
-                            selectedTerm.id,
-                          )?.name
-                        }
-                        .
+                        {getPreviousTerm(selectedTerm.id)?.name}.
                       </p>
                     ) : (
                       <p className="text-sm text-orange-700">
                         Vui lòng cấu hình{" "}
                         <strong>
-                          {
-                            getPreviousTerm(
-                              selectedTerm.id,
-                            )?.name
-                          }{" "}
+                          {getPreviousTerm(selectedTerm.id)?.name}{" "}
                           {academicYear}
                         </strong>{" "}
-                        trước khi cấu hình{" "}
-                        {selectedTerm.name}.
+                        trước khi cấu hình {selectedTerm.name}.
                       </p>
                     )}
                   </div>
@@ -1201,17 +1374,10 @@ const EducationAcademicYear: React.FC = () => {
 
                     <input
                       type="date"
-                      min={
-                        getMinimumStartDate(
-                          selectedTerm.id,
-                        ) || undefined
-                      }
+                      min={getMinimumStartDate(selectedTerm.id) || undefined}
                       value={selectedTerm.startDate}
                       onChange={(event) =>
-                        updateSelectedTerm(
-                          "startDate",
-                          event.target.value,
-                        )
+                        updateSelectedTerm("startDate", event.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                     />
@@ -1224,16 +1390,10 @@ const EducationAcademicYear: React.FC = () => {
 
                     <input
                       type="date"
-                      min={
-                        selectedTerm.startDate ||
-                        undefined
-                      }
+                      min={selectedTerm.startDate || undefined}
                       value={selectedTerm.endDate}
                       onChange={(event) =>
-                        updateSelectedTerm(
-                          "endDate",
-                          event.target.value,
-                        )
+                        updateSelectedTerm("endDate", event.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                     />
@@ -1242,14 +1402,12 @@ const EducationAcademicYear: React.FC = () => {
               </section>
 
               {/* HOLIDAYS */}
+
               <section className="mt-8 border-t border-slate-100 pt-6">
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Clock3
-                        size={19}
-                        className="text-orange-500"
-                      />
+                      <Clock3 size={19} className="text-orange-500" />
 
                       <h3 className="font-bold text-slate-800">
                         2. Ngày nghỉ trong kỳ
@@ -1257,7 +1415,8 @@ const EducationAcademicYear: React.FC = () => {
                     </div>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      Thiết lập Tết, ngày lễ Nhà nước hoặc ngày nghỉ đặc biệt của trường.
+                      Thiết lập Tết, ngày lễ Nhà nước hoặc ngày nghỉ đặc biệt
+                      của trường.
                     </p>
                   </div>
 
@@ -1287,81 +1446,62 @@ const EducationAcademicYear: React.FC = () => {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="px-4 py-3">
-                            Tên kỳ nghỉ
-                          </th>
-                          <th className="px-4 py-3">
-                            Bắt đầu
-                          </th>
-                          <th className="px-4 py-3">
-                            Kết thúc
-                          </th>
-                          <th className="px-4 py-3 text-right">
-                            Thao tác
-                          </th>
+                          <th className="px-4 py-3">Tên kỳ nghỉ</th>
+
+                          <th className="px-4 py-3">Bắt đầu</th>
+
+                          <th className="px-4 py-3">Kết thúc</th>
+
+                          <th className="px-4 py-3 text-right">Thao tác</th>
                         </tr>
                       </thead>
 
                       <tbody className="divide-y divide-slate-100">
-                        {selectedTerm.holidays.map(
-                          (holiday) => (
-                            <tr key={holiday.id}>
-                              <td className="px-4 py-3">
-                                <p className="font-semibold text-slate-800">
-                                  {holiday.name}
+                        {selectedTerm.holidays.map((holiday) => (
+                          <tr key={holiday.id}>
+                            <td className="px-4 py-3">
+                              <p className="font-semibold text-slate-800">
+                                {holiday.name}
+                              </p>
+
+                              {holiday.note && (
+                                <p className="mt-1 text-xs text-slate-400">
+                                  {holiday.note}
                                 </p>
+                              )}
+                            </td>
 
-                                {holiday.note && (
-                                  <p className="mt-1 text-xs text-slate-400">
-                                    {holiday.note}
-                                  </p>
-                                )}
-                              </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                              {formatDate(holiday.startDate)}
+                            </td>
 
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                {formatDate(
-                                  holiday.startDate,
-                                )}
-                              </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                              {formatDate(holiday.endDate)}
+                            </td>
 
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                {formatDate(
-                                  holiday.endDate,
-                                )}
-                              </td>
+                            <td className="px-4 py-3">
+                              <div className="flex justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditHoliday(holiday)}
+                                  className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-600"
+                                >
+                                  <Edit3 size={16} />
+                                </button>
 
-                              <td className="px-4 py-3">
-                                <div className="flex justify-end gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleOpenEditHoliday(
-                                        holiday,
-                                      )
-                                    }
-                                    className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-600"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteHoliday(
-                                        holiday.id,
-                                      )
-                                    }
-                                    className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                  >
-                                    <Trash2
-                                      size={16}
-                                    />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ),
-                        )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteHoliday(holiday.id)
+                                  }
+                                  className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -1369,12 +1509,10 @@ const EducationAcademicYear: React.FC = () => {
               </section>
 
               {/* TERM BREAK */}
+
               <section className="mt-8 border-t border-slate-100 pt-6">
                 <div className="flex items-center gap-2">
-                  <Clock3
-                    size={19}
-                    className="text-orange-500"
-                  />
+                  <Clock3 size={19} className="text-orange-500" />
 
                   <h3 className="font-bold text-slate-800">
                     3. Thời gian nghỉ / chuyển kỳ
@@ -1382,8 +1520,8 @@ const EducationAcademicYear: React.FC = () => {
                 </div>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Khoảng nghỉ sau khi kết thúc{" "}
-                  {selectedTerm.name} và trước khi kỳ tiếp theo bắt đầu.
+                  Khoảng nghỉ sau khi kết thúc {selectedTerm.name} và trước khi
+                  kỳ tiếp theo bắt đầu.
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1396,19 +1534,12 @@ const EducationAcademicYear: React.FC = () => {
                       type="date"
                       min={
                         selectedTerm.endDate
-                          ? addOneDay(
-                              selectedTerm.endDate,
-                            )
+                          ? addOneDay(selectedTerm.endDate)
                           : undefined
                       }
-                      value={
-                        selectedTerm.breakStartDate
-                      }
+                      value={selectedTerm.breakStartDate}
                       onChange={(event) =>
-                        updateSelectedTerm(
-                          "breakStartDate",
-                          event.target.value,
-                        )
+                        updateSelectedTerm("breakStartDate", event.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                     />
@@ -1421,18 +1552,10 @@ const EducationAcademicYear: React.FC = () => {
 
                     <input
                       type="date"
-                      min={
-                        selectedTerm.breakStartDate ||
-                        undefined
-                      }
-                      value={
-                        selectedTerm.breakEndDate
-                      }
+                      min={selectedTerm.breakStartDate || undefined}
+                      value={selectedTerm.breakEndDate}
                       onChange={(event) =>
-                        updateSelectedTerm(
-                          "breakEndDate",
-                          event.target.value,
-                        )
+                        updateSelectedTerm("breakEndDate", event.target.value)
                       }
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                     />
@@ -1463,7 +1586,10 @@ const EducationAcademicYear: React.FC = () => {
         </div>
       )}
 
-      {/* HOLIDAY MODAL */}
+      {/* ===================================================
+          HOLIDAY MODAL
+          =================================================== */}
+
       {showHolidayModal && selectedTerm && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-4"
@@ -1471,16 +1597,12 @@ const EducationAcademicYear: React.FC = () => {
         >
           <div
             className="w-full max-w-lg rounded-3xl bg-white shadow-2xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <h2 className="text-lg font-black text-slate-900">
-                  {editingHolidayId
-                    ? "Chỉnh sửa ngày nghỉ"
-                    : "Thêm ngày nghỉ"}
+                  {editingHolidayId ? "Chỉnh sửa ngày nghỉ" : "Thêm ngày nghỉ"}
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
@@ -1525,20 +1647,13 @@ const EducationAcademicYear: React.FC = () => {
 
                   <input
                     type="date"
-                    min={
-                      selectedTerm.startDate ||
-                      undefined
-                    }
-                    max={
-                      selectedTerm.endDate ||
-                      undefined
-                    }
+                    min={selectedTerm.startDate || undefined}
+                    max={selectedTerm.endDate || undefined}
                     value={holidayForm.startDate}
                     onChange={(event) =>
                       setHolidayForm((current) => ({
                         ...current,
-                        startDate:
-                          event.target.value,
+                        startDate: event.target.value,
                       }))
                     }
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
@@ -1557,16 +1672,12 @@ const EducationAcademicYear: React.FC = () => {
                       selectedTerm.startDate ||
                       undefined
                     }
-                    max={
-                      selectedTerm.endDate ||
-                      undefined
-                    }
+                    max={selectedTerm.endDate || undefined}
                     value={holidayForm.endDate}
                     onChange={(event) =>
                       setHolidayForm((current) => ({
                         ...current,
-                        endDate:
-                          event.target.value,
+                        endDate: event.target.value,
                       }))
                     }
                     className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
@@ -1574,24 +1685,19 @@ const EducationAcademicYear: React.FC = () => {
                 </div>
               </div>
 
-              {selectedTerm.startDate &&
-                selectedTerm.endDate && (
-                  <p className="text-xs text-slate-400">
-                    Ngày nghỉ phải nằm trong thời gian học từ{" "}
-                    <span className="font-semibold text-slate-600">
-                      {formatDate(
-                        selectedTerm.startDate,
-                      )}
-                    </span>{" "}
-                    đến{" "}
-                    <span className="font-semibold text-slate-600">
-                      {formatDate(
-                        selectedTerm.endDate,
-                      )}
-                    </span>
-                    .
-                  </p>
-                )}
+              {selectedTerm.startDate && selectedTerm.endDate && (
+                <p className="text-xs text-slate-400">
+                  Ngày nghỉ phải nằm trong thời gian học từ{" "}
+                  <span className="font-semibold text-slate-600">
+                    {formatDate(selectedTerm.startDate)}
+                  </span>{" "}
+                  đến{" "}
+                  <span className="font-semibold text-slate-600">
+                    {formatDate(selectedTerm.endDate)}
+                  </span>
+                  .
+                </p>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
@@ -1629,9 +1735,7 @@ const EducationAcademicYear: React.FC = () => {
               >
                 <Save size={16} />
 
-                {editingHolidayId
-                  ? "Lưu thay đổi"
-                  : "Thêm ngày nghỉ"}
+                {editingHolidayId ? "Lưu thay đổi" : "Thêm ngày nghỉ"}
               </button>
             </div>
           </div>
