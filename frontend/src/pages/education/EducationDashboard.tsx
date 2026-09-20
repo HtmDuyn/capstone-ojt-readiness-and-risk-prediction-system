@@ -4,51 +4,63 @@ import {
   Users,
   CheckCircle2,
   AlertTriangle,
-  Clock3,
   TrendingUp,
-  TrendingDown,
-  ShieldAlert,
   UserCheck,
   BookOpen,
   ArrowRight,
   School,
   Bot,
+  ShieldAlert,
 } from "lucide-react";
 
 export const EducationDashboard: React.FC = () => {
   const navigate = useNavigate();
 
+  const totalStudents = 5240;
+  const eligibleStudents = 3850;
+  const ineligibleStudents = 1390;
+
+  const lowRiskStudents = 4670;
+  const mediumRiskStudents = 420;
+  const highRiskStudents = 150;
+
+  const lowRiskPercent = 89.1;
+  const mediumRiskPercent = 8.0;
+  const highRiskPercent = 2.9;
+
   return (
     <div className="space-y-6">
-      {/* ==================== HEADER ==================== */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      {/* =====================================================
+          HEADER
+          ===================================================== */}
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-medium text-orange-600">
-            Trang chủ → Tổng quan
+          <p className="text-sm font-semibold text-orange-600">
+            Trang chủ → Tổng quan Phòng Đào tạo
           </p>
 
-          <h1 className="mt-1 text-2xl font-extrabold text-slate-900">
-            Tổng quan Phòng Đào tạo
-          </h1>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Theo dõi tiến độ học tập, điều kiện OJT và rủi ro của sinh viên.
+          <p className="mt-2 text-sm text-slate-500">
+            Theo dõi tiến độ học tập, điều kiện OJT và mức nguy cơ trễ OJT của
+            sinh viên.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            Xuất báo cáo
-          </button>
-        </div>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          Xuất báo cáo
+        </button>
       </div>
 
-      {/* ==================== TỔNG QUAN ==================== */}
+      {/* =====================================================
+          TỔNG QUAN
+          ===================================================== */}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Tổng sinh viên */}
+
         <div className="card-glass p-5">
           <div className="flex items-start justify-between">
             <div>
@@ -57,7 +69,7 @@ export const EducationDashboard: React.FC = () => {
               </p>
 
               <p className="mt-2 text-2xl font-extrabold text-slate-900">
-                5,240
+                {totalStudents.toLocaleString("en-US")}
               </p>
 
               <div className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600">
@@ -72,7 +84,8 @@ export const EducationDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Đủ điều kiện */}
+        {/* Đủ điều kiện OJT */}
+
         <div className="card-glass p-5">
           <div className="flex items-start justify-between">
             <div>
@@ -81,7 +94,7 @@ export const EducationDashboard: React.FC = () => {
               </p>
 
               <p className="mt-2 text-2xl font-extrabold text-slate-900">
-                3,850
+                {eligibleStudents.toLocaleString("en-US")}
               </p>
 
               <p className="mt-2 text-xs font-medium text-green-600">
@@ -96,14 +109,17 @@ export const EducationDashboard: React.FC = () => {
         </div>
 
         {/* Chưa đủ điều kiện */}
+
         <div className="card-glass p-5">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm font-medium text-slate-500">
-                Chưa đủ điều kiện
+                Chưa đủ điều kiện OJT
               </p>
 
-              <p className="mt-2 text-2xl font-extrabold text-red-600">1,390</p>
+              <p className="mt-2 text-2xl font-extrabold text-red-600">
+                {ineligibleStudents.toLocaleString("en-US")}
+              </p>
 
               <p className="mt-2 text-xs font-medium text-red-500">
                 Cần theo dõi điều kiện OJT
@@ -116,95 +132,162 @@ export const EducationDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Hồ sơ chờ duyệt */}
+        {/* Lớp hỗ trợ */}
+
         <div className="card-glass p-5">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">
-                Hồ sơ chờ duyệt
-              </p>
+              <p className="text-sm font-medium text-slate-500">Lớp hỗ trợ</p>
 
-              <p className="mt-2 text-2xl font-extrabold text-slate-900">175</p>
+              <p className="mt-2 text-2xl font-extrabold text-slate-900">12</p>
 
-              <p className="mt-2 text-xs font-medium text-orange-600">
-                Đang chờ Phòng Đào tạo xử lý
+              <p className="mt-2 text-xs font-medium text-blue-600">
+                Lớp hỗ trợ đang được quản lý
               </p>
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
-              <Clock3 size={21} />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+              <School size={21} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ==================== RISK SUMMARY ==================== */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {/* Risk cao */}
-        <div className="card-glass border-l-4 border-red-500 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500">Risk cao</p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">150</p>
+      {/* =====================================================
+          PHÂN BỐ MỨC NGUY CƠ
+          ===================================================== */}
+
+      <div className="card-glass p-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          {/* Tiêu đề */}
+
+          <div className="lg:w-[260px]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                <ShieldAlert size={21} />
+              </div>
+
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  Phân bố mức nguy cơ
+                </h2>
+
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Nguy cơ sinh viên bị trễ so với lộ trình OJT dự kiến.
+                </p>
+              </div>
             </div>
-
-            <ShieldAlert className="text-red-500" size={22} />
           </div>
-        </div>
 
-        {/* Risk trung bình */}
-        <div className="card-glass border-l-4 border-orange-400 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500">
-                Risk trung bình
+          {/* Ba mức nguy cơ */}
+
+          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Thấp */}
+
+            <div className="rounded-2xl border border-green-100 bg-green-50/70 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-green-700">
+                    Nguy cơ thấp
+                  </p>
+
+                  <p className="mt-1 text-xl font-extrabold text-slate-900">
+                    {lowRiskStudents.toLocaleString("en-US")}
+                  </p>
+                </div>
+
+                <CheckCircle2 size={21} className="text-green-500" />
+              </div>
+
+              <p className="mt-2 text-xs font-semibold text-green-600">
+                {lowRiskPercent}% tổng sinh viên
               </p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">420</p>
             </div>
 
-            <AlertTriangle className="text-orange-500" size={22} />
-          </div>
-        </div>
+            {/* Trung bình */}
 
-        {/* Risk thấp */}
-        <div className="card-glass border-l-4 border-green-500 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500">Risk thấp</p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">
-                4,670
+            <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-orange-700">
+                    Nguy cơ trung bình
+                  </p>
+
+                  <p className="mt-1 text-xl font-extrabold text-slate-900">
+                    {mediumRiskStudents.toLocaleString("en-US")}
+                  </p>
+                </div>
+
+                <AlertTriangle size={21} className="text-orange-500" />
+              </div>
+
+              <p className="mt-2 text-xs font-semibold text-orange-600">
+                {mediumRiskPercent}% tổng sinh viên
               </p>
             </div>
 
-            <CheckCircle2 className="text-green-500" size={22} />
+            {/* Cao */}
+
+            <div className="rounded-2xl border border-red-100 bg-red-50/70 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-red-700">
+                    Nguy cơ cao
+                  </p>
+
+                  <p className="mt-1 text-xl font-extrabold text-slate-900">
+                    {highRiskStudents.toLocaleString("en-US")}
+                  </p>
+                </div>
+
+                <ShieldAlert size={21} className="text-red-500" />
+              </div>
+
+              <p className="mt-2 text-xs font-semibold text-red-600">
+                {highRiskPercent}% tổng sinh viên
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Lớp hỗ trợ */}
-        <div className="card-glass border-l-4 border-blue-500 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-slate-500">Lớp hỗ trợ</p>
-              <p className="mt-1 text-xl font-extrabold text-slate-900">12</p>
-            </div>
+        {/* Thanh phân bố */}
 
-            <School className="text-blue-500" size={22} />
+        <div className="mt-5">
+          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full bg-green-500"
+              style={{ width: `${lowRiskPercent}%` }}
+            />
+
+            <div
+              className="h-full bg-orange-500"
+              style={{ width: `${mediumRiskPercent}%` }}
+            />
+
+            <div
+              className="h-full bg-red-500"
+              style={{ width: `${highRiskPercent}%` }}
+            />
           </div>
         </div>
       </div>
 
-      {/* ==================== BIỂU ĐỒ ==================== */}
+      {/* =====================================================
+          BIỂU ĐỒ
+          ===================================================== */}
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Xu hướng Risk */}
+        {/* Xu hướng nguy cơ */}
+
         <div className="card-glass p-6">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Xu hướng Risk theo kỳ
+                Xu hướng nguy cơ theo kỳ
               </h2>
 
               <p className="mt-1 text-xs text-slate-500">
-                Số lượng sinh viên có mức Risk cao theo từng kỳ.
+                Số lượng sinh viên có mức nguy cơ cao theo từng kỳ.
               </p>
             </div>
 
@@ -215,13 +298,13 @@ export const EducationDashboard: React.FC = () => {
 
           <div className="mt-6 flex h-48 items-end gap-3 border-b border-slate-200 px-2">
             {[
-              { label: "Spr 23", value: 42 },
-              { label: "Sum 23", value: 51 },
+              { label: "Spring 23", value: 42 },
+              { label: "Summer 23", value: 51 },
               { label: "Fall 23", value: 47 },
-              { label: "Spr 24", value: 68 },
-              { label: "Sum 24", value: 61 },
+              { label: "Spring 24", value: 68 },
+              { label: "Summer 24", value: 61 },
               { label: "Fall 24", value: 82 },
-              { label: "Spr 25", value: 74 },
+              { label: "Spring 25", value: 74 },
             ].map((item) => (
               <div
                 key={item.label}
@@ -238,28 +321,32 @@ export const EducationDashboard: React.FC = () => {
                   }}
                 />
 
-                <span className="text-[9px] text-slate-400">{item.label}</span>
+                <span className="whitespace-nowrap text-[9px] text-slate-400">
+                  {item.label}
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Phân bố Risk */}
+        {/* Phân bố điểm nguy cơ */}
+
         <div className="card-glass p-6">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              Phân bố Risk Score
+              Phân bố điểm nguy cơ
             </h2>
 
             <p className="mt-1 text-xs text-slate-500">
-              Phân loại sinh viên theo kết quả dự báo Risk.
+              Phân loại sinh viên theo kết quả dự báo nguy cơ trễ OJT.
             </p>
           </div>
 
           <div className="mt-5 flex flex-col items-center justify-center sm:flex-row sm:gap-10">
             {/* Donut */}
+
             <div
-              className="relative flex h-44 w-44 items-center justify-center rounded-full"
+              className="relative flex h-44 w-44 shrink-0 items-center justify-center rounded-full"
               style={{
                 background:
                   "conic-gradient(#22c55e 0deg 321deg, #f97316 321deg 350deg, #dc2626 350deg 360deg)",
@@ -270,42 +357,57 @@ export const EducationDashboard: React.FC = () => {
                   5.2k
                 </span>
 
-                <span className="text-xs text-slate-500">Tổng cộng</span>
+                <span className="text-xs text-slate-500">Tổng sinh viên</span>
               </div>
             </div>
+
+            {/* Chú thích */}
 
             <div className="mt-5 w-full space-y-3 sm:mt-0 sm:w-auto">
               <div className="flex items-center justify-between gap-8 text-xs">
                 <span className="flex items-center gap-2 text-slate-600">
                   <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                  Risk thấp
+                  Nguy cơ thấp
                 </span>
-                <span className="font-bold text-slate-900">89.1%</span>
+
+                <span className="font-bold text-slate-900">
+                  {lowRiskPercent}%
+                </span>
               </div>
 
               <div className="flex items-center justify-between gap-8 text-xs">
                 <span className="flex items-center gap-2 text-slate-600">
                   <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-                  Risk trung bình
+                  Nguy cơ trung bình
                 </span>
-                <span className="font-bold text-slate-900">8.0%</span>
+
+                <span className="font-bold text-slate-900">
+                  {mediumRiskPercent}%
+                </span>
               </div>
 
               <div className="flex items-center justify-between gap-8 text-xs">
                 <span className="flex items-center gap-2 text-slate-600">
                   <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-                  Risk cao
+                  Nguy cơ cao
                 </span>
-                <span className="font-bold text-slate-900">2.9%</span>
+
+                <span className="font-bold text-slate-900">
+                  {highRiskPercent}%
+                </span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ==================== TIẾN ĐỘ + ĐIỀU KIỆN ==================== */}
+      {/* =====================================================
+          TIẾN ĐỘ + ĐIỀU KIỆN
+          ===================================================== */}
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* Tiến độ học tập */}
+
         <div className="card-glass p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -323,7 +425,7 @@ export const EducationDashboard: React.FC = () => {
 
           <div className="mt-6 space-y-5">
             {[
-              { label: "Khóa 18 (K18)", value: 98 },
+              { label: "Khóa 16 (K16)", value: 98 },
               { label: "Khóa 17 (K17)", value: 75 },
               { label: "Khóa 18 (K18)", value: 42 },
             ].map((item) => (
@@ -341,7 +443,9 @@ export const EducationDashboard: React.FC = () => {
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
                     className="h-full rounded-full bg-blue-500"
-                    style={{ width: `${item.value}%` }}
+                    style={{
+                      width: `${item.value}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -350,6 +454,7 @@ export const EducationDashboard: React.FC = () => {
         </div>
 
         {/* Điều kiện OJT */}
+
         <div className="card-glass p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -372,7 +477,9 @@ export const EducationDashboard: React.FC = () => {
                   Đủ điều kiện
                 </span>
 
-                <span className="font-bold text-green-600">3,850</span>
+                <span className="font-bold text-green-600">
+                  {eligibleStudents.toLocaleString("en-US")}
+                </span>
               </div>
 
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
@@ -389,7 +496,9 @@ export const EducationDashboard: React.FC = () => {
                   Chưa đủ điều kiện
                 </span>
 
-                <span className="font-bold text-red-600">1,390</span>
+                <span className="font-bold text-red-600">
+                  {ineligibleStudents.toLocaleString("en-US")}
+                </span>
               </div>
 
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
@@ -403,9 +512,13 @@ export const EducationDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ==================== SINH VIÊN CẦN HỖ TRỢ ==================== */}
+      {/* =====================================================
+          SINH VIÊN CẦN ƯU TIÊN HỖ TRỢ
+          ===================================================== */}
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
         {/* Danh sách */}
+
         <div className="card-glass overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 p-5">
             <div>
@@ -414,14 +527,15 @@ export const EducationDashboard: React.FC = () => {
               </h2>
 
               <p className="mt-1 text-xs text-slate-500">
-                Sinh viên có Risk cao hoặc vấn đề ảnh hưởng đến tiến độ OJT.
+                Sinh viên có mức nguy cơ cao hoặc có vấn đề ảnh hưởng đến tiến
+                độ OJT.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => navigate("/education/risk-students")}
-              className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+              className="whitespace-nowrap text-xs font-semibold text-orange-600 transition hover:text-orange-700"
             >
               Xem tất cả
             </button>
@@ -440,7 +554,7 @@ export const EducationDashboard: React.FC = () => {
                   </th>
 
                   <th className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">
-                    Risk Score
+                    Điểm nguy cơ
                   </th>
 
                   <th className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">
@@ -459,22 +573,22 @@ export const EducationDashboard: React.FC = () => {
                     name: "Nguyễn Thành Phương",
                     id: "SE161234",
                     risk: "92/100",
-                    issue: "Thiếu chứng chỉ OJT",
-                    action: "Gửi mail",
+                    issue: "Thiếu điều kiện cần thiết cho OJT",
+                    action: "Xem",
                   },
                   {
                     name: "Phan Lan Anh",
                     id: "SE161458",
                     risk: "78/100",
-                    issue: "GPA chuyển ngành thấp",
-                    action: "Tư vấn",
+                    issue: "Tiến độ học tập cần theo dõi",
+                    action: "Xem",
                   },
                   {
                     name: "Trần Hùng Dũng",
                     id: "SE161789",
                     risk: "80/100",
-                    issue: "Nợ môn tiên quyết",
-                    action: "Đăng ký lớp",
+                    issue: "Chưa hoàn thành môn tiên quyết",
+                    action: "Xem",
                   },
                 ].map((student) => (
                   <tr
@@ -487,7 +601,7 @@ export const EducationDashboard: React.FC = () => {
                           {student.name.charAt(0)}
                         </div>
 
-                        <span className="text-xs font-semibold text-slate-800">
+                        <span className="whitespace-nowrap text-xs font-semibold text-slate-800">
                           {student.name}
                         </span>
                       </div>
@@ -498,7 +612,7 @@ export const EducationDashboard: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-4">
-                      <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
+                      <span className="whitespace-nowrap rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
                         {student.risk}
                       </span>
                     </td>
@@ -510,7 +624,8 @@ export const EducationDashboard: React.FC = () => {
                     <td className="px-4 py-4">
                       <button
                         type="button"
-                        className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                        onClick={() => navigate("/education/risk-students")}
+                        className="text-xs font-semibold text-orange-600 transition hover:text-orange-700"
                       >
                         {student.action}
                       </button>
@@ -522,9 +637,13 @@ export const EducationDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Cảnh báo + AI */}
+        {/* =================================================
+            CẢNH BÁO + ĐỀ XUẤT AI
+            ================================================= */}
+
         <div className="space-y-6">
-          {/* AI cảnh báo */}
+          {/* Cảnh báo AI */}
+
           <div className="card-glass p-5">
             <div className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
@@ -533,7 +652,7 @@ export const EducationDashboard: React.FC = () => {
 
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  AI cảnh báo mới
+                  Cảnh báo mới từ AI
                 </h2>
 
                 <p className="text-[11px] text-slate-500">
@@ -545,11 +664,12 @@ export const EducationDashboard: React.FC = () => {
             <div className="mt-4 space-y-3">
               <div className="rounded-xl border border-red-100 bg-red-50 p-3">
                 <p className="text-xs font-bold text-red-700">
-                  Rủi ro hệ thống
+                  Cảnh báo nguy cơ cao
                 </p>
 
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  Phát hiện 42 sinh viên có Risk cao và chưa đủ điều kiện OJT.
+                  Phát hiện 42 sinh viên có mức nguy cơ cao và chưa đủ điều kiện
+                  OJT.
                 </p>
               </div>
 
@@ -559,7 +679,8 @@ export const EducationDashboard: React.FC = () => {
                 </p>
 
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  AI đề xuất mở lớp hỗ trợ cho nhóm sinh viên có cùng vấn đề.
+                  AI đề xuất mở lớp hỗ trợ cho nhóm sinh viên có cùng vấn đề học
+                  tập.
                 </p>
               </div>
             </div>
@@ -575,6 +696,7 @@ export const EducationDashboard: React.FC = () => {
           </div>
 
           {/* Đề xuất lớp */}
+
           <div className="card-glass p-5">
             <div className="flex items-center justify-between">
               <div>
