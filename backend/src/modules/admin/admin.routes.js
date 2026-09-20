@@ -1,15 +1,15 @@
 const express = require("express");
 const router = express.Router();
 
-const authMiddleware = require("../middlewares/auth.middleware");
-const requireAdmin = require("../middlewares/admin.middleware");
+const authMiddleware = require("../../middlewares/auth.middleware");
+const requireAdmin = require("./admin.middleware");
 
 const {
     getUsers,
     getUserById,
     updateUserStatus,
     updateUser
-} = require("../controllers/admin.controller");
+} = require("./admin.controller");
 
 /**
  * @swagger

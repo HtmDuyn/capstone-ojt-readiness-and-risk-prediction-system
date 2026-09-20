@@ -3,7 +3,7 @@ const router = express.Router();
 
 const healthRoutes = require("./health.routes");
 const authRoutes = require("./auth.routes");
-const adminRoutes = require("./admin.routes");
+const adminRoutes = require("../modules/admin/admin.routes");
 
 router.use("/health", healthRoutes);
 router.use("/auth", authRoutes);

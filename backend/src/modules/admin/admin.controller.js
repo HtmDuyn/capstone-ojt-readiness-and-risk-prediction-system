@@ -4,7 +4,7 @@ const {
     updateUserStatus: updateUserStatusService,
     validateUserUpdate: validateUserUpdateService,
     updateUser: updateUserService
-} = require("../services/admin.service");
+} = require("./admin.service");
 
 const getUsers = async (req, res) => {
     try {
