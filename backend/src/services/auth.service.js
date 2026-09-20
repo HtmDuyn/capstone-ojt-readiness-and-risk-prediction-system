@@ -7,7 +7,8 @@ console.log("AUTH SERVICE DATABASE POOL:", !!database.pool);
 
 const JWT_SECRET = process.env.JWT_SECRET || "ojt-dev-secret";
 
-const normalizeIdentifier = (value) => (typeof value === "string" ? value.trim() : "");
+const normalizeIdentifier = (value) =>
+    typeof value === "string" ? value.trim() : "";
 
 const verifyPassword = async (inputPassword, storedHash) => {
     if (!inputPassword || !storedHash) {
@@ -40,7 +41,8 @@ const getUserById = async (userId) => {
                 r."RoleCode" AS role_code,
                 r."RoleName" AS role_name
             FROM "Users" u
-            LEFT JOIN "Roles" r ON r."RoleID" = u."RoleID"
+            LEFT JOIN "Roles" r
+                ON r."RoleID" = u."RoleID"
             WHERE u."UserID" = $1
             LIMIT 1;
         `,
@@ -55,11 +57,23 @@ const loginUser = async (username, password) => {
     const safePassword = typeof password === "string" ? password : "";
 
     if (!safeUsername) {
-        throw Object.assign(new Error("Username or email is required."), { statusCode: 400, errorCode: "MISSING_USERNAME" });
+        throw Object.assign(
+            new Error("Username or email is required."),
+            {
+                statusCode: 400,
+                errorCode: "MISSING_USERNAME"
+            }
+        );
     }
 
     if (!safePassword) {
-        throw Object.assign(new Error("Password is required."), { statusCode: 400, errorCode: "MISSING_PASSWORD" });
+        throw Object.assign(
+            new Error("Password is required."),
+            {
+                statusCode: 400,
+                errorCode: "MISSING_PASSWORD"
+            }
+        );
     }
 
     const result = await database.query(
@@ -74,7 +88,8 @@ const loginUser = async (username, password) => {
                 r."RoleCode" AS role_code,
                 r."RoleName" AS role_name
             FROM "Users" u
-            LEFT JOIN "Roles" r ON r."RoleID" = u."RoleID"
+            LEFT JOIN "Roles" r
+                ON r."RoleID" = u."RoleID"
             WHERE LOWER(u."Username") = LOWER($1)
                OR LOWER(u."Email") = LOWER($1)
             LIMIT 1;
@@ -85,13 +100,52 @@ const loginUser = async (username, password) => {
     const user = result.rows[0];
 
     if (!user) {
-        throw Object.assign(new Error("User not found. Please check your username or email."), { statusCode: 404, errorCode: "USER_NOT_FOUND" });
+        throw Object.assign(
+            new Error(
+                "User not found. Please check your username or email."
+            ),
+            {
+                statusCode: 404,
+                errorCode: "USER_NOT_FOUND"
+            }
+        );
     }
 
-    const isPasswordValid = await verifyPassword(safePassword, user.password_hash);
+    const isPasswordValid = await verifyPassword(
+        safePassword,
+        user.password_hash
+    );
 
     if (!isPasswordValid) {
-        throw Object.assign(new Error("Incorrect password. Please check your password and try again."), { statusCode: 401, errorCode: "INVALID_PASSWORD" });
+        throw Object.assign(
+            new Error(
+                "Incorrect password. Please check your password and try again."
+            ),
+            {
+                statusCode: 401,
+                errorCode: "INVALID_PASSWORD"
+            }
+        );
+    }
+
+    if (user.status === "LOCKED") {
+        throw Object.assign(
+            new Error("This account is locked."),
+            {
+                statusCode: 403,
+                errorCode: "ACCOUNT_LOCKED"
+            }
+        );
+    }
+
+    if (user.status !== "ACTIVE") {
+        throw Object.assign(
+            new Error("This account is not active."),
+            {
+                statusCode: 403,
+                errorCode: "ACCOUNT_INACTIVE"
+            }
+        );
     }
 
     const token = jwt.sign(
