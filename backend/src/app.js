@@ -64,6 +64,9 @@ app.use(
         // Custom CSS
         customCssUrl: "/swagger-static/swagger-custom.css",
 
+        // Custom JavaScript for automatic JWT authorization
+        customJs: "/swagger-static/swagger-custom.js",
+
         // Swagger UI settings
         swaggerOptions: {
 
