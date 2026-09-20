@@ -27,8 +27,14 @@ const authMiddleware = require("../middlewares/auth.middleware");
  *     responses:
  *       200:
  *         description: Login successful
+ *       400:
+ *         description: Missing username or password
  *       401:
  *         description: Invalid credentials
+ *       404:
+ *         description: User not found    
+ *       500:
+ *         description: Internal server error
  */
 router.post("/login", login);
 
@@ -45,6 +51,10 @@ router.post("/login", login);
  *         description: User profile retrieved successfully
  *       401:
  *         description: User is not authenticated
+ *       404:
+ *         description: Authenticated user not found
+ *       500:
+ *         description: Internal server error
  */
 router.get("/me", authMiddleware, getCurrentUser);
 
