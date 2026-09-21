@@ -34,16 +34,41 @@ interface Holiday {
   startDate: string;
   endDate: string;
   note: string;
+
+  // Nguồn của lịch nghỉ
+  // government = lịch nghỉ Nhà nước
+  // school = lịch nghỉ đặc biệt do trường bổ sung
+  source: "government" | "school";
+}
+
+interface MakeupSchedule {
+  id: string;
+
+  // Nếu lịch học bù liên quan đến một ngày nghỉ cụ thể
+  holidayId: string;
+
+  // Ngày tổ chức học bù
+  makeupDate: string;
+
+  // Ghi chú thêm
+  note: string;
 }
 
 interface TermConfig {
   id: string;
   name: "Spring" | "Summer" | "Fall";
+
   startDate: string;
   endDate: string;
+
   breakStartDate: string;
   breakEndDate: string;
+
+  // Lịch nghỉ nằm trong kỳ
   holidays: Holiday[];
+
+  // Các lịch học bù do PĐT thiết lập
+  makeupSchedules: MakeupSchedule[];
 }
 
 /* =========================================================
@@ -54,37 +79,71 @@ const INITIAL_TERMS_2026: TermConfig[] = [
   {
     id: "spring",
     name: "Spring",
+
+    // Spring 2026
     startDate: "2026-01-05",
-    endDate: "2026-04-26",
-    breakStartDate: "2026-04-27",
+    endDate: "2026-03-29",
+
+    // Nghỉ / chuyển kỳ trước Summer
+    breakStartDate: "2026-03-30",
     breakEndDate: "2026-05-10",
+
     holidays: [
       {
-        id: "holiday-spring-1",
+        id: "tet-2026",
         name: "Nghỉ Tết Nguyên Đán",
         startDate: "2026-02-14",
         endDate: "2026-02-22",
-        note: "Nghỉ Tết trong học kỳ Spring.",
+        note: "Lịch nghỉ trong kỳ Spring.",
+        source: "government",
       },
     ],
+
+    makeupSchedules: [],
   },
+
   {
     id: "summer",
     name: "Summer",
-    startDate: "",
-    endDate: "",
-    breakStartDate: "",
-    breakEndDate: "",
-    holidays: [],
+
+    // Summer 2026
+    startDate: "2026-05-11",
+    endDate: "2026-07-26",
+
+    // Nghỉ / chuyển kỳ trước Fall
+    breakStartDate: "2026-07-27",
+    breakEndDate: "2026-09-06",
+
+    holidays: [
+      {
+        id: "summer-break-2026",
+        name: "Nghỉ hè",
+        startDate: "2026-07-06",
+        endDate: "2026-07-12",
+        note: "Nghỉ hè 1 tuần sau khi hoàn thành tuần học thứ 8.",
+        source: "school",
+      },
+    ],
+
+    makeupSchedules: [],
   },
+
   {
     id: "fall",
     name: "Fall",
-    startDate: "",
-    endDate: "",
+
+    // Fall 2026
+    startDate: "2026-09-07",
+
+    // 10 tuần, kết thúc vào thứ Bảy của tuần 10
+    endDate: "2026-11-14",
+
     breakStartDate: "",
     breakEndDate: "",
+
     holidays: [],
+
+    makeupSchedules: [],
   },
 ];
 
@@ -97,6 +156,7 @@ const createEmptyTerms = (): TermConfig[] => [
     breakStartDate: "",
     breakEndDate: "",
     holidays: [],
+    makeupSchedules: [],
   },
   {
     id: "summer",
@@ -106,6 +166,7 @@ const createEmptyTerms = (): TermConfig[] => [
     breakStartDate: "",
     breakEndDate: "",
     holidays: [],
+    makeupSchedules: [],
   },
   {
     id: "fall",
@@ -115,6 +176,7 @@ const createEmptyTerms = (): TermConfig[] => [
     breakStartDate: "",
     breakEndDate: "",
     holidays: [],
+    makeupSchedules: [],
   },
 ];
 
@@ -361,6 +423,14 @@ const EducationAcademicYear: React.FC = () => {
     name: "",
     startDate: "",
     endDate: "",
+    note: "",
+  });
+  /* MAKEUP SCHEDULE */
+  const [showMakeupModal, setShowMakeupModal] = React.useState(false);
+
+  const [makeupForm, setMakeupForm] = React.useState({
+    holidayId: "",
+    makeupDate: "",
     note: "",
   });
 
@@ -677,6 +747,7 @@ const EducationAcademicYear: React.FC = () => {
         const newHoliday: Holiday = {
           id: `holiday-${Date.now()}`,
           ...holidayForm,
+          source: "school",
         };
 
         return {
@@ -762,7 +833,7 @@ const EducationAcademicYear: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageBanner
-        title="Khởi tạo Năm học"
+        title="Khởi tạo Năm học TEST 123"
         description="Thiết lập năm học, từng kỳ học và các khoảng thời gian nghỉ của nhà trường."
         badge="Quản lý dữ liệu"
       />
@@ -1422,11 +1493,11 @@ const EducationAcademicYear: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={handleOpenAddHoliday}
+                    onClick={() => setShowMakeupModal(true)}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-600 hover:bg-orange-100"
                   >
                     <Plus size={17} />
-                    Thêm ngày nghỉ
+                    Thêm lịch học bù
                   </button>
                 </div>
 
@@ -1506,61 +1577,6 @@ const EducationAcademicYear: React.FC = () => {
                     </table>
                   </div>
                 )}
-              </section>
-
-              {/* TERM BREAK */}
-
-              <section className="mt-8 border-t border-slate-100 pt-6">
-                <div className="flex items-center gap-2">
-                  <Clock3 size={19} className="text-orange-500" />
-
-                  <h3 className="font-bold text-slate-800">
-                    3. Thời gian nghỉ / chuyển kỳ
-                  </h3>
-                </div>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Khoảng nghỉ sau khi kết thúc {selectedTerm.name} và trước khi
-                  kỳ tiếp theo bắt đầu.
-                </p>
-
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      Ngày bắt đầu nghỉ
-                    </label>
-
-                    <input
-                      type="date"
-                      min={
-                        selectedTerm.endDate
-                          ? addOneDay(selectedTerm.endDate)
-                          : undefined
-                      }
-                      value={selectedTerm.breakStartDate}
-                      onChange={(event) =>
-                        updateSelectedTerm("breakStartDate", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      Ngày kết thúc nghỉ
-                    </label>
-
-                    <input
-                      type="date"
-                      min={selectedTerm.breakStartDate || undefined}
-                      value={selectedTerm.breakEndDate}
-                      onChange={(event) =>
-                        updateSelectedTerm("breakEndDate", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                    />
-                  </div>
-                </div>
               </section>
             </div>
 
@@ -1736,6 +1752,98 @@ const EducationAcademicYear: React.FC = () => {
                 <Save size={16} />
 
                 {editingHolidayId ? "Lưu thay đổi" : "Thêm ngày nghỉ"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ===================================================
+    MAKEUP SCHEDULE MODAL
+    =================================================== */}
+
+      {showMakeupModal && selectedTerm && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4"
+          onClick={() => setShowMakeupModal(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">
+                  Thêm lịch học bù
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedTerm.name} {academicYear}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowMakeupModal(false)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Ngày học bù
+                </label>
+
+                <input
+                  type="date"
+                  value={makeupForm.makeupDate}
+                  onChange={(event) =>
+                    setMakeupForm((current) => ({
+                      ...current,
+                      makeupDate: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Ghi chú
+                </label>
+
+                <textarea
+                  rows={3}
+                  value={makeupForm.note}
+                  onChange={(event) =>
+                    setMakeupForm((current) => ({
+                      ...current,
+                      note: event.target.value,
+                    }))
+                  }
+                  placeholder="VD: Học bù cho buổi nghỉ lễ..."
+                  className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowMakeupModal(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+              >
+                <Save size={16} />
+                Thêm lịch học bù
               </button>
             </div>
           </div>
