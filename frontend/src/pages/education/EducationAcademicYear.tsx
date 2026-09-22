@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
-  Edit3,
   Eye,
   List,
   Pencil,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { PageBanner } from "@/components/common/PageBanner";
+import { getGovernmentHolidays } from "@/services/governmentHoliday.service";
 
 /* =========================================================
    TYPES
@@ -72,115 +72,6 @@ interface TermConfig {
 }
 
 /* =========================================================
-   MOCK DATA
-   ========================================================= */
-
-const INITIAL_TERMS_2026: TermConfig[] = [
-  {
-    id: "spring",
-    name: "Spring",
-
-    // Spring 2026
-    startDate: "2026-01-05",
-    endDate: "2026-03-29",
-
-    // Nghỉ / chuyển kỳ trước Summer
-    breakStartDate: "2026-03-30",
-    breakEndDate: "2026-05-10",
-
-    holidays: [
-      {
-        id: "tet-2026",
-        name: "Nghỉ Tết Nguyên Đán",
-        startDate: "2026-02-14",
-        endDate: "2026-02-22",
-        note: "Lịch nghỉ trong kỳ Spring.",
-        source: "government",
-      },
-    ],
-
-    makeupSchedules: [],
-  },
-
-  {
-    id: "summer",
-    name: "Summer",
-
-    // Summer 2026
-    startDate: "2026-05-11",
-    endDate: "2026-07-26",
-
-    // Nghỉ / chuyển kỳ trước Fall
-    breakStartDate: "2026-07-27",
-    breakEndDate: "2026-09-06",
-
-    holidays: [
-      {
-        id: "summer-break-2026",
-        name: "Nghỉ hè",
-        startDate: "2026-07-06",
-        endDate: "2026-07-12",
-        note: "Nghỉ hè 1 tuần sau khi hoàn thành tuần học thứ 8.",
-        source: "school",
-      },
-    ],
-
-    makeupSchedules: [],
-  },
-
-  {
-    id: "fall",
-    name: "Fall",
-
-    // Fall 2026
-    startDate: "2026-09-07",
-
-    // 10 tuần, kết thúc vào thứ Bảy của tuần 10
-    endDate: "2026-11-14",
-
-    breakStartDate: "",
-    breakEndDate: "",
-
-    holidays: [],
-
-    makeupSchedules: [],
-  },
-];
-
-const createEmptyTerms = (): TermConfig[] => [
-  {
-    id: "spring",
-    name: "Spring",
-    startDate: "",
-    endDate: "",
-    breakStartDate: "",
-    breakEndDate: "",
-    holidays: [],
-    makeupSchedules: [],
-  },
-  {
-    id: "summer",
-    name: "Summer",
-    startDate: "",
-    endDate: "",
-    breakStartDate: "",
-    breakEndDate: "",
-    holidays: [],
-    makeupSchedules: [],
-  },
-  {
-    id: "fall",
-    name: "Fall",
-    startDate: "",
-    endDate: "",
-    breakStartDate: "",
-    breakEndDate: "",
-    holidays: [],
-    makeupSchedules: [],
-  },
-];
-
-/* =========================================================
    STYLES
    ========================================================= */
 
@@ -231,12 +122,6 @@ const TERM_VIEW_STYLE: Record<
 /* =========================================================
    HELPERS
    ========================================================= */
-
-const TERM_ORDER: Record<TermConfig["name"], number> = {
-  Spring: 0,
-  Summer: 1,
-  Fall: 2,
-};
 
 const formatDate = (date: string) => {
   if (!date) return "Chưa thiết lập";
@@ -295,74 +180,165 @@ const getTermStatus = (
   term: TermConfig,
   year: string,
   today: string,
+  allTermsByYear: Record<string, TermConfig[]>,
 ): TermStatus => {
-  /* =========================================
-     ĐÃ CÓ NGÀY CẤU HÌNH
-     ========================================= */
-
-  if (term.startDate && term.endDate) {
-    if (today < term.startDate) {
-      return "Đang chuẩn bị";
-    }
-
-    if (today > term.endDate) {
-      return "Đã kết thúc";
-    }
-
-    return "Đang diễn ra";
-  }
-
-  /* =========================================
-     CHƯA CẤU HÌNH NGÀY
-     ========================================= */
-
-  const currentYear = Number(today.slice(0, 4));
-  const targetYear = Number(year);
-
-  if (targetYear < currentYear) {
+  /* Kỳ đã kết thúc */
+  if (term.endDate && today > term.endDate) {
     return "Đã kết thúc";
   }
 
-  if (targetYear > currentYear) {
+  /* Kỳ đang diễn ra */
+  if (
+    term.startDate &&
+    term.endDate &&
+    today >= term.startDate &&
+    today <= term.endDate
+  ) {
+    return "Đang diễn ra";
+  }
+
+  /* Không có ngày */
+  if (!term.startDate || !term.endDate) {
     return "Chưa cấu hình";
   }
 
-  /* =========================================
-     NĂM HIỆN TẠI
-     ========================================= */
+  /*
+   * Tìm kỳ gần nhất trong tương lai.
+   * Chỉ kỳ này mới được "Đang chuẩn bị".
+   */
+  const futureTerms = Object.entries(allTermsByYear)
+    .flatMap(([termYear, yearTerms]) =>
+      yearTerms.map((item) => ({
+        year: termYear,
+        term: item,
+      })),
+    )
+    .filter(({ term: item }) => item.startDate && item.startDate > today)
+    .sort((a, b) => a.term.startDate.localeCompare(b.term.startDate));
 
-  const currentMonth = Number(today.slice(5, 7));
+  const nextTerm = futureTerms[0];
 
-  let currentTerm: TermConfig["name"];
-
-  if (currentMonth >= 9) {
-    currentTerm = "Fall";
-  } else if (currentMonth >= 5) {
-    currentTerm = "Summer";
-  } else {
-    currentTerm = "Spring";
-  }
-
-  const currentTermIndex = TERM_ORDER[currentTerm];
-  const termIndex = TERM_ORDER[term.name];
-
-  if (termIndex < currentTermIndex) {
-    return "Đã kết thúc";
-  }
-
-  if (termIndex === currentTermIndex) {
-    return "Đang diễn ra";
+  if (nextTerm && nextTerm.year === year && nextTerm.term.id === term.id) {
+    return "Đang chuẩn bị";
   }
 
   return "Chưa cấu hình";
 };
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+
+  return result;
+};
+
+const getFirstMondayOfMonth = (year: number, monthIndex: number) => {
+  const date = new Date(year, monthIndex, 1);
+
+  while (date.getDay() !== 1) {
+    date.setDate(date.getDate() + 1);
+  }
+
+  return date;
+};
+
+const getSecondMondayOfMonth = (year: number, monthIndex: number) => {
+  const firstMonday = getFirstMondayOfMonth(year, monthIndex);
+
+  return addDays(firstMonday, 7);
+};
+
+const getAutoAcademicYears = () => {
+  const currentYear = new Date().getFullYear();
+
+  return [
+    String(currentYear),
+    String(currentYear + 1),
+    String(currentYear + 2),
+  ];
+};
+
+const createDefaultTerms = (yearString: string): TermConfig[] => {
+  const year = Number(yearString);
+
+  const springStart = getFirstMondayOfMonth(year, 0);
+  const springEnd = addDays(springStart, 83);
+
+  const summerStart = getSecondMondayOfMonth(year, 4);
+  const summerEnd = addDays(summerStart, 76);
+
+  const fallStart = getFirstMondayOfMonth(year, 8);
+  const fallEnd = addDays(fallStart, 68);
+
+  return [
+    {
+      id: "spring",
+      name: "Spring",
+      startDate: formatLocalDate(springStart),
+      endDate: formatLocalDate(springEnd),
+      breakStartDate: "",
+      breakEndDate: "",
+      holidays: [],
+      makeupSchedules: [],
+    },
+
+    {
+      id: "summer",
+      name: "Summer",
+      startDate: formatLocalDate(summerStart),
+      endDate: formatLocalDate(summerEnd),
+      breakStartDate: "",
+      breakEndDate: "",
+      holidays: [
+        {
+          id: `summer-break-${year}`,
+          name: "Nghỉ hè",
+          startDate: formatLocalDate(addDays(summerStart, 56)),
+          endDate: formatLocalDate(addDays(summerStart, 62)),
+          note: "Nghỉ hè 1 tuần sau tuần học thứ 8.",
+          source: "school",
+        },
+      ],
+      makeupSchedules: [],
+    },
+
+    {
+      id: "fall",
+      name: "Fall",
+      startDate: formatLocalDate(fallStart),
+      endDate: formatLocalDate(fallEnd),
+      breakStartDate: "",
+      breakEndDate: "",
+      holidays: [],
+      makeupSchedules: [],
+    },
+  ];
+};
+const createInitialTermsByYear = (): Record<string, TermConfig[]> => {
+  return getAutoAcademicYears().reduce<Record<string, TermConfig[]>>(
+    (result, year) => {
+      result[year] = createDefaultTerms(year);
+      return result;
+    },
+    {},
+  );
+};
 /* =========================================================
    COMPONENT
    ========================================================= */
 
 const EducationAcademicYear: React.FC = () => {
-  const [academicYear, setAcademicYear] = React.useState("2026");
+  const [academicYear, setAcademicYear] = React.useState(() =>
+    String(new Date().getFullYear()),
+  );
 
   /*
    * Ngày hiện tại.
@@ -393,9 +369,52 @@ const EducationAcademicYear: React.FC = () => {
    */
   const [termsByYear, setTermsByYear] = React.useState<
     Record<string, TermConfig[]>
-  >({
-    "2026": INITIAL_TERMS_2026,
-  });
+  >(() => createInitialTermsByYear());
+  React.useEffect(() => {
+    const loadGovernmentHolidays = async () => {
+      const years = getAutoAcademicYears();
+
+      const holidayResults = await Promise.all(
+        years.map(async (year) => ({
+          year,
+          holidays: await getGovernmentHolidays(year),
+        })),
+      );
+
+      setTermsByYear((current) => {
+        const next = { ...current };
+
+        holidayResults.forEach(({ year, holidays }) => {
+          const yearTerms = next[year] ?? createDefaultTerms(year);
+
+          next[year] = yearTerms.map((term) => {
+            const governmentHolidaysInTerm = holidays.filter(
+              (holiday) =>
+                holiday.startDate <= term.endDate &&
+                holiday.endDate >= term.startDate,
+            );
+
+            return {
+              ...term,
+
+              // Giữ lịch của trường như nghỉ hè.
+              // Lịch government cũ sẽ được thay bằng dữ liệu mới nhất.
+              holidays: [
+                ...term.holidays.filter(
+                  (holiday) => holiday.source !== "government",
+                ),
+                ...governmentHolidaysInTerm,
+              ],
+            };
+          });
+        });
+
+        return next;
+      });
+    };
+
+    loadGovernmentHolidays();
+  }, []);
 
   const [selectedTermId, setSelectedTermId] = React.useState<string | null>(
     null,
@@ -403,28 +422,14 @@ const EducationAcademicYear: React.FC = () => {
 
   const [showInitializedYears, setShowInitializedYears] = React.useState(false);
 
-  const [initializedYears, setInitializedYears] = React.useState<string[]>([
-    "2026",
-  ]);
-
+  const [initializedYears, setInitializedYears] = React.useState<string[]>(() =>
+    getAutoAcademicYears(),
+  );
   /* YEAR ACTION */
   const [yearAction, setYearAction] = React.useState<YearAction>(null);
 
   const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
 
-  /* HOLIDAY */
-  const [showHolidayModal, setShowHolidayModal] = React.useState(false);
-
-  const [editingHolidayId, setEditingHolidayId] = React.useState<string | null>(
-    null,
-  );
-
-  const [holidayForm, setHolidayForm] = React.useState({
-    name: "",
-    startDate: "",
-    endDate: "",
-    note: "",
-  });
   /* MAKEUP SCHEDULE */
   const [showMakeupModal, setShowMakeupModal] = React.useState(false);
 
@@ -439,7 +444,7 @@ const EducationAcademicYear: React.FC = () => {
      ======================================================= */
 
   const getTermsForYear = (year: string): TermConfig[] => {
-    return termsByYear[year] ?? createEmptyTerms();
+    return termsByYear[year] ?? createDefaultTerms(year);
   };
 
   const updateTermsForYear = (
@@ -447,7 +452,7 @@ const EducationAcademicYear: React.FC = () => {
     updater: (current: TermConfig[]) => TermConfig[],
   ) => {
     setTermsByYear((current) => {
-      const currentTerms = current[year] ?? createEmptyTerms();
+      const currentTerms = current[year] ?? createDefaultTerms(year);
 
       return {
         ...current,
@@ -642,128 +647,57 @@ const EducationAcademicYear: React.FC = () => {
 
     handleCloseTerm();
   };
-
   /* =======================================================
-     HOLIDAY ACTIONS
-     ======================================================= */
+   MAKEUP SCHEDULE ACTIONS
+   ======================================================= */
 
-  const resetHolidayForm = () => {
-    setHolidayForm({
-      name: "",
-      startDate: "",
-      endDate: "",
+  const handleSaveMakeupSchedule = () => {
+    if (!selectedTermId) return;
+
+    if (!makeupForm.makeupDate) {
+      alert("Vui lòng chọn ngày học bù.");
+      return;
+    }
+    const isHoliday = selectedTerm?.holidays.some(
+      (holiday) =>
+        makeupForm.makeupDate >= holiday.startDate &&
+        makeupForm.makeupDate <= holiday.endDate,
+    );
+
+    if (isHoliday) {
+      alert("Ngày học bù không được trùng với ngày nghỉ trong kỳ.");
+      return;
+    }
+    const newMakeupSchedule: MakeupSchedule = {
+      id: `makeup-${Date.now()}`,
+      holidayId: makeupForm.holidayId,
+      makeupDate: makeupForm.makeupDate,
+      note: makeupForm.note.trim(),
+    };
+
+    updateTermsForYear(academicYear, (current) =>
+      current.map((term) =>
+        term.id === selectedTermId
+          ? {
+              ...term,
+              makeupSchedules: [...term.makeupSchedules, newMakeupSchedule],
+            }
+          : term,
+      ),
+    );
+
+    setMakeupForm({
+      holidayId: "",
+      makeupDate: "",
       note: "",
     });
 
-    setEditingHolidayId(null);
+    setShowMakeupModal(false);
   };
-
-  const handleOpenAddHoliday = () => {
-    if (!selectedTerm?.startDate || !selectedTerm?.endDate) {
-      alert(
-        "Vui lòng thiết lập thời gian học trước khi thêm ngày nghỉ trong kỳ.",
-      );
-      return;
-    }
-
-    resetHolidayForm();
-    setShowHolidayModal(true);
-  };
-
-  const handleOpenEditHoliday = (holiday: Holiday) => {
-    setEditingHolidayId(holiday.id);
-
-    setHolidayForm({
-      name: holiday.name,
-      startDate: holiday.startDate,
-      endDate: holiday.endDate,
-      note: holiday.note,
-    });
-
-    setShowHolidayModal(true);
-  };
-
-  const handleCloseHolidayModal = () => {
-    setShowHolidayModal(false);
-    resetHolidayForm();
-  };
-
-  const handleSaveHoliday = () => {
+  const handleDeleteMakeupSchedule = (scheduleId: string) => {
     if (!selectedTermId) return;
 
-    if (
-      !holidayForm.name.trim() ||
-      !holidayForm.startDate ||
-      !holidayForm.endDate
-    ) {
-      alert("Vui lòng nhập tên ngày nghỉ, ngày bắt đầu và ngày kết thúc.");
-      return;
-    }
-
-    if (holidayForm.startDate > holidayForm.endDate) {
-      alert("Ngày kết thúc nghỉ phải sau ngày bắt đầu nghỉ.");
-      return;
-    }
-
-    const currentTerm = terms.find((term) => term.id === selectedTermId);
-
-    if (!currentTerm?.startDate || !currentTerm.endDate) {
-      alert(
-        "Vui lòng thiết lập thời gian học trước khi thêm ngày nghỉ trong kỳ.",
-      );
-      return;
-    }
-
-    if (
-      holidayForm.startDate < currentTerm.startDate ||
-      holidayForm.endDate > currentTerm.endDate
-    ) {
-      alert(
-        `Ngày nghỉ phải nằm trong thời gian học của kỳ ${currentTerm.name}.`,
-      );
-      return;
-    }
-
-    updateTermsForYear(academicYear, (current) =>
-      current.map((term) => {
-        if (term.id !== selectedTermId) {
-          return term;
-        }
-
-        if (editingHolidayId) {
-          return {
-            ...term,
-            holidays: term.holidays.map((holiday) =>
-              holiday.id === editingHolidayId
-                ? {
-                    ...holiday,
-                    ...holidayForm,
-                  }
-                : holiday,
-            ),
-          };
-        }
-
-        const newHoliday: Holiday = {
-          id: `holiday-${Date.now()}`,
-          ...holidayForm,
-          source: "school",
-        };
-
-        return {
-          ...term,
-          holidays: [...term.holidays, newHoliday],
-        };
-      }),
-    );
-
-    handleCloseHolidayModal();
-  };
-
-  const handleDeleteHoliday = (holidayId: string) => {
-    if (!selectedTermId) return;
-
-    const confirmed = window.confirm("Bạn có chắc muốn xóa ngày nghỉ này?");
+    const confirmed = window.confirm("Bạn có chắc muốn xóa lịch học bù này?");
 
     if (!confirmed) return;
 
@@ -772,15 +706,14 @@ const EducationAcademicYear: React.FC = () => {
         term.id === selectedTermId
           ? {
               ...term,
-              holidays: term.holidays.filter(
-                (holiday) => holiday.id !== holidayId,
+              makeupSchedules: term.makeupSchedules.filter(
+                (schedule) => schedule.id !== scheduleId,
               ),
             }
           : term,
       ),
     );
   };
-
   /* =======================================================
      YEAR ACTIONS
      ======================================================= */
@@ -833,7 +766,7 @@ const EducationAcademicYear: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageBanner
-        title="Khởi tạo Năm học TEST 123"
+        title="Khởi tạo Năm học"
         description="Thiết lập năm học, từng kỳ học và các khoảng thời gian nghỉ của nhà trường."
         badge="Quản lý dữ liệu"
       />
@@ -887,11 +820,11 @@ const EducationAcademicYear: React.FC = () => {
               }}
               className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             >
-              <option value="2026">2026</option>
-              <option value="2027">2027</option>
-              <option value="2028">2028</option>
-              <option value="2029">2029</option>
-              <option value="2030">2030</option>
+              {getAutoAcademicYears().map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -912,7 +845,12 @@ const EducationAcademicYear: React.FC = () => {
 
         <div className="mt-5 space-y-3">
           {terms.map((term) => {
-            const realtimeStatus = getTermStatus(term, academicYear, today);
+            const realtimeStatus = getTermStatus(
+              term,
+              academicYear,
+              today,
+              termsByYear,
+            );
 
             return (
               <div
@@ -1115,6 +1053,7 @@ const EducationAcademicYear: React.FC = () => {
                         term,
                         selectedYear,
                         today,
+                        termsByYear,
                       );
 
                       return (
@@ -1267,6 +1206,7 @@ const EducationAcademicYear: React.FC = () => {
                       term,
                       selectedYear,
                       today,
+                      termsByYear,
                     );
 
                     return (
@@ -1518,12 +1458,9 @@ const EducationAcademicYear: React.FC = () => {
                       <thead className="bg-slate-50">
                         <tr>
                           <th className="px-4 py-3">Tên kỳ nghỉ</th>
-
                           <th className="px-4 py-3">Bắt đầu</th>
-
                           <th className="px-4 py-3">Kết thúc</th>
-
-                          <th className="px-4 py-3 text-right">Thao tác</th>
+                          <th className="px-4 py-3">Nguồn</th>
                         </tr>
                       </thead>
 
@@ -1551,25 +1488,11 @@ const EducationAcademicYear: React.FC = () => {
                             </td>
 
                             <td className="px-4 py-3">
-                              <div className="flex justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditHoliday(holiday)}
-                                  className="rounded-lg p-2 text-slate-400 hover:bg-orange-50 hover:text-orange-600"
-                                >
-                                  <Edit3 size={16} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDeleteHoliday(holiday.id)
-                                  }
-                                  className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
+                              <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                {holiday.source === "government"
+                                  ? "Lịch Nhà nước"
+                                  : "Lịch nhà trường"}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -1577,6 +1500,67 @@ const EducationAcademicYear: React.FC = () => {
                     </table>
                   </div>
                 )}
+                {/* MAKEUP SCHEDULE LIST */}
+
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">
+                      Lịch học bù
+                    </h4>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Các buổi học bù được Phòng Đào tạo thiết lập cho kỳ này.
+                    </p>
+                  </div>
+
+                  {selectedTerm.makeupSchedules.length === 0 ? (
+                    <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center">
+                      <p className="text-sm text-slate-400">
+                        Chưa có lịch học bù.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-4 py-3">Ngày học bù</th>
+                            <th className="px-4 py-3">Ghi chú</th>
+                            <th className="px-4 py-3">Thao tác</th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedTerm.makeupSchedules.map((schedule) => (
+                            <tr key={schedule.id}>
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">
+                                {formatDate(schedule.makeupDate)}
+                              </td>
+
+                              <td className="px-4 py-3 text-slate-500">
+                                {schedule.note || "—"}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteMakeupSchedule(schedule.id)
+                                    }
+                                    className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </section>
             </div>
 
@@ -1602,161 +1586,6 @@ const EducationAcademicYear: React.FC = () => {
         </div>
       )}
 
-      {/* ===================================================
-          HOLIDAY MODAL
-          =================================================== */}
-
-      {showHolidayModal && selectedTerm && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-4"
-          onClick={handleCloseHolidayModal}
-        >
-          <div
-            className="w-full max-w-lg rounded-3xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <h2 className="text-lg font-black text-slate-900">
-                  {editingHolidayId ? "Chỉnh sửa ngày nghỉ" : "Thêm ngày nghỉ"}
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedTerm.name} {academicYear}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCloseHolidayModal}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"
-              >
-                <X size={19} />
-              </button>
-            </div>
-
-            <div className="space-y-4 px-6 py-5">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Tên kỳ nghỉ
-                </label>
-
-                <input
-                  type="text"
-                  value={holidayForm.name}
-                  onChange={(event) =>
-                    setHolidayForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="VD: Nghỉ Tết Nguyên Đán"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Ngày bắt đầu
-                  </label>
-
-                  <input
-                    type="date"
-                    min={selectedTerm.startDate || undefined}
-                    max={selectedTerm.endDate || undefined}
-                    value={holidayForm.startDate}
-                    onChange={(event) =>
-                      setHolidayForm((current) => ({
-                        ...current,
-                        startDate: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Ngày kết thúc
-                  </label>
-
-                  <input
-                    type="date"
-                    min={
-                      holidayForm.startDate ||
-                      selectedTerm.startDate ||
-                      undefined
-                    }
-                    max={selectedTerm.endDate || undefined}
-                    value={holidayForm.endDate}
-                    onChange={(event) =>
-                      setHolidayForm((current) => ({
-                        ...current,
-                        endDate: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
-              </div>
-
-              {selectedTerm.startDate && selectedTerm.endDate && (
-                <p className="text-xs text-slate-400">
-                  Ngày nghỉ phải nằm trong thời gian học từ{" "}
-                  <span className="font-semibold text-slate-600">
-                    {formatDate(selectedTerm.startDate)}
-                  </span>{" "}
-                  đến{" "}
-                  <span className="font-semibold text-slate-600">
-                    {formatDate(selectedTerm.endDate)}
-                  </span>
-                  .
-                </p>
-              )}
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Ghi chú
-                </label>
-
-                <textarea
-                  rows={3}
-                  value={holidayForm.note}
-                  onChange={(event) =>
-                    setHolidayForm((current) => ({
-                      ...current,
-                      note: event.target.value,
-                    }))
-                  }
-                  placeholder="Ghi chú thêm nếu cần..."
-                  className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
-              <button
-                type="button"
-                onClick={handleCloseHolidayModal}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
-              >
-                Hủy
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveHoliday}
-                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
-              >
-                <Save size={16} />
-
-                {editingHolidayId ? "Lưu thay đổi" : "Thêm ngày nghỉ"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* ===================================================
     MAKEUP SCHEDULE MODAL
     =================================================== */}
@@ -1791,6 +1620,31 @@ const EducationAcademicYear: React.FC = () => {
             </div>
 
             <div className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Học bù cho ngày nghỉ
+                </label>
+
+                <select
+                  value={makeupForm.holidayId}
+                  onChange={(event) =>
+                    setMakeupForm((current) => ({
+                      ...current,
+                      holidayId: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                >
+                  <option value="">Chọn ngày nghỉ</option>
+
+                  {selectedTerm.holidays.map((holiday) => (
+                    <option key={holiday.id} value={holiday.id}>
+                      {holiday.name} ({formatDate(holiday.startDate)} →{" "}
+                      {formatDate(holiday.endDate)})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Ngày học bù
@@ -1840,6 +1694,7 @@ const EducationAcademicYear: React.FC = () => {
 
               <button
                 type="button"
+                onClick={handleSaveMakeupSchedule}
                 className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
               >
                 <Save size={16} />
