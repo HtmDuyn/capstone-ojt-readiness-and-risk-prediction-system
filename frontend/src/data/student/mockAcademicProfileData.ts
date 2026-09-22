@@ -1,7 +1,7 @@
 import type {
   AcademicProfileStats,
-  CourseCategoryDistribution,
   AcademicSemesterStep,
+  SemesterCreditProgress,
   SubjectItem,
 } from '../../types/student/academicProfileTypes';
 
@@ -13,88 +13,81 @@ export const mockAcademicStats: AcademicProfileStats = {
   totalCredits: 145,
   missingCredits: 31,
   completionPercentage: 78.6,
-  currentSemester: 'Spring 2024 (Kỳ 7)',
+  currentSemester: 'Spring 2024 (Kỳ 6)',
 };
-
-export const mockCourseCategories: CourseCategoryDistribution[] = [
-  {
-    id: 'cat-1',
-    name: 'Cơ bản & Đại cương',
-    percentage: 100,
-    colorClass: 'bg-cyan-500',
-    barColor: '#06b6d4',
-  },
-  {
-    id: 'cat-2',
-    name: 'Cơ sở ngành',
-    percentage: 85,
-    colorClass: 'bg-[#c2410c]',
-    barColor: '#c2410c',
-  },
-  {
-    id: 'cat-3',
-    name: 'Chuyên ngành hẹp',
-    percentage: 45,
-    colorClass: 'bg-blue-600',
-    barColor: '#2563eb',
-  },
-  {
-    id: 'cat-4',
-    name: 'Đồ án tốt nghiệp',
-    percentage: 0,
-    colorClass: 'bg-slate-300',
-    barColor: '#cbd5e1',
-  },
-];
 
 export const mockAcademicRoadmap: AcademicSemesterStep[] = [
   {
     id: 1,
     semesterName: 'Học kỳ 1',
+    semesterCode: 'Kỳ 1',
     status: 'completed',
     gpaText: 'GPA: 3.2',
+    creditsText: '18 Tín chỉ',
+    subjectCountText: '5 môn học',
+    subjectsSummary: ['PRF192', 'CEA201', 'CSI104', 'MAE101', 'SSL101c'],
   },
   {
     id: 2,
     semesterName: 'Học kỳ 2',
+    semesterCode: 'Kỳ 2',
     status: 'completed',
     gpaText: 'GPA: 3.5',
+    creditsText: '20 Tín chỉ',
+    subjectCountText: '5 môn học',
+    subjectsSummary: ['PRO192', 'MAD101', 'SSG104', 'MLN122', 'SOFT101'],
   },
   {
     id: 3,
     semesterName: 'Học kỳ 3',
+    semesterCode: 'Kỳ 3',
     status: 'completed',
     gpaText: 'GPA: 3.1',
+    creditsText: '19 Tín chỉ',
+    subjectCountText: '5 môn học',
+    subjectsSummary: ['CSD201', 'DBI202', 'JPD113', 'WED201c', 'MAS291'],
   },
   {
-    id: 7,
-    semesterName: 'Học kỳ 7 (Hiện tại)',
+    id: 4,
+    semesterName: 'Học kỳ 4',
+    semesterCode: 'Kỳ 4',
+    status: 'completed',
+    gpaText: 'GPA: 3.4',
+    creditsText: '18 Tín chỉ',
+    subjectCountText: '5 môn học',
+    subjectsSummary: ['PRJ301', 'SWE201c', 'IOT102', 'NWC203c', 'JPD123'],
+  },
+  {
+    id: 5,
+    semesterName: 'Học kỳ 5',
+    semesterCode: 'Kỳ 5',
+    status: 'completed',
+    gpaText: 'GPA: 3.6',
+    creditsText: '19 Tín chỉ',
+    subjectCountText: '5 môn học',
+    subjectsSummary: ['SWT301', 'PRN211', 'SWR302', 'HCM202', 'WDU202'],
+  },
+  {
+    id: 6,
+    semesterName: 'Học kỳ 6 (Hiện tại)',
+    semesterCode: 'Kỳ 6',
     status: 'current',
+    gpaText: 'GPA dự kiến: 3.42',
+    creditsText: '20 Tín chỉ',
     subjectCountText: 'Đang theo học 5 môn',
-  },
-  {
-    id: 8,
-    semesterName: 'Học kỳ 8 (OJT)',
-    status: 'locked',
-    subtitleText: 'Thực tập doanh nghiệp',
-  },
-  {
-    id: 9,
-    semesterName: 'Học kỳ 9',
-    status: 'locked',
-    subtitleText: 'Đồ án tốt nghiệp',
+    subjectsSummary: ['SWP391', 'PRN231', 'ITE302c', 'PRM392', 'AI101'],
   },
 ];
 
-export const mockSemesterCredits = [
-  { semester: 'Kỳ 1', credits: 18, target: 18 },
-  { semester: 'Kỳ 2', credits: 20, target: 20 },
-  { semester: 'Kỳ 3', credits: 19, target: 19 },
-  { semester: 'Kỳ 4', credits: 18, target: 18 },
-  { semester: 'Kỳ 5', credits: 19, target: 19 },
-  { semester: 'Kỳ 6', credits: 20, target: 20 },
-  { semester: 'Kỳ 7', credits: 15, target: 15 },
+export const mockSemesterCredits: SemesterCreditProgress[] = [
+  { semester: 'Kỳ 1', credits: 18, cumulative: 18, target: 18, gpa: 3.2 },
+  { semester: 'Kỳ 2', credits: 20, cumulative: 38, target: 38, gpa: 3.5 },
+  { semester: 'Kỳ 3', credits: 19, cumulative: 57, target: 57, gpa: 3.1 },
+  { semester: 'Kỳ 4', credits: 18, cumulative: 75, target: 75, gpa: 3.4 },
+  { semester: 'Kỳ 5', credits: 19, cumulative: 94, target: 94, gpa: 3.6 },
+  { semester: 'Kỳ 6', credits: 20, cumulative: 114, target: 114, gpa: 3.42 },
 ];
+
 
 export const mockSubjectList: SubjectItem[] = [
   // Page 1 (Items matching screenshot directly)
@@ -105,7 +98,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'in_progress',
     prerequisites: ['SWT301', 'PRN211'],
-    semester: 'Kỳ 7',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-2',
@@ -236,7 +229,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'in_progress',
     prerequisites: [],
-    semester: 'Kỳ 7',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-15',
@@ -405,7 +398,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'in_progress',
     prerequisites: ['SWP391'],
-    semester: 'Kỳ 7',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-32',
@@ -414,7 +407,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'in_progress',
     prerequisites: [],
-    semester: 'Kỳ 7',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-33',
@@ -453,7 +446,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 2,
     status: 'in_progress',
     prerequisites: [],
-    semester: 'Kỳ 7',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-37',
@@ -462,7 +455,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 10,
     status: 'not_started',
     prerequisites: ['SWP391'],
-    semester: 'Kỳ 8',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-38',
@@ -471,7 +464,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 10,
     status: 'not_started',
     prerequisites: ['OJT490'],
-    semester: 'Kỳ 9',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-39',
@@ -490,7 +483,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['AI101'],
-    semester: 'Kỳ 8',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-41',
@@ -499,7 +492,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['NWC203c'],
-    semester: 'Kỳ 8',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-42',
@@ -508,7 +501,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['PRJ301'],
-    semester: 'Kỳ 8',
+    semester: 'Kỳ 6',
   },
   {
     id: 'sub-43',
@@ -527,7 +520,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['SWR302'],
-    semester: 'Kỳ 9',
+    semester: 'Kỳ 5',
   },
   {
     id: 'sub-45',
@@ -536,7 +529,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['PRJ301'],
-    semester: 'Kỳ 9',
+    semester: 'Kỳ 5',
   },
   {
     id: 'sub-46',
@@ -545,7 +538,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['DBI202'],
-    semester: 'Kỳ 9',
+    semester: 'Kỳ 5',
   },
   {
     id: 'sub-47',
@@ -554,7 +547,7 @@ export const mockSubjectList: SubjectItem[] = [
     credits: 3,
     status: 'not_started',
     prerequisites: ['CSD201'],
-    semester: 'Kỳ 9',
+    semester: 'Kỳ 5',
   },
   {
     id: 'sub-48',

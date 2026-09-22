@@ -8,24 +8,19 @@ export interface SubjectItem {
   status: SubjectStatus;
   prerequisites: string[]; // e.g., ['SWT301', 'PRN211'] or []
   grade?: number; // e.g., 8.5
-  semester: string; // e.g., 'Kỳ 1', 'Kỳ 7'
-}
-
-export interface CourseCategoryDistribution {
-  id: string;
-  name: string;
-  percentage: number;
-  colorClass: string; // Tailwind color gradient/solid class
-  barColor: string; // CSS color string or Tailwind hex
+  semester: string; // e.g., 'Kỳ 1', 'Kỳ 6'
 }
 
 export interface AcademicSemesterStep {
   id: number;
-  semesterName: string;
+  semesterName: string; // e.g. 'Học kỳ 1'
+  semesterCode: string; // e.g. 'Kỳ 1'
   status: 'completed' | 'current' | 'locked';
   gpaText?: string;
+  creditsText?: string;
   subjectCountText?: string;
   subtitleText?: string;
+  subjectsSummary?: string[];
 }
 
 export interface AcademicProfileStats {
@@ -38,3 +33,12 @@ export interface AcademicProfileStats {
   completionPercentage: number;
   currentSemester: string;
 }
+
+export interface SemesterCreditProgress {
+  semester: string;
+  credits: number;
+  cumulative: number;
+  target: number;
+  gpa: number;
+}
+
