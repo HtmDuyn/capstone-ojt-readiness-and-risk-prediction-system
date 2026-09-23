@@ -4,6 +4,7 @@ import type { WeeklyReportItem } from '@/types/student/ojtProgressTypes';
 
 interface SubmitReportModalProps {
   report: WeeklyReportItem | null;
+  isOpen?: boolean;
   onClose: () => void;
   onSubmit: (reportId: string, data: { taskTitle: string; summary: string; challenges: string; fileName: string }) => void;
 }

@@ -118,7 +118,7 @@ export const StudentOJTProgress: React.FC = () => {
   const hasActiveFilters = selectedPriority !== 'all' || selectedStatus !== 'all' || taskSearchQuery.trim() !== '';
 
   return (
-    <div className="font-inter space-y-6 w-full max-w-[1400px] mx-auto animate-in fade-in duration-500 pb-12">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12 w-full max-w-[1400px] mx-auto font-outfit">
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold animate-in fade-in slide-in-from-bottom-4 border border-slate-700">
@@ -127,10 +127,10 @@ export const StudentOJTProgress: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Page Banner */}
+      {/* 1. Page Banner - Premium Overlapping Style */}
       <PageBanner
         breadcrumb={
-          <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+          <div className="flex items-center gap-2 text-xs font-semibold text-purple-200/80 font-outfit">
             <button
               type="button"
               onClick={() => navigate('/student/dashboard')}
@@ -139,7 +139,7 @@ export const StudentOJTProgress: React.FC = () => {
               Trang chủ
             </button>
             <span className="text-white/40">›</span>
-            <span className="text-amber-300 font-bold">Tiến độ thực tập</span>
+            <span className="text-amber-300 font-bold drop-shadow-md">Tiến độ thực tập</span>
           </div>
         }
         title="Theo dõi tiến độ thực tập OJT"
@@ -147,6 +147,7 @@ export const StudentOJTProgress: React.FC = () => {
         primaryAction={{
           label: 'Hỏi AI về tiến độ',
           icon: <BotSparkleIcon size={16} />,
+          className: "bg-white text-purple-700 hover:bg-purple-50",
           onClick: () =>
             openAIConsult(
               'Hãy đánh giá tiến độ thực tập OJT hiện tại của tôi và gợi ý những điều cần cải thiện.'
@@ -154,98 +155,103 @@ export const StudentOJTProgress: React.FC = () => {
         }}
         secondaryAction={{
           label: 'Về Dashboard',
+          className: "bg-white/10 text-white hover:bg-white/20",
           onClick: () => navigate('/student/dashboard'),
         }}
+        className="pb-32"
       />
 
-      {/* 2. Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-600">Nhiệm vụ đã giao</p>
-              <h2 className="text-4xl font-extrabold text-slate-800">{totalAssigned}</h2>
+      <div className="px-4 lg:px-8 relative z-10 -mt-24 space-y-8">
+        {/* 2. Stats Overview - Premium Glassmorphism Look */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100 flex flex-col justify-between hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Nhiệm vụ đã giao</p>
+                <h2 className="text-4xl font-extrabold text-slate-800 font-outfit">{totalAssigned}</h2>
+              </div>
+              <div className="p-3 bg-orange-50 rounded-2xl text-orange-500 group-hover:scale-110 transition-transform">
+                <ClipboardList size={24} />
+              </div>
             </div>
-            <div className="p-2 bg-orange-50 rounded-xl text-orange-500">
-              <ClipboardList size={24} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-xs font-medium text-blue-600">
-            <span className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md">
-              <Sparkles size={14} /> +2 nhiệm vụ trong tuần này
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-600">Đã hoàn thành</p>
-              <h2 className="text-4xl font-extrabold text-slate-800">
-                {String(completedCount).padStart(2, '0')}
-              </h2>
-            </div>
-            <div className="p-2 bg-green-50 rounded-xl text-green-500">
-              <CheckCircle2 size={24} />
-            </div>
-          </div>
-          <div className="mt-4 text-xs font-medium text-emerald-600 flex items-center gap-1">
-            <span className="bg-emerald-50 px-2 py-1 rounded-md">
-              Đạt {completionRate}% kế hoạch
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-600">Còn lại</p>
-              <h2 className="text-4xl font-extrabold text-slate-800">
-                {String(remainingCount).padStart(2, '0')}
-              </h2>
-            </div>
-            <div className="p-2 bg-rose-50 rounded-xl text-rose-500">
-              <CalendarClock size={24} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-xs font-medium text-rose-600">
-            {urgentCount > 0 ? (
-              <span className="flex items-center gap-1 bg-rose-50 px-2 py-1 rounded-md font-bold">
-                <AlertCircle size={14} /> {urgentCount} nhiệm vụ gấp cần làm
+            <div className="mt-6 flex items-center text-xs font-bold text-blue-700">
+              <span className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">
+                <Sparkles size={14} className="text-blue-500" /> +2 nhiệm vụ tuần này
               </span>
-            ) : (
-              <span className="text-slate-400">Không có nhiệm vụ quá hạn</span>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow">
-          <div className="relative w-20 h-20 flex-shrink-0">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-              <path
-                className="text-orange-100"
-                strokeWidth="3.5"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-              <path
-                className="text-orange-500 transition-all duration-1000"
-                strokeWidth="3.5"
-                strokeDasharray={`${completionRate}, 100`}
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold text-slate-800">{completionRate}%</span>
             </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-600 mb-1">Tỷ lệ hoàn thành</h3>
-            <p className="text-xs font-medium text-slate-400">Kỳ thực tập Fall 2023</p>
+
+          <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100 flex flex-col justify-between hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Đã hoàn thành</p>
+                <h2 className="text-4xl font-extrabold text-slate-800 font-outfit">
+                  {String(completedCount).padStart(2, '0')}
+                </h2>
+              </div>
+              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-500 group-hover:scale-110 transition-transform">
+                <CheckCircle2 size={24} />
+              </div>
+            </div>
+            <div className="mt-6 text-xs font-bold text-emerald-700 flex items-center gap-1">
+              <span className="bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full shadow-inner flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-emerald-500" /> Đạt {completionRate}% kế hoạch
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100 flex flex-col justify-between hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Còn lại</p>
+                <h2 className="text-4xl font-extrabold text-slate-800 font-outfit">
+                  {String(remainingCount).padStart(2, '0')}
+                </h2>
+              </div>
+              <div className="p-3 bg-rose-50 rounded-2xl text-rose-500 group-hover:scale-110 transition-transform">
+                <CalendarClock size={24} />
+              </div>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-medium">
+              {urgentCount > 0 ? (
+                <span className="flex items-center gap-1.5 bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-full font-bold text-rose-700 shadow-inner">
+                  <AlertCircle size={14} className="text-rose-500 animate-pulse" /> {urgentCount} nhiệm vụ gấp cần làm
+                </span>
+              ) : (
+                <span className="text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">Không có nhiệm vụ quá hạn</span>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 shadow-xl border border-slate-700/50 flex items-center gap-6 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-orange-500/20 transition-colors"></div>
+            <div className="relative w-20 h-20 flex-shrink-0 z-10">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-white/10"
+                  strokeWidth="3.5"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-orange-500 transition-all duration-1000"
+                  strokeWidth="3.5"
+                  strokeDasharray={`${completionRate}, 100`}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-extrabold text-white">{completionRate}%</span>
+              </div>
+            </div>
+            <div className="relative z-10">
+              <h3 className="text-sm font-semibold text-slate-300 mb-1">Tỷ lệ hoàn thành</h3>
+              <p className="text-xs font-bold text-white bg-white/10 px-2 py-1 rounded-lg w-fit">Kỳ thực tập Fall 2026</p>
+            </div>
           </div>
         </div>
       </div>
@@ -457,12 +463,14 @@ export const StudentOJTProgress: React.FC = () => {
 
       <SubmitReportModal
         report={submitReportTarget}
+        isOpen={!!submitReportTarget}
         onClose={() => setSubmitReportTarget(null)}
         onSubmit={handleSubmitReport}
       />
 
       <ViewReportModal
         report={viewReportTarget}
+        isOpen={!!viewReportTarget}
         onClose={() => setViewReportTarget(null)}
         onDownloadFile={(fileName) => showToast(`Đang tải file ${fileName}...`)}
       />

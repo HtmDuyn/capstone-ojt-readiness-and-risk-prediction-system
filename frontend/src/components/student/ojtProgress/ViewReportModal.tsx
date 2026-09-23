@@ -4,6 +4,7 @@ import type { WeeklyReportItem } from '@/types/student/ojtProgressTypes';
 
 interface ViewReportModalProps {
   report: WeeklyReportItem | null;
+  isOpen?: boolean;
   onClose: () => void;
   onDownloadFile?: (fileName: string) => void;
 }

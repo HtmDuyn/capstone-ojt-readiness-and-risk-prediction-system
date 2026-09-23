@@ -39,6 +39,7 @@ import {
   MapPin,
   Users,
   LucideProps,
+  Calendar,
 } from 'lucide-react';
 
 export interface IconProps extends LucideProps {
@@ -234,5 +235,9 @@ export const LocationIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8
 
 export const UsersIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
   <Users size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const CalendarIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Calendar size={size} strokeWidth={strokeWidth} {...props} />
 );
 

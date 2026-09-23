@@ -211,51 +211,60 @@ const OjtStatCards: React.FC<{
   onViewProgressClick: () => void;
 }> = ({ myApplication, onRegisterClick, onViewProgressClick }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Deadline Card */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/70 shadow-sm flex flex-col justify-between hover:border-orange-300 transition-all">
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
         <div>
-          <div className="flex justify-between items-center mb-1">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hạn đăng ký OJT</h3>
-            <ClockIcon className="text-orange-500" size={16} />
+          <div className="flex justify-between items-start mb-4">
+            <span className="inline-flex items-center justify-center p-3 bg-orange-50 text-orange-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <ClockIcon size={24} />
+            </span>
           </div>
-          <div className="text-2xl font-black text-slate-900 font-outfit">30/09/2026</div>
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Hạn đăng ký OJT</h3>
+          <div className="text-3xl font-extrabold text-slate-800 font-outfit">30/09/2026</div>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-orange-700 bg-orange-50/80 w-fit px-3 py-1 rounded-full border border-orange-100">
-          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+        <div className="mt-6 flex items-center gap-2 text-xs font-bold text-orange-700 bg-orange-50 w-fit px-3 py-1.5 rounded-full border border-orange-100 shadow-inner">
+          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
           Còn 15 ngày đăng ký
         </div>
       </div>
 
       {/* Profile Status Card */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/70 shadow-sm flex flex-col justify-between hover:border-blue-300 transition-all">
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
         <div>
-          <div className="flex justify-between items-center mb-1">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tình trạng Hồ sơ (CV)</h3>
-            <CheckCircleIcon className="text-emerald-500" size={16} />
+          <div className="flex justify-between items-start mb-4">
+            <span className="inline-flex items-center justify-center p-3 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <CheckCircleIcon size={24} />
+            </span>
           </div>
-          <div className="text-2xl font-black text-slate-900 font-outfit flex items-center gap-2">
-            Đã phê duyệt
-          </div>
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Tình trạng Hồ sơ (CV)</h3>
+          <div className="text-3xl font-extrabold text-slate-800 font-outfit">Đã phê duyệt</div>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50/80 w-fit px-3 py-1 rounded-full border border-emerald-100">
+        <div className="mt-6 flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 w-fit px-3 py-1.5 rounded-full border border-emerald-100 shadow-inner">
           <CheckIcon size={14} className="text-emerald-600" />
           <span>CV đã sẵn sàng nộp OJT</span>
         </div>
       </div>
 
       {/* Chosen Enterprise Status Card */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200/70 shadow-sm flex flex-col justify-between hover:border-purple-300 transition-all">
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Doanh nghiệp đã chọn</h3>
-            <BriefcaseIcon className="text-purple-500" size={16} />
+      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group relative overflow-hidden">
+        {myApplication && (
+          <div className="absolute top-0 right-0 p-4 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-125 transition-transform duration-700">
+             <BriefcaseIcon size={120} />
           </div>
-          <div className="text-xl font-black text-slate-900 font-outfit truncate">
+        )}
+        <div className="relative z-10">
+          <div className="flex justify-between items-start mb-4">
+            <span className="inline-flex items-center justify-center p-3 bg-purple-50 text-purple-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <BriefcaseIcon size={24} />
+            </span>
+          </div>
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Doanh nghiệp đã chọn</h3>
+          <div className="text-2xl font-extrabold text-slate-800 font-outfit truncate">
             {myApplication ? myApplication.companyName : 'Chưa đăng ký'}
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-6 flex items-center justify-between relative z-10">
           {myApplication?.status === 'CHỜ_DUYỆT' && (
             <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg border border-blue-200">
               ⏳ Đang chờ xét duyệt
@@ -1151,11 +1160,11 @@ export const StudentOjtRegistration: React.FC = () => {
   }, [handleOpenRegisterModal]);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12 w-full max-w-[1400px] mx-auto font-outfit">
       {/* Toast Notification */}
       <ToastNotification message={toastMessage} onClose={() => setToastMessage(null)} />
 
-      {/* Header Banner */}
+      {/* Header Banner - Premium Overlapping Style */}
       <PageBanner
         student={mockStudentProfile}
         breadcrumb={
@@ -1168,15 +1177,20 @@ export const StudentOjtRegistration: React.FC = () => {
               Trang chủ
             </button>
             <span className="text-white/40">›</span>
-            <span className="text-amber-300 font-bold">Đăng ký OJT</span>
+            <span className="text-amber-300 font-bold drop-shadow-md">Đăng ký OJT</span>
           </div>
         }
         title="Cổng Đăng Ký OJT"
         description="Mỗi sinh viên chọn 1 doanh nghiệp đối tác để nộp hồ sơ thực tập OJT Kỳ Fall 2026."
-        badge="Kỳ Fall 2026"
+        badge={
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white backdrop-blur-md border border-white/20 shadow-inner">
+            Kỳ Fall 2026
+          </span>
+        }
         primaryAction={{
           label: myApplication?.status === 'TỪ_CHỐI_ĐIỀU_PHỐI' ? 'Chọn lại Doanh nghiệp' : myApplication ? 'Xem hồ sơ đã nộp' : 'Đăng ký OJT ngay',
           icon: <AcademicCapIcon size={16} />,
+          className: "bg-gradient-to-r from-orange-500 to-amber-500 text-white border-none shadow-lg shadow-orange-500/50 hover:shadow-orange-500/60",
           onClick: () => {
             if (myApplication?.status === 'TỪ_CHỐI_ĐIỀU_PHỐI' || !myApplication) {
               handleOpenRegisterModal();
@@ -1188,12 +1202,17 @@ export const StudentOjtRegistration: React.FC = () => {
         secondaryAction={{
           label: 'Hỏi AI viết CV',
           icon: <BotSparkleIcon size={16} />,
+          className: "bg-white/10 text-white hover:bg-white/20",
           onClick: () => openAIConsult('Hướng dẫn tôi cách chỉnh sửa CV OJT để gây ấn tượng với các công ty CNTT.'),
         }}
+        className="pb-32"
       />
 
-      {/* Demo State Switcher */}
-      <DemoStateSwitcher currentStatus={myApplication?.status} onSimulate={handleSimulateState} />
+      <div className="px-4 lg:px-8 relative z-10 -mt-24 space-y-8">
+        {/* Demo State Switcher */}
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 shadow-2xl rounded-2xl">
+          <DemoStateSwitcher currentStatus={myApplication?.status} onSimulate={handleSimulateState} />
+        </div>
 
       {/* Stat Cards */}
       <OjtStatCards
@@ -1380,12 +1399,13 @@ export const StudentOjtRegistration: React.FC = () => {
       />
 
       {/* MODAL 2: COMPANY DETAIL PREVIEW */}
-      <CompanyDetailModal
+        <CompanyDetailModal
         company={selectedDetailCompany}
         myApplication={myApplication}
         onClose={() => setSelectedDetailCompany(null)}
         onSelectCompany={handleSelectFromDetail}
       />
+      </div>
     </div>
   );
 };
