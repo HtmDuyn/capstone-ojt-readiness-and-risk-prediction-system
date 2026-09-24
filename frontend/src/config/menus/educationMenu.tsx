@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   DashboardGridIcon,
-  RiskAnalyticsIcon,
   RoadmapConsultingIcon,
 } from '@/components/common/icons/AppIcons';
 
@@ -10,13 +9,10 @@ import {
   Database,
   FileCheck,
   BookOpen,
-  AlertTriangle,
   Upload,
   Users,
   ClipboardCheck,
   Activity,
-  Bell,
-  School,
 } from 'lucide-react';
 
 import type { NavItem } from '@/types/common.types';
@@ -146,111 +142,19 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
     ],
   },
 
-  // =========================
-  // AI & DASHBOARD
-  // =========================
-  {
-    id: 'ai-dashboard',
-    label: 'AI & Dashboard',
-    path: '',
-    icon: <RiskAnalyticsIcon size={20} />,
-    children: [
-      {
-        id: 'risk-students',
-        label: 'Sinh viên theo Risk',
-        path: '/education/risk-students',
-        icon: <RiskAnalyticsIcon size={20} />,
-        banner: {
-          title: 'Danh sách Sinh viên theo Risk',
-          description:
-            'Xem danh sách sinh viên được phân loại theo mức độ Risk.',
-          badge: 'AI & Dashboard',
-        },
-      },
-      {
-        id: 'risk-alerts',
-        label: 'Cảnh báo sinh viên nguy cơ cao',
-        path: '/education/risk-alerts',
-        icon: <AlertTriangle size={20} />,
-        banner: {
-          title: 'Cảnh báo Sinh viên Nguy cơ cao',
-          description:
-            'Theo dõi các sinh viên có nguy cơ cao được hệ thống cảnh báo.',
-          badge: 'AI & Dashboard',
-        },
-      },
-      {
-        id: 'ojt-statistics',
-        label: 'Thống kê điều kiện OJT',
-        path: '/education/ojt-statistics',
-        icon: <Database size={20} />,
-        banner: {
-          title: 'Thống kê Điều kiện OJT',
-          description:
-            'Theo dõi thống kê sinh viên đủ và chưa đủ điều kiện OJT.',
-          badge: 'AI & Dashboard',
-        },
-      },
-    ],
+// =========================
+// ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
+// =========================
+{
+  id: 'ai-class-proposals',
+  label: 'Đề xuất lớp hỗ trợ từ AI',
+  path: '/education/ai-class-proposals',
+  icon: <RoadmapConsultingIcon size={20} />,
+  banner: {
+    title: 'Đề xuất Lớp hỗ trợ từ AI',
+    description:
+      'Xem các đề xuất lớp hỗ trợ được AI hình thành từ dữ liệu học tập và mức nguy cơ của sinh viên.',
+    badge: 'Phòng Đào tạo',
   },
-
-  // =========================
-  // QUẢN LÝ LỚP HỖ TRỢ
-  // =========================
-  {
-    id: 'support-class-management',
-    label: 'Quản lý lớp hỗ trợ',
-    path: '',
-    icon: <School size={20} />,
-    children: [
-      {
-        id: 'ai-class-proposals',
-        label: 'Đề xuất mở lớp từ AI',
-        path: '/education/ai-class-proposals',
-        icon: <RoadmapConsultingIcon size={20} />,
-        banner: {
-          title: 'Đề xuất Mở lớp từ AI',
-          description:
-            'Xem các đề xuất mở lớp hỗ trợ được AI đưa ra.',
-          badge: 'Lớp hỗ trợ',
-        },
-      },
-      {
-        id: 'support-classes',
-        label: 'Tạo lớp học hỗ trợ',
-        path: '/education/support-classes',
-        icon: <School size={20} />,
-        banner: {
-          title: 'Tạo Lớp học Hỗ trợ',
-          description:
-            'Tạo lớp học hỗ trợ cho sinh viên theo nhu cầu.',
-          badge: 'Lớp hỗ trợ',
-        },
-      },
-      {
-        id: 'class-notifications',
-        label: 'Thông báo mở lớp',
-        path: '/education/class-notifications',
-        icon: <Bell size={20} />,
-        banner: {
-          title: 'Thông báo Mở lớp',
-          description:
-            'Gửi thông báo về các lớp học hỗ trợ được mở.',
-          badge: 'Lớp hỗ trợ',
-        },
-      },
-      {
-        id: 'class-students',
-        label: 'Danh sách sinh viên đăng ký lớp',
-        path: '/education/class-students',
-        icon: <Users size={20} />,
-        banner: {
-          title: 'Danh sách Sinh viên Đăng ký Lớp',
-          description:
-            'Quản lý danh sách sinh viên đăng ký các lớp học hỗ trợ.',
-          badge: 'Lớp hỗ trợ',
-        },
-      },
-    ],
-  },
+},
 ];

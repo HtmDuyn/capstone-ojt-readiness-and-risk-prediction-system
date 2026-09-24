@@ -4,28 +4,27 @@ import {
   Navigate,
   type RouteObject,
 } from "react-router-dom";
+
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import { getMenuByRole } from "@/config";
+
 import LoginPage from "@/pages/auth/LoginPage";
+
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
 import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
+
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
-import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
 import EducationStudentImport from "@/pages/education/EducationStudentImport";
 import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
-import EducationRiskStudents from "@/pages/education/EducationRiskStudents";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
-import EducationOjtStatistics from "@/pages/education/EducationOjtStatistics";
 import EducationAiClassProposals from "@/pages/education/EducationAiClassProposals";
-import EducationSupportClasses from "@/pages/education/EducationSupportClasses";
-import EducationClassNotifications from "@/pages/education/EducationClassNotifications";
-import EducationClassStudents from "@/pages/education/EducationClassStudents";
+
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -36,35 +35,50 @@ const ROLE_LABELS: Record<UserRole, string> = {
   qhdn: "Phòng Quan hệ Doanh nghiệp",
 };
 
-// Màn hình tạm thời cho các phân hệ chưa có trang nghiệp vụ riêng.
-const RolePlaceholderPage: React.FC<{ role: UserRole }> = ({ role }) => (
-  <div className="card-glass p-8 sm:p-12 text-center min-h-[360px] flex flex-col items-center justify-center">
-    <div className="w-16 h-16 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-2xl font-bold">
+/* =========================================================
+   PLACEHOLDER
+   ========================================================= */
+
+const RolePlaceholderPage: React.FC<{
+  role: UserRole;
+}> = ({ role }) => (
+  <div className="card-glass flex min-h-[360px] flex-col items-center justify-center p-8 text-center sm:p-12">
+    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-2xl font-bold text-orange-600">
       {ROLE_LABELS[role].charAt(0)}
     </div>
+
     <h1 className="mt-5 text-2xl font-extrabold text-slate-900">
       Cổng {ROLE_LABELS[role]}
     </h1>
+
     <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">
-      Phân hệ này đang được hoàn thiện. Bạn đã đăng nhập đúng vai trò và có thể
-      sử dụng menu bên trái khi các chức năng được triển khai.
+      Phân hệ này đang được hoàn thiện. Bạn đã đăng nhập đúng vai trò
+      và có thể sử dụng menu bên trái khi các chức năng được triển khai.
     </p>
   </div>
 );
 
-// Tạo route dùng chung cho các role chưa có dashboard nghiệp vụ hoàn chỉnh.
-const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
+/* =========================================================
+   ROLE ROUTES CHUNG
+   ========================================================= */
+
+const createRoleRoutes = (
+  role: Exclude<UserRole, "student">,
+): RouteObject => {
   const navItems = getMenuByRole(role);
 
   return {
     element: (
       <BaseLayout
         navItems={navItems}
-        homePath={navItems[0]?.path || `/${role}/dashboard`}
+        homePath={
+          navItems[0]?.path || `/${role}/dashboard`
+        }
         brandSubtitle={ROLE_LABELS[role]}
         showAIConsult={false}
       />
     ),
+
     children: navItems.map((item) => ({
       path: item.path,
       element: <RolePlaceholderPage role={role} />,
@@ -72,7 +86,10 @@ const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
   };
 };
 
-// Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
+/* =========================================================
+   STUDENT ROUTES
+   ========================================================= */
+
 const studentRoutes: RouteObject = {
   element: (
     <BaseLayout
@@ -81,166 +98,390 @@ const studentRoutes: RouteObject = {
       brandSubtitle="Cổng Sinh viên"
     />
   ),
-  children: [
-    // Route chính của sinh viên.
-    { path: "/student", element: <Navigate to="/student/dashboard" replace /> },
-    { path: "/student/dashboard", element: <StudentDashboard /> },
-    { path: "/student/academic-profile", element: <StudentAcademicProfile /> },
-    { path: "/student/risk-prediction", element: <StudentFeaturePage /> },
-    { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
-    { path: "/student/ojt-registration", element: <StudentFeaturePage /> },
-    { path: "/student/ojt-profile", element: <StudentFeaturePage /> },
-    { path: "/student/internship-progress", element: <StudentFeaturePage /> },
-    { path: "/student/evaluation-results", element: <StudentFeaturePage /> },
-    { path: "/student/notifications", element: <StudentFeaturePage /> },
 
-    // Alias giữ tương thích với các đường dẫn cũ.
+  children: [
+    {
+      path: "/student",
+      element: (
+        <Navigate
+          to="/student/dashboard"
+          replace
+        />
+      ),
+    },
+
+    {
+      path: "/student/dashboard",
+      element: <StudentDashboard />,
+    },
+
+    {
+      path: "/student/academic-profile",
+      element: <StudentAcademicProfile />,
+    },
+
+    {
+      path: "/student/risk-prediction",
+      element: <StudentFeaturePage />,
+    },
+
+    {
+      path: "/student/roadmap-consulting",
+      element: <StudentFeaturePage />,
+    },
+
+    {
+      path: "/student/ojt-registration",
+      element: <StudentFeaturePage />,
+    },
+
+    {
+      path: "/student/ojt-profile",
+      element: <StudentFeaturePage />,
+    },
+
+    {
+      path: "/student/internship-progress",
+      element: <StudentFeaturePage />,
+    },
+
+    {
+      path: "/student/evaluation-results",
+      element: <StudentFeaturePage />,
+    },
+
+    {
+      path: "/student/notifications",
+      element: <StudentFeaturePage />,
+    },
+
+    /* =====================================================
+       ALIAS CŨ
+       ===================================================== */
+
     {
       path: "/dashboard",
-      element: <Navigate to="/student/dashboard" replace />,
+      element: (
+        <Navigate
+          to="/student/dashboard"
+          replace
+        />
+      ),
     },
+
     {
       path: "/dashboard/student",
-      element: <Navigate to="/student/dashboard" replace />,
+      element: (
+        <Navigate
+          to="/student/dashboard"
+          replace
+        />
+      ),
     },
+
     {
       path: "/dashboard/academic-profile",
-      element: <Navigate to="/student/academic-profile" replace />,
+      element: (
+        <Navigate
+          to="/student/academic-profile"
+          replace
+        />
+      ),
     },
+
     {
       path: "/academic-profile",
-      element: <Navigate to="/student/academic-profile" replace />,
+      element: (
+        <Navigate
+          to="/student/academic-profile"
+          replace
+        />
+      ),
     },
+
     {
       path: "/risk-prediction",
-      element: <Navigate to="/student/risk-prediction" replace />,
+      element: (
+        <Navigate
+          to="/student/risk-prediction"
+          replace
+        />
+      ),
     },
+
     {
       path: "/roadmap-consulting",
-      element: <Navigate to="/student/roadmap-consulting" replace />,
+      element: (
+        <Navigate
+          to="/student/roadmap-consulting"
+          replace
+        />
+      ),
     },
+
     {
       path: "/ojt-registration",
-      element: <Navigate to="/student/ojt-registration" replace />,
+      element: (
+        <Navigate
+          to="/student/ojt-registration"
+          replace
+        />
+      ),
     },
+
     {
       path: "/ojt-profile",
-      element: <Navigate to="/student/ojt-profile" replace />,
+      element: (
+        <Navigate
+          to="/student/ojt-profile"
+          replace
+        />
+      ),
     },
+
     {
       path: "/internship-progress",
-      element: <Navigate to="/student/internship-progress" replace />,
+      element: (
+        <Navigate
+          to="/student/internship-progress"
+          replace
+        />
+      ),
     },
+
     {
       path: "/evaluation-results",
-      element: <Navigate to="/student/evaluation-results" replace />,
+      element: (
+        <Navigate
+          to="/student/evaluation-results"
+          replace
+        />
+      ),
     },
+
     {
       path: "/notifications",
-      element: <Navigate to="/student/notifications" replace />,
+      element: (
+        <Navigate
+          to="/student/notifications"
+          replace
+        />
+      ),
     },
   ],
 };
 
+/* =========================================================
+   ROUTER
+   ========================================================= */
+
 export const router = createBrowserRouter([
-  // Route công khai: người đã đăng nhập sẽ được chuyển về dashboard theo role.
+  /* =======================================================
+     PUBLIC / GUEST
+     ======================================================= */
+
   {
     element: <GuestRoute />,
+
     children: [
-      { index: true, element: <Navigate to="/login" replace /> },
-      { path: "/login", element: <LoginPage /> },
-      { path: "/register", element: <LoginPage /> },
+      {
+        index: true,
+        element: (
+          <Navigate
+            to="/login"
+            replace
+          />
+        ),
+      },
+
+      {
+        path: "/login",
+        element: <LoginPage />,
+      },
+
+      {
+        path: "/register",
+        element: <LoginPage />,
+      },
     ],
   },
 
-  // Route sinh viên: chỉ tài khoản student được phép truy cập.
+  /* =======================================================
+     STUDENT
+     ======================================================= */
+
   {
-    element: <PrivateRoute allowedRoles={["student"]} />,
+    element: (
+      <PrivateRoute
+        allowedRoles={["student"]}
+      />
+    ),
+
     children: [studentRoutes],
   },
 
-  // Các role còn lại dùng layout chung và trang tạm trong khi chờ nghiệp vụ.
+  /* =======================================================
+     ADMIN
+     ======================================================= */
+
   {
-    element: <PrivateRoute allowedRoles={["admin"]} />,
-    children: [createRoleRoutes("admin")],
+    element: (
+      <PrivateRoute
+        allowedRoles={["admin"]}
+      />
+    ),
+
+    children: [
+      createRoleRoutes("admin"),
+    ],
   },
+
+  /* =======================================================
+     PHÒNG ĐÀO TẠO
+     ======================================================= */
+
   {
-    element: <PrivateRoute allowedRoles={["education"]} />,
+    element: (
+      <PrivateRoute
+        allowedRoles={["education"]}
+      />
+    ),
+
     children: [
       {
         element: (
           <BaseLayout
-            navItems={getMenuByRole("education")}
+            navItems={getMenuByRole(
+              "education",
+            )}
             homePath="/education/dashboard"
             brandSubtitle="Phòng Đào tạo"
             showAIConsult={false}
           />
         ),
+
         children: [
+          /* =========================
+             DASHBOARD
+             ========================= */
+
+          {
+            path: "/education",
+            element: (
+              <Navigate
+                to="/education/dashboard"
+                replace
+              />
+            ),
+          },
+
           {
             path: "/education/dashboard",
             element: <EducationDashboard />,
           },
 
-          // Các chức năng con của menu PĐT
-          ...getMenuByRole("education")
-            .filter((item) => item.children?.length)
-            .flatMap((group) =>
-              group.children!.map((item) => ({
-                path: item.path,
-                element:
-                  item.path === "/education/academic-year" ? (
-                    <EducationAcademicYear />
-                  ) : item.path === "/education/student-import" ? (
-                    <EducationStudentImport />
-                  ) : item.path === "/education/ojt-eligibility" ? (
-                    <EducationOjtEligibility />
-                  ) : item.path === "/education/academic-alerts" ? (
-                    <EducationAcademicAlerts />
-                  ) : item.path === "/education/curriculum-plan" ? (
-                    <EducationCurriculumPlan />
-                  ) : item.path === "/education/ojt-conditions" ? (
-                    <EducationOjtConditions />
-                  ) : item.path === "/education/student-progress" ? (
-                    <EducationStudentProgress />
-                  ) : item.path === "/education/student-status" ? (
-                    <EducationStudentStatus />
-                  ) : item.path === "/education/risk-students" ? (
-                    <EducationRiskStudents />
-                  ) : item.path === "/education/risk-alerts" ? (
-                    <EducationAcademicAlerts />
-                  ) : item.path === "/education/ojt-statistics" ? (
-                    <EducationOjtStatistics />
-                  ) : item.path === "/education/ai-class-proposals" ? (
-                    <EducationAiClassProposals />
-                  ) : item.path === "/education/support-classes" ? (
-                    <EducationSupportClasses />
-                  ) : item.path === "/education/class-notifications" ? (
-                    <EducationClassNotifications />
-                  ) : item.path === "/education/class-students" ? (
-                    <EducationClassStudents />
-                  ) : (
-                    <RolePlaceholderPage role="education" />
-                  ),
-              })),
+          /* =========================
+             QUẢN LÝ DỮ LIỆU
+             ========================= */
+
+          {
+            path: "/education/academic-year",
+            element: <EducationAcademicYear />,
+          },
+
+          {
+            path: "/education/student-import",
+            element: <EducationStudentImport />,
+          },
+
+          {
+            path: "/education/curriculum-plan",
+            element: <EducationCurriculumPlan />,
+          },
+
+          {
+            path: "/education/ojt-conditions",
+            element: <EducationOjtConditions />,
+          },
+
+          /* =========================
+             QUẢN LÝ SINH VIÊN
+             ========================= */
+
+          {
+            path: "/education/student-progress",
+            element: <EducationStudentProgress />,
+          },
+
+          {
+            path: "/education/ojt-eligibility",
+            element: <EducationOjtEligibility />,
+          },
+
+          {
+            path: "/education/student-status",
+            element: <EducationStudentStatus />,
+          },
+
+          /* =========================
+             ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
+             ========================= */
+
+          {
+            path: "/education/ai-class-proposals",
+            element: (
+              <EducationAiClassProposals />
             ),
+          },
         ],
       },
     ],
   },
+
+  /* =======================================================
+     QHDN
+     ======================================================= */
+
   {
-    element: <PrivateRoute allowedRoles={["qhdn"]} />,
-    children: [createRoleRoutes("qhdn")],
-  },
-  {
-    element: <PrivateRoute allowedRoles={["enterprise"]} />,
-    children: [createRoleRoutes("enterprise")],
+    element: (
+      <PrivateRoute
+        allowedRoles={["qhdn"]}
+      />
+    ),
+
+    children: [
+      createRoleRoutes("qhdn"),
+    ],
   },
 
-  // URL không tồn tại luôn quay về login thay vì hiển thị trang 404 mặc định.
+  /* =======================================================
+     ENTERPRISE
+     ======================================================= */
+
+  {
+    element: (
+      <PrivateRoute
+        allowedRoles={["enterprise"]}
+      />
+    ),
+
+    children: [
+      createRoleRoutes("enterprise"),
+    ],
+  },
+
+  /* =======================================================
+     FALLBACK
+     ======================================================= */
+
   {
     path: "*",
-    element: <Navigate to="/login" replace />,
+    element: (
+      <Navigate
+        to="/login"
+        replace
+      />
+    ),
   },
 ]);
 
