@@ -1,15 +1,21 @@
-const express = require("express");
-const router = express.Router();
+import { Router } from "express";
 
-const { login, getCurrentUser } = require("../controllers/auth.controller");
-const authMiddleware = require("../middlewares/auth.middleware");
+import { authenticate } from "../../middleware/authenticate";
+
+import {
+  getCurrentUser,
+  login,
+} from "./auth.controller";
+
+const router = Router();
 
 /**
  * @swagger
  * /api/auth/login:
  *   post:
  *     summary: Login with username/email and password
- *     tags: [Auth]
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
@@ -22,8 +28,11 @@ const authMiddleware = require("../middlewares/auth.middleware");
  *             properties:
  *               username:
  *                 type: string
+ *                 example: student01
  *               password:
  *                 type: string
+ *                 format: password
+ *                 example: password123
  *     responses:
  *       200:
  *         description: Login successful
@@ -31,31 +40,37 @@ const authMiddleware = require("../middlewares/auth.middleware");
  *         description: Missing username or password
  *       401:
  *         description: Invalid credentials
- *       404:
- *         description: User not found    
- *       500:
- *         description: Internal server error
+ *       403:
+ *         description: Account inactive or locked
  */
-router.post("/login", login);
+router.post(
+  "/login",
+  login,
+);
 
 /**
  * @swagger
  * /api/auth/me:
  *   get:
  *     summary: Get current authenticated user
- *     tags: [Auth]
+ *     tags:
+ *       - Auth
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: User profile retrieved successfully
  *       401:
- *         description: User is not authenticated
+ *         description: Invalid or expired token
+ *       403:
+ *         description: Account inactive or locked
  *       404:
- *         description: Authenticated user not found
- *       500:
- *         description: Internal server error
+ *         description: User not found
  */
-router.get("/me", authMiddleware, getCurrentUser);
+router.get(
+  "/me",
+  authenticate,
+  getCurrentUser,
+);
 
-module.exports = router;
+export default router;
