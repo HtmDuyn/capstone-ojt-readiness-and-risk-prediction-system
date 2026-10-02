@@ -18,7 +18,6 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const statsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -55,7 +54,7 @@ const LoginPage: React.FC = () => {
     performMockLogin(selectedRole);
   };
 
-  const handleSocialLogin = async (_provider: "google" | "microsoft") => {
+  const handleSocialLogin = async (_provider: "google") => {
     setIsLoading(true);
     await new Promise((r) => setTimeout(r, 400));
     setIsLoading(false);
@@ -82,8 +81,6 @@ const LoginPage: React.FC = () => {
         <LeftPanel
           statsRef={statsRef}
           statsVisible={statsVisible}
-          authMode={authMode}
-          onAuthModeChange={setAuthMode}
         />
 
         <RightPanel
@@ -101,8 +98,6 @@ const LoginPage: React.FC = () => {
           isLoading={isLoading}
           onSubmit={handleLogin}
           onSocialLogin={handleSocialLogin}
-          authMode={authMode}
-          onAuthModeChange={setAuthMode}
         />
       </div>
     </div>

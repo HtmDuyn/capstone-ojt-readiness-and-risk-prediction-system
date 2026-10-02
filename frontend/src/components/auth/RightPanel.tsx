@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import type { UserRole, Role } from "@/types/auth.types";
 import { roles } from "./loginData";
 
@@ -16,9 +16,7 @@ interface RightPanelProps {
   onToggleRemember: () => void;
   isLoading: boolean;
   onSubmit: (e: React.FormEvent) => void;
-  onSocialLogin?: (provider: "google" | "microsoft") => void;
-  authMode?: "login" | "register";
-  onAuthModeChange?: (mode: "login" | "register") => void;
+  onSocialLogin?: (provider: "google") => void;
 }
 
 interface InputFieldProps {
@@ -85,12 +83,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   isLoading,
   onSubmit,
   onSocialLogin,
-  authMode = "login",
-  onAuthModeChange,
 }) => {
-  const [fullName, setFullName] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
   const fadeStyle = (delay = 0) => ({
     opacity: animateIn ? 1 : 0,
     transform: animateIn ? "translateY(0)" : "translateY(16px)",
@@ -101,28 +94,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
     <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
       {/* Top Header Row with Language switcher */}
       <div className="relative z-10 flex items-center justify-between pb-4">
-        {/* Notch switch for Mobile */}
-        <div className="flex items-center gap-1 bg-orange-50/80 p-1 rounded-full border border-orange-200/60 lg:hidden">
-          <button
-            type="button"
-            onClick={() => onAuthModeChange?.("login")}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-              authMode === "login" ? "bg-orange-500 text-white shadow-2xs" : "text-gray-600"
-            }`}
-          >
-            LOGIN
-          </button>
-          <button
-            type="button"
-            onClick={() => onAuthModeChange?.("register")}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-              authMode === "register" ? "bg-orange-500 text-white shadow-2xs" : "text-gray-600"
-            }`}
-          >
-            SIGN IN
-          </button>
-        </div>
-
         {/* Language selector */}
         <button
           type="button"
@@ -150,19 +121,17 @@ const RightPanel: React.FC<RightPanelProps> = ({
             </div>
           </div>
           <span className="text-sm font-extrabold tracking-widest text-orange-600 uppercase font-cinematic">
-            {authMode === "login" ? "LOGIN" : "SIGN IN"}
+            LOGIN
           </span>
         </div>
 
         {/* Title */}
         <div className="text-center mb-6" style={fadeStyle(0.04)}>
           <h2 className="text-2xl lg:text-3xl font-extrabold text-gray-900 font-cinematic tracking-tight mb-1.5">
-            {authMode === "login" ? "Đăng nhập hệ thống" : "Tạo tài khoản mới"}
+            Đăng nhập hệ thống
           </h2>
           <p className="text-gray-500 text-xs lg:text-sm font-outfit">
-            {authMode === "login"
-              ? "Chào mừng bạn trở lại! Vui lòng đăng nhập để tiếp tục."
-              : "Vui lòng nhập thông tin để đăng ký tài khoản OJT."}
+            Chào mừng bạn trở lại! Vui lòng đăng nhập để tiếp tục.
           </p>
         </div>
 
@@ -210,24 +179,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         </div>
 
         {/* Form Container */}
-        <form onSubmit={onSubmit} key={authMode} className="auth-form-enter" style={fadeStyle(0.12)}>
-          {/* Full Name field if Register mode */}
-          {authMode === "register" && (
-            <InputField
-              label="Họ và tên"
-              type="text"
-              placeholder="Nhập họ và tên đầy đủ"
-              value={fullName}
-              onChange={setFullName}
-              required
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              }
-            />
-          )}
-
+        <form onSubmit={onSubmit} className="auth-form-enter" style={fadeStyle(0.12)}>
           {/* Account */}
           <InputField
             id="login-account"
@@ -254,7 +206,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
             placeholder="Nhập mật khẩu"
             value={password}
             onChange={onPasswordChange}
-            autoComplete={authMode === "login" ? "current-password" : "new-password"}
+            autoComplete="current-password"
             required
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -284,28 +236,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
             }
           />
 
-          {/* Confirm Password if Register mode */}
-          {authMode === "register" && (
-            <InputField
-              label="Xác nhận mật khẩu"
-              type="password"
-              placeholder="Nhập lại mật khẩu"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              autoComplete="new-password"
-              required
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" />
-                </svg>
-              }
-            />
-          )}
-
           {/* Remember & Forgot Password */}
-          {authMode === "login" && (
-            <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-5">
               <label className="flex items-center gap-2 cursor-pointer group select-none">
                 <div
                   className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
@@ -327,8 +259,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
               <a href="#" className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors font-outfit hover:underline">
                 Quên mật khẩu?
               </a>
-            </div>
-          )}
+          </div>
 
           {/* Submit button */}
           <button
@@ -340,12 +271,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
             {isLoading ? (
               <div className="flex items-center justify-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>{authMode === "login" ? "Đang đăng nhập..." : "Đang xử lý..."}</span>
+                <span>Đang đăng nhập...</span>
               </div>
-            ) : authMode === "login" ? (
-              "Đăng nhập"
             ) : (
-              "Đăng ký ngay"
+              "Đăng nhập"
             )}
           </button>
         </form>
@@ -358,7 +287,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         </div>
 
         {/* Social login buttons */}
-        <div className="grid grid-cols-2 gap-3" style={{ opacity: animateIn ? 1 : 0, transition: "all 0.6s 0.25s ease" }}>
+        <div className="grid grid-cols-1 gap-3" style={{ opacity: animateIn ? 1 : 0, transition: "all 0.6s 0.25s ease" }}>
           <button
             id="google-login"
             type="button"
@@ -372,20 +301,6 @@ const RightPanel: React.FC<RightPanelProps> = ({
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
             Google
-          </button>
-          <button
-            id="microsoft-login"
-            type="button"
-            onClick={() => onSocialLogin && onSocialLogin("microsoft")}
-            className="social-btn flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 bg-white/90 text-gray-700 font-semibold text-xs shadow-2xs hover:bg-white"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 23 23">
-              <path fill="#f25022" d="M1 1h10v10H1z" />
-              <path fill="#00a4ef" d="M12 1h10v10H12z" />
-              <path fill="#7fba00" d="M1 12h10v10H1z" />
-              <path fill="#ffb900" d="M12 12h10v10H12z" />
-            </svg>
-            Microsoft
           </button>
         </div>
       </div>
