@@ -1,3 +1,5 @@
+import type { SignOptions } from "jsonwebtoken";
+
 const jwtSecret = process.env.JWT_SECRET;
 
 if (!jwtSecret) {
@@ -8,5 +10,7 @@ if (!jwtSecret) {
 
 export const authConfig = {
   jwtSecret,
-  accessTokenExpiresIn: "1d",
-} as const;
+
+  expiresIn:
+    (process.env.JWT_EXPIRES_IN || "1d") as SignOptions["expiresIn"],
+};

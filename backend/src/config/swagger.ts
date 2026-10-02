@@ -14,8 +14,8 @@ const modulesDirectory =
 
 const collectApiFiles = (
   directory: string,
-): string[] =>
-  readdirSync(
+): string[] => {
+  return readdirSync(
     directory,
     {
       withFileTypes: true,
@@ -43,12 +43,12 @@ const collectApiFiles = (
         : [];
     },
   );
+};
 
 const options: swaggerJSDoc.Options =
   {
     definition: {
-      openapi:
-        "3.0.0",
+      openapi: "3.0.0",
 
       info: {
         title:
@@ -82,13 +82,258 @@ const options: swaggerJSDoc.Options =
       components: {
         securitySchemes: {
           bearerAuth: {
-            type: "http",
+            type:
+              "http",
 
             scheme:
               "bearer",
 
             bearerFormat:
               "JWT",
+
+            description:
+              "Enter JWT token only.",
+          },
+        },
+
+        schemas: {
+          /*
+           * =========================
+           * ERROR
+           * =========================
+           */
+          ErrorResponse: {
+            type:
+              "object",
+
+            properties: {
+              success: {
+                type:
+                  "boolean",
+
+                example:
+                  false,
+              },
+
+              errorCode: {
+                type:
+                  "string",
+
+                example:
+                  "INVALID_CREDENTIALS",
+              },
+
+              message: {
+                type:
+                  "string",
+
+                example:
+                  "Invalid email or password.",
+              },
+            },
+          },
+
+          /*
+           * =========================
+           * LOGIN
+           * =========================
+           */
+          LoginRequest: {
+            type:
+              "object",
+
+            required: [
+              "email",
+              "password",
+            ],
+
+            properties: {
+              email: {
+                type:
+                  "string",
+
+                format:
+                  "email",
+
+                example:
+                  "admin@ojtrpa.edu.vn",
+              },
+
+              password: {
+                type:
+                  "string",
+
+                format:
+                  "password",
+
+                example:
+                  "Password@123",
+              },
+            },
+          },
+
+          LoginResponse: {
+            type:
+              "object",
+
+            properties: {
+              success: {
+                type:
+                  "boolean",
+
+                example:
+                  true,
+              },
+
+              message: {
+                type:
+                  "string",
+
+                example:
+                  "Login successful",
+              },
+
+              token: {
+                type:
+                  "string",
+
+                example:
+                  "eyJhbGciOiJIUzI1NiIs...",
+              },
+            },
+          },
+
+          /*
+           * =========================
+           * USER
+           * =========================
+           */
+          UserResponse: {
+            type:
+              "object",
+
+            properties: {
+              id: {
+                type:
+                  "integer",
+
+                example:
+                  1,
+              },
+
+              username: {
+                type:
+                  "string",
+
+                example:
+                  "admin01",
+              },
+
+              email: {
+                type:
+                  "string",
+
+                format:
+                  "email",
+
+                example:
+                  "admin@ojtrpa.edu.vn",
+              },
+
+              fullName: {
+                type:
+                  "string",
+
+                example:
+                  "System Administrator",
+              },
+
+              status: {
+                type:
+                  "string",
+
+                example:
+                  "ACTIVE",
+              },
+
+              roleCode: {
+                type:
+                  "string",
+
+                nullable:
+                  true,
+
+                example:
+                  "ADMIN",
+              },
+
+              roleName: {
+                type:
+                  "string",
+
+                nullable:
+                  true,
+
+                example:
+                  "System Administrator",
+              },
+            },
+          },
+
+          CurrentUserResponse: {
+            type:
+              "object",
+
+            properties: {
+              success: {
+                type:
+                  "boolean",
+
+                example:
+                  true,
+              },
+
+              message: {
+                type:
+                  "string",
+
+                example:
+                  "User profile retrieved successfully",
+              },
+
+              user: {
+                $ref:
+                  "#/components/schemas/UserResponse",
+              },
+            },
+          },
+
+          /*
+           * =========================
+           * LOGOUT
+           * =========================
+           */
+          LogoutResponse: {
+            type:
+              "object",
+
+            properties: {
+              success: {
+                type:
+                  "boolean",
+
+                example:
+                  true,
+              },
+
+              message: {
+                type:
+                  "string",
+
+                example:
+                  "Logout successful",
+              },
+            },
           },
         },
       },

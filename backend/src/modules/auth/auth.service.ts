@@ -1,17 +1,26 @@
+import crypto from "node:crypto";
+
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 import { authConfig } from "../../config/auth";
+import { hashToken } from "../../utils/token";
 
 import {
+  findByEmail,
   findById,
-  findByIdentifier,
 } from "./auth.repository";
+
+import {
+  createSession,
+  revokeAllSessionsByUserId,
+  revokeSessionById,
+} from "./session.repository";
 
 import type {
   AuthError,
+  AuthTokenPayload,
   AuthUserRecord,
-  PublicUser,
 } from "./auth.types";
 
 const createAuthError = (
@@ -28,29 +37,14 @@ const createAuthError = (
   );
 };
 
-const toPublicUser = (
-  user: AuthUserRecord,
-): PublicUser => ({
-  id: user.id,
-
-  username: user.username,
-
-  email: user.email,
-
-  fullName: user.full_name,
-
-  status: user.status,
-
-  roleCode: user.role_code,
-
-  roleName: user.role_name,
-});
-
 export const verifyPassword = async (
   inputPassword: string,
   storedHash: string,
 ): Promise<boolean> => {
-  if (!inputPassword || !storedHash) {
+  if (
+    !inputPassword ||
+    !storedHash
+  ) {
     return false;
   }
 
@@ -80,27 +74,33 @@ export const getUserById = async (
 };
 
 export const loginUser = async (
-  username: unknown,
+  email: unknown,
   password: unknown,
 ): Promise<{
   token: string;
-  user: PublicUser;
 }> => {
-  const safeUsername =
-    typeof username === "string"
-      ? username.trim()
+  /*
+   * Validate email.
+   */
+  const safeEmail =
+    typeof email === "string"
+      ? email.trim().toLowerCase()
       : "";
 
+  /*
+   * Không trim password vì khoảng trắng
+   * có thể là một phần của password.
+   */
   const safePassword =
     typeof password === "string"
       ? password
       : "";
 
-  if (!safeUsername) {
+  if (!safeEmail) {
     throw createAuthError(
-      "Username or email is required.",
+      "Email is required.",
       400,
-      "MISSING_USERNAME",
+      "MISSING_EMAIL",
     );
   }
 
@@ -112,25 +112,27 @@ export const loginUser = async (
     );
   }
 
+  /*
+   * Tìm user theo email.
+   */
   const user =
-    await findByIdentifier(
-      safeUsername,
+    await findByEmail(
+      safeEmail,
     );
 
   /*
-   * Không trả USER_NOT_FOUND.
-   * Tránh để người ngoài biết account có tồn tại hay không.
+   * Không tiết lộ email có tồn tại hay không.
    */
   if (!user) {
     throw createAuthError(
-      "Invalid username/email or password.",
+      "Invalid email or password.",
       401,
       "INVALID_CREDENTIALS",
     );
   }
 
   /*
-   * Kiểm tra trạng thái account.
+   * Chỉ tài khoản ACTIVE được login.
    */
   if (
     user.status?.toUpperCase() !==
@@ -143,6 +145,9 @@ export const loginUser = async (
     );
   }
 
+  /*
+   * Verify bcrypt password.
+   */
   const passwordValid =
     await verifyPassword(
       safePassword,
@@ -151,34 +156,104 @@ export const loginUser = async (
 
   if (!passwordValid) {
     throw createAuthError(
-      "Invalid username/email or password.",
+      "Invalid email or password.",
       401,
       "INVALID_CREDENTIALS",
     );
   }
 
-  const token = jwt.sign(
-    {
-      userId: user.id,
+  /*
+   * Mỗi lần login tạo SessionID mới.
+   */
+  const sessionId =
+    crypto.randomUUID();
 
-      username: user.username,
+  /*
+   * Tạo JWT.
+   */
+  const token =
+    jwt.sign(
+      {
+        userId: user.id,
+        username: user.username,
+        roleCode: user.role_code,
+        sessionId,
+      },
+      authConfig.jwtSecret,
+      {
+        subject: String(user.id),
+        expiresIn: authConfig.expiresIn,
+      },
+    );
 
-      roleCode: user.role_code,
-    },
+  /*
+   * Decode lại JWT để lấy chính xác
+   * thời gian hết hạn do jsonwebtoken tạo.
+   */
+  const decoded =
+    jwt.decode(
+      token,
+    ) as AuthTokenPayload | null;
 
-    authConfig.jwtSecret,
+  if (
+    !decoded ||
+    typeof decoded.exp !== "number"
+  ) {
+    throw new Error(
+      "Unable to determine token expiration time.",
+    );
+  }
 
-    {
-      subject: String(user.id),
+  const expiresAt =
+    new Date(
+      decoded.exp * 1000,
+    );
 
-      expiresIn:
-        authConfig.accessTokenExpiresIn,
-    },
+  /*
+   * DB không lưu JWT thật.
+   * Chỉ lưu SHA-256 hash.
+   */
+  const tokenHash =
+    hashToken(token);
+
+  /*
+   * Hệ thống chỉ cho phép
+   * một active session / user.
+   *
+   * Login mới:
+   * Session cũ -> revoked
+   */
+  await revokeAllSessionsByUserId(
+    user.id,
+  );
+
+  /*
+   * Tạo session mới.
+   */
+  await createSession(
+    sessionId,
+    user.id,
+    tokenHash,
+    expiresAt,
   );
 
   return {
     token,
-
-    user: toPublicUser(user),
   };
+};
+
+export const logoutUser = async (
+  sessionId: string,
+): Promise<void> => {
+  if (!sessionId) {
+    throw createAuthError(
+      "Invalid authentication session.",
+      401,
+      "INVALID_SESSION",
+    );
+  }
+
+  await revokeSessionById(
+    sessionId,
+  );
 };
