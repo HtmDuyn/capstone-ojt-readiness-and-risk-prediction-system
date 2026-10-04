@@ -1,6 +1,9 @@
 const {
     getUsers: getUsersService,
     getUserById: getUserByIdService,
+    getSystemConfig: getSystemConfigService,
+    validateCurrentPeriod: validateCurrentPeriodService,
+    updateSystemConfig: updateSystemConfigService,
     updateUserStatus: updateUserStatusService,
     validateUserUpdate: validateUserUpdateService,
     updateUser: updateUserService
@@ -355,7 +358,130 @@ const updateUser = async (req, res) => {
     }
 };
 
+const getSystemConfig = async (req, res) => {
+    try {
+        const config = await getSystemConfigService();
+
+        return res.status(200).json({
+            success: true,
+            message: "System configuration retrieved successfully.",
+            config
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            errorCode: "ADMIN_SYSTEM_CONFIG_ERROR",
+            message: "Unable to retrieve system configuration.",
+            details:
+                error && error.message
+                    ? error.message
+                    : "Unknown error"
+        });
+    }
+};
+
+const updateSystemConfig = async (req, res) => {
+    try {
+        const academicYearId =
+            Number(req.body?.academicYearId);
+
+        const ojtSemesterId =
+            Number(req.body?.ojtSemesterId);
+
+        if (
+            !Number.isInteger(academicYearId) ||
+            academicYearId <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "INVALID_ACADEMIC_YEAR_ID",
+                message:
+                    "Academic year ID must be a positive integer."
+            });
+        }
+
+        if (
+            !Number.isInteger(ojtSemesterId) ||
+            ojtSemesterId <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "INVALID_OJT_SEMESTER_ID",
+                message:
+                    "OJT semester ID must be a positive integer."
+            });
+        }
+
+        const validation =
+            await validateCurrentPeriodService({
+                academicYearId,
+                ojtSemesterId
+            });
+
+        if (!validation.academicYearExists) {
+            return res.status(404).json({
+                success: false,
+                errorCode: "ACADEMIC_YEAR_NOT_FOUND",
+                message: "Academic year not found."
+            });
+        }
+
+        if (!validation.ojtSemesterExists) {
+            return res.status(404).json({
+                success: false,
+                errorCode: "OJT_SEMESTER_NOT_FOUND",
+                message: "OJT semester not found."
+            });
+        }
+
+        if (!validation.semesterBelongsToAcademicYear) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "OJT_SEMESTER_YEAR_MISMATCH",
+                message:
+                    "OJT semester does not belong to the selected academic year."
+            });
+        }
+
+        const currentPeriod =
+            await updateSystemConfigService({
+                academicYearId,
+                ojtSemesterId,
+                updatedBy: req.user.userId
+            });
+
+        if (!currentPeriod) {
+            return res.status(409).json({
+                success: false,
+                errorCode: "SYSTEM_CONFIG_UPDATE_CONFLICT",
+                message:
+                    "System configuration could not be updated because the selected period is no longer valid."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "System configuration updated successfully.",
+            currentPeriod
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            errorCode: "ADMIN_SYSTEM_CONFIG_UPDATE_ERROR",
+            message:
+                "Unable to update system configuration.",
+            details:
+                error && error.message
+                    ? error.message
+                    : "Unknown error"
+        });
+    }
+};
+
 module.exports = {
+    getSystemConfig,
+    updateSystemConfig,
     getUsers,
     getUserById,
     updateUserStatus,

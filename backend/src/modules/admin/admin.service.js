@@ -255,7 +255,200 @@ const updateUser = async ({
     return result.rows[0] || null;
 };
 
+const getSystemConfig = async () => {
+    const [
+        settingResult,
+        academicYearsResult,
+        ojtSemestersResult
+    ] = await Promise.all([
+        db.query(
+            `
+            SELECT
+                "SettingKey" AS "settingKey",
+                "SettingValue" AS "settingValue",
+                "Description" AS "description",
+                "UpdatedBy" AS "updatedBy",
+                "UpdatedAt" AS "updatedAt"
+            FROM "SystemSettings"
+            WHERE "SettingKey" = $1;
+            `,
+            ["system.current_period"]
+        ),
+
+        db.query(
+            `
+            SELECT
+                "AcademicYearID" AS "id",
+                "YearCode" AS "yearCode",
+                "StartDate" AS "startDate",
+                "EndDate" AS "endDate",
+                "Status" AS "status"
+            FROM "AcademicYears"
+            ORDER BY
+                "StartDate" DESC NULLS LAST,
+                "AcademicYearID" DESC;
+            `
+        ),
+
+        db.query(
+            `
+            SELECT
+                s."OJTSemesterID" AS "id",
+                s."AcademicYearID" AS "academicYearId",
+                a."YearCode" AS "academicYearCode",
+                s."SemesterCode" AS "semesterCode",
+                s."Name" AS "name",
+                s."RegStartDate" AS "regStartDate",
+                s."RegEndDate" AS "regEndDate",
+                s."StartDate" AS "startDate",
+                s."EndDate" AS "endDate",
+                s."Status" AS "status"
+            FROM "OJTSemesters" s
+            INNER JOIN "AcademicYears" a
+                ON a."AcademicYearID" = s."AcademicYearID"
+            ORDER BY
+                s."StartDate" DESC NULLS LAST,
+                s."OJTSemesterID" DESC;
+            `
+        )
+    ]);
+
+    const setting = settingResult.rows[0] || null;
+
+    return {
+        currentPeriod: setting
+            ? {
+                academicYearId:
+                    setting.settingValue?.academicYearId ?? null,
+                ojtSemesterId:
+                    setting.settingValue?.ojtSemesterId ?? null,
+                updatedBy: setting.updatedBy,
+                updatedAt: setting.updatedAt
+            }
+            : null,
+
+        academicYears: academicYearsResult.rows,
+        ojtSemesters: ojtSemestersResult.rows
+    };
+};
+
+const validateCurrentPeriod = async ({
+    academicYearId,
+    ojtSemesterId
+}) => {
+    const result = await db.query(
+        `
+        SELECT
+            EXISTS (
+                SELECT 1
+                FROM "AcademicYears"
+                WHERE "AcademicYearID" = $1
+            ) AS "academicYearExists",
+
+            EXISTS (
+                SELECT 1
+                FROM "OJTSemesters"
+                WHERE "OJTSemesterID" = $2
+            ) AS "ojtSemesterExists",
+
+            EXISTS (
+                SELECT 1
+                FROM "OJTSemesters"
+                WHERE "OJTSemesterID" = $2
+                  AND "AcademicYearID" = $1
+            ) AS "semesterBelongsToAcademicYear";
+        `,
+        [
+            academicYearId,
+            ojtSemesterId
+        ]
+    );
+
+    return result.rows[0];
+};
+
+const updateSystemConfig = async ({
+    academicYearId,
+    ojtSemesterId,
+    updatedBy
+}) => {
+    const result = await db.query(
+        `
+        WITH valid_period AS (
+            SELECT 1
+            FROM "AcademicYears" a
+            INNER JOIN "OJTSemesters" s
+                ON s."OJTSemesterID" = $2
+               AND s."AcademicYearID" = a."AcademicYearID"
+            WHERE a."AcademicYearID" = $1
+        ),
+
+        upserted_setting AS (
+            INSERT INTO "SystemSettings" (
+                "SettingKey",
+                "SettingValue",
+                "Description",
+                "UpdatedBy",
+                "UpdatedAt"
+            )
+
+            SELECT
+                'system.current_period',
+                jsonb_build_object(
+                    'academicYearId', $1::integer,
+                    'ojtSemesterId', $2::integer
+                ),
+                'Current academic year and OJT semester used by system operations',
+                $3,
+                CURRENT_TIMESTAMP
+
+            FROM valid_period
+
+            ON CONFLICT ("SettingKey")
+            DO UPDATE SET
+                "SettingValue" = EXCLUDED."SettingValue",
+                "UpdatedBy" = EXCLUDED."UpdatedBy",
+                "UpdatedAt" = CURRENT_TIMESTAMP
+
+            RETURNING
+                "SettingValue" AS "settingValue",
+                "UpdatedBy" AS "updatedBy",
+                "UpdatedAt" AS "updatedAt"
+        )
+
+        SELECT
+            "settingValue",
+            "updatedBy",
+            "updatedAt"
+        FROM upserted_setting;
+        `,
+        [
+            academicYearId,
+            ojtSemesterId,
+            updatedBy
+        ]
+    );
+
+    const setting = result.rows[0] || null;
+
+    if (!setting) {
+        return null;
+    }
+
+    return {
+        academicYearId:
+            setting.settingValue.academicYearId,
+        ojtSemesterId:
+            setting.settingValue.ojtSemesterId,
+        updatedBy: setting.updatedBy,
+        updatedAt: setting.updatedAt
+    };
+};
+
 module.exports = {
+    getSystemConfig,
+    validateCurrentPeriod,
+    updateSystemConfig,
     getUsers,
     getUserById,
     updateUserStatus,

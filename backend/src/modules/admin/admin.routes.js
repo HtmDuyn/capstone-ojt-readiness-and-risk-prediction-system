@@ -8,8 +8,85 @@ const {
     getUsers,
     getUserById,
     updateUserStatus,
-    updateUser
+    updateUser,
+    getSystemConfig,
+    updateSystemConfig
 } = require("./admin.controller");
+
+
+
+/**
+ * @swagger
+ * /api/admin/system-config:
+ *   get:
+ *     summary: Get system configuration
+ *     description: Get the current academic year, current OJT semester, and available period options. Admin only.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: System configuration retrieved successfully
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Administrator access required
+ *       500:
+ *         description: Unable to retrieve system configuration
+ *   patch:
+ *     summary: Update system configuration
+ *     description: Set the current academic year and OJT semester. The selected OJT semester must belong to the selected academic year. Admin only.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - academicYearId
+ *               - ojtSemesterId
+ *             properties:
+ *               academicYearId:
+ *                 type: integer
+ *                 minimum: 1
+ *                 example: 3
+ *               ojtSemesterId:
+ *                 type: integer
+ *                 minimum: 1
+ *                 example: 2
+ *     responses:
+ *       200:
+ *         description: System configuration updated successfully
+ *       400:
+ *         description: Invalid ID or OJT semester does not belong to the selected academic year
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Administrator access required
+ *       404:
+ *         description: Academic year or OJT semester not found
+ *       409:
+ *         description: Selected period became invalid before update
+ *       500:
+ *         description: Unable to update system configuration
+ */
+
+router.get(
+    "/system-config",
+    authMiddleware,
+    requireAdmin,
+    getSystemConfig
+);
+
+router.patch(
+    "/system-config",
+    authMiddleware,
+    requireAdmin,
+    updateSystemConfig
+);
 
 /**
  * @swagger

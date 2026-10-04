@@ -11,6 +11,52 @@ const db = require("../src/config/database");
 
 const JWT_SECRET = process.env.JWT_SECRET || "ojt-dev-secret";
 
+const getSeedUserByRole = async (roleCode) => {
+    const result = await db.query(
+        `
+        SELECT
+            u."UserID" AS "id",
+            u."Username" AS "username",
+            u."Email" AS "email",
+            u."Status" AS "status",
+            r."RoleCode" AS "roleCode",
+            s."StudentCode" AS "studentCode"
+        FROM "Users" u
+        INNER JOIN "Roles" r
+            ON r."RoleID" = u."RoleID"
+        LEFT JOIN "Students" s
+            ON s."UserID" = u."UserID"
+        WHERE r."RoleCode" = $1
+          AND u."Status" = 'ACTIVE'
+        ORDER BY u."UserID"
+        LIMIT 1;
+        `,
+        [roleCode]
+    );
+
+    const user = result.rows[0] || null;
+
+    assert.ok(
+        user,
+        `Expected an ACTIVE ${roleCode} fixture user in the database.`
+    );
+
+    return user;
+};
+
+const createTokenForUser = (user) =>
+    jwt.sign(
+        {
+            sub: user.id,
+            userId: user.id,
+            username: user.username,
+            roleCode: user.roleCode
+        },
+        JWT_SECRET,
+        { expiresIn: "5m" }
+    );
+
+
 test("GET /api/admin/users returns 401 without token", async () => {
     const response = await request(app)
         .get("/api/admin/users");
@@ -21,16 +67,8 @@ test("GET /api/admin/users returns 401 without token", async () => {
 });
 
 test("GET /api/admin/users returns 403 for non-admin user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 1,
-            userId: 1,
-            username: "student.test",
-            roleCode: "STUDENT"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const studentUser = await getSeedUserByRole("STUDENT");
+    const token = createTokenForUser(studentUser);
 
     const response = await request(app)
         .get("/api/admin/users")
@@ -42,16 +80,8 @@ test("GET /api/admin/users returns 403 for non-admin user", async () => {
 });
 
 test("GET /api/admin/users returns 200 for admin user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .get("/api/admin/users")
@@ -65,11 +95,11 @@ test("GET /api/admin/users returns 200 for admin user", async () => {
     assert.ok(response.body.users.length > 0);
 
     const admin = response.body.users.find(
-        (user) => user.roleCode === "ADMIN"
+        (user) => user.id === adminUser.id
     );
 
     assert.ok(admin);
-    assert.equal(admin.username, "admin.test");
+    assert.equal(admin.username, adminUser.username);
 
     for (const user of response.body.users) {
         assert.equal(
@@ -91,28 +121,23 @@ test("GET /api/admin/users returns 200 for admin user", async () => {
 });
 
 test("GET /api/admin/users/:id returns 200 for existing user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
+    const studentUser = await getSeedUserByRole("STUDENT");
+
+    assert.ok(studentUser.studentCode);
 
     const response = await request(app)
-        .get("/api/admin/users/1")
+        .get(`/api/admin/users/${studentUser.id}`)
         .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
     assert.equal(response.body.success, true);
     assert.equal(response.body.message, "User retrieved successfully");
 
-    assert.equal(response.body.user.id, 1);
-    assert.equal(response.body.user.username, "student.test");
-    assert.equal(response.body.user.studentCode, "SE150000");
+    assert.equal(response.body.user.id, studentUser.id);
+    assert.equal(response.body.user.username, studentUser.username);
+    assert.equal(response.body.user.studentCode, studentUser.studentCode);
 
     assert.equal(
         Object.prototype.hasOwnProperty.call(
@@ -132,16 +157,8 @@ test("GET /api/admin/users/:id returns 200 for existing user", async () => {
 });
 
 test("GET /api/admin/users/:id returns 404 for missing user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .get("/api/admin/users/999999")
@@ -153,16 +170,8 @@ test("GET /api/admin/users/:id returns 404 for missing user", async () => {
 });
 
 test("GET /api/admin/users/:id returns 400 for invalid user id", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .get("/api/admin/users/abc")
@@ -174,42 +183,29 @@ test("GET /api/admin/users/:id returns 400 for invalid user id", async () => {
 });
 
 test("GET /api/admin/users searches by student code", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
+    const studentUser = await getSeedUserByRole("STUDENT");
+
+    assert.ok(studentUser.studentCode);
 
     const response = await request(app)
         .get("/api/admin/users")
         .query({
-            search: "SE150000"
+            search: studentUser.studentCode
         })
         .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
     assert.equal(response.body.success, true);
     assert.equal(response.body.users.length, 1);
-    assert.equal(response.body.users[0].username, "student.test");
-    assert.equal(response.body.users[0].studentCode, "SE150000");
+    assert.equal(response.body.users[0].username, studentUser.username);
+    assert.equal(response.body.users[0].studentCode, studentUser.studentCode);
 });
 
 test("GET /api/admin/users filters by role", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .get("/api/admin/users")
@@ -220,36 +216,35 @@ test("GET /api/admin/users filters by role", async () => {
 
     assert.equal(response.status, 200);
     assert.equal(response.body.success, true);
-    assert.equal(response.body.users.length, 1);
-    assert.equal(response.body.users[0].username, "enterprise.test");
-    assert.equal(response.body.users[0].roleCode, "ENTERPRISE");
+    assert.ok(response.body.users.length > 0);
+
+    for (const user of response.body.users) {
+        assert.equal(user.roleCode, "ENTERPRISE");
+    }
 });
 
 test("GET /api/admin/users supports search and role together", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .get("/api/admin/users")
         .query({
-            search: "test",
+            search: adminUser.username,
             role: "ADMIN"
         })
         .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
     assert.equal(response.body.success, true);
-    assert.equal(response.body.users.length, 1);
-    assert.equal(response.body.users[0].username, "admin.test");
-    assert.equal(response.body.users[0].roleCode, "ADMIN");
+    assert.ok(response.body.users.length > 0);
+    const matchedAdmin = response.body.users.find(
+        (user) => user.id === adminUser.id
+    );
+
+    assert.ok(matchedAdmin);
+    assert.equal(matchedAdmin.username, adminUser.username);
+    assert.equal(matchedAdmin.roleCode, "ADMIN");
 });
 
 test("PATCH /api/admin/users/:id/status returns 401 without token", async () => {
@@ -265,16 +260,8 @@ test("PATCH /api/admin/users/:id/status returns 401 without token", async () => 
 });
 
 test("PATCH /api/admin/users/:id/status returns 403 for non-admin user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 1,
-            userId: 1,
-            username: "student.test",
-            roleCode: "STUDENT"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const studentUser = await getSeedUserByRole("STUDENT");
+    const token = createTokenForUser(studentUser);
 
     const response = await request(app)
         .patch("/api/admin/users/2/status")
@@ -289,16 +276,8 @@ test("PATCH /api/admin/users/:id/status returns 403 for non-admin user", async (
 });
 
 test("PATCH /api/admin/users/:id/status returns 400 for invalid user id", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .patch("/api/admin/users/abc/status")
@@ -313,19 +292,11 @@ test("PATCH /api/admin/users/:id/status returns 400 for invalid user id", async 
 });
 
 test("PATCH /api/admin/users/:id/status returns 400 for invalid status", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
-        .patch("/api/admin/users/1/status")
+        .patch(`/api/admin/users/${adminUser.id}/status`)
         .set("Authorization", `Bearer ${token}`)
         .send({
             status: "DELETED"
@@ -337,16 +308,8 @@ test("PATCH /api/admin/users/:id/status returns 400 for invalid status", async (
 });
 
 test("PATCH /api/admin/users/:id/status returns 404 for missing user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .patch("/api/admin/users/999999/status")
@@ -365,16 +328,8 @@ test("PATCH /api/admin/users/:id/status locks and unlocks account correctly", as
     const email = "__admin_lock_test__@ojt.local";
     const password = "TempLock#12345";
 
-    const adminToken = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const adminToken = createTokenForUser(adminUser);
 
     let userId = null;
 
@@ -539,16 +494,8 @@ test("PATCH /api/admin/users/:id returns 401 without token", async () => {
 });
 
 test("PATCH /api/admin/users/:id returns 403 for non-admin user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 1,
-            userId: 1,
-            username: "student.test",
-            roleCode: "STUDENT"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const studentUser = await getSeedUserByRole("STUDENT");
+    const token = createTokenForUser(studentUser);
 
     const response = await request(app)
         .patch("/api/admin/users/2")
@@ -566,16 +513,8 @@ test("PATCH /api/admin/users/:id returns 403 for non-admin user", async () => {
 });
 
 test("PATCH /api/admin/users/:id returns 400 for invalid user id", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .patch("/api/admin/users/abc")
@@ -590,16 +529,8 @@ test("PATCH /api/admin/users/:id returns 400 for invalid user id", async () => {
 });
 
 test("PATCH /api/admin/users/:id returns 404 for missing user", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
         .patch("/api/admin/users/999999")
@@ -614,19 +545,11 @@ test("PATCH /api/admin/users/:id returns 404 for missing user", async () => {
 });
 
 test("PATCH /api/admin/users/:id returns 400 when no update fields are provided", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
-        .patch("/api/admin/users/1")
+        .patch(`/api/admin/users/${adminUser.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({});
 
@@ -636,22 +559,15 @@ test("PATCH /api/admin/users/:id returns 400 when no update fields are provided"
 });
 
 test("PATCH /api/admin/users/:id rejects duplicate username case-insensitively", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
+    const studentUser = await getSeedUserByRole("STUDENT");
 
     const response = await request(app)
-        .patch("/api/admin/users/1")
+        .patch(`/api/admin/users/${studentUser.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({
-            username: "ADMIN.TEST"
+            username: adminUser.username.toUpperCase()
         });
 
     assert.equal(response.status, 409);
@@ -663,22 +579,17 @@ test("PATCH /api/admin/users/:id rejects duplicate username case-insensitively",
 });
 
 test("PATCH /api/admin/users/:id rejects duplicate email case-insensitively", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
+    const studentUser = await getSeedUserByRole("STUDENT");
+
+    assert.ok(adminUser.email);
 
     const response = await request(app)
-        .patch("/api/admin/users/1")
+        .patch(`/api/admin/users/${studentUser.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({
-            email: "ADMIN.TEST@OJT.LOCAL"
+            email: adminUser.email.toUpperCase()
         });
 
     assert.equal(response.status, 409);
@@ -690,19 +601,11 @@ test("PATCH /api/admin/users/:id rejects duplicate email case-insensitively", as
 });
 
 test("PATCH /api/admin/users/:id rejects role that does not exist", async () => {
-    const token = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const token = createTokenForUser(adminUser);
 
     const response = await request(app)
-        .patch("/api/admin/users/1")
+        .patch(`/api/admin/users/${adminUser.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({
             roleCode: "ROLE_DOES_NOT_EXIST"
@@ -723,16 +626,8 @@ test("PATCH /api/admin/users/:id supports partial and full account updates", asy
     const updatedEmail =
         "__admin_update_auto_changed__@ojt.local";
 
-    const adminToken = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const adminToken = createTokenForUser(adminUser);
 
     try {
         await db.query(
@@ -921,16 +816,8 @@ test("changing an admin role immediately removes admin access from an old JWT", 
     const username = "__stale_admin_role_test__";
     const email = "__stale_admin_role_test__@ojt.local";
 
-    const stableAdminToken = jwt.sign(
-        {
-            sub: 5,
-            userId: 5,
-            username: "admin.test",
-            roleCode: "ADMIN"
-        },
-        JWT_SECRET,
-        { expiresIn: "5m" }
-    );
+    const adminUser = await getSeedUserByRole("ADMIN");
+    const stableAdminToken = createTokenForUser(adminUser);
 
     try {
         await db.query(
