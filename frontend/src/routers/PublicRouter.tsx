@@ -19,7 +19,6 @@ import EducationGraduationReview from "@/pages/education/EducationGraduationRevi
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
-import AdminDataSync from "@/pages/admin/AdminDataSync";
 import AdminAiConfig from "@/pages/admin/AdminAiConfig";
 import AdminSettings from "@/pages/admin/AdminSettings";
 import type { UserRole } from "@/types/auth.types";
@@ -182,8 +181,6 @@ export const router = createBrowserRouter([
                   <AdminUsers />
                 ) : item.path === "/admin/metrics" ? (
                   <AdminSystemMetrics />
-                ) : item.path === "/admin/data-sync" ? (
-                  <AdminDataSync />
                 ) : item.path === "/admin/ai-config" ? (
                   <AdminAiConfig />
                 ) : item.path === "/admin/settings" ? (
