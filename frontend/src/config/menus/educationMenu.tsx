@@ -11,7 +11,6 @@ import {
   BookOpen,
   Upload,
   Users,
-  ClipboardCheck,
   Activity,
 } from 'lucide-react';
 
@@ -112,18 +111,6 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
           title: 'Theo dõi Tiến độ Học tập',
           description:
             'Theo dõi tiến độ học tập của sinh viên phục vụ quá trình OJT.',
-          badge: 'Quản lý sinh viên',
-        },
-      },
-      {
-        id: 'ojt-eligibility',
-        label: 'Kiểm tra điều kiện OJT',
-        path: '/education/ojt-eligibility',
-        icon: <ClipboardCheck size={20} />,
-        banner: {
-          title: 'Kiểm tra Điều kiện OJT',
-          description:
-            'Kiểm tra tình trạng đủ hoặc chưa đủ điều kiện OJT của sinh viên.',
           badge: 'Quản lý sinh viên',
         },
       },

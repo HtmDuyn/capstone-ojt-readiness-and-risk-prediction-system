@@ -16,7 +16,6 @@ import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
 import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
 
 import EducationDashboard from "@/pages/education/EducationDashboard";
-import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
 import EducationStudentImport from "@/pages/education/EducationStudentImport";
@@ -411,11 +410,6 @@ export const router = createBrowserRouter([
           {
             path: "/education/student-progress",
             element: <EducationStudentProgress />,
-          },
-
-          {
-            path: "/education/ojt-eligibility",
-            element: <EducationOjtEligibility />,
           },
 
           {
