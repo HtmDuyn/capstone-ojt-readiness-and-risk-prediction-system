@@ -445,7 +445,171 @@ const updateSystemConfig = async ({
     };
 };
 
+
+const getNotificationTemplates = async () => {
+    const result = await db.query(
+        `
+        SELECT
+            t."TemplateID" AS "id",
+            t."TemplateCode" AS "templateCode",
+            t."Subject" AS "subject",
+            t."BodyTemplate" AS "bodyTemplate",
+            t."Channel" AS "channel",
+            COUNT(n."NotificationID")::integer AS "notificationCount"
+        FROM "NotificationTemplates" t
+        LEFT JOIN "Notifications" n
+            ON n."TemplateID" = t."TemplateID"
+        GROUP BY
+            t."TemplateID",
+            t."TemplateCode",
+            t."Subject",
+            t."BodyTemplate",
+            t."Channel"
+        ORDER BY
+            t."TemplateID";
+        `
+    );
+
+    return result.rows;
+};
+
+const getNotificationTemplateById = async (templateId) => {
+    const result = await db.query(
+        `
+        SELECT
+            t."TemplateID" AS "id",
+            t."TemplateCode" AS "templateCode",
+            t."Subject" AS "subject",
+            t."BodyTemplate" AS "bodyTemplate",
+            t."Channel" AS "channel",
+            COUNT(n."NotificationID")::integer AS "notificationCount"
+        FROM "NotificationTemplates" t
+        LEFT JOIN "Notifications" n
+            ON n."TemplateID" = t."TemplateID"
+        WHERE t."TemplateID" = $1
+        GROUP BY
+            t."TemplateID",
+            t."TemplateCode",
+            t."Subject",
+            t."BodyTemplate",
+            t."Channel";
+        `,
+        [templateId]
+    );
+
+    return result.rows[0] || null;
+};
+
+
+const validateNotificationTemplateCode = async (templateCode) => {
+    const result = await db.query(
+        `
+        SELECT
+            EXISTS (
+                SELECT 1
+                FROM "NotificationTemplates"
+                WHERE UPPER("TemplateCode") = UPPER($1)
+            ) AS "templateCodeExists";
+        `,
+        [templateCode]
+    );
+
+    return result.rows[0];
+};
+
+
+const createNotificationTemplate = async ({
+    templateCode,
+    subject,
+    bodyTemplate,
+    channel
+}) => {
+    const result = await db.query(
+        `
+        INSERT INTO "NotificationTemplates" (
+            "TemplateCode",
+            "Subject",
+            "BodyTemplate",
+            "Channel"
+        )
+        VALUES ($1, $2, $3, $4)
+        RETURNING
+            "TemplateID" AS "id",
+            "TemplateCode" AS "templateCode",
+            "Subject" AS "subject",
+            "BodyTemplate" AS "bodyTemplate",
+            "Channel" AS "channel",
+            0::integer AS "notificationCount";
+        `,
+        [
+            templateCode,
+            subject,
+            bodyTemplate,
+            channel
+        ]
+    );
+
+    return result.rows[0];
+};
+
+
+const updateNotificationTemplate = async ({
+    templateId,
+    subject,
+    bodyTemplate,
+    channel
+}) => {
+    const result = await db.query(
+        `
+        WITH updated_template AS (
+            UPDATE "NotificationTemplates"
+            SET
+                "Subject" = $2,
+                "BodyTemplate" = $3,
+                "Channel" = $4
+            WHERE "TemplateID" = $1
+            RETURNING
+                "TemplateID" AS "id",
+                "TemplateCode" AS "templateCode",
+                "Subject" AS "subject",
+                "BodyTemplate" AS "bodyTemplate",
+                "Channel" AS "channel"
+        )
+
+        SELECT
+            t."id",
+            t."templateCode",
+            t."subject",
+            t."bodyTemplate",
+            t."channel",
+            COUNT(n."NotificationID")::integer AS "notificationCount"
+        FROM updated_template t
+        LEFT JOIN "Notifications" n
+            ON n."TemplateID" = t."id"
+        GROUP BY
+            t."id",
+            t."templateCode",
+            t."subject",
+            t."bodyTemplate",
+            t."channel";
+        `,
+        [
+            templateId,
+            subject,
+            bodyTemplate,
+            channel
+        ]
+    );
+
+    return result.rows[0] || null;
+};
+
 module.exports = {
+    updateNotificationTemplate,
+    createNotificationTemplate,
+    validateNotificationTemplateCode,
+    getNotificationTemplates,
+    getNotificationTemplateById,
     getSystemConfig,
     validateCurrentPeriod,
     updateSystemConfig,

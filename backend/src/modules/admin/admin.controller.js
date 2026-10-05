@@ -4,6 +4,11 @@ const {
     getSystemConfig: getSystemConfigService,
     validateCurrentPeriod: validateCurrentPeriodService,
     updateSystemConfig: updateSystemConfigService,
+    getNotificationTemplates: getNotificationTemplatesService,
+    getNotificationTemplateById: getNotificationTemplateByIdService,
+    validateNotificationTemplateCode: validateNotificationTemplateCodeService,
+    createNotificationTemplate: createNotificationTemplateService,
+    updateNotificationTemplate: updateNotificationTemplateService,
     updateUserStatus: updateUserStatusService,
     validateUserUpdate: validateUserUpdateService,
     updateUser: updateUserService
@@ -479,7 +484,446 @@ const updateSystemConfig = async (req, res) => {
     }
 };
 
+
+const getNotificationTemplates = async (req, res) => {
+    try {
+        const templates =
+            await getNotificationTemplatesService();
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "Notification templates retrieved successfully.",
+            templates
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            errorCode:
+                "ADMIN_NOTIFICATION_TEMPLATES_ERROR",
+            message:
+                "Unable to retrieve notification templates.",
+            details:
+                error && error.message
+                    ? error.message
+                    : "Unknown error"
+        });
+    }
+};
+
+
+const getNotificationTemplateById = async (req, res) => {
+    try {
+        const templateId = Number(req.params.id);
+
+        if (
+            !Number.isInteger(templateId) ||
+            templateId <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "INVALID_TEMPLATE_ID",
+                message:
+                    "Notification template ID must be a positive integer."
+            });
+        }
+
+        const template =
+            await getNotificationTemplateByIdService(
+                templateId
+            );
+
+        if (!template) {
+            return res.status(404).json({
+                success: false,
+                errorCode: "NOTIFICATION_TEMPLATE_NOT_FOUND",
+                message:
+                    "Notification template not found."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "Notification template retrieved successfully.",
+            template
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            errorCode:
+                "ADMIN_NOTIFICATION_TEMPLATE_ERROR",
+            message:
+                "Unable to retrieve notification template.",
+            details:
+                error && error.message
+                    ? error.message
+                    : "Unknown error"
+        });
+    }
+};
+
+
+const createNotificationTemplate = async (req, res) => {
+    try {
+        const body = req.body || {};
+
+        const templateCode =
+            typeof body.templateCode === "string"
+                ? body.templateCode.trim().toUpperCase()
+                : "";
+
+        if (!templateCode) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "INVALID_TEMPLATE_CODE",
+                message: "Template code is required."
+            });
+        }
+
+        if (templateCode.length > 30) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "TEMPLATE_CODE_TOO_LONG",
+                message:
+                    "Template code must not exceed 30 characters."
+            });
+        }
+
+        const channel =
+            typeof body.channel === "string"
+                ? body.channel.trim().toUpperCase()
+                : "";
+
+        if (!["EMAIL", "IN_APP"].includes(channel)) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "INVALID_TEMPLATE_CHANNEL",
+                message:
+                    "Channel must be either EMAIL or IN_APP."
+            });
+        }
+
+        let subject = null;
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                body,
+                "subject"
+            )
+        ) {
+            if (
+                body.subject !== null &&
+                typeof body.subject !== "string"
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode: "INVALID_TEMPLATE_SUBJECT",
+                    message:
+                        "Subject must be a string or null."
+                });
+            }
+
+            subject =
+                typeof body.subject === "string"
+                    ? body.subject.trim()
+                    : null;
+
+            if (
+                subject !== null &&
+                subject.length > 200
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode: "TEMPLATE_SUBJECT_TOO_LONG",
+                    message:
+                        "Subject must not exceed 200 characters."
+                });
+            }
+        }
+
+        let bodyTemplate = null;
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                body,
+                "bodyTemplate"
+            )
+        ) {
+            if (
+                body.bodyTemplate !== null &&
+                typeof body.bodyTemplate !== "string"
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode: "INVALID_BODY_TEMPLATE",
+                    message:
+                        "Body template must be a string or null."
+                });
+            }
+
+            bodyTemplate = body.bodyTemplate;
+        }
+
+        const validation =
+            await validateNotificationTemplateCodeService(
+                templateCode
+            );
+
+        if (validation.templateCodeExists) {
+            return res.status(409).json({
+                success: false,
+                errorCode: "TEMPLATE_CODE_ALREADY_EXISTS",
+                message:
+                    "Notification template code already exists."
+            });
+        }
+
+        const template =
+            await createNotificationTemplateService({
+                templateCode,
+                subject,
+                bodyTemplate,
+                channel
+            });
+
+        return res.status(201).json({
+            success: true,
+            message:
+                "Notification template created successfully.",
+            template
+        });
+    } catch (error) {
+        if (error && error.code === "23505") {
+            return res.status(409).json({
+                success: false,
+                errorCode: "TEMPLATE_CODE_ALREADY_EXISTS",
+                message:
+                    "Notification template code already exists."
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            errorCode:
+                "ADMIN_NOTIFICATION_TEMPLATE_CREATE_ERROR",
+            message:
+                "Unable to create notification template.",
+            details:
+                error && error.message
+                    ? error.message
+                    : "Unknown error"
+        });
+    }
+};
+
+
+const updateNotificationTemplate = async (req, res) => {
+    try {
+        const templateId = Number(req.params.id);
+
+        if (
+            !Number.isInteger(templateId) ||
+            templateId <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "INVALID_TEMPLATE_ID",
+                message:
+                    "Notification template ID must be a positive integer."
+            });
+        }
+
+        const body = req.body || {};
+
+        if (
+            Object.prototype.hasOwnProperty.call(
+                body,
+                "templateCode"
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "TEMPLATE_CODE_IMMUTABLE",
+                message:
+                    "Template code cannot be changed."
+            });
+        }
+
+        const hasSubject =
+            Object.prototype.hasOwnProperty.call(
+                body,
+                "subject"
+            );
+
+        const hasBodyTemplate =
+            Object.prototype.hasOwnProperty.call(
+                body,
+                "bodyTemplate"
+            );
+
+        const hasChannel =
+            Object.prototype.hasOwnProperty.call(
+                body,
+                "channel"
+            );
+
+        if (
+            !hasSubject &&
+            !hasBodyTemplate &&
+            !hasChannel
+        ) {
+            return res.status(400).json({
+                success: false,
+                errorCode: "NO_TEMPLATE_UPDATE_FIELDS",
+                message:
+                    "At least one editable template field must be provided."
+            });
+        }
+
+        const currentTemplate =
+            await getNotificationTemplateByIdService(
+                templateId
+            );
+
+        if (!currentTemplate) {
+            return res.status(404).json({
+                success: false,
+                errorCode:
+                    "NOTIFICATION_TEMPLATE_NOT_FOUND",
+                message:
+                    "Notification template not found."
+            });
+        }
+
+        let subject = currentTemplate.subject;
+
+        if (hasSubject) {
+            if (
+                body.subject !== null &&
+                typeof body.subject !== "string"
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode:
+                        "INVALID_TEMPLATE_SUBJECT",
+                    message:
+                        "Subject must be a string or null."
+                });
+            }
+
+            subject =
+                typeof body.subject === "string"
+                    ? body.subject.trim()
+                    : null;
+
+            if (
+                subject !== null &&
+                subject.length > 200
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode:
+                        "TEMPLATE_SUBJECT_TOO_LONG",
+                    message:
+                        "Subject must not exceed 200 characters."
+                });
+            }
+        }
+
+        let bodyTemplate =
+            currentTemplate.bodyTemplate;
+
+        if (hasBodyTemplate) {
+            if (
+                body.bodyTemplate !== null &&
+                typeof body.bodyTemplate !== "string"
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode:
+                        "INVALID_BODY_TEMPLATE",
+                    message:
+                        "Body template must be a string or null."
+                });
+            }
+
+            bodyTemplate = body.bodyTemplate;
+        }
+
+        let channel = currentTemplate.channel;
+
+        if (hasChannel) {
+            if (typeof body.channel !== "string") {
+                return res.status(400).json({
+                    success: false,
+                    errorCode:
+                        "INVALID_TEMPLATE_CHANNEL",
+                    message:
+                        "Channel must be either EMAIL or IN_APP."
+                });
+            }
+
+            channel =
+                body.channel.trim().toUpperCase();
+
+            if (
+                !["EMAIL", "IN_APP"].includes(channel)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    errorCode:
+                        "INVALID_TEMPLATE_CHANNEL",
+                    message:
+                        "Channel must be either EMAIL or IN_APP."
+                });
+            }
+        }
+
+        const template =
+            await updateNotificationTemplateService({
+                templateId,
+                subject,
+                bodyTemplate,
+                channel
+            });
+
+        if (!template) {
+            return res.status(404).json({
+                success: false,
+                errorCode:
+                    "NOTIFICATION_TEMPLATE_NOT_FOUND",
+                message:
+                    "Notification template not found."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "Notification template updated successfully.",
+            template
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            errorCode:
+                "ADMIN_NOTIFICATION_TEMPLATE_UPDATE_ERROR",
+            message:
+                "Unable to update notification template.",
+            details:
+                error && error.message
+                    ? error.message
+                    : "Unknown error"
+        });
+    }
+};
+
 module.exports = {
+    updateNotificationTemplate,
+    createNotificationTemplate,
+    getNotificationTemplateById,
+    getNotificationTemplates,
     getSystemConfig,
     updateSystemConfig,
     getUsers,

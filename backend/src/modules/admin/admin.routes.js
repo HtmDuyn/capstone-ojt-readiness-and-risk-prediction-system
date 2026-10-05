@@ -10,7 +10,11 @@ const {
     updateUserStatus,
     updateUser,
     getSystemConfig,
-    updateSystemConfig
+    updateSystemConfig,
+    getNotificationTemplates,
+    getNotificationTemplateById,
+    createNotificationTemplate,
+    updateNotificationTemplate
 } = require("./admin.controller");
 
 
@@ -86,6 +90,177 @@ router.patch(
     authMiddleware,
     requireAdmin,
     updateSystemConfig
+);
+
+/**
+ * @swagger
+ * /api/admin/notification-templates:
+ *   get:
+ *     summary: Get notification templates
+ *     description: Get all notification templates with their notification usage counts. Admin only.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Notification templates retrieved successfully
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Administrator access required
+ *       500:
+ *         description: Unable to retrieve notification templates
+ *   post:
+ *     summary: Create notification template
+ *     description: Create a new notification template. Template code is normalized to uppercase and must be unique. Admin only.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - templateCode
+ *               - channel
+ *             properties:
+ *               templateCode:
+ *                 type: string
+ *                 maxLength: 30
+ *                 example: OJT_DEADLINE
+ *               subject:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 200
+ *                 example: OJT deadline reminder
+ *               bodyTemplate:
+ *                 type: string
+ *                 nullable: true
+ *                 example: OJT registration closes on {{deadline}}.
+ *               channel:
+ *                 type: string
+ *                 enum: [EMAIL, IN_APP]
+ *                 example: EMAIL
+ *     responses:
+ *       201:
+ *         description: Notification template created successfully
+ *       400:
+ *         description: Invalid template data
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Administrator access required
+ *       409:
+ *         description: Template code already exists
+ *       500:
+ *         description: Unable to create notification template
+ */
+
+/**
+ * @swagger
+ * /api/admin/notification-templates/{id}:
+ *   get:
+ *     summary: Get notification template by ID
+ *     description: Get one notification template and its notification usage count. Admin only.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     responses:
+ *       200:
+ *         description: Notification template retrieved successfully
+ *       400:
+ *         description: Invalid notification template ID
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Administrator access required
+ *       404:
+ *         description: Notification template not found
+ *       500:
+ *         description: Unable to retrieve notification template
+ *   patch:
+ *     summary: Update notification template
+ *     description: Update subject, body template, or channel. Template code is immutable. Admin only.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               subject:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 200
+ *                 example: Updated reminder subject
+ *               bodyTemplate:
+ *                 type: string
+ *                 nullable: true
+ *                 example: Updated notification body for {{value}}.
+ *               channel:
+ *                 type: string
+ *                 enum: [EMAIL, IN_APP]
+ *                 example: IN_APP
+ *     responses:
+ *       200:
+ *         description: Notification template updated successfully
+ *       400:
+ *         description: Invalid ID, invalid editable field, or attempt to change template code
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Administrator access required
+ *       404:
+ *         description: Notification template not found
+ *       500:
+ *         description: Unable to update notification template
+ */
+
+router.get(
+    "/notification-templates",
+    authMiddleware,
+    requireAdmin,
+    getNotificationTemplates
+);
+
+router.get(
+    "/notification-templates/:id",
+    authMiddleware,
+    requireAdmin,
+    getNotificationTemplateById
+);
+
+router.post(
+    "/notification-templates",
+    authMiddleware,
+    requireAdmin,
+    createNotificationTemplate
+);
+
+router.patch(
+    "/notification-templates/:id",
+    authMiddleware,
+    requireAdmin,
+    updateNotificationTemplate
 );
 
 /**
