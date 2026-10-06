@@ -32,13 +32,13 @@ const LeftPanel: React.FC<LeftPanelProps> = () => {
       <div className="relative z-10 flex items-center justify-between">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 lg:w-13 lg:h-13 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md shadow-orange-500/30 border border-white/80">
-            <span className="text-white font-black text-base lg:text-lg tracking-wider font-outfit">FPT</span>
+            <span className="text-white font-black text-base lg:text-lg tracking-wider font-inter">FPT</span>
           </div>
           <div>
-            <h4 className="text-sm lg:text-base font-extrabold uppercase tracking-widest text-orange-950 font-cinematic">
+            <h4 className="text-sm lg:text-base font-extrabold uppercase tracking-widest text-orange-950 font-inter">
               FPT University
             </h4>
-            <p className="text-xs text-gray-600 font-semibold font-outfit">OJT Management System</p>
+            <p className="text-xs text-gray-600 font-semibold font-inter">OJT Management System</p>
           </div>
         </div>
       </div>
@@ -47,19 +47,19 @@ const LeftPanel: React.FC<LeftPanelProps> = () => {
       <div className="relative z-10 my-auto py-4 lg:py-6 max-w-[72%]">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-orange-200/70 shadow-2xs mb-4">
           <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping flex-shrink-0" />
-          <span className="text-[11px] sm:text-xs font-extrabold text-orange-950 tracking-wider font-outfit uppercase">
+          <span className="text-[11px] sm:text-xs font-bold text-orange-950 tracking-wide font-inter uppercase">
             Hệ thống quản lý OJT tích hợp AI
           </span>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl lg:text-[2.25rem] font-black font-outfit text-slate-950 leading-[1.2] mb-3 tracking-tight">
+        <h1 className="text-2xl sm:text-3xl lg:text-[2.25rem] font-black font-inter text-slate-950 leading-[1.2] mb-3 tracking-tight">
           OJT Readiness & <br />
-          <span className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 bg-clip-text text-transparent font-outfit">
+          <span className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 bg-clip-text text-transparent font-inter">
             Risk Prediction System
           </span>
         </h1>
 
-        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-outfit mt-3 font-medium">
+        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-inter mt-3 font-medium">
           Giải pháp toàn diện kết nối <strong className="font-bold text-orange-950">Sinh viên — Nhà trường — Doanh nghiệp</strong>. 
           Dự báo rủi ro thực tập và cá nhân hóa lộ trình phát triển.
         </p>

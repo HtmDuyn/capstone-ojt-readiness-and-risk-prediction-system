@@ -1,21 +1,35 @@
 import API from './api';
 
-// Đây là ví dụ về cách dùng API (axios instance) đã tạo để gọi backend
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  token: string;
+}
+
+export interface CurrentUserResponse {
+  success: boolean;
+  message: string;
+  user: {
+    id: number;
+    username: string;
+    email: string;
+    fullName: string;
+    status: string;
+    roleCode: string | null;
+    roleName: string | null;
+  };
+}
 
 export const authService = {
-  // Ví dụ đăng nhập
-  login: async (credentials: { username?: string; password?: string; email?: string }) => {
-    const response = await API.post('/auth/login', credentials);
-    // Nếu có token, bạn có thể lưu ở đây hoặc ở component
-    // if (response.data.token) {
-    //   localStorage.setItem('token', response.data.token);
-    // }
+  login: async (credentials: { email: string; password: string }) => {
+    const response = await API.post<LoginResponse>('/auth/login', credentials);
     return response.data;
   },
 
-  // Ví dụ lấy thông tin profile (cần token)
-  getProfile: async () => {
-    const response = await API.get('/auth/profile');
+  getCurrentUser: async (token: string) => {
+    const response = await API.get<CurrentUserResponse>('/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   },
 };
