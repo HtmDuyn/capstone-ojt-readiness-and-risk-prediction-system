@@ -1,19 +1,25 @@
-import { Router } from "express";
+import {
+  Router,
+} from "express";
 
-import { authenticate } from "../../middleware/authenticate";
+import {
+  authenticate,
+} from "../../middleware/authenticate";
 
 import {
   getCurrentUser,
   login,
+  logout,
 } from "./auth.controller";
 
-const router = Router();
+const router =
+  Router();
 
 /**
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Login with username/email and password
+ *     summary: Login with email and password
  *     tags:
  *       - Auth
  *     requestBody:
@@ -21,27 +27,32 @@ const router = Router();
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - username
- *               - password
- *             properties:
- *               username:
- *                 type: string
- *                 example: student01
- *               password:
- *                 type: string
- *                 format: password
- *                 example: password123
+ *             $ref: '#/components/schemas/LoginRequest'
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
  *       400:
  *         description: Missing username or password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Account inactive or locked
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post(
   "/login",
@@ -60,17 +71,63 @@ router.post(
  *     responses:
  *       200:
  *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CurrentUserResponse'
  *       401:
- *         description: Invalid or expired token
+ *         description: Invalid, expired or revoked token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Account inactive or locked
- *       404:
- *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get(
   "/me",
   authenticate,
   getCurrentUser,
+);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout current session
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Logout successful
+ *       401:
+ *         description: Invalid, expired or revoked token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post(
+  "/logout",
+  authenticate,
+  logout,
 );
 
 export default router;

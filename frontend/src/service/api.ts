@@ -1,7 +1,8 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-// Lấy base URL từ biến môi trường Vite, nếu không có thì dùng mặc định (thay đổi port/api theo backend của bạn)
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const baseURL =
+  import.meta.env.VITE_API_URL ||
+  'https://capstone-ojt-readiness-and-risk.onrender.com/api';
 
 const API = axios.create({
   baseURL,
@@ -13,8 +14,13 @@ const API = axios.create({
 // Request Interceptor: Chạy trước khi gửi request (ví dụ: đính kèm token)
 API.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('token');
-    if (token && config.headers) {
+    const token = localStorage.getItem('ojt_auth_token');
+    if (
+      config.url !== '/auth/login' &&
+      token &&
+      config.headers &&
+      !config.headers.Authorization
+    ) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
