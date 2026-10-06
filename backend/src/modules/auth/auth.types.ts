@@ -1,5 +1,12 @@
 import type { JwtPayload } from "jsonwebtoken";
 
+export type RoleCode =
+  | "ADMIN"
+  | "ACADEMIC"
+  | "OJT_COORD"
+  | "STUDENT"
+  | "ENTERPRISE";
+
 export interface AuthUserRecord {
   id: number;
   username: string;
@@ -7,7 +14,7 @@ export interface AuthUserRecord {
   full_name: string;
   status: string;
   password_hash: string;
-  role_code: string | null;
+  role_code: RoleCode | null;
   role_name: string | null;
 }
 
@@ -24,6 +31,6 @@ export interface AuthError extends Error {
 export interface AuthTokenPayload extends JwtPayload {
   userId: number;
   username: string;
-  roleCode: string | null;
+  roleCode: RoleCode | null;
   sessionId: string;
 }

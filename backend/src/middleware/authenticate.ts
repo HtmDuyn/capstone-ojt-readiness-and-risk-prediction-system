@@ -11,6 +11,10 @@ import {
 } from "../config/auth";
 
 import {
+  findById,
+} from "../modules/auth/auth.repository";
+
+import {
   findActiveSessionById,
 } from "../modules/auth/session.repository";
 
@@ -28,9 +32,13 @@ export const authenticate = async (
   next: NextFunction,
 ): Promise<void> => {
   const authorization =
-    req.headers.authorization ||
-    "";
+    req.headers.authorization ?? "";
 
+  /*
+   * Authorization header phải có:
+   *
+   * Bearer <token>
+   */
   if (
     !authorization.startsWith(
       "Bearer ",
@@ -49,6 +57,9 @@ export const authenticate = async (
     return;
   }
 
+  /*
+   * Lấy JWT.
+   */
   const token =
     authorization
       .slice(7)
@@ -69,6 +80,11 @@ export const authenticate = async (
   }
 
   try {
+    /*
+     * ==============================
+     * 1. VERIFY JWT
+     * ==============================
+     */
     const decoded =
       jwt.verify(
         token,
@@ -95,6 +111,12 @@ export const authenticate = async (
     const payload =
       decoded as AuthTokenPayload;
 
+    /*
+     * Token bắt buộc phải chứa:
+     *
+     * userId
+     * sessionId
+     */
     if (
       !payload.userId ||
       !payload.sessionId
@@ -113,13 +135,24 @@ export const authenticate = async (
     }
 
     /*
-     * Kiểm tra session
+     * ==============================
+     * 2. CHECK SESSION
+     * ==============================
      */
     const session =
       await findActiveSessionById(
         payload.sessionId,
       );
 
+    /*
+     * Session:
+     *
+     * - không tồn tại
+     * - đã revoke
+     * - đã hết hạn
+     *
+     * đều không được phép tiếp tục.
+     */
     if (!session) {
       res.status(401).json({
         success: false,
@@ -135,7 +168,12 @@ export const authenticate = async (
     }
 
     /*
-     * Kiểm tra session có đúng user hay không.
+     * ==============================
+     * 3. SESSION OWNERSHIP
+     * ==============================
+     *
+     * Session phải thuộc đúng user
+     * trong JWT.
      */
     if (
       session.user_id !==
@@ -155,8 +193,11 @@ export const authenticate = async (
     }
 
     /*
-     * Kiểm tra token hiện tại
-     * có đúng với token của session hay không.
+     * ==============================
+     * 4. CHECK TOKEN HASH
+     * ==============================
+     *
+     * Database chỉ lưu SHA-256 token.
      */
     const currentTokenHash =
       hashToken(token);
@@ -178,14 +219,94 @@ export const authenticate = async (
       return;
     }
 
-    req.user =
-      payload;
+    /*
+     * ==============================
+     * 5. GET CURRENT USER FROM DB
+     * ==============================
+     *
+     * Không hoàn toàn tin status / role
+     * được lưu trong JWT.
+     *
+     * Role và status có thể đã thay đổi
+     * sau khi token được tạo.
+     */
+    const currentUser =
+      await findById(
+        payload.userId,
+      );
+
+    if (!currentUser) {
+      res.status(401).json({
+        success: false,
+
+        errorCode:
+          "USER_NOT_FOUND",
+
+        message:
+          "Authenticated user no longer exists.",
+      });
+
+      return;
+    }
+
+    /*
+     * ==============================
+     * 6. CHECK USER STATUS
+     * ==============================
+     */
+    if (
+      currentUser.status
+        ?.toUpperCase() !==
+      "ACTIVE"
+    ) {
+      res.status(403).json({
+        success: false,
+
+        errorCode:
+          "ACCOUNT_INACTIVE",
+
+        message:
+          "This account is currently inactive or locked.",
+      });
+
+      return;
+    }
+
+    /*
+     * ==============================
+     * 7. SET CURRENT USER
+     * ==============================
+     *
+     * roleCode lấy từ database hiện tại,
+     * không dùng role cũ trong JWT.
+     */
+    req.user = {
+      ...payload,
+
+      userId:
+        currentUser.id,
+
+      username:
+        currentUser.username,
+
+      roleCode:
+        currentUser.role_code,
+
+      sessionId:
+        payload.sessionId,
+    };
 
     req.token =
       token;
 
+    /*
+     * Authentication thành công.
+     */
     next();
   } catch (error) {
+    /*
+     * JWT hết hạn.
+     */
     const expired =
       error instanceof
       jwt.TokenExpiredError;
