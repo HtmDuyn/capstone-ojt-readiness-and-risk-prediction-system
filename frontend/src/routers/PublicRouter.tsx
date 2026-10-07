@@ -279,31 +279,21 @@ export const router = createBrowserRouter([
      PUBLIC / GUEST
      ======================================================= */
 
-  {
-    element: <GuestRoute />,
+{
+  element: <GuestRoute />,
 
-    children: [
-      {
-        index: true,
-        element: (
-          <Navigate
-            to="/login"
-            replace
-          />
-        ),
-      },
+  children: [
+    {
+      index: true,
+      element: <Navigate to="/login" replace />,
+    },
 
-      {
-        path: "/login",
-        element: <LoginPage />,
-      },
-
-      {
-        path: "/register",
-        element: <LoginPage />,
-      },
-    ],
-  },
+    {
+      path: "/login",
+      element: <LoginPage />,
+    },
+  ],
+},
 
   /* =======================================================
      STUDENT
