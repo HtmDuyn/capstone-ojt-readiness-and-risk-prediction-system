@@ -1,3 +1,4 @@
+import { academicAlertEmailIsCurrent } from '../modules/academic-reporting/notification.service';
 import nodemailer from 'nodemailer';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
@@ -58,6 +59,10 @@ export async function deliverEmails() {
       if (!row.rows.length) break;
       const e = row.rows[0];
       try {
+        if (e.Kind === 'ACADEMIC_ALERT' && !(await academicAlertEmailIsCurrent(e.EmailID))) {
+          await query(`UPDATE "EmailOutbox" SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL WHERE "EmailID"=$1`,[e.EmailID]);
+          continue;
+        }
         const message = decryptEmail(e.EncryptedPayload);
         const delivery = await transport.sendMail({ from: process.env.SMTP_FROM, to: e.Recipient, ...message, messageId: `<ojt-${e.EmailID}@${new URL(process.env.FRONTEND_LOGIN_URL!).hostname}>` });
         if (!delivery.accepted.length) throw new Error('SMTP_REJECTED');

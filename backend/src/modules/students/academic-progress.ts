@@ -31,7 +31,7 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
       normal.set(key,r);requirements.push(r);
     } else {
       const allowed=options.filter(o=>o.ProgramCourseID===c.ProgramCourseID);
-      const choices=[...new Set<number>(allowed.map(o=>canonical(o.CourseID)).filter(id=>id>0))];
+      const choices=[...new Set<number>(allowed.map(o=>canonical(o.CourseID)).filter(id=>id>0))].sort((a,b)=>a-b);
       let credits=c.Credits===null?null:Number(c.Credits);
       if (credits===null) {
         const weights=new Set(allowed.map(o=>o.Credits===null?null:Number(o.Credits)));
