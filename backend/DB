@@ -5258,35 +5258,35 @@ FROM (
     VALUES
     (
         'admin01',
-        '2y10$Bex5JjAlj0jPPI5ElerfQusUJYu10eWrgyphDOAbKS1yKV6zf.Psy',
+        '$2b$12$LQR3NnTiMLm3pELI8m/M1.XQ.YdWPSqIBH9JwQHVKvim5Ita.AorC',
         'admin@ojtrpa.edu.vn',
         'System Administrator',
         'ADMIN'
     ),
     (
         'academic01',
-        '2y10$qsneZC1y9kxIs9tcakssEej1q8tY9b3QhlJBW077ZTrrs6wQuPGCi',
+        '$2b$12$pFxlemy2lPqCnEuhONH4WOJrcuSqYR4BgQ6fGE0xyM2./B9MPMWF6',
         'academic@ojtrpa.edu.vn',
         'Academic Staff',
         'ACADEMIC'
     ),
     (
         'ojt.coord01',
-        '2y10$2LdeFQSGhs9rkdb7fuJz8O6coF3Bk3bl48eLLLg3T4HCC4vZWE7BC',
+        '$2b$12$7ju31R8JRLro8U1ZA3WzoOvJvJD1yXSY1nuzw/Gan9OI84tVNwa62',
         'ojt.coord@ojtrpa.edu.vn',
         'OJT Coordinator',
         'OJT_COORD'
     ),
     (
         'student01',
-        '2y10$QFPit7wlA2stAuDev7TmwuaNKBTLsiKJWHoH4kd0U6NuNQevW0bS.',
+        '$2b$12$/7w0sgql7uF34ubVsXY4eOztDZ3XG7jUXXE/qhDOVPz3CU/HsLlRm',
         'student01@student.edu.vn',
         'Student 01',
         'STUDENT'
     ),
     (
         'enterprise01',
-        '2y10$IXNmL9ebKzAC5Lg7QnCvyupTqYcp7z5TbhAKQevhtlAgT3h0ryMHC',
+        '$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii',
         'hr@techviet.example',
         'TechViet HR',
         'ENTERPRISE'
