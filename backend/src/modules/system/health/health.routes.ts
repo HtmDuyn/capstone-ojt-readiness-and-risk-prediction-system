@@ -1,8 +1,6 @@
 import { Router } from "express";
 
-import {
-  getHealth,
-} from "./health.controller";
+import { getHealth } from "../health.controller";
 
 const router = Router();
 
@@ -19,9 +17,6 @@ const router = Router();
  *       500:
  *         description: Backend or database error
  */
-router.get(
-  "/health",
-  getHealth,
-);
+router.get("/", getHealth);
 
 export default router;

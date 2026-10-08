@@ -14,6 +14,9 @@ export interface AuthUserRecord {
   full_name: string;
   status: string;
   password_hash: string;
+  must_change_password: boolean;
+  temporary_password_expires_at: Date | null;
+  auth_version: number;
   role_code: RoleCode | null;
   role_name: string | null;
 }
@@ -29,8 +32,8 @@ export interface AuthError extends Error {
 }
 
 export interface AuthTokenPayload extends JwtPayload {
+  authVersion: number;
   userId: number;
   username: string;
   roleCode: RoleCode | null;
-  sessionId: string;
 }

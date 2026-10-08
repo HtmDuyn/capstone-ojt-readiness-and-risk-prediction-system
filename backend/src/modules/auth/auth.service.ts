@@ -1,25 +1,16 @@
-import crypto from "node:crypto";
-
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 import { authConfig } from "../../config/auth";
-import { hashToken } from "../../utils/token";
+import { query } from "../../config/database";
 
 import {
   findByEmail,
   findById,
 } from "./auth.repository";
 
-import {
-  createSession,
-  revokeAllSessionsByUserId,
-  revokeSessionById,
-} from "./session.repository";
-
 import type {
   AuthError,
-  AuthTokenPayload,
   AuthUserRecord,
 } from "./auth.types";
 
@@ -78,6 +69,7 @@ export const loginUser = async (
   password: unknown,
 ): Promise<{
   token: string;
+  mustChangePassword: boolean;
 }> => {
   /*
    * Validate email.
@@ -162,22 +154,17 @@ export const loginUser = async (
     );
   }
 
-  /*
-   * Mỗi lần login tạo SessionID mới.
-   */
-  const sessionId =
-    crypto.randomUUID();
+  if (user.must_change_password && (!user.temporary_password_expires_at || new Date(user.temporary_password_expires_at).getTime() <= Date.now())) {
+    throw createAuthError('Temporary password expired. Contact your importing department.', 403, 'TEMPORARY_PASSWORD_EXPIRED');
+  }
 
-  /*
-   * Tạo JWT.
-   */
   const token =
     jwt.sign(
       {
         userId: user.id,
         username: user.username,
         roleCode: user.role_code,
-        sessionId,
+        authVersion: user.auth_version,
       },
       authConfig.jwtSecret,
       {
@@ -186,74 +173,26 @@ export const loginUser = async (
       },
     );
 
-  /*
-   * Decode lại JWT để lấy chính xác
-   * thời gian hết hạn do jsonwebtoken tạo.
-   */
-  const decoded =
-    jwt.decode(
-      token,
-    ) as AuthTokenPayload | null;
-
-  if (
-    !decoded ||
-    typeof decoded.exp !== "number"
-  ) {
-    throw new Error(
-      "Unable to determine token expiration time.",
-    );
-  }
-
-  const expiresAt =
-    new Date(
-      decoded.exp * 1000,
-    );
-
-  /*
-   * DB không lưu JWT thật.
-   * Chỉ lưu SHA-256 hash.
-   */
-  const tokenHash =
-    hashToken(token);
-
-  /*
-   * Hệ thống chỉ cho phép
-   * một active session / user.
-   *
-   * Login mới:
-   * Session cũ -> revoked
-   */
-  await revokeAllSessionsByUserId(
-    user.id,
-  );
-
-  /*
-   * Tạo session mới.
-   */
-  await createSession(
-    sessionId,
-    user.id,
-    tokenHash,
-    expiresAt,
-  );
-
   return {
     token,
+    mustChangePassword: user.must_change_password,
   };
 };
 
-export const logoutUser = async (
-  sessionId: string,
-): Promise<void> => {
-  if (!sessionId) {
-    throw createAuthError(
-      "Invalid authentication session.",
-      401,
-      "INVALID_SESSION",
-    );
+export async function changePassword(userId: number, currentPassword: unknown, newPassword: unknown) {
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length < 12 || Buffer.byteLength(newPassword, 'utf8') > 72) {
+    throw createAuthError('New password must have at least 12 characters and at most 72 UTF-8 bytes.', 400, 'INVALID_PASSWORD');
   }
-
-  await revokeSessionById(
-    sessionId,
-  );
-};
+  const user = await findById(userId);
+  if (!user || !await verifyPassword(currentPassword, user.password_hash)) throw createAuthError('Current password is incorrect.', 401, 'INVALID_CREDENTIALS');
+  if (await verifyPassword(newPassword, user.password_hash)) throw createAuthError('New password must differ from current password.', 400, 'PASSWORD_UNCHANGED');
+  const hash = await bcrypt.hash(newPassword, 12);
+  const result = await query(`WITH changed AS (UPDATE "Users" SET "PasswordHash"=$2,"MustChangePassword"=false,
+    "TemporaryPasswordExpiresAt"=NULL,"PasswordChangedAt"=now(),"UpdatedAt"=now(),"AuthVersion"="AuthVersion"+1
+    WHERE "UserID"=$1 AND "PasswordHash"=$3 AND "Status"='ACTIVE'
+    AND (NOT "MustChangePassword" OR "TemporaryPasswordExpiresAt">now()) RETURNING "UserID"),
+    cancelled AS (UPDATE "EmailOutbox" SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL
+      WHERE "UserID" IN (SELECT "UserID" FROM changed) AND "Status"<>'SENT')
+    SELECT "UserID" FROM changed`, [userId, hash, user.password_hash]);
+  if (!result.rowCount) throw createAuthError('Account changed or temporary password expired. Please login again.', 409, 'ACCOUNT_CHANGED');
+}

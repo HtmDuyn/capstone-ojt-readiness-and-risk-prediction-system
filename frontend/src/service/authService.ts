@@ -26,10 +26,9 @@ export const authService = {
     return response.data;
   },
 
-  getCurrentUser: async (token: string) => {
-    const response = await API.get<CurrentUserResponse>('/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  // Ví dụ lấy thông tin profile (cần token)
+  getProfile: async () => {
+    const response = await API.get('/auth/me');
     return response.data;
   },
 };

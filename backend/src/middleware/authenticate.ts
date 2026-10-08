@@ -14,17 +14,9 @@ import {
   findById,
 } from "../modules/auth/auth.repository";
 
-import {
-  findActiveSessionById,
-} from "../modules/auth/session.repository";
-
 import type {
   AuthTokenPayload,
 } from "../modules/auth/auth.types";
-
-import {
-  hashToken,
-} from "../utils/token";
 
 export const authenticate = async (
   req: Request,
@@ -111,16 +103,7 @@ export const authenticate = async (
     const payload =
       decoded as AuthTokenPayload;
 
-    /*
-     * Token bắt buộc phải chứa:
-     *
-     * userId
-     * sessionId
-     */
-    if (
-      !payload.userId ||
-      !payload.sessionId
-    ) {
+    if (!payload.userId) {
       res.status(401).json({
         success: false,
 
@@ -136,92 +119,7 @@ export const authenticate = async (
 
     /*
      * ==============================
-     * 2. CHECK SESSION
-     * ==============================
-     */
-    const session =
-      await findActiveSessionById(
-        payload.sessionId,
-      );
-
-    /*
-     * Session:
-     *
-     * - không tồn tại
-     * - đã revoke
-     * - đã hết hạn
-     *
-     * đều không được phép tiếp tục.
-     */
-    if (!session) {
-      res.status(401).json({
-        success: false,
-
-        errorCode:
-          "TOKEN_REVOKED",
-
-        message:
-          "This session is no longer valid. Please login again.",
-      });
-
-      return;
-    }
-
-    /*
-     * ==============================
-     * 3. SESSION OWNERSHIP
-     * ==============================
-     *
-     * Session phải thuộc đúng user
-     * trong JWT.
-     */
-    if (
-      session.user_id !==
-      payload.userId
-    ) {
-      res.status(401).json({
-        success: false,
-
-        errorCode:
-          "INVALID_SESSION",
-
-        message:
-          "Invalid authentication session.",
-      });
-
-      return;
-    }
-
-    /*
-     * ==============================
-     * 4. CHECK TOKEN HASH
-     * ==============================
-     *
-     * Database chỉ lưu SHA-256 token.
-     */
-    const currentTokenHash =
-      hashToken(token);
-
-    if (
-      currentTokenHash !==
-      session.token_hash
-    ) {
-      res.status(401).json({
-        success: false,
-
-        errorCode:
-          "INVALID_SESSION",
-
-        message:
-          "Invalid authentication session.",
-      });
-
-      return;
-    }
-
-    /*
-     * ==============================
-     * 5. GET CURRENT USER FROM DB
+     * 2. GET CURRENT USER FROM DB
      * ==============================
      *
      * Không hoàn toàn tin status / role
@@ -251,7 +149,7 @@ export const authenticate = async (
 
     /*
      * ==============================
-     * 6. CHECK USER STATUS
+     * 3. CHECK USER STATUS
      * ==============================
      */
     if (
@@ -274,12 +172,28 @@ export const authenticate = async (
 
     /*
      * ==============================
-     * 7. SET CURRENT USER
+     * 4. SET CURRENT USER
      * ==============================
      *
      * roleCode lấy từ database hiện tại,
      * không dùng role cũ trong JWT.
      */
+    if ((payload.authVersion ?? 0) !== currentUser.auth_version) {
+      res.status(401).json({ success: false, errorCode: 'TOKEN_REVOKED', message: 'Please login again.' });
+      return;
+    }
+    if (currentUser.must_change_password) {
+      if (!currentUser.temporary_password_expires_at || new Date(currentUser.temporary_password_expires_at).getTime() <= Date.now()) {
+        res.status(403).json({ success: false, errorCode: 'TEMPORARY_PASSWORD_EXPIRED', message: 'Temporary password expired. Contact your importing department.' });
+        return;
+      }
+      const allowed = (req.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout'].includes(req.originalUrl.split('?')[0]))
+        || (req.method === 'GET' && req.originalUrl.split('?')[0] === '/api/auth/me');
+      if (!allowed) {
+        res.status(403).json({ success: false, errorCode: 'PASSWORD_CHANGE_REQUIRED', message: 'Change your temporary password first.' });
+        return;
+      }
+    }
     req.user = {
       ...payload,
 
@@ -291,9 +205,6 @@ export const authenticate = async (
 
       roleCode:
         currentUser.role_code,
-
-      sessionId:
-        payload.sessionId,
     };
 
     req.token =

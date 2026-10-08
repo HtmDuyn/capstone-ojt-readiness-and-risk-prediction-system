@@ -1,4 +1,6 @@
 import "./config/env";
+import { startEligibilityWorker } from './jobs/eligibility';
+import { startProvisioningJobs } from './jobs/provisioning';
 
 import app from "./app";
 
@@ -24,6 +26,8 @@ const startServer =
   async (): Promise<void> => {
     try {
       await testDatabaseConnection();
+      const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
+      const stopJobs = process.env.PROVISIONING_JOBS_ENABLED === 'true' ? startProvisioningJobs() : () => {};
 
       const server =
         app.listen(
@@ -54,6 +58,8 @@ const startServer =
 
       const shutdown =
         async () => {
+          stopJobs();
+          stopEligibility();
           logger.info(
             "Shutting down server...",
           );
