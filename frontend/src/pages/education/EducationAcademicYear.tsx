@@ -15,6 +15,7 @@ import {
 
 import { PageBanner } from "@/components/common/PageBanner";
 import { getGovernmentHolidays } from "@/services/governmentHoliday.service";
+import { academicService } from "@/service/academic.service";
 
 /* =========================================================
    TYPES
@@ -26,7 +27,7 @@ type TermStatus =
   | "Đang chuẩn bị"
   | "Chưa cấu hình";
 
-type YearAction = "view" | "edit" | "delete" | null;
+type YearAction = "view" | "edit" | null;
 
 interface Holiday {
   id: string;
@@ -101,6 +102,7 @@ const TERM_VIEW_STYLE: Record<
     icon: "text-emerald-600",
     label: "text-emerald-800",
   },
+
   Summer: {
     border: "border-orange-200",
     accent: "bg-orange-500",
@@ -109,6 +111,7 @@ const TERM_VIEW_STYLE: Record<
     icon: "text-orange-600",
     label: "text-orange-800",
   },
+
   Fall: {
     border: "border-indigo-200",
     accent: "bg-indigo-500",
@@ -127,6 +130,7 @@ const formatDate = (date: string) => {
   if (!date) return "Chưa thiết lập";
 
   const [year, month, day] = date.split("-");
+
   return `${day}/${month}/${year}`;
 };
 
@@ -260,25 +264,57 @@ const getAutoAcademicYears = () => {
   const currentYear = new Date().getFullYear();
 
   return [
-    String(currentYear),
-    String(currentYear + 1),
-    String(currentYear + 2),
+    `${currentYear}-${currentYear + 1}`,
+    `${currentYear + 1}-${currentYear + 2}`,
+    `${currentYear + 2}-${currentYear + 3}`,
   ];
 };
 
-const createDefaultTerms = (yearString: string): TermConfig[] => {
-  const year = Number(yearString);
+const getAcademicYearStartYear = (academicYearCode: string) => {
+  return Number(academicYearCode.split("-")[0]);
+};
 
-  const springStart = getFirstMondayOfMonth(year, 0);
-  const springEnd = addDays(springStart, 83);
+const getAcademicYearEndYear = (academicYearCode: string) => {
+  return Number(academicYearCode.split("-")[1]);
+};
 
-  const summerStart = getSecondMondayOfMonth(year, 4);
-  const summerEnd = addDays(summerStart, 76);
+const createDefaultTerms = (academicYearCode: string): TermConfig[] => {
+  const startYear = getAcademicYearStartYear(academicYearCode);
 
-  const fallStart = getFirstMondayOfMonth(year, 8);
+  const endYear = getAcademicYearEndYear(academicYearCode);
+
+  /*
+   * Năm học 2026-2027:
+   *
+   * Fall 2026
+   * Spring 2027
+   * Summer 2027
+   */
+
+  const fallStart = getFirstMondayOfMonth(startYear, 8);
+
   const fallEnd = addDays(fallStart, 68);
 
+  const springStart = getFirstMondayOfMonth(endYear, 0);
+
+  const springEnd = addDays(springStart, 83);
+
+  const summerStart = getSecondMondayOfMonth(endYear, 4);
+
+  const summerEnd = addDays(summerStart, 76);
+
   return [
+    {
+      id: "fall",
+      name: "Fall",
+      startDate: formatLocalDate(fallStart),
+      endDate: formatLocalDate(fallEnd),
+      breakStartDate: "",
+      breakEndDate: "",
+      holidays: [],
+      makeupSchedules: [],
+    },
+
     {
       id: "spring",
       name: "Spring",
@@ -299,7 +335,7 @@ const createDefaultTerms = (yearString: string): TermConfig[] => {
       breakEndDate: "",
       holidays: [
         {
-          id: `summer-break-${year}`,
+          id: `summer-break-${endYear}`,
           name: "Nghỉ hè",
           startDate: formatLocalDate(addDays(summerStart, 56)),
           endDate: formatLocalDate(addDays(summerStart, 62)),
@@ -309,19 +345,9 @@ const createDefaultTerms = (yearString: string): TermConfig[] => {
       ],
       makeupSchedules: [],
     },
-
-    {
-      id: "fall",
-      name: "Fall",
-      startDate: formatLocalDate(fallStart),
-      endDate: formatLocalDate(fallEnd),
-      breakStartDate: "",
-      breakEndDate: "",
-      holidays: [],
-      makeupSchedules: [],
-    },
   ];
 };
+
 const createInitialTermsByYear = (): Record<string, TermConfig[]> => {
   return getAutoAcademicYears().reduce<Record<string, TermConfig[]>>(
     (result, year) => {
@@ -331,14 +357,19 @@ const createInitialTermsByYear = (): Record<string, TermConfig[]> => {
     {},
   );
 };
+
 /* =========================================================
    COMPONENT
    ========================================================= */
 
 const EducationAcademicYear: React.FC = () => {
-  const [academicYear, setAcademicYear] = React.useState(() =>
-    String(new Date().getFullYear()),
-  );
+  const [isCreatingYear, setIsCreatingYear] = React.useState(false);
+
+  const [academicYear, setAcademicYear] = React.useState(() => {
+    const currentYear = new Date().getFullYear();
+
+    return `${currentYear}-${currentYear + 1}`;
+  });
 
   /*
    * Ngày hiện tại.
@@ -370,6 +401,7 @@ const EducationAcademicYear: React.FC = () => {
   const [termsByYear, setTermsByYear] = React.useState<
     Record<string, TermConfig[]>
   >(() => createInitialTermsByYear());
+
   React.useEffect(() => {
     const loadGovernmentHolidays = async () => {
       const years = getAutoAcademicYears();
@@ -422,9 +454,33 @@ const EducationAcademicYear: React.FC = () => {
 
   const [showInitializedYears, setShowInitializedYears] = React.useState(false);
 
-  const [initializedYears, setInitializedYears] = React.useState<string[]>(() =>
-    getAutoAcademicYears(),
-  );
+  const [initializedYears, setInitializedYears] = React.useState<string[]>([]);
+
+  const [isLoadingYears, setIsLoadingYears] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadAcademicYears = async () => {
+      try {
+        setIsLoadingYears(true);
+
+        const academicYears = await academicService.searchAcademicYears();
+
+        setInitializedYears(academicYears.map((year) => year.yearCode));
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách năm học.";
+
+        console.error(message);
+      } finally {
+        setIsLoadingYears(false);
+      }
+    };
+
+    loadAcademicYears();
+  }, []);
+
   /* YEAR ACTION */
   const [yearAction, setYearAction] = React.useState<YearAction>(null);
 
@@ -647,9 +703,10 @@ const EducationAcademicYear: React.FC = () => {
 
     handleCloseTerm();
   };
+
   /* =======================================================
-   MAKEUP SCHEDULE ACTIONS
-   ======================================================= */
+     MAKEUP SCHEDULE ACTIONS
+     ======================================================= */
 
   const handleSaveMakeupSchedule = () => {
     if (!selectedTermId) return;
@@ -658,6 +715,7 @@ const EducationAcademicYear: React.FC = () => {
       alert("Vui lòng chọn ngày học bù.");
       return;
     }
+
     const isHoliday = selectedTerm?.holidays.some(
       (holiday) =>
         makeupForm.makeupDate >= holiday.startDate &&
@@ -668,6 +726,7 @@ const EducationAcademicYear: React.FC = () => {
       alert("Ngày học bù không được trùng với ngày nghỉ trong kỳ.");
       return;
     }
+
     const newMakeupSchedule: MakeupSchedule = {
       id: `makeup-${Date.now()}`,
       holidayId: makeupForm.holidayId,
@@ -694,10 +753,13 @@ const EducationAcademicYear: React.FC = () => {
 
     setShowMakeupModal(false);
   };
+
   const handleDeleteMakeupSchedule = (scheduleId: string) => {
     if (!selectedTermId) return;
 
-    const confirmed = window.confirm("Bạn có chắc muốn xóa lịch học bù này?");
+    const confirmed = window.confirm(
+      "Bạn có chắc muốn xóa lịch học bù này?",
+    );
 
     if (!confirmed) return;
 
@@ -714,6 +776,49 @@ const EducationAcademicYear: React.FC = () => {
       ),
     );
   };
+
+  /* =======================================================
+     CREATE ACADEMIC YEAR
+     ======================================================= */
+
+  const handleCreateAcademicYear = async () => {
+    if (isCreatingYear) return;
+
+    try {
+      setIsCreatingYear(true);
+
+      const startYear = getAcademicYearStartYear(academicYear);
+
+      const endYear = getAcademicYearEndYear(academicYear);
+
+      const createdYear = await academicService.createAcademicYear({
+        yearCode: academicYear,
+        startDate: `${startYear}-09-01`,
+        endDate: `${endYear}-08-31`,
+        status: "PLANNED",
+      });
+
+      setInitializedYears((current) => {
+        if (current.includes(createdYear.yearCode)) {
+          return current;
+        }
+
+        return [...current, createdYear.yearCode];
+      });
+
+      alert(`Khởi tạo năm học ${createdYear.yearCode} thành công.`);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Không thể khởi tạo năm học.";
+
+      alert(message);
+    } finally {
+      setIsCreatingYear(false);
+    }
+  };
+
   /* =======================================================
      YEAR ACTIONS
      ======================================================= */
@@ -728,24 +833,9 @@ const EducationAcademicYear: React.FC = () => {
     setYearAction("edit");
   };
 
-  const handleDeleteYear = (year: string) => {
-    setSelectedYear(year);
-    setYearAction("delete");
-  };
-
   const handleCloseYearAction = () => {
     setSelectedYear(null);
     setYearAction(null);
-  };
-
-  const handleConfirmDeleteYear = () => {
-    if (!selectedYear) return;
-
-    setInitializedYears((current) =>
-      current.filter((year) => year !== selectedYear),
-    );
-
-    handleCloseYearAction();
   };
 
   const handleEditTermFromYearPopup = (termId: string) => {
@@ -801,32 +891,47 @@ const EducationAcademicYear: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-5 max-w-xs">
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            Năm
-          </label>
+        <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
+          {/* CHỌN NĂM HỌC */}
+          <div className="w-full max-w-xs">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Năm học
+            </label>
 
-          <div className="relative">
-            <CalendarDays
-              size={18}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+            <div className="relative">
+              <CalendarDays
+                size={18}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
 
-            <select
-              value={academicYear}
-              onChange={(event) => {
-                setAcademicYear(event.target.value);
-                setSelectedTermId(null);
-              }}
-              className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-            >
-              {getAutoAcademicYears().map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+              <select
+                value={academicYear}
+                onChange={(event) => {
+                  setAcademicYear(event.target.value);
+                  setSelectedTermId(null);
+                }}
+                className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              >
+                {getAutoAcademicYears().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {/* NÚT GỌI API TẠO NĂM HỌC */}
+          <button
+            type="button"
+            onClick={handleCreateAcademicYear}
+            disabled={isCreatingYear}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Plus size={18} />
+
+            {isCreatingYear ? "Đang khởi tạo..." : "Khởi tạo năm học"}
+          </button>
         </div>
       </section>
 
@@ -942,55 +1047,66 @@ const EducationAcademicYear: React.FC = () => {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {initializedYears.map((year) => (
-                  <tr key={year}>
-                    <td className="px-4 py-3 font-semibold text-slate-800">
-                      {year}
-                    </td>
-
-                    <td className="px-4 py-3 text-slate-600">
-                      {getConfiguredTermCount(year)} kỳ
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                        <CheckCircle2 size={14} />
-                        Đã khởi tạo
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleViewYear(year)}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
-                        >
-                          <Eye size={16} />
-                          Xem
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleEditYear(year)}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-orange-600 hover:bg-orange-50"
-                        >
-                          <Pencil size={16} />
-                          Sửa
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteYear(year)}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={16} />
-                          Xóa
-                        </button>
-                      </div>
+                {isLoadingYears ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-4 py-8 text-center text-sm text-slate-400"
+                    >
+                      Đang tải danh sách năm học...
                     </td>
                   </tr>
-                ))}
+                ) : initializedYears.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-4 py-8 text-center text-sm text-slate-400"
+                    >
+                      Chưa có năm học nào được khởi tạo.
+                    </td>
+                  </tr>
+                ) : (
+                  initializedYears.map((year) => (
+                    <tr key={year}>
+                      <td className="px-4 py-3 font-semibold text-slate-800">
+                        {year}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-600">
+                        {getConfiguredTermCount(year)} kỳ
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                          <CheckCircle2 size={14} />
+                          Đã khởi tạo
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewYear(year)}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                          >
+                            <Eye size={16} />
+                            Xem
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleEditYear(year)}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-orange-600 hover:bg-orange-50"
+                          >
+                            <Pencil size={16} />
+                            Sửa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1017,17 +1133,13 @@ const EducationAcademicYear: React.FC = () => {
                 <h2 className="text-xl font-black text-slate-900">
                   {yearAction === "view"
                     ? `Thông tin năm học ${selectedYear}`
-                    : yearAction === "edit"
-                      ? `Chỉnh sửa năm học ${selectedYear}`
-                      : `Xóa năm học ${selectedYear}`}
+                    : `Chỉnh sửa năm học ${selectedYear}`}
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
                   {yearAction === "view"
                     ? "Xem thông tin các kỳ đã được thiết lập trong năm học."
-                    : yearAction === "edit"
-                      ? "Chọn kỳ cần chỉnh sửa trong năm học."
-                      : "Xác nhận trước khi xóa năm học."}
+                    : "Chọn kỳ cần chỉnh sửa trong năm học."}
                 </p>
               </div>
 
@@ -1240,7 +1352,9 @@ const EducationAcademicYear: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={() => handleEditTermFromYearPopup(term.id)}
+                          onClick={() =>
+                            handleEditTermFromYearPopup(term.id)
+                          }
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-600 transition hover:bg-orange-100"
                         >
                           <Pencil size={16} />
@@ -1258,49 +1372,6 @@ const EducationAcademicYear: React.FC = () => {
                     className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     Đóng
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ================= DELETE YEAR ================= */}
-
-            {yearAction === "delete" && (
-              <div className="p-6">
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-                  <div className="flex gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                      <Trash2 size={19} />
-                    </div>
-
-                    <div>
-                      <p className="font-bold text-red-700">
-                        Bạn có chắc muốn xóa năm học {selectedYear}?
-                      </p>
-
-                      <p className="mt-1 text-sm leading-6 text-red-600">
-                        Năm học sẽ bị xóa khỏi danh sách năm học đã khởi tạo.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCloseYearAction}
-                    className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Hủy
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleConfirmDeleteYear}
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
-                  >
-                    <Trash2 size={17} />
-                    Xóa năm học
                   </button>
                 </div>
               </div>
@@ -1349,7 +1420,9 @@ const EducationAcademicYear: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <CalendarDays size={19} className="text-orange-500" />
 
-                  <h3 className="font-bold text-slate-800">1. Thời gian học</h3>
+                  <h3 className="font-bold text-slate-800">
+                    1. Thời gian học
+                  </h3>
                 </div>
 
                 {getPreviousTerm(selectedTerm.id) && (
@@ -1500,6 +1573,7 @@ const EducationAcademicYear: React.FC = () => {
                     </table>
                   </div>
                 )}
+
                 {/* MAKEUP SCHEDULE LIST */}
 
                 <div className="mt-6 border-t border-slate-100 pt-5">
@@ -1587,8 +1661,8 @@ const EducationAcademicYear: React.FC = () => {
       )}
 
       {/* ===================================================
-    MAKEUP SCHEDULE MODAL
-    =================================================== */}
+          MAKEUP SCHEDULE MODAL
+          =================================================== */}
 
       {showMakeupModal && selectedTerm && (
         <div
@@ -1645,6 +1719,7 @@ const EducationAcademicYear: React.FC = () => {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Ngày học bù

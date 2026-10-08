@@ -14,7 +14,6 @@ import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
 import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
-
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
@@ -23,7 +22,8 @@ import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
 import EducationAiClassProposals from "@/pages/education/EducationAiClassProposals";
-
+import EducationOjtRegistrationPeriod from "@/pages/education/EducationOjtRegistrationPeriod";
+import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -51,8 +51,8 @@ const RolePlaceholderPage: React.FC<{
     </h1>
 
     <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">
-      Phân hệ này đang được hoàn thiện. Bạn đã đăng nhập đúng vai trò
-      và có thể sử dụng menu bên trái khi các chức năng được triển khai.
+      Phân hệ này đang được hoàn thiện. Bạn đã đăng nhập đúng vai trò và có thể
+      sử dụng menu bên trái khi các chức năng được triển khai.
     </p>
   </div>
 );
@@ -61,18 +61,14 @@ const RolePlaceholderPage: React.FC<{
    ROLE ROUTES CHUNG
    ========================================================= */
 
-const createRoleRoutes = (
-  role: Exclude<UserRole, "student">,
-): RouteObject => {
+const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
   const navItems = getMenuByRole(role);
 
   return {
     element: (
       <BaseLayout
         navItems={navItems}
-        homePath={
-          navItems[0]?.path || `/${role}/dashboard`
-        }
+        homePath={navItems[0]?.path || `/${role}/dashboard`}
         brandSubtitle={ROLE_LABELS[role]}
         showAIConsult={false}
       />
@@ -101,12 +97,7 @@ const studentRoutes: RouteObject = {
   children: [
     {
       path: "/student",
-      element: (
-        <Navigate
-          to="/student/dashboard"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/dashboard" replace />,
     },
 
     {
@@ -160,112 +151,57 @@ const studentRoutes: RouteObject = {
 
     {
       path: "/dashboard",
-      element: (
-        <Navigate
-          to="/student/dashboard"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/dashboard" replace />,
     },
 
     {
       path: "/dashboard/student",
-      element: (
-        <Navigate
-          to="/student/dashboard"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/dashboard" replace />,
     },
 
     {
       path: "/dashboard/academic-profile",
-      element: (
-        <Navigate
-          to="/student/academic-profile"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/academic-profile" replace />,
     },
 
     {
       path: "/academic-profile",
-      element: (
-        <Navigate
-          to="/student/academic-profile"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/academic-profile" replace />,
     },
 
     {
       path: "/risk-prediction",
-      element: (
-        <Navigate
-          to="/student/risk-prediction"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/risk-prediction" replace />,
     },
 
     {
       path: "/roadmap-consulting",
-      element: (
-        <Navigate
-          to="/student/roadmap-consulting"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/roadmap-consulting" replace />,
     },
 
     {
       path: "/ojt-registration",
-      element: (
-        <Navigate
-          to="/student/ojt-registration"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/ojt-registration" replace />,
     },
 
     {
       path: "/ojt-profile",
-      element: (
-        <Navigate
-          to="/student/ojt-profile"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/ojt-profile" replace />,
     },
 
     {
       path: "/internship-progress",
-      element: (
-        <Navigate
-          to="/student/internship-progress"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/internship-progress" replace />,
     },
 
     {
       path: "/evaluation-results",
-      element: (
-        <Navigate
-          to="/student/evaluation-results"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/evaluation-results" replace />,
     },
 
     {
       path: "/notifications",
-      element: (
-        <Navigate
-          to="/student/notifications"
-          replace
-        />
-      ),
+      element: <Navigate to="/student/notifications" replace />,
     },
   ],
 };
@@ -279,32 +215,28 @@ export const router = createBrowserRouter([
      PUBLIC / GUEST
      ======================================================= */
 
-{
-  element: <GuestRoute />,
+  {
+    element: <GuestRoute />,
 
-  children: [
-    {
-      index: true,
-      element: <Navigate to="/login" replace />,
-    },
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/login" replace />,
+      },
 
-    {
-      path: "/login",
-      element: <LoginPage />,
-    },
-  ],
-},
+      {
+        path: "/login",
+        element: <LoginPage />,
+      },
+    ],
+  },
 
   /* =======================================================
      STUDENT
      ======================================================= */
 
   {
-    element: (
-      <PrivateRoute
-        allowedRoles={["student"]}
-      />
-    ),
+    element: <PrivateRoute allowedRoles={["student"]} />,
 
     children: [studentRoutes],
   },
@@ -314,15 +246,9 @@ export const router = createBrowserRouter([
      ======================================================= */
 
   {
-    element: (
-      <PrivateRoute
-        allowedRoles={["admin"]}
-      />
-    ),
+    element: <PrivateRoute allowedRoles={["admin"]} />,
 
-    children: [
-      createRoleRoutes("admin"),
-    ],
+    children: [createRoleRoutes("admin")],
   },
 
   /* =======================================================
@@ -330,19 +256,13 @@ export const router = createBrowserRouter([
      ======================================================= */
 
   {
-    element: (
-      <PrivateRoute
-        allowedRoles={["education"]}
-      />
-    ),
+    element: <PrivateRoute allowedRoles={["education"]} />,
 
     children: [
       {
         element: (
           <BaseLayout
-            navItems={getMenuByRole(
-              "education",
-            )}
+            navItems={getMenuByRole("education")}
             homePath="/education/dashboard"
             brandSubtitle="Phòng Đào tạo"
             showAIConsult={false}
@@ -356,12 +276,7 @@ export const router = createBrowserRouter([
 
           {
             path: "/education",
-            element: (
-              <Navigate
-                to="/education/dashboard"
-                replace
-              />
-            ),
+            element: <Navigate to="/education/dashboard" replace />,
           },
 
           {
@@ -407,15 +322,22 @@ export const router = createBrowserRouter([
             element: <EducationStudentStatus />,
           },
 
+          {
+            path: "/education/ojt-registration-period",
+            element: <EducationOjtRegistrationPeriod />,
+          },
+          {
+            path: "/education/ojt-final-results",
+            element: <EducationOjtFinalResults />,
+          },
+
           /* =========================
              ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
              ========================= */
 
           {
             path: "/education/ai-class-proposals",
-            element: (
-              <EducationAiClassProposals />
-            ),
+            element: <EducationAiClassProposals />,
           },
         ],
       },
@@ -427,15 +349,9 @@ export const router = createBrowserRouter([
      ======================================================= */
 
   {
-    element: (
-      <PrivateRoute
-        allowedRoles={["qhdn"]}
-      />
-    ),
+    element: <PrivateRoute allowedRoles={["qhdn"]} />,
 
-    children: [
-      createRoleRoutes("qhdn"),
-    ],
+    children: [createRoleRoutes("qhdn")],
   },
 
   /* =======================================================
@@ -443,15 +359,9 @@ export const router = createBrowserRouter([
      ======================================================= */
 
   {
-    element: (
-      <PrivateRoute
-        allowedRoles={["enterprise"]}
-      />
-    ),
+    element: <PrivateRoute allowedRoles={["enterprise"]} />,
 
-    children: [
-      createRoleRoutes("enterprise"),
-    ],
+    children: [createRoleRoutes("enterprise")],
   },
 
   /* =======================================================
@@ -460,12 +370,7 @@ export const router = createBrowserRouter([
 
   {
     path: "*",
-    element: (
-      <Navigate
-        to="/login"
-        replace
-      />
-    ),
+    element: <Navigate to="/login" replace />,
   },
 ]);
 

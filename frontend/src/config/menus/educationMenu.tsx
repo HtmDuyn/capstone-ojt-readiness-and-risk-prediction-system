@@ -12,6 +12,7 @@ import {
   Upload,
   Users,
   Activity,
+  ClipboardCheck,
 } from 'lucide-react';
 
 import type { NavItem } from '@/types/common.types';
@@ -129,19 +130,55 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
     ],
   },
 
-// =========================
-// ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
-// =========================
-{
-  id: 'ai-class-proposals',
-  label: 'Đề xuất lớp hỗ trợ từ AI',
-  path: '/education/ai-class-proposals',
-  icon: <RoadmapConsultingIcon size={20} />,
-  banner: {
-    title: 'Đề xuất Lớp hỗ trợ từ AI',
-    description:
-      'Xem các đề xuất lớp hỗ trợ được AI hình thành từ dữ liệu học tập và mức nguy cơ của sinh viên.',
-    badge: 'Phòng Đào tạo',
+  // =========================
+  // QUẢN LÝ OJT
+  // =========================
+  {
+    id: 'ojt-management',
+    label: 'Quản lý OJT',
+    path: '',
+    icon: <CalendarDays size={20} />,
+    children: [
+      {
+        id: 'ojt-registration-period',
+        label: 'Mở đợt đăng ký OJT',
+        path: '/education/ojt-registration-period',
+        icon: <CalendarDays size={20} />,
+        banner: {
+          title: 'Mở đợt Đăng ký OJT',
+          description:
+            'Quản lý các đợt đăng ký nguyện vọng OJT dành cho sinh viên.',
+          badge: 'Quản lý OJT',
+        },
+      },
+      {
+        id: 'ojt-final-results',
+        label: 'Kết quả OJT cuối kỳ',
+        path: '/education/ojt-final-results',
+        icon: <ClipboardCheck size={20} />,
+        banner: {
+          title: 'Cập nhật Kết quả OJT Cuối kỳ',
+          description:
+            'Xem kết quả do Phòng Quan hệ Doanh nghiệp chuyển sang và xác nhận kết quả OJT chính thức của sinh viên.',
+          badge: 'Quản lý OJT',
+        },
+      },
+    ],
   },
-},
+
+  // =========================
+  // ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
+  // =========================
+  {
+    id: 'ai-class-proposals',
+    label: 'Đề xuất lớp hỗ trợ từ AI',
+    path: '/education/ai-class-proposals',
+    icon: <RoadmapConsultingIcon size={20} />,
+    banner: {
+      title: 'Đề xuất Lớp hỗ trợ từ AI',
+      description:
+        'Xem các đề xuất lớp hỗ trợ được AI hình thành từ dữ liệu học tập và mức nguy cơ của sinh viên.',
+      badge: 'Phòng Đào tạo',
+    },
+  },
 ];
