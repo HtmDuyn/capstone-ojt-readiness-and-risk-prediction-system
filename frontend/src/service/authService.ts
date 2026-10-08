@@ -1,5 +1,4 @@
 import API from './api';
-
 export interface LoginResponse {
   success: boolean;
   message: string;
@@ -19,16 +18,15 @@ export interface CurrentUserResponse {
     roleName: string | null;
   };
 }
-
 export const authService = {
   login: async (credentials: { email: string; password: string }) => {
     const response = await API.post<LoginResponse>('/auth/login', credentials);
     return response.data;
   },
-
-  // Ví dụ lấy thông tin profile (cần token)
-  getProfile: async () => {
-    const response = await API.get('/auth/me');
+   getCurrentUser: async (token: string) => {
+    const response = await API.get<CurrentUserResponse>('/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   },
 };
