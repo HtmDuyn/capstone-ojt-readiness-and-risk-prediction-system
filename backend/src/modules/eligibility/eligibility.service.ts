@@ -73,3 +73,11 @@ export async function eligibility(id:number,params:Row) {for(const key of Object
 export async function confirm(id:number,body:unknown,actor:number) {const b=inputObject(body,['reason']);const reason=requiredText(b.reason,'reason',1000);return academicTransaction(async c=>{const r=(await c.query(`${checkSelect} WHERE e."CheckID"=$1`,[id])).rows[0];if(!r)throw invalid('Eligibility check not found.',404);if(r.Status==='REVIEW_REQUIRED')throw invalid('Resolve missing configuration before official confirmation.',409,'ELIGIBILITY_REVIEW_REQUIRED');const input=await inputSnapshot(c,r.StudentID,r.OJTSemesterID);if(fingerprint(input)!==r.SourceHash)throw invalid('Academic data or active rules changed. Run a new check.',409,'ELIGIBILITY_CHECK_STALE');if(r.ConfirmedAt){if(r.ConfirmedBy===actor&&r.Reason===reason)return checkApi(r);throw invalid('This check has already been confirmed.',409,'ELIGIBILITY_ALREADY_CONFIRMED');}
  const newer=(await c.query(`SELECT 1 FROM "EligibilityChecks" e JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID" WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 AND e."CheckID">$3`,[r.StudentID,r.OJTSemesterID,id])).rowCount;if(newer)throw invalid('A newer check is already official.',409,'NEWER_OFFICIAL_CHECK');
  await c.query('INSERT INTO "EligibilityConfirmations" ("CheckID","ConfirmedBy","Reason") VALUES ($1,$2,$3)',[id,actor,reason]);await audit(c,actor,'EligibilityChecks',id,'CONFIRM',null,{status:r.Status,reason});return checkApi((await c.query(`${checkSelect} WHERE e."CheckID"=$1`,[id])).rows[0]);});}
+
+// Share the same current-source comparison with registration approval and handoff transactions.
+export async function officialEligibilityWithClient(c:PoolClient,studentId:number,semesterId:number) {
+ const row=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 AND f."CheckID" IS NOT NULL ORDER BY f."ConfirmedAt" DESC,e."CheckID" DESC LIMIT 1`,[studentId,semesterId])).rows[0];
+ if(!row)return null;
+ const input=await inputSnapshot(c,studentId,semesterId);
+ return {...checkApi(row),isStale:row.SourceHash!==fingerprint(input),programId:input.student.ProgramID};
+}

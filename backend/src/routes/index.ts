@@ -1,3 +1,4 @@
+import ojtRegistrationRoutes from '../modules/ojt-registration/registration.routes';
 import eligibilityRoutes from '../modules/eligibility/eligibility.routes';
 import { Router } from "express";
 import importRoutes from '../modules/imports/import.routes';
@@ -16,6 +17,7 @@ router.use(studentRoutes);
 router.use(curriculumRoutes);
 router.use(comboRoutes);
 router.use(eligibilityRoutes);
+router.use(ojtRegistrationRoutes);
 router.use('/imports', importRoutes);
 
 /*
