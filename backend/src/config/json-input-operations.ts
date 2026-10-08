@@ -10,7 +10,10 @@ const idFields: Record<string,string> = {
   'course-results':'courseResultId','academic-imports':'importId','ojt-rule-sets':'ruleSetId',
   'eligibility-checks':'checkId','eligibility-check-runs':'runId',
   'combo-registration-windows':'windowId','ojt-registration-windows':'windowId',
-  'ojt-registrations':'registrationId','ojt-results':'resultId'
+  'ojt-registrations':'registrationId','ojt-results':'resultId',
+  companies:'companyId',positions:'positionId',assignments:'assignmentId',
+  'assessment-templates':'templateId',assessments:'assessmentId',predictions:'predictionId',
+  alerts:'alertId',interventions:'interventionId','prediction-jobs':'jobId',models:'modelId'
 };
 export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] {
   const resolve=(v:any):any=>v?.$ref?.startsWith('#/')?v.$ref.slice(2).split('/').reduce((a:any,k:string)=>a?.[k],spec):v;
@@ -21,8 +24,10 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       const params=[...(item.parameters??[]),...(original.parameters??[])].map(resolve)
         .filter(p=>p.in==='path'||p.in==='query');
       if(!params.length)continue;
+      const segments=sourcePath.split('/');
+      const pathIdName=idFields[segments[segments.indexOf('{id}')-1]]??'id';
       const inputs=params.map(p=>({
-        name:p.in==='path'&&p.name==='id'?(idFields[sourcePath.split('/')[2]]??'id'):p.name,
+        name:p.in==='path'&&p.name==='id'?pathIdName:p.name,
         sourceName:p.name,location:p.in as 'path'|'query',required:p.required===true,schema:structuredClone(resolve(p.schema)??{})
       }));
       let path='/api/json'+sourcePath.slice(4).replace(/\/\{[^}]+\}/g,'');
