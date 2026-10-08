@@ -520,6 +520,64 @@
  *           "currentAcademicPeriodId": 1,
  *           "reason": "Gan lo trinh dau nam hoc"
  *         }
+ *       },
+ *       "AcademicPlacementBodyPatch": {
+ *         "type": "object",
+ *         "additionalProperties": false,
+ *         "required": [
+ *           "studentId",
+ *           "reason"
+ *         ],
+ *         "properties": {
+ *           "studentId": {
+ *             "type": "integer",
+ *             "minimum": 1,
+ *             "maximum": 2147483647,
+ *             "description": "Existing StudentID in the database, not UserID or student code."
+ *           },
+ *           "cohortId": {
+ *             "type": "integer",
+ *             "minimum": 1,
+ *             "maximum": 2147483647
+ *           },
+ *           "groupCode": {
+ *             "type": "string",
+ *             "enum": [
+ *               "A",
+ *               "B",
+ *               "C",
+ *               "D"
+ *             ]
+ *           },
+ *           "entryAcademicPeriodId": {
+ *             "type": "integer",
+ *             "minimum": 1,
+ *             "maximum": 2147483647,
+ *             "description": "Optional actual entry override. New cohort/group defaults to its configured entry semester."
+ *           },
+ *           "currentAcademicPeriodId": {
+ *             "type": "integer",
+ *             "minimum": 1,
+ *             "maximum": 2147483647,
+ *             "description": "Required for first placement; a regular semester or its Block 3."
+ *           },
+ *           "programId": {
+ *             "type": "integer",
+ *             "minimum": 1,
+ *             "maximum": 2147483647
+ *           },
+ *           "reason": {
+ *             "type": "string",
+ *             "maxLength": 1000
+ *           }
+ *         },
+ *         "example": {
+ *           "studentId": 1,
+ *           "cohortId": 1,
+ *           "groupCode": "A",
+ *           "currentAcademicPeriodId": 1,
+ *           "reason": "Gan lo trinh dau nam hoc"
+ *         }
  *       }
  *     }
  *   },
@@ -1267,6 +1325,51 @@
  *             "application/json": {
  *               "schema": {
  *                 "$ref": "#/components/schemas/AcademicPlacementPatch"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "responses": {
+ *           "200": {
+ *             "description": "Placement data includes studentId, cohortId, groupCode, entryAcademicPeriodId, currentAcademicPeriodId, currentSemester, enrollmentYear, programId and updatedAt"
+ *           },
+ *           "400": {
+ *             "description": "Invalid JSON, date, identifier or enum"
+ *           },
+ *           "401": {
+ *             "description": "Authentication required"
+ *           },
+ *           "403": {
+ *             "description": "ADMIN or ACADEMIC required; change temporary password first"
+ *           },
+ *           "404": {
+ *             "description": "Record or referenced cohort/group not found"
+ *           },
+ *           "409": {
+ *             "description": "Duplicate code, invalid calendar, or existing history conflict"
+ *           }
+ *         }
+ *       }
+ *     },
+ *     "/api/students/academic-placement": {
+ *       "patch": {
+ *         "tags": [
+ *           "Academic Management"
+ *         ],
+ *         "summary": "Assign actual academic placement using studentId in JSON",
+ *         "description": "Same business rules, authorization, transaction and audit as the path-ID endpoint. Supply an existing studentId in the JSON body. Referenced student, cohort/group and academic periods must already exist; no prerequisite APIs need rerunning when data is already configured.",
+ *         "security": [
+ *           {
+ *             "bearerAuth": []
+ *           }
+ *         ],
+ *         "parameters": [],
+ *         "requestBody": {
+ *           "required": true,
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/AcademicPlacementBodyPatch"
  *               }
  *             }
  *           }

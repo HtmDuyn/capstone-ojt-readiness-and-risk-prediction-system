@@ -3,7 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { listRecords, resources, type Resource } from './academic.repository';
 import { assignPlacement, saveResource } from './academic.service';
-import { positiveId } from './academic.schema';
+import { positiveId, inputObject } from './academic.schema';
 
 const router = Router();
 // Scope authentication to these paths so sibling APIs retain their own role rules.
@@ -21,6 +21,12 @@ for (const resource of Object.keys(resources) as Resource[]) {
     catch (error) { next(error); }
   });
 }
+router.patch('/students/academic-placement', authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
+  try {
+    const { studentId, ...placement } = inputObject(req.body, ['studentId','cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId','programId','reason']);
+    res.json({ success: true, data: await assignPlacement(positiveId(studentId, 'studentId'), placement, req.user!.userId) });
+  } catch (error) { next(error); }
+});
 router.patch('/students/:id/academic-placement', authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
   try { res.json({ success: true, data: await assignPlacement(positiveId(req.params.id, 'studentId'), req.body, req.user!.userId) }); }
   catch (error) { next(error); }

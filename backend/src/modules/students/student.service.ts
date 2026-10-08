@@ -49,7 +49,7 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
     return (await client.query(`${studentSelect} WHERE s."StudentID"=$1`,[id])).rows[0];
   });
 }
-export const resultSelect = `SELECT r."ResultID" AS id,r."StudentID" AS "studentId",r."CourseID" AS "courseId",c."CourseCode" AS "courseCode",c."CourseName" AS "courseName",r."AcademicPeriodID" AS "academicPeriodId",p."PeriodCode" AS "periodCode",p."Kind" AS "periodKind",p."StartDate" AS "periodStartDate",r."AcademicYearID" AS "academicYearId",r."SemesterTaken" AS "semesterTaken",r."AttemptNumber" AS "attemptNumber",r."Score"::float8 AS score,r."GradePoints"::float8 AS "gradePoints",r."Grade" AS grade,r."Status" AS status,r."SourceReference" AS "sourceReference",r."RecordedBy" AS "recordedBy",r."CreatedAt" AS "createdAt",r."UpdatedAt" AS "updatedAt" FROM "StudentCourseResults" r JOIN "Courses" c ON c."CourseID"=r."CourseID" LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=r."AcademicPeriodID"`;
+export const resultSelect = `SELECT r."ResultID" AS id,r."StudentID" AS "studentId",r."CourseID" AS "courseId",c."CourseCode" AS "courseCode",c."CourseName" AS "courseName",r."AcademicPeriodID" AS "academicPeriodId",p."PeriodCode" AS "periodCode",p."Kind" AS "periodKind",p."StartDate" AS "periodStartDate",r."AcademicYearID" AS "academicYearId",r."SemesterTaken" AS "semesterTaken",r."AttemptNumber" AS "attemptNumber",r."Score"::float8 AS score,r."GradePoints"::float8 AS "gradePoints",r."Grade" AS grade,r."Status" AS status,r."SourceReference" AS "sourceReference",r."OJTResultID" AS "ojtResultId",r."RecordedBy" AS "recordedBy",r."CreatedAt" AS "createdAt",r."UpdatedAt" AS "updatedAt" FROM "StudentCourseResults" r JOIN "Courses" c ON c."CourseID"=r."CourseID" LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=r."AcademicPeriodID"`;
 export async function results(id: number, params: Record<string,unknown>) {
   await student(id);
   const p=pagination(params,['courseId','academicPeriodId','status']), args:unknown[]=[id], filters=['r."StudentID"=$1'];
@@ -72,6 +72,7 @@ export async function patchResult(id: number, body: unknown, actorId: number) {
   return academicTransaction(async client => {
     const old=(await client.query('SELECT * FROM "StudentCourseResults" WHERE "ResultID"=$1 FOR UPDATE',[id])).rows[0];
     if (!old) throw invalid('Course result not found.',404,'RESULT_NOT_FOUND');
+    if(old.OJTResultID)throw invalid('A synchronized official OJT grade is immutable.',409,'OFFICIAL_OJT_GRADE_IMMUTABLE');
     const values=resultValues({status:old.Status,score:old.Score===null?null:Number(old.Score),grade:old.Grade,gradePoints:old.GradePoints===null?null:Number(old.GradePoints),sourceReference:old.SourceReference,...input});
     const courseId=positiveId(input.courseId??old.CourseID,'courseId');
     const periodId=positiveId(input.academicPeriodId??old.AcademicPeriodID,'academicPeriodId');

@@ -1,5 +1,7 @@
 # Đợt chọn và xác nhận combo
 
+> Cập nhật G01–G05: xem [cấu hình kỳ đăng ký, lịch combo, preview, mốc xét và đồng bộ điểm OJT](academic-workflow-gaps.md). Các ràng buộc mới này được áp dụng cùng các API bên dưới.
+
 Base URL: `http://localhost:3000/api`. Gửi `Authorization: Bearer <token>`. Các API quản lý dành cho ADMIN/ACADEMIC; sinh viên được gửi lựa chọn của mình và xem lịch sử của chính mình. Swagger: `http://localhost:3000/api-docs`.
 
 Schema tập trung trong `backend/DB`, phần `20261008 combo registration windows and confirmed choices`. Không có tạo bảng/seed/migration tự chạy trong API. DB đầy đủ là script khởi tạo/reset, không chạy toàn bộ trên dữ liệu production hiện có.

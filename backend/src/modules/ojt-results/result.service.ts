@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, positiveId, requiredText, optionalText, score, enumValue, pagination } from '../students/student.validation';
 import { fingerprint } from '../eligibility/eligibility.service';
+import { syncOfficialGrade } from './grade-sync';
 
 type Row = Record<string, any>;
 export const statuses = ['PENDING_ACADEMIC_CONFIRMATION', 'REVISION_REQUESTED', 'CONFIRMED'];
@@ -15,7 +16,8 @@ export function resultApi(r: Row) {
     status:r.Status, version:r.Version, dossier:r.Dossier, source:r.SourceSnapshot,
     officialScore:r.OfficialScore == null ? null : Number(r.OfficialScore), outcome:r.Outcome,
     academicNote:r.AcademicNote, transferredBy:r.TransferredBy, transferredAt:r.TransferredAt,
-    updatedAt:r.UpdatedAt, confirmedBy:r.ConfirmedBy, confirmedAt:r.ConfirmedAt, confirmationReason:r.ConfirmationReason };
+    updatedAt:r.UpdatedAt, confirmedBy:r.ConfirmedBy, confirmedAt:r.ConfirmedAt, confirmationReason:r.ConfirmationReason,
+    courseResultId:r.CourseResultID,gradeMappingId:r.GradeMappingID,gradeMapping:r.GradeMappingSnapshot };
 }
 async function record(c:PoolClient, id:number):Promise<Row> {
   const r=(await c.query(`${select} WHERE r."ResultID"=$1 FOR UPDATE OF r`,[id])).rows[0];
@@ -103,7 +105,9 @@ export async function change(id:number,body:unknown,actor:number,action:'REVISIO
     outcome=enumValue(b.outcome,['PASSED','FAILED'],'outcome');note=optionalText(b.academicNote,'academicNote',5000);
   }
   return academicTransaction(async c=>{
-    const before=await record(c,id);expected(before,b.expectedVersion);
+    const before=await record(c,id);
+    if(action==='CONFIRMED'&&before.Status==='CONFIRMED'&&before.ConfirmedBy===actor&&before.ConfirmationReason===reason&&before.Version===Number(b.expectedVersion)+1&&before.CourseResultID)return {...resultApi(before),replayed:true};
+    expected(before,b.expectedVersion);
     if(before.Status!=='PENDING_ACADEMIC_CONFIRMATION')throw invalid('Wait for QHDN to resubmit the revised dossier.',409,'OJT_RESULT_REVISION_PENDING');
     if(action!=='REVISION_REQUESTED') {
       const current=await source(c,before.AssignmentID);
@@ -113,7 +117,8 @@ export async function change(id:number,body:unknown,actor:number,action:'REVISIO
     if(action==='UPDATED') await c.query(`UPDATE "OJTResults" SET "OfficialScore"=$2,"Outcome"=$3,"AcademicNote"=$4,"Version"="Version"+1,"UpdatedAt"=now() WHERE "ResultID"=$1`,[id,officialScore,outcome,note]);
     else if(action==='REVISION_REQUESTED') await c.query(`UPDATE "OJTResults" SET "Status"='REVISION_REQUESTED',"OfficialScore"=NULL,"Outcome"=NULL,"AcademicNote"=NULL,"Version"="Version"+1,"UpdatedAt"=now() WHERE "ResultID"=$1`,[id]);
     else {
-      await c.query(`UPDATE "OJTResults" SET "Status"='CONFIRMED',"ConfirmedBy"=$2,"ConfirmedAt"=now(),"ConfirmationReason"=$3,"Version"="Version"+1,"UpdatedAt"=now() WHERE "ResultID"=$1`,[id,actor,reason]);
+      const synced=await syncOfficialGrade(c,before,actor,reason);
+      await c.query(`UPDATE "OJTResults" SET "Status"='CONFIRMED',"ConfirmedBy"=$2,"ConfirmedAt"=now(),"ConfirmationReason"=$3,"Version"="Version"+1,"UpdatedAt"=now(),"CourseResultID"=$4,"GradeMappingID"=$5,"GradeMappingSnapshot"=$6 WHERE "ResultID"=$1`,[id,actor,reason,synced.courseResultId,synced.mappingId,JSON.stringify(synced.mappingSnapshot)]);
       await c.query(`UPDATE "InternshipAssignments" SET "Status"=$2 WHERE "AssignmentID"=$1`,[before.AssignmentID,before.Outcome==='PASSED'?'COMPLETED':'FAILED']);
     }
     const after=await record(c,id);await event(c,after,actor,action,reason);

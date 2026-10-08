@@ -5,6 +5,8 @@ import {
 import path from "node:path";
 
 import swaggerJSDoc from "swagger-jsdoc";
+import { describeManualInputs } from './swagger-inputs';
+import { buildJsonInputOperations, documentJsonInputOperations } from './json-input-operations';
 
 const modulesDirectory =
   path.resolve(
@@ -351,5 +353,6 @@ const options: swaggerJSDoc.Options =
       ),
   };
 
-export const swaggerSpec =
-  swaggerJSDoc(options);
+const originalSpec = describeManualInputs(swaggerJSDoc(options));
+export const jsonInputOperations = buildJsonInputOperations(originalSpec);
+export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

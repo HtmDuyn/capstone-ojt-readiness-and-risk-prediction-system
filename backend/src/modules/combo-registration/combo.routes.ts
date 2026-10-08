@@ -15,6 +15,7 @@ for(const action of ['open','close'] as const)router.post(`/combo-registration-w
 router.post('/combo-registration-windows/:id/extensions',...staff,handle(req=>extendWindow(positiveId(req.params.id),req.body,req.user.userId),201));
 router.get('/combo-registration-windows/:id/selections',...staff,handle(req=>selectionReport(positiveId(req.params.id),req.query)));
 router.post('/combo-registration-windows/:id/selections',...own,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user),201));
+router.post('/combo-registration-windows/:id/preview',...own,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user,true)));
 router.post('/combo-registration-windows/:id/reminders',...staff,handle(req=>sendReminders(positiveId(req.params.id),req.body,req.user.userId)));
 router.get('/students/:id/combo-selections',...own,handle(req=>studentComboHistory(positiveId(req.params.id),req.query,req.user)));
 router.post('/combo-registration-windows/:id/finalize',...staff,handle(req=>finalizeWindow(positiveId(req.params.id),req.body,req.user.userId)));

@@ -1,5 +1,7 @@
 # Academic calendar and student placement APIs
 
+> Cập nhật G01–G05: xem [cấu hình kỳ đăng ký, lịch combo, preview, mốc xét và đồng bộ điểm OJT](academic-workflow-gaps.md). Các ràng buộc mới này được áp dụng cùng các API bên dưới.
+
 All 13 endpoints require a bearer token for `ACADEMIC` or `ADMIN`. Accounts with a temporary password must change it first. Requests and responses use JSON.
 
 | Resource | List | Create | Update |
@@ -138,6 +140,20 @@ PATCH may update 1–4 group defaults:
 Other group defaults are retained. Changing a group default does not silently overwrite a student's saved actual entry period. Changing a cohort enrollment year validates all affected placements and synchronizes `Students.EnrollmentYear`.
 
 ## 5. Actual student placement
+
+Alternative with the student ID in the JSON body: `PATCH /api/students/academic-placement`.
+
+```json
+{
+  "studentId": 123,
+  "cohortId": 1,
+  "groupCode": "A",
+  "currentAcademicPeriodId": 5,
+  "reason": "Gán lộ trình thực tế"
+}
+```
+
+`studentId` is an existing database StudentID, not a UserID or student code. This alternative uses the same ADMIN/ACADEMIC authorization, validation, transaction and audit as the URL-ID API. Referenced student, cohort/group and academic periods must already exist; once configured they can be reused without rerunning their creation or GET APIs for every test. It does not automatically create sample data.
 
 `PATCH /api/students/123/academic-placement`
 

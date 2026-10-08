@@ -1,5 +1,7 @@
 # Xác nhận kết quả OJT
 
+> Cập nhật G01–G05: xem [cấu hình kỳ đăng ký, lịch combo, preview, mốc xét và đồng bộ điểm OJT](academic-workflow-gaps.md). Các ràng buộc mới này được áp dụng cùng các API bên dưới.
+
 Base URL: `/api`. Gửi `Authorization: Bearer <accessToken>`. JSON thành công: `{ "success": true, "data": ... }`.
 
 ## Vai trò và luồng xử lý

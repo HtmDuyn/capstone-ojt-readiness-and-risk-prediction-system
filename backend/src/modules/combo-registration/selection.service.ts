@@ -9,6 +9,8 @@ import { invalid, inputObject, positiveId, requiredText, ids, purpose } from './
 import { roster, windowRecord, activeChoice, cancelQueuedReminders, type Row } from './combo.repository';
 import { now } from './window.service';
 import { recalculateAcademicState } from './combo-eligibility';
+import { academicProgressWithClient } from '../students/academic-progress';
+import { prospectiveEligibility } from '../eligibility/eligibility.service';
 
 export async function assertRosterContext(client:PoolClient,r:Row) {
   const current=(await client.query(`SELECT s."ProgramID",s."Status",u."Status" AS "AccountStatus",p."CohortID",p."GroupCode",p."EntryAcademicPeriodID" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" WHERE s."StudentID"=$1`,[r.studentId])).rows[0];
@@ -31,7 +33,11 @@ export async function validateChoice(client:PoolClient,programId:number,comboId:
   if(new Set(courseIds.map(canonical)).size!==courseIds.length)throw invalid('Equivalent courses cannot be selected as two distinct combo requirements.');
   return {programId,programCode:combo.ProgramCode,version:combo.Version,comboId,code:combo.ComboCode,name:combo.ComboName,courseIds,courses:chosen};
 }
-export async function submitChoice(windowId:number,body:unknown,user:{userId:number;roleCode:string}) {
+async function impact(client:PoolClient,studentId:number,semesterId:number,comboId:number,courseIds:number[]) {
+  const current=await academicProgressWithClient(client,studentId),proposed=await academicProgressWithClient(client,studentId,{comboId,courseIds});
+  return {isPreview:true,current,proposed,eligibility:await prospectiveEligibility(client,studentId,semesterId,proposed),missingRequiredCourses:proposed.requirements.filter((r:any)=>r.required&&!r.completed),earnedCreditDelta:proposed.credits.earned-current.credits.earned};
+}
+export async function submitChoice(windowId:number,body:unknown,user:{userId:number;roleCode:string},previewOnly=false) {
   const b=inputObject(body,['studentId','comboId','courseIds','reason']),comboId=positiveId(b.comboId,'comboId'),courseIds=ids(b.courseIds,'courseIds',500);
   return academicTransaction(async client=>{
     const w=await windowRecord(client,windowId,true);if(w.Status!=='OPEN')throw invalid('This window is not open.',409,'COMBO_WINDOW_CLOSED');
@@ -45,12 +51,14 @@ export async function submitChoice(windowId:number,body:unknown,user:{userId:num
     const choice=await validateChoice(client,member.programId,comboId,courseIds),active=await activeChoice(client,studentId,member.programId);
     const previous=member.choiceSnapshot??active[0]??null;
     const changed=previous && (previous.comboId!==comboId || JSON.stringify(previous.courseIds)!==JSON.stringify(courseIds));
-    const reason=(changed || user.roleCode!=='STUDENT')?requiredText(b.reason,'reason',2000):b.reason===undefined?null:requiredText(b.reason,'reason',2000);
+    const reason=previewOnly?null:(changed || user.roleCode!=='STUDENT')?requiredText(b.reason,'reason',2000):b.reason===undefined?null:requiredText(b.reason,'reason',2000);
     const time=await now(client);if(time<new Date(w.StartsAt)||time>=new Date(member.effectiveEndsAt))throw invalid('Outside your effective registration deadline.',409,'COMBO_DEADLINE');
+    const preview=await impact(client,studentId,w.OJTSemesterID,comboId,courseIds);
+    if(previewOnly)return {windowId,studentId,phase:w.Phase,choice,preview,effectiveEndsAt:member.effectiveEndsAt};
     const event=(await client.query(`INSERT INTO "StudentComboSelectionEvents" ("WindowID","StudentID","ProgramComboID","EventType","CourseIDs","ChoiceSnapshot","PreviousSnapshot","CreatedBy","Reason","SourceEventID") VALUES ($1,$2,$3,'SUBMITTED',$4,$5,$6,$7,$8,$9) RETURNING "EventID","CreatedAt"`,[windowId,studentId,comboId,JSON.stringify(courseIds),JSON.stringify(choice),previous?JSON.stringify(previous):null,user.userId,reason,member.eventId??null])).rows[0];
     await cancelQueuedReminders(client,windowId,studentId);
     await audit(client,user.userId,'StudentComboSelectionEvents',event.EventID,'SUBMIT_COMBO_CHOICE',previous,choice,reason??undefined);
-    return {eventId:event.EventID,windowId,studentId,phase:w.Phase,choice,submittedAt:event.CreatedAt,effectiveEndsAt:member.effectiveEndsAt,status:'SUBMITTED'};
+    return {eventId:event.EventID,windowId,studentId,phase:w.Phase,choice,preview,submittedAt:event.CreatedAt,effectiveEndsAt:member.effectiveEndsAt,status:'SUBMITTED'};
   });
 }
 export async function finalizeWindow(id:number,body:unknown,actorId:number) {

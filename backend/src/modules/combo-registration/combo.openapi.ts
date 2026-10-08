@@ -808,7 +808,59 @@
  *             "description": "Success"
  *           },
  *           "201": {
- *             "description": "Created"
+ *             "description": "Created",
+ *             "content": {
+ *               "application/json": {
+ *                 "schema": {
+ *                   "type": "object",
+ *                   "properties": {
+ *                     "success": {
+ *                       "type": "boolean"
+ *                     },
+ *                     "data": {
+ *                       "type": "object",
+ *                       "properties": {
+ *                         "eventId": {
+ *                           "type": "integer"
+ *                         },
+ *                         "choice": {
+ *                           "type": "object"
+ *                         },
+ *                         "preview": {
+ *                           "type": "object",
+ *                           "properties": {
+ *                             "isPreview": {
+ *                               "type": "boolean",
+ *                               "enum": [
+ *                                 true
+ *                               ]
+ *                             },
+ *                             "current": {
+ *                               "type": "object"
+ *                             },
+ *                             "proposed": {
+ *                               "type": "object"
+ *                             },
+ *                             "eligibility": {
+ *                               "type": "object"
+ *                             },
+ *                             "missingRequiredCourses": {
+ *                               "type": "array",
+ *                               "items": {
+ *                                 "type": "object"
+ *                               }
+ *                             },
+ *                             "earnedCreditDelta": {
+ *                               "type": "number"
+ *                             }
+ *                           }
+ *                         }
+ *                       }
+ *                     }
+ *                   }
+ *                 }
+ *               }
+ *             }
  *           },
  *           "400": {
  *             "description": "Invalid scope, deadline or choice group"
@@ -835,7 +887,8 @@
  *               }
  *             }
  *           }
- *         }
+ *         },
+ *         "description": "Includes preview of proposed progress and eligibility. Official choice remains unchanged until finalize."
  *       }
  *     },
  *     "/api/combo-registration-windows/{id}/reminders": {

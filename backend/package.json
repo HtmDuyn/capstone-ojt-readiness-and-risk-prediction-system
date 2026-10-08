@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs"
@@ -29,7 +30,6 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^10.0.16",
     "pg": "^8.23.0",
-    "postgres": "^3.4.9",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   },
@@ -42,7 +42,6 @@
     "@types/pg": "^8.15.5",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "nodemon": "^3.1.14",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

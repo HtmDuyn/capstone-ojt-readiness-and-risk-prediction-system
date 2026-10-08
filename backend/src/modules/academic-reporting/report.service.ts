@@ -1,5 +1,5 @@
 import { academicTransaction } from '../academic/academic.repository';
-import { invalid,positiveId,pagination,enumValue,requiredText } from '../students/student.validation';
+import { invalid,positiveId,pagination,enumValue } from '../students/student.validation';
 import { filters,requirePeriod,report,type Row } from './report.repository';
 export const counts=(rows:Row[])=>({total:rows.length,eligible:rows.filter(r=>r.category==='ELIGIBLE').length,notEligible:rows.filter(r=>r.category==='NOT_ELIGIBLE').length,insufficientData:rows.filter(r=>r.category==='INSUFFICIENT_DATA').length,awaitingConfirmation:rows.filter(r=>r.category==='AWAITING_CONFIRMATION').length});
 const publicStudent=(r:Row)=>({studentId:r.studentId,studentCode:r.studentCode,fullName:r.fullName,programId:r.programId,cohortId:r.cohortId,groupCode:r.groupCode,majorId:r.majorId,comboIds:r.comboIds,category:r.category,officialCheckId:r.officialCheckId,officialStale:r.officialStale,evaluation:r.evaluation,missingRequiredCourses:r.missingRequiredCourses,alternativeRequirements:r.alternativeRequirements,dataIssues:r.dataIssues,alertTypes:r.alertTypes});

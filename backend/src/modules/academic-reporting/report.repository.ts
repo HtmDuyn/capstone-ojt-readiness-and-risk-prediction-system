@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { invalid,positiveId,enumValue,pagination } from '../students/student.validation';
-import { timestamp,ids } from '../combo-registration/combo.validation';
+import { timestamp } from '../combo-registration/combo.validation';
 import { calculateProgress } from '../students/academic-progress';
 import { resultSelect } from '../students/student.service';
 import { evaluateEligibility,fingerprint } from '../eligibility/eligibility.service';

@@ -1,5 +1,7 @@
 # API kiểm tra và xác nhận điều kiện OJT
 
+> Cập nhật G01–G05: xem [cấu hình kỳ đăng ký, lịch combo, preview, mốc xét và đồng bộ điểm OJT](academic-workflow-gaps.md). Các ràng buộc mới này được áp dụng cùng các API bên dưới.
+
 Tất cả API dùng `Authorization: Bearer <JWT>`. ADMIN và ACADEMIC quản lý quy tắc, chạy kiểm tra, xác nhận và xem batch. STUDENT chỉ xem kết quả/lịch sử của mình. Response có dạng `{ "success": true, "data": ... }`.
 
 ## Định nghĩa điều kiện

@@ -1,0 +1,17 @@
+import { Router,type RequestHandler } from 'express';
+import { authenticate } from '../../middleware/authenticate';
+import { authorizeRoles } from '../../middleware/authorize';
+import { positiveId } from '../students/student.validation';
+import { saveComboSchedule,getComboSchedules,saveAssessment,assessmentDetails,changeAssessment,saveGradeMapping,gradeMappingDetails,saveRegistrationExceptions,revokeRegistrationException } from './workflow-policy';
+const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
+const handle=(fn:(r:any)=>Promise<unknown>):RequestHandler=>async(req,res,next)=>{try{res.json({success:true,data:await fn(req)});}catch(e){next(e);}};
+router.get('/academic-periods/:id/combo-phase-schedules',...staff,handle(r=>getComboSchedules(positiveId(r.params.id))));
+router.put('/academic-periods/:id/combo-phase-schedules',...staff,handle(r=>saveComboSchedule(positiveId(r.params.id),r.body,r.user.userId)));
+router.get('/ojt-semesters/:id/assessment-window',...staff,handle(r=>assessmentDetails(positiveId(r.params.id))));
+router.put('/ojt-semesters/:id/assessment-window',...staff,handle(r=>saveAssessment(positiveId(r.params.id),r.body,r.user.userId)));
+for(const action of ['open','close']as const)router.post(`/ojt-semesters/:id/assessment-window/${action}`,...staff,handle(r=>changeAssessment(positiveId(r.params.id),action,r.body,r.user.userId)));
+router.get('/curricula/:id/ojt-grade-mappings/:semesterId',...staff,handle(r=>gradeMappingDetails(positiveId(r.params.id),positiveId(r.params.semesterId))));
+router.put('/curricula/:id/ojt-grade-mappings/:semesterId',...staff,handle(r=>saveGradeMapping(positiveId(r.params.id),positiveId(r.params.semesterId),r.body,r.user.userId)));
+router.post('/ojt-registration-windows/:id/semester-exceptions',...staff,handle(r=>saveRegistrationExceptions(positiveId(r.params.id),r.body,r.user.userId)));
+router.post('/ojt-registration-windows/:id/semester-exceptions/:exceptionId/revoke',...staff,handle(r=>revokeRegistrationException(positiveId(r.params.id),positiveId(r.params.exceptionId),r.body,r.user.userId)));
+export default router;

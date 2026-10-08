@@ -3,10 +3,13 @@ import { academicTransaction, audit } from '../academic/academic.repository';
 import { pagination } from '../students/student.validation';
 import { inputObject, invalid, positiveId, requiredText, enumValue, timestamp, scope, ids } from './combo.validation';
 import { windowRecord, asWindow, matchingStudents, roster, cancelQueuedReminders, type Row } from './combo.repository';
+import { comboSchedule } from '../academic/workflow-policy';
 
 export async function now(client:PoolClient):Promise<Date> {return (await client.query('SELECT clock_timestamp() AS now')).rows[0].now;}
 async function validateWindow(client:PoolClient,w:Row) {
   if(new Date(w.EndsAt)<=new Date(w.StartsAt))throw invalid('endsAt must be after startsAt.');
+  const schedule=await comboSchedule(client,w.AcademicPeriodID,w.Phase);
+  if(new Date(w.StartsAt)<new Date(schedule.StartsAt)||new Date(w.EndsAt)>new Date(schedule.EndsAt))throw invalid('Base window dates must fit the explicitly configured combo phase. Use scoped extensions for exceptions.',409,'COMBO_WINDOW_OUTSIDE_PHASE');
   const period=(await client.query('SELECT * FROM "AcademicPeriods" WHERE "AcademicPeriodID"=$1',[w.AcademicPeriodID])).rows[0];if(!period)throw invalid('Academic period not found.');
   if(!(await client.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rowCount)throw invalid('OJT semester not found.');
   if(w.Phase==='INITIAL' && period.Kind!=='SEMESTER')throw invalid('Initial choice must target the actual regular specialized semester 4.');
@@ -14,7 +17,7 @@ async function validateWindow(client:PoolClient,w:Row) {
     if(!w.InitialWindowID)throw invalid('Confirmation requires initialWindowId.');
     const initial=await windowRecord(client,w.InitialWindowID);
     if(initial.Phase!=='INITIAL' || initial.AcademicPeriodID!==(period.ParentPeriodID??period.AcademicPeriodID) || initial.OJTSemesterID!==w.OJTSemesterID)throw invalid('Confirmation must refer to an INITIAL window for the same semester 4 and OJT semester.');
-    if(new Date(w.StartsAt)<new Date(initial.StartsAt))throw invalid('Confirmation cannot start before the initial window.');
+    if(new Date(w.StartsAt)<new Date(initial.EndsAt))throw invalid('Confirmation cannot start before the initial base window ends.');
   }else if(w.InitialWindowID!==null)throw invalid('Initial phase must not specify initialWindowId.');
   for(const [table,col,values] of [['Cohorts','CohortID',w.Scope.cohortIds],['Specializations','SpecializationID',w.Scope.majorIds],['Students','StudentID',w.Scope.studentIds]] as const)if(values) {
     const count=(await client.query(`SELECT count(*)::int AS n FROM "${table}" WHERE "${col}"=ANY($1::int[])`,[values])).rows[0].n;
