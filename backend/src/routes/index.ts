@@ -1,4 +1,5 @@
 import reportingRoutes from '../modules/academic-reporting/report.routes';
+import resultRoutes from '../modules/ojt-results/result.routes';
 import ojtRegistrationRoutes from '../modules/ojt-registration/registration.routes';
 import eligibilityRoutes from '../modules/eligibility/eligibility.routes';
 import { Router } from "express";
@@ -15,6 +16,7 @@ import healthRoutes from "../modules/system/health/health.routes";
 const router = Router();
 router.use(academicRoutes);
 router.use(reportingRoutes);
+router.use(resultRoutes);
 router.use(studentRoutes);
 router.use(curriculumRoutes);
 router.use(comboRoutes);

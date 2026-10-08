@@ -6,7 +6,7 @@ SET LOCAL search_path=public,pg_catalog;
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
  SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries')
+ WHERE n.nspname='public' AND c.relname IN ('OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries')
 ), edges AS (
  SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
  UNION
@@ -6006,4 +6006,95 @@ BEGIN
  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO service_role',seq); END IF;
 END $$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_academic_reporting');
+
+-- SECTION: 20261008 official OJT results
+CREATE TABLE "OJTResults" (
+ "ResultID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "AssignmentID" int NOT NULL UNIQUE REFERENCES "InternshipAssignments"("AssignmentID"),
+ "StudentID" int NOT NULL REFERENCES "Students"("StudentID"),
+ "OJTSemesterID" int NOT NULL REFERENCES "OJTSemesters"("OJTSemesterID"),
+ "Status" varchar(40) NOT NULL DEFAULT 'PENDING_ACADEMIC_CONFIRMATION'
+  CHECK ("Status" IN ('PENDING_ACADEMIC_CONFIRMATION','REVISION_REQUESTED','CONFIRMED')),
+ "Version" int NOT NULL DEFAULT 1 CHECK ("Version">0),
+ "Dossier" jsonb NOT NULL CHECK (jsonb_typeof("Dossier")='object'),
+ "SourceSnapshot" jsonb NOT NULL CHECK (jsonb_typeof("SourceSnapshot")='object'),
+ "SourceHash" text NOT NULL,
+ "OfficialScore" numeric(4,2) CHECK ("OfficialScore" BETWEEN 0 AND 10),
+ "Outcome" varchar(10) CHECK ("Outcome" IN ('PASSED','FAILED')),
+ "AcademicNote" text,
+ "TransferredBy" int NOT NULL REFERENCES "Users"("UserID"),
+ "TransferredAt" timestamptz NOT NULL DEFAULT now(),
+ "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
+ "ConfirmedBy" int REFERENCES "Users"("UserID"),
+ "ConfirmedAt" timestamptz,
+ "ConfirmationReason" text,
+ UNIQUE ("StudentID","OJTSemesterID"),
+ CHECK (("OfficialScore" IS NULL)=("Outcome" IS NULL)),
+ CHECK ("Status"<>'REVISION_REQUESTED' OR "OfficialScore" IS NULL),
+ CHECK (("Status"='CONFIRMED' AND "ConfirmedBy" IS NOT NULL AND "ConfirmedAt" IS NOT NULL
+  AND "OfficialScore" IS NOT NULL AND "Outcome" IS NOT NULL AND "ConfirmationReason" IS NOT NULL AND length(btrim("ConfirmationReason"))>0)
+  OR ("Status"<>'CONFIRMED' AND "ConfirmedBy" IS NULL AND "ConfirmedAt" IS NULL AND "ConfirmationReason" IS NULL))
+);
+CREATE INDEX "IX_OJTResults_SemesterStatus" ON "OJTResults"("OJTSemesterID","Status");
+CREATE TABLE "OJTResultEvents" (
+ "EventID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "ResultID" int NOT NULL REFERENCES "OJTResults"("ResultID"),
+ "Version" int NOT NULL,
+ "Action" varchar(30) NOT NULL CHECK ("Action" IN ('TRANSFERRED','RESUBMITTED','REVISION_REQUESTED','UPDATED','CONFIRMED')),
+ "Snapshot" jsonb NOT NULL,
+ "Reason" text NOT NULL CHECK (length(btrim("Reason"))>0),
+ "CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),
+ "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+ "IdempotencyKey" varchar(100) UNIQUE,
+ "RequestHash" text,
+ UNIQUE ("ResultID","Version"),
+ CHECK (("IdempotencyKey" IS NULL)=("RequestHash" IS NULL))
+);
+CREATE OR REPLACE FUNCTION "GuardOJTResult"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP<>'INSERT' AND OLD."Status"='CONFIRMED' THEN
+  RAISE EXCEPTION 'Confirmed OJT result is immutable' USING ERRCODE='23514'; END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ IF TG_OP='INSERT' AND (NEW."Status"<>'PENDING_ACADEMIC_CONFIRMATION' OR NEW."Version"<>1) THEN
+  RAISE EXCEPTION 'New OJT result must start pending at version 1' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' THEN
+  IF (NEW."AssignmentID",NEW."StudentID",NEW."OJTSemesterID") IS DISTINCT FROM
+   (OLD."AssignmentID",OLD."StudentID",OLD."OJTSemesterID") OR NEW."Version"<>OLD."Version"+1 THEN
+   RAISE EXCEPTION 'OJT context is immutable and version must advance' USING ERRCODE='23514'; END IF;
+  IF OLD."Status"='REVISION_REQUESTED' AND NEW."Status"<>'PENDING_ACADEMIC_CONFIRMATION' THEN
+   RAISE EXCEPTION 'Revised OJT result must return to pending' USING ERRCODE='23514'; END IF;
+ END IF;
+ IF NOT EXISTS (
+  SELECT 1 FROM "InternshipAssignments" a
+  JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
+  JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
+  JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"
+  WHERE a."AssignmentID"=NEW."AssignmentID" AND a."StudentID"=NEW."StudentID"
+   AND r."StudentID"=NEW."StudentID" AND r."OJTSemesterID"=NEW."OJTSemesterID"
+   AND co."OJTSemesterID"=NEW."OJTSemesterID" AND p."OJTSemesterID"=NEW."OJTSemesterID"
+   AND co."EnterpriseID"=a."EnterpriseID" AND p."EnterpriseID"=a."EnterpriseID" AND co."PositionID"=a."PositionID"
+ ) THEN RAISE EXCEPTION 'Invalid OJT result assignment context' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER "TR_GuardOJTResult" BEFORE INSERT OR UPDATE OR DELETE ON "OJTResults"
+ FOR EACH ROW EXECUTE FUNCTION "GuardOJTResult"();
+CREATE TRIGGER "TR_AppendOnly_OJTResultEvents" BEFORE UPDATE OR DELETE ON "OJTResultEvents"
+ FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
+DO $$ DECLARE t text; seq text;
+BEGIN
+ FOREACH t IN ARRAY ARRAY['OJTResults','OJTResultEvents'] LOOP
+  EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t);
+  EXECUTE format('REVOKE ALL ON TABLE %I FROM PUBLIC',t);
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN EXECUTE format('REVOKE ALL ON TABLE %I FROM anon',t); END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN EXECUTE format('REVOKE ALL ON TABLE %I FROM authenticated',t); END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT ALL ON TABLE %I TO service_role',t); END IF;
+ END LOOP;
+ FOR seq IN SELECT pg_get_serial_sequence(format('%I',v.t),v.c) FROM (VALUES ('OJTResults','ResultID'),('OJTResultEvents','EventID')) v(t,c) LOOP
+  EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM PUBLIC',seq);
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM anon',seq); END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM authenticated',seq); END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO service_role',seq); END IF;
+ END LOOP;
+END $$;
+INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_ojt_results');
 COMMIT;
