@@ -1,5 +1,6 @@
 import "./config/env";
 import { startEligibilityWorker } from './jobs/eligibility';
+import { startPredictionWorker } from './jobs/predictions';
 import { startProvisioningJobs } from './jobs/provisioning';
 
 import app from "./app";
@@ -27,6 +28,7 @@ const startServer =
     try {
       await testDatabaseConnection();
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
+      const stopPredictions = process.env.PREDICTION_WORKER_ENABLED === 'true' ? startPredictionWorker() : () => {};
       const stopJobs = process.env.PROVISIONING_JOBS_ENABLED === 'true' ? startProvisioningJobs() : () => {};
 
       const server =
@@ -60,6 +62,7 @@ const startServer =
         async () => {
           stopJobs();
           stopEligibility();
+          stopPredictions();
           logger.info(
             "Shutting down server...",
           );

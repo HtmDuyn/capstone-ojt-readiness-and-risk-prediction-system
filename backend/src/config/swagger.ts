@@ -6,6 +6,7 @@ import path from "node:path";
 
 import swaggerJSDoc from "swagger-jsdoc";
 import { describeManualInputs } from './swagger-inputs';
+import { addAdminOperations } from '../modules/admin/admin.openapi';
 import { buildJsonInputOperations, documentJsonInputOperations } from './json-input-operations';
 
 const modulesDirectory =
@@ -353,6 +354,6 @@ const options: swaggerJSDoc.Options =
       ),
   };
 
-const originalSpec = describeManualInputs(swaggerJSDoc(options));
+const originalSpec = describeManualInputs(addAdminOperations(swaggerJSDoc(options)));
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
 export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);
