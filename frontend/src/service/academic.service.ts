@@ -21,6 +21,71 @@ export interface AcademicYear {
   endDate: string;
   status: AcademicYearStatus;
 }
+export type AcademicPeriodKind = "SEMESTER";
+
+export type AcademicPeriodStatus =
+  | "PLANNED"
+  | "ACTIVE"
+  | "COMPLETED";
+
+export interface CreateAcademicPeriodPayload {
+  academicYearId: number;
+  periodCode: string;
+  name: string;
+  kind: AcademicPeriodKind;
+  startDate: string;
+  endDate: string;
+  status: AcademicPeriodStatus;
+}
+
+export interface AcademicPeriod {
+  id: number;
+  academicYearId: number;
+  periodCode: string;
+  name: string;
+  kind: AcademicPeriodKind;
+  parentPeriodId: number | null;
+  startDate: string;
+  endDate: string;
+  status: AcademicPeriodStatus;
+}
+export interface UpdateAcademicPeriodPayload {
+  academicYearId: number;
+  periodCode: string;
+  name: string;
+  kind: AcademicPeriodKind;
+  parentPeriodId: number | null;
+  startDate: string;
+  endDate: string;
+  status: AcademicPeriodStatus;
+  academicPeriodId: number;
+}
+
+interface UpdateAcademicPeriodResponse {
+  success: boolean;
+  data: AcademicPeriod;
+}
+export interface SearchAcademicPeriodsPayload {
+  page: number;
+  limit: number;
+  search: string;
+  status: AcademicPeriodStatus;
+  academicYearId: number;
+  kind: AcademicPeriodKind;
+}
+
+interface SearchAcademicPeriodsResponse {
+  success: boolean;
+  items: AcademicPeriod[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+interface CreateAcademicPeriodResponse {
+  success: boolean;
+  data: AcademicPeriod;
+}
 export interface SearchAcademicYearsResponse {
   success: boolean;
   items: AcademicYear[];
@@ -149,8 +214,155 @@ const searchAcademicYears = async (): Promise<AcademicYear[]> => {
 
   return successResult.items;
 };
+const createAcademicPeriod = async (
+  payload: CreateAcademicPeriodPayload,
+): Promise<AcademicPeriod> => {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error(
+      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
+    );
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/academic-periods`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = (await response.json()) as
+    | CreateAcademicPeriodResponse
+    | ApiErrorResponse;
+
+  if (!response.ok) {
+    const error = result as ApiErrorResponse;
+
+    if (response.status === 401) {
+      throw new Error(
+        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
+      );
+    }
+
+    if (response.status === 409) {
+      throw new Error(
+        "Kỳ học này đã tồn tại trong hệ thống.",
+      );
+    }
+
+    throw new Error(
+      error.message || "Không thể tạo kỳ học.",
+    );
+  }
+
+  const successResult =
+    result as CreateAcademicPeriodResponse;
+
+  return successResult.data;
+};
+const searchAcademicPeriods = async (
+  payload: SearchAcademicPeriodsPayload,
+): Promise<AcademicPeriod[]> => {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error(
+      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
+    );
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/json/academic-periods/search`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = (await response.json()) as
+    | SearchAcademicPeriodsResponse
+    | ApiErrorResponse;
+
+  if (!response.ok) {
+    const error = result as ApiErrorResponse;
+
+    if (response.status === 401) {
+      throw new Error(
+        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
+      );
+    }
+
+    throw new Error(
+      error.message || "Không thể tải danh sách kỳ học.",
+    );
+  }
+
+  const successResult =
+    result as SearchAcademicPeriodsResponse;
+
+  return successResult.items;
+};
+const updateAcademicPeriod = async (
+  payload: UpdateAcademicPeriodPayload,
+): Promise<AcademicPeriod> => {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error(
+      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
+    );
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/json/academic-periods`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = (await response.json()) as
+    | UpdateAcademicPeriodResponse
+    | ApiErrorResponse;
+
+  if (!response.ok) {
+    const error = result as ApiErrorResponse;
+
+    if (response.status === 401) {
+      throw new Error(
+        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
+      );
+    }
+
+    throw new Error(
+      error.message || "Không thể cập nhật kỳ học.",
+    );
+  }
+
+  const successResult =
+    result as UpdateAcademicPeriodResponse;
+
+  return successResult.data;
+};
 export const academicService = {
   createAcademicYear,
   searchAcademicYears,
+  createAcademicPeriod,
+  searchAcademicPeriods,
+  updateAcademicPeriod,
 };
 
