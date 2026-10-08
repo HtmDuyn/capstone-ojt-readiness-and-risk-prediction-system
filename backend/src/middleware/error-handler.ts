@@ -36,6 +36,7 @@ export const errorHandler: ErrorRequestHandler =
         success: false,
 
         errorCode,
+        ...(typeof error?.importBatchId === 'string' ? { importBatchId: error.importBatchId } : {}),
 
         message:
           statusCode === 500

@@ -92,6 +92,10 @@ app.use(
   routes,
 );
 
+app.get('/api-docs/openapi.json', (_req, res) => {
+  res.json(swaggerSpec);
+});
+
 app.use(
   "/api-docs",
   swaggerUi.serve,
@@ -112,7 +116,7 @@ app.use(
           -1,
 
         defaultModelExpandDepth:
-          -1,
+          2,
 
         tryItOutEnabled:
           true,

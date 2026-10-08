@@ -12,6 +12,9 @@ const selectUser = `
     u."FullName" AS full_name,
     u."Status" AS status,
     u."PasswordHash" AS password_hash,
+    u."MustChangePassword" AS must_change_password,
+    u."TemporaryPasswordExpiresAt" AS temporary_password_expires_at,
+    u."AuthVersion" AS auth_version,
     r."RoleCode" AS role_code,
     r."RoleName" AS role_name
   FROM "Users" u

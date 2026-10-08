@@ -5,6 +5,8 @@ import {
 import path from "node:path";
 
 import swaggerJSDoc from "swagger-jsdoc";
+import { describeManualInputs } from './swagger-inputs';
+import { buildJsonInputOperations, documentJsonInputOperations } from './json-input-operations';
 
 const modulesDirectory =
   path.resolve(
@@ -58,7 +60,7 @@ const options: swaggerJSDoc.Options =
           "1.0.0",
 
         description:
-          "API for OJT Management and AI Risk Prediction System",
+          "API for OJT Management and Academic Eligibility",
       },
 
       servers: [
@@ -200,6 +202,11 @@ const options: swaggerJSDoc.Options =
                 example:
                   "eyJhbGciOiJIUzI1NiIs...",
               },
+              mustChangePassword: {
+                type: "boolean",
+                description: "Change the temporary password before using protected business APIs.",
+                example: false,
+              },
             },
           },
 
@@ -213,6 +220,7 @@ const options: swaggerJSDoc.Options =
               "object",
 
             properties: {
+              mustChangePassword: { type: "boolean", example: false },
               id: {
                 type:
                   "integer",
@@ -345,5 +353,6 @@ const options: swaggerJSDoc.Options =
       ),
   };
 
-export const swaggerSpec =
-  swaggerJSDoc(options);
+const originalSpec = describeManualInputs(swaggerJSDoc(options));
+export const jsonInputOperations = buildJsonInputOperations(originalSpec);
+export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

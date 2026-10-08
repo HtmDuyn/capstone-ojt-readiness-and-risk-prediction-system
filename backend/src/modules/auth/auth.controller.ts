@@ -11,7 +11,6 @@ import {
 import {
   getUserById,
   loginUser,
-  logoutUser,
 } from "./auth.service";
 
 export const login = async (
@@ -39,6 +38,7 @@ export const login = async (
         "Login successful",
       token:
         result.token,
+      mustChangePassword: result.mustChangePassword,
     });
   } catch (error) {
     next(error);
@@ -97,6 +97,7 @@ export const getCurrentUser = async (
         "User profile retrieved successfully",
 
       user: {
+        mustChangePassword: user.must_change_password,
         id:
           user.id,
 
@@ -125,39 +126,13 @@ export const getCurrentUser = async (
 };
 
 export const logout = async (
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ): Promise<void> => {
-  try {
-    const sessionId =
-      req.user?.sessionId;
-
-    if (!sessionId) {
-      res.status(401).json({
-        success: false,
-
-        errorCode:
-          "AUTH_REQUIRED",
-
-        message:
-          "Authentication required.",
-      });
-
-      return;
-    }
-
-    await logoutUser(
-      sessionId,
-    );
-
-    res.status(200).json({
-      success: true,
-
-      message:
-        "Logout successful",
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.status(200).json({
+    success: true,
+    message:
+      "Logout successful",
+  });
 };
