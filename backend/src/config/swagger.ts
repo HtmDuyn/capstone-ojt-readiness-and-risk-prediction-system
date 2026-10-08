@@ -58,7 +58,7 @@ const options: swaggerJSDoc.Options =
           "1.0.0",
 
         description:
-          "API for OJT Management and AI Risk Prediction System",
+          "API for OJT Management and Academic Eligibility",
       },
 
       servers: [
@@ -200,6 +200,11 @@ const options: swaggerJSDoc.Options =
                 example:
                   "eyJhbGciOiJIUzI1NiIs...",
               },
+              mustChangePassword: {
+                type: "boolean",
+                description: "Change the temporary password before using protected business APIs.",
+                example: false,
+              },
             },
           },
 
@@ -213,6 +218,7 @@ const options: swaggerJSDoc.Options =
               "object",
 
             properties: {
+              mustChangePassword: { type: "boolean", example: false },
               id: {
                 type:
                   "integer",

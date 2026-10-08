@@ -15,7 +15,7 @@ export const authService = {
 
   // Ví dụ lấy thông tin profile (cần token)
   getProfile: async () => {
-    const response = await API.get('/auth/profile');
+    const response = await API.get('/auth/me');
     return response.data;
   },
 };
