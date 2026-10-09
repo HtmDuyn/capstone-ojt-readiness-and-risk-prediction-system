@@ -4,21 +4,58 @@ import RightPanel from "@/components/auth/RightPanel";
 import type { UserRole } from "@/types/auth.types";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoleRedirect } from "@/hooks/useRoleRedirect";
-import { mockStudentProfile } from "@/data/student/mockStudentData";
+import { authService } from "@/service/authService";
+
+const roleByCode: Record<string, UserRole> = {
+  ADMIN: "admin",
+  ACADEMIC: "education",
+  OJT_COORD: "qhdn",
+  STUDENT: "student",
+  ENTERPRISE: "enterprise",
+};
+
+const getApiErrorMessage = (error: unknown): string | undefined => {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("response" in error)
+  ) {
+    return undefined;
+  }
+
+  const response = error.response;
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    !("data" in response)
+  ) {
+    return undefined;
+  }
+
+  const data = response.data;
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("message" in data) ||
+    typeof data.message !== "string"
+  ) {
+    return undefined;
+  }
+
+  return data.message;
+};
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { redirectToDashboard } = useRoleRedirect();
 
-  const [selectedRole, setSelectedRole] = useState<UserRole>("student");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const statsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -35,31 +72,45 @@ const LoginPage: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const performMockLogin = (role: UserRole) => {
-    const mockUser = {
-      id: role === 'student' ? mockStudentProfile.studentCode : `${role.toUpperCase()}_001`,
-      name: role === 'student' ? mockStudentProfile.fullName : `${role === 'admin' ? 'Quản trị viên' : role === 'education' ? 'Cán bộ Đào tạo' : role === 'qhdn' ? 'Cán bộ QHDN' : 'Đại diện Doanh nghiệp'}`,
-      email: role === 'student' ? mockStudentProfile.email : `${role}@fpt.edu.vn`,
-      role,
-      avatar: mockStudentProfile.avatar,
-    };
-    login("mock_token_" + Date.now(), mockUser);
-    redirectToDashboard(role);
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setIsLoading(false);
-    performMockLogin(selectedRole);
-  };
+    setErrorMessage("");
 
-  const handleSocialLogin = async (_provider: "google" | "microsoft") => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setIsLoading(false);
-    performMockLogin(selectedRole);
+    try {
+      const loginResponse = await authService.login({
+        email: account.trim(),
+        password,
+      });
+      const profileResponse = await authService.getCurrentUser(loginResponse.token);
+      const profile = profileResponse.user;
+      const role = profile.roleCode
+        ? roleByCode[profile.roleCode.toUpperCase()]
+        : undefined;
+
+      if (!role) {
+        throw new Error("Vai trò tài khoản không được hỗ trợ.");
+      }
+
+      login(loginResponse.token, {
+        id: String(profile.id),
+        name: profile.fullName || profile.username,
+        email: profile.email,
+        role,
+      });
+      redirectToDashboard(role);
+    } catch (error) {
+      const apiErrorMessage = getApiErrorMessage(error);
+      if (apiErrorMessage) {
+        setErrorMessage(apiErrorMessage);
+      } else if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("Không thể đăng nhập. Vui lòng thử lại.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -82,27 +133,19 @@ const LoginPage: React.FC = () => {
         <LeftPanel
           statsRef={statsRef}
           statsVisible={statsVisible}
-          authMode={authMode}
-          onAuthModeChange={setAuthMode}
         />
 
         <RightPanel
           animateIn={animateIn}
-          selectedRole={selectedRole}
-          onSelectRole={setSelectedRole}
           account={account}
           onAccountChange={setAccount}
           password={password}
           onPasswordChange={setPassword}
           showPassword={showPassword}
           onTogglePassword={() => setShowPassword((v) => !v)}
-          rememberMe={rememberMe}
-          onToggleRemember={() => setRememberMe((v) => !v)}
           isLoading={isLoading}
+          errorMessage={errorMessage}
           onSubmit={handleLogin}
-          onSocialLogin={handleSocialLogin}
-          authMode={authMode}
-          onAuthModeChange={setAuthMode}
         />
       </div>
     </div>

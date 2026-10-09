@@ -1,0 +1,15 @@
+import { Router,type RequestHandler } from 'express';
+import { authenticate } from '../../middleware/authenticate';
+import { authorizeRoles } from '../../middleware/authorize';
+import { dashboard,statistics,alerts,courseDemand,csvReport } from './report.service';
+import { notifyAlerts } from './notification.service';
+import { enumValue } from '../students/student.validation';
+const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
+const handle=(work:(req:any)=>Promise<unknown>):RequestHandler=>async(req,res,next)=>{try{res.json({success:true,data:await work(req)});}catch(error){next(error);}};
+router.get('/academic/dashboard',...staff,handle(req=>dashboard(req.query)));
+router.get('/academic/eligibility-statistics',...staff,handle(req=>statistics(req.query)));
+router.get('/academic/alerts',...staff,handle(req=>alerts(req.query)));
+router.post('/academic/alerts/notifications',...staff,handle(req=>notifyAlerts(req.body,req.user.userId)));
+router.get('/academic/course-demand',...staff,handle(req=>courseDemand(req.query)));
+router.get('/academic/course-demand/export',...staff,async(req,res,next)=>{try{const format=enumValue(req.query.format??'csv',['csv','json'],'format');const data=await courseDemand(req.query,true);if(format==='json'){res.json({success:true,data});return;}res.setHeader('Content-Disposition','attachment; filename="academic-course-demand.csv"');res.setHeader('X-Data-Issue-Students',String(data.studentsWithDataIssues.length));res.setHeader('X-Unresolved-Alternative-Students',String(data.unresolvedAlternatives.length));res.type('text/csv; charset=utf-8').send(csvReport(data));}catch(error){next(error);}});
+export default router;
