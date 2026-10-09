@@ -82,7 +82,19 @@ pip-wheel-metadata/
 # Environment variables and secrets
 .env
 .env.*
-!.env.example
+*.env
+*.env.*
+.envrc
+
+# Private keys, credentials, and local database backups
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+*.dump
+*.backup
 
 # Logs and runtime files
 *.log
@@ -107,4 +119,14 @@ desktop.ini
 .eslintcache
 .stylelintcache
 .npm/
+
+# Temporary files and local runtime storage
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+tmp/
+temp/
+uploads/
 # Serverless directories
