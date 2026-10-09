@@ -8,7 +8,7 @@ import type { NavItem } from '@/types/common.types';
 export const QHDN_NAV_ITEMS: NavItem[] = [
   {
     id: 'dashboard',
-    label: 'Tổng quan & Thống kê',
+    label: 'Tổng quan',
     path: '/qhdn/dashboard',
     icon: <DashboardGridIcon size={20} />,
     banner: {
@@ -20,9 +20,23 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'enterprises',
-    label: 'Quản lý Doanh nghiệp',
+    label: 'Doanh nghiệp liên kết',
     path: '/qhdn/enterprises',
     icon: <Building2 size={20} />,
+    children: [
+      {
+        id: 'enterprises-import',
+        label: 'Import doanh nghiệp',
+        path: '/qhdn/enterprises/import',
+        icon: <Building2 size={16} />,
+      },
+      {
+        id: 'enterprises-list',
+        label: 'Danh sách doanh nghiệp',
+        path: '/qhdn/enterprises',
+        icon: <Building2 size={16} />,
+      },
+    ],
     banner: {
       title: 'Quản lý Doanh nghiệp & Vị trí Thực tập',
       description: 'Quản lý danh sách doanh nghiệp liên kết, vị trí thực tập tuyển dụng và chỉ tiêu số lượng tiếp nhận (quota).',
@@ -44,11 +58,11 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'evaluations',
-    label: 'Đánh giá từ Doanh nghiệp',
+    label: 'Báo cáo OJT',
     path: '/qhdn/evaluations',
     icon: <Award size={20} />,
     banner: {
-      title: 'Xem Đánh giá Thực tập Doanh nghiệp',
+      title: 'Báo cáo OJT',
       description: 'Tổng hợp kết quả đánh giá kỹ năng chuyên môn, thái độ và điểm thực tập OJT từ người hướng dẫn doanh nghiệp.',
       badge: 'Kết quả OJT',
       primaryActionLabel: 'Tải bảng đánh giá',

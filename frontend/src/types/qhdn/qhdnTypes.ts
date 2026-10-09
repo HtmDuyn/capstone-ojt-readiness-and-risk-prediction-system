@@ -17,6 +17,9 @@ export interface EnterprisePartner {
   totalQuota: number;
   acceptedCount: number;
   availableQuota: number;
+  semester?: string;
+  semesters?: string[];
+  cohorts?: string[];
 }
 
 export interface InternshipPosition {
@@ -88,3 +91,32 @@ export interface SemesterStats {
   totalPartnerEnterprises: number;
   totalQuotaAvailable: number;
 }
+
+export interface ExtractedEnterprise {
+  id: string;
+  fileName: string;
+  fileSize: string;
+  name: string;
+  shortName: string;
+  email: string;
+  contactPerson: string;
+  contactRole: string;
+  phone: string;
+  industry: string;
+  website: string;
+  address: string;
+  description: string;
+  positionsCount: number;
+  quota: number;
+  status: 'valid' | 'missing_jd' | 'need_review' | 'error';
+  statusText: string;
+  createAccount: boolean;
+  logoBg: string;
+  logoText: string;
+}
+
+export interface SelectedFileItem {
+  name: string;
+  size: string;
+}
+

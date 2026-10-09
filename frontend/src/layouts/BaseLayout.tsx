@@ -100,7 +100,10 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
             user={resolvedUserSummary}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
-            showSearch={brandSubtitle !== 'Phòng Đào tạo'}
+            showSearch={
+              brandSubtitle !== 'Phòng Đào tạo' &&
+              brandSubtitle !== 'Phòng Quan hệ Doanh nghiệp'
+            }
           />
 
           {/* Container chính thống nhất qua Dashboard & Modules */}

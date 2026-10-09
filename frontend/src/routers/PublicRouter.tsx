@@ -17,9 +17,10 @@ import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
 import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
-import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterpriseManagement";
-import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoordination";
-import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEnterpriseEvaluations";
+import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
+import QhdnEnterpriseImport from "@/pages/qhdn/QhdnEnterpriseImport";
+import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
+import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -211,6 +212,8 @@ export const router = createBrowserRouter([
           { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
           { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
           { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
+          { path: "/qhdn/enterprises/import", element: <QhdnEnterpriseImport /> },
+          { path: "/qhdn/enterprises/list", element: <Navigate to="/qhdn/enterprises" replace /> },
           { path: "/qhdn/partners", element: <Navigate to="/qhdn/enterprises" replace /> },
           { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
           { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
