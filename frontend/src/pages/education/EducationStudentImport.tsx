@@ -1,97 +1,249 @@
-import React from 'react';
+import React from "react";
 import {
-  Upload,
-  FileSpreadsheet,
-  CheckCircle2,
   AlertTriangle,
-  XCircle,
-  Users,
+  CheckCircle2,
   Download,
-  Link2,
+  FileSpreadsheet,
   Plus,
+  RefreshCw,
+  Save,
+  Upload,
   X,
-} from 'lucide-react';
-import { PageBanner } from '@/components/common/PageBanner';
+} from "lucide-react";
 
-interface StudentRow {
-  studentCode: string;
-  accountId: string | null;
-  fullName: string;
-  curriculum: string;
-  cohort: string;
-  currentTerm: string;
-  gpa: string;
-  credits: string;
-  status: string;
-  mappingStatus: 'Đã khớp' | 'Chưa khớp';
+import * as XLSX from "xlsx";
+
+import { PageBanner } from "@/components/common/PageBanner";
+
+import {
+  importService,
+  type ImportCommitResponse,
+  type ImportPreviewResponse,
+  type StudentImportRow,
+} from "@/service/import.service";
+
+/* =========================================================
+   TYPES
+   ========================================================= */
+
+type ToastType = "success" | "error";
+
+interface ToastState {
+  type: ToastType;
+  message: string;
 }
 
-const mockStudents: StudentRow[] = [
-  {
-    studentCode: 'SE161234',
-    accountId: 'SE161234',
-    fullName: 'Nguyễn Thành Phương',
-    curriculum: 'IS',
-    cohort: 'K16D-19A',
-    currentTerm: 'Kỳ 5',
-    gpa: '3.42',
-    credits: '112',
-    status: 'Đang học',
-    mappingStatus: 'Đã khớp',
-  },
-  {
-    studentCode: 'SE161458',
-    accountId: 'SE161458',
-    fullName: 'Phan Lan Anh',
-    curriculum: 'IS',
-    cohort: 'K16D-19A',
-    currentTerm: 'Kỳ 5',
-    gpa: '3.18',
-    credits: '108',
-    status: 'Đang học',
-    mappingStatus: 'Đã khớp',
-  },
-  {
-    studentCode: 'SE161789',
-    accountId: null,
-    fullName: 'Trần Hùng Dũng',
-    curriculum: 'IS',
-    cohort: 'K16D-19B',
-    currentTerm: 'Kỳ 4',
-    gpa: '2.95',
-    credits: '91',
-    status: 'Đang học',
-    mappingStatus: 'Chưa khớp',
-  },
-];
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
 
-const EMPTY_STUDENT_FORM = {
-  studentCode: '',
-  accountId: '',
-  fullName: '',
-  curriculum: '',
-  cohort: '',
-  currentTerm: '',
-  gpa: '',
-  credits: '',
-  status: 'Đang học',
+const EMPTY_STUDENT_FORM: StudentImportRow = {
+  code: "",
+  email: "",
+  fullName: "",
 };
 
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+/**
+ * Chuẩn hóa tên cột trong Excel/CSV.
+ *
+ * Ví dụ:
+ * "Mã sinh viên" -> "masinhvien"
+ * "Student Code" -> "studentcode"
+ * "full_name"    -> "fullname"
+ */
+const normalizeHeader = (value: string) => {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+};
+
+const getValueByAliases = (row: Record<string, unknown>, aliases: string[]) => {
+  const normalizedAliases = aliases.map(normalizeHeader);
+
+  for (const [key, value] of Object.entries(row)) {
+    const normalizedKey = normalizeHeader(key);
+
+    if (normalizedAliases.includes(normalizedKey)) {
+      return String(value ?? "").trim();
+    }
+  }
+
+  return "";
+};
+
+/**
+ * Backend hiện tại đã xác nhận các field:
+ *
+ * code
+ * email
+ * fullName
+ *
+ * FE hỗ trợ thêm một số tên cột tương đương
+ * để file Excel dễ sử dụng hơn.
+ */
+const convertExcelRowToStudent = (
+  row: Record<string, unknown>,
+): StudentImportRow => {
+  const code = getValueByAliases(row, [
+    "code",
+    "studentCode",
+    "student_code",
+    "MSSV",
+    "Mã sinh viên",
+    "Ma sinh vien",
+  ]);
+
+  const email = getValueByAliases(row, [
+    "email",
+    "studentEmail",
+    "student_email",
+    "Email sinh viên",
+  ]);
+
+  const fullName = getValueByAliases(row, [
+    "fullName",
+    "full_name",
+    "name",
+    "studentName",
+    "student_name",
+    "Họ tên",
+    "Ho ten",
+    "Tên sinh viên",
+  ]);
+
+  return {
+    code,
+    email,
+    fullName,
+  };
+};
+
+const createIdempotencyKey = (prefix: string) => {
+  const randomPart =
+    window.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+
+  return `${prefix}-${Date.now()}-${randomPart}`;
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+};
+
+const getActionLabel = (action: string) => {
+  if (action === "CREATED") {
+    return "Tạo mới";
+  }
+
+  if (action === "UPDATED") {
+    return "Cập nhật";
+  }
+
+  return action;
+};
+
+/* =========================================================
+   COMPONENT
+   ========================================================= */
+
 export const EducationStudentImport: React.FC = () => {
-  const [selectedFile, setSelectedFile] =
-    React.useState<File | null>(null);
+  /* ===================== FILE ===================== */
 
-  const [isImported, setIsImported] = React.useState(false);
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
-  const [students, setStudents] = React.useState<StudentRow[]>([]);
+  /*
+   * Đây là dữ liệu sẽ gửi lên API.
+   *
+   * Dù lấy từ Excel, CSV hay nhập thủ công,
+   * cuối cùng đều chuyển về:
+   *
+   * {
+   *   code,
+   *   email,
+   *   fullName
+   * }
+   */
+  const [students, setStudents] = React.useState<StudentImportRow[]>([]);
 
-  const [showAddStudentModal, setShowAddStudentModal] =
-    React.useState(false);
+  /* ===================== PREVIEW ===================== */
+
+  const [previewResult, setPreviewResult] =
+    React.useState<ImportPreviewResponse | null>(null);
+
+  const [commitResult, setCommitResult] =
+    React.useState<ImportCommitResponse | null>(null);
+
+  const [isReadingFile, setIsReadingFile] = React.useState(false);
+
+  const [isPreviewing, setIsPreviewing] = React.useState(false);
+
+  const [isCommitting, setIsCommitting] = React.useState(false);
+
+  /* ===================== ADD STUDENT ===================== */
+
+  const [showAddStudentModal, setShowAddStudentModal] = React.useState(false);
 
   const [studentForm, setStudentForm] =
-    React.useState(EMPTY_STUDENT_FORM);
+    React.useState<StudentImportRow>(EMPTY_STUDENT_FORM);
 
-  const handleFileChange = (
+  /* ===================== TOAST ===================== */
+
+  const [toast, setToast] = React.useState<ToastState | null>(null);
+
+  const toastTimeoutRef = React.useRef<number | null>(null);
+
+  const showToast = React.useCallback((type: ToastType, message: string) => {
+    setToast({
+      type,
+      message,
+    });
+
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+
+      toastTimeoutRef.current = null;
+    }, 3500);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  /* =====================================================
+       RESET PREVIEW
+       ===================================================== */
+
+  const resetPreview = () => {
+    setPreviewResult(null);
+    setCommitResult(null);
+  };
+
+  /* =====================================================
+       FILE ACTIONS
+       ===================================================== */
+
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
@@ -100,103 +252,382 @@ export const EducationStudentImport: React.FC = () => {
       return;
     }
 
-    setSelectedFile(file);
-    setIsImported(false);
-  };
+    const fileName = file.name.toLowerCase();
 
-  const handleImport = () => {
-    if (!selectedFile) {
-      alert('Vui lòng chọn file dữ liệu sinh viên.');
+    const supported =
+      fileName.endsWith(".xlsx") ||
+      fileName.endsWith(".xls") ||
+      fileName.endsWith(".csv");
+
+    if (!supported) {
+      showToast("error", "Chỉ hỗ trợ file Excel (.xlsx, .xls) hoặc CSV.");
+
+      event.target.value = "";
+
       return;
     }
 
-    // UI mock:
-    // Sau này dữ liệu thật sẽ được parse từ Excel/CSV.
-    // Hiện tại dùng mockStudents để mô phỏng danh sách sau khi import.
-    setStudents(mockStudents);
-    setIsImported(true);
+    try {
+      setIsReadingFile(true);
+
+      /*
+       * Đọc file thành ArrayBuffer.
+       */
+      const arrayBuffer = await file.arrayBuffer();
+
+      /*
+       * XLSX có thể đọc cả:
+       * .xlsx
+       * .xls
+       * .csv
+       */
+      const workbook = XLSX.read(arrayBuffer, {
+        type: "array",
+      });
+
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        throw new Error("File không có worksheet dữ liệu.");
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+        worksheet,
+        {
+          defval: "",
+        },
+      );
+
+      const parsedRows = rawRows
+        .map(convertExcelRowToStudent)
+        .filter((row) => row.code || row.email || row.fullName);
+
+      if (parsedRows.length === 0) {
+        throw new Error("Không tìm thấy dữ liệu sinh viên trong file.");
+      }
+
+      /*
+       * Chọn file mới sẽ thay danh sách
+       * đang chuẩn bị import.
+       */
+      setSelectedFile(file);
+
+      setStudents(parsedRows);
+
+      resetPreview();
+
+      showToast("success", `Đã đọc ${parsedRows.length} dòng dữ liệu từ file.`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Không thể đọc file dữ liệu.";
+
+      setSelectedFile(null);
+
+      setStudents([]);
+
+      resetPreview();
+
+      showToast("error", message);
+    } finally {
+      setIsReadingFile(false);
+
+      /*
+       * Cho phép chọn lại cùng một file.
+       */
+      event.target.value = "";
+    }
   };
 
-  const handleConfirmImport = () => {
-    alert(
-      'UI mock: danh sách sinh viên đã được xác nhận và sẵn sàng cập nhật vào hệ thống.',
-    );
+  /* =====================================================
+       DOWNLOAD TEMPLATE
+       ===================================================== */
+
+  const handleDownloadTemplate = () => {
+    /*
+     * Chưa có API tải template trong Swagger,
+     * nên tạo file mẫu trực tiếp ở FE.
+     */
+    const templateRows = [
+      {
+        code: "SE161234",
+        email: "student@example.com",
+        fullName: "Nguyễn Văn A",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateRows);
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+
+    XLSX.writeFile(workbook, "student-import-template.xlsx");
   };
+
+  /* =====================================================
+       PREVIEW API
+       ===================================================== */
+
+  const handlePreview = async () => {
+    if (students.length === 0) {
+      showToast("error", "Vui lòng chọn file hoặc thêm ít nhất một sinh viên.");
+
+      return;
+    }
+
+    /*
+     * Kiểm tra tối thiểu ở FE.
+     * Validation nghiệp vụ thật vẫn do backend /preview xử lý.
+     */
+    const invalidIndex = students.findIndex(
+      (student) =>
+        !student.code.trim() ||
+        !student.email.trim() ||
+        !student.fullName.trim(),
+    );
+
+    if (invalidIndex !== -1) {
+      showToast(
+        "error",
+        `Dòng ${invalidIndex + 1} đang thiếu MSSV, email hoặc họ tên.`,
+      );
+
+      return;
+    }
+
+    try {
+      setIsPreviewing(true);
+
+      setCommitResult(null);
+
+      const result = await importService.previewStudentImport({
+        kind: "STUDENT",
+
+        idempotencyKey: createIdempotencyKey("student-preview"),
+
+        rows: students,
+      });
+
+      setPreviewResult(result);
+
+      showToast("success", `Kiểm tra hoàn tất ${result.total} sinh viên.`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Không thể kiểm tra dữ liệu.";
+
+      setPreviewResult(null);
+
+      showToast("error", message);
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  /* =====================================================
+       COMMIT API
+       ===================================================== */
+
+  const handleConfirmImport = async () => {
+    if (!previewResult) {
+      showToast("error", "Vui lòng kiểm tra dữ liệu trước khi xác nhận nhập.");
+
+      return;
+    }
+
+    if (students.length === 0) {
+      showToast("error", "Không có dữ liệu để nhập.");
+
+      return;
+    }
+
+    try {
+      setIsCommitting(true);
+
+      const result = await importService.commitStudentImport({
+        kind: "STUDENT",
+
+        /*
+         * Commit dùng key mới để tránh
+         * xung đột với preview.
+         */
+        idempotencyKey: createIdempotencyKey("student-commit"),
+
+        rows: students,
+      });
+
+      setCommitResult(result);
+
+      showToast(
+        "success",
+        `Nhập thành công ${result.total} sinh viên: ${result.created} tạo mới, ${result.updated} cập nhật.`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Không thể nhập dữ liệu sinh viên.";
+
+      showToast("error", message);
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
+  /* =====================================================
+       MANUAL STUDENT
+       ===================================================== */
 
   const handleOpenAddStudent = () => {
     setStudentForm(EMPTY_STUDENT_FORM);
+
     setShowAddStudentModal(true);
   };
 
   const handleCloseAddStudent = () => {
     setShowAddStudentModal(false);
+
     setStudentForm(EMPTY_STUDENT_FORM);
   };
 
   const handleSaveStudent = () => {
-    const studentCode = studentForm.studentCode.trim();
+    const code = studentForm.code.trim();
+
+    const email = studentForm.email.trim();
+
     const fullName = studentForm.fullName.trim();
 
-    if (!studentCode || !fullName) {
-      alert('Vui lòng nhập MSSV và họ tên sinh viên.');
+    if (!code || !email || !fullName) {
+      showToast("error", "Vui lòng nhập đầy đủ MSSV, email và họ tên.");
+
       return;
     }
 
+    /*
+     * Chỉ chặn duplicate trong batch hiện tại.
+     *
+     * Nếu MSSV đã tồn tại trong DB,
+     * backend preview sẽ trả action UPDATED.
+     */
     const duplicated = students.some(
-      (student) =>
-        student.studentCode.toLowerCase() === studentCode.toLowerCase(),
+      (student) => student.code.toLowerCase() === code.toLowerCase(),
     );
 
     if (duplicated) {
-      alert('MSSV này đã tồn tại.');
+      showToast("error", "MSSV này đã có trong danh sách đang chuẩn bị nhập.");
+
       return;
     }
 
-    const accountId = studentForm.accountId.trim();
-
-    const newStudent: StudentRow = {
-      studentCode,
-      accountId: accountId || null,
+    const newStudent: StudentImportRow = {
+      code,
+      email,
       fullName,
-      curriculum: studentForm.curriculum.trim(),
-      cohort: studentForm.cohort.trim(),
-      currentTerm: studentForm.currentTerm.trim(),
-      gpa: studentForm.gpa.trim(),
-      credits: studentForm.credits.trim(),
-      status: studentForm.status.trim() || 'Đang học',
-      mappingStatus: accountId ? 'Đã khớp' : 'Chưa khớp',
     };
 
     setStudents((current) => [...current, newStudent]);
-    setIsImported(true);
+
+    resetPreview();
+
     handleCloseAddStudent();
+
+    showToast("success", `Đã thêm ${code} vào danh sách chờ kiểm tra.`);
   };
 
-  const totalStudents = students.length;
+  /* =====================================================
+       DERIVED DATA
+       ===================================================== */
 
-  const validStudents = students.filter(
-    (student) =>
-      student.studentCode.trim() &&
-      student.fullName.trim(),
-  ).length;
+  const getPreviewAction = (index: number) => {
+    if (!previewResult) {
+      return null;
+    }
 
-  const mappedStudents = students.filter(
-    (student) => student.mappingStatus === 'Đã khớp',
-  ).length;
+    /*
+     * Backend trả rowNumber bắt đầu từ 1.
+     */
+    return (
+      previewResult.rows.find((row) => row.rowNumber === index + 1) ?? null
+    );
+  };
 
-  const needReviewStudents = students.filter(
-    (student) => student.mappingStatus === 'Chưa khớp',
-  ).length;
+  /* =====================================================
+       RENDER
+       ===================================================== */
 
   return (
     <div className="space-y-6">
+      {/* ===================== TOAST ===================== */}
+
+      {toast && (
+        <div className="fixed right-6 top-6 z-[9999] w-[380px] max-w-[calc(100vw-3rem)]">
+          <div
+            className={`overflow-hidden rounded-2xl border bg-white shadow-2xl ${
+              toast.type === "success" ? "border-emerald-200" : "border-red-200"
+            }`}
+          >
+            <div
+              className={`h-1 ${
+                toast.type === "success" ? "bg-emerald-500" : "bg-red-500"
+              }`}
+            />
+
+            <div className="flex items-start gap-3 p-4">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                  toast.type === "success"
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-red-50 text-red-600"
+                }`}
+              >
+                {toast.type === "success" ? (
+                  <CheckCircle2 size={20} />
+                ) : (
+                  <AlertTriangle size={20} />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p
+                  className={`text-sm font-bold ${
+                    toast.type === "success"
+                      ? "text-emerald-800"
+                      : "text-red-800"
+                  }`}
+                >
+                  {toast.type === "success"
+                    ? "Thành công"
+                    : "Không thể thực hiện"}
+                </p>
+
+                <p className="mt-1 text-sm leading-5 text-slate-600">
+                  {toast.message}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={17} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== BANNER ===================== */}
+
       <PageBanner
         title="Import dữ liệu sinh viên"
-        description="Nhập dữ liệu học vụ sinh viên từ dữ liệu nhà trường để phục vụ quản lý tiến độ và điều kiện OJT."
+        description="Nhập dữ liệu sinh viên từ file Excel/CSV hoặc thêm thủ công, kiểm tra trước khi lưu vào hệ thống."
         badge="Quản lý dữ liệu"
       />
 
-      {/* ==================== CHỌN FILE ==================== */}
+      {/* ===================== CHỌN FILE ===================== */}
+
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-slate-800">
@@ -204,7 +635,8 @@ export const EducationStudentImport: React.FC = () => {
           </h2>
 
           <p className="mt-1 text-sm text-slate-500">
-            Chọn file dữ liệu học vụ hoặc thêm từng sinh viên thủ công vào hệ thống.
+            Chọn file Excel/CSV hoặc thêm từng sinh viên thủ công. Dữ liệu sẽ
+            được kiểm tra trước khi nhập vào hệ thống.
           </p>
         </div>
 
@@ -219,18 +651,28 @@ export const EducationStudentImport: React.FC = () => {
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            Hỗ trợ file Excel (.xlsx, .xls) hoặc CSV
+            Hỗ trợ Excel (.xlsx, .xls) hoặc CSV
+          </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            Các cột cần có: code, email, fullName
           </p>
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600">
+            <label
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 ${
+                isReadingFile ? "pointer-events-none opacity-60" : ""
+              }`}
+            >
               <Upload size={17} />
-              Chọn file
+
+              {isReadingFile ? "Đang đọc file..." : "Chọn file"}
 
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
                 onChange={handleFileChange}
+                disabled={isReadingFile}
                 className="hidden"
               />
             </label>
@@ -247,27 +689,32 @@ export const EducationStudentImport: React.FC = () => {
 
           {selectedFile && (
             <div className="mx-auto mt-5 flex max-w-xl items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <FileSpreadsheet
                   size={22}
-                  className="text-emerald-500"
+                  className="shrink-0 text-emerald-500"
                 />
 
-                <div>
-                  <p className="text-sm font-medium text-slate-700">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-700">
                     {selectedFile.name}
                   </p>
 
                   <p className="text-xs text-slate-400">
-                    {(selectedFile.size / 1024).toFixed(1)} KB
+                    {formatFileSize(selectedFile.size)} • {students.length} dòng
+                    dữ liệu
                   </p>
                 </div>
               </div>
 
-              <CheckCircle2
-                size={20}
-                className="text-emerald-500"
-              />
+              <CheckCircle2 size={20} className="shrink-0 text-emerald-500" />
+            </div>
+          )}
+
+          {!selectedFile && students.length > 0 && (
+            <div className="mx-auto mt-5 max-w-xl rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Đang có <strong>{students.length}</strong> sinh viên được thêm thủ
+              công.
             </div>
           )}
         </div>
@@ -275,10 +722,8 @@ export const EducationStudentImport: React.FC = () => {
         <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
           <button
             type="button"
+            onClick={handleDownloadTemplate}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-            onClick={() =>
-              alert('UI mock: tải file mẫu dữ liệu sinh viên.')
-            }
           >
             <Download size={17} />
             Tải file mẫu
@@ -286,107 +731,36 @@ export const EducationStudentImport: React.FC = () => {
 
           <button
             type="button"
-            onClick={handleImport}
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+            onClick={handlePreview}
+            disabled={isPreviewing || isReadingFile || students.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Upload size={17} />
-            Kiểm tra dữ liệu
+            {isPreviewing ? (
+              <RefreshCw size={17} className="animate-spin" />
+            ) : (
+              <Upload size={17} />
+            )}
+
+            {isPreviewing ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
           </button>
         </div>
       </section>
 
-      {/* ==================== KẾT QUẢ KIỂM TRA ==================== */}
-      {isImported && (
+      {/* ===================== PREVIEW RESULT ===================== */}
+
+      {previewResult && (
         <>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            {/* Tổng dữ liệu */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">
-                    Tổng dữ liệu
-                  </p>
+          {/* TABLE */}
 
-                  <p className="mt-2 text-2xl font-bold text-slate-800">
-                    {totalStudents}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                  <Users size={21} />
-                </div>
-              </div>
-            </div>
-
-            {/* Dữ liệu hợp lệ */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">
-                    Dữ liệu hợp lệ
-                  </p>
-
-                  <p className="mt-2 text-2xl font-bold text-emerald-600">
-                    {validStudents}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <CheckCircle2 size={21} />
-                </div>
-              </div>
-            </div>
-
-            {/* Mapping thành công */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">
-                    Mapping tài khoản
-                  </p>
-
-                  <p className="mt-2 text-2xl font-bold text-blue-600">
-                    {mappedStudents}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                  <Link2 size={21} />
-                </div>
-              </div>
-            </div>
-
-            {/* Cần xử lý */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">
-                    Cần xử lý
-                  </p>
-
-                  <p className="mt-2 text-2xl font-bold text-red-600">
-                    {needReviewStudents}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                  <AlertTriangle size={21} />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ==================== PREVIEW ==================== */}
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  Xem trước dữ liệu
+                  Kết quả kiểm tra
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Danh sách sinh viên được thêm thủ công hoặc import từ file.
-                  Kiểm tra lại dữ liệu trước khi xác nhận.
+                  Kiểm tra lại danh sách trước khi xác nhận nhập dữ liệu.
                 </p>
               </div>
 
@@ -397,9 +771,13 @@ export const EducationStudentImport: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[1250px] text-left text-sm">
+              <table className="w-full min-w-[850px] text-left text-sm">
                 <thead className="bg-slate-50">
                   <tr>
+                    <th className="px-4 py-3 font-semibold text-slate-600">
+                      Dòng
+                    </th>
+
                     <th className="px-4 py-3 font-semibold text-slate-600">
                       MSSV
                     </th>
@@ -409,175 +787,161 @@ export const EducationStudentImport: React.FC = () => {
                     </th>
 
                     <th className="px-4 py-3 font-semibold text-slate-600">
-                      Tài khoản
+                      Email
                     </th>
 
                     <th className="px-4 py-3 font-semibold text-slate-600">
-                      Mapping
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Chương trình
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Khóa / Lớp
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Kỳ hiện tại
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      GPA
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Tín chỉ
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Trạng thái
+                      Xử lý
                     </th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {students.map((student) => (
-                    <tr key={student.studentCode}>
-                      <td className="px-4 py-3 font-medium text-slate-700">
-                        {student.studentCode}
-                      </td>
+                  {students.map((student, index) => {
+                    const previewRow = getPreviewAction(index);
 
-                      <td className="px-4 py-3 text-slate-700">
-                        {student.fullName}
-                      </td>
+                    return (
+                      <tr key={`${student.code}-${index}`}>
+                        <td className="px-4 py-3 text-slate-500">
+                          {index + 1}
+                        </td>
 
-                      <td className="px-4 py-3 text-slate-600">
-                        {student.accountId ?? '—'}
-                      </td>
+                        <td className="px-4 py-3 font-medium text-slate-700">
+                          {student.code}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        {student.mappingStatus === 'Đã khớp' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                            <CheckCircle2 size={13} />
-                            Đã khớp
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                            <AlertTriangle size={13} />
-                            Chưa khớp
-                          </span>
-                        )}
-                      </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {student.fullName}
+                        </td>
 
-                      <td className="px-4 py-3 text-slate-600">
-                        {student.curriculum}
-                      </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {student.email}
+                        </td>
 
-                      <td className="px-4 py-3 text-slate-600">
-                        {student.cohort}
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-600">
-                        {student.currentTerm}
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-600">
-                        {student.gpa}
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-600">
-                        {student.credits}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-                          <CheckCircle2 size={13} />
-                          {student.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-4 py-3">
+                          {previewRow ? (
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                previewRow.action === "CREATED"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : previewRow.action === "UPDATED"
+                                    ? "bg-orange-50 text-orange-700"
+                                    : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {getActionLabel(previewRow.action)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {/* Dữ liệu cần xử lý */}
-            {needReviewStudents > 0 ? (
-              <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50 p-4">
-                <div className="flex gap-3">
-                  <AlertTriangle
-                    size={20}
-                    className="mt-0.5 shrink-0 text-amber-500"
-                  />
+            {/* READY MESSAGE */}
 
-                  <div>
-                    <p className="text-sm font-semibold text-amber-700">
-                      {needReviewStudents} dữ liệu cần xử lý
-                    </p>
+            <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <div className="flex gap-3">
+                <CheckCircle2
+                  size={20}
+                  className="mt-0.5 shrink-0 text-emerald-500"
+                />
 
-                    <p className="mt-1 text-xs text-amber-700">
-                      Một số sinh viên chưa mapping được với tài khoản
-                      tương ứng. Vui lòng kiểm tra lại trước khi xác nhận.
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Dữ liệu đã được kiểm tra
+                  </p>
+
+                  <p className="mt-1 text-xs text-emerald-700">
+                    {previewResult.created} sinh viên sẽ được tạo mới và{" "}
+                    {previewResult.updated} sinh viên sẽ được cập nhật.
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+            </div>
+
+            {/* COMMIT SUCCESS */}
+
+            {commitResult && (
+              <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
                 <div className="flex gap-3">
                   <CheckCircle2
                     size={20}
-                    className="mt-0.5 shrink-0 text-emerald-500"
+                    className="mt-0.5 shrink-0 text-blue-600"
                   />
 
                   <div>
-                    <p className="text-sm font-semibold text-emerald-700">
-                      Danh sách đã sẵn sàng để xác nhận
+                    <p className="text-sm font-semibold text-blue-700">
+                      Nhập dữ liệu thành công
                     </p>
 
-                    <p className="mt-1 text-xs text-emerald-700">
-                      Không có sinh viên nào đang ở trạng thái chưa khớp tài khoản.
+                    <p className="mt-1 text-xs leading-5 text-blue-700">
+                      Đã xử lý thành công{" "}
+                      <strong>{commitResult.total} sinh viên</strong>. Trong đó
+                      có{" "}
+                      <strong>
+                        {commitResult.created} sinh viên được thêm mới
+                      </strong>{" "}
+                      và{" "}
+                      <strong>
+                        {commitResult.updated} sinh viên được cập nhật
+                      </strong>
+                      .
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Xác nhận */}
+            {/* CONFIRM */}
+
             <div className="mt-5 flex justify-end">
               <button
                 type="button"
                 onClick={handleConfirmImport}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                disabled={isCommitting || Boolean(commitResult)}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <CheckCircle2 size={17} />
-                Xác nhận danh sách
+                {isCommitting ? (
+                  <RefreshCw size={17} className="animate-spin" />
+                ) : (
+                  <Save size={17} />
+                )}
+
+                {isCommitting
+                  ? "Đang nhập dữ liệu..."
+                  : commitResult
+                    ? "Đã nhập dữ liệu"
+                    : "Xác nhận nhập dữ liệu"}
               </button>
             </div>
           </section>
         </>
       )}
 
-      {/* ==================== THÊM SINH VIÊN ==================== */}
+      {/* ===================== ADD STUDENT MODAL ===================== */}
+
       {showAddStudentModal && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
           onClick={handleCloseAddStudent}
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <h2 className="text-xl font-black text-slate-900">
                   Thêm sinh viên
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Nhập thủ công thông tin học vụ của một sinh viên.
+                  Thêm sinh viên vào danh sách chờ kiểm tra.
                 </p>
               </div>
 
@@ -590,178 +954,75 @@ export const EducationStudentImport: React.FC = () => {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    MSSV <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={studentForm.studentCode}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        studentCode: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: SE161234"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+            <div className="space-y-4 px-6 py-5">
+              {/* MSSV */}
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Họ tên <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={studentForm.fullName}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        fullName: event.target.value,
-                      }))
-                    }
-                    placeholder="Nhập họ tên sinh viên"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  MSSV <span className="text-red-500">*</span>
+                </label>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Tài khoản sinh viên
-                  </label>
-                  <input
-                    type="text"
-                    value={studentForm.accountId}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        accountId: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: SE161234"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={studentForm.code}
+                  onChange={(event) =>
+                    setStudentForm((current) => ({
+                      ...current,
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Chương trình
-                  </label>
-                  <input
-                    type="text"
-                    value={studentForm.curriculum}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        curriculum: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: IS"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+                      code: event.target.value,
+                    }))
+                  }
+                  placeholder="VD: SE161234"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Khóa / Lớp
-                  </label>
-                  <input
-                    type="text"
-                    value={studentForm.cohort}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        cohort: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: K16D-19A"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+              {/* FULL NAME */}
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Kỳ hiện tại
-                  </label>
-                  <input
-                    type="text"
-                    value={studentForm.currentTerm}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        currentTerm: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: Kỳ 5"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Họ tên <span className="text-red-500">*</span>
+                </label>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    GPA
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="4"
-                    value={studentForm.gpa}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        gpa: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: 3.42"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={studentForm.fullName}
+                  onChange={(event) =>
+                    setStudentForm((current) => ({
+                      ...current,
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Tín chỉ
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={studentForm.credits}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        credits: event.target.value,
-                      }))
-                    }
-                    placeholder="VD: 112"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+                      fullName: event.target.value,
+                    }))
+                  }
+                  placeholder="Nhập họ tên sinh viên"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
 
-                <div className="sm:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={studentForm.status}
-                    onChange={(event) =>
-                      setStudentForm((current) => ({
-                        ...current,
-                        status: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  >
-                    <option value="Đang học">Đang học</option>
-                    <option value="Tạm dừng">Tạm dừng</option>
-                  </select>
-                </div>
+              {/* EMAIL */}
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Email <span className="text-red-500">*</span>
+                </label>
+
+                <input
+                  type="email"
+                  value={studentForm.email}
+                  onChange={(event) =>
+                    setStudentForm((current) => ({
+                      ...current,
+
+                      email: event.target.value,
+                    }))
+                  }
+                  placeholder="VD: student@example.com"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
               </div>
             </div>
 
-            <div className="flex shrink-0 justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
               <button
                 type="button"
                 onClick={handleCloseAddStudent}
@@ -782,7 +1043,6 @@ export const EducationStudentImport: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
