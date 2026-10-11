@@ -1,1122 +1,962 @@
-import React from 'react';
-import {
-  BookOpen,
-  Search,
-  Plus,
-  Pencil,
-  Trash2,
-  Download,
-  Upload,
-  X,
-  Layers3,
-} from 'lucide-react';
-import { PageBanner } from '@/components/common/PageBanner';
+import React from "react";
 
-interface CurriculumSubject {
-  id: string;
+import {
+  AlertTriangle,
+  BookOpen,
+  Boxes,
+  CheckCircle2,
+  Layers3,
+  Plus,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
+
+import { PageBanner } from "@/components/common/PageBanner";
+
+import {
+  curriculumService,
+  type CurriculumCombo,
+  type CurriculumCourse,
+  type CurriculumDetail,
+  type CurriculumSummary,
+  type Major,
+} from "@/service/curriculum.service";
+
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+
+const SUPPORTED_MAJOR_CODES = ["AI", "SE", "IA", "IS"] as const;
+
+const SEMESTERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/* =========================================================
+   TYPES
+   ========================================================= */
+
+type ToastType = "success" | "error";
+
+interface ToastState {
+  type: ToastType;
+  message: string;
+}
+
+interface CourseFormState {
   code: string;
   name: string;
+
   semester: number;
   credits: number;
-  prerequisite: string;
-}
 
-interface Curriculum {
-  code: string;
-  name: string;
-  totalSubjects: number;
-  totalCredits: number;
-  subjects: CurriculumSubject[];
+  prerequisiteText: string;
+
+  isOjtPrerequisite: boolean;
 }
 
 /* =========================================================
-   KHUNG BIT_IS_K18D_19A
-========================================================= */
+   HELPERS
+   ========================================================= */
 
-const K18D_19A_SUBJECTS: CurriculumSubject[] = [
-  // KỲ 0
-  {
-    id: 'K18D-OTP101',
-    code: 'OTP101',
-    name: 'Orientation and General Training Program / Định hướng và Rèn luyện tập trung',
-    semester: 0,
-    credits: 0,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-PEN',
-    code: 'PEN',
-    name: 'Preparation English / Tiếng Anh chuẩn bị',
-    semester: 0,
-    credits: 0,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-PHE1',
-    code: 'PHE_COM*1',
-    name: 'Physical Education 1 / Giáo dục thể chất 1',
-    semester: 0,
-    credits: 2,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-TMI',
-    code: 'TMI_ELE',
-    name: 'Traditional musical instrument / Nhạc cụ truyền thống',
-    semester: 0,
-    credits: 3,
-    prerequisite: '',
-  },
+const getSemesterLabel = (semester: number) => {
+  if (semester === 0) {
+    return "Chuẩn bị";
+  }
 
-  // KỲ 1
-  {
-    id: 'K18D-CEA201',
-    code: 'CEA201',
-    name: 'Computer Organization and Architecture / Tổ chức và Kiến trúc máy tính',
-    semester: 1,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-CSI106',
-    code: 'CSI106',
-    name: 'Introduction to Computer Science / Nhập môn khoa học máy tính',
-    semester: 1,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-MAE101',
-    code: 'MAE101',
-    name: 'Mathematics for Engineering / Toán cho ngành kỹ thuật',
-    semester: 1,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-PHE2',
-    code: 'PHE_COM*2',
-    name: 'Physical Education 2 / Giáo dục thể chất 2',
-    semester: 1,
-    credits: 2,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-PRF192',
-    code: 'PRF192',
-    name: 'Programming Fundamentals / Cơ sở lập trình',
-    semester: 1,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-SSL101c',
-    code: 'SSL101c',
-    name: 'Academic Skills for University Success / Kỹ năng học tập đại học',
-    semester: 1,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 2
-  {
-    id: 'K18D-MAD101',
-    code: 'MAD101',
-    name: 'Discrete Mathematics / Toán rời rạc',
-    semester: 2,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-NWC204',
-    code: 'NWC204',
-    name: 'Computer Networking / Mạng máy tính',
-    semester: 2,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-OSG202',
-    code: 'OSG202',
-    name: 'Operating Systems / Hệ điều hành',
-    semester: 2,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-PHE3',
-    code: 'PHE_COM*3',
-    name: 'Physical Education 3 / Giáo dục thể chất 3',
-    semester: 2,
-    credits: 2,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-PRO192',
-    code: 'PRO192',
-    name: 'Object-Oriented Programming / Lập trình hướng đối tượng',
-    semester: 2,
-    credits: 3,
-    prerequisite: 'Pass PRF192',
-  },
-  {
-    id: 'K18D-SSG104',
-    code: 'SSG104',
-    name: 'Communication and In-Group Working Skills / Kỹ năng giao tiếp và cộng tác',
-    semester: 2,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 3
-  {
-    id: 'K18D-CSD201',
-    code: 'CSD201',
-    name: 'Data Structures and Algorithms / Cấu trúc dữ liệu và giải thuật',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'PRO192',
-  },
-  {
-    id: 'K18D-DBI202',
-    code: 'DBI202',
-    name: 'Introduction to Databases / Các hệ cơ sở dữ liệu',
-    semester: 3,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-ITA203c',
-    code: 'ITA203c',
-    name: 'Information System Overview / Nhập môn hệ thống thông tin',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-JPD113',
-    code: 'JPD113',
-    name: 'Elementary Japanese 1 - A1.1 / Tiếng Nhật sơ cấp 1-A1.1',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'Không',
-  },
-  {
-    id: 'K18D-LAB211',
-    code: 'LAB211',
-    name: 'OOP with Java Lab / Thực hành OOP với Java',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'PRO192',
-  },
-
-  // KỲ 4
-  {
-    id: 'K18D-JPD123',
-    code: 'JPD123',
-    name: 'Elementary Japanese 1 - A1.2 / Tiếng Nhật sơ cấp 1-A1.2',
-    semester: 4,
-    credits: 3,
-    prerequisite: 'JPD113',
-  },
-  {
-    id: 'K18D-MAS291',
-    code: 'MAS291',
-    name: 'Statistics & Probability / Xác suất thống kê',
-    semester: 4,
-    credits: 3,
-    prerequisite: 'MAE101 or MAC101',
-  },
-  {
-    id: 'K18D-PRC392c',
-    code: 'PRC392c',
-    name: 'Cloud Computing / Điện toán đám mây',
-    semester: 4,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-PRJ302',
-    code: 'PRJ302',
-    name: 'Java Web Application Development / Phát triển ứng dụng Java web',
-    semester: 4,
-    credits: 3,
-    prerequisite: 'DBI202, PRO192',
-  },
-  {
-    id: 'K18D-SWE201c',
-    code: 'SWE201c',
-    name: 'Introduction to Software Engineering / Nhập môn kĩ thuật phần mềm',
-    semester: 4,
-    credits: 3,
-    prerequisite:
-      'PRO192 (not applied to the BIT_AI; BIT_IC; BIT_AS; BIT_DX and BA programs)',
-  },
-
-  // KỲ 5
-  {
-    id: 'K18D-ISCOM1',
-    code: 'IS_COM*1',
-    name: 'Subject 1 of Combo* / Học phần 1 của combo*',
-    semester: 5,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-ISM302',
-    code: 'ISM302',
-    name: 'Enterprise Resource Planning (ERP) / Lập kế hoạch nguồn lực doanh nghiệp',
-    semester: 5,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-ISP392',
-    code: 'ISP392',
-    name: 'Information System Programming Project / Dự án lập trình HTTT',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'PRJ302, SWE201c, Pass LAB211',
-  },
-  {
-    id: 'K18D-ITA301',
-    code: 'ITA301',
-    name: 'Information System Design & Analysis / Phân tích thiết kế HTTT',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'ITA203c, DBI202',
-  },
-  {
-    id: 'K18D-ITE302c',
-    code: 'ITE302c',
-    name: 'Ethics in IT / Đạo đức trong CNTT',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 6
-  {
-    id: 'K18D-ENW493c',
-    code: 'ENW493c',
-    name: 'Research Methods & Academic Writing Skills / Phương pháp nghiên cứu & Kỹ năng viết học thuật',
-    semester: 6,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-OJT202',
-    code: 'OJT202',
-    name: 'On-The-Job Training / Đào tạo trong môi trường thực tế',
-    semester: 6,
-    credits: 10,
-    prerequisite:
-      'Students attained 90% of the total credits prior to the OJT term (excluding Physical Education and OTP Programs). Students choosing JS combo (Japanese Bridge Engineer) have to pass JPD133.',
-  },
-
-  // KỲ 7
-  {
-    id: 'K18D-EXE101',
-    code: 'EXE101',
-    name: 'Experiential Entrepreneurship 1 / Trải nghiệm khởi nghiệp 1',
-    semester: 7,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-ISCOM2',
-    code: 'IS_COM*2',
-    name: 'Subject 2 of Combo* / Học phần 2 của combo*',
-    semester: 7,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-ISCOM3',
-    code: 'IS_COM*3',
-    name: 'Subject 3 of Combo* / Học phần 3 của combo*',
-    semester: 7,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-ISC301',
-    code: 'ISC301',
-    name: 'e-Commerce / Thương mại điện tử',
-    semester: 7,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-ITB302c',
-    code: 'ITB302c',
-    name: 'Business Intelligence (BI) / Kinh doanh thông minh',
-    semester: 7,
-    credits: 3,
-    prerequisite: 'DBI202',
-  },
-
-  // KỲ 8
-  {
-    id: 'K18D-DTA301',
-    code: 'DTA301',
-    name: 'Data Analysis / Phân tích dữ liệu',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'PRO192, CSD201, DBI202, MAS291',
-  },
-  {
-    id: 'K18D-EXE201',
-    code: 'EXE201',
-    name: 'Experiential Entrepreneurship 2 / Trải nghiệm khởi nghiệp 2',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'EXE101',
-  },
-  {
-    id: 'K18D-ISCOM4',
-    code: 'IS_COM*4',
-    name: 'Subject 4 of Combo* / Học phần 4 của combo*',
-    semester: 8,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-MLN111',
-    code: 'MLN111',
-    name: 'Philosophy of Marxism – Leninism / Triết học Mác - Lê-nin',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-MLN122',
-    code: 'MLN122',
-    name: 'Political Economics of Marxism – Leninism / Kinh tế chính trị Mác - Lê-nin',
-    semester: 8,
-    credits: 2,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18D-PMG201c',
-    code: 'PMG201c',
-    name: 'Project Management',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 9
-  {
-    id: 'K18D-HCM202',
-    code: 'HCM202',
-    name: 'Ho Chi Minh Ideology / Tư tưởng Hồ Chí Minh',
-    semester: 9,
-    credits: 2,
-    prerequisite: 'MLN111, MLN122',
-  },
-  {
-    id: 'K18D-GRA',
-    code: 'IS_GRA_ELE',
-    name: 'Graduation Elective - Information System / Học phần lựa chọn Đồ án tốt nghiệp chuyên ngành Hệ thống thông tin',
-    semester: 9,
-    credits: 10,
-    prerequisite: '',
-  },
-  {
-    id: 'K18D-MLN131',
-    code: 'MLN131',
-    name: 'Scientific Socialism / Chủ nghĩa xã hội khoa học',
-    semester: 9,
-    credits: 2,
-    prerequisite: 'MLN111, MLN122',
-  },
-  {
-    id: 'K18D-VNR202',
-    code: 'VNR202',
-    name: 'History of Communist Party of Vietnam / Lịch sử Đảng Cộng sản Việt Nam',
-    semester: 9,
-    credits: 2,
-    prerequisite: 'MLN111, MLN122',
-  },
-];
-
-/* =========================================================
-   KHUNG BIT_IS_K18C
-   Dữ liệu riêng theo ảnh K18C user cung cấp
-========================================================= */
-
-const K18C_SUBJECTS: CurriculumSubject[] = [
-  // KỲ 0
-  {
-    id: 'K18C-OTP101',
-    code: 'OTP101',
-    name: 'Orientation and General Training Program / Định hướng và Rèn luyện tập trung',
-    semester: 0,
-    credits: 0,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-PEN',
-    code: 'PEN',
-    name: 'Preparation English / Tiếng Anh chuẩn bị',
-    semester: 0,
-    credits: 0,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-PHE1',
-    code: 'PHE_COM*1',
-    name: 'Physical Education 1 / Giáo dục thể chất 1',
-    semester: 0,
-    credits: 2,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-TMI',
-    code: 'TMI_ELE',
-    name: 'Traditional musical instrument / Nhạc cụ truyền thống',
-    semester: 0,
-    credits: 3,
-    prerequisite: '',
-  },
-
-  // KỲ 1
-  {
-    id: 'K18C-CEA201',
-    code: 'CEA201',
-    name: 'Computer Organization and Architecture / Tổ chức và Kiến trúc máy tính',
-    semester: 1,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-CSI104',
-    code: 'CSI104',
-    name: 'Introduction to Computer / Nhập môn khoa học máy tính',
-    semester: 1,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-MAE101',
-    code: 'MAE101',
-    name: 'Mathematics for Engineering / Toán cho ngành kỹ thuật',
-    semester: 1,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-PHE2',
-    code: 'PHE_COM*2',
-    name: 'Physical Education 2 / Giáo dục thể chất 2',
-    semester: 1,
-    credits: 2,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-PRF192',
-    code: 'PRF192',
-    name: 'Programming Fundamentals / Cơ sở lập trình',
-    semester: 1,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-SSL101c',
-    code: 'SSL101c',
-    name: 'Academic Skills for University Success / Kỹ năng học tập đại học',
-    semester: 1,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 2
-  {
-    id: 'K18C-MAD101',
-    code: 'MAD101',
-    name: 'Discrete Mathematics / Toán rời rạc',
-    semester: 2,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-NWC204',
-    code: 'NWC204',
-    name: 'Computer Networking / Mạng máy tính',
-    semester: 2,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-OSG202',
-    code: 'OSG202',
-    name: 'Operating Systems / Hệ điều hành',
-    semester: 2,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-PHE3',
-    code: 'PHE_COM*3',
-    name: 'Physical Education 3 / Giáo dục thể chất 3',
-    semester: 2,
-    credits: 2,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-PRO192',
-    code: 'PRO192',
-    name: 'Object-Oriented Programming / Lập trình hướng đối tượng',
-    semester: 2,
-    credits: 3,
-    prerequisite: 'Pass PRF192',
-  },
-  {
-    id: 'K18C-SSG104',
-    code: 'SSG104',
-    name: 'Communication and In-Group Working Skills / Kỹ năng giao tiếp và cộng tác',
-    semester: 2,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 3
-  {
-    id: 'K18C-CSD201',
-    code: 'CSD201',
-    name: 'Data Structures and Algorithms / Cấu trúc dữ liệu và giải thuật',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'PRO192',
-  },
-  {
-    id: 'K18C-DBI202',
-    code: 'DBI202',
-    name: 'Introduction to Databases / Các hệ cơ sở dữ liệu',
-    semester: 3,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-ITA203c',
-    code: 'ITA203c',
-    name: 'Information System Overview / Nhập môn hệ thống thông tin',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-JPD113',
-    code: 'JPD113',
-    name: 'Elementary Japanese 1 - A1.1 / Tiếng Nhật sơ cấp 1-A1.1',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'Không',
-  },
-  {
-    id: 'K18C-LAB211',
-    code: 'LAB211',
-    name: 'OOP with Java Lab / Thực hành OOP với Java',
-    semester: 3,
-    credits: 3,
-    prerequisite: 'PRO192',
-  },
-
-  // KỲ 4
-  {
-    id: 'K18C-JPD123',
-    code: 'JPD123',
-    name: 'Elementary Japanese 1-A1.2 / Tiếng Nhật sơ cấp 1-A1.2',
-    semester: 4,
-    credits: 3,
-    prerequisite: 'JPD113',
-  },
-  {
-    id: 'K18C-MAS291',
-    code: 'MAS291',
-    name: 'Statistics & Probability / Xác suất thống kê',
-    semester: 4,
-    credits: 3,
-    prerequisite: 'MAE101 or MAC101',
-  },
-  {
-    id: 'K18C-PRC392c',
-    code: 'PRC392c',
-    name: 'Cloud Computing / Điện toán đám mây',
-    semester: 4,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-PRJ302',
-    code: 'PRJ302',
-    name: 'Java Web Application Development / Phát triển ứng dụng Java web',
-    semester: 4,
-    credits: 3,
-    prerequisite: 'DBI202, PRO192',
-  },
-  {
-    id: 'K18C-SWE201c',
-    code: 'SWE201c',
-    name: 'Introduction to Software Engineering / Nhập môn kĩ thuật phần mềm',
-    semester: 4,
-    credits: 3,
-    prerequisite:
-      'PRO192 (not applied to the BIT_AI; BIT_IC; BIT_AS; BIT_DX and BA programs)',
-  },
-
-  // KỲ 5
-  {
-    id: 'K18C-DTA301',
-    code: 'DTA301',
-    name: 'Data Analysis / Phân tích dữ liệu',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'PRO192, CSD201, DBI202, MAS291',
-  },
-  {
-    id: 'K18C-ISM302',
-    code: 'ISM302',
-    name: 'Enterprise Resource Planning (ERP) / Lập kế hoạch nguồn lực doanh nghiệp',
-    semester: 5,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-ISP392',
-    code: 'ISP392',
-    name: 'Information System Programming Project / Dự án lập trình HTTT',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'PRJ302, SWE201c, Pass LAB211',
-  },
-  {
-    id: 'K18C-ITA301',
-    code: 'ITA301',
-    name: 'Information System Design & Analysis / Phân tích thiết kế HTTT',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'ITA203c, DBI202',
-  },
-  {
-    id: 'K18C-ITE302c',
-    code: 'ITE302c',
-    name: 'Ethics in IT / Đạo đức trong CNTT',
-    semester: 5,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 6
-  {
-    id: 'K18C-ENW493c',
-    code: 'ENW493c',
-    name: 'Research Methods & Academic Writing Skills / Phương pháp nghiên cứu & Kỹ năng viết học thuật',
-    semester: 6,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-OJT202',
-    code: 'OJT202',
-    name: 'On-The-Job Training / Đào tạo trong môi trường thực tế',
-    semester: 6,
-    credits: 10,
-    prerequisite:
-      'Students attained 90% of the total credits prior to the OJT term (excluding Physical Education and OTP Programs). Students choosing JS combo (Japanese Bridge Engineer) have to pass JPD133.',
-  },
-
-  // KỲ 7
-  {
-    id: 'K18C-EXE101',
-    code: 'EXE101',
-    name: 'Experiential Entrepreneurship 1 / Trải nghiệm khởi nghiệp 1',
-    semester: 7,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-ISCOM1',
-    code: 'IS_COM*1',
-    name: 'Subject 1 of Combo* / Học phần 1 của combo*',
-    semester: 7,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-ISCOM2',
-    code: 'IS_COM*2',
-    name: 'Subject 2 of Combo* / Học phần 2 của combo*',
-    semester: 7,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-ISC301',
-    code: 'ISC301',
-    name: 'e-Commerce / Thương mại điện tử',
-    semester: 7,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-ITB302c',
-    code: 'ITB302c',
-    name: 'Business Intelligence (BI) / Kinh doanh thông minh',
-    semester: 7,
-    credits: 3,
-    prerequisite: 'DBI202',
-  },
-
-  // KỲ 8
-  {
-    id: 'K18C-EXE201',
-    code: 'EXE201',
-    name: 'Experiential Entrepreneurship 2 / Trải nghiệm khởi nghiệp 2',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'EXE101',
-  },
-  {
-    id: 'K18C-ISCOM3',
-    code: 'IS_COM*3',
-    name: 'Subject 3 of Combo* / Học phần 3 của combo*',
-    semester: 8,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-ISCOM4',
-    code: 'IS_COM*4',
-    name: 'Subject 4 of Combo* / Học phần 4 của combo*',
-    semester: 8,
-    credits: 3,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-MLN111',
-    code: 'MLN111',
-    name: 'Philosophy of Marxism – Leninism / Triết học Mác - Lê-nin',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-MLN122',
-    code: 'MLN122',
-    name: 'Political Economics of Marxism – Leninism / Kinh tế chính trị Mác - Lê-nin',
-    semester: 8,
-    credits: 2,
-    prerequisite: 'None',
-  },
-  {
-    id: 'K18C-PMG201c',
-    code: 'PMG201c',
-    name: 'Project Management',
-    semester: 8,
-    credits: 3,
-    prerequisite: 'None',
-  },
-
-  // KỲ 9
-  {
-    id: 'K18C-HCM202',
-    code: 'HCM202',
-    name: 'Ho Chi Minh Ideology / Tư tưởng Hồ Chí Minh',
-    semester: 9,
-    credits: 2,
-    prerequisite: 'MLN111, MLN122',
-  },
-  {
-    id: 'K18C-GRA',
-    code: 'IS_GRA_ELE',
-    name: 'Graduation Elective - Information System / Học phần lựa chọn Đồ án tốt nghiệp chuyên ngành Hệ thống thông tin',
-    semester: 9,
-    credits: 10,
-    prerequisite: '',
-  },
-  {
-    id: 'K18C-MLN131',
-    code: 'MLN131',
-    name: 'Scientific Socialism / Chủ nghĩa xã hội khoa học',
-    semester: 9,
-    credits: 2,
-    prerequisite: 'MLN111, MLN122',
-  },
-  {
-    id: 'K18C-VNR202',
-    code: 'VNR202',
-    name: 'History of Communist Party of Vietnam / Lịch sử Đảng Cộng sản Việt Nam',
-    semester: 9,
-    credits: 2,
-    prerequisite: 'MLN111, MLN122',
-  },
-];
-
-const INITIAL_CURRICULUMS: Curriculum[] = [
-  {
-    code: 'BIT_IS_K18D_19A',
-    name: 'Hệ thống thông tin - K18D/19A',
-    totalSubjects: 48,
-    totalCredits: 145,
-    subjects: K18D_19A_SUBJECTS,
-  },
-  {
-    code: 'BIT_IS_K18C',
-    name: 'Hệ thống thông tin - K18C',
-    totalSubjects: 48,
-    totalCredits: 145,
-    subjects: K18C_SUBJECTS,
-  },
-];
-
-const EMPTY_FORM = {
-  code: '',
-  name: '',
-  semester: 1,
-  credits: 3,
-  prerequisite: '',
+  return `Kỳ ${semester}`;
 };
 
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case "DRAFT":
+      return "Bản nháp";
+
+    case "PUBLISHED":
+      return "Đã ban hành";
+
+    case "ACTIVE":
+      return "Đang áp dụng";
+
+    case "ARCHIVED":
+      return "Đã lưu trữ";
+
+    default:
+      return status;
+  }
+};
+
+const getStatusClassName = (status: string) => {
+  switch (status) {
+    case "DRAFT":
+      return "bg-amber-50 text-amber-700";
+
+    case "PUBLISHED":
+    case "ACTIVE":
+      return "bg-emerald-50 text-emerald-700";
+
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+};
+
+const matchesSearch = (
+  keyword: string,
+  ...values: Array<string | null | undefined>
+) => {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+
+  if (!normalizedKeyword) {
+    return true;
+  }
+
+  return values.some((value) =>
+    (value ?? "").toLowerCase().includes(normalizedKeyword),
+  );
+};
+
+const deduplicateMajors = (majors: Major[]) => {
+  const map = new Map<number, Major>();
+
+  majors.forEach((major) => {
+    map.set(major.id, major);
+  });
+
+  return Array.from(map.values());
+};
+
+const createEmptyCourseForm = (semester: number): CourseFormState => ({
+  code: "",
+  name: "",
+
+  semester,
+  credits: 3,
+
+  prerequisiteText: "",
+
+  isOjtPrerequisite: false,
+});
+
+/* =========================================================
+   COMPONENT
+   ========================================================= */
+
 const EducationCurriculumPlan: React.FC = () => {
-  const [curriculums, setCurriculums] =
-    React.useState<Curriculum[]>(INITIAL_CURRICULUMS);
+  /* ===================== DATA ===================== */
 
-  const [selectedCurriculumCode, setSelectedCurriculumCode] =
-    React.useState('BIT_IS_K18D_19A');
+  const [majors, setMajors] = React.useState<Major[]>([]);
 
-  const [selectedSemester, setSelectedSemester] =
-    React.useState<number | 'all'>('all');
+  const [curriculums, setCurriculums] = React.useState<CurriculumSummary[]>([]);
 
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [curriculumDetail, setCurriculumDetail] =
+    React.useState<CurriculumDetail | null>(null);
 
-  const [editingSubject, setEditingSubject] =
-    React.useState<CurriculumSubject | null>(null);
+  /* ===================== SELECTION ===================== */
 
-  const [formData, setFormData] = React.useState(EMPTY_FORM);
+  const [selectedMajorId, setSelectedMajorId] = React.useState<number | null>(
+    null,
+  );
+
+  const [selectedProgramId, setSelectedProgramId] = React.useState<
+    number | null
+  >(null);
+
+  const [selectedSemester, setSelectedSemester] = React.useState(1);
+
+  const [searchTerm, setSearchTerm] = React.useState("");
+
+  /* ===================== ADD COURSE ===================== */
+
+  const [isCourseModalOpen, setIsCourseModalOpen] = React.useState(false);
+
+  const [isSavingCourse, setIsSavingCourse] = React.useState(false);
+
+  const [courseForm, setCourseForm] = React.useState<CourseFormState>(
+    createEmptyCourseForm(1),
+  );
+
+  /* ===================== LOADING ===================== */
+
+  const [isLoadingMajors, setIsLoadingMajors] = React.useState(true);
+
+  const [isLoadingCurriculums, setIsLoadingCurriculums] = React.useState(false);
+
+  const [isLoadingDetail, setIsLoadingDetail] = React.useState(false);
+
+  /* ===================== TOAST ===================== */
+
+  const [toast, setToast] = React.useState<ToastState | null>(null);
+
+  const toastTimeoutRef = React.useRef<number | null>(null);
+
+  const showToast = React.useCallback((type: ToastType, message: string) => {
+    setToast({
+      type,
+      message,
+    });
+
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+
+      toastTimeoutRef.current = null;
+    }, 3500);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  /* =====================================================
+       LOAD SUPPORTED MAJORS
+       ===================================================== */
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadMajors = async () => {
+      try {
+        setIsLoadingMajors(true);
+
+        const responses = await Promise.all(
+          SUPPORTED_MAJOR_CODES.map((code) =>
+            curriculumService.searchMajors({
+              page: 1,
+              limit: 20,
+              search: code,
+            }),
+          ),
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        const allMajors = responses.flatMap((response) => response.data.items);
+
+        const supportedMajors = deduplicateMajors(
+          allMajors.filter((major) =>
+            SUPPORTED_MAJOR_CODES.includes(
+              major.code as (typeof SUPPORTED_MAJOR_CODES)[number],
+            ),
+          ),
+        );
+
+        const orderedMajors = SUPPORTED_MAJOR_CODES.flatMap((code) =>
+          supportedMajors.filter((major) => major.code === code),
+        );
+
+        setMajors(orderedMajors);
+
+        const preferredMajor =
+          orderedMajors.find((major) => major.code === "IS") ??
+          orderedMajors[0];
+
+        if (preferredMajor) {
+          setSelectedMajorId(preferredMajor.id);
+        } else {
+          throw new Error("Không tìm thấy chuyên ngành phù hợp.");
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách chuyên ngành.";
+
+        showToast("error", message);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingMajors(false);
+        }
+      }
+    };
+
+    void loadMajors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showToast]);
+
+  /* =====================================================
+       LOAD CURRICULUMS BY MAJOR
+       ===================================================== */
+
+  React.useEffect(() => {
+    if (selectedMajorId === null) {
+      return;
+    }
+
+    const selectedMajor = majors.find((major) => major.id === selectedMajorId);
+
+    if (!selectedMajor) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCurriculums = async () => {
+      try {
+        setIsLoadingCurriculums(true);
+
+        setCurriculumDetail(null);
+
+        setSelectedProgramId(null);
+
+        const response = await curriculumService.searchCurricula({
+          page: 1,
+          limit: 100,
+
+          search: selectedMajor.code,
+
+          majorId: selectedMajor.id,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        const items = response.data.items;
+
+        setCurriculums(items);
+
+        if (items.length === 0) {
+          showToast(
+            "error",
+            `Chưa có khung chương trình cho chuyên ngành ${selectedMajor.name}.`,
+          );
+
+          return;
+        }
+
+        const preferred =
+          selectedMajor.code === "IS"
+            ? items.find((curriculum) => curriculum.code === "BIT_IS_K18D_19A")
+            : null;
+
+        setSelectedProgramId(preferred?.id ?? items[0].id);
+
+        setSelectedSemester(1);
+
+        setSearchTerm("");
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách khung chương trình.";
+
+        setCurriculums([]);
+
+        showToast("error", message);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingCurriculums(false);
+        }
+      }
+    };
+
+    void loadCurriculums();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [majors, selectedMajorId, showToast]);
+
+  /* =====================================================
+       LOAD CURRICULUM DETAIL
+       ===================================================== */
+
+  React.useEffect(() => {
+    if (selectedProgramId === null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDetail = async () => {
+      try {
+        setIsLoadingDetail(true);
+
+        setCurriculumDetail(null);
+
+        const response =
+          await curriculumService.getCurriculumDetail(selectedProgramId);
+
+        if (cancelled) {
+          return;
+        }
+
+        setCurriculumDetail(response.data);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Không thể tải chi tiết chương trình đào tạo.";
+
+        showToast("error", message);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDetail(false);
+        }
+      }
+    };
+
+    void loadDetail();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProgramId, showToast]);
+
+  /* =====================================================
+       SELECTED DATA
+       ===================================================== */
 
   const selectedCurriculum =
-    curriculums.find(
-      (curriculum) =>
-        curriculum.code === selectedCurriculumCode,
-    ) ?? curriculums[0];
+    curriculums.find((curriculum) => curriculum.id === selectedProgramId) ??
+    null;
 
-  const filteredSubjects = selectedCurriculum.subjects.filter(
-    (subject) => {
-      const semesterMatch =
-        selectedSemester === 'all' ||
-        subject.semester === selectedSemester;
+  /* =====================================================
+       SEMESTER DATA
+       ===================================================== */
 
-      const keyword = searchTerm.toLowerCase().trim();
+  const semesterEntries =
+    curriculumDetail?.courses.filter(
+      (course) => course.semester === selectedSemester,
+    ) ?? [];
 
-      const searchMatch =
-        !keyword ||
-        subject.code.toLowerCase().includes(keyword) ||
-        subject.name.toLowerCase().includes(keyword) ||
-        subject.prerequisite.toLowerCase().includes(keyword);
-
-      return semesterMatch && searchMatch;
-    },
+  const commonCourses = semesterEntries.filter(
+    (course) =>
+      course.entryKind === "COURSE" &&
+      matchesSearch(
+        searchTerm,
+        course.courseCode,
+        course.name,
+        course.prerequisiteText,
+      ),
   );
+
+  const comboSlots = semesterEntries.filter(
+    (course) => course.entryKind === "COMBO_SLOT",
+  );
+
+  const electiveSlots = semesterEntries.filter(
+    (course) =>
+      course.entryKind === "ELECTIVE_SLOT" &&
+      matchesSearch(
+        searchTerm,
+        course.courseCode,
+        course.name,
+        course.prerequisiteText,
+      ),
+  );
+
+  const combosInSemester: Array<
+    CurriculumCombo & {
+      visibleCourses: CurriculumCombo["courses"];
+    }
+  > =
+    curriculumDetail?.combos
+      .map((combo) => {
+        const courses = combo.courses.filter(
+          (course) =>
+            course.semester === selectedSemester &&
+            matchesSearch(
+              searchTerm,
+              course.courseCode,
+              course.name,
+              course.prerequisiteText,
+            ),
+        );
+
+        return {
+          ...combo,
+          visibleCourses: courses,
+        };
+      })
+      .filter((combo) => combo.visibleCourses.length > 0) ?? [];
+
+  const totalComboOptionsInSemester =
+    curriculumDetail?.combos.filter((combo) =>
+      combo.courses.some((course) => course.semester === selectedSemester),
+    ).length ?? 0;
+
+  /* =====================================================
+       HANDLERS
+       ===================================================== */
+
+  const handleMajorChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedMajorId(Number(event.target.value));
+
+    setSearchTerm("");
+  };
 
   const handleCurriculumChange = (
     event: React.ChangeEvent<HTMLSelectElement>,
   ) => {
-    setSelectedCurriculumCode(event.target.value);
+    setSelectedProgramId(Number(event.target.value));
 
-    // Reset filter khi đổi khung
-    setSelectedSemester('all');
-    setSearchTerm('');
+    setSelectedSemester(1);
+
+    setSearchTerm("");
   };
 
-  const updateSelectedCurriculumSubjects = (
-    updater: (subjects: CurriculumSubject[]) => CurriculumSubject[],
-  ) => {
-    setCurriculums((prev) =>
-      prev.map((curriculum) =>
-        curriculum.code === selectedCurriculumCode
-          ? {
-              ...curriculum,
-              subjects: updater(curriculum.subjects),
-            }
-          : curriculum,
-      ),
-    );
-  };
-
-  const openAddModal = () => {
-    setEditingSubject(null);
-    setFormData(EMPTY_FORM);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (subject: CurriculumSubject) => {
-    setEditingSubject(subject);
-
-    setFormData({
-      code: subject.code,
-      name: subject.name,
-      semester: subject.semester,
-      credits: subject.credits,
-      prerequisite: subject.prerequisite,
-    });
-
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingSubject(null);
-    setFormData(EMPTY_FORM);
-  };
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!formData.code.trim() || !formData.name.trim()) {
-      alert('Vui lòng nhập mã môn và tên môn học.');
+  const openAddCourseModal = () => {
+    if (!curriculumDetail) {
       return;
     }
 
-    if (editingSubject) {
-      updateSelectedCurriculumSubjects((subjects) =>
-        subjects.map((subject) =>
-          subject.id === editingSubject.id
-            ? {
-                ...subject,
-                code: formData.code.trim(),
-                name: formData.name.trim(),
-                semester: formData.semester,
-                credits: formData.credits,
-                prerequisite: formData.prerequisite.trim(),
-              }
-            : subject,
-        ),
-      );
-    } else {
-      const newSubject: CurriculumSubject = {
-        id: `${selectedCurriculumCode}-${formData.code.trim()}-${Date.now()}`,
-        code: formData.code.trim(),
-        name: formData.name.trim(),
-        semester: formData.semester,
-        credits: formData.credits,
-        prerequisite: formData.prerequisite.trim(),
-      };
+    setCourseForm(createEmptyCourseForm(selectedSemester));
 
-      updateSelectedCurriculumSubjects((subjects) => [
-        ...subjects,
-        newSubject,
-      ]);
+    setIsCourseModalOpen(true);
+  };
+
+  const closeAddCourseModal = () => {
+    if (isSavingCourse) {
+      return;
     }
 
-    closeModal();
+    setIsCourseModalOpen(false);
   };
 
-  const handleDelete = (subject: CurriculumSubject) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa môn "${subject.code}" khỏi khung ${selectedCurriculumCode}?`,
+  /* =====================================================
+       ADD COURSE
+       ===================================================== */
+
+  const handleAddCourseSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!curriculumDetail) {
+      showToast("error", "Chưa chọn khung chương trình.");
+
+      return;
+    }
+
+    const code = courseForm.code.trim();
+
+    const name = courseForm.name.trim();
+
+    const prerequisiteText = courseForm.prerequisiteText.trim();
+
+    if (!code) {
+      showToast("error", "Vui lòng nhập mã môn học.");
+
+      return;
+    }
+
+    if (!name) {
+      showToast("error", "Vui lòng nhập tên môn học.");
+
+      return;
+    }
+
+    if (courseForm.credits < 0 || Number.isNaN(courseForm.credits)) {
+      showToast("error", "Số tín chỉ không hợp lệ.");
+
+      return;
+    }
+
+    /*
+     * Không cho cùng một mã môn xuất hiện
+     * hai lần trong cùng khung.
+     */
+    const alreadyInCurriculum = curriculumDetail.courses.some(
+      (course) => course.courseCode.trim().toLowerCase() === code.toLowerCase(),
     );
 
-    if (!confirmed) return;
+    if (alreadyInCurriculum) {
+      showToast(
+        "error",
+        `Môn ${code} đã có trong khung ${curriculumDetail.code}.`,
+      );
 
-    updateSelectedCurriculumSubjects((subjects) =>
-      subjects.filter((item) => item.id !== subject.id),
+      return;
+    }
+    /*
+     * Một sinh viên học tối đa 5 môn trong một kỳ.
+     *
+     * Môn chung
+     * + vị trí combo
+     * + vị trí tự chọn
+     * không được vượt quá 5.
+     */
+    const semesterStructure = curriculumDetail.courses.filter(
+      (course) => course.semester === courseForm.semester,
+    );
+
+    const currentStudySlots = semesterStructure.filter(
+      (course) =>
+        course.entryKind === "COURSE" ||
+        course.entryKind === "COMBO_SLOT" ||
+        course.entryKind === "ELECTIVE_SLOT",
+    ).length;
+
+    if (currentStudySlots >= 5) {
+      showToast(
+        "error",
+        `${getSemesterLabel(
+          courseForm.semester,
+        )} đã đủ tối đa 5 môn/học phần theo khung chương trình.`,
+      );
+
+      return;
+    }
+
+    setIsSavingCourse(true);
+
+    let createdNewCourse = false;
+
+    try {
+      /* =============================================
+             1. SEARCH COURSE CATALOG
+             ============================================= */
+
+      const searchResponse = await curriculumService.searchCourses({
+        page: 1,
+        limit: 20,
+        search: code,
+      });
+
+      let catalogCourse = searchResponse.data.items.find(
+        (course) => course.code.trim().toLowerCase() === code.toLowerCase(),
+      );
+
+      /* =============================================
+             2. CREATE IF NOT EXISTS
+             ============================================= */
+
+      if (!catalogCourse) {
+        await curriculumService.createCourse({
+          code,
+          name,
+
+          defaultCredits: courseForm.credits,
+
+          isOjtPrerequisite: courseForm.isOjtPrerequisite,
+        });
+
+        createdNewCourse = true;
+
+        /*
+         * Swagger của POST /api/courses
+         * không công bố response schema rõ ràng.
+         *
+         * Search lại bằng code để lấy ID thật.
+         */
+        const searchAfterCreate = await curriculumService.searchCourses({
+          page: 1,
+          limit: 20,
+          search: code,
+        });
+
+        catalogCourse = searchAfterCreate.data.items.find(
+          (course) => course.code.trim().toLowerCase() === code.toLowerCase(),
+        );
+
+        if (!catalogCourse) {
+          throw new Error(
+            `Đã tạo môn ${code} nhưng chưa thể xác định dữ liệu môn vừa tạo.`,
+          );
+        }
+      }
+
+      /* =============================================
+             3. KEEP ALL CURRENT CURRICULUM ENTRIES
+             ============================================= */
+
+      const existingCourses = curriculumDetail.courses.map((course) => ({
+        /*
+         * Backend yêu cầu chỉ courseId hoặc courseCode.
+         * Detail đã có courseId nên chỉ gửi courseId.
+         */
+        courseId: course.courseId,
+
+        credits: course.credits,
+
+        semester: course.semester,
+
+        isRequired: course.isRequired ?? true,
+
+        entryKind: course.entryKind,
+
+        prerequisiteText: course.prerequisiteText?.trim() || "None",
+      }));
+
+      /* =============================================
+             4. ADD NEW NORMAL COURSE
+             ============================================= */
+
+      const newCourse = {
+        /*
+         * Chỉ gửi courseId.
+         */
+        courseId: catalogCourse.id,
+
+        credits: courseForm.credits,
+
+        semester: courseForm.semester,
+
+        isRequired: true,
+
+        entryKind: "COURSE" as const,
+
+        prerequisiteText: prerequisiteText || "None",
+      };
+
+      /* =============================================
+             5. PUT FULL CURRICULUM COURSE LIST
+             ============================================= */
+
+      await curriculumService.updateCurriculumCourses({
+        programId: curriculumDetail.id,
+
+        courses: [...existingCourses, newCourse],
+      });
+
+      /* =============================================
+             6. RELOAD DETAIL
+             ============================================= */
+
+      const detailResponse = await curriculumService.getCurriculumDetail(
+        curriculumDetail.id,
+      );
+
+      setCurriculumDetail(detailResponse.data);
+
+      setSelectedSemester(courseForm.semester);
+
+      setSearchTerm("");
+
+      setIsCourseModalOpen(false);
+
+      showToast(
+        "success",
+        `Đã thêm môn ${catalogCourse.code} vào ${getSemesterLabel(
+          courseForm.semester,
+        )} của khung ${curriculumDetail.code}.`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Không thể thêm môn học.";
+
+      if (createdNewCourse) {
+        showToast(
+          "error",
+          `${message} Môn đã được tạo nhưng có thể chưa được gắn vào khung chương trình.`,
+        );
+      } else {
+        showToast("error", message);
+      }
+    } finally {
+      setIsSavingCourse(false);
+    }
+  };
+
+  /* =====================================================
+       RENDER COURSE TABLE
+       ===================================================== */
+
+  const renderCourseTable = (courses: CurriculumCourse[]) => {
+    if (courses.length === 0) {
+      return (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-400">
+          Không có môn học phù hợp.
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
+        <table className="w-full min-w-[900px] table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-[14%]" />
+            <col className="w-[48%]" />
+            <col className="w-[12%]" />
+            <col className="w-[26%]" />
+          </colgroup>
+
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="px-4 py-3 font-semibold text-slate-600">Mã môn</th>
+
+              <th className="px-4 py-3 font-semibold text-slate-600">
+                Tên môn học
+              </th>
+
+              <th className="px-4 py-3 text-center font-semibold text-slate-600">
+                Tín chỉ
+              </th>
+
+              <th className="px-4 py-3 font-semibold text-slate-600">
+                Môn tiên quyết / Điều kiện
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {courses.map((course) => (
+              <tr key={course.id} className="transition hover:bg-slate-50/70">
+                <td className="px-4 py-3 align-top">
+                  <span className="font-semibold text-orange-600">
+                    {course.courseCode}
+                  </span>
+                </td>
+
+                <td className="break-words px-4 py-3 align-top font-medium text-slate-700">
+                  {course.name}
+                </td>
+
+                <td className="px-4 py-3 text-center align-top font-medium text-slate-700">
+                  {course.credits}
+                </td>
+
+                <td className="break-words px-4 py-3 align-top text-slate-600">
+                  {course.prerequisiteText || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   };
 
-  const handleDownloadTemplate = () => {
-    const content =
-      'MaKhungChuongTrinh,MaMon,TenMonHoc,SoTinChi,KyChuongTrinh,MonTienQuyet\n' +
-      `${selectedCurriculumCode},PRF192,Programming Fundamentals,3,1,None`;
-
-    const blob = new Blob([content], {
-      type: 'text/csv;charset=utf-8;',
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = 'curriculum-template.csv';
-    link.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportFile = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    alert(
-      `UI mock: đã chọn file "${file.name}" để import cho khung ${selectedCurriculumCode}.`,
-    );
-
-    event.target.value = '';
-  };
+  /* =====================================================
+       RENDER
+       ===================================================== */
 
   return (
     <div className="space-y-6">
+      {/* ===================== TOAST ===================== */}
+
+      {toast && (
+        <div className="fixed right-6 top-6 z-[9999] w-[380px] max-w-[calc(100vw-3rem)]">
+          <div
+            className={`rounded-2xl border bg-white p-4 shadow-2xl ${
+              toast.type === "success" ? "border-emerald-200" : "border-red-200"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {toast.type === "success" ? (
+                <CheckCircle2
+                  size={20}
+                  className="mt-0.5 shrink-0 text-emerald-600"
+                />
+              ) : (
+                <AlertTriangle
+                  size={20}
+                  className="mt-0.5 shrink-0 text-red-600"
+                />
+              )}
+
+              <p className="text-sm text-slate-700">{toast.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== BANNER ===================== */}
+
       <PageBanner
         title="Quản lý Chương trình Đào tạo"
-        description="Quản lý các khung chương trình đào tạo phục vụ theo dõi tiến độ học tập và điều kiện OJT."
+        description="Theo dõi cấu trúc từng khung chương trình, các môn học chung và các môn theo combo của từng kỳ."
         badge="Quản lý dữ liệu"
       />
 
-      {/* ==================== CHỌN KHUNG ==================== */}
+      {/* ===================== SELECTORS ===================== */}
+
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Chuyên ngành
+            </label>
+
+            <select
+              value={selectedMajorId ?? ""}
+              onChange={handleMajorChange}
+              disabled={isLoadingMajors}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:opacity-60"
+            >
+              {isLoadingMajors && <option value="">Đang tải...</option>}
+
+              {majors.map((major) => (
+                <option key={major.id} value={major.id}>
+                  {major.code} - {major.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
               Khung chương trình
             </label>
 
             <select
-              value={selectedCurriculumCode}
+              value={selectedProgramId ?? ""}
               onChange={handleCurriculumChange}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              disabled={isLoadingCurriculums || curriculums.length === 0}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:opacity-60"
             >
-              {curriculums.map((curriculum) => (
-                <option
-                  key={curriculum.code}
-                  value={curriculum.code}
-                >
-                  {curriculum.code}
-                </option>
-              ))}
+              {isLoadingCurriculums ? (
+                <option value="">Đang tải...</option>
+              ) : (
+                curriculums.map((curriculum) => (
+                  <option key={curriculum.id} value={curriculum.id}>
+                    {curriculum.code}
+                  </option>
+                ))
+              )}
             </select>
-
-            <p className="mt-2 text-xs text-slate-500">
-              Chọn khung chương trình cần xem hoặc quản lý.
-            </p>
           </div>
+        </div>
+      </section>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5">
+      {/* ===================== CURRICULUM INFO ===================== */}
+
+      {selectedCurriculum && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-                <Layers3 size={21} />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
+                <Layers3 size={23} />
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Khung đang chọn
                 </p>
 
-                <h2 className="mt-1 text-lg font-bold text-slate-800">
+                <h2 className="mt-1 text-xl font-bold text-slate-800">
                   {selectedCurriculum.code}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
                   {selectedCurriculum.name}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                    {selectedCurriculum.totalSubjects} môn học
+                    {selectedCurriculum.majorName}
                   </span>
 
                   <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
@@ -1124,371 +964,532 @@ const EducationCurriculumPlan: React.FC = () => {
                   </span>
 
                   <span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700">
-                    Kỳ 0 - Kỳ 9
+                    9 kỳ
+                  </span>
+
+                  <span
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClassName(
+                      selectedCurriculum.status,
+                    )}`}
+                  >
+                    {getStatusLabel(selectedCurriculum.status)}
                   </span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* ==================== TOOLBAR ==================== */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-slate-800">
-              Danh sách môn học
-            </h2>
+      {/* ===================== LOADING DETAIL ===================== */}
 
-            <p className="mt-1 text-sm text-slate-500">
-              Quản lý các môn thuộc khung{' '}
-              <span className="font-semibold">
-                {selectedCurriculum.code}
-              </span>
-            </p>
-          </div>
+      {isLoadingDetail && (
+        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm">
+          <RefreshCw
+            size={26}
+            className="mx-auto animate-spin text-orange-500"
+          />
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleDownloadTemplate}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-            >
-              <Download size={17} />
-              Tải file mẫu
-            </button>
+          <p className="mt-3 text-sm text-slate-500">
+            Đang tải cấu trúc chương trình...
+          </p>
+        </section>
+      )}
 
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-600 transition hover:bg-orange-100">
-              <Upload size={17} />
-              Import dữ liệu
+      {/* ===================== DETAIL ===================== */}
 
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleImportFile}
-                className="hidden"
-              />
-            </label>
+      {curriculumDetail && !isLoadingDetail && (
+        <>
+          {/* SEMESTER NAV */}
 
-            <button
-              type="button"
-              onClick={openAddModal}
-              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
-            >
-              <Plus size={17} />
-              Thêm môn học
-            </button>
-          </div>
-        </div>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+              <h2 className="font-semibold text-slate-800">
+                Cấu trúc chương trình
+              </h2>
 
-        {/* Filter */}
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-5">
-          <div className="relative min-w-[260px] flex-1">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+              <p className="mt-1 text-sm text-slate-500">
+                Chọn kỳ để xem môn chung, môn theo combo và học phần tự chọn.
+              </p>
+            </div>
 
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) =>
-                setSearchTerm(event.target.value)
-              }
-              placeholder="Tìm mã môn, tên môn, môn tiên quyết..."
-              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-            />
-          </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {SEMESTERS.map((semester) => (
+                <button
+                  key={semester}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSemester(semester);
 
-          <select
-            value={selectedSemester}
-            onChange={(event) =>
-              setSelectedSemester(
-                event.target.value === 'all'
-                  ? 'all'
-                  : Number(event.target.value),
-              )
-            }
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400"
-          >
-            <option value="all">Tất cả kỳ chương trình</option>
+                    setSearchTerm("");
+                  }}
+                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    selectedSemester === semester
+                      ? "bg-orange-500 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-orange-50 hover:text-orange-600"
+                  }`}
+                >
+                  {getSemesterLabel(semester)}
+                </button>
+              ))}
+            </div>
 
-            {Array.from({ length: 10 }, (_, semester) => (
-              <option key={semester} value={semester}>
-                Kỳ {semester}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+            <div className="mt-5 border-t border-slate-100 pt-5">
+              <div className="relative">
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
 
-      {/* ==================== TABLE ==================== */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <div>
-            <h3 className="font-semibold text-slate-800">
-              {selectedCurriculum.code}
-            </h3>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Tìm mã môn, tên môn, môn tiên quyết..."
+                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+              </div>
+            </div>
+          </section>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Hiển thị {filteredSubjects.length} môn học
-            </p>
-          </div>
+          {/* COMMON COURSES */}
 
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <BookOpen size={17} />
-            {selectedCurriculum.totalSubjects} môn •{' '}
-            {selectedCurriculum.totalCredits} tín chỉ
-          </div>
-        </div>
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <BookOpen size={19} />
+                </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-5 py-3 font-semibold text-slate-600">
-                  Mã môn
-                </th>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-semibold text-slate-800">
+                      Môn học chung
+                    </h2>
 
-                <th className="px-5 py-3 font-semibold text-slate-600">
-                  Tên môn học
-                </th>
+                    <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                      {getSemesterLabel(selectedSemester)}
+                    </span>
+                  </div>
 
-                <th className="px-5 py-3 text-center font-semibold text-slate-600">
-                  Kỳ
-                </th>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Các môn thuộc khung chương trình và không phụ thuộc combo
+                    sinh viên lựa chọn.
+                  </p>
+                </div>
+              </div>
 
-                <th className="px-5 py-3 text-center font-semibold text-slate-600">
-                  Tín chỉ
-                </th>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                  {commonCourses.length} môn học
+                </span>
 
-                <th className="px-5 py-3 font-semibold text-slate-600">
-                  Môn tiên quyết / Điều kiện
-                </th>
+                <button
+                  type="button"
+                  onClick={openAddCourseModal}
+                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+                >
+                  <Plus size={17} />
+                  Thêm môn học
+                </button>
+              </div>
+            </div>
 
-                <th className="px-5 py-3 text-right font-semibold text-slate-600">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
+            {renderCourseTable(commonCourses)}
+          </section>
 
-            <tbody className="divide-y divide-slate-100">
-              {filteredSubjects.length > 0 ? (
-                filteredSubjects.map((subject) => (
-                  <tr
-                    key={subject.id}
-                    className="transition hover:bg-slate-50/70"
-                  >
-                    <td className="px-5 py-4">
-                      <span className="font-semibold text-orange-600">
-                        {subject.code}
+          {/* COMBO COURSES */}
+
+          {(comboSlots.length > 0 || totalComboOptionsInSemester > 0) && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <Boxes size={19} />
+                  </div>
+
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-semibold text-slate-800">
+                        Môn theo combo
+                      </h2>
+
+                      <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                        {getSemesterLabel(selectedSemester)}
                       </span>
-                    </td>
+                    </div>
 
-                    <td className="max-w-md px-5 py-4 font-medium text-slate-700">
-                      {subject.name}
-                    </td>
+                    <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                      Sinh viên học các môn của combo đã chọn song song với các
+                      môn chung trong cùng kỳ.
+                    </p>
+                  </div>
+                </div>
 
-                    <td className="px-5 py-4 text-center">
-                      <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                        Kỳ {subject.semester}
-                      </span>
-                    </td>
+                <div className="flex flex-wrap gap-2">
+                  {comboSlots.length > 0 && (
+                    <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
+                      {comboSlots.length} vị trí môn combo
+                    </span>
+                  )}
 
-                    <td className="px-5 py-4 text-center font-medium text-slate-700">
-                      {subject.credits}
-                    </td>
+                  {totalComboOptionsInSemester > 0 && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      {totalComboOptionsInSemester} combo
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                    <td className="max-w-lg px-5 py-4 text-slate-600">
-                      {subject.prerequisite || '—'}
-                    </td>
+              {combosInSemester.length > 0 ? (
+                <div className="space-y-5">
+                  {combosInSemester.map((combo) => (
+                    <div
+                      key={combo.id}
+                      className="overflow-hidden rounded-2xl border border-purple-100 bg-purple-50/20"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-purple-100 bg-purple-50/60 px-5 py-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold uppercase tracking-wide text-purple-600">
+                            {combo.code}
+                          </p>
 
-                    <td className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(subject)}
-                          title="Chỉnh sửa"
-                          className="rounded-lg p-2 text-slate-400 transition hover:bg-orange-50 hover:text-orange-500"
-                        >
-                          <Pencil size={17} />
-                        </button>
+                          <h3 className="mt-1 break-words font-semibold text-slate-800">
+                            {combo.name}
+                          </h3>
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(subject)}
-                          title="Xóa"
-                          className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                        <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-purple-700 shadow-sm">
+                          {combo.visibleCourses.length} môn trong kỳ
+                        </span>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-5 py-12 text-center text-slate-400"
-                  >
-                    Không tìm thấy môn học phù hợp.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      {/* ==================== MODAL ==================== */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[900px] table-fixed text-left text-sm">
+                          <colgroup>
+                            <col className="w-[14%]" />
+                            <col className="w-[48%]" />
+                            <col className="w-[12%]" />
+                            <col className="w-[26%]" />
+                          </colgroup>
+
+                          <thead className="bg-white/70">
+                            <tr>
+                              <th className="px-5 py-3 font-semibold text-slate-600">
+                                Mã môn
+                              </th>
+
+                              <th className="px-5 py-3 font-semibold text-slate-600">
+                                Tên môn học
+                              </th>
+
+                              <th className="px-5 py-3 text-center font-semibold text-slate-600">
+                                Tín chỉ
+                              </th>
+
+                              <th className="px-5 py-3 font-semibold text-slate-600">
+                                Môn tiên quyết / Điều kiện
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-purple-50 bg-white">
+                            {combo.visibleCourses.map((course) => (
+                              <tr
+                                key={course.id}
+                                className="transition hover:bg-purple-50/30"
+                              >
+                                <td className="px-5 py-3 align-top">
+                                  <span className="font-semibold text-purple-700">
+                                    {course.courseCode}
+                                  </span>
+                                </td>
+
+                                <td className="break-words px-5 py-3 align-top font-medium text-slate-700">
+                                  {course.name}
+                                </td>
+
+                                <td className="px-5 py-3 text-center align-top text-slate-700">
+                                  {course.credits ?? "—"}
+                                </td>
+
+                                <td className="break-words px-5 py-3 align-top text-slate-600">
+                                  {course.prerequisiteText || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-400">
+                  Không tìm thấy môn combo phù hợp với bộ lọc.
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ELECTIVE */}
+
+          {electiveSlots.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-semibold text-slate-800">
+                      Học phần tự chọn
+                    </h2>
+
+                    <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                      {getSemesterLabel(selectedSemester)}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Các vị trí học phần tự chọn được quy định trong khung chương
+                    trình.
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                  {electiveSlots.length} học phần
+                </span>
+              </div>
+
+              {renderCourseTable(electiveSlots)}
+            </section>
+          )}
+        </>
+      )}
+
+      {/* ===================== EMPTY ===================== */}
+
+      {!isLoadingDetail &&
+        selectedProgramId === null &&
+        !isLoadingCurriculums && (
+          <section className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
+            <BookOpen size={32} className="mx-auto text-slate-300" />
+
+            <p className="mt-3 text-sm text-slate-500">
+              Chưa có khung chương trình để hiển thị.
+            </p>
+          </section>
+        )}
+
+      {/* ===================== ADD COURSE MODAL ===================== */}
+
+      {isCourseModalOpen && curriculumDetail && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/45 px-4 py-8">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+            {/* HEADER */}
+
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <h3 className="text-lg font-semibold text-slate-800">
-                  {editingSubject
-                    ? 'Chỉnh sửa môn học'
-                    : 'Thêm môn học'}
+                <h3 className="text-xl font-bold text-slate-800">
+                  Thêm môn học
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Khung {selectedCurriculum.code}
+                  Thêm môn vào khung{" "}
+                  <span className="font-semibold text-slate-700">
+                    {curriculumDetail.code}
+                  </span>
+                  .
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={closeModal}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100"
+                disabled={isSavingCourse}
+                onClick={closeAddCourseModal}
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 gap-5 px-6 py-5 md:grid-cols-2">
+            {/* FORM */}
+
+            <form onSubmit={handleAddCourseSubmit}>
+              <div className="grid grid-cols-1 gap-5 px-6 py-6 md:grid-cols-2">
+                {/* CODE */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Mã môn
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Mã môn <span className="text-red-500">*</span>
                   </label>
 
                   <input
-                    value={formData.code}
+                    type="text"
+                    value={courseForm.code}
                     onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
+                      setCourseForm((previous) => ({
+                        ...previous,
+
                         code: event.target.value,
                       }))
                     }
-                    placeholder="Ví dụ: PRF192"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                    placeholder="Ví dụ: ISM302"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
 
+                {/* SEMESTER */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Kỳ chương trình
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Kỳ chương trình <span className="text-red-500">*</span>
                   </label>
 
                   <select
-                    value={formData.semester}
+                    value={courseForm.semester}
                     onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
+                      setCourseForm((previous) => ({
+                        ...previous,
+
                         semester: Number(event.target.value),
                       }))
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-orange-400"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
-                    {Array.from(
-                      { length: 10 },
-                      (_, semester) => (
-                        <option
-                          key={semester}
-                          value={semester}
-                        >
-                          Kỳ {semester}
-                        </option>
-                      ),
-                    )}
+                    {SEMESTERS.map((semester) => (
+                      <option key={semester} value={semester}>
+                        {getSemesterLabel(semester)}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* NAME */}
+
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Tên môn học
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Tên môn học <span className="text-red-500">*</span>
                   </label>
 
                   <input
-                    value={formData.name}
+                    type="text"
+                    value={courseForm.name}
                     onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
+                      setCourseForm((previous) => ({
+                        ...previous,
+
                         name: event.target.value,
                       }))
                     }
                     placeholder="Nhập tên môn học"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
 
+                {/* CREDITS */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Số tín chỉ
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Số tín chỉ <span className="text-red-500">*</span>
                   </label>
 
                   <input
                     type="number"
                     min="0"
-                    value={formData.credits}
+                    step="0.5"
+                    value={courseForm.credits}
                     onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
+                      setCourseForm((previous) => ({
+                        ...previous,
+
                         credits: Number(event.target.value),
                       }))
                     }
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
 
+                {/* OJT */}
+
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Điều kiện OJT
+                  </label>
+
+                  <label className="flex min-h-[46px] cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={courseForm.isOjtPrerequisite}
+                      onChange={(event) =>
+                        setCourseForm((previous) => ({
+                          ...previous,
+
+                          isOjtPrerequisite: event.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 accent-orange-500"
+                    />
+
+                    <span className="text-sm text-slate-700">
+                      Môn liên quan đến điều kiện OJT
+                    </span>
+                  </label>
+
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Áp dụng khi đây là môn mới chưa có trong danh mục môn học.
+                  </p>
+                </div>
+
+                {/* PREREQUISITE */}
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
                     Môn tiên quyết / Điều kiện
                   </label>
 
                   <input
-                    value={formData.prerequisite}
+                    type="text"
+                    value={courseForm.prerequisiteText}
                     onChange={(event) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        prerequisite: event.target.value,
+                      setCourseForm((previous) => ({
+                        ...previous,
+
+                        prerequisiteText: event.target.value,
                       }))
                     }
-                    placeholder="Ví dụ: PRO192"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                    placeholder="Ví dụ: DBI202, PRO192"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              {/* ACTIONS */}
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
                 <button
                   type="button"
-                  onClick={closeModal}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  onClick={closeAddCourseModal}
+                  disabled={isSavingCourse}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Hủy
                 </button>
 
                 <button
                   type="submit"
-                  className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+                  disabled={isSavingCourse}
+                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {editingSubject
-                    ? 'Lưu thay đổi'
-                    : 'Thêm môn học'}
+                  {isSavingCourse ? (
+                    <>
+                      <RefreshCw size={17} className="animate-spin" />
+                      Đang thêm...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={17} />
+                      Thêm môn học
+                    </>
+                  )}
                 </button>
               </div>
             </form>
