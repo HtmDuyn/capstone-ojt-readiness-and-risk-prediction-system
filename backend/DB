@@ -6,7 +6,7 @@ SET LOCAL search_path=public,pg_catalog;
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
  SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries')
+ WHERE n.nspname='public' AND c.relname IN ('OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
 ), edges AS (
  SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
  UNION
@@ -54,6 +54,8 @@ BEGIN
  FROM pg_temp._ojt_reset_targets;
  IF names IS NOT NULL THEN EXECUTE 'DROP TABLE ' || names; END IF;
 END; $reset$;
+DROP FUNCTION IF EXISTS public."GuardAssessmentTemplate"();
+DROP FUNCTION IF EXISTS public."GuardPredictionModelVersion"();
 DROP FUNCTION IF EXISTS public."CheckProgramSlot"();
 DROP FUNCTION IF EXISTS public."CheckCoordinationContext"();
 DROP FUNCTION IF EXISTS public."TouchUpdatedAt"();
@@ -6208,4 +6210,109 @@ BEGIN
  END LOOP;
 END $$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_academic_workflow_gaps');
+COMMIT;
+
+-- SECTION: Admin management APIs
+-- Additive admin section. scripts/migrate-admin.cjs reads only this section for upgrades.
+BEGIN;
+ALTER TABLE "Students" ADD COLUMN "DeletedAt" timestamptz;
+ALTER TABLE "Enterprises" ADD COLUMN "DeletedAt" timestamptz;
+ALTER TABLE "InternshipPositions" ADD COLUMN "DeletedAt" timestamptz;
+ALTER TABLE "InternshipAssignments" ADD COLUMN "AcademicSupervisorID" int REFERENCES "Users"("UserID");
+
+CREATE TABLE "AssessmentTemplates" (
+ "TemplateID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "Code" varchar(50) NOT NULL, "Version" int NOT NULL CHECK ("Version">0),
+ "Name" varchar(150) NOT NULL, "Criteria" jsonb NOT NULL CHECK (jsonb_typeof("Criteria")='array'),
+ "Status" text NOT NULL DEFAULT 'DRAFT' CHECK ("Status" IN ('DRAFT','PUBLISHED')),
+ "CreatedBy" int NOT NULL REFERENCES "Users"("UserID"), "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+ "PublishedAt" timestamptz, UNIQUE ("Code","Version"),
+ CHECK (("Status"='PUBLISHED')=("PublishedAt" IS NOT NULL))
+);
+ALTER TABLE "InternshipEvaluations" ADD COLUMN "TemplateID" int REFERENCES "AssessmentTemplates"("TemplateID"), ADD COLUMN "ScoreDetails" jsonb;
+CREATE FUNCTION "GuardAssessmentTemplate"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF OLD."Status"='PUBLISHED' OR EXISTS (SELECT 1 FROM "InternshipEvaluations" WHERE "TemplateID"=OLD."TemplateID") THEN
+  RAISE EXCEPTION 'Published or used assessment templates are immutable' USING ERRCODE='23514';
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
+END $$;
+CREATE TRIGGER "TR_AssessmentTemplateImmutable" BEFORE UPDATE OR DELETE ON "AssessmentTemplates" FOR EACH ROW EXECUTE FUNCTION "GuardAssessmentTemplate"();
+
+CREATE TABLE "PredictionModels" (
+ "ModelID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "Code" varchar(50) NOT NULL, "Version" varchar(50) NOT NULL, "Name" varchar(150) NOT NULL,
+ "Status" text NOT NULL DEFAULT 'INACTIVE' CHECK ("Status" IN ('ACTIVE','INACTIVE')),
+ "Metrics" jsonb NOT NULL DEFAULT '{}', "FeatureSchema" jsonb NOT NULL DEFAULT '{}',
+ "CreatedAt" timestamptz NOT NULL DEFAULT now(), UNIQUE ("Code","Version")
+);
+CREATE TABLE "PredictionJobs" (
+ "JobID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "ModelID" int NOT NULL REFERENCES "PredictionModels"("ModelID"),
+ "OJTSemesterID" int NOT NULL REFERENCES "OJTSemesters"("OJTSemesterID"),
+ "IdempotencyKey" varchar(100) NOT NULL UNIQUE, "RequestHash" text NOT NULL,
+ "Status" text NOT NULL DEFAULT 'PENDING' CHECK ("Status" IN ('PENDING','RUNNING','COMPLETED','COMPLETED_WITH_ERRORS')),
+ "CreatedBy" int NOT NULL REFERENCES "Users"("UserID"), "CreatedAt" timestamptz NOT NULL DEFAULT now(), "CompletedAt" timestamptz
+);
+CREATE FUNCTION "GuardPredictionModelVersion"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF (NEW."Code",NEW."Version",NEW."Metrics",NEW."FeatureSchema") IS DISTINCT FROM (OLD."Code",OLD."Version",OLD."Metrics",OLD."FeatureSchema")
+ AND EXISTS (SELECT 1 FROM "PredictionJobs" WHERE "ModelID"=OLD."ModelID") THEN
+  RAISE EXCEPTION 'A queued or used model version is immutable; register a new version' USING ERRCODE='23514';
+ END IF; RETURN NEW;
+END $$;
+CREATE TRIGGER "TR_PredictionModelImmutable" BEFORE UPDATE ON "PredictionModels" FOR EACH ROW EXECUTE FUNCTION "GuardPredictionModelVersion"();
+CREATE TABLE "PredictionJobItems" (
+ "JobID" int NOT NULL REFERENCES "PredictionJobs"("JobID"), "StudentID" int NOT NULL REFERENCES "Students"("StudentID"),
+ "Status" text NOT NULL DEFAULT 'PENDING' CHECK ("Status" IN ('PENDING','COMPLETED','FAILED')),
+ "ErrorCode" text, "ErrorMessage" text, PRIMARY KEY ("JobID","StudentID")
+);
+CREATE TABLE "Predictions" (
+ "PredictionID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "JobID" int NOT NULL, "StudentID" int NOT NULL,
+ "ModelSnapshot" jsonb NOT NULL, "InputSnapshot" jsonb NOT NULL,
+ "ReadinessScore" numeric(5,2) NOT NULL CHECK ("ReadinessScore" BETWEEN 0 AND 100),
+ "ReadinessLevel" text NOT NULL CHECK ("ReadinessLevel" IN ('LOW','MEDIUM','HIGH')),
+ "RiskScore" numeric(5,2) NOT NULL CHECK ("RiskScore" BETWEEN 0 AND 100),
+ "RiskLevel" text NOT NULL CHECK ("RiskLevel" IN ('LOW','MEDIUM','HIGH')),
+ "Factors" jsonb NOT NULL CHECK (jsonb_typeof("Factors")='array'), "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+ UNIQUE ("JobID","StudentID"), FOREIGN KEY ("JobID","StudentID") REFERENCES "PredictionJobItems"("JobID","StudentID")
+);
+CREATE INDEX "IX_PredictionStudent" ON "Predictions"("StudentID","CreatedAt" DESC);
+CREATE INDEX "IX_PredictionPending" ON "PredictionJobItems"("JobID") WHERE "Status"='PENDING';
+CREATE TABLE "RiskAlerts" (
+ "AlertID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "PredictionID" int NOT NULL UNIQUE REFERENCES "Predictions"("PredictionID"),
+ "Status" text NOT NULL DEFAULT 'OPEN' CHECK ("Status" IN ('OPEN','ACKNOWLEDGED','RESOLVED','DISMISSED')),
+ "CreatedAt" timestamptz NOT NULL DEFAULT now(), "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
+ "UpdatedBy" int REFERENCES "Users"("UserID"), "ResolutionNote" text
+);
+CREATE TABLE "StudentInterventions" (
+ "InterventionID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "AlertID" int NOT NULL REFERENCES "RiskAlerts"("AlertID"),
+ "Description" text NOT NULL, "AssignedTo" int NOT NULL REFERENCES "Users"("UserID"),
+ "DueDate" date, "Status" text NOT NULL DEFAULT 'PLANNED' CHECK ("Status" IN ('PLANNED','IN_PROGRESS','COMPLETED','CANCELLED')),
+ "Outcome" text, "CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),
+ "CreatedAt" timestamptz NOT NULL DEFAULT now(), "UpdatedAt" timestamptz NOT NULL DEFAULT now()
+);
+-- Match the existing backend-only access policy; no direct browser database access.
+DO $$ DECLARE t text; seq text; role_name text;
+BEGIN
+ FOREACH t IN ARRAY ARRAY['AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions'] LOOP
+  EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t);
+  EXECUTE format('REVOKE ALL ON TABLE %I FROM PUBLIC',t);
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON TABLE %I FROM %I',t,role_name); END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT ALL ON TABLE %I TO service_role',t); END IF;
+ END LOOP;
+ FOR seq IN SELECT pg_get_serial_sequence(format('%I',v.t),v.c) FROM (VALUES ('AssessmentTemplates','TemplateID'),('PredictionModels','ModelID'),('PredictionJobs','JobID'),('Predictions','PredictionID'),('RiskAlerts','AlertID'),('StudentInterventions','InterventionID')) v(t,c) LOOP
+  EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM PUBLIC',seq);
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM %I',seq,role_name); END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO service_role',seq); END IF;
+ END LOOP;
+END $$;
+INSERT INTO "SchemaMigrations"("Version") VALUES ('20261008_admin_api');
 COMMIT;
