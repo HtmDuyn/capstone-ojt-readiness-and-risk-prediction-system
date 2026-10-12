@@ -8,7 +8,7 @@ import { positiveId, inputObject } from './academic.schema';
 const router = Router();
 // Scope authentication to these paths so sibling APIs retain their own role rules.
 for (const resource of Object.keys(resources) as Resource[]) {
-  router.get(`/${resource}`, authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
+  router.get(`/${resource}`, authenticate, (resource === 'ojt-semesters' ? authorizeRoles('ADMIN','ACADEMIC','OJT_COORD') : authorizeRoles('ADMIN','ACADEMIC')), async (req,res,next) => {
     try { res.json({ success: true, ...await listRecords(resource, req.query as Record<string, unknown>) }); }
     catch (error) { next(error); }
   });

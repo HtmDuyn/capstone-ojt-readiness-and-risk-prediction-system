@@ -2,6 +2,8 @@
 
 Base `/api`; JWT bắt buộc, chỉ ADMIN/ACADEMIC. Không tạo lớp hoặc nhận đăng ký lớp hỗ trợ. GET không tạo lịch sử xét, không tự xác nhận và không ghi trạng thái học vụ.
 
+Cảnh báo điều kiện OJT được tính bằng quy tắc code từ kết quả học tập và cấu hình chương trình; không gọi AI. AI chỉ hỗ trợ sinh viên đánh giá mức độ phù hợp của doanh nghiệp/vị trí đang tuyển dụng.
+
 ## Bộ lọc chung
 
 `ojtSemesterId` bắt buộc. Bộ lọc tùy chọn, kết hợp AND: `programId`, `cohortId`, `majorId` (SpecializationID), `comboId` (ProgramComboID đã xác nhận của chương trình hiện tại), `groupCode=A|B|C|D`.

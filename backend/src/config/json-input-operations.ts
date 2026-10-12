@@ -5,6 +5,7 @@ export type JsonInputOperation = {
   bodySchema: RecordValue; operation: RecordValue; protected: boolean;
 };
 const idFields: Record<string,string> = {
+  companies:'companyId',positions:'positionId','ojt-coordinations':'coordinationId',assignments:'assignmentId','internship-evaluations':'evaluationId',
   students:'studentId',accounts:'userId','academic-years':'academicYearId','academic-periods':'academicPeriodId',
   'ojt-semesters':'ojtSemesterId',cohorts:'cohortId',curricula:'programId',courses:'courseId',combos:'comboId',
   'course-results':'courseResultId','academic-imports':'importId','ojt-rule-sets':'ruleSetId',

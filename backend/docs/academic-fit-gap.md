@@ -6,7 +6,7 @@ Ngày kiểm tra: 08/10/2026. Đối chiếu mã nguồn, Swagger, backend đang
 
 1. Proposal PDF: [Proposal PDF](C:/Users/tthuh/Downloads/OJT-RPA_Proposal_hoan_chinh.pdf). Các mục đối chiếu chính: 7.1–7.3, trang 5; 8.2, trang 6; luồng 2/3/6, trang 7; nguyên tắc AI, trang 8; các điểm cần xác nhận, trang 11–12.
 2. Tám bảng API phòng đào tạo do người dùng yêu cầu trong hội thoại, cùng các điều chỉnh về JSON, tài khoản import, GPA, điều kiện OJT và bỏ permission.
-3. Phạm vi AI mới nhất: **chỉ gọi model để đề xuất doanh nghiệp đang tuyển dụng phù hợp cho sinh viên**. Không dùng AI xét điều kiện, dự báo rủi ro học vụ, tư vấn lộ trình học, cảnh báo hoặc thống kê nhu cầu học.
+3. Phạm vi AI mới nhất: **chỉ gọi model AI để hỗ trợ sinh viên đánh giá mức độ phù hợp và đề xuất doanh nghiệp/vị trí OJT đang tuyển dụng**. Không dùng AI xét điều kiện, dự báo rủi ro học vụ, tư vấn lộ trình học, cảnh báo hoặc thống kê nhu cầu học.
 
 Khi nội dung proposal khác với yêu cầu đã chốt trong hội thoại, dùng yêu cầu mới nhất. Vì vậy:
 
