@@ -13,6 +13,16 @@ import { dashboardSummary, distribution, trends, predictionReport } from './repo
 
 const router=Router();
 const admin=[authenticate,authorizeRoles('ADMIN')];
+const useAdminHandlerOnShared: RequestHandler = (req,_res,next) => {
+  if (req.user?.roleCode === 'ADMIN') return next();
+  return next('route');
+};
+const adminForShared = [
+  authenticate,
+  useAdminHandlerOnShared,
+  authorizeRoles('ADMIN')
+];
+
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{
  try{const data=await work(req);if(status===204){res.status(204).end();return;}res.status(status).json({success:true,data});}catch(error){next(error);}
 };
@@ -24,21 +34,21 @@ router.post('/students',...admin,handle(r=>createStudent(r.body,r.user.userId),2
 // Must be mounted before existing /students/:id.
 router.get('/students/export',...admin,async(req,res,next)=>{try{const rows=await exportStudents(req.query);res.attachment('students.csv').type('text/csv; charset=utf-8').send(csv(rows,['id','studentCode','fullName','email','programId','cohortId','groupCode','className','status']));}catch(error){next(error);}});
 router.delete('/students/:id',...admin,handle(r=>deleteStudent(positiveId(r.params.id),r.user.userId),204));
-router.get('/companies',...admin,handle(r=>listCatalog(catalogs.companies,r.query)));
-router.get('/companies/:id',...admin,handle(r=>detail(catalogs.companies,positiveId(r.params.id))));
-router.post('/companies',...admin,handle(r=>saveCompany(r.body,r.user.userId),201));
-router.patch('/companies/:id',...admin,handle(r=>saveCompany(r.body,r.user.userId,positiveId(r.params.id))));
+router.get('/companies',...adminForShared,handle(r=>listCatalog(catalogs.companies,r.query)));
+router.get('/companies/:id',...adminForShared,handle(r=>detail(catalogs.companies,positiveId(r.params.id))));
+router.post('/companies',...adminForShared,handle(r=>saveCompany(r.body,r.user.userId),201));
+router.patch('/companies/:id',...adminForShared,handle(r=>saveCompany(r.body,r.user.userId,positiveId(r.params.id))));
 router.delete('/companies/:id',...admin,handle(r=>softDelete('companies',positiveId(r.params.id),r.user.userId),204));
-router.get('/positions',...admin,handle(r=>listCatalog(catalogs.positions,r.query)));
-router.post('/positions',...admin,handle(r=>savePosition(r.body,r.user.userId),201));
-router.patch('/positions/:id',...admin,handle(r=>savePosition(r.body,r.user.userId,positiveId(r.params.id))));
+router.get('/positions',...adminForShared,handle(r=>listCatalog(catalogs.positions,r.query)));
+router.post('/positions',...adminForShared,handle(r=>savePosition(r.body,r.user.userId),201));
+router.patch('/positions/:id',...adminForShared,handle(r=>savePosition(r.body,r.user.userId,positiveId(r.params.id))));
 router.delete('/positions/:id',...admin,handle(r=>softDelete('positions',positiveId(r.params.id),r.user.userId),204));
 router.get('/ojt-semesters/:id',...admin,handle(r=>semesterDetail(positiveId(r.params.id))));
-router.get('/assignments',...admin,handle(r=>assignments(r.query)));
-router.get('/assignments/:id',...admin,handle(r=>assignmentDetail(positiveId(r.params.id))));
-router.post('/assignments',...admin,handle(r=>saveAssignment(r.body,r.user.userId),201));
-router.patch('/assignments/:id',...admin,handle(r=>saveAssignment(r.body,r.user.userId,positiveId(r.params.id))));
-router.patch('/assignments/:id/status',...admin,handle(r=>saveAssignment(r.body,r.user.userId,positiveId(r.params.id),true)));
+router.get('/assignments',...adminForShared,handle(r=>assignments(r.query)));
+router.get('/assignments/:id',...adminForShared,handle(r=>assignmentDetail(positiveId(r.params.id))));
+router.post('/assignments',...adminForShared,handle(r=>saveAssignment(r.body,r.user.userId),201));
+router.patch('/assignments/:id',...adminForShared,handle(r=>saveAssignment(r.body,r.user.userId,positiveId(r.params.id))));
+router.patch('/assignments/:id/status',...adminForShared,handle(r=>saveAssignment(r.body,r.user.userId,positiveId(r.params.id),true)));
 router.get('/assessment-templates',...admin,handle(r=>listCatalog(catalogs.templates,r.query)));
 router.get('/assessment-templates/:id',...admin,handle(r=>detail(catalogs.templates,positiveId(r.params.id))));
 router.post('/assessment-templates',...admin,handle(r=>saveTemplate(r.body,r.user.userId),201));

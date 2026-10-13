@@ -5,13 +5,13 @@ export type JsonInputOperation = {
   bodySchema: RecordValue; operation: RecordValue; protected: boolean;
 };
 const idFields: Record<string,string> = {
+  companies:'companyId',positions:'positionId','ojt-coordinations':'coordinationId',assignments:'assignmentId','internship-evaluations':'evaluationId',
   students:'studentId',accounts:'userId','academic-years':'academicYearId','academic-periods':'academicPeriodId',
   'ojt-semesters':'ojtSemesterId',cohorts:'cohortId',curricula:'programId',courses:'courseId',combos:'comboId',
   'course-results':'courseResultId','academic-imports':'importId','ojt-rule-sets':'ruleSetId',
   'eligibility-checks':'checkId','eligibility-check-runs':'runId',
   'combo-registration-windows':'windowId','ojt-registration-windows':'windowId',
   'ojt-registrations':'registrationId','ojt-results':'resultId',
-  companies:'companyId',positions:'positionId',assignments:'assignmentId',
   'assessment-templates':'templateId',assessments:'assessmentId',predictions:'predictionId',
   alerts:'alertId',interventions:'interventionId','prediction-jobs':'jobId',models:'modelId'
 };

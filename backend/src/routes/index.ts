@@ -1,3 +1,4 @@
+import qhdnRoutes from '../modules/qhdn/qhdn.routes';
 import reportingRoutes from '../modules/academic-reporting/report.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import resultRoutes from '../modules/ojt-results/result.routes';
@@ -20,6 +21,7 @@ const router = Router();
 router.use(createJsonInputRouter(router));
 router.use(adminRoutes);
 router.use(academicRoutes);
+router.use(qhdnRoutes);
 router.use(reportingRoutes);
 router.use(resultRoutes);
 router.use(workflowRoutes);
