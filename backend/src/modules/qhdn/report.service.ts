@@ -1,0 +1,25 @@
+import { academicTransaction } from '../academic/academic.repository';
+import { enumValue, invalid, positiveId, pagination } from '../students/student.validation';
+import { requireStaff, reservedSeats, type Actor, type Row } from './qhdn.repository';
+import { page } from '../student-portal/shared';
+
+export async function dashboard(params:Row,actor:Actor) {
+  requireStaff(actor);pagination(params,['ojtSemesterId']);const sid=positiveId(params.ojtSemesterId,'ojtSemesterId');return academicTransaction(async c=>{
+    if(!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[sid])).rowCount)throw invalid('OJT semester not found.',404);
+    const positions=(await c.query(`SELECT p."EnterpriseID",p."Capacity",${reservedSeats('p')} AS used FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" WHERE p."OJTSemesterID"=$1 AND p."DeletedAt" IS NULL AND p."ArchivedAt" IS NULL AND e."DeletedAt" IS NULL`,[sid])).rows;
+    const students=(await c.query('SELECT h."StudentID",co."Decision",a."AssignmentID",a."Status" FROM "EligibleStudentHandoffItems" h LEFT JOIN LATERAL(SELECT co.* FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=h."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1) co ON true LEFT JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID" WHERE h."OJTSemesterID"=$1',[sid])).rows;
+    return {ojtSemesterId:sid,enterprises:new Set(positions.map(p=>p.EnterpriseID)).size,capacity:positions.reduce((n,p)=>n+(p.Capacity??0),0),reserved:positions.reduce((n,p)=>n+p.used,0),remainingSlots:positions.reduce((n,p)=>n+Math.max(0,(p.Capacity??0)-p.used),0),handedOff:students.length,unallocated:students.filter(s=>!s.AssignmentID).length,pendingEnterprise:students.filter(s=>s.Decision==='PENDING').length,assigned:students.filter(s=>s.AssignmentID&&!['CANCELLED','CANCELED'].includes(s.Status)).length,computedAt:new Date().toISOString()};
+  });
+}
+export async function report(type:string,params:Row,actor:Actor,exporting=false) {
+  requireStaff(actor);enumValue(type,['acceptance','internships','enterprise-feedback'],'type');pagination(params,['ojtSemesterId','enterpriseId',...(exporting?['format','type']:[])]);
+  if(exporting&&(params.page!==undefined||params.limit!==undefined))throw invalid('Export does not accept pagination.');
+  const sid=positiveId(params.ojtSemesterId,'ojtSemesterId'),eid=params.enterpriseId===undefined?null:positiveId(params.enterpriseId,'enterpriseId');
+  const source=' FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID" JOIN "EligibleStudentHandoffItems" h ON h."RegistrationID"=r."RegistrationID" JOIN "Enterprises" e ON e."EnterpriseID"=co."EnterpriseID"';
+  const condition=' WHERE r."OJTSemesterID"=$1 AND ($2::int IS NULL OR e."EnterpriseID"=$2)';
+  const sql=type==='acceptance'?'SELECT e."EnterpriseID" AS id,e."Name" AS name,count(*)::int AS total,count(*) FILTER(WHERE co."Decision"=\'ACCEPTED\')::int AS accepted,count(*) FILTER(WHERE co."Decision"=\'REJECTED\')::int AS rejected,count(*) FILTER(WHERE co."Decision"=\'PENDING\')::int AS pending'+source+condition+' GROUP BY e."EnterpriseID",e."Name"'
+    :type==='internships'?'SELECT e."EnterpriseID" AS id,e."Name" AS name,count(*)::int AS total,count(*) FILTER(WHERE a."Status" IN (\'ACTIVE\',\'IN_PROGRESS\'))::int AS "inProgress",count(*) FILTER(WHERE a."Status"=\'COMPLETED\')::int AS completed,count(*) FILTER(WHERE a."Status"=\'FAILED\')::int AS failed,count(*) FILTER(WHERE a."Status" IN (\'CANCELLED\',\'CANCELED\'))::int AS cancelled'+source+' JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID"'+condition+' GROUP BY e."EnterpriseID",e."Name"'
+    :'SELECT e."EnterpriseID" AS id,e."Name" AS name,count(*)::int AS evaluations,avg(ev."OverallScore")::float8 AS "averageOverall",avg(ev."AttitudeScore")::float8 AS "averageAttitude",avg(ev."SkillScore")::float8 AS "averageSkill"'+source+' JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID" JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID"'+condition+' GROUP BY e."EnterpriseID",e."Name"';
+  return academicTransaction(async c=>{if(!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[sid])).rowCount)throw invalid('OJT semester not found.',404);if(exporting){const items=(await c.query(sql+' ORDER BY id LIMIT 10001',[sid,eid])).rows;if(items.length>10000)throw invalid('Narrow export to 10000 rows.',422);return {type,ojtSemesterId:sid,items,total:items.length};}return {type,ojtSemesterId:sid,...await page(c,sql,[sid,eid],params,['ojtSemesterId','enterpriseId'])};});
+}
+export function reportCsv(items:Row[]) {const cell=(v:unknown)=>{let s=v==null?'':String(v);if(/^\s*[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};const columns=Object.keys(items[0]??{id:0,name:''});return '\uFEFF'+[columns.map(cell).join(','),...items.map(r=>columns.map(k=>cell(r[k])).join(','))].join('\r\n')+'\r\n';}

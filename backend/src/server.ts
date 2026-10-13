@@ -1,3 +1,4 @@
+import { startAdvisoryWorker } from './modules/student-portal/advisory.service';
 import "./config/env";
 import { startEligibilityWorker } from './jobs/eligibility';
 import { startPredictionWorker } from './jobs/predictions';
@@ -27,6 +28,7 @@ const startServer =
   async (): Promise<void> => {
     try {
       await testDatabaseConnection();
+      const stopAdvisories = process.env.ADVISORY_WORKER_ENABLED !== 'false' ? startAdvisoryWorker() : () => {};
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
       const stopPredictions = process.env.PREDICTION_WORKER_ENABLED === 'true' ? startPredictionWorker() : () => {};
       const stopJobs = process.env.PROVISIONING_JOBS_ENABLED === 'true' ? startProvisioningJobs() : () => {};
@@ -60,6 +62,7 @@ const startServer =
 
       const shutdown =
         async () => {
+          stopAdvisories();
           stopJobs();
           stopEligibility();
           stopPredictions();

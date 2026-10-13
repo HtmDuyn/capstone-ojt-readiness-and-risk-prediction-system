@@ -1,3 +1,5 @@
+import multer from 'multer';
+import { parseCompanySheet, importCompanies } from '../recruitment/company-import.service';
 import { Router } from 'express';
 import { archiveRecruitment } from '../../jobs/provisioning';
 import { authenticate } from '../../middleware/authenticate';
@@ -7,12 +9,17 @@ import { query } from '../../config/database';
 import { fail } from './import.validation';
 const router = Router();
 router.use(authenticate, authorizeRoles('ADMIN', 'ACADEMIC', 'OJT_COORD'));
+const sheetUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:8*1024*1024,files:1,fields:12}});
 for (const path of ['/preview', '/commit']) {
-  router.post(path, async (req, res, next) => {
+  router.post(path, sheetUpload.single('file'), async (req, res, next) => {
     try {
       const role = req.user!.roleCode;
       if (role !== 'ADMIN' && !((role === 'ACADEMIC' && req.body?.kind === 'STUDENT') || (role === 'OJT_COORD' && req.body?.kind === 'ENTERPRISE'))) throw fail('This role cannot import this account type.', 403, 'FORBIDDEN');
-      res.json({ success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview') });
+      if(req.body?.kind==='ENTERPRISE'){
+        let input;try{input=await parseCompanySheet(req.body,req.file);}catch(e:any){if(e.statusCode)throw e;throw fail('Invalid sheet or column mapping.',400,'INVALID_SHEET');}
+        const data=await importCompanies(input,{...req.user!,roleCode:req.user!.roleCode!},path==='/preview');
+        res.status(data.rejectedBatch?422:200).json({success:!data.rejectedBatch,...data});
+      }else res.json({ success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview') });
     } catch (error) { next(error); }
   });
 }

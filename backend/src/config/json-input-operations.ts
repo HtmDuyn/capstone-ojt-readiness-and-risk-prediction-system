@@ -12,6 +12,8 @@ const idFields: Record<string,string> = {
   'combo-registration-windows':'windowId','ojt-registration-windows':'windowId',
   'ojt-registrations':'registrationId','ojt-results':'resultId',
   companies:'companyId',positions:'positionId',assignments:'assignmentId',
+  'applications':'applicationId','job-applications':'applicationId','recruitment-posts':'postId','company-imports':'importId','advisory-runs':'runId','analyses':'analysisId',
+  'ojt-coordinations':'coordinationId','internship-evaluations':'evaluationId',
   'assessment-templates':'templateId',assessments:'assessmentId',predictions:'predictionId',
   alerts:'alertId',interventions:'interventionId','prediction-jobs':'jobId',models:'modelId'
 };

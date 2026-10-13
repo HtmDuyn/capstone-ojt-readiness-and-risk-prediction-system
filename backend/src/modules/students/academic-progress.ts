@@ -105,12 +105,12 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   const allIssues=[...new Set([...issues,...gpaIssues])];
   return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator*100)/100,gpaScale:scale??null,gpaCredits:denominator,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
-export async function academicProgressWithClient(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
+export async function academicProgressWithClient(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]},assumeInProgressPassed=false) {
     const s=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1',[studentId])).rows[0];
     if (!s) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
     const program=(await client.query('SELECT * FROM "TrainingPrograms" WHERE "ProgramID"=$1',[s.ProgramID])).rows[0];
     const courses=(await client.query('SELECT pc.*,c."CourseCode" FROM "ProgramCourses" pc JOIN "Courses" c ON c."CourseID"=pc."CourseID" WHERE pc."ProgramID"=$1 ORDER BY pc."ProgramCourseID"',[s.ProgramID])).rows;
-    const attempts=(await client.query(`${resultSelect} WHERE r."StudentID"=$1`,[studentId])).rows;
+    const attempts=(await client.query(`${resultSelect} WHERE r."StudentID"=$1`,[studentId])).rows.map(r=>assumeInProgressPassed&&r.status==='IN_PROGRESS'?{...r,status:'RECOGNIZED'}:r);
     const aliases=(await client.query('SELECT * FROM "ProgramCourseEquivalences" WHERE "ProgramID"=$1',[s.ProgramID])).rows;
     const policy=(await client.query('SELECT * FROM "AcademicGradingPolicies" WHERE "ProgramID"=$1',[s.ProgramID])).rows[0];
     let options=(await client.query(`SELECT sc."SelectionPurpose",opt."ProgramCourseID",cc."CourseID",cc."Credits" FROM "StudentComboSelections" sc JOIN "StudentComboCourseSelections" choice ON choice."SelectionID"=sc."SelectionID" JOIN "ComboCourses" cc ON cc."ComboCourseID"=choice."ComboCourseID" JOIN "ProgramSlotOptions" opt ON opt."ProgramID"=sc."ProgramID" AND opt."ProgramComboID"=sc."ProgramComboID" AND opt."ComboCourseID"=cc."ComboCourseID" WHERE sc."StudentID"=$1 AND sc."ProgramID"=$2 AND sc."ConfirmedAt" IS NOT NULL`,[studentId,s.ProgramID])).rows;
