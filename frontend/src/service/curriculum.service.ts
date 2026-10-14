@@ -438,6 +438,172 @@ export interface UpdateComboCoursesPayload {
 
   comboId: number;
 }
+/* =========================================================
+   CURRICULUM IMPORT
+   ========================================================= */
+
+export type CurriculumImportEntryKind =
+  | "COURSE"
+  | "COMBO_SLOT"
+  | "ELECTIVE_SLOT";
+
+export interface CurriculumImportPayload {
+  idempotencyKey: string;
+
+  sourceName: string | null;
+
+  curriculum: {
+    code: string;
+    name: string;
+    version: string;
+
+    majorId: number;
+
+    totalCredits: number;
+    effectiveYear: number;
+    gpaScale: number;
+  };
+
+  courses: Array<{
+    /*
+     * Backend yêu cầu đúng một trong:
+     * courseId HOẶC courseCode.
+     *
+     * Khi import Excel, FE ưu tiên courseCode
+     * để người PĐT không phải nhập ID database.
+     */
+    courseId?: number;
+    courseCode?: string;
+
+    credits: number;
+    semester: number;
+
+    isRequired: boolean;
+
+    entryKind: CurriculumImportEntryKind;
+
+    prerequisiteText: string | null;
+  }>;
+
+  prerequisites: Array<{
+    courseId: number;
+
+    groupCode: string;
+
+    minimumPassed: number;
+
+    prerequisiteCourseIds: number[];
+  }>;
+
+  combos: Array<{
+    code: string;
+    name: string;
+
+    selectionGroup: string | null;
+
+    note: string | null;
+
+    courses: Array<{
+      /*
+       * Backend yêu cầu đúng một:
+       * courseId HOẶC courseCode.
+       */
+      courseId?: number;
+      courseCode?: string;
+
+      credits: number;
+      semester: number;
+
+      prerequisiteText: string | null;
+
+      note: string | null;
+
+      /*
+       * Đây là CourseID của COMBO_SLOT.
+       * Người dùng Excel nhập slotCourseCode,
+       * FE sẽ tự đổi thành ID.
+       */
+      slotCourseIds: number[];
+    }>;
+
+    choiceGroups: Array<{
+      code: string;
+
+      minCourses: number;
+      maxCourses: number;
+
+      courseIds: number[];
+    }>;
+  }>;
+
+  equivalences: Array<{
+    sourceCourseId: number;
+
+    targetCourseId: number;
+
+    reason: string;
+  }>;
+}
+
+export interface CurriculumImportPreviewResponse {
+  success: boolean;
+
+  data: {
+    courseCount: number;
+    comboCount: number;
+
+    prerequisiteGroupCount: number;
+    equivalenceCount: number;
+
+    canCommit: boolean;
+
+    preview: boolean;
+
+    normalized: {
+      key: string;
+
+      sourceName: string | null;
+
+      curriculum: {
+        code: string;
+        name: string;
+        version: string;
+
+        majorId: number;
+
+        totalCredits: number;
+        effectiveYear: number;
+        gpaScale: number;
+      };
+
+      courses: Array<{
+        courseId: number;
+
+        name: string;
+
+        credits: number;
+        semester: number;
+
+        isRequired: boolean;
+
+        entryKind: CurriculumImportEntryKind;
+
+        prerequisiteText: string | null;
+      }>;
+
+      /*
+       * Preview hiện mình chỉ cần số lượng
+       * và dữ liệu chương trình để render UI.
+       * Không đoán thêm response schema.
+       */
+      combos: unknown[];
+
+      prerequisites: unknown[];
+
+      equivalences: unknown[];
+    };
+  };
+}
 
 /* =========================================================
    API
@@ -525,6 +691,23 @@ const updateComboCourses = (
     payload,
   );
 };
+const previewCurriculumImport = (
+  payload: CurriculumImportPayload,
+) => {
+  return postJson<CurriculumImportPreviewResponse>(
+    "/api/curriculum-imports/preview",
+    payload,
+  );
+};
+
+const commitCurriculumImport = (
+  payload: CurriculumImportPayload,
+) => {
+  return postJson<unknown>(
+    "/api/curriculum-imports/commit",
+    payload,
+  );
+};
 
 /* =========================================================
    EXPORT
@@ -543,4 +726,7 @@ export const curriculumService = {
   createCurriculumCombo,
   searchCurriculumCombos,
   updateComboCourses,
+
+  previewCurriculumImport,
+  commitCurriculumImport,
 };
