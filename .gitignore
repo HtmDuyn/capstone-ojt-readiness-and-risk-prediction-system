@@ -85,6 +85,7 @@ pip-wheel-metadata/
 *.env
 *.env.*
 .envrc
+!backend/.env.student-portal.example
 
 # Private keys, credentials, and local database backups
 *.pem

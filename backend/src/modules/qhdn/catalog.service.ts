@@ -1,127 +1,118 @@
-import { readTransaction } from './read.repository';
-import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
-import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
-import type { Actor, Row } from '../ojt-registration/window.service';
+import { inputObject, positiveId, requiredText, optionalText, invalid, pagination, enumValue } from '../students/student.validation';
+import { semester } from '../ojt-registration/window.service';
+import { resources, asApi, record, requireStaff, enterpriseScope, assertAccess, reservedSeats, remaining, syncSlots, history, type Resource, type Actor, type Row } from './qhdn.repository';
 
-export const configs = {
-  companies: { table:'Enterprises', id:'EnterpriseID', fields:{code:'EnterpriseCode',name:'Name',address:'Address',industry:'Industry',contactPersonName:'ContactPersonName',contactPhone:'ContactPhone',contactEmail:'ContactEmail',status:'Status',createdAt:'CreatedAt'} },
-  positions: { table:'InternshipPositions', id:'PositionID', fields:{companyId:'EnterpriseID',ojtSemesterId:'OJTSemesterID',title:'Title',description:'Description',requirements:'Requirements',capacity:'Capacity',remainingSlots:'RemainingSlots',status:'Status'} },
-  coordinations: { table:'StudentEnterpriseCoordination', id:'CoordinationID', fields:{registrationId:'RegistrationID',companyId:'EnterpriseID',positionId:'PositionID',coordinatedBy:'CoordinatedBy',coordinatedAt:'CoordinatedAt',decision:'Decision',decisionAt:'DecisionAt',rejectReason:'RejectReason',previousCoordinationId:'PreviousCoordinationID'} },
-  assignments: { table:'InternshipAssignments', id:'AssignmentID', fields:{coordinationId:'CoordinationID',studentId:'StudentID',companyId:'EnterpriseID',positionId:'PositionID',enterpriseSupervisorName:'EnterpriseSupervisorName',startDate:'StartDate',endDate:'EndDate',status:'Status'} },
-  evaluations: { table:'InternshipEvaluations', id:'EvaluationID', fields:{assignmentId:'AssignmentID',evaluatedBy:'EvaluatedBy',evaluatedAt:'EvaluatedAt',completionScore:'CompletionScore',attitudeScore:'AttitudeScore',skillScore:'SkillScore',overallScore:'OverallScore',comments:'Comments',status:'Status'} },
-} as const;
-export type Resource=keyof typeof configs;
-export function api(resource:Resource,r:Row):Row {
-  const cfg=configs[resource],out:Row={id:r[cfg.id]};
-  for(const [key,col] of Object.entries(cfg.fields)){
-    let value=r[col];
-    if(key.endsWith('Score')&&value!=null)value=Number(value);
-    if(['startDate','endDate'].includes(key)&&value instanceof Date)value=`${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
-    out[key]=value;
+export async function list(resource: Resource, params: Row, actor: Actor) {
+  params = {...params};
+  if (params.companyId !== undefined) {
+    if (params.enterpriseId !== undefined && positiveId(params.enterpriseId,'enterpriseId') !== positiveId(params.companyId,'companyId')) throw invalid('companyId conflicts with enterpriseId.');
+    params.enterpriseId = params.companyId; delete params.companyId;
   }
-  if(resource==='positions'&&r.Occupied!==undefined)out.remainingSlots=Math.max(0,(r.Capacity??0)-r.Occupied);
-  for(const key of ['studentCode','fullName','companyName','positionTitle','ojtSemesterId','studentId'])if(r[key]!==undefined)out[key]=r[key];
-  return out;
-}
-export async function enterpriseScope(c:PoolClient,actor:Actor):Promise<number|null> {
-  if(['ADMIN','OJT_COORD'].includes(actor.roleCode))return null;
-  if(actor.roleCode!=='ENTERPRISE')throw invalid('Role not permitted.',403,'FORBIDDEN');
-  const row=(await c.query('SELECT eu."EnterpriseID" FROM "EnterpriseUsers" eu JOIN "Enterprises" e ON e."EnterpriseID"=eu."EnterpriseID" WHERE eu."UserID"=$1 AND e."Status"=\'ACTIVE\'',[actor.userId])).rows[0];
-  if(!row)throw invalid('An active enterprise membership is required.',403,'ENTERPRISE_SCOPE_REQUIRED');
-  return row.EnterpriseID;
-}
-export async function assertScope(c:PoolClient,actor:Actor,enterpriseId:number){const own=await enterpriseScope(c,actor);if(own!==null&&own!==enterpriseId)throw invalid('This record belongs to another enterprise.',403,'FORBIDDEN');}
-export function staff(actor:Actor){if(!['ADMIN','OJT_COORD'].includes(actor.roleCode))throw invalid('QHDN staff required.',403,'FORBIDDEN');}
-export async function record(c:PoolClient,resource:Resource,id:number,lock=true):Promise<Row>{
-  const cfg=configs[resource],row=(await c.query(`SELECT * FROM "${cfg.table}" WHERE "${cfg.id}"=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];
-  if(!row)throw invalid(`${resource} record not found.`,404,'QHDN_RECORD_NOT_FOUND');return row;
-}
-export async function occupied(c:PoolClient,positionId:number){return (await c.query(`SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "PositionID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[positionId])).rows[0].n as number;}
-export async function refreshSlots(c:PoolClient,positionId:number){await c.query(`UPDATE "InternshipPositions" SET "RemainingSlots"=GREATEST(0,"Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" WHERE "PositionID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))) WHERE "PositionID"=$1`,[positionId]);}
-export async function persist(c:PoolClient,resource:Resource,values:Row,id?:number):Promise<Row>{
-  const cfg=configs[resource],cols=Object.keys(values),args=Object.values(values);
-  return (await c.query(id?`UPDATE "${cfg.table}" SET ${cols.map((k,i)=>`"${k}"=$${i+1}`).join(',')} WHERE "${cfg.id}"=$${args.length+1} RETURNING *`:`INSERT INTO "${cfg.table}" (${cols.map(k=>`"${k}"`).join(',')}) VALUES (${cols.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,id?[...args,id]:args)).rows[0];
-}
-export async function log(c:PoolClient,resource:Resource,before:Row|null,after:Row,actor:Actor,action:string,reason:string,extra:Row={}){
-  await audit(c,actor.userId,configs[resource].table,after[configs[resource].id],action,before?api(resource,before):null,{...api(resource,after),...extra,actorRole:actor.roleCode,enteredOnBehalf:actor.roleCode==='OJT_COORD'&&['ENTERPRISE_DECISION','SUBMIT_EVALUATION','UPDATE_EVALUATION'].includes(action)},reason);
-}
-export async function history(c:PoolClient,resource:Resource,id:number){return (await c.query(`SELECT "LogID" AS id,"UserID" AS "actorId","Action" AS action,"Detail"::jsonb AS detail,"ActionAt" AS "createdAt" FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID"`,[configs[resource].table,id])).rows;}
-export async function list(resource:Resource,params:Row,actor:Actor){
-  const allowed=resource==='companies'?['search','status']:resource==='positions'?['search','status','companyId','ojtSemesterId']:['search','status','companyId','ojtSemesterId','studentId','positionId',...(resource==='coordinations'?['registrationId','decision']:resource==='evaluations'?['assignmentId']:[])];
-  const p=pagination(params,allowed);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
-  return readTransaction(async c=>{
-    const own=await enterpriseScope(c,actor),args:unknown[]=[],filters:string[]=[];
-    const add=(col:string,value:unknown)=>{args.push(value);filters.push(`${col}=$${args.length}`);};
-    let from=`FROM "${configs[resource].table}" t`;
-    let extras='',companyColumn='t."EnterpriseID"';
-    if(resource==='positions'){from+=' JOIN "Enterprises" e ON e."EnterpriseID"=t."EnterpriseID"';extras=`,e."Name" AS "companyName",(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=t."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS "Occupied"`;}
-    if(['coordinations','assignments','evaluations'].includes(resource)){
-      if(resource==='coordinations')from+=' JOIN "OJTRegistrations" r ON r."RegistrationID"=t."RegistrationID"';
-      else {if(resource==='evaluations')from+=' JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID"';from+=` JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=${resource==='assignments'?'t':'a'}."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"`;}
-      companyColumn=resource==='evaluations'?'a."EnterpriseID"':'t."EnterpriseID"';
-      from+=` JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Enterprises" e ON e."EnterpriseID"=${companyColumn}`;
-      extras=',s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."OJTSemesterID" AS "ojtSemesterId",r."StudentID" AS "studentId",e."Name" AS "companyName"';
-      for(const [key,col] of Object.entries({ojtSemesterId:'r."OJTSemesterID"',studentId:'r."StudentID"',registrationId:'t."RegistrationID"',assignmentId:'t."AssignmentID"',positionId:resource==='evaluations'?'a."PositionID"':'t."PositionID"'}))if(params[key]!==undefined)add(col,positiveId(params[key],key));
-      if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`);}
-    }else if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(resource==='companies'?`(t."Name" ILIKE $${args.length} OR t."EnterpriseCode" ILIKE $${args.length})`:`t."Title" ILIKE $${args.length}`);}
-    if(params.companyId!==undefined)add(companyColumn,positiveId(params.companyId,'companyId'));
-    if(own!==null)add(companyColumn,own);
-    if(resource==='positions'&&params.ojtSemesterId!==undefined)add('t."OJTSemesterID"',positiveId(params.ojtSemesterId,'ojtSemesterId'));
-    const states=resource==='companies'?['ACTIVE','INACTIVE']:resource==='positions'?['OPEN','CLOSED']:resource==='assignments'?['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED']:resource==='evaluations'?['SUBMITTED']:['PENDING','ACCEPTED','REJECTED'];
-    if(params.status!==undefined||params.decision!==undefined){
-      if(params.status!==undefined&&params.decision!==undefined&&params.status!==params.decision)throw invalid('status conflicts with decision.');
-      add(resource==='coordinations'?`COALESCE(UPPER(t."Decision"),'PENDING')`:'t."Status"',enumValue(params.decision??params.status,states,'status'));
+  const allowed: Record<Resource,string[]> = {
+    companies:['status','industry','search'], positions:['enterpriseId','ojtSemesterId','status','search'],
+    coordinations:['enterpriseId','ojtSemesterId','registrationId','applicationId','decision','search'],
+    assignments:['enterpriseId','ojtSemesterId','studentId','positionId','status','search'],
+    evaluations:['enterpriseId','ojtSemesterId','studentId','assignmentId','status','search'],
+  };
+  const p = pagination(params,allowed[resource]);
+  if (p.offset > 2147483647) throw invalid('Pagination exceeds allowed range.');
+  return academicTransaction(async c => {
+    const scope = await enterpriseScope(c,actor), cfg = resources[resource];
+    const args: unknown[] = [], filters: string[] = [];
+    if (resource === 'companies' || resource === 'positions') filters.push('t."DeletedAt" IS NULL');
+    const add = (expression: string, value: unknown) => { args.push(value); filters.push(`${expression}=$${args.length}`); };
+    const enterpriseColumn = resource === 'evaluations' ? 'a."EnterpriseID"' : 't."EnterpriseID"';
+    if (scope !== null) add(enterpriseColumn,scope);
+    let join = '', search: string[], semesterColumn = 't."OJTSemesterID"';
+    if (resource === 'companies') search = ['t."EnterpriseCode"','t."Name"'];
+    else if (resource === 'positions') search = ['t."Title"','t."RecruitmentCode"'];
+    else {
+      join = resource === 'coordinations'
+        ? 'JOIN "OJTRegistrations" r ON r."RegistrationID"=t."RegistrationID"'
+        : resource === 'assignments'
+          ? 'JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=t."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"'
+          : 'JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"';
+      join += ' JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID"';
+      search = ['s."StudentCode"','u."FullName"']; semesterColumn = 'r."OJTSemesterID"';
     }
-    const where=filters.length?' WHERE '+filters.join(' AND '):'';
-    const count=(await c.query(`SELECT count(*)::int AS n ${from}${where}`,args)).rows[0].n;
-    const rows=(await c.query(`SELECT t.*${extras} ${from}${where} ORDER BY t."${configs[resource].id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
-    return {items:rows.map(r=>api(resource,r)),total:count,page:p.page,limit:p.limit};
+    for (const key of ['enterpriseId','ojtSemesterId','studentId','assignmentId','registrationId','positionId','applicationId']) if (params[key] !== undefined) {
+      const column = key === 'enterpriseId' ? enterpriseColumn : key === 'ojtSemesterId' ? semesterColumn : key === 'studentId' ? 'r."StudentID"' : key === 'assignmentId' ? 't."AssignmentID"' : key === 'applicationId' ? 't."ApplicationID"' : key === 'positionId' ? 't."PositionID"' : 't."RegistrationID"';
+      add(column,positiveId(params[key],key));
+    }
+    for (const key of ['status','industry']) if (params[key] !== undefined) add(`t."${key === 'status' ? 'Status' : 'Industry'}"`,requiredText(params[key],key,100));
+    if (params.decision !== undefined) add(`COALESCE(t."Decision",'PENDING')`,enumValue(params.decision,['PENDING','ACCEPTED','REJECTED','REASSIGNED','WITHDRAWN'],'decision'));
+    if (params.search !== undefined) { args.push(`%${requiredText(params.search,'search',100)}%`); filters.push(`(${search.map(col=>`${col} ILIKE $${args.length}`).join(' OR ')})`); }
+    const extra = resource === 'positions' ? `,CASE WHEN t."Capacity" IS NULL THEN NULL ELSE GREATEST(0,t."Capacity"-${reservedSeats('t')}) END AS "remainingSlots"` : resource === 'assignments' ? ',r."OJTSemesterID"' : '';
+    const sql = `SELECT t.*${extra} FROM "${cfg.table}" t ${join} ${filters.length ? 'WHERE '+filters.join(' AND ') : ''}`;
+    const result = (await c.query(`WITH filtered AS (${sql}), paged AS (SELECT * FROM filtered ORDER BY "${cfg.id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY paged."${cfg.id}" DESC) FILTER (WHERE paged."${cfg.id}" IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
+    return { ...result,items:result.items.map((r:Row)=>asApi(resource,r)),page:p.page,limit:p.limit };
   });
 }
-export async function details(resource:Resource,id:number,actor:Actor){return readTransaction(async c=>{
-  const r=await record(c,resource,id,false),a=resource==='evaluations'?await record(c,'assignments',r.AssignmentID,false):r;
-  await assertScope(c,actor,a.EnterpriseID);
-  if(resource==='positions')r.Occupied=await occupied(c,id);
-  const out=api(resource,r);
-  // Enterprise sees only its own coordination chain, never a previous enterprise's dossier or audit.
-  if(resource==='coordinations'){
-    const registration=(await c.query('SELECT "RegistrationID","StudentID","OJTSemesterID","Application" FROM "OJTRegistrations" WHERE "RegistrationID"=$1',[r.RegistrationID])).rows[0];
-    out.registration={id:registration.RegistrationID,studentId:registration.StudentID,ojtSemesterId:registration.OJTSemesterID,application:registration.Application};
-    const chain=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 AND ($2::int IS NULL OR "EnterpriseID"=$2) ORDER BY "CoordinationID"',[r.RegistrationID,actor.roleCode==='ENTERPRISE'?r.EnterpriseID:null])).rows;
-    out.coordinationHistory=chain.map(row=>api('coordinations',row));
-  }
-  out.history=await history(c,resource,id);
-  return out;
-});}
-export async function saveCompany(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
-  return academicTransaction(async c=>{
-    const before=id?await record(c,'companies',id):null,values:Row={};
-    const reason=requiredText(b.reason,'reason',2000);
-    const lengths:Row={code:20,name:200,address:300,industry:100,contactPersonName:100,contactPhone:20,contactEmail:100};
-    for(const [key,max] of Object.entries(lengths))if(key in b||(!id&&['code','name'].includes(key)))values[(configs.companies.fields as Row)[key]]=['code','name'].includes(key)?requiredText(b[key],key,max as number):optionalText(b[key],key,max as number);
-    if(values.ContactEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.ContactEmail))throw invalid('contactEmail is invalid.');
-    if(!id||'status' in b)values.Status=enumValue(b.status??'ACTIVE',['ACTIVE','INACTIVE'],'status');
-    if(!Object.keys(values).length)throw invalid('Provide an editable field.');
-    if(values.Status==='INACTIVE'){
-      const active=(await c.query(`SELECT 1 FROM "InternshipAssignments" WHERE "EnterpriseID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') IN ('ASSIGNED','ACTIVE','IN_PROGRESS') LIMIT 1`,[id])).rowCount;
-      if(active)throw invalid('Cannot deactivate a company with active assignments.',409,'COMPANY_IN_USE');
+export async function details(resource: Resource, id: number, actor: Actor) {
+  return academicTransaction(async c => {
+    const row = await record(c,resource,id); await assertAccess(c,resource,row,actor);
+    const value = asApi(resource,row);
+    if (resource === 'positions') value.remainingSlots = row.Capacity == null ? null : (await remaining(c,id)).remainingSlots;
+    if (resource === 'assignments') value.ojtSemesterId = (await record(c,'coordinations',row.CoordinationID)).OJTSemesterID;
+    value.history = await history(c,resource,id);
+    if(actor.roleCode==='ENTERPRISE')value.history=value.history.map((e:Row)=>({action:e.action,createdAt:e.createdAt}));
+    if (resource === 'coordinations') {
+      const scope = await enterpriseScope(c,actor);
+      value.coordinationHistory = (await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 AND ($2::int IS NULL OR "EnterpriseID"=$2) ORDER BY "CoordinationID"',[row.RegistrationID,scope])).rows.map(r=>asApi('coordinations',r));
     }
-    const after=await persist(c,'companies',values,id);await log(c,'companies',before,after,actor,id?'UPDATE':'CREATE',reason);return api('companies',after);
+    return value;
   });
 }
-export async function savePosition(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['companyId','ojtSemesterId','title','description','requirements','capacity','status','reason']);return academicTransaction(async c=>{
-  const before=id?await record(c,'positions',id):null,values:Row={},reason=requiredText(b.reason,'reason',2000);
-  if(id&&('companyId' in b||'ojtSemesterId' in b))throw invalid('Position company and semester cannot change.');
-  if(!id){values.EnterpriseID=positiveId(b.companyId,'companyId');values.OJTSemesterID=positiveId(b.ojtSemesterId,'ojtSemesterId');if(!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[values.OJTSemesterID])).rowCount)throw invalid('OJT semester not found.',404);}
-  const company=await record(c,'companies',before?.EnterpriseID??values.EnterpriseID);
-  for(const key of ['title','description','requirements'])if(key in b||(!id&&key==='title'))values[(configs.positions.fields as Row)[key]]=key==='title'?requiredText(b[key],key,150):optionalText(b[key],key,10000);
-  if(!id||'capacity' in b)values.Capacity=positiveId(b.capacity,'capacity');
-  if(!id||'status' in b)values.Status=enumValue(b.status??'OPEN',['OPEN','CLOSED'],'status');
-  if(!Object.keys(values).length)throw invalid('Provide an editable field.');
-  if((values.Status??before?.Status)==='OPEN'&&company.Status!=='ACTIVE')throw invalid('An open position requires an active company.',409);
-  const used=id?await occupied(c,id):0,capacity=values.Capacity??before?.Capacity;
-  if(capacity<used)throw invalid('Capacity cannot be lower than occupied slots.',409,'POSITION_CAPACITY_CONFLICT');
-  values.RemainingSlots=capacity-used;
-  const after=await persist(c,'positions',values,id);await log(c,'positions',before,after,actor,id?'UPDATE':'CREATE',reason);return api('positions',after);
-});}
+async function write(c: import('pg').PoolClient, resource: 'companies'|'positions', values: Row, id?: number) {
+  const cfg = resources[resource], entries = Object.entries(values), columns = entries.map(([key])=>`"${key}"`), args = entries.map(([,v])=>v);
+  return id === undefined
+    ? (await c.query(`INSERT INTO "${cfg.table}" (${columns.join(',')}) VALUES (${args.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,args)).rows[0]
+    : (await c.query(`UPDATE "${cfg.table}" SET ${columns.map((col,i)=>`${col}=$${i+1}`).join(',')} WHERE "${cfg.id}"=$${args.length+1} RETURNING *`,[...args,id])).rows[0];
+}
+export async function saveCompany(body: unknown, actor: Actor, id?: number) {
+  requireStaff(actor);
+  const b = inputObject(body,['enterpriseCode','code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
+  if (b.code !== undefined) { if (b.enterpriseCode !== undefined && b.code !== b.enterpriseCode) throw invalid('code conflicts with enterpriseCode.'); b.enterpriseCode = b.code; }
+  const reason = optionalText(b.reason,'reason',2000), values: Row = {};
+  for (const [key,col,max] of [['enterpriseCode','EnterpriseCode',20],['name','Name',200]] as const) if (id === undefined || key in b) values[col] = requiredText(b[key],key,max);
+  for (const [key,col,max] of [['address','Address',300],['industry','Industry',100],['contactPersonName','ContactPersonName',100],['contactPhone','ContactPhone',20],['contactEmail','ContactEmail',100]] as const) if (key in b) values[col] = optionalText(b[key],key,max);
+  if (values.ContactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.ContactEmail)) throw invalid('contactEmail is invalid.');
+  if (id === undefined || 'status' in b) values.Status = enumValue(b.status ?? 'ACTIVE',['ACTIVE','INACTIVE'],'status');
+  if (!Object.keys(values).length) throw invalid('Provide at least one company field.');
+  return academicTransaction(async c => {
+    const before = id === undefined ? null : await record(c,'companies',id);
+    const after = await write(c,'companies',values,id);
+    await audit(c,actor.userId,'Enterprises',after.EnterpriseID,id === undefined ? 'CREATE' : 'UPDATE',before,after,reason ?? undefined);
+    return asApi('companies',after);
+  });
+}
+export async function savePosition(body: unknown, actor: Actor, id?: number) {
+  requireStaff(actor);
+  const b = inputObject(body,['enterpriseId','companyId','ojtSemesterId','recruitmentCode','title','description','requirements','capacity','status','location','workMode','reason']);
+  if (b.companyId !== undefined) { if (b.enterpriseId !== undefined && positiveId(b.enterpriseId,'enterpriseId') !== positiveId(b.companyId,'companyId')) throw invalid('companyId conflicts with enterpriseId.'); b.enterpriseId = b.companyId; }
+  const reason = optionalText(b.reason,'reason',2000), values: Row = {};
+  for (const [key,col] of [['enterpriseId','EnterpriseID'],['ojtSemesterId','OJTSemesterID']] as const) if (id === undefined || key in b) values[col] = positiveId(b[key],key);
+  if (id === undefined || 'title' in b) values.Title = requiredText(b.title,'title',150);
+  for (const [key,col,max] of [['description','Description',20000],['requirements','Requirements',20000],['recruitmentCode','RecruitmentCode',60],['location','Location',300]] as const) if (key in b) values[col] = optionalText(b[key],key,max);
+  if ('workMode' in b) values.WorkMode = b.workMode === null ? null : enumValue(b.workMode,['ONSITE','REMOTE','HYBRID'],'workMode');
+  if (id === undefined || 'capacity' in b) {
+    if (typeof b.capacity !== 'number' || !Number.isInteger(b.capacity) || b.capacity < 0 || b.capacity > 2147483647) throw invalid('capacity must be a nonnegative 32-bit integer.');
+    values.Capacity = b.capacity;
+  }
+  if (id === undefined || 'status' in b) values.Status = enumValue(b.status ?? 'OPEN',['OPEN','CLOSED'],'status');
+  if (!Object.keys(values).length) throw invalid('Provide at least one position field.');
+  return academicTransaction(async c => {
+    const before = id === undefined ? null : await record(c,'positions',id), merged = {...before,...values};
+    const company = await record(c,'companies',merged.EnterpriseID); await semester(c,merged.OJTSemesterID);
+    if (merged.Status === 'OPEN' && company.Status !== 'ACTIVE') throw invalid('Cannot open a position for an inactive enterprise.',409);
+    if (before) {
+      if ((merged.EnterpriseID !== before.EnterpriseID || merged.OJTSemesterID !== before.OJTSemesterID) && (await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "PositionID"=$1',[id])).rowCount) throw invalid('A coordinated position cannot change enterprise or semester.',409);
+      if (merged.Capacity != null && merged.Capacity < (await c.query(`SELECT ${reservedSeats('p')} AS used FROM "InternshipPositions" p WHERE p."PositionID"=$1`,[id])).rows[0].used) throw invalid('Capacity cannot be below reserved seats.',409,'POSITION_CAPACITY_CONFLICT');
+    }
+    const after = await write(c,'positions',values,id);
+    const slots = after.Capacity == null ? null : await syncSlots(c,after.PositionID);
+    await audit(c,actor.userId,'InternshipPositions',after.PositionID,id === undefined ? 'CREATE' : 'UPDATE',before,after,reason ?? undefined);
+    return {...asApi('positions',after),remainingSlots:slots?.remainingSlots ?? null};
+  });
+}

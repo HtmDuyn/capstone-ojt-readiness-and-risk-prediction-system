@@ -1,0 +1,93 @@
+import type { PoolClient } from 'pg';
+import { academicTransaction, audit } from '../academic/academic.repository';
+import { inputObject, invalid, positiveId, requiredText, optionalText, enumValue } from '../students/student.validation';
+import { timestamp } from '../combo-registration/combo.validation';
+import { requireStaff, record, reservedSeats, enterpriseScope } from '../qhdn/qhdn.repository';
+import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
+import { ownStudent, page, type Row, type Actor } from '../student-portal/shared';
+
+const postSelect='SELECT p."PostID" AS id,p."EnterpriseID" AS "enterpriseId",p."OJTSemesterID" AS "ojtSemesterId",p."Title" AS title,p."Content" AS content,p."Benefits" AS benefits,p."ApplicationInstructions" AS "applicationInstructions",p."Status" AS status,p."PublishedAt" AS "publishedAt",p."DeadlineAt" AS "deadlineAt",COALESCE((SELECT jsonb_agg(pp."PositionID" ORDER BY pp."PositionID") FROM "RecruitmentPostPositions" pp WHERE pp."PostID"=p."PostID"),\'[]\'::jsonb) AS "positionIds" FROM "RecruitmentPosts" p';
+export async function posts(params:Row,actor:Actor,id?:number) {
+  requireStaff(actor);return academicTransaction(async c=>{const data=await page(c,postSelect+' WHERE ($1::int IS NULL OR p."PostID"=$1) AND ($2::int IS NULL OR p."EnterpriseID"=$2) AND ($3::int IS NULL OR p."OJTSemesterID"=$3) AND ($4::text IS NULL OR p."Status"=$4)',[id??null,params.enterpriseId===undefined?null:positiveId(params.enterpriseId,'enterpriseId'),params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId'),params.status===undefined?null:enumValue(params.status,['DRAFT','PENDING_REVIEW','PUBLISHED','CLOSED','ARCHIVED'],'status')],params,['enterpriseId','ojtSemesterId','status']);if(id&&!data.items.length)throw invalid('Recruitment publication not found.',404);return id?data.items[0]:data;});
+}
+export async function changePost(id:number,body:unknown,actor:Actor,action?:'publish'|'close') {
+  requireStaff(actor);const b=inputObject(body,action?['reason']:['title','content','benefits','applicationInstructions','deadlineAt','reason']),reason=requiredText(b.reason,'reason',2000);
+  return academicTransaction(async c=>{
+    const before=(await c.query('SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1 FOR UPDATE',[id])).rows[0];if(!before)throw invalid('Recruitment publication not found.',404);
+    if(before.Status==='ARCHIVED')throw invalid('Archived publications are immutable.',409);
+    const company=await record(c,'companies',before.EnterpriseID);
+    const fields:Row={};for(const [key,col,max] of [['title','Title',200],['content','Content',20000],['benefits','Benefits',10000],['applicationInstructions','ApplicationInstructions',10000]] as const)if(key in b)fields[col]=['title','content'].includes(key)?requiredText(b[key],key,max):optionalText(b[key],key,max);
+    if('deadlineAt' in b)fields.DeadlineAt=timestamp(b.deadlineAt,'deadlineAt');
+    if(!action&&!Object.keys(fields).length)throw invalid('Provide an editable field.');
+    if(action==='publish'){
+      if(company.Status!=='ACTIVE')throw invalid('Enterprise is inactive.',409);
+      if(!before.DeadlineAt||new Date(before.DeadlineAt)<=new Date())throw invalid('A future deadline is required before publication.',409);
+      const positions=(await c.query('SELECT p.* FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" p ON p."PositionID"=pp."PositionID" WHERE pp."PostID"=$1',[id])).rows;
+      if(!positions.length||positions.some(p=>p.DeletedAt||p.ArchivedAt||p.Status!=='OPEN'||p.Capacity==null||p.EnterpriseID!==before.EnterpriseID||p.OJTSemesterID!==before.OJTSemesterID))throw invalid('Publication requires open positions in the same enterprise and semester.',409);
+      Object.assign(fields,{Status:'PUBLISHED',PublishedAt:before.PublishedAt??new Date(),ReviewedBy:actor.userId,ReviewedAt:new Date()});
+    }else if(action==='close')fields.Status='CLOSED';
+    // Editing published content requires QHDN review again; existing applications retain snapshots.
+    else if(before.Status==='PUBLISHED')fields.Status='PENDING_REVIEW';
+    const entries=Object.entries(fields);const after=(await c.query(`UPDATE "RecruitmentPosts" SET ${entries.map(([k],i)=>`"${k}"=$${i+2}`).join(',')},"UpdatedAt"=now() WHERE "PostID"=$1 RETURNING *`,[id,...entries.map(([,v])=>v)])).rows[0];
+    await audit(c,actor.userId,'RecruitmentPosts',id,action?.toUpperCase()??'UPDATE',before,after,reason);return (await c.query(postSelect+' WHERE p."PostID"=$1',[id])).rows[0];
+  });
+}
+export const publicPositionSelect=`SELECT p."PositionID" AS id,p."EnterpriseID" AS "enterpriseId",e."Name" AS "enterpriseName",p."OJTSemesterID" AS "ojtSemesterId",p."Title" AS title,p."Description" AS description,p."Requirements" AS requirements,p."Capacity" AS capacity,GREATEST(0,p."Capacity"-${reservedSeats('p')}) AS "remainingSlots",post."PostID" AS "postId",post."DeadlineAt" AS "deadlineAt",post."Benefits" AS benefits,post."ApplicationInstructions" AS "applicationInstructions"
+ FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
+ JOIN LATERAL (SELECT rp.* FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" rp ON rp."PostID"=pp."PostID" WHERE pp."PositionID"=p."PositionID" AND rp."Status"='PUBLISHED' AND rp."ArchivedAt" IS NULL AND rp."DeadlineAt">clock_timestamp() ORDER BY rp."PostID" DESC LIMIT 1) post ON true
+ WHERE p."Status"='OPEN' AND p."DeletedAt" IS NULL AND p."ArchivedAt" IS NULL AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL`;
+export async function studentPositions(params:Row,actor:Actor,id?:number) {
+  return academicTransaction(async c=>{const s=await ownStudent(c,actor),data=await page(c,publicPositionSelect+' AND ($1::int IS NULL OR p."PositionID"=$1) AND ($2::int IS NULL OR p."EnterpriseID"=$2) AND ($3::int IS NULL OR p."OJTSemesterID"=$3) AND ($4::text IS NULL OR p."Title" ILIKE $4)',[id??null,params.enterpriseId===undefined?null:positiveId(params.enterpriseId,'enterpriseId'),params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId'),params.search===undefined?null:'%'+requiredText(params.search,'search',100)+'%'],params,['enterpriseId','ojtSemesterId','search']);
+    for(const item of data.items){const reasons:string[]=[];const official=await officialEligibilityWithClient(c,s.StudentID,item.ojtSemesterId);if(!official||official.status!=='ELIGIBLE'||official.isStale)reasons.push('OFFICIAL_ELIGIBILITY_REQUIRED');
+      const r=(await c.query('SELECT r.* FROM "OJTRegistrations" r JOIN "OJTRegistrationWindows" w ON w."WindowID"=r."WindowID" WHERE r."StudentID"=$1 AND r."OJTSemesterID"=$2 AND w."Status"=\'OPEN\' AND w."StartsAt"<=clock_timestamp() AND w."EndsAt">clock_timestamp()',[s.StudentID,item.ojtSemesterId])).rows[0];if(!r||!['SUBMITTED','APPROVED','HANDED_OFF'].includes(r.Status))reasons.push('REGISTRATION_OR_WINDOW_REQUIRED');
+      if(r&&r.ProgramID!==s.ProgramID)reasons.push('REGISTRATION_PROGRAM_CHANGED');
+      if(!(await c.query('SELECT 1 FROM "StudentCVVersions" WHERE "StudentID"=$1 AND "RetiredAt" IS NULL',[s.StudentID])).rowCount)reasons.push('CV_REQUIRED');
+      if(r&&(await c.query('SELECT 1 FROM "JobApplications" WHERE "RegistrationID"=$1 AND ("Status"=\'ACCEPTED\' OR ("PostID"=$2 AND "PositionID"=$3 AND "Status"<>\'WITHDRAWN\'))',[r.RegistrationID,item.postId,item.id])).rowCount)reasons.push('APPLICATION_EXISTS');
+      if((await c.query('SELECT 1 FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" WHERE a."StudentID"=$1 AND p."OJTSemesterID"=$2 AND COALESCE(UPPER(a."Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\')',[s.StudentID,item.ojtSemesterId])).rowCount)reasons.push('ASSIGNMENT_EXISTS');
+      if(item.remainingSlots<1)reasons.push('POSITION_FULL');item.canApply=!reasons.length;item.blockReasons=reasons;
+    }if(id&&!data.items.length)throw invalid('Published position not found.',404);return id?data.items[0]:data;});
+}
+export async function studentCompanies(params:Row,actor:Actor,id?:number) {
+  return academicTransaction(async c=>{await ownStudent(c,actor);const data=await page(c,'SELECT e."EnterpriseID" AS id,e."EnterpriseCode" AS code,e."Name" AS name,e."Industry" AS industry,e."Address" AS address FROM "Enterprises" e WHERE e."Status"=\'ACTIVE\' AND e."DeletedAt" IS NULL AND ($1::int IS NULL OR e."EnterpriseID"=$1) AND ($2::text IS NULL OR e."Name" ILIKE $2 OR e."EnterpriseCode" ILIKE $2) AND EXISTS(SELECT 1 FROM "RecruitmentPosts" p WHERE p."EnterpriseID"=e."EnterpriseID" AND p."Status"=\'PUBLISHED\' AND p."DeadlineAt">clock_timestamp() AND ($3::int IS NULL OR p."OJTSemesterID"=$3))',[id??null,params.search===undefined?null:'%'+requiredText(params.search,'search',100)+'%',params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId')],params,['search','ojtSemesterId']);if(id&&!data.items.length)throw invalid('Published enterprise not found.',404);return id?data.items[0]:data;});
+}
+export async function applicationEvent(c:PoolClient,id:number,action:string,actor:number,snapshot:Row,reason?:string) {await c.query('INSERT INTO "ApplicationEvents" ("ApplicationID","Action","ActorID","Snapshot","Reason") VALUES ($1,$2,$3,$4,$5)',[id,action,actor,JSON.stringify(snapshot),reason??null]);}
+export const applicationSelect=`SELECT a."ApplicationID" AS id,a."RegistrationID" AS "registrationId",a."OJTSemesterID" AS "ojtSemesterId",a."PostID" AS "postId",a."PositionID" AS "positionId",a."Status" AS status,a."AppliedAt" AS "appliedAt",a."UpdatedAt" AS "updatedAt",a."CVID" AS "cvId",a."CoverLetter" AS "coverLetter",a."PositionSnapshot" AS position,r."StudentID" AS "studentId",s."StudentCode" AS "studentCode",u."FullName" AS "fullName",p."EnterpriseID" AS "enterpriseId"
+ FROM "JobApplications" a JOIN "OJTRegistrations" r ON r."RegistrationID"=a."RegistrationID" JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"`;
+export async function applicationScope(c:PoolClient,actor:Actor) {
+  if(actor.roleCode==='ADMIN')return {sql:'$1::int IS NULL',value:null};
+  if(actor.roleCode==='STUDENT')return {sql:'r."StudentID"=$1',value:(await ownStudent(c,actor)).StudentID};
+  const scope=await enterpriseScope(c,actor);
+  return scope===null?{sql:'EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."RegistrationID"=r."RegistrationID") AND $1::int IS NULL',value:null}:{sql:'p."EnterpriseID"=$1 AND EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "EligibleStudentHandoffItems" h ON h."RegistrationID"=co."RegistrationID" WHERE co."ApplicationID"=a."ApplicationID" AND co."EnterpriseID"=$1)',value:scope};
+}
+export async function applications(params:Row,actor:Actor,id?:number) {
+  return academicTransaction(async c=>{const scope=await applicationScope(c,actor);const data=await page(c,applicationSelect+` WHERE ${scope.sql} AND ($2::int IS NULL OR a."ApplicationID"=$2) AND ($3::int IS NULL OR a."OJTSemesterID"=$3) AND ($4::text IS NULL OR a."Status"=$4) AND ($5::int IS NULL OR p."EnterpriseID"=$5)`,[scope.value,id??null,params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId'),params.status===undefined?null:enumValue(params.status,['SUBMITTED','REVIEWING','INTERVIEW','OFFERED','ACCEPTED','REJECTED','WITHDRAWN'],'status'),params.enterpriseId===undefined?null:positiveId(params.enterpriseId,'enterpriseId')],params,['ojtSemesterId','status','enterpriseId']);if(id&&!data.items.length)throw invalid('Application not found.',404);if(id){const result=data.items[0];result.history=(await c.query('SELECT "EventID" AS id,"Action" AS action,"CreatedAt" AS "createdAt" FROM "ApplicationEvents" WHERE "ApplicationID"=$1 ORDER BY "EventID"',[id])).rows;return result;}return data;});
+}
+export async function submitApplication(body:unknown,actor:Actor) {
+  const b=inputObject(body,['postId','positionId','cvId','coverLetter']);return academicTransaction(async c=>{
+    const s=await ownStudent(c,actor),postId=positiveId(b.postId,'postId'),positionId=positiveId(b.positionId,'positionId');
+    const p=await record(c,'positions',positionId),post=(await c.query('SELECT p.* FROM "RecruitmentPosts" p JOIN "RecruitmentPostPositions" pp ON pp."PostID"=p."PostID" WHERE p."PostID"=$1 AND pp."PositionID"=$2 FOR UPDATE OF p',[postId,positionId])).rows[0];
+    if(!post||post.Status!=='PUBLISHED'||post.ArchivedAt||!post.DeadlineAt||new Date(post.DeadlineAt)<=new Date()||p.Status!=='OPEN'||p.ArchivedAt)throw invalid('The publication is not accepting applications.',409,'PUBLICATION_UNAVAILABLE');
+    const company=await record(c,'companies',p.EnterpriseID);if(company.Status!=='ACTIVE')throw invalid('Enterprise is inactive.',409);
+    const used=(await c.query(`SELECT ${reservedSeats('p')} AS used FROM "InternshipPositions" p WHERE p."PositionID"=$1`,[positionId])).rows[0].used;if(p.Capacity==null||used>=p.Capacity)throw invalid('Position has no remaining seats.',409,'POSITION_FULL');
+    const official=await officialEligibilityWithClient(c,s.StudentID,p.OJTSemesterID);if(!official||official.status!=='ELIGIBLE'||official.isStale)throw invalid('A current official eligible decision is required.',409,'OFFICIAL_ELIGIBILITY_REQUIRED');
+    const r=(await c.query('SELECT r.* FROM "OJTRegistrations" r JOIN "OJTRegistrationWindows" w ON w."WindowID"=r."WindowID" WHERE r."StudentID"=$1 AND r."OJTSemesterID"=$2 AND w."Status"=\'OPEN\' AND w."StartsAt"<=clock_timestamp() AND w."EndsAt">clock_timestamp() FOR UPDATE OF r',[s.StudentID,p.OJTSemesterID])).rows[0];if(!r||!['SUBMITTED','APPROVED','HANDED_OFF'].includes(r.Status))throw invalid('Submit an OJT profile in an open registration window first.',409,'OJT_PROFILE_REQUIRED');
+    if(r.ProgramID!==s.ProgramID)throw invalid('The OJT profile curriculum has changed; contact Academic.',409,'REGISTRATION_PROGRAM_CHANGED');
+    if((await c.query('SELECT 1 FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" WHERE a."StudentID"=$1 AND p."OJTSemesterID"=$2 AND COALESCE(UPPER(a."Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\')',[s.StudentID,p.OJTSemesterID])).rowCount)throw invalid('The student already has a non-cancelled assignment in this semester.',409,'ASSIGNMENT_EXISTS');
+    const cv=(await c.query('SELECT "CVID" FROM "StudentCVVersions" WHERE "StudentID"=$1 AND "RetiredAt" IS NULL AND ($2::int IS NULL OR "CVID"=$2)',[s.StudentID,b.cvId===undefined?null:positiveId(b.cvId,'cvId')])).rows[0];if(!cv)throw invalid('Upload a current CV before applying.',409,'CV_REQUIRED');
+    if((await c.query('SELECT 1 FROM "JobApplications" WHERE "RegistrationID"=$1 AND "Status"=\'ACCEPTED\'',[r.RegistrationID])).rowCount)throw invalid('A position has already been accepted for this semester.',409,'ACCEPTED_APPLICATION_EXISTS');
+    const old=(await c.query('SELECT * FROM "JobApplications" WHERE "RegistrationID"=$1 AND "PostID"=$2 AND "PositionID"=$3 FOR UPDATE',[r.RegistrationID,postId,positionId])).rows[0];if(old&&old.Status!=='WITHDRAWN')throw invalid('This application already exists.',409,'APPLICATION_EXISTS');
+    if(old&&(await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "ApplicationID"=$1',[old.ApplicationID])).rowCount)throw invalid('A previously coordinated withdrawn dossier cannot be overwritten; contact QHDN for reassignment.',409,'APPLICATION_HISTORY_LOCKED');
+    const snapshot={enterpriseId:p.EnterpriseID,title:p.Title,requirements:p.Requirements,description:p.Description,postId,deadlineAt:post.DeadlineAt},cover=optionalText(b.coverLetter,'coverLetter',5000);
+    const a=old?(await c.query('UPDATE "JobApplications" SET "Status"=\'SUBMITTED\',"CVID"=$2,"CoverLetter"=$3,"PositionSnapshot"=$4,"UpdatedAt"=now() WHERE "ApplicationID"=$1 RETURNING *',[old.ApplicationID,cv.CVID,cover,JSON.stringify(snapshot)])).rows[0]:(await c.query('INSERT INTO "JobApplications" ("RegistrationID","OJTSemesterID","PostID","PositionID","CVID","CoverLetter","PositionSnapshot") VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',[r.RegistrationID,p.OJTSemesterID,postId,positionId,cv.CVID,cover,JSON.stringify(snapshot)])).rows[0];
+    await applicationEvent(c,a.ApplicationID,old?'RESUBMITTED':'SUBMITTED',actor.userId,{status:'SUBMITTED',cvId:cv.CVID});await audit(c,actor.userId,'JobApplications',a.ApplicationID,'SUBMIT',old,a);return {id:a.ApplicationID,status:a.Status,waitingForHandoff:r.Status!=='HANDED_OFF'};
+  });
+}
+export async function withdraw(id:number,body:unknown,actor:Actor) {
+  const b=inputObject(body,['reason']),reason=requiredText(b.reason,'reason',2000);return academicTransaction(async c=>{
+    const s=await ownStudent(c,actor),a=(await c.query('SELECT a.* FROM "JobApplications" a JOIN "OJTRegistrations" r ON r."RegistrationID"=a."RegistrationID" WHERE a."ApplicationID"=$1 AND r."StudentID"=$2 FOR UPDATE OF a',[id,s.StudentID])).rows[0];if(!a)throw invalid('Application not found.',404);
+    if(a.Status==='WITHDRAWN')return {id,status:a.Status};if(!['SUBMITTED','REVIEWING','INTERVIEW','OFFERED'].includes(a.Status))throw invalid('Accepted/rejected applications cannot be withdrawn.',409);
+    if((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID" WHERE co."ApplicationID"=$1',[id])).rowCount)throw invalid('Assigned applications cannot be withdrawn.',409);
+    await c.query('UPDATE "JobApplications" SET "Status"=\'WITHDRAWN\',"UpdatedAt"=now() WHERE "ApplicationID"=$1',[id]);await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=\'WITHDRAWN\',"DecisionAt"=now() WHERE "ApplicationID"=$1 AND COALESCE("Decision",\'PENDING\')=\'PENDING\'',[id]);
+    await applicationEvent(c,id,'WITHDRAWN',actor.userId,{status:'WITHDRAWN'},reason);await c.query('INSERT INTO "Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt") SELECT u."UserID",\'Sinh viên rút hồ sơ ứng tuyển\',$1,\'IN_APP\',\'JOB_APPLICATION\',$2,now() FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE r."RoleCode"=\'OJT_COORD\' AND u."Status"=\'ACTIVE\'',[reason,id]);return {id,status:'WITHDRAWN'};
+  });
+}
