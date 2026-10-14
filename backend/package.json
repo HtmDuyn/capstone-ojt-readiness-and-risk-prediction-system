@@ -4,6 +4,7 @@
   "description": "A full-stack web system for managing OJT processes and connecting **Students, Universities, and Companies**.",
   "main": "dist/server.js",
   "scripts": {
+    "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
     "build": "tsc -p tsconfig.json",
     "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
