@@ -29,37 +29,24 @@ const requestJson = async <T>(
     );
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}${path}`,
-    {
-      method,
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
 
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-  );
 
-  /*
-   * Có một số API Swagger không khai báo
-   * response body rõ ràng.
-   *
-   * Vì vậy đọc text trước để tránh lỗi
-   * response.json() nếu backend trả body rỗng.
-   */
-  const responseText =
-    await response.text();
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await response.text();
 
   let result: unknown = null;
 
   if (responseText) {
     try {
-      result = JSON.parse(
-        responseText,
-      );
+      result = JSON.parse(responseText);
     } catch {
       result = responseText;
     }
@@ -67,8 +54,7 @@ const requestJson = async <T>(
 
   if (!response.ok) {
     const error =
-      typeof result === "object" &&
-      result !== null
+      typeof result === "object" && result !== null
         ? (result as ApiErrorResponse)
         : null;
 
@@ -363,13 +349,6 @@ export interface CurriculumDetailResponse {
    ========================================================= */
 
 export interface UpdateCurriculumCourseItem {
-  /*
-   * Backend yêu cầu chỉ truyền đúng một:
-   * courseId HOẶC courseCode.
-   *
-   * FE hiện đã có courseId từ curriculum detail
-   * và courses/search nên ưu tiên dùng courseId.
-   */
   courseId: number;
 
   credits: number;
@@ -386,6 +365,78 @@ export interface UpdateCurriculumCoursesPayload {
   courses: UpdateCurriculumCourseItem[];
 
   programId: number;
+}
+
+/* =========================================================
+   CURRICULUM COMBOS
+   ========================================================= */
+
+export interface CreateCurriculumComboPayload {
+  code: string;
+  name: string;
+
+  selectionGroup: string | null;
+  note: string | null;
+
+  programId: number;
+}
+
+export interface SearchCurriculumCombosPayload {
+  programId: number;
+}
+
+export interface SearchCurriculumCombosResponse {
+  success: boolean;
+
+  data: CurriculumCombo[];
+}
+
+/* =========================================================
+   UPDATE COMBO COURSES
+   ========================================================= */
+
+export interface UpdateComboCourseItem {
+  /*
+   * Backend yêu cầu đúng một trong hai:
+   * courseId hoặc courseCode.
+   *
+   * FE dùng courseId.
+   */
+  courseId: number;
+
+  credits: number;
+  semester: number;
+
+  prerequisiteText: string | null;
+  note: string | null;
+
+  /*
+   * Đây là CourseID của COMBO_SLOT
+   * trong curriculum.
+   */
+  slotCourseIds: number[];
+}
+
+export interface UpdateComboChoiceGroupItem {
+  code: string;
+
+  minCourses: number;
+  maxCourses: number;
+
+  courseIds: number[];
+}
+
+export interface UpdateComboCoursesPayload {
+  courses: UpdateComboCourseItem[];
+
+  /*
+   * Backend bắt buộc field này.
+   * Combo thường hiện tại chưa có choice group
+   * nên FE gửi [].
+   */
+  choiceGroups: UpdateComboChoiceGroupItem[];
+
+  comboId: number;
 }
 
 /* =========================================================
@@ -413,13 +464,6 @@ const searchCourses = (
 const createCourse = (
   payload: CreateCoursePayload,
 ) => {
-  /*
-   * Swagger không khai báo response mẫu rõ ràng,
-   * nên FE không phụ thuộc vào response này.
-   *
-   * Sau khi tạo sẽ search lại bằng course code
-   * để lấy ID thật.
-   */
   return postJson<unknown>(
     "/api/courses",
     payload,
@@ -455,6 +499,33 @@ const updateCurriculumCourses = (
   );
 };
 
+const createCurriculumCombo = (
+  payload: CreateCurriculumComboPayload,
+) => {
+  return postJson<unknown>(
+    "/api/json/curricula/combos",
+    payload,
+  );
+};
+
+const searchCurriculumCombos = (
+  payload: SearchCurriculumCombosPayload,
+) => {
+  return postJson<SearchCurriculumCombosResponse>(
+    "/api/json/curricula/combos/search",
+    payload,
+  );
+};
+
+const updateComboCourses = (
+  payload: UpdateComboCoursesPayload,
+) => {
+  return putJson<unknown>(
+    "/api/json/combos/courses",
+    payload,
+  );
+};
+
 /* =========================================================
    EXPORT
    ========================================================= */
@@ -468,4 +539,8 @@ export const curriculumService = {
   searchCurricula,
   getCurriculumDetail,
   updateCurriculumCourses,
+
+  createCurriculumCombo,
+  searchCurriculumCombos,
+  updateComboCourses,
 };
