@@ -49,6 +49,34 @@ export interface AcademicPeriod {
   endDate: string;
   status: AcademicPeriodStatus;
 }
+export interface OjtSemester {
+  id: number;
+  academicYearId: number;
+  semesterCode: string;
+  name: string;
+  academicPeriodId: number | null;
+  startDate: string;
+  endDate: string;
+  regStartDate: string;
+  regEndDate: string;
+  status: AcademicPeriodStatus;
+}
+
+export interface SearchOjtSemestersPayload {
+  page: number;
+  limit: number;
+  search?: string;
+  status?: AcademicPeriodStatus;
+  academicYearId?: number;
+}
+
+interface SearchOjtSemestersResponse {
+  success: boolean;
+  items: OjtSemester[];
+  page: number;
+  limit: number;
+  total: number;
+}
 export interface UpdateAcademicPeriodPayload {
   academicYearId: number;
   periodCode: string;
@@ -358,11 +386,59 @@ const updateAcademicPeriod = async (
 
   return successResult.data;
 };
+const searchOjtSemesters = async (
+  payload: SearchOjtSemestersPayload,
+): Promise<OjtSemester[]> => {
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error(
+      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
+    );
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/json/ojt-semesters/search`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = (await response.json()) as
+    | SearchOjtSemestersResponse
+    | ApiErrorResponse;
+
+  if (!response.ok) {
+    const error = result as ApiErrorResponse;
+
+    if (response.status === 401) {
+      throw new Error(
+        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
+      );
+    }
+
+    throw new Error(
+      error.message ||
+        "Không thể tải danh sách kỳ OJT.",
+    );
+  }
+
+  const successResult =
+    result as SearchOjtSemestersResponse;
+
+  return successResult.items;
+};
 export const academicService = {
   createAcademicYear,
   searchAcademicYears,
   createAcademicPeriod,
   searchAcademicPeriods,
   updateAcademicPeriod,
+  searchOjtSemesters,
 };
 
