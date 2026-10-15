@@ -9,6 +9,7 @@ import {
 } from "./auth.schema";
 
 import {
+  actorProfileIds,
   getUserById,
   loginUser,
 } from "./auth.service";
@@ -97,6 +98,7 @@ export const getCurrentUser = async (
         "User profile retrieved successfully",
 
       user: {
+        ...await actorProfileIds(user.id, user.role_code),
         mustChangePassword: user.must_change_password,
         id:
           user.id,

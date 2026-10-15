@@ -1017,7 +1017,7 @@
  *             "description": "Authentication required"
  *           },
  *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
+ *             "description": "ADMIN, ACADEMIC or OJT_COORD required; change temporary password first"
  *           },
  *           "404": {
  *             "description": "Record or referenced cohort/group not found"

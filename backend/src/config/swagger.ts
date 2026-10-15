@@ -1,3 +1,4 @@
+import { addPortalOperations } from '../modules/student-portal/portal.openapi';
 import {
   readdirSync,
 } from "node:fs";
@@ -7,7 +8,9 @@ import path from "node:path";
 import swaggerJSDoc from "swagger-jsdoc";
 import { describeManualInputs } from './swagger-inputs';
 import { addAdminOperations } from '../modules/admin/admin.openapi';
+import { addQhdnOperations } from '../modules/qhdn/qhdn.openapi';
 import { buildJsonInputOperations, documentJsonInputOperations } from './json-input-operations';
+import { groupSwaggerByActor } from './swagger-actor-groups';
 
 const modulesDirectory =
   path.resolve(
@@ -354,6 +357,6 @@ const options: swaggerJSDoc.Options =
       ),
   };
 
-const originalSpec = describeManualInputs(addAdminOperations(swaggerJSDoc(options)));
+const originalSpec = describeManualInputs(addPortalOperations(addQhdnOperations(addAdminOperations(swaggerJSDoc(options)))));
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
-export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);
+export const swaggerSpec = groupSwaggerByActor(documentJsonInputOperations(originalSpec, jsonInputOperations));

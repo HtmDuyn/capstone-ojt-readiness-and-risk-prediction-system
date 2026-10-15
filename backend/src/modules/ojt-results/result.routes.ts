@@ -1,3 +1,4 @@
+import { resultPdf } from './result.pdf';
 import { Router,type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
@@ -19,9 +20,10 @@ router.patch('/ojt-results/:id',...academic,handle(req=>change(positiveId(req.pa
 router.post('/ojt-results/:id/confirm',...academic,handle(req=>change(positiveId(req.params.id),req.body,req.user.userId,'CONFIRMED')));
 router.get('/ojt-semesters/:id/results/export',...read,async(req,res,next)=>{
   try{
-    const format=enumValue(req.query.format??'csv',['csv','json'],'format');
+    const format=enumValue(req.query.format??'csv',['csv','json','pdf'],'format');
     const data=await list(req.query,positiveId(req.params.id),true);
     if(format==='json'){res.json({success:true,data});return;}
+    if(format==='pdf'){const pdf=await resultPdf(data.items,positiveId(req.params.id));res.setHeader('Content-Disposition',`attachment; filename="ojt-results-${positiveId(req.params.id)}.pdf"`);res.type('application/pdf').send(pdf);return;}
     res.setHeader('Content-Disposition',`attachment; filename="ojt-results-${positiveId(req.params.id)}.csv"`);
     res.type('text/csv; charset=utf-8').send(resultCsv(data.items));
   }catch(error){next(error);}
