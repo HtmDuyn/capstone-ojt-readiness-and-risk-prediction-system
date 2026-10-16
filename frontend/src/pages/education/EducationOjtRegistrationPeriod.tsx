@@ -1,484 +1,1067 @@
-import React, { useState } from "react";
+import React from "react";
+
 import {
-  CalendarDays,
+  CalendarClock,
   CheckCircle2,
   Clock3,
+  Loader2,
   Plus,
-  X,
-  XCircle,
+  RefreshCcw,
+  UsersRound,
 } from "lucide-react";
 
 import { PageBanner } from "@/components/common/PageBanner";
 
-type RegistrationPeriodStatus =
-  | "Đang mở"
-  | "Đã đóng"
-  | "Chưa mở";
+import { academicService, type OjtSemester } from "@/service/academic.service";
 
-interface RegistrationPeriod {
-  id: string;
-  name: string;
-  term: string;
-  startDate: string;
-  endDate: string;
-  status: RegistrationPeriodStatus;
-}
+import {
+  ojtRegistrationWindowService,
+  type OjtRegistrationWindow,
+} from "@/service/ojtRegistrationWindow.service";
 
-interface RegistrationPeriodForm {
-  name: string;
-  term: string;
-  startDate: string;
-  endDate: string;
-}
+/* =========================================================
+   HELPERS
+   ========================================================= */
 
-const INITIAL_PERIODS: RegistrationPeriod[] = [
-  {
-    id: "period-1",
-    name: "Đợt đăng ký OJT Fall 2026",
-    term: "Fall 2026",
-    startDate: "01/08/2026",
-    endDate: "15/08/2026",
-    status: "Đang mở",
-  },
-  {
-    id: "period-2",
-    name: "Đợt đăng ký OJT Summer 2026",
-    term: "Summer 2026",
-    startDate: "01/04/2026",
-    endDate: "15/04/2026",
-    status: "Đã đóng",
-  },
-];
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return "—";
+  }
 
-const STATUS_STYLES: Record<
-  RegistrationPeriodStatus,
-  string
-> = {
-  "Đang mở":
-    "border-emerald-200 bg-emerald-50 text-emerald-700",
+  const date = new Date(value);
 
-  "Đã đóng":
-    "border-slate-200 bg-slate-100 text-slate-600",
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
 
-  "Chưa mở":
-    "border-amber-200 bg-amber-50 text-amber-700",
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 };
 
-const EMPTY_FORM: RegistrationPeriodForm = {
-  name: "",
-  term: "",
-  startDate: "",
-  endDate: "",
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case "DRAFT":
+      return "Bản nháp";
+
+    case "OPEN":
+      return "Đang mở";
+
+    case "CLOSED":
+      return "Đã đóng";
+
+    default:
+      return status;
+  }
 };
+
+const getStatusClass = (status: string) => {
+  switch (status) {
+    case "DRAFT":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+
+    case "OPEN":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+    case "CLOSED":
+      return "border-slate-200 bg-slate-100 text-slate-600";
+
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+};
+
+/* =========================================================
+   COMPONENT
+   ========================================================= */
 
 const EducationOjtRegistrationPeriod: React.FC = () => {
-  const [periods, setPeriods] =
-    useState<RegistrationPeriod[]>(INITIAL_PERIODS);
+  /* ===================== SEMESTERS ===================== */
 
-  const [isModalOpen, setIsModalOpen] =
-    useState(false);
+  const [semesters, setSemesters] = React.useState<OjtSemester[]>([]);
 
-  const [form, setForm] =
-    useState<RegistrationPeriodForm>(EMPTY_FORM);
+  const [selectedSemesterId, setSelectedSemesterId] = React.useState<
+    number | null
+  >(null);
 
-  const handleOpenModal = () => {
-    setForm(EMPTY_FORM);
-    setIsModalOpen(true);
-  };
+  const [loadingSemesters, setLoadingSemesters] = React.useState(true);
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setForm(EMPTY_FORM);
-  };
+  /* ===================== WINDOWS ===================== */
 
-  const handleCreatePeriod = () => {
-    if (
-      !form.name.trim() ||
-      !form.term.trim() ||
-      !form.startDate ||
-      !form.endDate
-    ) {
-      alert("Vui lòng nhập đầy đủ thông tin đợt đăng ký.");
+  const [windows, setWindows] = React.useState<OjtRegistrationWindow[]>([]);
+
+  const [loadingWindows, setLoadingWindows] = React.useState(false);
+
+  /* ===================== MESSAGE ===================== */
+
+  const [errorMessage, setErrorMessage] = React.useState("");
+  const [openingWindowId, setOpeningWindowId] = React.useState<number | null>(
+    null,
+  );
+
+  const [confirmOpenWindow, setConfirmOpenWindow] =
+    React.useState<OjtRegistrationWindow | null>(null);
+  const [openErrorMessage, setOpenErrorMessage] = React.useState("");
+
+  const [successMessage, setSuccessMessage] = React.useState("");
+  const [closingWindowId, setClosingWindowId] = React.useState<number | null>(
+    null,
+  );
+
+  const [confirmCloseWindow, setConfirmCloseWindow] =
+    React.useState<OjtRegistrationWindow | null>(null);
+
+  const [closeErrorMessage, setCloseErrorMessage] = React.useState("");
+  const [showCreateModal, setShowCreateModal] = React.useState(false);
+
+  const [creatingWindow, setCreatingWindow] = React.useState(false);
+
+  const [createErrorMessage, setCreateErrorMessage] = React.useState("");
+
+  const [createForm, setCreateForm] = React.useState({
+    name: "",
+    startsAt: "",
+    endsAt: "",
+    reason: "",
+    requiredRelativeSemester: 5,
+  });
+
+  /* =====================================================
+       LOAD OJT SEMESTERS
+       ===================================================== */
+
+  React.useEffect(() => {
+    const loadSemesters = async () => {
+      setLoadingSemesters(true);
+      setErrorMessage("");
+
+      try {
+        const items = await academicService.searchOjtSemesters({
+          page: 1,
+          limit: 100,
+        });
+
+        const sorted = [...items].sort((a, b) => {
+          return (
+            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+          );
+        });
+
+        setSemesters(sorted);
+
+        if (sorted.length > 0) {
+          setSelectedSemesterId(sorted[0].id);
+        }
+      } catch (error) {
+        console.error("Load OJT semesters failed:", error);
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Không thể tải danh sách kỳ OJT.",
+        );
+      } finally {
+        setLoadingSemesters(false);
+      }
+    };
+
+    void loadSemesters();
+  }, []);
+
+  /* =====================================================
+       LOAD REGISTRATION WINDOWS
+       ===================================================== */
+
+  const loadWindows = React.useCallback(async () => {
+    if (selectedSemesterId === null) {
+      setWindows([]);
       return;
     }
 
-    const newPeriod: RegistrationPeriod = {
-      id: `period-${Date.now()}`,
-      name: form.name.trim(),
-      term: form.term.trim(),
-      startDate: form.startDate,
-      endDate: form.endDate,
-      status: "Chưa mở",
-    };
+    setLoadingWindows(true);
+    setErrorMessage("");
 
-    setPeriods((current) => [
-      newPeriod,
-      ...current,
-    ]);
+    try {
+      const response = await ojtRegistrationWindowService.searchWindows({
+        ojtSemesterId: selectedSemesterId,
 
-    handleCloseModal();
-  };
+        page: 1,
 
-  const handleOpenPeriod = (
-    periodId: string,
-  ) => {
-    setPeriods((current) =>
-      current.map((period) =>
-        period.id === periodId
-          ? {
-              ...period,
-              status: "Đang mở",
-            }
-          : period,
-      ),
-    );
-  };
+        limit: 100,
+      });
 
-  const handleClosePeriod = (
-    periodId: string,
-  ) => {
-    const confirmed = window.confirm(
-      "Bạn có chắc muốn đóng đợt đăng ký OJT này không?",
-    );
+      const items = response.data.items ?? [];
 
-    if (!confirmed) return;
+      const sorted = [...items].sort((a, b) => {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
 
-    setPeriods((current) =>
-      current.map((period) =>
-        period.id === periodId
-          ? {
-              ...period,
-              status: "Đã đóng",
-            }
-          : period,
-      ),
-    );
-  };
+      setWindows(sorted);
+    } catch (error) {
+      console.error("Load registration windows failed:", error);
 
-  const getStatusIcon = (
-    status: RegistrationPeriodStatus,
-  ) => {
-    if (status === "Đang mở") {
-      return (
-        <CheckCircle2 size={15} />
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Không thể tải danh sách đợt đăng ký OJT.",
       );
+    } finally {
+      setLoadingWindows(false);
+    }
+  }, [selectedSemesterId]);
+
+  React.useEffect(() => {
+    void loadWindows();
+  }, [loadWindows]);
+  /* =====================================================
+   CREATE MODAL
+   ===================================================== */
+
+  const handleOpenCreateModal = () => {
+    if (!selectedSemester) {
+      setErrorMessage("Vui lòng chọn kỳ OJT trước khi tạo đợt đăng ký.");
+
+      return;
     }
 
-    if (status === "Đã đóng") {
-      return <XCircle size={15} />;
-    }
+    setCreateErrorMessage("");
 
-    return <Clock3 size={15} />;
+    setCreateForm({
+      name: `Đợt đăng ký ${selectedSemester.name}`,
+      startsAt: "",
+      endsAt: "",
+      reason: `Mở đợt đăng ký ${selectedSemester.name}`,
+      requiredRelativeSemester: 5,
+    });
+
+    setShowCreateModal(true);
   };
+  /* =====================================================
+   OPEN REGISTRATION WINDOW
+   ===================================================== */
+
+  const handleOpenWindow = async () => {
+    if (!confirmOpenWindow) {
+      return;
+    }
+
+    const currentWindow = confirmOpenWindow;
+
+    setOpeningWindowId(currentWindow.id);
+
+    setOpenErrorMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await ojtRegistrationWindowService.openWindow({
+        windowId: currentWindow.id,
+
+        reason: "Phòng Đào tạo mở đợt đăng ký OJT",
+      });
+
+      setConfirmOpenWindow(null);
+
+      setSuccessMessage(`Đã mở "${currentWindow.name}" thành công.`);
+
+      await loadWindows();
+    } catch (error) {
+      console.error("Open registration window failed:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Không thể mở đợt đăng ký OJT.";
+
+      // QUAN TRỌNG:
+      // giữ modal mở để người dùng thấy lỗi.
+      setOpenErrorMessage(message);
+    } finally {
+      setOpeningWindowId(null);
+    }
+  };
+  /* =====================================================
+   CLOSE REGISTRATION WINDOW
+   ===================================================== */
+
+  const handleCloseWindow = async () => {
+    if (!confirmCloseWindow) {
+      return;
+    }
+
+    const currentWindow = confirmCloseWindow;
+
+    setClosingWindowId(currentWindow.id);
+
+    setCloseErrorMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await ojtRegistrationWindowService.closeWindow({
+        windowId: currentWindow.id,
+
+        reason: "Phòng Đào tạo đóng đợt đăng ký OJT",
+      });
+
+      setConfirmCloseWindow(null);
+
+      setSuccessMessage(`Đã đóng "${currentWindow.name}" thành công.`);
+
+      await loadWindows();
+    } catch (error) {
+      console.error("Close registration window failed:", error);
+
+      setCloseErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Không thể đóng đợt đăng ký OJT.",
+      );
+    } finally {
+      setClosingWindowId(null);
+    }
+  };
+  /* =====================================================
+       DERIVED
+       ===================================================== */
+
+  const selectedSemester =
+    semesters.find((semester) => semester.id === selectedSemesterId) ?? null;
+
+  const draftCount = windows.filter(
+    (windowItem) => windowItem.status === "DRAFT",
+  ).length;
+
+  const openCount = windows.filter(
+    (windowItem) => windowItem.status === "OPEN",
+  ).length;
+
+  const closedCount = windows.filter(
+    (windowItem) => windowItem.status === "CLOSED",
+  ).length;
+
+  /* =====================================================
+       RENDER
+       ===================================================== */
 
   return (
     <div className="space-y-6">
+      {/* ================= BANNER ================= */}
+
       <PageBanner
-        title="Mở đợt Đăng ký OJT"
-        description="Quản lý các đợt đăng ký nguyện vọng OJT dành cho sinh viên."
+        title="Mở đợt đăng ký OJT"
+        description="Quản lý thời gian và phạm vi đăng ký OJT dành cho sinh viên."
         badge="Quản lý OJT"
       />
+      {/* ================= SUCCESS ================= */}
 
-      {/* HEADER */}
+      {successMessage && (
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={18} className="shrink-0" />
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div>
-            <h2 className="text-lg font-bold text-slate-800">
-              Danh sách đợt đăng ký
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Theo dõi trạng thái các đợt đăng ký OJT.
-            </p>
+            <span>{successMessage}</span>
           </div>
 
           <button
             type="button"
-            onClick={handleOpenModal}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+            onClick={() => setSuccessMessage("")}
+            className="font-semibold text-emerald-700 hover:text-emerald-900"
           >
-            <Plus size={18} />
-
-            Tạo đợt đăng ký
+            ×
           </button>
         </div>
-      </section>
+      )}
+      {/* ================= ERROR ================= */}
 
-      {/* TABLE */}
+      {errorMessage && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Đợt đăng ký
-                </th>
+      {/* ================= FILTER ================= */}
 
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Kỳ OJT
-                </th>
+      <section className="rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+            <CalendarClock size={21} />
+          </div>
 
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Thời gian bắt đầu
-                </th>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-blue-600">Kỳ OJT</p>
 
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Thời gian kết thúc
-                </th>
+            <h2 className="mt-1 text-lg font-semibold text-blue-900">
+              Chọn kỳ OJT cần quản lý
+            </h2>
 
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Trạng thái
-                </th>
+            <p className="mt-1 text-sm text-blue-700">
+              Danh sách các đợt đăng ký bên dưới sẽ thay đổi theo kỳ OJT được
+              chọn.
+            </p>
 
-                <th className="px-5 py-4 text-right font-semibold text-slate-600">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
+            <div className="mt-4 max-w-xl">
+              <select
+                value={selectedSemesterId ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
 
-            <tbody className="divide-y divide-slate-100">
-              {periods.map((period) => (
-                <tr
-                  key={period.id}
-                  className="transition hover:bg-slate-50/70"
-                >
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-                        <CalendarDays size={19} />
-                      </div>
+                  setSelectedSemesterId(value ? Number(value) : null);
+                }}
+                disabled={loadingSemesters}
+                className="w-full rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              >
+                <option value="">
+                  {loadingSemesters ? "Đang tải kỳ OJT..." : "Chọn kỳ OJT"}
+                </option>
 
-                      <div>
-                        <p className="font-semibold text-slate-800">
-                          {period.name}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-4 font-medium text-slate-700">
-                    {period.term}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {period.startDate}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {period.endDate}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                        STATUS_STYLES[
-                          period.status
-                        ]
-                      }`}
-                    >
-                      {getStatusIcon(
-                        period.status,
-                      )}
-
-                      {period.status}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end">
-                      {period.status ===
-                        "Chưa mở" && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleOpenPeriod(
-                              period.id,
-                            )
-                          }
-                          className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                        >
-                          Mở đợt
-                        </button>
-                      )}
-
-                      {period.status ===
-                        "Đang mở" && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleClosePeriod(
-                              period.id,
-                            )
-                          }
-                          className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-                        >
-                          Đóng đợt
-                        </button>
-                      )}
-
-                      {period.status ===
-                        "Đã đóng" && (
-                        <span className="text-xs font-medium text-slate-400">
-                          Đã kết thúc
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                {semesters.map((semester) => (
+                  <option key={semester.id} value={semester.id}>
+                    {semester.name}
+                    {" • "}
+                    {semester.semesterCode}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* CREATE MODAL */}
+      {/* ================= SUMMARY ================= */}
 
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]"
-          onClick={handleCloseModal}
-        >
-          <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Bản nháp</p>
+
+          <p className="mt-2 text-2xl font-bold text-amber-600">{draftCount}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Đang mở</p>
+
+          <p className="mt-2 text-2xl font-bold text-emerald-600">
+            {openCount}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Đã đóng</p>
+
+          <p className="mt-2 text-2xl font-bold text-slate-600">
+            {closedCount}
+          </p>
+        </div>
+      </section>
+
+      {/* ================= LIST ================= */}
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            disabled={selectedSemesterId === null}
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {/* MODAL HEADER */}
+            <Plus size={17} />
+            Tạo đợt đăng ký
+          </button>
 
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  Tạo đợt đăng ký OJT
-                </h2>
+          <button
+            type="button"
+            onClick={() => void loadWindows()}
+            disabled={loadingWindows || selectedSemesterId === null}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCcw
+              size={16}
+              className={loadingWindows ? "animate-spin" : ""}
+            />
+            Làm mới
+          </button>
+        </div>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Nhập thông tin cho đợt đăng ký mới.
-                </p>
-              </div>
+        {loadingWindows ? (
+          <div className="flex min-h-[280px] items-center justify-center">
+            <div className="text-center">
+              <Loader2
+                size={30}
+                className="mx-auto animate-spin text-orange-500"
+              />
 
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              <p className="mt-3 text-sm text-slate-500">
+                Đang tải danh sách đợt đăng ký...
+              </p>
+            </div>
+          </div>
+        ) : windows.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <CalendarClock size={40} className="mx-auto text-slate-300" />
+
+            <h3 className="mt-3 font-semibold text-slate-700">
+              Chưa có đợt đăng ký
+            </h3>
+
+            <p className="mt-1 text-sm text-slate-400">
+              Kỳ OJT này chưa có đợt đăng ký nào được tạo.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {windows.map((windowItem) => (
+              <div
+                key={windowItem.id}
+                className="p-5 transition hover:bg-slate-50/70"
               >
-                <X size={19} />
-              </button>
+                <div className="flex flex-col justify-between gap-5 xl:flex-row">
+                  {/* LEFT */}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="text-base font-semibold text-slate-800">
+                        {windowItem.name}
+                      </h3>
+
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(
+                          windowItem.status,
+                        )}`}
+                      >
+                        {getStatusLabel(windowItem.status)}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                      {/* TIME */}
+
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 text-orange-500">
+                          <Clock3 size={18} />
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-medium text-slate-400">
+                            Thời gian đăng ký
+                          </p>
+
+                          <p className="mt-1 text-sm font-medium text-slate-700">
+                            {formatDateTime(windowItem.startsAt)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            đến {formatDateTime(windowItem.endsAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* STUDENT SEMESTER */}
+
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 text-blue-500">
+                          <UsersRound size={18} />
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-medium text-slate-400">
+                            Đối tượng
+                          </p>
+
+                          <p className="mt-1 text-sm font-medium text-slate-700">
+                            Sinh viên kỳ {windowItem.requiredRelativeSemester}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            {windowItem.scope.programIds?.length ?? 0} chương
+                            trình đào tạo
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* CREATED */}
+
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 text-emerald-500">
+                          <CheckCircle2 size={18} />
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-medium text-slate-400">
+                            Khởi tạo
+                          </p>
+
+                          <p className="mt-1 text-sm font-medium text-slate-700">
+                            {formatDateTime(windowItem.createdAt)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            {windowItem.status === "DRAFT"
+                              ? "Chưa mở đăng ký"
+                              : windowItem.status === "OPEN"
+                                ? "Đang nhận đăng ký"
+                                : "Đợt đã kết thúc"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ACTION */}
+
+                  <div className="flex shrink-0 items-center">
+                    {windowItem.status === "DRAFT" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenErrorMessage("");
+                          setSuccessMessage("");
+
+                          setConfirmOpenWindow(windowItem);
+                        }}
+                        disabled={openingWindowId === windowItem.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {openingWindowId === windowItem.id ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Đang mở...
+                          </>
+                        ) : (
+                          "Mở đợt đăng ký"
+                        )}
+                      </button>
+                    )}
+
+                    {windowItem.status === "OPEN" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCloseErrorMessage("");
+                          setSuccessMessage("");
+
+                          setConfirmCloseWindow(windowItem);
+                        }}
+                        disabled={closingWindowId === windowItem.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {closingWindowId === windowItem.id ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Đang đóng...
+                          </>
+                        ) : (
+                          "Đóng đợt đăng ký"
+                        )}
+                      </button>
+                    )}
+                    {windowItem.status === "CLOSED" && (
+                      <span className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-500">
+                        Đã đóng
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      {/* ================= CREATE MODAL ================= */}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-4 py-8 backdrop-blur-[2px]">
+          <div className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
+                  <CalendarClock size={21} />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    Tạo đợt đăng ký OJT
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Thiết lập thời gian đăng ký cho sinh viên thuộc kỳ OJT đang
+                    chọn.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* MODAL BODY */}
+            <div className="space-y-5 px-6 py-5">
+              {/* KỲ OJT */}
 
-            <div className="space-y-4 px-6 py-6">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Kỳ OJT
+                </label>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  {selectedSemester
+                    ? `${selectedSemester.name} • ${selectedSemester.semesterCode}`
+                    : "Chưa chọn kỳ OJT"}
+                </div>
+              </div>
+
+              {/* TÊN */}
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Tên đợt đăng ký
                 </label>
 
                 <input
                   type="text"
-                  value={form.name}
+                  value={createForm.name}
                   onChange={(event) =>
-                    setForm((current) => ({
+                    setCreateForm((current) => ({
                       ...current,
-                      name:
-                        event.target.value,
+                      name: event.target.value,
                     }))
                   }
-                  placeholder="VD: Đợt đăng ký OJT Fall 2026"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  placeholder="Ví dụ: Đợt đăng ký OJT Fall 2026"
                 />
               </div>
 
+              {/* TIME */}
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Bắt đầu đăng ký
+                  </label>
+
+                  <input
+                    type="datetime-local"
+                    value={createForm.startsAt}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        startsAt: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Hạn đăng ký
+                  </label>
+
+                  <input
+                    type="datetime-local"
+                    value={createForm.endsAt}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        endsAt: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  />
+                </div>
+              </div>
+
+              {/* SEMESTER */}
+
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  Kỳ OJT
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Kỳ tương đối của sinh viên
                 </label>
 
                 <input
-                  type="text"
-                  value={form.term}
+                  type="number"
+                  min={1}
+                  max={9}
+                  value={createForm.requiredRelativeSemester}
                   onChange={(event) =>
-                    setForm((current) => ({
+                    setCreateForm((current) => ({
                       ...current,
-                      term:
-                        event.target.value,
+                      requiredRelativeSemester: Number(event.target.value),
                     }))
                   }
-                  placeholder="VD: Fall 2026"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+
+                <p className="mt-2 text-xs text-slate-400">
+                  Theo nghiệp vụ hiện tại, sinh viên thường đăng ký OJT từ kỳ 5.
+                </p>
+              </div>
+
+              {/* REASON */}
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Lý do
+                </label>
+
+                <textarea
+                  rows={3}
+                  value={createForm.reason}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      reason: event.target.value,
+                    }))
+                  }
+                  className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Ngày bắt đầu
-                  </label>
+              {createErrorMessage && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-red-700">
+                    Không thể tạo đợt đăng ký
+                  </p>
 
-                  <input
-                    type="date"
-                    value={
-                      form.startDate
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          startDate:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
+                  <p className="mt-1 text-sm leading-6 text-red-600">
+                    {createErrorMessage}
+                  </p>
                 </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Ngày kết thúc
-                  </label>
-
-                  <input
-                    type="date"
-                    value={
-                      form.endDate
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          endDate:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* MODAL FOOTER */}
-
-            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
               <button
                 type="button"
-                onClick={handleCloseModal}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                onClick={() => setShowCreateModal(false)}
+                disabled={creatingWindow}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 Hủy
               </button>
 
               <button
                 type="button"
-                onClick={handleCreatePeriod}
-                className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+                disabled
+                className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white opacity-50"
               >
-                Tạo đợt
+                Tạo đợt đăng ký
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ================= OPEN CONFIRM MODAL ================= */}
+
+      {confirmOpenWindow && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-4 py-8 backdrop-blur-[2px]">
+          <div className="my-auto w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <CalendarClock size={21} />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    Xác nhận mở đợt đăng ký
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Sau khi mở, sinh viên thuộc phạm vi áp dụng có thể tham gia
+                    đăng ký OJT theo quy định của hệ thống.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  {confirmOpenWindow.name}
+                </p>
+
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">Bắt đầu</span>
+
+                    <span className="text-right font-medium text-slate-700">
+                      {formatDateTime(confirmOpenWindow.startsAt)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">Kết thúc</span>
+
+                    <span className="text-right font-medium text-slate-700">
+                      {formatDateTime(confirmOpenWindow.endsAt)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">Sinh viên áp dụng</span>
+
+                    <span className="text-right font-medium text-slate-700">
+                      Kỳ {confirmOpenWindow.requiredRelativeSemester}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">CTĐT áp dụng</span>
+
+                    <span className="text-right font-medium text-slate-700">
+                      {confirmOpenWindow.scope.programIds?.length ?? 0} chương
+                      trình
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {openErrorMessage && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-red-700">
+                    Không thể mở đợt đăng ký
+                  </p>
+
+                  <p className="mt-1 text-sm leading-6 text-red-600">
+                    {openErrorMessage}
+                  </p>
+                </div>
+              )}
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-700">
+                Hệ thống sẽ kiểm tra điều kiện nghiệp vụ trước khi chuyển đợt từ{" "}
+                <strong>Bản nháp</strong> sang <strong>Đang mở</strong>.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setConfirmOpenWindow(null)}
+                disabled={openingWindowId !== null}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleOpenWindow()}
+                disabled={openingWindowId !== null}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {openingWindowId !== null ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  "Xác nhận mở đợt"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ================= CLOSE CONFIRM MODAL ================= */}
+
+      {confirmCloseWindow && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 px-4 py-8 backdrop-blur-[2px]">
+          <div className="my-auto w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <CalendarClock size={21} />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    Xác nhận đóng đợt đăng ký
+                  </h3>
+
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Sau khi đóng, sinh viên sẽ không thể tiếp tục gửi đăng ký
+                    trong đợt này.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  {confirmCloseWindow.name}
+                </p>
+
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">Trạng thái hiện tại</span>
+
+                    <span className="font-semibold text-emerald-600">
+                      Đang mở
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">Bắt đầu</span>
+
+                    <span className="text-right font-medium text-slate-700">
+                      {formatDateTime(confirmCloseWindow.startsAt)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-slate-500">Hạn đăng ký</span>
+
+                    <span className="text-right font-medium text-slate-700">
+                      {formatDateTime(confirmCloseWindow.endsAt)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {closeErrorMessage && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-red-700">
+                    Không thể đóng đợt đăng ký
+                  </p>
+
+                  <p className="mt-1 text-sm leading-6 text-red-600">
+                    {closeErrorMessage}
+                  </p>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+                Thao tác này sẽ chuyển đợt từ <strong>Đang mở</strong> sang{" "}
+                <strong>Đã đóng</strong>.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setConfirmCloseWindow(null)}
+                disabled={closingWindowId !== null}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleCloseWindow()}
+                disabled={closingWindowId !== null}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {closingWindowId !== null ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  "Xác nhận đóng đợt"
+                )}
               </button>
             </div>
           </div>
