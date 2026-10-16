@@ -533,15 +533,15 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   ],
   "PATCH /api/json/ojt-registration-windows": [
     "Admin",
-    "Phòng Đào tạo"
+    "Phòng QHDN"
   ],
   "POST /api/json/ojt-registration-windows/close": [
     "Admin",
-    "Phòng Đào tạo"
+    "Phòng QHDN"
   ],
   "POST /api/json/ojt-registration-windows/open": [
     "Admin",
-    "Phòng Đào tạo"
+    "Phòng QHDN"
   ],
   "POST /api/json/ojt-registration-windows/search": [
     "Admin",
@@ -856,7 +856,7 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   ],
   "POST /api/ojt-registration-windows": [
     "Admin",
-    "Phòng Đào tạo"
+    "Phòng QHDN"
   ],
   "POST /api/ojt-registrations": [
     "Admin",
