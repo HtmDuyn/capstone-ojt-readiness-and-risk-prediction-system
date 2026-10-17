@@ -12,7 +12,16 @@ import {
 
 import { PageBanner } from "@/components/common/PageBanner";
 
-import { academicService, type OjtSemester } from "@/service/academic.service";
+import {
+  academicService,
+  type AcademicPeriod,
+  type OjtSemester,
+} from "@/service/academic.service";
+
+import {
+  curriculumService,
+  type CurriculumSummary,
+} from "@/service/curriculum.service";
 
 import {
   ojtRegistrationWindowService,
@@ -122,14 +131,23 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
 
   const [createErrorMessage, setCreateErrorMessage] = React.useState("");
 
+  const [academicPeriods, setAcademicPeriods] = React.useState<
+    AcademicPeriod[]
+  >([]);
+
+  const [programs, setPrograms] = React.useState<CurriculumSummary[]>([]);
+
+  const [loadingCreateOptions, setLoadingCreateOptions] = React.useState(false);
+
   const [createForm, setCreateForm] = React.useState({
+    academicPeriodId: "",
+    programIds: [] as number[],
     name: "",
     startsAt: "",
     endsAt: "",
     reason: "",
     requiredRelativeSemester: 5,
   });
-
   /* =====================================================
        LOAD OJT SEMESTERS
        ===================================================== */
@@ -220,6 +238,111 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
     void loadWindows();
   }, [loadWindows]);
   /* =====================================================
+   LOAD OPTIONS FOR CREATE REGISTRATION WINDOW
+   ===================================================== */
+
+  React.useEffect(() => {
+    if (!showCreateModal) return;
+
+    let cancelled = false;
+
+    const loadCreateOptions = async () => {
+      setLoadingCreateOptions(true);
+
+      try {
+        // 1. Tải năm học và các kỳ học đang ở trạng thái PLANNED.
+        const academicYears = await academicService.searchAcademicYears();
+
+        const periodResponses = await Promise.all(
+          academicYears.map((year) =>
+            academicService.searchAcademicPeriods({
+              page: 1,
+              limit: 100,
+              search: "",
+              status: "PLANNED",
+              academicYearId: year.id,
+              kind: "SEMESTER",
+            }),
+          ),
+        );
+
+        if (cancelled) return;
+
+        setAcademicPeriods(
+          periodResponses
+            .flat()
+            .sort((a, b) => a.startDate.localeCompare(b.startDate)),
+        );
+
+        // 2. Tải các chuyên ngành được hỗ trợ.
+        const majorCodes = ["AI", "SE", "IA", "IS"] as const;
+
+        const majorResponses = await Promise.all(
+          majorCodes.map((code) =>
+            curriculumService.searchMajors({
+              page: 1,
+              limit: 20,
+              search: code,
+            }),
+          ),
+        );
+
+        const majors = Array.from(
+          new Map(
+            majorResponses
+              .flatMap((response) => response.data.items)
+              .filter((major) =>
+                majorCodes.includes(major.code as (typeof majorCodes)[number]),
+              )
+              .map((major) => [major.id, major] as const),
+          ).values(),
+        );
+
+        // 3. Tải chương trình đào tạo thuộc các chuyên ngành đó.
+        const curriculumResponses = await Promise.all(
+          majors.map((major) =>
+            curriculumService.searchCurricula({
+              page: 1,
+              limit: 100,
+              search: major.code,
+              majorId: major.id,
+            }),
+          ),
+        );
+
+        if (cancelled) return;
+
+        const loadedPrograms = Array.from(
+          new Map(
+            curriculumResponses
+              .flatMap((response) => response.data.items)
+              .map((program) => [program.id, program] as const),
+          ).values(),
+        ).sort((a, b) => a.code.localeCompare(b.code));
+
+        setPrograms(loadedPrograms);
+      } catch (error) {
+        if (!cancelled) {
+          setCreateErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Không thể tải kỳ học và chương trình đào tạo.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCreateOptions(false);
+        }
+      }
+    };
+
+    void loadCreateOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showCreateModal]);
+  /* =====================================================
    CREATE MODAL
    ===================================================== */
 
@@ -233,6 +356,8 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
     setCreateErrorMessage("");
 
     setCreateForm({
+      academicPeriodId: "",
+      programIds: [],
       name: `Đợt đăng ký ${selectedSemester.name}`,
       startsAt: "",
       endsAt: "",
@@ -241,6 +366,128 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
     });
 
     setShowCreateModal(true);
+  };
+  /* =====================================================
+   CREATE REGISTRATION WINDOW
+   ===================================================== */
+
+  const handleCreateWindow = async () => {
+    if (creatingWindow) return;
+
+    setCreateErrorMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!selectedSemester) {
+      setCreateErrorMessage("Vui lòng chọn kỳ OJT.");
+      return;
+    }
+
+    if (!createForm.name.trim()) {
+      setCreateErrorMessage("Vui lòng nhập tên đợt đăng ký.");
+      return;
+    }
+
+    if (!createForm.academicPeriodId) {
+      setCreateErrorMessage("Vui lòng chọn kỳ học liên quan.");
+      return;
+    }
+
+    if (createForm.programIds.length === 0) {
+      setCreateErrorMessage("Vui lòng chọn ít nhất một chương trình đào tạo.");
+      return;
+    }
+
+    if (!createForm.startsAt || !createForm.endsAt) {
+      setCreateErrorMessage("Vui lòng nhập thời gian bắt đầu và kết thúc.");
+      return;
+    }
+
+    if (!createForm.reason.trim()) {
+      setCreateErrorMessage("Vui lòng nhập lý do tạo đợt đăng ký.");
+      return;
+    }
+
+    if (
+      !Number.isInteger(createForm.requiredRelativeSemester) ||
+      createForm.requiredRelativeSemester < 1 ||
+      createForm.requiredRelativeSemester > 9
+    ) {
+      setCreateErrorMessage("Kỳ tương đối của sinh viên phải từ 1 đến 9.");
+      return;
+    }
+
+    const startsAt = new Date(createForm.startsAt);
+    const endsAt = new Date(createForm.endsAt);
+    const ojtStartTime = new Date(selectedSemester.startDate).getTime();
+
+    if (
+      Number.isNaN(startsAt.getTime()) ||
+      Number.isNaN(endsAt.getTime()) ||
+      !Number.isFinite(ojtStartTime)
+    ) {
+      setCreateErrorMessage("Ngày giờ nhập vào không hợp lệ.");
+      return;
+    }
+
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      setCreateErrorMessage("Hạn đăng ký phải sau thời gian bắt đầu đăng ký.");
+      return;
+    }
+
+    if (endsAt.getTime() >= ojtStartTime) {
+      setCreateErrorMessage("Hạn đăng ký phải trước ngày bắt đầu kỳ OJT.");
+      return;
+    }
+
+    const academicPeriodId = Number(createForm.academicPeriodId);
+
+    const selectedPeriod = academicPeriods.find(
+      (period) => period.id === academicPeriodId,
+    );
+
+    if (
+      !selectedPeriod ||
+      new Date(selectedPeriod.endDate).getTime() >= ojtStartTime
+    ) {
+      setCreateErrorMessage(
+        "Kỳ học liên quan phải kết thúc trước ngày bắt đầu kỳ OJT.",
+      );
+      return;
+    }
+
+    setCreatingWindow(true);
+
+    try {
+      await ojtRegistrationWindowService.createWindow({
+        ojtSemesterId: selectedSemester.id,
+        name: createForm.name.trim(),
+        scope: {
+          programIds: createForm.programIds,
+        },
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        reason: createForm.reason.trim(),
+        academicPeriodId,
+        requiredRelativeSemester: createForm.requiredRelativeSemester,
+      });
+
+      setShowCreateModal(false);
+
+      setSuccessMessage(`Đã tạo "${createForm.name.trim()}" thành công.`);
+
+      await loadWindows();
+    } catch (error) {
+      console.error("Create registration window failed:", error);
+
+      setCreateErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Không thể tạo đợt đăng ký OJT.",
+      );
+    } finally {
+      setCreatingWindow(false);
+    }
   };
   /* =====================================================
    OPEN REGISTRATION WINDOW
@@ -333,6 +580,18 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
 
   const selectedSemester =
     semesters.find((semester) => semester.id === selectedSemesterId) ?? null;
+  const eligibleAcademicPeriods = selectedSemester
+    ? academicPeriods.filter((period) => {
+        const periodEndTime = new Date(period.endDate).getTime();
+        const ojtStartTime = new Date(selectedSemester.startDate).getTime();
+
+        return (
+          Number.isFinite(periodEndTime) &&
+          Number.isFinite(ojtStartTime) &&
+          periodEndTime < ojtStartTime
+        );
+      })
+    : [];
 
   const draftCount = windows.filter(
     (windowItem) => windowItem.status === "DRAFT",
@@ -710,7 +969,44 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
                     : "Chưa chọn kỳ OJT"}
                 </div>
               </div>
+              {/* KỲ HỌC LIÊN QUAN */}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Kỳ học liên quan
+                </label>
 
+                <select
+                  value={createForm.academicPeriodId}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      academicPeriodId: event.target.value,
+                    }))
+                  }
+                  disabled={loadingCreateOptions}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:opacity-60"
+                >
+                  <option value="">
+                    {loadingCreateOptions
+                      ? "Đang tải kỳ học..."
+                      : "Chọn kỳ học"}
+                  </option>
+
+                  {eligibleAcademicPeriods.map((period) => (
+                    <option key={period.id} value={period.id}>
+                      {period.name} • {period.periodCode} • Kết thúc{" "}
+                      {period.endDate}
+                    </option>
+                  ))}
+                </select>
+
+                {!loadingCreateOptions &&
+                  eligibleAcademicPeriods.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-600">
+                      Không tìm thấy kỳ học phù hợp kết thúc trước kỳ OJT này.
+                    </p>
+                  )}
+              </div>
               {/* TÊN */}
 
               <div>

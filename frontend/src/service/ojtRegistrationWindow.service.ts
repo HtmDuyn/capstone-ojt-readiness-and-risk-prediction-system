@@ -1,3 +1,4 @@
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://capstone-ojt-readiness-and-risk.onrender.com";
@@ -27,7 +28,6 @@ export class OjtRegistrationWindowApiError extends Error {
     data?: unknown,
   ) {
     super(message);
-
     this.name = "OjtRegistrationWindowApiError";
     this.status = status;
     this.errorCode = errorCode;
@@ -35,9 +35,7 @@ export class OjtRegistrationWindowApiError extends Error {
   }
 }
 
-const getAuthToken = () => {
-  return localStorage.getItem(TOKEN_KEY);
-};
+const getAuthToken = () => localStorage.getItem(TOKEN_KEY);
 
 const requestJson = async <T>(
   path: string,
@@ -52,27 +50,22 @@ const requestJson = async <T>(
     );
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}${path}`,
-    {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-  );
+    body: JSON.stringify(body),
+  });
 
-  const responseText =
-    await response.text();
+  const responseText = await response.text();
 
   let result: unknown = null;
 
   if (responseText) {
     try {
-      result =
-        JSON.parse(responseText);
+      result = JSON.parse(responseText);
     } catch {
       result = responseText;
     }
@@ -80,8 +73,7 @@ const requestJson = async <T>(
 
   if (!response.ok) {
     const error =
-      typeof result === "object" &&
-      result !== null
+      typeof result === "object" && result !== null
         ? (result as ApiErrorResponse)
         : null;
 
@@ -97,15 +89,11 @@ const requestJson = async <T>(
   return result as T;
 };
 
-const postJson = <T>(
-  path: string,
-  body: unknown,
-) =>
-  requestJson<T>(
-    path,
-    "POST",
-    body,
-  );
+const postJson = <T>(path: string, body: unknown) =>
+  requestJson<T>(path, "POST", body);
+
+const patchJson = <T>(path: string, body: unknown) =>
+  requestJson<T>(path, "PATCH", body);
 
 /* =========================================================
    TYPES
@@ -121,39 +109,35 @@ export interface OjtRegistrationWindowScope {
 
 export interface CreateOjtRegistrationWindowPayload {
   ojtSemesterId: number;
-
   name: string;
-
   scope: OjtRegistrationWindowScope;
-
   startsAt: string;
   endsAt: string;
-
   reason: string;
-
   academicPeriodId: number;
-
   requiredRelativeSemester: number;
 }
 
+export type UpdateOjtRegistrationWindowPayload =
+  Partial<CreateOjtRegistrationWindowPayload>;
+
 export interface SearchOjtRegistrationWindowsPayload {
   ojtSemesterId: number;
-
   status?: string;
-
   page: number;
   limit: number;
 }
 
 export interface OpenOjtRegistrationWindowPayload {
   reason: string;
-
   windowId: number;
 }
+
 export interface CloseOjtRegistrationWindowPayload {
   reason: string;
   windowId: number;
 }
+
 export type OjtRegistrationWindowStatus =
   | "DRAFT"
   | "OPEN"
@@ -162,45 +146,32 @@ export type OjtRegistrationWindowStatus =
 
 export interface OjtRegistrationWindow {
   id: number;
-
   ojtSemesterId: number;
   academicPeriodId: number;
-
   requiredRelativeSemester: number;
-
   name: string;
-
   scope: OjtRegistrationWindowScope;
-
   startsAt: string;
   endsAt: string;
-
   status: OjtRegistrationWindowStatus;
-
   createdBy: number | null;
   createdAt: string;
-
   updatedAt: string;
-
   openedBy: number | null;
   openedAt: string | null;
-
   closedBy: number | null;
   closedAt: string | null;
 }
 
 export interface OjtRegistrationWindowMutationResponse {
   success: boolean;
-
   data: OjtRegistrationWindow;
 }
 
 export interface SearchOjtRegistrationWindowsResponse {
   success: boolean;
-
   data: {
     items: OjtRegistrationWindow[];
-
     total: number;
     page: number;
     limit: number;
@@ -211,40 +182,53 @@ export interface SearchOjtRegistrationWindowsResponse {
    API
    ========================================================= */
 
+// POST /api/ojt-registration-windows
 const createWindow = (
   payload: CreateOjtRegistrationWindowPayload,
-) => {
-  return postJson<OjtRegistrationWindowMutationResponse>(
+) =>
+  postJson<OjtRegistrationWindowMutationResponse>(
     "/api/ojt-registration-windows",
     payload,
   );
-};
 
+// PATCH /api/ojt-registration-windows/:id
+const updateWindow = (
+  windowId: number,
+  payload: UpdateOjtRegistrationWindowPayload,
+) =>
+  patchJson<OjtRegistrationWindowMutationResponse>(
+    `/api/ojt-registration-windows/${windowId}`,
+    payload,
+  );
+
+// POST /api/json/ojt-registration-windows/search
 const searchWindows = (
   payload: SearchOjtRegistrationWindowsPayload,
-) => {
-  return postJson<SearchOjtRegistrationWindowsResponse>(
+) =>
+  postJson<SearchOjtRegistrationWindowsResponse>(
     "/api/json/ojt-registration-windows/search",
     payload,
   );
-};
 
-const openWindow = (
-  payload: OpenOjtRegistrationWindowPayload,
-) => {
-  return postJson<OjtRegistrationWindowMutationResponse>(
-    "/api/json/ojt-registration-windows/open",
-    payload,
+// POST /api/ojt-registration-windows/:id/open
+const openWindow = ({
+  windowId,
+  reason,
+}: OpenOjtRegistrationWindowPayload) =>
+  postJson<OjtRegistrationWindowMutationResponse>(
+    `/api/ojt-registration-windows/${windowId}/open`,
+    { reason },
   );
-};
-const closeWindow = (
-  payload: CloseOjtRegistrationWindowPayload,
-) => {
-  return postJson<OjtRegistrationWindowMutationResponse>(
-    "/api/json/ojt-registration-windows/close",
-    payload,
+
+// POST /api/ojt-registration-windows/:id/close
+const closeWindow = ({
+  windowId,
+  reason,
+}: CloseOjtRegistrationWindowPayload) =>
+  postJson<OjtRegistrationWindowMutationResponse>(
+    `/api/ojt-registration-windows/${windowId}/close`,
+    { reason },
   );
-};
 
 /* =========================================================
    EXPORT
@@ -252,6 +236,7 @@ const closeWindow = (
 
 export const ojtRegistrationWindowService = {
   createWindow,
+  updateWindow,
   searchWindows,
   openWindow,
   closeWindow,
