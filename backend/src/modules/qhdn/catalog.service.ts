@@ -3,13 +3,14 @@ import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { staffContextFields, templateField, registrationField, assignmentField } from './context-fields';
 
 export const configs = {
   companies: { table:'Enterprises', id:'EnterpriseID', fields:{code:'EnterpriseCode',name:'Name',address:'Address',industry:'Industry',contactPersonName:'ContactPersonName',contactPhone:'ContactPhone',contactEmail:'ContactEmail',status:'Status',createdAt:'CreatedAt'} },
-  positions: { table:'InternshipPositions', id:'PositionID', fields:{companyId:'EnterpriseID',ojtSemesterId:'OJTSemesterID',title:'Title',description:'Description',requirements:'Requirements',capacity:'Capacity',remainingSlots:'RemainingSlots',status:'Status'} },
+  positions: { table:'InternshipPositions', id:'PositionID', fields:{companyId:'EnterpriseID',ojtSemesterId:'OJTSemesterID',recruitmentCode:'RecruitmentCode',title:'Title',description:'Description',requirements:'Requirements',capacity:'Capacity',remainingSlots:'RemainingSlots',status:'Status',location:'Location',workMode:'WorkMode'} },
   coordinations: { table:'StudentEnterpriseCoordination', id:'CoordinationID', fields:{registrationId:'RegistrationID',companyId:'EnterpriseID',positionId:'PositionID',coordinatedBy:'CoordinatedBy',coordinatedAt:'CoordinatedAt',decision:'Decision',decisionAt:'DecisionAt',rejectReason:'RejectReason',previousCoordinationId:'PreviousCoordinationID'} },
-  assignments: { table:'InternshipAssignments', id:'AssignmentID', fields:{coordinationId:'CoordinationID',studentId:'StudentID',companyId:'EnterpriseID',positionId:'PositionID',enterpriseSupervisorName:'EnterpriseSupervisorName',startDate:'StartDate',endDate:'EndDate',status:'Status'} },
-  evaluations: { table:'InternshipEvaluations', id:'EvaluationID', fields:{assignmentId:'AssignmentID',evaluatedBy:'EvaluatedBy',evaluatedAt:'EvaluatedAt',completionScore:'CompletionScore',attitudeScore:'AttitudeScore',skillScore:'SkillScore',overallScore:'OverallScore',comments:'Comments',status:'Status'} },
+  assignments: { table:'InternshipAssignments', id:'AssignmentID', fields:{coordinationId:'CoordinationID',studentId:'StudentID',companyId:'EnterpriseID',positionId:'PositionID',academicSupervisorId:'AcademicSupervisorID',enterpriseSupervisorName:'EnterpriseSupervisorName',startDate:'StartDate',endDate:'EndDate',status:'Status'} },
+  evaluations: { table:'InternshipEvaluations', id:'EvaluationID', fields:{templateId:'TemplateID',scoreDetails:'ScoreDetails',assignmentId:'AssignmentID',evaluatedBy:'EvaluatedBy',evaluatedAt:'EvaluatedAt',completionScore:'CompletionScore',attitudeScore:'AttitudeScore',skillScore:'SkillScore',overallScore:'OverallScore',comments:'Comments',status:'Status'} },
 } as const;
 export type Resource=keyof typeof configs;
 export function api(resource:Resource,r:Row):Row {
@@ -21,7 +22,7 @@ export function api(resource:Resource,r:Row):Row {
     out[key]=value;
   }
   if(resource==='positions'&&r.Occupied!==undefined)out.remainingSlots=Math.max(0,(r.Capacity??0)-r.Occupied);
-  for(const key of ['studentCode','fullName','companyName','positionTitle','ojtSemesterId','studentId'])if(r[key]!==undefined)out[key]=r[key];
+  for(const key of ['studentCode','fullName','companyName','positionTitle','ojtSemesterId','studentId','companyId','positionId','student','company','position','academicSupervisor','evaluation','result','template','registration','assignment'])if(r[key]!==undefined)out[key]=r[key];
   return out;
 }
 export async function enterpriseScope(c:PoolClient,actor:Actor):Promise<number|null> {
@@ -49,11 +50,17 @@ export async function log(c:PoolClient,resource:Resource,before:Row|null,after:R
 export async function history(c:PoolClient,resource:Resource,id:number){return (await c.query(`SELECT "LogID" AS id,"UserID" AS "actorId","Action" AS action,"Detail"::jsonb AS detail,"ActionAt" AS "createdAt" FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID"`,[configs[resource].table,id])).rows;}
 export async function list(resource:Resource,params:Row,actor:Actor){
   staff(actor);
-  const allowed=resource==='companies'?['search','status']:resource==='positions'?['search','status','companyId','ojtSemesterId']:['search','status','companyId','ojtSemesterId','studentId','positionId',...(resource==='coordinations'?['registrationId','decision']:resource==='evaluations'?['assignmentId']:[])];
-  const p=pagination(params,allowed);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
+  const exactKey=resource==='companies'?'companyId':resource==='positions'?'positionId':resource==='assignments'?'assignmentId':null;
+  const allowed=resource==='companies'?['search','status','companyId']:resource==='positions'?['search','status','companyId','positionId','ojtSemesterId']:['search','status','companyId','ojtSemesterId','studentId','positionId',...(resource==='coordinations'?['registrationId','decision']:resource==='evaluations'?['assignmentId','templateId']:['assignmentId'])];
+  const p=pagination(params,[...allowed,...(exactKey?['historyPage','historyLimit']:[])]);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
+  const historyPaging=pagination({page:params.historyPage,limit:params.historyLimit},[]);
+  if(historyPaging.offset>2147483647)throw invalid('History pagination exceeds allowed range.');
+  if((params.historyPage!==undefined||params.historyLimit!==undefined)&&(!exactKey||params[exactKey]===undefined))throw invalid('Select one record by ID before paging its history.');
   return readTransaction(async c=>{
     const args:unknown[]=[],filters:string[]=[];
     const add=(col:string,value:unknown)=>{args.push(value);filters.push(`${col}=$${args.length}`);};
+    if(exactKey&&params[exactKey]!==undefined)add(`t."${configs[resource].id}"`,positiveId(params[exactKey],exactKey));
+    if(resource==='companies'||resource==='positions')filters.push('t."DeletedAt" IS NULL');
     let from=`FROM "${configs[resource].table}" t`;
     let extras='',companyColumn='t."EnterpriseID"';
     if(resource==='positions'){from+=' JOIN "Enterprises" e ON e."EnterpriseID"=t."EnterpriseID"';extras=`,e."Name" AS "companyName",(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=t."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS "Occupied"`;}
@@ -63,32 +70,61 @@ export async function list(resource:Resource,params:Row,actor:Actor){
       companyColumn=resource==='evaluations'?'a."EnterpriseID"':'t."EnterpriseID"';
       from+=` JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Enterprises" e ON e."EnterpriseID"=${companyColumn}`;
       extras=',s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."OJTSemesterID" AS "ojtSemesterId",r."StudentID" AS "studentId",e."Name" AS "companyName"';
-      for(const [key,col] of Object.entries({ojtSemesterId:'r."OJTSemesterID"',studentId:'r."StudentID"',registrationId:'t."RegistrationID"',assignmentId:'t."AssignmentID"',positionId:resource==='evaluations'?'a."PositionID"':'t."PositionID"'}))if(params[key]!==undefined)add(col,positiveId(params[key],key));
+      if(resource==='assignments'){
+        from+=' JOIN "InternshipPositions" pos ON pos."PositionID"=t."PositionID" LEFT JOIN "Users" supervisor ON supervisor."UserID"=t."AcademicSupervisorID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=t."AssignmentID" LEFT JOIN "OJTResults" outcome ON outcome."AssignmentID"=t."AssignmentID"';
+        extras+=`,pos."Title" AS "positionTitle",
+          jsonb_build_object('id',s."StudentID",'studentCode',s."StudentCode",'fullName',u."FullName",'email',u."Email",'phone',u."Phone") AS student,
+          jsonb_build_object('id',e."EnterpriseID",'code',e."EnterpriseCode",'name',e."Name",'contactPersonName',e."ContactPersonName",'contactPhone',e."ContactPhone",'contactEmail',e."ContactEmail") AS company,
+          jsonb_build_object('id',pos."PositionID",'code',pos."RecruitmentCode",'title',pos."Title",'description',pos."Description",'requirements',pos."Requirements",'location',pos."Location",'workMode',pos."WorkMode",'ojtSemesterId',pos."OJTSemesterID") AS position,
+          CASE WHEN supervisor."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',supervisor."UserID",'fullName',supervisor."FullName",'email',supervisor."Email",'phone',supervisor."Phone") END AS "academicSupervisor",
+          CASE WHEN ev."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object('id',ev."EvaluationID",'templateId',ev."TemplateID",'scoreDetails',ev."ScoreDetails",'completionScore',ev."CompletionScore",'attitudeScore',ev."AttitudeScore",'skillScore',ev."SkillScore",'overallScore',ev."OverallScore",'comments',ev."Comments",'status',ev."Status",'evaluatedBy',ev."EvaluatedBy",'evaluatedAt',ev."EvaluatedAt") END AS evaluation,
+          CASE WHEN outcome."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'version',outcome."Version",'officialScore',outcome."OfficialScore",'outcome',outcome."Outcome",'confirmedAt',outcome."ConfirmedAt",'evaluationLocked',outcome."Status"='CONFIRMED') END AS result`;
+      }
+      if(resource==='coordinations'||resource==='evaluations'){
+        from+=` JOIN "InternshipPositions" pos ON pos."PositionID"=${resource==='evaluations'?'a':'t'}."PositionID"`;
+        extras+=','+staffContextFields+','+registrationField;
+        if(resource==='evaluations'){from+=' LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=t."TemplateID"';extras+=','+templateField+','+assignmentField;}
+      }
+      for(const [key,col] of Object.entries({ojtSemesterId:'r."OJTSemesterID"',studentId:'r."StudentID"',registrationId:'t."RegistrationID"',assignmentId:'t."AssignmentID"',positionId:resource==='evaluations'?'a."PositionID"':'t."PositionID"'}))if(params[key]!==undefined&&key!==exactKey)add(col,positiveId(params[key],key));
       if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`);}
-    }else if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(resource==='companies'?`(t."Name" ILIKE $${args.length} OR t."EnterpriseCode" ILIKE $${args.length})`:`t."Title" ILIKE $${args.length}`);}
-    if(params.companyId!==undefined)add(companyColumn,positiveId(params.companyId,'companyId'));
+    }else if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(resource==='companies'?`(t."Name" ILIKE $${args.length} OR t."EnterpriseCode" ILIKE $${args.length})`:`(t."Title" ILIKE $${args.length} OR t."RecruitmentCode" ILIKE $${args.length})`);}
+    if(resource!=='companies'&&params.companyId!==undefined)add(companyColumn,positiveId(params.companyId,'companyId'));
     if(resource==='positions'&&params.ojtSemesterId!==undefined)add('t."OJTSemesterID"',positiveId(params.ojtSemesterId,'ojtSemesterId'));
+    if(resource==='evaluations'&&params.templateId!==undefined)add('t."TemplateID"',positiveId(params.templateId,'templateId'));
     const states=resource==='companies'?['ACTIVE','INACTIVE']:resource==='positions'?['OPEN','CLOSED']:resource==='assignments'?['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED']:resource==='evaluations'?['SUBMITTED']:['PENDING','ACCEPTED','REJECTED'];
     if(params.status!==undefined||params.decision!==undefined){
       if(params.status!==undefined&&params.decision!==undefined&&params.status!==params.decision)throw invalid('status conflicts with decision.');
-      add(resource==='coordinations'?`COALESCE(UPPER(t."Decision"),'PENDING')`:'t."Status"',enumValue(params.decision??params.status,states,'status'));
+      add(resource==='coordinations'?`COALESCE(UPPER(t."Decision"),'PENDING')`:'t."Status"',resource==='evaluations'?requiredText(params.status,'status',20):enumValue(params.decision??params.status,states,'status'));
     }
     const where=filters.length?' WHERE '+filters.join(' AND '):'';
     const count=(await c.query(`SELECT count(*)::int AS n ${from}${where}`,args)).rows[0].n;
     const rows=(await c.query(`SELECT t.*${extras} ${from}${where} ORDER BY t."${configs[resource].id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
-    return {items:rows.map(r=>api(resource,r)),total:count,page:p.page,limit:p.limit};
+    const items=rows.map(r=>api(resource,r));
+    if(exactKey&&params[exactKey]!==undefined)for(const item of items){
+      const historyTotal=(await c.query('SELECT count(*)::int AS n FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2',[configs[resource].table,item.id])).rows[0].n;
+      item.history=(await c.query(`SELECT "LogID" AS id,"UserID" AS "actorId","Action" AS action,"Detail"::jsonb AS detail,"ActionAt" AS "createdAt" FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID" DESC LIMIT $3 OFFSET $4`,[configs[resource].table,item.id,historyPaging.limit,historyPaging.offset])).rows;
+      item.historyPagination={total:historyTotal,page:historyPaging.page,limit:historyPaging.limit};
+    }
+    return {items,total:count,page:p.page,limit:p.limit};
   });
 }
-export async function details(resource:Resource,id:number,actor:Actor){staff(actor);return readTransaction(async c=>{
+export async function details(resource:'coordinations'|'evaluations',id:number,actor:Actor){staff(actor);return readTransaction(async c=>{
   const r=await record(c,resource,id,false);
-  if(resource==='positions')r.Occupied=await occupied(c,id);
   const out=api(resource,r);
+  const from=resource==='coordinations'
+    ? 'FROM "StudentEnterpriseCoordination" t JOIN "OJTRegistrations" r ON r."RegistrationID"=t."RegistrationID"'
+    : 'FROM "InternshipEvaluations" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"';
+  const owner=resource==='coordinations'?'t':'a';
+  Object.assign(out,(await c.query(`SELECT ${staffContextFields},${registrationField}${resource==='evaluations'?','+templateField+','+assignmentField:''} ${from}
+    JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID"
+    JOIN "Enterprises" e ON e."EnterpriseID"=${owner}."EnterpriseID" JOIN "InternshipPositions" pos ON pos."PositionID"=${owner}."PositionID"
+    ${resource==='evaluations'?'LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=t."TemplateID"':''}
+    WHERE t."${configs[resource].id}"=$1`,[id])).rows[0]);
   if(resource==='coordinations'){
-    const registration=(await c.query('SELECT "RegistrationID","StudentID","OJTSemesterID","Application" FROM "OJTRegistrations" WHERE "RegistrationID"=$1',[r.RegistrationID])).rows[0];
-    out.registration={id:registration.RegistrationID,studentId:registration.StudentID,ojtSemesterId:registration.OJTSemesterID,application:registration.Application};
     const chain=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID"',[r.RegistrationID])).rows;
     out.coordinationHistory=chain.map(row=>api('coordinations',row));
   }
+  if(resource==='evaluations')Object.assign(out,(await c.query('SELECT a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",p."OJTSemesterID" AS "ojtSemesterId" FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" WHERE a."AssignmentID"=$1',[r.AssignmentID])).rows[0]);
   out.history=await history(c,resource,id);
   return out;
 });}
@@ -108,18 +144,3 @@ export async function saveCompany(body:unknown,actor:Actor,id?:number){staff(act
     const after=await persist(c,'companies',values,id);await log(c,'companies',before,after,actor,id?'UPDATE':'CREATE',reason);return api('companies',after);
   });
 }
-export async function savePosition(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['companyId','ojtSemesterId','title','description','requirements','capacity','status','reason']);return academicTransaction(async c=>{
-  const before=id?await record(c,'positions',id):null,values:Row={},reason=requiredText(b.reason,'reason',2000);
-  if(id&&('companyId' in b||'ojtSemesterId' in b))throw invalid('Position company and semester cannot change.');
-  if(!id){values.EnterpriseID=positiveId(b.companyId,'companyId');values.OJTSemesterID=positiveId(b.ojtSemesterId,'ojtSemesterId');if(!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[values.OJTSemesterID])).rowCount)throw invalid('OJT semester not found.',404);}
-  const company=await record(c,'companies',before?.EnterpriseID??values.EnterpriseID);
-  for(const key of ['title','description','requirements'])if(key in b||(!id&&key==='title'))values[(configs.positions.fields as Row)[key]]=key==='title'?requiredText(b[key],key,150):optionalText(b[key],key,10000);
-  if(!id||'capacity' in b)values.Capacity=positiveId(b.capacity,'capacity');
-  if(!id||'status' in b)values.Status=enumValue(b.status??'OPEN',['OPEN','CLOSED'],'status');
-  if(!Object.keys(values).length)throw invalid('Provide an editable field.');
-  if((values.Status??before?.Status)==='OPEN'&&company.Status!=='ACTIVE')throw invalid('An open position requires an active company.',409);
-  const used=id?await occupied(c,id):0,capacity=values.Capacity??before?.Capacity;
-  if(capacity<used)throw invalid('Capacity cannot be lower than occupied slots.',409,'POSITION_CAPACITY_CONFLICT');
-  values.RemainingSlots=capacity-used;
-  const after=await persist(c,'positions',values,id);await log(c,'positions',before,after,actor,id?'UPDATE':'CREATE',reason);return api('positions',after);
-});}

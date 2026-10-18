@@ -1,3 +1,7 @@
+> Sáu cặp search/detail đã gộp: xem [hợp đồng mới](api-search-consolidation.md).
+
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # API quản trị
 
 Các endpoint dưới đây dùng tiền tố `/api`, yêu cầu JWT và role `ADMIN`.

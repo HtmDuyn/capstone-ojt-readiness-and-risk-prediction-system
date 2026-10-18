@@ -1,3 +1,4 @@
+import { readTransaction } from '../qhdn/read.repository';
 import { query } from '../../config/database';
 import { invalid } from '../students/student.validation';
 import { predictionFilters, predictionSelect, pageSql, type Row } from './admin.repository';
@@ -17,16 +18,16 @@ export async function dashboardSummary(params:Row) {
  if(Object.keys(params).length)throw invalid('Summary does not accept filters.');
  return (await query(`SELECT (SELECT count(*)::int FROM "Users") AS accounts,(SELECT count(*)::int FROM "Users" WHERE "Status"='ACTIVE') AS "activeAccounts",(SELECT count(*)::int FROM "Students" WHERE "DeletedAt" IS NULL) AS students,(SELECT count(*)::int FROM "Enterprises" WHERE "DeletedAt" IS NULL) AS companies,(SELECT count(*)::int FROM "OJTSemesters") AS "ojtSemesters",(SELECT count(*)::int FROM "RiskAlerts" WHERE "Status" IN ('OPEN','ACKNOWLEDGED')) AS "openAlerts"`)).rows[0];
 }
-export async function distribution(kind:'readiness'|'risks',params:Row) {
+async function distribution(kind:'readiness'|'risks',params:Row,run:typeof query) {
  if(params.page!==undefined||params.limit!==undefined)throw invalid('Statistics do not accept pagination.');
  const r=reportSql(params),level=kind==='readiness'?'readinessLevel':'riskLevel',score=kind==='readiness'?'readinessScore':'riskScore';
- const rows=(await query(`SELECT "${level}" AS level,count(*)::int AS count,avg("${score}")::float8 AS "averageScore" FROM (${r.sql}) data GROUP BY "${level}"`,r.args)).rows;
+ const rows=(await run(`SELECT "${level}" AS level,count(*)::int AS count,avg("${score}")::float8 AS "averageScore" FROM (${r.sql}) data GROUP BY "${level}"`,r.args)).rows;
  return {scope:params,basis:'LATEST_PER_STUDENT_PER_SEMESTER',total:rows.reduce((n,r)=>n+r.count,0),groups:['LOW','MEDIUM','HIGH'].map(level=>rows.find(r=>r.level===level)??{level,count:0,averageScore:null})};
 }
-export async function trends(params:Row) {
+async function trends(params:Row,run:typeof query) {
  if(params.page!==undefined||params.limit!==undefined)throw invalid('Trends do not accept pagination.');
  const f=predictionFilters(params);
- return {scope:params,basis:'ALL_PREDICTION_EVENTS',items:(await query(`SELECT date_trunc('month',"createdAt" AT TIME ZONE 'UTC') AS month,count(*)::int AS "predictionCount",avg("readinessScore")::float8 AS "averageReadiness",avg("riskScore")::float8 AS "averageRisk",count(*) FILTER(WHERE "riskLevel"='HIGH')::int AS "highRiskCount" FROM (${predictionSelect}${f.where.length?' WHERE '+f.where.join(' AND '):''}) d GROUP BY 1 ORDER BY 1`,f.args)).rows};
+ return {scope:params,basis:'ALL_PREDICTION_EVENTS',items:(await run(`SELECT date_trunc('month',"createdAt" AT TIME ZONE 'UTC') AS month,count(*)::int AS "predictionCount",avg("readinessScore")::float8 AS "averageReadiness",avg("riskScore")::float8 AS "averageRisk",count(*) FILTER(WHERE "riskLevel"='HIGH')::int AS "highRiskCount" FROM (${predictionSelect}${f.where.length?' WHERE '+f.where.join(' AND '):''}) d GROUP BY 1 ORDER BY 1`,f.args)).rows};
 }
 export async function predictionReport(params:Row,exporting=false) {
  const r=reportSql(params,exporting?['type','format']:[]);
@@ -36,4 +37,15 @@ export async function predictionReport(params:Row,exporting=false) {
   if(rows.length>10000)throw invalid('Narrow export to at most 10000 records.',422,'EXPORT_TOO_LARGE');return {basis:'LATEST_PER_STUDENT_PER_SEMESTER',total:rows.length,items:rows};
  }
  return {...await pageSql(r.sql,r.args,r.page),basis:'LATEST_PER_STUDENT_PER_SEMESTER'};
+}
+
+// One repeatable-read snapshot for every selected dashboard section.
+export async function predictionDashboard(params:Row) {
+ const {section,...filters}=params;
+ if(section!==undefined&&!['all','readiness','risks','trends'].includes(section))throw invalid('section must be all, readiness, risks or trends.');
+ return readTransaction(async c=>{
+  const result:Row={},run=c.query.bind(c) as typeof query;
+  for(const kind of ['readiness','risks','trends'] as const)if(section===undefined||section==='all'||section===kind)result[kind]=kind==='trends'?await trends(filters,run):await distribution(kind,filters,run);
+  return result;
+ });
 }

@@ -98,6 +98,8 @@ export const getCurrentUser = async (
 
       user: {
         mustChangePassword: user.must_change_password,
+        studentId: user.studentId,
+        enterpriseId: user.enterpriseId,
         id:
           user.id,
 
@@ -123,16 +125,4 @@ export const getCurrentUser = async (
   } catch (error) {
     next(error);
   }
-};
-
-export const logout = async (
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-): Promise<void> => {
-  res.status(200).json({
-    success: true,
-    message:
-      "Logout successful",
-  });
 };

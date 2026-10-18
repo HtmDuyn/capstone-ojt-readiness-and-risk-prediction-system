@@ -3,6 +3,8 @@ import type {
 } from "../auth/auth.types";
 
 export interface AccountRecord {
+  studentId: number | null;
+  enterpriseId: number | null;
   id: number;
   username: string;
   email: string;

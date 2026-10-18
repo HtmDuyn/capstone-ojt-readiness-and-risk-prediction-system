@@ -20,7 +20,9 @@ const selectAccount = `
     r."RoleName" AS role_name,
     u."CreatedAt" AS created_at,
     u."UpdatedAt" AS updated_at,
-    u."LastLoginAt" AS last_login_at
+    u."LastLoginAt" AS last_login_at,
+    (SELECT s."StudentID" FROM "Students" s WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL) AS "studentId",
+    (SELECT eu."EnterpriseID" FROM "EnterpriseUsers" eu WHERE eu."UserID"=u."UserID" ORDER BY eu."EnterpriseID" LIMIT 1) AS "enterpriseId"
 
   FROM "Users" u
 
@@ -61,6 +63,8 @@ export const findAccounts = async (
           u."CreatedAt" AS created_at,
           u."UpdatedAt" AS updated_at,
           u."LastLoginAt" AS last_login_at,
+          (SELECT s."StudentID" FROM "Students" s WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL) AS "studentId",
+          (SELECT eu."EnterpriseID" FROM "EnterpriseUsers" eu WHERE eu."UserID"=u."UserID" ORDER BY eu."EnterpriseID" LIMIT 1) AS "enterpriseId",
           COUNT(*) OVER() AS total_count
 
         FROM "Users" u

@@ -242,7 +242,7 @@ router.get(
  * /api/accounts/{userId}:
  *   put:
  *     summary: Update account
- *     description: ADMIN can update supported account fields. ACADEMIC, OJT_COORD and STUDENT may update permitted fields of their own account. ENTERPRISE uses /accounts/me/profile.
+ *     description: ADMIN only. All users update their own profile through PATCH /accounts/me/profile.
  *     tags:
  *       - Accounts
  *     security:
@@ -283,7 +283,7 @@ router.get(
 router.put(
   "/:userId",
   authenticate,
-  authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','STUDENT'),
+  authorizeRoles('ADMIN'),
   updateAccountById,
 );
 

@@ -1,17 +1,9 @@
-import { query } from '../../config/database';
 import { assertPublishedPosition } from '../recruitment/recruitment.repository';
 import { academicTransaction, audit } from '../academic/academic.repository';
-import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
+import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue } from '../students/student.validation';
 import { dateInput, dateRange } from '../academic/academic.schema';
-import { pageSql, type Row } from './admin.repository';
 
 const assignmentSelect=`SELECT a."AssignmentID" AS id,a."CoordinationID" AS "coordinationId",a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",p."OJTSemesterID" AS "ojtSemesterId",a."AcademicSupervisorID" AS "academicSupervisorId",a."EnterpriseSupervisorName" AS "enterpriseSupervisorName",a."StartDate" AS "startDate",a."EndDate" AS "endDate",a."Status" AS status FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"`;
-export async function assignments(params:Row) {
- const p=pagination(params,['studentId','companyId','positionId','ojtSemesterId','status']),args:unknown[]=[],where:string[]=[];
- for(const [key,col]of Object.entries({studentId:'a."StudentID"',companyId:'a."EnterpriseID"',positionId:'a."PositionID"',ojtSemesterId:'p."OJTSemesterID"',status:'a."Status"'}))if(params[key]!==undefined){args.push(key==='status'?enumValue(params[key],['ASSIGNED','ACTIVE','COMPLETED','CANCELLED'],'status'):positiveId(params[key],key));where.push(`${col}=$${args.length}`);}
- return pageSql(assignmentSelect+(where.length?' WHERE '+where.join(' AND '):''),args,p);
-}
-export async function assignmentDetail(id:number) {const r=(await query(assignmentSelect+' WHERE a."AssignmentID"=$1',[id])).rows[0];if(!r)throw invalid('Assignment not found.',404);return r;}
 export async function saveAssignment(body:unknown,actor:number,id?:number,statusOnly=false) {
  const b=inputObject(body,statusOnly?['status','reason']:id?['positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate','reason']:['registrationId','positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate']);
  if(id)requiredText(b.reason,'reason',2000);

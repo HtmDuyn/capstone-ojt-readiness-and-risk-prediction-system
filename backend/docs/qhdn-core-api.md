@@ -1,3 +1,7 @@
+> Sáu cặp search/detail đã gộp: xem [hợp đồng mới](api-search-consolidation.md).
+
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # API nghiệp vụ cốt lõi QHDN
 
 Luồng nhận đăng ký tuyển dụng doanh nghiệp theo học kỳ phòng đào tạo: xem [recruitment-api.md](recruitment-api.md). QHDN chọn academicPeriodId, mở đợt và import bằng windowId; không tạo kỳ OJT thủ công.

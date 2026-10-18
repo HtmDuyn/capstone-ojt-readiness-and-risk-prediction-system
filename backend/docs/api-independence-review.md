@@ -1,3 +1,5 @@
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Rà soát khả năng gọi độc lập và nhập tay
 
 Ngày: 08/10/2026. Phạm vi: toàn bộ 119 operation trong Swagger hiện tại, middleware, nhóm service backend, DB tham chiếu/trạng thái liên quan và lớp gọi API frontend. Đây là rà soát cấu trúc/mã nguồn, không phải xác nhận toàn bộ ca nghiệp vụ trên dữ liệu thật.

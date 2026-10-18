@@ -36,7 +36,7 @@ export async function saveWindow(body:unknown,actorId:number,id?:number) {
     await validateWindow(client,w);
     const args=[w.Name,w.Phase,w.AcademicPeriodID,w.OJTSemesterID,w.InitialWindowID,JSON.stringify(w.Scope),w.StartsAt,w.EndsAt];
     const after=id?(await client.query(`UPDATE "ComboRegistrationWindows" SET "Name"=$1,"Phase"=$2,"AcademicPeriodID"=$3,"OJTSemesterID"=$4,"InitialWindowID"=$5,"Scope"=$6,"StartsAt"=$7,"EndsAt"=$8,"UpdatedAt"=now() WHERE "WindowID"=$9 RETURNING *`,[...args,id])).rows[0]:(await client.query(`INSERT INTO "ComboRegistrationWindows" ("Name","Phase","AcademicPeriodID","OJTSemesterID","InitialWindowID","Scope","StartsAt","EndsAt","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[...args,actorId])).rows[0];
-    await audit(client,actorId,'ComboRegistrationWindows',after.WindowID,id?'UPDATE_COMBO_WINDOW':'CREATE_COMBO_WINDOW',before,after);return asWindow(after);
+    await audit(client,actorId,'ComboRegistrationWindows',after.WindowID,id?'UPDATE_COMBO_WINDOW':'CREATE_COMBO_WINDOW',before,after);return asWindow(await windowRecord(client,after.WindowID));
   });
 }
 export async function changeWindow(id:number,action:'open'|'close',body:unknown,actorId:number) {

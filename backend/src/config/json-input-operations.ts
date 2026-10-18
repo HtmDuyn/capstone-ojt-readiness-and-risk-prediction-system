@@ -52,6 +52,20 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       const operation=structuredClone(original);
       operation.parameters=(operation.parameters??[]).filter((p:any)=>!['path','query'].includes(resolve(p)?.in));
       operation.requestBody={required:true,content:{'application/json':{schema:bodySchema}}};
+      if(sourceMethod==='get'&&sourcePath==='/api/ojt-registrations') {
+        operation.requestBody.content['application/json'].examples={
+          all:{summary:'Tất cả hồ sơ được phép xem',value:{page:1,limit:20}},
+          submitted:{summary:'Hồ sơ đã nộp',value:{status:'SUBMITTED',page:1,limit:20}}
+        };
+      }
+      const searchId:Record<string,string>={
+        '/api/companies':'companyId','/api/positions':'positionId','/api/assignments':'assignmentId',
+        '/api/assessment-templates':'templateId','/api/admin/models':'modelId','/api/alerts':'alertId'
+      };
+      if(sourceMethod==='get'&&searchId[sourcePath])operation.requestBody.content['application/json'].examples={
+        list:{summary:'Danh sách hồ sơ',value:{page:1,limit:20}},
+        record:{summary:'Một hồ sơ theo ID',value:{[searchId[sourcePath]]:1,page:1,limit:20}}
+      };
       // Original examples lack newly required IDs/filters; let the expanded schema expose every field.
       operation['x-original-operation']={method:sourceMethod.toUpperCase(),path:sourcePath};
       result.push({method,path,sourceMethod,sourcePath,inputs,bodySchema,operation,protected:!!original.security?.length});

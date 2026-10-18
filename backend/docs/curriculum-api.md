@@ -1,3 +1,5 @@
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Chương trình đào tạo và combo
 
 Base URL `http://localhost:3000/api`; gửi Bearer token của ADMIN hoặc ACADEMIC. Swagger JSON tại `http://localhost:3000/api-docs`. Các ID dưới đây chỉ là ví dụ: thay bằng ID thực trả về từ API.

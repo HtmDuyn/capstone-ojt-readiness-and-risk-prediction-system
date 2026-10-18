@@ -322,115 +322,17 @@ export const createNewAccount = async (
 };
 
 export const updateAccount = async (
-  requestedUserId: unknown,
-  input: UpdateAccountInput,
-  currentUserId: number,
-  currentRole: RoleCode | null,
+  requestedUserId: unknown, input: UpdateAccountInput, _currentUserId: number, currentRole: RoleCode | null,
 ): Promise<AccountRecord> => {
-  const userId =
-    parseId(
-      requestedUserId,
-    );
-
-  const existing =
-    await findAccountById(
-      userId,
-    );
-
-  if (!existing) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  const isAdmin =
-    currentRole === "ADMIN";
-
-  const isOwn =
-    currentUserId === userId;
-
-  if (!isAdmin && !isOwn) {
-    throw createError(
-      "You may only update your own account.",
-      403,
-      "RESOURCE_FORBIDDEN",
-    );
-  }
-
-  /*
-   * Non-admin không được đổi email
-   * qua endpoint này.
-   */
-  if (
-    !isAdmin &&
-    input.email !== undefined
-  ) {
-    throw createError(
-      "You are not allowed to change email through this endpoint.",
-      403,
-      "FIELD_FORBIDDEN",
-    );
-  }
-
-  const fullName =
-    input.fullName !== undefined
-      ? normalizeRequiredString(
-          input.fullName,
-          "fullName",
-        )
-      : existing.full_name;
-
-  const phone =
-    input.phone !== undefined
-      ? normalizePhone(
-          input.phone,
-        )
-      : existing.phone;
-
-  if (isAdmin) {
-    const email =
-      input.email !== undefined
-        ? normalizeEmail(
-            input.email,
-          )
-        : existing.email;
-
-    if (
-      email !==
-        existing.email.toLowerCase() &&
-      await existsByEmail(
-        email,
-        userId,
-      )
-    ) {
-      throw createError(
-        "Email already exists.",
-        409,
-        "EMAIL_EXISTS",
-      );
-    }
-
-    await updateAccountByAdmin(
-      userId,
-      fullName,
-      phone,
-      email,
-    );
-  } else {
-    await updateOwnProfile(
-      userId,
-      fullName,
-      phone,
-    );
-  }
-
-  return (
-    await findAccountById(
-      userId,
-    )
-  )!;
+  if (currentRole !== 'ADMIN') throw createError('Use your own profile endpoint to update personal information.',403,'RESOURCE_FORBIDDEN');
+  const userId = parseId(requestedUserId), existing = await findAccountById(userId);
+  if (!existing) throw createError('Account not found.',404,'ACCOUNT_NOT_FOUND');
+  const fullName = input.fullName !== undefined ? normalizeRequiredString(input.fullName,'fullName') : existing.full_name;
+  const phone = input.phone !== undefined ? normalizePhone(input.phone) : existing.phone;
+  const email = input.email !== undefined ? normalizeEmail(input.email) : existing.email;
+  if (email !== existing.email.toLowerCase() && await existsByEmail(email,userId)) throw createError('Email already exists.',409,'EMAIL_EXISTS');
+  await updateAccountByAdmin(userId,fullName,phone,email);
+  return (await findAccountById(userId))!;
 };
 
 export const getOwnProfile = async (

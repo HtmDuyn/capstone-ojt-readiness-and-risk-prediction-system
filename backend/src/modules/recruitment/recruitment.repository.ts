@@ -25,7 +25,7 @@ export const windowApi=(w:Row)=>({id:w.WindowID,academicPeriodId:w.AcademicPerio
 
 export const postSelect=`SELECT p.*,w."AcademicPeriodID",ap."PeriodCode",e."Name" AS "CompanyName",
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',pos."PositionID",'code',pos."RecruitmentCode",'title',pos."Title",
- 'description',pos."Description",'requirements',pos."Requirements",'capacity',pos."Capacity",'remainingSlots',pos."RemainingSlots",'status',pos."Status") ORDER BY pos."PositionID")
+ 'description',pos."Description",'requirements',pos."Requirements",'capacity',pos."Capacity",'remainingSlots',pos."RemainingSlots",'status',pos."Status",'location',pos."Location",'workMode',pos."WorkMode") ORDER BY pos."PositionID")
  FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos ON pos."PositionID"=pp."PositionID" WHERE pp."PostID"=p."PostID"),'[]'::jsonb) AS positions
  FROM "RecruitmentPosts" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
  LEFT JOIN "RecruitmentWindows" w ON w."WindowID"=p."WindowID"

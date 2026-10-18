@@ -1,3 +1,5 @@
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Fit-gap API phòng đào tạo
 
 Ngày kiểm tra: 08/10/2026. Đối chiếu mã nguồn, Swagger, backend đang chạy, schema và dữ liệu cấu hình hiện tại. Bản đánh giá gốc được giữ bên dưới; G01–G05 đã được xử lý bằng thay đổi API/schema và kiểm thử riêng. Không chạy reset DB trên dữ liệu đang sử dụng.

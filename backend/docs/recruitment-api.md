@@ -1,3 +1,5 @@
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Tuyển dụng doanh nghiệp theo học kỳ
 
 ## Luồng đã triển khai

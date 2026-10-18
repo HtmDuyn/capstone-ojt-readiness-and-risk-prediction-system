@@ -54,6 +54,39 @@
  *                 "INACTIVE"
  *               ]
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "companyId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1
+ *             },
+ *             "description": "Lọc một hồ sơ; kết quả kèm lịch sử phân trang."
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "default": 1
+ *             },
+ *             "description": "Phân trang lịch sử khi lọc theo ID."
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100,
+ *               "default": 20
+ *             },
+ *             "description": "Phân trang lịch sử khi lọc theo ID."
  *           }
  *         ],
  *         "responses": {
@@ -205,64 +238,6 @@
  *       }
  *     },
  *     "/api/companies/{id}": {
- *       "get": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Detail companies with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
- *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         }
- *       },
  *       "patch": {
  *         "tags": [
  *           "QHDN core"
@@ -453,229 +428,39 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
  *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         }
- *       },
- *       "post": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Create semester internship position",
- *         "description": "Roles: ADMIN / OJT_COORD. Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
- *         "security": [
  *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [],
- *         "responses": {
- *           "201": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
- *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "type": "object",
- *                 "additionalProperties": false,
- *                 "properties": {
- *                   "companyId": {
- *                     "type": "integer",
- *                     "minimum": 1
- *                   },
- *                   "ojtSemesterId": {
- *                     "type": "integer",
- *                     "minimum": 1
- *                   },
- *                   "title": {
- *                     "type": "string",
- *                     "maxLength": 150
- *                   },
- *                   "description": {
- *                     "type": "string",
- *                     "maxLength": 10000,
- *                     "nullable": true
- *                   },
- *                   "requirements": {
- *                     "type": "string",
- *                     "maxLength": 10000,
- *                     "nullable": true
- *                   },
- *                   "capacity": {
- *                     "type": "integer",
- *                     "minimum": 1
- *                   },
- *                   "status": {
- *                     "type": "string",
- *                     "enum": [
- *                       "OPEN",
- *                       "CLOSED"
- *                     ]
- *                   },
- *                   "reason": {
- *                     "type": "string",
- *                     "maxLength": 2000
- *                   }
- *                 },
- *                 "required": [
- *                   "companyId",
- *                   "ojtSemesterId",
- *                   "title",
- *                   "capacity",
- *                   "reason"
- *                 ]
- *               }
- *             }
- *           }
- *         }
- *       }
- *     },
- *     "/api/positions/{id}": {
- *       "get": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Detail positions with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
+ *             "in": "query",
+ *             "name": "positionId",
+ *             "required": false,
  *             "schema": {
  *               "type": "integer",
  *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
+ *             },
+ *             "description": "Lọc một hồ sơ; kết quả kèm lịch sử phân trang."
  *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         }
- *       },
- *       "patch": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Update position capacity or open/close status",
- *         "description": "Roles: ADMIN / OJT_COORD. Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
- *         "security": [
  *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
+ *             "in": "query",
+ *             "name": "historyPage",
+ *             "required": false,
  *             "schema": {
  *               "type": "integer",
- *               "minimum": 1
- *             }
+ *               "minimum": 1,
+ *               "default": 1
+ *             },
+ *             "description": "Phân trang lịch sử khi lọc theo ID."
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100,
+ *               "default": 20
+ *             },
+ *             "description": "Phân trang lịch sử khi lọc theo ID."
  *           }
  *         ],
  *         "responses": {
@@ -711,51 +496,6 @@
  *           },
  *           "409": {
  *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "type": "object",
- *                 "additionalProperties": false,
- *                 "properties": {
- *                   "title": {
- *                     "type": "string",
- *                     "maxLength": 150
- *                   },
- *                   "description": {
- *                     "type": "string",
- *                     "maxLength": 10000,
- *                     "nullable": true
- *                   },
- *                   "requirements": {
- *                     "type": "string",
- *                     "maxLength": 10000,
- *                     "nullable": true
- *                   },
- *                   "capacity": {
- *                     "type": "integer",
- *                     "minimum": 1
- *                   },
- *                   "status": {
- *                     "type": "string",
- *                     "enum": [
- *                       "OPEN",
- *                       "CLOSED"
- *                     ]
- *                   },
- *                   "reason": {
- *                     "type": "string",
- *                     "maxLength": 2000
- *                   }
- *                 },
- *                 "required": [
- *                   "reason"
- *                 ]
- *               }
- *             }
  *           }
  *         }
  *       }
@@ -1146,6 +886,39 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "assignmentId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1
+ *             },
+ *             "description": "Lọc một hồ sơ; kết quả kèm lịch sử phân trang."
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "default": 1
+ *             },
+ *             "description": "Phân trang lịch sử khi lọc theo ID."
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100,
+ *               "default": 20
+ *             },
+ *             "description": "Phân trang lịch sử khi lọc theo ID."
  *           }
  *         ],
  *         "responses": {
@@ -1274,64 +1047,6 @@
  *       }
  *     },
  *     "/api/assignments/{id}": {
- *       "get": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Detail assignments with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
- *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         }
- *       },
  *       "patch": {
  *         "tags": [
  *           "QHDN core"
@@ -1430,7 +1145,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "List internship-evaluations",
- *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
+ *         "description": "ADMIN / OJT_COORD: hợp đồng đọc đánh giá thống nhất, giữ templateId, scoreDetails và bộ lọc. Chi tiết có audit.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1471,9 +1186,7 @@
  *             "required": false,
  *             "schema": {
  *               "type": "string",
- *               "enum": [
- *                 "SUBMITTED"
- *               ]
+ *               "maxLength": 20
  *             }
  *           },
  *           {
@@ -1515,6 +1228,15 @@
  *           {
  *             "in": "query",
  *             "name": "assignmentId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "templateId",
  *             "required": false,
  *             "schema": {
  *               "type": "integer",

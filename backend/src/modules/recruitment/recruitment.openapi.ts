@@ -17,12 +17,14 @@ export function addRecruitmentOperations(spec:Spec) {
  add('post','/api/recruitment/windows','QHDN tạo đợt từ học kỳ phòng đào tạo đã có',staff,{},window,['academicPeriodId','name','startsAt','endsAt','reason']);
  add('patch','/api/recruitment/windows/{id}','Cập nhật đợt nhận đơn tuyển dụng',staff,{},window,['reason']);
  for(const action of ['open','close'])add('post',`/api/recruitment/windows/{id}/${action}`,action==='open'?'Mở đợt nhận đơn doanh nghiệp':'Đóng đợt nhận đơn doanh nghiệp',staff,{}, {reason},['reason']);
- add('get','/api/recruitment/posts','Danh sách tin tuyển dụng kèm vị trí và chỉ tiêu',read,{...page,windowId:id,academicPeriodId:id,status:{type:'string',enum:['DRAFT','PENDING_REVIEW','PUBLISHED','REJECTED','CLOSED','ARCHIVED']}});
- add('get','/api/recruitment/posts/{id}','Chi tiết nhu cầu và trạng thái duyệt tuyển dụng',read);
+ add('get','/api/recruitment/posts','Danh sách tin tuyển dụng kèm vị trí và chỉ tiêu',read,{...page,postId:id,windowId:id,academicPeriodId:id,status:{type:'string',enum:['DRAFT','PENDING_REVIEW','PUBLISHED','REJECTED','CLOSED','ARCHIVED']}});
  const position={type:'object',additionalProperties:false,required:['code','title','description','requirements','capacity'],properties:{code:text(60),title:text(150),description:text(10000),requirements:text(10000),capacity:{...id,maximum:100000}}};
  add('post','/api/recruitment/posts','Doanh nghiệp gửi nhu cầu tuyển dụng', ['ENTERPRISE'],{},
   {windowId:id,idempotencyKey:text(100),title:text(200),content:text(20000),benefits:text(10000),applicationInstructions:text(10000),deadlineAt:time,positions:{type:'array',minItems:1,maxItems:50,items:position}},
   ['windowId','idempotencyKey','title','content','positions']);
+ const positionChange={type:'object',additionalProperties:false,minProperties:1,properties:{positionId:id,...position.properties,location:{...text(300),nullable:true},workMode:{type:'string',nullable:true,enum:['ONSITE','REMOTE','HYBRID']}}};
+ add('patch','/api/recruitment/posts/{id}','Sửa tin và vị trí, gửi lại để QHDN duyệt',read,{},
+  {title:text(200),content:text(20000),benefits:{...text(10000),nullable:true},applicationInstructions:{...text(10000),nullable:true},deadlineAt:time,positions:{type:'array',minItems:1,maxItems:50,items:positionChange},reason},['reason']);
  add('post','/api/recruitment/posts/{id}/review','QHDN duyệt công bố hoặc từ chối tin',staff,{}, {decision:{type:'string',enum:['PUBLISH','REJECT']},reason,deadlineAt:time},['decision','reason']);
  add('post','/api/recruitment/posts/{id}/close','QHDN đóng tin và ngừng nhận vào các vị trí liên quan',staff,{}, {reason},['reason']);
 }

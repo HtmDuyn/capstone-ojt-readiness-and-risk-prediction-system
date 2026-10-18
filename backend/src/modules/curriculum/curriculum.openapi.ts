@@ -1490,54 +1490,6 @@
  *       }
  *     },
  *     "/api/curricula/{id}/combos": {
- *       "get": {
- *         "tags": [
- *           "Curriculum management"
- *         ],
- *         "summary": "List combos and slot mappings",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid JSON/reference/rule"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN / ACADEMIC only"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Version conflict, published/in-use curriculum, or reference conflict"
- *           },
- *           "422": {
- *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         }
- *       },
  *       "post": {
  *         "tags": [
  *           "Curriculum management"

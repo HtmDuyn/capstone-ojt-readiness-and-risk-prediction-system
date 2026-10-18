@@ -323,6 +323,57 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "resultsPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "default": 1
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "resultsLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100,
+ *               "default": 20
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "ojtPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "default": 1
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "ojtLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100,
+ *               "default": 20
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "ojtSemesterId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1
+ *             }
  *           }
  *         ],
  *         "responses": {
