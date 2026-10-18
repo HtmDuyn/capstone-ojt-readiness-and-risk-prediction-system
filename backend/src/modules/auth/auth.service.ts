@@ -11,7 +11,6 @@ import {
 
 import type {
   AuthError,
-  AuthUserRecord,
 } from "./auth.types";
 
 const createAuthError = (
@@ -47,21 +46,6 @@ export const verifyPassword = async (
   } catch {
     return false;
   }
-};
-
-export const getUserById = async (
-  userId: unknown,
-): Promise<AuthUserRecord | null> => {
-  const id = Number(userId);
-
-  if (
-    !Number.isInteger(id) ||
-    id <= 0
-  ) {
-    return null;
-  }
-
-  return findById(id);
 };
 
 export const loginUser = async (

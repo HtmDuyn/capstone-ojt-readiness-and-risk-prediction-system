@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { ensureOjtSemesterForPeriod } from '../academic/ojt-semester-link';
 import { actualPeriod, periodBounds } from '../academic/workflow-policy';
@@ -18,9 +19,9 @@ export async function listWindows(params:Row,actor:Actor) {
   return {items:rows.map(windowApi),total,page:p.page,limit:p.limit};
  });
 }
-export async function saveWindow(body:unknown,actor:number,id?:number) {
+async function saveWindowFields(body:unknown,actor:number,id:number|undefined,client:PoolClient) {
  const b=inputObject(body,['academicPeriodId','name','startsAt','endsAt','reason']);
- return academicTransaction(async c=>{
+ const c=client;
   const old=id?await windowRecord(c,id):null;
   if(old&&old.Status!=='DRAFT'&&Object.keys(b).some(k=>!['name','endsAt','reason'].includes(k)))throw invalid('After opening only the name and deadline can change.',409);
   const reason=requiredText(b.reason,'reason',2000);
@@ -33,11 +34,11 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
   const row=(await c.query(id?`UPDATE "RecruitmentWindows" SET "AcademicPeriodID"=$1,"OJTSemesterID"=$2,"Name"=$3,"StartsAt"=$4,"EndsAt"=$5,"UpdatedBy"=$6,"UpdatedAt"=now() WHERE "WindowID"=$7 RETURNING "WindowID"`:
    `INSERT INTO "RecruitmentWindows" ("AcademicPeriodID","OJTSemesterID","Name","StartsAt","EndsAt","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6) RETURNING "WindowID"`,id?[periodId,semesterId,name,start,end,actor,id]:[periodId,semesterId,name,start,end,actor])).rows[0];
   const after=await windowRecord(c,row.WindowID);await audit(c,actor,'RecruitmentWindows',row.WindowID,id?'UPDATE':'CREATE',old,after,reason);return windowApi(after);
- });
+
 }
-export async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:number) {
+async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:number,client:PoolClient) {
  const reason=requiredText(inputObject(body,['reason']).reason,'reason',2000);
- return academicTransaction(async c=>{
+ const c=client;
   const old=await windowRecord(c,id),status=action==='open'?'OPEN':'CLOSED';
   if(old.Status===status)return {...windowApi(old),replayed:true};
   if(action==='close'&&old.Status!=='OPEN')throw invalid('Only an open intake can be closed.',409);
@@ -49,5 +50,19 @@ export async function changeWindow(id:number,action:'open'|'close',body:unknown,
   }
   await c.query('UPDATE "RecruitmentWindows" SET "Status"=$2,"UpdatedBy"=$3,"UpdatedAt"=now() WHERE "WindowID"=$1',[id,status,actor]);
   const after=await windowRecord(c,id);await audit(c,actor,'RecruitmentWindows',id,action.toUpperCase(),old,after,reason);return windowApi(after);
+
+}
+
+export async function saveWindow(body:unknown,actor:number,id?:number) {
+ const b=inputObject(body,["academicPeriodId","name","startsAt","endsAt","reason"].concat(id?['status']:[]));
+ const {status,...fields}=b;
+ const hasFields=Object.keys(fields).some(key=>key!=='reason');
+ if(id&&!hasFields&&status===undefined)throw invalid('Provide a field or status to update.');
+ const target=status===undefined?undefined:enumValue(status,['OPEN','CLOSED'],'status');
+ return academicTransaction(async client=>{
+  let result;
+  if(!id||hasFields)result=await saveWindowFields(fields,actor,id,client);
+  if(target!==undefined)result=await changeWindow(id!,target==='OPEN'?'open':'close',{reason:b.reason},actor,client);
+  return result;
  });
 }

@@ -14,9 +14,8 @@ function reportSql(params:Row,extra:string[]=[]) {
  const {args,where,page}=predictionFilters(params,extra);
  return {sql:predictionSelect+latestJoin+(where.length?' WHERE '+where.join(' AND '):''),args,page};
 }
-export async function dashboardSummary(params:Row) {
- if(Object.keys(params).length)throw invalid('Summary does not accept filters.');
- return (await query(`SELECT (SELECT count(*)::int FROM "Users") AS accounts,(SELECT count(*)::int FROM "Users" WHERE "Status"='ACTIVE') AS "activeAccounts",(SELECT count(*)::int FROM "Students" WHERE "DeletedAt" IS NULL) AS students,(SELECT count(*)::int FROM "Enterprises" WHERE "DeletedAt" IS NULL) AS companies,(SELECT count(*)::int FROM "OJTSemesters") AS "ojtSemesters",(SELECT count(*)::int FROM "RiskAlerts" WHERE "Status" IN ('OPEN','ACKNOWLEDGED')) AS "openAlerts"`)).rows[0];
+async function systemSummary(run:typeof query) {
+ return (await run(`SELECT (SELECT count(*)::int FROM "Users") AS accounts,(SELECT count(*)::int FROM "Users" WHERE "Status"='ACTIVE') AS "activeAccounts",(SELECT count(*)::int FROM "Students" WHERE "DeletedAt" IS NULL) AS students,(SELECT count(*)::int FROM "Enterprises" WHERE "DeletedAt" IS NULL) AS companies,(SELECT count(*)::int FROM "OJTSemesters") AS "ojtSemesters",(SELECT count(*)::int FROM "RiskAlerts" WHERE "Status" IN ('OPEN','ACKNOWLEDGED')) AS "openAlerts"`)).rows[0];
 }
 async function distribution(kind:'readiness'|'risks',params:Row,run:typeof query) {
  if(params.page!==undefined||params.limit!==undefined)throw invalid('Statistics do not accept pagination.');
@@ -42,9 +41,13 @@ export async function predictionReport(params:Row,exporting=false) {
 // One repeatable-read snapshot for every selected dashboard section.
 export async function predictionDashboard(params:Row) {
  const {section,...filters}=params;
- if(section!==undefined&&!['all','readiness','risks','trends'].includes(section))throw invalid('section must be all, readiness, risks or trends.');
+ if(section!==undefined&&!['all','summary','readiness','risks','trends'].includes(section))throw invalid('section must be all, summary, readiness, risks or trends.');
+ if(section==='summary'&&Object.keys(filters).length)throw invalid('System summary does not accept prediction filters.');
+ predictionFilters(filters);
+ if(filters.page!==undefined||filters.limit!==undefined)throw invalid('Dashboard does not accept pagination.');
  return readTransaction(async c=>{
   const result:Row={},run=c.query.bind(c) as typeof query;
+  if(section===undefined||section==='all'||section==='summary')result.summary={scope:'ALL_SYSTEM',...await systemSummary(run)};
   for(const kind of ['readiness','risks','trends'] as const)if(section===undefined||section==='all'||section===kind)result[kind]=kind==='trends'?await trends(filters,run):await distribution(kind,filters,run);
   return result;
  });

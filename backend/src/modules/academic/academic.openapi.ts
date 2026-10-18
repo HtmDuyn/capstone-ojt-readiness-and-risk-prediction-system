@@ -705,6 +705,16 @@
  *                 "BLOCK3"
  *               ]
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "academicPeriodId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
  *           }
  *         ],
  *         "responses": {
@@ -821,36 +831,6 @@
  *           },
  *           "409": {
  *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       },
- *       "get": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Hồ sơ học kỳ kèm thông tin OJT kỹ thuật",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: data includes ojtSemesterId and ojt (null for BLOCK3)"
- *           },
- *           "404": {
- *             "description": "Period not found"
  *           }
  *         }
  *       }
@@ -1007,62 +987,6 @@
  *         "responses": {
  *           "200": {
  *             "description": "Updated record in data"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       }
- *     },
- *     "/api/students/{id}/academic-placement": {
- *       "patch": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Assign actual academic placement and compute specialized semester",
- *         "description": "First assignment requires cohortId, groupCode and currentAcademicPeriodId. SEMESTER periods are counted from actual entry to the current semester; Block 3 does not advance the count. Updates preserve existing actual entry unless group/cohort changes or an override is supplied. All changes are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 2147483647
- *             }
- *           }
- *         ],
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/AcademicPlacementPatch"
- *               }
- *             }
- *           }
- *         },
- *         "responses": {
- *           "200": {
- *             "description": "Placement data includes studentId, cohortId, groupCode, entryAcademicPeriodId, currentAcademicPeriodId, currentSemester, enrollmentYear, programId and updatedAt"
  *           },
  *           "400": {
  *             "description": "Invalid JSON, date, identifier or enum"

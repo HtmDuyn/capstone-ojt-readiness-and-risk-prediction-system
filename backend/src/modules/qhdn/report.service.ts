@@ -8,12 +8,12 @@ export type ReportType='acceptance'|'internships'|'enterprise-feedback';
 export type Filters={ojtSemesterId:number|null;companyId:number|null};
 const reportTypes:ReportType[]=['acceptance','internships','enterprise-feedback'];
 export function reportQuery(params:Row,kind:'dashboard'|'report'|'export'){
-  const allowed=['ojtSemesterId','companyId',...(kind==='export'?['type','format']:[])];
+  const allowed=['ojtSemesterId','companyId',...(kind==='export'?['type','format']:kind==='report'?['type']:[])];
   const p=pagination(params,allowed);
   if(kind!=='report'&&(params.page!==undefined||params.limit!==undefined))throw invalid('Dashboard and export do not support pagination.');
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const filters:Filters={ojtSemesterId:params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId'),companyId:params.companyId===undefined?null:positiveId(params.companyId,'companyId')};
-  const type=kind==='export'?enumValue(params.type,reportTypes,'type') as ReportType:undefined;
+  const type=kind!=='dashboard'?enumValue(params.type,reportTypes,'type') as ReportType:undefined;
   const format=kind==='export'?enumValue(params.format??'csv',['csv','json'],'format'):undefined;
   return {filters,...p,type,format};
 }

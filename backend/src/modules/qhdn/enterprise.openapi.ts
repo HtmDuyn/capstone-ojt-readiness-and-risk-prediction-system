@@ -15,8 +15,7 @@ export function addEnterpriseOperations(spec: Spec) {
   };
   const candidateId = [{in:'path',name:'id',required:true,schema:id}];
   add('get','/api/enterprise/profile','Hồ sơ doanh nghiệp đang đăng nhập',[]);
-  add('get','/api/enterprise/candidates','Sinh viên được giới thiệu, kèm vị trí và trạng thái tiếp nhận',parameters({...page,decision:{type:'string',enum:['PENDING','ACCEPTED','REJECTED']}}));
-  add('get','/api/enterprise/candidates/{id}','Hồ sơ ứng viên, CV và thông tin vị trí',candidateId);
+  add('get','/api/enterprise/candidates','Sinh viên được giới thiệu, kèm vị trí và trạng thái tiếp nhận',parameters({...page,candidateId:id,decision:{type:'string',enum:['PENDING','ACCEPTED','REJECTED']}}));
   add('patch','/api/enterprise/candidates/{id}/decision','Tiếp nhận hoặc từ chối ứng viên',candidateId,spec.paths['/api/ojt-coordinations/{id}/decision'].post.requestBody);
   add('get','/api/enterprise/internships','Sinh viên thực tập, kèm phân công, vị trí và đánh giá',parameters({...page,status:{type:'string',enum:['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED']}}));
   add('put','/api/enterprise/internships/{id}/evaluation','Gửi hoặc cập nhật đánh giá thực tập',candidateId,spec.paths['/api/assignments/{id}/internship-evaluation'].put.requestBody);

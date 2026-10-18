@@ -41,11 +41,11 @@ export async function writeMetadata(client:PoolClient,body:unknown,actorId:numbe
   if(value.gpaScale!==undefined)await client.query(`INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","RetakePolicy","ConfirmedBy") VALUES ($1,$2,'LATEST',$3) ON CONFLICT ("ProgramID") DO UPDATE SET "GpaScale"=EXCLUDED."GpaScale","RetakePolicy"='LATEST',"ConfirmedBy"=EXCLUDED."ConfirmedBy","ConfirmedAt"=now()`,[id,value.gpaScale,actorId]);
   return id;
 }
-export async function saveCurriculum(body:unknown,actorId:number,id?:number) {
+export async function updateCurriculum(body:unknown,actorId:number,id:number) {
   return academicTransaction(async client=>{
-    const before=id?await editable(client,id):null;
+    const before=await editable(client,id);
     const savedId=await writeMetadata(client,body,actorId,id);await touch(client,savedId);const after=await curriculumRecord(client,savedId);
-    await audit(client,actorId,'TrainingPrograms',savedId,id?'UPDATE_CURRICULUM':'CREATE_CURRICULUM',before,after);return after;
+    await audit(client,actorId,'TrainingPrograms',savedId,'UPDATE_CURRICULUM',before,after);return after;
   });
 }
 export function comboMetadata(body:unknown) {
@@ -54,10 +54,6 @@ export function comboMetadata(body:unknown) {
 }
 export async function insertCombo(client:PoolClient,id:number,b:Row) {
   return (await client.query(`INSERT INTO "ProgramCombos" ("ProgramID","ComboCode","ComboName","SelectionGroup","Note") VALUES ($1,$2,$3,$4,$5) RETURNING "ProgramComboID"`,[id,b.code,b.name,b.selectionGroup,b.note])).rows[0].ProgramComboID as number;
-}
-export async function createCombo(id:number,body:unknown,actorId:number) {
-  const b=comboMetadata(body);
-  return academicTransaction(async client=>{await editable(client,id);const comboId=await insertCombo(client,id,b);await touch(client,id);const after={id:comboId,curriculumId:id,...b};await audit(client,actorId,'ProgramCombos',comboId,'CREATE_COMBO',null,after);return after;});
 }
 export async function replaceStructure(id:number,kind:'courses'|'prerequisites'|'equivalences',body:unknown,actorId:number) {
   const b=inputObject(body,[kind]);

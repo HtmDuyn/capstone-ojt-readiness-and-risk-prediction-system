@@ -3,7 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
 import { studentWindows } from '../students/registration-options.service';
-import { listWindows,saveWindow,changeWindow } from './window.service';
+import { listWindows,saveWindow } from './window.service';
 import { submit,listRegistrations,registrationDetails,review } from './registration.service';
 import { handoff,handoffHistory,semesterStudents } from './handoff.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','STUDENT')];
@@ -11,7 +11,6 @@ const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async
 router.get('/ojt-registration-windows',authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT'),handle(req=>req.user.roleCode==='STUDENT'?studentWindows('ojt',req.query,req.user):listWindows(req.query)));
 router.post('/ojt-registration-windows',...staff,handle(req=>saveWindow(req.body,req.user.userId),201));
 router.patch('/ojt-registration-windows/:id',...staff,handle(req=>saveWindow(req.body,req.user.userId,positiveId(req.params.id))));
-for(const action of ['open','close'] as const)router.post(`/ojt-registration-windows/:id/${action}`,...staff,handle(req=>changeWindow(positiveId(req.params.id),action,req.body,req.user.userId)));
 router.post('/ojt-registrations',authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT'),handle(req=>submit(req.body,req.user),201));
 router.get('/ojt-registrations',...read,handle(req=>listRegistrations(req.query,req.user)));
 router.get('/ojt-registrations/:id',...read,handle(req=>registrationDetails(positiveId(req.params.id),req.user)));

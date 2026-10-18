@@ -122,10 +122,10 @@ export async function saveResource(resource: Resource, input: unknown, actorId: 
   });
 }
 
-export async function assignPlacement(studentId: number, input: unknown, actorId: number) {
+export async function assignPlacementWithClient(client:PoolClient,studentId:number,input:unknown,actorId:number) {
   const patch = inputObject(input, ['cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId','programId','reason']);
   const reason = requiredText(patch.reason, 'reason', 1000);
-  return academicTransaction(async client => {
+
     const student = (await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1 FOR UPDATE', [studentId])).rows[0];
     if (!student) throw academicError('Student not found.', 404, 'STUDENT_NOT_FOUND');
     const previous = (await client.query('SELECT * FROM "StudentAcademicPlacements" WHERE "StudentID"=$1 FOR UPDATE', [studentId])).rows[0];
@@ -154,5 +154,5 @@ export async function assignPlacement(studentId: number, input: unknown, actorId
       FROM "StudentAcademicPlacements" p JOIN "Students" s ON s."StudentID"=p."StudentID" WHERE p."StudentID"=$1`, [studentId])).rows[0];
     await audit(client, actorId, 'StudentAcademicPlacements', studentId, 'UPDATE_ACADEMIC_PLACEMENT', { placement: previous ?? null, programId: student.ProgramID, currentSemester: student.CurrentSemester }, result, reason);
     return result;
-  });
+
 }

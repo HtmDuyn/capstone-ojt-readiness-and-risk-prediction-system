@@ -3,55 +3,6 @@
  * {
  *   "components": {
  *     "schemas": {
- *       "CurriculumCreate": {
- *         "type": "object",
- *         "additionalProperties": false,
- *         "properties": {
- *           "code": {
- *             "type": "string",
- *             "maxLength": 100
- *           },
- *           "name": {
- *             "type": "string",
- *             "maxLength": 200
- *           },
- *           "version": {
- *             "type": "string",
- *             "maxLength": 10
- *           },
- *           "majorId": {
- *             "type": "integer",
- *             "minimum": 1
- *           },
- *           "totalCredits": {
- *             "type": "number",
- *             "minimum": 0,
- *             "maximum": 9999.99,
- *             "exclusiveMinimum": true
- *           },
- *           "effectiveYear": {
- *             "type": "integer",
- *             "minimum": 1900,
- *             "maximum": 2200
- *           },
- *           "gpaScale": {
- *             "type": "integer",
- *             "enum": [
- *               4,
- *               10
- *             ]
- *           }
- *         },
- *         "required": [
- *           "code",
- *           "name",
- *           "version",
- *           "majorId",
- *           "totalCredits",
- *           "effectiveYear",
- *           "gpaScale"
- *         ]
- *       },
  *       "CurriculumPatch": {
  *         "type": "object",
  *         "additionalProperties": false,
@@ -306,34 +257,6 @@
  *         },
  *         "required": [
  *           "equivalences"
- *         ]
- *       },
- *       "ComboCreate": {
- *         "type": "object",
- *         "additionalProperties": false,
- *         "properties": {
- *           "code": {
- *             "type": "string",
- *             "maxLength": 50
- *           },
- *           "name": {
- *             "type": "string",
- *             "maxLength": 200
- *           },
- *           "selectionGroup": {
- *             "type": "string",
- *             "maxLength": 50,
- *             "nullable": true
- *           },
- *           "note": {
- *             "type": "string",
- *             "maxLength": 2000,
- *             "nullable": true
- *           }
- *         },
- *         "required": [
- *           "code",
- *           "name"
  *         ]
  *       },
  *       "ComboCourses": {
@@ -1091,54 +1014,6 @@
  *             "description": "Publication rejected; inspect data.issues"
  *           }
  *         }
- *       },
- *       "post": {
- *         "tags": [
- *           "Curriculum management"
- *         ],
- *         "summary": "Create curricula",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid JSON/reference/rule"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN / ACADEMIC only"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Version conflict, published/in-use curriculum, or reference conflict"
- *           },
- *           "422": {
- *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/CurriculumCreate"
- *               }
- *             }
- *           }
- *         }
  *       }
  *     },
  *     "/api/courses/{id}": {
@@ -1483,66 +1358,6 @@
  *             "application/json": {
  *               "schema": {
  *                 "$ref": "#/components/schemas/CurriculumEquivalences"
- *               }
- *             }
- *           }
- *         }
- *       }
- *     },
- *     "/api/curricula/{id}/combos": {
- *       "post": {
- *         "tags": [
- *           "Curriculum management"
- *         ],
- *         "summary": "Create a curriculum-scoped combo",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid JSON/reference/rule"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN / ACADEMIC only"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Version conflict, published/in-use curriculum, or reference conflict"
- *           },
- *           "422": {
- *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/ComboCreate"
  *               }
  *             }
  *           }

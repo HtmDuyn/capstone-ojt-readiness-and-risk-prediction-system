@@ -611,6 +611,56 @@
  *                 "REJECTED"
  *               ]
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "coordinationId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "coordinationPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "coordinationLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100
+ *             }
  *           }
  *         ],
  *         "responses": {
@@ -729,66 +779,6 @@
  *                 ]
  *               }
  *             }
- *           }
- *         }
- *       }
- *     },
- *     "/api/ojt-coordinations/{id}": {
- *       "get": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Detail ojt-coordinations with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
- *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
  *           }
  *         }
  *       }
@@ -1128,6 +1118,14 @@
  *                   "reason": {
  *                     "type": "string",
  *                     "maxLength": 2000
+ *                   },
+ *                   "status": {
+ *                     "type": "string",
+ *                     "enum": [
+ *                       "ACTIVE",
+ *                       "COMPLETED",
+ *                       "CANCELLED"
+ *                     ]
  *                   }
  *                 },
  *                 "required": [
@@ -1242,65 +1240,35 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
  *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         }
- *       }
- *     },
- *     "/api/internship-evaluations/{id}": {
- *       "get": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Detail internship-evaluations with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
- *         "security": [
  *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
+ *             "in": "query",
+ *             "name": "evaluationId",
+ *             "required": false,
  *             "schema": {
  *               "type": "integer",
- *               "minimum": 1
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyPage",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "historyLimit",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 100
  *             }
  *           }
  *         ],
@@ -1512,95 +1480,6 @@
  *                   "positionId",
  *                   "reason",
  *                   "idempotencyKey"
- *                 ]
- *               }
- *             }
- *           }
- *         }
- *       }
- *     },
- *     "/api/assignments/{id}/status": {
- *       "patch": {
- *         "tags": [
- *           "QHDN core"
- *         ],
- *         "summary": "Start, complete or cancel assignment",
- *         "description": "Roles: ADMIN / OJT_COORD. Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}",
- *             "content": {
- *               "application/json": {
- *                 "schema": {
- *                   "type": "object",
- *                   "properties": {
- *                     "success": {
- *                       "type": "boolean"
- *                     },
- *                     "data": {
- *                       "type": "object"
- *                     }
- *                   }
- *                 }
- *               }
- *             }
- *           },
- *           "400": {
- *             "description": "Invalid body/query"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or enterprise scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate, invalid workflow transition, full capacity or confirmed result lock"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "type": "object",
- *                 "additionalProperties": false,
- *                 "properties": {
- *                   "status": {
- *                     "type": "string",
- *                     "enum": [
- *                       "ACTIVE",
- *                       "COMPLETED",
- *                       "CANCELLED"
- *                     ]
- *                   },
- *                   "reason": {
- *                     "type": "string",
- *                     "maxLength": 2000
- *                   }
- *                 },
- *                 "required": [
- *                   "status",
- *                   "reason"
  *                 ]
  *               }
  *             }

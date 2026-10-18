@@ -193,7 +193,6 @@ Danh sách operation dưới đây là phạm vi 85 API đã kiểm tra, không 
 | POST | `/api/courses` |
 | PATCH | `/api/courses/{id}` |
 | GET | `/api/curricula` |
-| POST | `/api/curricula` |
 | GET | `/api/curricula/{id}` |
 | PATCH | `/api/curricula/{id}` |
 | POST | `/api/curriculum-imports/preview` |
@@ -202,7 +201,6 @@ Danh sách operation dưới đây là phạm vi 85 API đã kiểm tra, không 
 | PUT | `/api/curricula/{id}/prerequisites` |
 | PUT | `/api/curricula/{id}/course-equivalences` |
 | GET | `/api/curricula/{id}/combos` |
-| POST | `/api/curricula/{id}/combos` |
 | PUT | `/api/combos/{id}/courses` |
 | POST | `/api/curricula/{id}/publish` |
 

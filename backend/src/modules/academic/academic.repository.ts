@@ -35,7 +35,7 @@ export async function findRecord(client: PoolClient, resource: Resource, id: num
 
 export async function listRecords(resource: Resource, params: Record<string, unknown>) {
   const c = resources[resource], p = pageInput(params);
-  const allowed = ['page','limit','search','status', ...(resource === 'academic-periods' ? ['academicYearId','kind'] : [])];
+  const allowed = ['page','limit','search','status', ...(resource === 'academic-periods' ? ['academicYearId','kind','academicPeriodId'] : [])];
   for (const key of Object.keys(params)) if (!allowed.includes(key)) throw academicError(`Unknown query parameter: ${key}.`);
   const args: unknown[] = [];
   const conditions: string[] = [];
@@ -46,6 +46,7 @@ export async function listRecords(resource: Resource, params: Record<string, unk
     if (!['SEMESTER','BLOCK3'].includes(params.kind as string)) throw academicError('kind must be SEMESTER or BLOCK3.');
     args.push(params.kind); conditions.push(`t."Kind"=$${args.length}`);
   }
+  if (params.academicPeriodId !== undefined) { args.push(positiveId(params.academicPeriodId,"academicPeriodId")); conditions.push(`t."AcademicPeriodID"=$${args.length}`); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   // Use one statement so total and page share the same database snapshot, including an empty page.
   const grouped = resource === 'cohorts' ? `, COALESCE((SELECT jsonb_agg(jsonb_build_object('groupCode',g."GroupCode",'entryAcademicPeriodId',g."EntryAcademicPeriodID") ORDER BY g."GroupCode") FROM "CohortGroups" g WHERE g."CohortID"=t."CohortID"),'[]'::jsonb) AS groups` : resource === 'academic-periods' ? periodOjt : '';
@@ -53,12 +54,6 @@ export async function listRecords(resource: Resource, params: Record<string, unk
     SELECT * FROM filtered ORDER BY "${c.id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}
   ) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(page) ORDER BY page."${c.id}" DESC) FILTER (WHERE page."${c.id}" IS NOT NULL),'[]'::jsonb) AS items FROM page`, [...args, p.limit, p.offset]);
   return { items: result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r)), page: p.page, limit: p.limit, total: result.rows[0].total };
-}
-
-export async function periodDetails(id: number) {
-  const row = (await query(`SELECT t.* ${periodOjt} FROM "AcademicPeriods" t WHERE t."AcademicPeriodID"=$1`, [id])).rows[0];
-  if (!row) throw academicError('Academic period not found.', 404, 'ACADEMIC_RECORD_NOT_FOUND');
-  return asApi('academic-periods', row);
 }
 
 export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {

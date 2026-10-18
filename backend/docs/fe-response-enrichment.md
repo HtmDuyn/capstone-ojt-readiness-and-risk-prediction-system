@@ -1,10 +1,12 @@
+> Hợp đồng đọc/báo cáo mới nhất: [api-read-report-consolidation.md](api-read-report-consolidation.md). GET profile cũ và các detail đã gộp không còn tồn tại.
+
 # Dữ liệu trả về phục vụ FE
 
-Giữ nguyên 176 API và sáu nhóm Swagger. Bổ sung trường vào response hiện có; không thay cấu trúc envelope, không thêm endpoint và không đổi cấu trúc DB. Riêng hai API danh sách đợt OJT/combo mở thêm quyền STUDENT với dữ liệu được lọc theo người đăng nhập.
+Giữ nguyên 154 API và sáu nhóm Swagger. Bổ sung trường vào response hiện có; không thay cấu trúc envelope, không thêm endpoint và không đổi cấu trúc DB. Riêng hai API danh sách đợt OJT/combo mở thêm quyền STUDENT với dữ liệu được lọc theo người đăng nhập.
 
 ## Tài khoản và định danh hồ sơ
 
-GET `/api/auth/me` và GET `/api/accounts/me/profile` trả thêm `studentId`, `enterpriseId`. ID tài khoản vẫn giữ nguyên. Hai trường liên kết có thể null; FE không được dùng UserID thay StudentID hoặc EnterpriseID.
+GET `/api/auth/me` và PATCH `/api/accounts/me/profile` trả thêm `studentId`, `enterpriseId`. ID tài khoản vẫn giữ nguyên. Hai trường liên kết có thể null; FE không được dùng UserID thay StudentID hoặc EnterpriseID.
 
 Các response tài khoản đọc/sửa cũng giữ các trường cũ và bổ sung hai định danh liên kết này.
 

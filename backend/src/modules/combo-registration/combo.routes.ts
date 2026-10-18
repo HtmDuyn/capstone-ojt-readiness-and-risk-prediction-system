@@ -4,7 +4,7 @@ import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './combo.validation';
 import { studentWindows } from '../students/registration-options.service';
 import { listWindows } from './combo.repository';
-import { saveWindow, changeWindow, extendWindow, selectionReport } from './window.service';
+import { saveWindow, extendWindow, selectionReport } from './window.service';
 import { submitChoice, finalizeWindow, studentComboHistory } from './selection.service';
 import { sendReminders } from './reminder.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],own=[authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT')];
@@ -12,7 +12,6 @@ const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(r
 router.get('/combo-registration-windows',...own,handle(req=>req.user.roleCode==='STUDENT'?studentWindows('combo',req.query,req.user):listWindows(req.query)));
 router.post('/combo-registration-windows',...staff,handle(req=>saveWindow(req.body,req.user.userId),201));
 router.patch('/combo-registration-windows/:id',...staff,handle(req=>saveWindow(req.body,req.user.userId,positiveId(req.params.id))));
-for(const action of ['open','close'] as const)router.post(`/combo-registration-windows/:id/${action}`,...staff,handle(req=>changeWindow(positiveId(req.params.id),action,req.body,req.user.userId)));
 router.post('/combo-registration-windows/:id/extensions',...staff,handle(req=>extendWindow(positiveId(req.params.id),req.body,req.user.userId),201));
 router.get('/combo-registration-windows/:id/selections',...staff,handle(req=>selectionReport(positiveId(req.params.id),req.query)));
 router.post('/combo-registration-windows/:id/selections',...own,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user),201));

@@ -89,18 +89,18 @@ export async function assign(body:unknown,actor:Actor){staff(actor);const b=inpu
     await refreshSlots(c,p.PositionID);await log(c,'assignments',null,after,actor,'ASSIGN',reason);return api('assignments',after);
   });
 }
-export async function updateAssignment(id:number,body:unknown,actor:Actor){staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','reason']),reason=requiredText(b.reason,'reason',2000);
+async function updateAssignmentFields(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','reason']),reason=requiredText(b.reason,'reason',2000);
   if(!['enterpriseSupervisorName','startDate','endDate'].some(k=>k in b))throw invalid('Provide an editable field.');
-  return academicTransaction(async c=>{
+  const c=client;
     const before=await record(c,'assignments',id);await mutableAssignment(c,id);
     if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(before.Status).toUpperCase()))throw invalid('Only pending or active assignments can change.',409);
     const values:Row=assignmentDates(b,before);
     if('enterpriseSupervisorName' in b)values.EnterpriseSupervisorName=optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100);
     const after=await persist(c,'assignments',values,id);await log(c,'assignments',before,after,actor,'UPDATE_ASSIGNMENT',reason);return api('assignments',after);
-  });
+
 }
-export async function assignmentStatus(id:number,body:unknown,actor:Actor){staff(actor);const b=inputObject(body,['status','reason']),value=enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'),reason=requiredText(b.reason,'reason',2000);
-  return academicTransaction(async c=>{
+async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['status','reason']),value=enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'),reason=requiredText(b.reason,'reason',2000);
+  const c=client;
     const before=await record(c,'assignments',id);await mutableAssignment(c,id);
     const current=String(before.Status??'ASSIGNED').toUpperCase();
     if(current===value)return {...api('assignments',before),replayed:true};
@@ -110,7 +110,7 @@ export async function assignmentStatus(id:number,body:unknown,actor:Actor){staff
     if(value==='CANCELLED'&&(await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1',[id])).rowCount)throw invalid('Cannot cancel an assignment with a transferred result.',409,'ASSIGNMENT_HAS_RESULT');
     await record(c,'positions',before.PositionID);
     const after=await persist(c,'assignments',{Status:value},id);await refreshSlots(c,before.PositionID);await log(c,'assignments',before,after,actor,'ASSIGNMENT_STATUS',reason);return api('assignments',after);
-  });
+
 }
 export async function evaluate(id:number,body:unknown,actor:Actor){
   const b=inputObject(body,['completionScore','attitudeScore','skillScore','overallScore','comments','reason']),reason=requiredText(b.reason,'reason',2000),values:Row={};
@@ -125,4 +125,17 @@ export async function evaluate(id:number,body:unknown,actor:Actor){
     values.AssignmentID=id;values.EvaluatedBy=actor.userId;values.EvaluatedAt=new Date();values.Status='SUBMITTED';
     const after=await persist(c,'evaluations',values,before?.EvaluationID);await log(c,'evaluations',before,after,actor,before?'UPDATE_EVALUATION':'SUBMIT_EVALUATION',reason);return api('evaluations',after);
   });
+}
+
+export async function updateAssignment(id:number,body:unknown,actor:Actor) {
+ staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','status','reason']);
+ const {status,...fields}=b;
+ const hasFields=Object.keys(fields).some(key=>key!=='reason');
+ if(!hasFields&&status===undefined)throw invalid('Provide a field or status to update.');
+ return academicTransaction(async client=>{
+  let result;
+  if(hasFields)result=await updateAssignmentFields(id,fields,actor,client);
+  if(status!==undefined)result=await assignmentStatus(id,{status,reason:b.reason},actor,client);
+  return result;
+ });
 }

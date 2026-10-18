@@ -1,3 +1,4 @@
+import { assignPlacementWithClient } from '../academic/academic.service';
 import { query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -28,7 +29,7 @@ export async function listStudents(params: Record<string,unknown>, exporting=fal
   return {total:row.total,items:row.items,page:p.page,limit:p.limit};
 }
 export async function patchStudent(id: number, body: unknown, actorId: number) {
-  const input=inputObject(body,['fullName','phone','className','status','programId','reason']);
+  const input=inputObject(body,['fullName','phone','className','status','programId','placement','reason']);
   const reason=requiredText(input.reason,'reason',2000);
   const fields: Record<string,unknown>={};
   if ('className' in input) fields.ClassName=optionalText(input.className,'className',20);
@@ -37,7 +38,7 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
   const userFields: Record<string,unknown>={};
   if ('fullName' in input) userFields.FullName=requiredText(input.fullName,'fullName',100);
   if ('phone' in input) userFields.Phone=optionalText(input.phone,'phone',20);
-  if (!Object.keys(fields).length && !Object.keys(userFields).length) throw invalid('Provide at least one profile field.');
+  if (!Object.keys(fields).length && !Object.keys(userFields).length && input.placement===undefined) throw invalid('Provide at least one profile field.');
   return academicTransaction(async client => {
     const before=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL FOR UPDATE',[id])).rows[0];
     if (!before) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
@@ -45,6 +46,11 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
     for (const [table,key,keyId,values] of [['Students','StudentID',id,fields],['Users','UserID',before.UserID,userFields]] as const) {
       const entries=Object.entries(values);
       if (entries.length) await client.query(`UPDATE "${table}" SET ${entries.map(([col],i)=>`"${col}"=$${i+2}`).join(',')}${table==='Users'?',"UpdatedAt"=now()':''} WHERE "${key}"=$1`,[keyId,...entries.map(([,v])=>v)]);
+    }
+    if(input.placement!==undefined) {
+      const placement=inputObject(input.placement,['cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId']);
+      if(!Object.keys(placement).length)throw invalid('Provide at least one placement field.');
+      await assignPlacementWithClient(client,id,{...placement,reason},actorId);
     }
     await audit(client,actorId,'Students',id,'UPDATE_PROFILE',{...before,...beforeUser},{...before,...beforeUser,...fields,...userFields},reason);
     return (await client.query(`${studentSelect} WHERE s."StudentID"=$1`,[id])).rows[0];

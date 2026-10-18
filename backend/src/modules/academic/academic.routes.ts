@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
-import { listRecords, periodDetails, resources, type Resource } from './academic.repository';
-import { assignPlacement, saveResource } from './academic.service';
+import { listRecords, resources, type Resource } from './academic.repository';
+import { saveResource } from './academic.service';
 import { positiveId } from './academic.schema';
 
 const router = Router();
@@ -21,11 +21,4 @@ for (const resource of Object.keys(resources) as Resource[]) {
     catch (error) { next(error); }
   });
 }
-router.get('/academic-periods/:id', authenticate, authorizeRoles('ADMIN','ACADEMIC','OJT_COORD'), async (req,res,next) => {
-  try { res.json({success:true,data:await periodDetails(positiveId(req.params.id,'academicPeriodId'))}); } catch(error) { next(error); }
-});
-router.patch('/students/:id/academic-placement', authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
-  try { res.json({ success: true, data: await assignPlacement(positiveId(req.params.id, 'studentId'), req.body, req.user!.userId) }); }
-  catch (error) { next(error); }
-});
 export default router;

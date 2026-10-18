@@ -32,25 +32,20 @@ const candidateFields = `co."CoordinationID" AS id,${student} AS student,${posit
   co."DecisionAt" AS "decisionAt",co."RejectReason" AS "rejectReason",
   NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID") AS "isLatestCoordination"`;
 
-export async function enterpriseCandidates(params: Row, actor: Actor, id?: number) {
-  const page = pagination(params, id ? [] : ['ojtSemesterId','positionId','decision','search']);
+export async function enterpriseCandidates(params: Row, actor: Actor) {
+  const page = pagination(params,['candidateId','ojtSemesterId','positionId','decision','search']);
+  if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
+  const id=params.candidateId===undefined?undefined:positiveId(params.candidateId,'candidateId');
   return readTransaction(async c => {
     const companyId = await enterpriseScope(c, actor), args: unknown[] = [companyId];
     const where = ['co."EnterpriseID"=$1'];
     const add = (sql: string, value: unknown) => { args.push(value); where.push(sql.replace('?', '$'+args.length)); };
     if (id) add('co."CoordinationID"=?', id);
-    else {
-      where.push(`NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."EnterpriseID"=co."EnterpriseID" AND newer."CoordinationID">co."CoordinationID")`);
+    if(!id)where.push(`NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."EnterpriseID"=co."EnterpriseID" AND newer."CoordinationID">co."CoordinationID")`);
       for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','co."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
       if (params.decision!==undefined) add(`COALESCE(co."Decision",'PENDING')=?`,enumValue(params.decision,['PENDING','ACCEPTED','REJECTED'],'decision'));
       if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
-    }
     const sql = `SELECT ${candidateFields},r."Application" AS application ${candidateFrom} WHERE ${where.join(' AND ')}`;
-    if (id) {
-      const row = (await c.query(sql,args)).rows[0];
-      if (!row) throw invalid('Candidate not found.',404,'CANDIDATE_NOT_FOUND');
-      return row;
-    }
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) candidates`,args)).rows[0].n;
     const items = (await c.query(`${sql} ORDER BY co."CoordinationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
     return {items,total,page:page.page,limit:page.limit};

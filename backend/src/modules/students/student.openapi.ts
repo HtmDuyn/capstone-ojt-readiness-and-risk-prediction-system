@@ -125,6 +125,35 @@
  *           "reason": {
  *             "type": "string",
  *             "maxLength": 2000
+ *           },
+ *           "placement": {
+ *             "type": "object",
+ *             "additionalProperties": false,
+ *             "minProperties": 1,
+ *             "properties": {
+ *               "cohortId": {
+ *                 "type": "integer",
+ *                 "minimum": 1
+ *               },
+ *               "groupCode": {
+ *                 "type": "string",
+ *                 "enum": [
+ *                   "A",
+ *                   "B",
+ *                   "C",
+ *                   "D"
+ *                 ]
+ *               },
+ *               "entryAcademicPeriodId": {
+ *                 "type": "integer",
+ *                 "minimum": 1
+ *               },
+ *               "currentAcademicPeriodId": {
+ *                 "type": "integer",
+ *                 "minimum": 1
+ *               }
+ *             },
+ *             "description": "Chỉ gửi trường lộ trình cần sửa. Lần đầu cần khóa, nhóm và kỳ hiện tại."
  *           }
  *         },
  *         "required": [

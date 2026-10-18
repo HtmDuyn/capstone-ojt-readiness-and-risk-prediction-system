@@ -1,3 +1,5 @@
+> Luồng mới: [khung chương trình tạo bằng import](curriculum-import-only.md). Đã xóa POST tạo chương trình và POST tạo combo thủ công.
+
 > Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
 
 # Chương trình đào tạo và combo
@@ -25,7 +27,7 @@ Tín chỉ mặc định có thể là số thập phân hoặc null. Tính ti�
 ## Chương trình và phiên bản
 
 - `GET /curricula`: lọc `search`, `majorId`, `version`, `status` DRAFT/PUBLISHED, `page`, `limit`.
-- `POST /curricula`: tạo một phiên bản nháp.
+- `POST /curriculum-imports/preview` và `/commit`: kiểm tra và nhập một phiên bản nháp hoàn chỉnh; không có API tạo khung thủ công.
 - `GET /curricula/:id`: trả metadata, môn, tiên quyết, combo/nhóm chọn/slot, tương đương môn.
 - `PATCH /curricula/:id`: sửa các trường metadata đã gửi, chỉ cho nháp chưa gán sinh viên.
 
@@ -63,7 +65,7 @@ Thay khung môn sẽ đánh dấu cần rà soát lại tiên quyết, tương �
 
 ## Combo, nhóm chọn và slot
 
-`GET/POST /curricula/:id/combos`. Tạo combo:
+Combo mới được gửi trong `combos` của payload import, kèm `courses` và `choiceGroups`. Xem combo qua `POST /api/json/curricula/detail`, trường `data.combos`. Metadata combo trong dữ liệu import:
 
 ```json
 {"code":"COM_SE","name":"Combo kỹ thuật phần mềm","selectionGroup":"SPECIALIZATION"}

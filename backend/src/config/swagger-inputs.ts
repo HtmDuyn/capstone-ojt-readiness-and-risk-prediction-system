@@ -48,13 +48,10 @@ for (const [resource, name] of Object.entries({
   describe('/' + resource, { get: 'Danh sách ' + name, post: 'Tạo ' + name });
   describe('/' + resource + '/{id}', { patch: 'Cập nhật ' + name });
 }
-describe('/academic-periods/{id}', { get: 'Hồ sơ học kỳ và thông tin OJT' });
 describe('/academic-periods', {
   get: ['Danh sách kỳ học và Block 3', 'Lọc kind=SEMESTER để chọn học kỳ tuyển dụng; kết quả kèm thông tin OJT.'],
   post: ['Tạo kỳ học và Block 3', 'Học kỳ thường tự liên kết OJT và trả ojtSemesterId; QHDN không tạo kỳ riêng.']
 });
-const placement: [string, string] = ['Gán lộ trình học cho sinh viên', 'Lần đầu cần khóa, nhóm và kỳ hiện tại. Kỳ chuyên ngành tính từ kỳ vào thực tế; Block 3 không tăng số kỳ.'];
-describe('/students/{id}/academic-placement', { patch: placement });
 describe('/academic-periods/{id}/combo-phase-schedules', {
   get: 'Xem mốc chọn và xác nhận combo',
   put: ['Thiết lập mốc chọn và xác nhận combo', 'Chọn ban đầu trong kỳ học; xác nhận trong Block 3. Các mốc phải nằm trong kỳ tương ứng.']
@@ -71,23 +68,20 @@ describe('/curricula/{id}/ojt-grade-mappings/{semesterId}', {
 });
 describe('/ojt-registration-windows/{id}/semester-exceptions', { post: ['Thêm ngoại lệ kỳ đăng ký OJT', 'Chỉ áp dụng cho sinh viên, kỳ và thời hạn được chỉ định; cần lý do.'] });
 describe('/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke', { post: 'Thu hồi ngoại lệ kỳ đăng ký OJT' });
-describe('/academic/dashboard', { get: 'Tổng quan điều kiện OJT' });
-describe('/academic/eligibility-statistics', { get: 'Thống kê điều kiện theo khóa, nhóm, chuyên ngành và combo' });
+describe('/academic/dashboard', { get: ['Tổng quan và thống kê điều kiện OJT', 'Chọn section summary/statistics/all; thống kê hỗ trợ groupBy.'] });
 describe('/academic/alerts', { get: 'Danh sách cảnh báo thiếu điều kiện OJT' });
 describe('/academic/alerts/notifications', { post: 'Gửi cảnh báo học vụ' });
 describe('/academic/course-demand', { get: 'Thống kê nhu cầu học môn còn thiếu' });
 describe('/academic/course-demand/export', { get: 'Xuất nhu cầu học theo môn, kỳ và Block' });
 describe('/accounts', { get: 'Danh sách tài khoản', post: 'Tạo tài khoản' });
-describe('/accounts/me/profile', { get: ['Xem hồ sơ cá nhân', 'Kèm studentId và enterpriseId để mở đúng hồ sơ chức năng.'], patch: 'Cập nhật hồ sơ cá nhân' });
-describe('/accounts/{userId}', { get: 'Chi tiết tài khoản', put: 'Cập nhật tài khoản' });
-describe('/accounts/{userId}/status', { patch: 'Cập nhật trạng thái tài khoản' });
-describe('/accounts/{userId}/role', { patch: 'Cập nhật vai trò tài khoản' });
+describe('/accounts/me/profile', { patch: 'Cập nhật hồ sơ cá nhân' });
+describe('/accounts/{userId}', { patch: ['Cập nhật tài khoản', 'Admin sửa thông tin, trạng thái và vai trò trong một lần; chỉ gửi trường cần thay đổi.'] });
 describe('/auth/login', { post: 'Đăng nhập bằng email và mật khẩu' });
 describe('/auth/me', { get: ['Xem tài khoản đang đăng nhập', 'Kèm ID hồ sơ sinh viên hoặc doanh nghiệp liên kết.'] });
 describe('/auth/change-password', { post: ['Đổi mật khẩu', 'Token cũ bị thu hồi; cần đăng nhập lại.'] });
 describe('/combo-registration-windows', { get: ['Danh sách đợt chọn combo', 'Sinh viên chỉ thấy đợt của mình, kèm lựa chọn hợp lệ, hạn gia hạn và lý do chưa thể nộp.'], post: 'Tạo đợt chọn hoặc xác nhận combo' });
-describe('/combo-registration-windows/{id}', { patch: 'Cập nhật đợt chọn combo' });
-for (const [action, title] of Object.entries({ open: 'Mở đợt chọn combo', close: 'Đóng đợt chọn combo', extensions: 'Gia hạn chọn combo', reminders: 'Gửi nhắc chọn combo', finalize: 'Chốt lựa chọn combo' }))
+describe('/combo-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt chọn combo', 'Giữ kiểm tra phạm vi, chốt danh sách và hạn đăng ký; status cần reason.'] });
+for (const [action, title] of Object.entries({ extensions: 'Gia hạn chọn combo', reminders: 'Gửi nhắc chọn combo', finalize: 'Chốt lựa chọn combo' }))
   describe('/combo-registration-windows/{id}/' + action, { post: title });
 describe('/combo-registration-windows/{id}/selections', { get: 'Theo dõi lựa chọn combo', post: 'Gửi lựa chọn combo' });
 describe('/combo-registration-windows/{id}/preview', { post: ['Xem ảnh hưởng của combo dự kiến', 'Tính tín chỉ, môn còn thiếu và điều kiện OJT; không lưu lựa chọn chính thức.'] });
@@ -95,12 +89,11 @@ describe('/students/{id}/combo-selections', { get: 'Lịch sử lựa chọn com
 describe('/majors', { get: 'Danh sách chuyên ngành', post: 'Tạo chuyên ngành' });
 describe('/courses', { get: 'Danh sách môn học', post: 'Tạo môn học' });
 describe('/courses/{id}', { patch: 'Cập nhật môn học' });
-describe('/curricula', { get: 'Danh sách chương trình đào tạo', post: 'Tạo phiên bản chương trình' });
-describe('/curricula/{id}', { get: 'Chi tiết chương trình đào tạo', patch: 'Cập nhật phiên bản chương trình' });
+describe('/curricula', { get: 'Danh sách chương trình đào tạo đã nhập' });
+describe('/curricula/{id}', { get: 'Chi tiết chương trình đào tạo', patch: ['Sửa thông tin chương trình đã nhập', 'Chỉ sửa bản nháp; tạo phiên bản mới bằng import.'] });
 describe('/curricula/{id}/courses', { put: 'Thiết lập môn, tín chỉ và kỳ học' });
 describe('/curricula/{id}/prerequisites', { put: 'Thiết lập môn tiên quyết' });
 describe('/curricula/{id}/course-equivalences', { put: 'Thiết lập công nhận và tương đương môn' });
-describe('/curricula/{id}/combos', { get: 'Danh sách combo của chương trình', post: 'Tạo combo' });
 describe('/combos/{id}/courses', { put: 'Thiết lập môn thuộc combo' });
 describe('/curricula/{id}/publish', { post: 'Ban hành phiên bản chương trình' });
 for (const [resource, name] of Object.entries({ 'curriculum-imports': 'khung chương trình', 'course-result-imports': 'kết quả học tập', imports: 'sinh viên hoặc doanh nghiệp' })) {
@@ -119,9 +112,7 @@ describe('/imports/emails', { get: 'Trạng thái gửi email tài khoản' });
 describe('/imports/emails/{emailId}/retry', { post: 'Gửi lại email bị lỗi' });
 describe('/imports/archive', { post: 'Lưu trữ tuyển dụng sau hai học kỳ' });
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
-describe('/ojt-registration-windows/{id}', { patch: 'Cập nhật đợt đăng ký OJT' });
-describe('/ojt-registration-windows/{id}/open', { post: 'Mở đợt đăng ký OJT' });
-describe('/ojt-registration-windows/{id}/close', { post: 'Đóng đợt đăng ký OJT' });
+describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
 describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post: 'Nộp hồ sơ đăng ký OJT' });
 describe('/ojt-registrations/{id}', { get: 'Chi tiết hồ sơ đăng ký OJT' });
 describe('/ojt-registrations/{id}/review', { post: 'Duyệt hoặc từ chối hồ sơ OJT' });
@@ -134,7 +125,7 @@ describe('/ojt-results/{id}/transfer', { post: 'Gửi lại hồ sơ OJT đã b�
 describe('/ojt-results/{id}/confirm', { post: ['Xác nhận kết quả OJT', 'Ghi nhận kết quả môn học và trạng thái thực tập theo cấu hình quy đổi điểm.'] });
 describe('/ojt-semesters/{id}/results/export', { get: 'Xuất báo cáo kết quả OJT theo kỳ' });
 describe('/students', { get: 'Tìm kiếm và lọc sinh viên' });
-describe('/students/{id}', { get: ['Hồ sơ học vụ tổng hợp', 'Kèm GPA, tín chỉ, điểm, combo và OJT; điểm và lịch sử đăng ký có phân trang.'], patch: 'Cập nhật hồ sơ học vụ' });
+describe('/students/{id}', { get: ['Hồ sơ học vụ tổng hợp', 'Kèm GPA, tín chỉ, điểm, combo và OJT; điểm và lịch sử đăng ký có phân trang.'], patch: ['Cập nhật hồ sơ và lộ trình học vụ', 'Chỉ gửi trường cần sửa; placement chứa khóa, nhóm và kỳ học.'] });
 describe('/students/{id}/course-results', { get: 'Điểm, lần học và trạng thái môn' });
 describe('/students/{id}/academic-progress', { get: ['GPA, tín chỉ và tiến độ học tập', 'GPA lấy lần học gần nhất. Tín chỉ không cộng trùng học lại, môn tương đương và môn được công nhận.'] });
 describe('/course-results/{id}', { patch: 'Sửa kết quả học tập và ghi lý do' });
@@ -144,8 +135,7 @@ describe('/health', { get: 'Kiểm tra backend và cơ sở dữ liệu' });
 describe('/roles', { get: 'Danh sách vai trò' });
 
 describe('/auth/users/{userId}/password-reset', { post: ['Đặt lại mật khẩu', 'Gửi mật khẩu tạm qua email và thu hồi phiên cũ.'] });
-describe('/admin/dashboard/summary', { get: 'Tổng quan hệ thống' });
-describe('/admin/dashboard', { get: ['Thống kê mức sẵn sàng và rủi ro', 'Xem phân bố và xu hướng; dùng section để chọn nội dung.'] });
+describe('/admin/dashboard', { get: ['Tổng quan hệ thống và thống kê dự đoán', 'section: summary/readiness/risks/trends/all. Summary luôn là tổng toàn hệ thống.'] });
 describe('/students', { post: ['Tạo hồ sơ sinh viên', 'Liên kết với tài khoản sinh viên đang hoạt động.'] });
 describe('/students/{id}', { delete: ['Xóa hồ sơ sinh viên', 'Xóa mềm hồ sơ và vô hiệu hóa tài khoản.'] });
 describe('/students/export', { get: 'Xuất danh sách sinh viên' });
@@ -155,8 +145,7 @@ describe('/companies/{id}', { patch: ['Cập nhật doanh nghiệp', sharedWrite
 describe('/positions', { get: ['Danh sách và hồ sơ vị trí thực tập', 'Lọc positionId để lấy một vị trí kèm lịch sử; có mã, địa điểm và hình thức làm việc.'] });
 describe('/positions/{id}', { delete: ['Xóa vị trí thực tập', 'Xóa mềm vị trí theo điều kiện dữ liệu liên quan.'] });
 describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; lọc assignmentId để xem lịch sử.'], post: ['Phân công sinh viên thực tập', sharedWrite] });
-describe('/assignments/{id}', { patch: ['Cập nhật phân công thực tập', sharedWrite] });
-describe('/assignments/{id}/status', { patch: ['Cập nhật trạng thái thực tập', sharedWrite] });
+describe('/assignments/{id}', { patch: ['Cập nhật thông tin và trạng thái thực tập', sharedWrite] });
 describe('/assessment-templates', { get: ['Danh sách và hồ sơ bộ tiêu chí đánh giá', 'Lọc templateId để lấy một bộ tiêu chí đầy đủ.'], post: ['Tạo bộ tiêu chí đánh giá', 'Tổng trọng số tiêu chí phải bằng 100.'] });
 describe('/assessment-templates/{id}', { patch: ['Sửa bộ tiêu chí đánh giá', 'Chỉ sửa phiên bản còn nháp.'] });
 describe('/assessment-templates/{id}/publish', { post: ['Ban hành bộ tiêu chí đánh giá', 'Phiên bản đã ban hành không được sửa.'] });
@@ -173,29 +162,22 @@ describe('/interventions/{id}', { patch: 'Cập nhật hoạt động hỗ trợ
 describe('/admin/reports/readiness', { get: ['Báo cáo mức sẵn sàng và rủi ro', 'Lấy dự đoán mới nhất của từng sinh viên trong mỗi kỳ.'] });
 describe('/admin/reports/export', { get: ['Xuất báo cáo dự đoán', 'Tối đa 10.000 bản ghi dự đoán mới nhất.'] });
 describe('/admin/audit-logs', { get: ['Nhật ký hoạt động hệ thống', 'Ẩn các trường dữ liệu nhạy cảm.'] });
-describe('/ojt-coordinations', { get: 'Danh sách điều phối sinh viên', post: ['Giới thiệu sinh viên cho doanh nghiệp', 'Áp dụng cho hồ sơ đã bàn giao; cần lý do và lưu nhật ký.'] });
-describe('/ojt-coordinations/{id}', { get: 'Chi tiết và lịch sử điều phối' });
+describe('/ojt-coordinations', { get: ['Danh sách và hồ sơ điều phối', 'Lọc coordinationId để xem hồ sơ, lịch sử và chuỗi điều phối phân trang.'], post: ['Giới thiệu sinh viên cho doanh nghiệp', 'Áp dụng cho hồ sơ đã bàn giao; cần lý do và lưu nhật ký.'] });
 describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định tiếp nhận sinh viên', 'Admin hoặc Phòng QHDN ghi nhận thay doanh nghiệp; cần lý do.'] });
 describe('/ojt-coordinations/{id}/reassign', { post: ['Điều phối lại sinh viên', 'Chuyển hồ sơ bị từ chối sang vị trí khác; cần lý do.'] });
-describe('/internship-evaluations', { get: ['Danh sách đánh giá thực tập', 'Có bộ tiêu chí và điểm chi tiết; hỗ trợ lọc theo templateId.'] });
-describe('/internship-evaluations/{id}', { get: 'Chi tiết và lịch sử đánh giá thực tập' });
+describe('/internship-evaluations', { get: ['Danh sách đánh giá thực tập', 'Lọc evaluationId để xem hồ sơ và lịch sử; giữ lọc templateId.'] });
 describe('/assignments/{id}/internship-evaluation', { put: ['Ghi nhận đánh giá thực tập', 'Admin hoặc Phòng QHDN nhập thay doanh nghiệp; cần lý do.'] });
 describe('/qhdn/dashboard', { get: ['Tổng quan QHDN', 'Tổng hợp bàn giao, tiếp nhận và sức chứa; dùng lần điều phối mới nhất.'] });
-describe('/qhdn/reports/acceptance', { get: ['Thống kê tiếp nhận và từ chối', 'Theo học kỳ và doanh nghiệp. Tỷ lệ tiếp nhận tính trên các hồ sơ đã có quyết định.'] });
-describe('/qhdn/reports/internships', { get: ['Thống kê thực tập và kết quả', 'Theo học kỳ và doanh nghiệp; điểm và kết quả chỉ lấy hồ sơ đã xác nhận.'] });
-describe('/qhdn/reports/enterprise-feedback', { get: ['Tổng hợp đánh giá từ doanh nghiệp', 'Gồm mức độ hoàn tất đánh giá và điểm trung bình; không phải khảo sát hài lòng.'] });
+describe('/qhdn/reports', {get:['Báo cáo QHDN theo loại', 'type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang.']});
 describe('/qhdn/reports/export', { get: ['Xuất báo cáo QHDN', 'Định dạng CSV hoặc JSON; tối đa 10.000 dòng, không phân trang.'] });
 const ownEnterprise = 'Chỉ xem dữ liệu của doanh nghiệp đang đăng nhập.';
 describe('/enterprise/profile', { get: ['Hồ sơ doanh nghiệp', ownEnterprise+' Kèm số liệu tuyển dụng và thực tập.'] });
-describe('/enterprise/candidates', { get: ['Danh sách ứng viên', 'Kèm liên hệ, CV, vị trí và quyết định tiếp nhận của doanh nghiệp đang đăng nhập.'] });
-describe('/enterprise/candidates/{id}', { get: ['Hồ sơ ứng viên', 'Kèm CV và vị trí; candidateId là ID điều phối.'] });
+describe('/enterprise/candidates', { get: ['Danh sách và hồ sơ ứng viên', 'Lọc candidateId để xem một lần giới thiệu, kể cả lịch sử thuộc doanh nghiệp đăng nhập.'] });
 describe('/enterprise/candidates/{id}/decision', { patch: ['Tiếp nhận hoặc từ chối ứng viên', 'Chỉ xử lý ứng viên được giới thiệu cho doanh nghiệp đang đăng nhập.'] });
 describe('/enterprise/internships', { get: ['Danh sách sinh viên thực tập', 'Kèm người hướng dẫn, vị trí, đánh giá và kết quả; điểm chính thức chỉ hiển thị sau xác nhận.'] });
 describe('/enterprise/internships/{id}/evaluation', { put: ['Gửi hoặc cập nhật đánh giá thực tập', 'Chỉ đánh giá sinh viên của doanh nghiệp; internshipId là ID phân công.'] });
 describe('/recruitment/windows', { get: 'Danh sách đợt tuyển dụng theo học kỳ', post: ['Tạo đợt nhận nhu cầu tuyển dụng', 'Chọn học kỳ có sẵn và thời hạn nhận đơn; không tạo kỳ OJT riêng.'] });
-describe('/recruitment/windows/{id}', { patch: 'Cập nhật đợt nhận nhu cầu tuyển dụng' });
-describe('/recruitment/windows/{id}/open', { post: 'Mở đợt nhận nhu cầu tuyển dụng' });
-describe('/recruitment/windows/{id}/close', { post: 'Đóng đợt nhận nhu cầu tuyển dụng' });
+describe('/recruitment/windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt tuyển dụng', 'Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason.'] });
 describe('/recruitment/posts', { get: ['Danh sách tin tuyển dụng', 'Kèm vị trí và chỉ tiêu; doanh nghiệp chỉ xem tin của mình.'], post: ['Gửi nhu cầu tuyển dụng', 'Gửi vị trí, yêu cầu và số lượng trong đợt đang mở.'] });
 describe('/recruitment/posts/{id}', { patch: ['Sửa tin và vị trí tuyển dụng', 'Tin chuyển về chờ duyệt; vị trí có lịch sử chỉ được sửa sức chứa.'] });
 describe('/recruitment/posts/{id}/review', { post: ['Duyệt hoặc từ chối tin tuyển dụng', 'Vị trí được mở sau khi tin được công bố.'] });

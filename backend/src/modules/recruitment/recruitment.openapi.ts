@@ -15,8 +15,7 @@ export function addRecruitmentOperations(spec:Spec) {
  const window={academicPeriodId:id,name:text(150),startsAt:time,endsAt:time,reason};
  add('get','/api/recruitment/windows','Đợt nhận nhu cầu tuyển dụng theo học kỳ',read,{...page,academicPeriodId:id,status:{type:'string',enum:['DRAFT','OPEN','CLOSED']}});
  add('post','/api/recruitment/windows','QHDN tạo đợt từ học kỳ phòng đào tạo đã có',staff,{},window,['academicPeriodId','name','startsAt','endsAt','reason']);
- add('patch','/api/recruitment/windows/{id}','Cập nhật đợt nhận đơn tuyển dụng',staff,{},window,['reason']);
- for(const action of ['open','close'])add('post',`/api/recruitment/windows/{id}/${action}`,action==='open'?'Mở đợt nhận đơn doanh nghiệp':'Đóng đợt nhận đơn doanh nghiệp',staff,{}, {reason},['reason']);
+ add('patch','/api/recruitment/windows/{id}','Cập nhật đợt nhận đơn tuyển dụng',staff,{},{...window,status:{type:'string',enum:['OPEN','CLOSED']}},['reason']);
  add('get','/api/recruitment/posts','Danh sách tin tuyển dụng kèm vị trí và chỉ tiêu',read,{...page,postId:id,windowId:id,academicPeriodId:id,status:{type:'string',enum:['DRAFT','PENDING_REVIEW','PUBLISHED','REJECTED','CLOSED','ARCHIVED']}});
  const position={type:'object',additionalProperties:false,required:['code','title','description','requirements','capacity'],properties:{code:text(60),title:text(150),description:text(10000),requirements:text(10000),capacity:{...id,maximum:100000}}};
  add('post','/api/recruitment/posts','Doanh nghiệp gửi nhu cầu tuyển dụng', ['ENTERPRISE'],{},

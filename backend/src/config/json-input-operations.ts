@@ -60,6 +60,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       }
       const searchId:Record<string,string>={
         '/api/companies':'companyId','/api/positions':'positionId','/api/assignments':'assignmentId',
+        '/api/academic-periods':'academicPeriodId','/api/accounts':'userId','/api/ojt-coordinations':'coordinationId','/api/internship-evaluations':'evaluationId','/api/enterprise/candidates':'candidateId',
         '/api/assessment-templates':'templateId','/api/admin/models':'modelId','/api/alerts':'alertId'
       };
       if(sourceMethod==='get'&&searchId[sourcePath])operation.requestBody.content['application/json'].examples={

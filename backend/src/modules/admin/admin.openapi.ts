@@ -18,8 +18,7 @@ export function addAdminOperations(spec:Schema):Schema {
   spec.paths[path]??={};spec.paths[path][method]=operation;
  };
  add('post','/api/auth/users/{userId}/password-reset','Queue temporary password email and revoke previous JWTs',undefined,[],undefined,202);
- add('get','/api/admin/dashboard/summary','System totals');
- add('get','/api/admin/dashboard','Readiness, risk and trends in one snapshot',undefined,[],{...predictionQuery,section:status('all','readiness','risks','trends')});
+ add('get','/api/admin/dashboard','Readiness, risk and trends in one snapshot',undefined,[],{...predictionQuery,section:status('all','summary','readiness','risks','trends')});
  add('post','/api/students','Create profile for an existing active STUDENT account',{userId:id,studentCode:text(20),programId:id,enrollmentYear:{type:'integer',minimum:1900,maximum:2200},currentSemester:{type:'integer',minimum:1,maximum:100},className:text(20)},['userId','studentCode'],undefined,201);
  add('delete','/api/students/{id}','Soft delete student and deactivate account',undefined,[],undefined,204);
  add('get','/api/students/export','Export students as CSV',undefined,[],{search:text(100),status:text(30),programId:id,cohortId:id,groupCode:status('A','B','C','D'),enrollmentYear:id,currentSemester:id});
@@ -30,7 +29,7 @@ export function addAdminOperations(spec:Schema):Schema {
 
  add('post','/api/assignments','Assign an approved registration to a position',assignment,['registrationId','positionId','startDate','endDate'],undefined,201);
  const {registrationId:_,...assignmentPatch}=assignment;
- add('patch','/api/assignments/{id}','Update assignment',{...assignmentPatch,reason},['reason']);add('patch','/api/assignments/{id}/status','Change assignment status',{status:status('ACTIVE','COMPLETED','CANCELLED'),reason},['status','reason']);
+ add('patch','/api/assignments/{id}','Update assignment',{...assignmentPatch,status:status('ACTIVE','COMPLETED','CANCELLED'),reason},['reason']);
  add('get','/api/assessment-templates','List assessment templates',undefined,[],{...paged,templateId:id,search:text(100),status:status('DRAFT','PUBLISHED')});
  add('post','/api/assessment-templates','Create template version; weights total 100',template,['code','version','name','criteria'],undefined,201);
  add('patch','/api/assessment-templates/{id}','Edit draft template',{name:template.name,criteria:template.criteria});add('post','/api/assessment-templates/{id}/publish','Publish immutable template');

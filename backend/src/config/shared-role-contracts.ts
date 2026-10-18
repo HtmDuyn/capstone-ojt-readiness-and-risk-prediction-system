@@ -8,7 +8,6 @@ const sharedRoutes: Record<string, string[]> = {
   '/api/companies/{id}': ['patch'],
   '/api/assignments': ['post'],
   '/api/assignments/{id}': ['patch'],
-  '/api/assignments/{id}/status': ['patch'],
 };
 
 // Keep both schemas and both sets of allowed input fields: the JSON-input
@@ -51,5 +50,5 @@ export function mergeSharedRoleContracts(spec: Spec, qhdnPaths: Spec): void {
       ++count;
     }
   }
-  if (count !== 5) throw new Error('Expected 5 shared operations, got ' + count);
+  if (count !== 4) throw new Error('Expected 4 shared operations, got ' + count);
 }

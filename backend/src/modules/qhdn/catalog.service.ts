@@ -47,15 +47,17 @@ export async function persist(c:PoolClient,resource:Resource,values:Row,id?:numb
 export async function log(c:PoolClient,resource:Resource,before:Row|null,after:Row,actor:Actor,action:string,reason:string,extra:Row={}){
   await audit(c,actor.userId,configs[resource].table,after[configs[resource].id],action,before?api(resource,before):null,{...api(resource,after),...extra,actorRole:actor.roleCode,enteredOnBehalf:actor.roleCode==='OJT_COORD'&&['ENTERPRISE_DECISION','SUBMIT_EVALUATION','UPDATE_EVALUATION'].includes(action)},reason);
 }
-export async function history(c:PoolClient,resource:Resource,id:number){return (await c.query(`SELECT "LogID" AS id,"UserID" AS "actorId","Action" AS action,"Detail"::jsonb AS detail,"ActionAt" AS "createdAt" FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID"`,[configs[resource].table,id])).rows;}
 export async function list(resource:Resource,params:Row,actor:Actor){
   staff(actor);
-  const exactKey=resource==='companies'?'companyId':resource==='positions'?'positionId':resource==='assignments'?'assignmentId':null;
-  const allowed=resource==='companies'?['search','status','companyId']:resource==='positions'?['search','status','companyId','positionId','ojtSemesterId']:['search','status','companyId','ojtSemesterId','studentId','positionId',...(resource==='coordinations'?['registrationId','decision']:resource==='evaluations'?['assignmentId','templateId']:['assignmentId'])];
-  const p=pagination(params,[...allowed,...(exactKey?['historyPage','historyLimit']:[])]);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
+  const exactKey=resource==='companies'?'companyId':resource==='positions'?'positionId':resource==='assignments'?'assignmentId':resource==='coordinations'?'coordinationId':'evaluationId';
+  const allowed=resource==='companies'?['search','status','companyId']:resource==='positions'?['search','status','companyId','positionId','ojtSemesterId']:['search','status','companyId','ojtSemesterId','studentId','positionId',...(resource==='coordinations'?['registrationId','decision','coordinationId']:resource==='evaluations'?['assignmentId','templateId','evaluationId']:['assignmentId'])];
+  const p=pagination(params,[...allowed,...(exactKey?['historyPage','historyLimit']:[]),...(resource==='coordinations'?['coordinationPage','coordinationLimit']:[])]);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const historyPaging=pagination({page:params.historyPage,limit:params.historyLimit},[]);
   if(historyPaging.offset>2147483647)throw invalid('History pagination exceeds allowed range.');
   if((params.historyPage!==undefined||params.historyLimit!==undefined)&&(!exactKey||params[exactKey]===undefined))throw invalid('Select one record by ID before paging its history.');
+  if((params.coordinationPage!==undefined||params.coordinationLimit!==undefined)&&params.coordinationId===undefined)throw invalid('Select coordinationId before paging the coordination chain.');
+  const chainPaging=pagination({page:params.coordinationPage,limit:params.coordinationLimit},[]);
+  if(chainPaging.offset>2147483647)throw invalid('Coordination pagination exceeds allowed range.');
   return readTransaction(async c=>{
     const args:unknown[]=[],filters:string[]=[];
     const add=(col:string,value:unknown)=>{args.push(value);filters.push(`${col}=$${args.length}`);};
@@ -104,30 +106,16 @@ export async function list(resource:Resource,params:Row,actor:Actor){
       const historyTotal=(await c.query('SELECT count(*)::int AS n FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2',[configs[resource].table,item.id])).rows[0].n;
       item.history=(await c.query(`SELECT "LogID" AS id,"UserID" AS "actorId","Action" AS action,"Detail"::jsonb AS detail,"ActionAt" AS "createdAt" FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID" DESC LIMIT $3 OFFSET $4`,[configs[resource].table,item.id,historyPaging.limit,historyPaging.offset])).rows;
       item.historyPagination={total:historyTotal,page:historyPaging.page,limit:historyPaging.limit};
+      if(resource==='coordinations') {
+        const registrationId=item.registrationId;
+        const chainTotal=(await c.query('SELECT count(*)::int AS n FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1',[registrationId])).rows[0].n;
+        item.coordinationHistory=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT $2 OFFSET $3',[registrationId,chainPaging.limit,chainPaging.offset])).rows.map(row=>api('coordinations',row));
+        item.coordinationHistoryPagination={total:chainTotal,page:chainPaging.page,limit:chainPaging.limit};
+      }
     }
     return {items,total:count,page:p.page,limit:p.limit};
   });
 }
-export async function details(resource:'coordinations'|'evaluations',id:number,actor:Actor){staff(actor);return readTransaction(async c=>{
-  const r=await record(c,resource,id,false);
-  const out=api(resource,r);
-  const from=resource==='coordinations'
-    ? 'FROM "StudentEnterpriseCoordination" t JOIN "OJTRegistrations" r ON r."RegistrationID"=t."RegistrationID"'
-    : 'FROM "InternshipEvaluations" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"';
-  const owner=resource==='coordinations'?'t':'a';
-  Object.assign(out,(await c.query(`SELECT ${staffContextFields},${registrationField}${resource==='evaluations'?','+templateField+','+assignmentField:''} ${from}
-    JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID"
-    JOIN "Enterprises" e ON e."EnterpriseID"=${owner}."EnterpriseID" JOIN "InternshipPositions" pos ON pos."PositionID"=${owner}."PositionID"
-    ${resource==='evaluations'?'LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=t."TemplateID"':''}
-    WHERE t."${configs[resource].id}"=$1`,[id])).rows[0]);
-  if(resource==='coordinations'){
-    const chain=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID"',[r.RegistrationID])).rows;
-    out.coordinationHistory=chain.map(row=>api('coordinations',row));
-  }
-  if(resource==='evaluations')Object.assign(out,(await c.query('SELECT a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",p."OJTSemesterID" AS "ojtSemesterId" FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" WHERE a."AssignmentID"=$1',[r.AssignmentID])).rows[0]);
-  out.history=await history(c,resource,id);
-  return out;
-});}
 export async function saveCompany(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
   return academicTransaction(async c=>{
     const before=id?await record(c,'companies',id):null,values:Row={};
