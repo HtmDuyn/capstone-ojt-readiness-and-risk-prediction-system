@@ -8,8 +8,7 @@
     "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
-    "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs"
+    "jobs:provisioning": "node scripts/provisioning-jobs.cjs"
   },
   "repository": {
     "type": "git",

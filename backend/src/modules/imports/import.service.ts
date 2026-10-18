@@ -4,6 +4,7 @@ import { pool } from '../../config/database';
 import { encryptEmail, emailKey } from './email.crypto';
 import { fail, validateImport } from './import.validation';
 import { saveHistory, recordRejected, safeRow } from '../students/academic-import.service';
+import { windowRecord, assertOpen } from '../recruitment/recruitment.repository';
 
 export async function importAccounts(body: unknown, actorId: number, preview = false) {
   try { return await performAccountImport(body,actorId,preview); }
@@ -17,12 +18,13 @@ export async function importAccounts(body: unknown, actorId: number, preview = f
 }
 async function performAccountImport(body: unknown, actorId: number, preview = false) {
   const input = validateImport(body);
-  const payloadHash = createHash('sha256').update(JSON.stringify({ kind: input.kind, semesterId: input.semesterId, rows: input.rows })).digest('hex');
+  const payloadHash = createHash('sha256').update(JSON.stringify({ kind: input.kind, windowId: input.windowId, rows: input.rows })).digest('hex');
   if (!pool) throw fail('Database is not configured.', 503);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Serialize imports so identity/email checks and the once-per-semester rule cannot race.
+    if (input.kind === 'ENTERPRISE') await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
+    // Serialize identity checks and recruitment writes, including repeated batches in one intake.
     await client.query("SELECT pg_advisory_xact_lock(hashtext('account-provisioning'))");
     const old = await client.query('SELECT * FROM "AccountImportBatches" WHERE "IdempotencyKey"=$1', [input.idempotencyKey]);
     if (old.rows.length) {
@@ -31,15 +33,16 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       await client.query('ROLLBACK');
       return { ...old.rows[0].Summary, batchId: old.rows[0].BatchID, academicImportId, replayed: true };
     }
-    let retentionSemesterId: number | undefined;
+    let recruitmentDeadline: Date | undefined;
     if (input.kind === 'ENTERPRISE') {
-      const semester = await client.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1', [input.semesterId]);
-      if (!semester.rows[0]?.StartDate || !semester.rows[0]?.EndDate) throw fail('Semester requires start and end dates.');
-      const next = await client.query('SELECT "OJTSemesterID", "EndDate" FROM "OJTSemesters" WHERE "StartDate">$1 ORDER BY "StartDate", "OJTSemesterID" LIMIT 1', [semester.rows[0].StartDate]);
-      if (!next.rows[0]?.EndDate || new Date(next.rows[0].EndDate) <= new Date(semester.rows[0].EndDate)) throw fail('Configure the next semester and its end date before importing.');
-      retentionSemesterId = next.rows[0].OJTSemesterID;
-      const completed = await client.query('SELECT 1 FROM "AccountImportBatches" WHERE "Kind"=\'ENTERPRISE\' AND "OJTSemesterID"=$1', [input.semesterId]);
-      if (completed.rowCount) throw fail('This semester has already been imported.', 409, 'SEMESTER_ALREADY_IMPORTED');
+      const window = await windowRecord(client, input.windowId!); assertOpen(window);
+      input.semesterId = window.OJTSemesterID;
+      recruitmentDeadline = window.EndsAt;
+      for (const row of input.rows) {
+        const conflict = await client.query(`SELECT 1 FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
+          WHERE upper(e."EnterpriseCode")=$1 AND p."OJTSemesterID"=$2 AND p."RecruitmentCode"=ANY($3::text[])`, [row.code, input.semesterId, row.positions!.map(p=>p.code)]);
+        if (conflict.rowCount) throw fail('A recruitment position code already exists in this semester.',409,'RECRUITMENT_CODE_EXISTS');
+      }
     }
     const plans: { row: typeof input.rows[number]; userId?: number; entityId?: number; action: string }[] = [];
     for (let i = 0; i < input.rows.length; i++) {
@@ -65,7 +68,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       const url = new URL(process.env.FRONTEND_LOGIN_URL ?? '');
       if (!['http:', 'https:'].includes(url.protocol)) throw fail('Configure FRONTEND_LOGIN_URL.', 503);
     }
-    const batch = await client.query('INSERT INTO "AccountImportBatches" ("IdempotencyKey","PayloadHash","Kind","OJTSemesterID","ImportedBy","Summary") VALUES ($1,$2,$3,$4,$5,$6) RETURNING "BatchID"', [input.idempotencyKey, payloadHash, input.kind, input.semesterId ?? null, actorId, summary]);
+    const batch = await client.query('INSERT INTO "AccountImportBatches" ("IdempotencyKey","PayloadHash","Kind","OJTSemesterID","ImportedBy","Summary","RecruitmentWindowID") VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING "BatchID"', [input.idempotencyKey, payloadHash, input.kind, input.semesterId ?? null, actorId, summary, input.windowId ?? null]);
     const batchId = batch.rows[0].BatchID;
     for (let i = 0; i < plans.length; i++) {
       const p = plans[i], row = p.row;
@@ -90,8 +93,8 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
         // Existing enterprises retain account and contact data; only this semester's recruitment is added.
         await client.query('INSERT INTO "EnterpriseUsers" ("UserID","EnterpriseID","PositionTitle") VALUES ($1,$2,\'HR\') ON CONFLICT ("UserID") DO NOTHING', [p.userId, p.entityId]);
         for (const position of row.positions!) {
-          const pos = await client.query('INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","RecruitmentCode","Title","Description","Requirements","Capacity","RemainingSlots","Status") VALUES ($1,$2,$3,$4,$5,$6,$7,$7,\'OPEN\') RETURNING "PositionID"', [p.entityId, input.semesterId, position.code, position.title, position.description, position.requirements, position.capacity]);
-          const post = await client.query('INSERT INTO "RecruitmentPosts" ("EnterpriseID","OJTSemesterID","Title","Content","Status","CreatedBy","RetentionSemesterID") VALUES ($1,$2,$3,$4,\'PENDING_REVIEW\',$5,$6) RETURNING "PostID"', [p.entityId, input.semesterId, position.title, position.description, actorId, retentionSemesterId]);
+          const pos = await client.query('INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","RecruitmentCode","Title","Description","Requirements","Capacity","RemainingSlots","Status") VALUES ($1,$2,$3,$4,$5,$6,$7,$7,\'CLOSED\') RETURNING "PositionID"', [p.entityId, input.semesterId, position.code, position.title, position.description, position.requirements, position.capacity]);
+          const post = await client.query('INSERT INTO "RecruitmentPosts" ("EnterpriseID","OJTSemesterID","Title","Content","Status","CreatedBy","WindowID","DeadlineAt") VALUES ($1,$2,$3,$4,\'PENDING_REVIEW\',$5,$6,$7) RETURNING "PostID"', [p.entityId, input.semesterId, position.title, position.description, actorId, input.windowId, recruitmentDeadline]);
           await client.query('INSERT INTO "RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID") VALUES ($1,$2,$3,$4)', [post.rows[0].PostID, pos.rows[0].PositionID, p.entityId, input.semesterId]);
         }
       }

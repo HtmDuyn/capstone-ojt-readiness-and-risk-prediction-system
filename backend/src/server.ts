@@ -1,4 +1,5 @@
 import "./config/env";
+import { startRecruitmentWorker } from './jobs/recruitment';
 import { startEligibilityWorker } from './jobs/eligibility';
 import { startPredictionWorker } from './jobs/predictions';
 import { startProvisioningJobs } from './jobs/provisioning';
@@ -27,6 +28,7 @@ const startServer =
   async (): Promise<void> => {
     try {
       await testDatabaseConnection();
+      const stopRecruitment = startRecruitmentWorker();
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
       const stopPredictions = process.env.PREDICTION_WORKER_ENABLED === 'true' ? startPredictionWorker() : () => {};
       const stopJobs = process.env.PROVISIONING_JOBS_ENABLED === 'true' ? startProvisioningJobs() : () => {};
@@ -61,6 +63,7 @@ const startServer =
       const shutdown =
         async () => {
           stopJobs();
+          stopRecruitment();
           stopEligibility();
           stopPredictions();
           logger.info(

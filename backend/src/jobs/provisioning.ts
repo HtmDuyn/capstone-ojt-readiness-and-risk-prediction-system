@@ -12,7 +12,9 @@ export async function archiveRecruitment() {
     // Backfill retention for older/manual posts from the next chronological semester.
     await client.query(`UPDATE "RecruitmentPosts" p SET "RetentionSemesterID"=(
       SELECT n."OJTSemesterID" FROM "OJTSemesters" n JOIN "OJTSemesters" s ON s."OJTSemesterID"=p."OJTSemesterID"
-      WHERE n."StartDate">s."StartDate" ORDER BY n."StartDate",n."OJTSemesterID" LIMIT 1
+      WHERE n."StartDate">s."StartDate" AND (s."AcademicPeriodID" IS NULL OR EXISTS (
+        SELECT 1 FROM "AcademicPeriods" ap WHERE ap."AcademicPeriodID"=n."AcademicPeriodID" AND ap."Kind"='SEMESTER'))
+      ORDER BY n."StartDate",n."OJTSemesterID" LIMIT 1
     ) WHERE p."RetentionSemesterID" IS NULL`);
     await client.query(`UPDATE "RecruitmentPosts" SET "Status"='CLOSED',"UpdatedAt"=now()
       WHERE "Status"='PUBLISHED' AND "DeadlineAt"<=now()`);

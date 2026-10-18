@@ -21,7 +21,7 @@ export async function saveRule(body:unknown,actorId:number,id?:number) {
  const fields:Row={};if('programId'in b)fields.ProgramID=positiveId(b.programId,'programId');if('ojtSemesterId'in b)fields.OJTSemesterID=b.ojtSemesterId===null?null:positiveId(b.ojtSemesterId,'ojtSemesterId');
  if('version'in b)fields.Version=positiveId(b.version,'version');if('name'in b)fields.Name=requiredText(b.name,'name',200);
  if('minCredits'in b){if(b.minCredits!==70)throw invalid('The OJT credit threshold is 70.');fields.MinCredits=b.minCredits;}
- if('maxUnpassedCourses'in b){if(b.maxUnpassedCourses!==2)throw invalid('The maximum number of unpassed courses is 2.');fields.MaxUnpassedCourses=b.maxUnpassedCourses;}
+ if('maxUnpassedCourses'in b){if(b.maxUnpassedCourses!==2)throw invalid('Cho phép tối đa 2 môn còn nợ.');fields.MaxUnpassedCourses=b.maxUnpassedCourses;}
  if('debtBasis'in b)fields.DebtBasis=enumValue(b.debtBasis,['FAILED_ATTEMPTS'],'debtBasis');
  if(!id){fields.ProgramID=positiveId(b.programId,'programId');fields.Version=positiveId(b.version,'version');fields.Name=requiredText(b.name,'name',200);fields.CreatedBy=actorId;}
  return academicTransaction(async c=>{let before:Row|undefined;if(id){before=(await c.query('SELECT * FROM "OJTRuleSets" WHERE "RuleSetID"=$1 FOR UPDATE',[id])).rows[0];if(!before)throw invalid('Rule set not found.',404);if(before.Status!=='DRAFT')throw invalid('Published rules cannot be edited. Create a new version.',409,'RULE_IMMUTABLE');}

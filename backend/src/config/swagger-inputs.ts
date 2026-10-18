@@ -42,6 +42,10 @@ for (const [resource, name] of Object.entries({
   describe('/' + resource, { get: 'Danh sách ' + name, post: 'Tạo ' + name });
   describe('/' + resource + '/{id}', { patch: 'Cập nhật ' + name });
 }
+describe('/academic-periods', {
+  get: ['Danh sách kỳ học và Block 3', 'ADMIN/ACADEMIC/OJT_COORD xem lịch học. QHDN lọc kind=SEMESTER để chọn học kỳ tuyển dụng.'],
+  post: ['Tạo kỳ học và Block 3', 'ADMIN/ACADEMIC tạo học kỳ. Với SEMESTER, hệ thống tự tạo liên kết OJT và trả ojtSemesterId; QHDN không khởi tạo kỳ riêng.']
+});
 const placement: [string, string] = ['Gán lộ trình học cho sinh viên', 'Lần đầu cần khóa, nhóm và kỳ hiện tại. Kỳ chuyên ngành tính từ kỳ vào thực tế; Block 3 không tăng số kỳ.'];
 describe('/students/academic-placement', { patch: placement });
 describe('/students/{id}/academic-placement', { patch: placement });
@@ -98,7 +102,7 @@ for (const [resource, name] of Object.entries({ 'curriculum-imports': 'khung ch�
   describe('/' + resource + '/preview', { post: 'Kiểm tra dữ liệu nhập ' + name });
   describe('/' + resource + '/commit', { post: 'Nhập ' + name });
 }
-describe('/ojt-rule-sets', { get: 'Danh sách bộ quy tắc OJT', post: ['Tạo bộ quy tắc OJT', 'Điều kiện: tối thiểu 70 tín chỉ và tối đa 2 môn chưa đạt.'] });
+describe('/ojt-rule-sets', { get: 'Danh sách bộ quy tắc OJT', post: ['Tạo bộ quy tắc OJT', 'Điều kiện: tối thiểu 70 tín chỉ và tối đa 2 môn còn nợ.'] });
 describe('/ojt-rule-sets/{id}', { patch: 'Sửa bộ quy tắc chưa ban hành' });
 describe('/ojt-rule-sets/{id}/publish', { post: 'Ban hành bộ quy tắc OJT' });
 describe('/students/{id}/eligibility-checks', { get: 'Lịch sử kiểm tra điều kiện OJT', post: 'Kiểm tra điều kiện OJT của sinh viên' });
@@ -181,7 +185,7 @@ export function describeManualInputs(spec: Spec): Spec {
     const media=importBody.content['application/json'];
     media.examples={
       student:{summary:'Nhập sinh viên',value:{kind:'STUDENT',idempotencyKey:'manual-student-import-001',rows:[{code:'SV-MANUAL-001',email:'student@example.invalid',fullName:'Sinh viên mẫu'}]}},
-      enterprise:{summary:'Nhập doanh nghiệp',value:{kind:'ENTERPRISE',idempotencyKey:'manual-enterprise-import-001',semesterId:1,rows:[{code:'DN-MANUAL-001',email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu',address:'TP. Hồ Chí Minh',positions:[{code:'DEV-001',title:'Thực tập lập trình',description:'Mô tả công việc',requirements:'Yêu cầu tuyển dụng',capacity:5}]}]}}
+      enterprise:{summary:'Nhập doanh nghiệp vào đợt tuyển dụng đang mở',value:{kind:'ENTERPRISE',idempotencyKey:'manual-enterprise-import-001',windowId:1,rows:[{code:'DN-MANUAL-001',email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu',address:'TP. Hồ Chí Minh',positions:[{code:'DEV-001',title:'Thực tập lập trình',description:'Mô tả công việc',requirements:'Yêu cầu tuyển dụng',capacity:5}]}]}}
     };
   }
   return spec;

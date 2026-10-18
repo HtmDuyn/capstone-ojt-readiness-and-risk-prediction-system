@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { ensureOjtSemesterForPeriod } from './ojt-semester-link';
 import { academicError, dateInput, dateRange, inputObject, positiveId, requiredText, statusInput } from './academic.schema';
 import { academicTransaction, asApi, audit, findRecord, resources, type AcademicRecord, type Resource } from './academic.repository';
 
@@ -95,6 +96,9 @@ export async function saveResource(resource: Resource, input: unknown, actorId: 
       ? await client.query(`INSERT INTO "${config.table}" (${entries.map(([,column]) => `"${column}"`).join(',')}) VALUES (${values.map((_,i) => `$${i+1}`).join(',')}) RETURNING *`, values)
       : await client.query(`UPDATE "${config.table}" SET ${entries.map(([,column],i) => `"${column}"=$${i+1}`).join(',')} WHERE "${config.id}"=$${values.length+1} RETURNING *`, [...values,id]);
     const saved = asApi(resource, result.rows[0]);
+    if (resource === 'academic-periods' && saved.kind === 'SEMESTER') {
+      saved.ojtSemesterId = await ensureOjtSemesterForPeriod(client, saved.id);
+    }
     if (resource === 'cohorts') {
       for (const group of row.groups) await client.query(`INSERT INTO "CohortGroups" ("CohortID","GroupCode","EntryAcademicPeriodID") VALUES ($1,$2,$3)
         ON CONFLICT ("CohortID","GroupCode") DO UPDATE SET "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID"`, [saved.id, group.groupCode, group.entryAcademicPeriodId]);

@@ -1,4 +1,5 @@
 import { query } from '../../config/database';
+import { assertPublishedPosition } from '../recruitment/recruitment.repository';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
 import { dateInput, dateRange } from '../academic/academic.schema';
@@ -32,6 +33,7 @@ export async function saveAssignment(body:unknown,actor:number,id?:number,status
   const pos=locked.find(p=>p.PositionID===positionId);
   const cancelling=statusOnly&&b.status==='CANCELLED';
   const allocating=!old||positionId!==old.PositionID;
+  if(allocating)await assertPublishedPosition(c,positionId);
   if(!pos||(!cancelling&&pos.DeletedAt)||(allocating&&pos.Status!=='OPEN')||pos.OJTSemesterID!==reg.OJTSemesterID)throw invalid('Position must belong to the registration semester and be open for new assignments.',409);
   const company=(await c.query('SELECT "Status","DeletedAt" FROM "Enterprises" WHERE "EnterpriseID"=$1 FOR UPDATE',[pos.EnterpriseID])).rows[0];
   if(!cancelling&&(!company||company.DeletedAt||(allocating&&company.Status!=='ACTIVE')))throw invalid('Company is inactive.',409);

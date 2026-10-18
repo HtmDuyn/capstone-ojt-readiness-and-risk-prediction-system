@@ -8,7 +8,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "List companies",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -210,7 +210,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Detail companies with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -389,7 +389,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "List positions",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -603,7 +603,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Detail positions with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -766,7 +766,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "List ojt-coordinations",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -999,7 +999,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Detail ojt-coordinations with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1059,7 +1059,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "List assignments",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1279,7 +1279,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Detail assignments with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1430,7 +1430,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "List internship-evaluations",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1565,7 +1565,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Detail internship-evaluations with audit history",
- *         "description": "Roles: ADMIN / OJT_COORD / ENTERPRISE (own company only). Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1625,7 +1625,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Enterprise accepts or rejects its latest coordination",
- *         "description": "Roles: ENTERPRISE (own company); ADMIN / OJT_COORD may enter on behalf with audit. Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD may enter on behalf with audit. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -1892,7 +1892,7 @@
  *           "QHDN core"
  *         ],
  *         "summary": "Submit or update the enterprise internship evaluation",
- *         "description": "Roles: ENTERPRISE (own company); ADMIN / OJT_COORD may enter on behalf with audit. Enterprise scope is derived from EnterpriseUsers, never from client input. All writes require reason and are audited.",
+ *         "description": "Roles: ADMIN / OJT_COORD may enter on behalf with audit. ENTERPRISE uses the dedicated Enterprise APIs. All writes require reason and are audited.",
  *         "security": [
  *           {
  *             "bearerAuth": []

@@ -48,10 +48,11 @@ export async function log(c:PoolClient,resource:Resource,before:Row|null,after:R
 }
 export async function history(c:PoolClient,resource:Resource,id:number){return (await c.query(`SELECT "LogID" AS id,"UserID" AS "actorId","Action" AS action,"Detail"::jsonb AS detail,"ActionAt" AS "createdAt" FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID"`,[configs[resource].table,id])).rows;}
 export async function list(resource:Resource,params:Row,actor:Actor){
+  staff(actor);
   const allowed=resource==='companies'?['search','status']:resource==='positions'?['search','status','companyId','ojtSemesterId']:['search','status','companyId','ojtSemesterId','studentId','positionId',...(resource==='coordinations'?['registrationId','decision']:resource==='evaluations'?['assignmentId']:[])];
   const p=pagination(params,allowed);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async c=>{
-    const own=await enterpriseScope(c,actor),args:unknown[]=[],filters:string[]=[];
+    const args:unknown[]=[],filters:string[]=[];
     const add=(col:string,value:unknown)=>{args.push(value);filters.push(`${col}=$${args.length}`);};
     let from=`FROM "${configs[resource].table}" t`;
     let extras='',companyColumn='t."EnterpriseID"';
@@ -66,7 +67,6 @@ export async function list(resource:Resource,params:Row,actor:Actor){
       if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`);}
     }else if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(resource==='companies'?`(t."Name" ILIKE $${args.length} OR t."EnterpriseCode" ILIKE $${args.length})`:`t."Title" ILIKE $${args.length}`);}
     if(params.companyId!==undefined)add(companyColumn,positiveId(params.companyId,'companyId'));
-    if(own!==null)add(companyColumn,own);
     if(resource==='positions'&&params.ojtSemesterId!==undefined)add('t."OJTSemesterID"',positiveId(params.ojtSemesterId,'ojtSemesterId'));
     const states=resource==='companies'?['ACTIVE','INACTIVE']:resource==='positions'?['OPEN','CLOSED']:resource==='assignments'?['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED']:resource==='evaluations'?['SUBMITTED']:['PENDING','ACCEPTED','REJECTED'];
     if(params.status!==undefined||params.decision!==undefined){
@@ -79,16 +79,14 @@ export async function list(resource:Resource,params:Row,actor:Actor){
     return {items:rows.map(r=>api(resource,r)),total:count,page:p.page,limit:p.limit};
   });
 }
-export async function details(resource:Resource,id:number,actor:Actor){return readTransaction(async c=>{
-  const r=await record(c,resource,id,false),a=resource==='evaluations'?await record(c,'assignments',r.AssignmentID,false):r;
-  await assertScope(c,actor,a.EnterpriseID);
+export async function details(resource:Resource,id:number,actor:Actor){staff(actor);return readTransaction(async c=>{
+  const r=await record(c,resource,id,false);
   if(resource==='positions')r.Occupied=await occupied(c,id);
   const out=api(resource,r);
-  // Enterprise sees only its own coordination chain, never a previous enterprise's dossier or audit.
   if(resource==='coordinations'){
     const registration=(await c.query('SELECT "RegistrationID","StudentID","OJTSemesterID","Application" FROM "OJTRegistrations" WHERE "RegistrationID"=$1',[r.RegistrationID])).rows[0];
     out.registration={id:registration.RegistrationID,studentId:registration.StudentID,ojtSemesterId:registration.OJTSemesterID,application:registration.Application};
-    const chain=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 AND ($2::int IS NULL OR "EnterpriseID"=$2) ORDER BY "CoordinationID"',[r.RegistrationID,actor.roleCode==='ENTERPRISE'?r.EnterpriseID:null])).rows;
+    const chain=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID"',[r.RegistrationID])).rows;
     out.coordinationHistory=chain.map(row=>api('coordinations',row));
   }
   out.history=await history(c,resource,id);

@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { assertPublishedPosition } from '../recruitment/recruitment.repository';
 import { academicTransaction } from '../academic/academic.repository';
 import { dateInput, dateRange } from '../academic/academic.schema';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, score } from '../students/student.validation';
@@ -19,6 +20,7 @@ async function latest(c:PoolClient,r:Row,coordinationId:number){
   if(row?.CoordinationID!==coordinationId)throw invalid('Only the latest coordination can change.',409,'COORDINATION_SUPERSEDED');
 }
 async function availablePosition(c:PoolClient,id:number,semesterId:number){
+  await assertPublishedPosition(c,id);
   const p=await record(c,'positions',id),company=await record(c,'companies',p.EnterpriseID);
   if(p.OJTSemesterID!==semesterId)throw invalid('Position belongs to a different semester.',409,'POSITION_SEMESTER_MISMATCH');
   if(company.Status!=='ACTIVE'||p.Status!=='OPEN')throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');

@@ -1,13 +1,15 @@
 # API nghiệp vụ cốt lõi QHDN
 
+Luồng nhận đăng ký tuyển dụng doanh nghiệp theo học kỳ phòng đào tạo: xem [recruitment-api.md](recruitment-api.md). QHDN chọn academicPeriodId, mở đợt và import bằng windowId; không tạo kỳ OJT thủ công.
+
 Cập nhật: 12/10/2026. Base path `/api`. Header `Authorization: Bearer <JWT>`.
 Response thành công: `{ "success": true, "data": ... }`. Danh sách trả `data: {items,total,page,limit}`; mặc định page=1, limit=20, tối đa 100.
 
 ## Quyền truy cập
 
 - ADMIN/OJT_COORD: quản lý doanh nghiệp, vị trí, điều phối, phân công; đọc các hồ sơ nghiệp vụ.
-- ENTERPRISE: đọc doanh nghiệp/vị trí/điều phối/phân công/đánh giá thuộc doanh nghiệp của mình; quyết định tiếp nhận và nộp đánh giá. Không được quản lý danh mục, gửi điều phối hoặc tạo/sửa phân công.
-- Phạm vi ENTERPRISE lấy từ `EnterpriseUsers.UserID` và doanh nghiệp ACTIVE. Không lấy companyId từ body để xác định quyền. Danh sách ngoài phạm vi trả rỗng; xem/sửa chi tiết ngoài phạm vi trả 403. Tài khoản chưa liên kết doanh nghiệp nhận 403.
+- ENTERPRISE: dùng 6 API riêng trong `docs/enterprise-api.md`. Các endpoint QHDN bên dưới chỉ dành cho ADMIN/OJT_COORD.
+- Phạm vi doanh nghiệp lấy từ JWT và EnterpriseUsers; xem tài liệu Enterprise để biết contract mới.
 - STUDENT/ACADEMIC không truy cập module mới. Các API học vụ hiện có giữ nguyên quyền.
 - Mọi thao tác ghi yêu cầu `reason`. AuditLogs ghi người thao tác, vai trò, lý do và dữ liệu trước/sau. Khi OJT_COORD quyết định hoặc nộp/cập nhật đánh giá thay DN, audit có `enteredOnBehalf: true`.
 
@@ -17,27 +19,27 @@ Response thành công: `{ "success": true, "data": ... }`. Danh sách trả `dat
 
 | Method | Endpoint | Quyền | Input |
 | --- | --- | --- | --- |
-| GET | `/companies` | Staff/DN | search, status, page, limit |
-| GET | `/companies/:id` | Staff/DN | ID doanh nghiệp |
+| GET | `/companies` | Staff | search, status, page, limit |
+| GET | `/companies/:id` | Staff | ID doanh nghiệp |
 | POST | `/companies` | Staff | code, name, thông tin liên hệ, status, reason |
 | PATCH | `/companies/:id` | Staff | Trường cần sửa và reason |
-| GET | `/positions` | Staff/DN | companyId, ojtSemesterId, status, search, page, limit |
-| GET | `/positions/:id` | Staff/DN | ID vị trí |
+| GET | `/positions` | Staff | companyId, ojtSemesterId, status, search, page, limit |
+| GET | `/positions/:id` | Staff | ID vị trí |
 | POST | `/positions` | Staff | companyId, ojtSemesterId, title, capacity, description, requirements, status, reason |
 | PATCH | `/positions/:id` | Staff | title, capacity, description, requirements, status, reason |
-| GET | `/ojt-coordinations` | Staff/DN | companyId, ojtSemesterId, studentId, positionId, registrationId, decision/status, search, page, limit |
-| GET | `/ojt-coordinations/:id` | Staff/DN | Chi tiết, application, lịch sử điều phối và audit |
+| GET | `/ojt-coordinations` | Staff | companyId, ojtSemesterId, studentId, positionId, registrationId, decision/status, search, page, limit |
+| GET | `/ojt-coordinations/:id` | Staff | Chi tiết, application, lịch sử điều phối và audit |
 | POST | `/ojt-coordinations` | Staff | registrationId, positionId, reason, idempotencyKey |
-| POST | `/ojt-coordinations/:id/decision` | DN hoặc Staff nhập thay | decision, reason |
+| POST | `/ojt-coordinations/:id/decision` | Staff nhập thay | decision, reason |
 | POST | `/ojt-coordinations/:id/reassign` | Staff | positionId, reason, idempotencyKey |
-| GET | `/assignments` | Staff/DN | companyId, ojtSemesterId, studentId, positionId, status, search, page, limit |
-| GET | `/assignments/:id` | Staff/DN | Chi tiết và audit |
+| GET | `/assignments` | Staff | companyId, ojtSemesterId, studentId, positionId, status, search, page, limit |
+| GET | `/assignments/:id` | Staff | Chi tiết và audit |
 | POST | `/assignments` | Staff | coordinationId, startDate, endDate, enterpriseSupervisorName, reason |
 | PATCH | `/assignments/:id` | Staff | startDate, endDate, enterpriseSupervisorName, reason |
 | PATCH | `/assignments/:id/status` | Staff | status, reason |
-| GET | `/internship-evaluations` | Staff/DN | companyId, ojtSemesterId, studentId, positionId, assignmentId, status, search, page, limit |
-| GET | `/internship-evaluations/:id` | Staff/DN | Điểm, nhận xét, người đánh giá, audit |
-| PUT | `/assignments/:id/internship-evaluation` | DN hoặc Staff nhập thay | completionScore, attitudeScore, skillScore, overallScore, comments, reason |
+| GET | `/internship-evaluations` | Staff | companyId, ojtSemesterId, studentId, positionId, assignmentId, status, search, page, limit |
+| GET | `/internship-evaluations/:id` | Staff | Điểm, nhận xét, người đánh giá, audit |
+| PUT | `/assignments/:id/internship-evaluation` | Staff nhập thay | completionScore, attitudeScore, skillScore, overallScore, comments, reason |
 
 Staff = ADMIN/OJT_COORD; DN = ENTERPRISE trong phạm vi doanh nghiệp.
 

@@ -10,16 +10,11 @@ Trong thư mục `backend`:
 
 ```sh
 npm install
-npm run db:migrate:admin
 npm run build
 npm start
 ```
 
-`backend/DB` là nguồn schema duy nhất; không có file database hoặc migration SQL riêng.
-`db:migrate:admin` đọc phần `Admin management APIs` ngay trong `DB`, áp dụng các thay đổi cộng thêm và bỏ qua nếu đã cài.
-Script dùng kết nối backend trong `.env`; cần tài khoản có quyền thay đổi schema.
-File `DB` đã được cập nhật cho cài đặt mới, nhưng là script **reset dữ liệu**, không dùng để nâng cấp database đang sử dụng.
-Phải chạy migration trước khi dùng backend mới vì API sinh viên hiện có cũng sử dụng cột `DeletedAt`.
+Trước khi khởi động backend, chạy toàn bộ `backend/DB` trên PostgreSQL theo [hướng dẫn khởi tạo DB](database-reset.md). Đây là file định nghĩa database duy nhất, đã chứa đầy đủ cấu trúc quản trị và tuyển dụng. Script xóa dữ liệu ứng dụng cũ và tạo lại DB; không cần chạy migration riêng.
 
 ## Hợp đồng chung
 

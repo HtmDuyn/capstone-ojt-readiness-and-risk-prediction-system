@@ -10,7 +10,7 @@ Ngày kiểm tra: 08/10/2026. Đối chiếu mã nguồn, Swagger, backend đang
 
 Khi nội dung proposal khác với yêu cầu đã chốt trong hội thoại, dùng yêu cầu mới nhất. Vì vậy:
 
-- Điều kiện cứng hiện tại: ít nhất 70 tín chỉ và tối đa 2 môn chưa đạt; không tự thêm GPA hay tiên quyết vào điều kiện OJT.
+- Điều kiện cứng hiện tại: ít nhất 70 tín chỉ và tối đa 2 môn còn nợ; không tự thêm GPA hay tiên quyết vào điều kiện OJT.
 - GPA lấy lần học hoàn tất gần nhất; công nhận/tương đương/học lại không cộng trùng tín chỉ.
 - Backend nhận JSON để test và dùng API; upload CSV/Excel trực tiếp chưa thuộc phạm vi đã yêu cầu. Frontend hoặc công cụ import có thể chuyển file thành JSON.
 - Chỉ thống kê và xuất nhu cầu học; không tạo lớp, thông báo mở lớp hoặc nhận đăng ký lớp.

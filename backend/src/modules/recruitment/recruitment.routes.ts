@@ -1,0 +1,18 @@
+import { Router,type RequestHandler } from 'express';
+import { authenticate } from '../../middleware/authenticate';
+import { authorizeRoles } from '../../middleware/authorize';
+import { positiveId } from '../students/student.validation';
+import { listWindows,saveWindow,changeWindow } from './window.service';
+import { submitPost,listPosts,postDetails,reviewPost } from './post.service';
+const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','OJT_COORD')],read=[authenticate,authorizeRoles('ADMIN','OJT_COORD','ENTERPRISE')];
+const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
+router.get('/windows',...read,handle(r=>listWindows(r.query,r.user)));
+router.post('/windows',...staff,handle(r=>saveWindow(r.body,r.user.userId),201));
+router.patch('/windows/:id',...staff,handle(r=>saveWindow(r.body,r.user.userId,positiveId(r.params.id))));
+for(const action of ['open','close'] as const)router.post(`/windows/:id/${action}`,...staff,handle(r=>changeWindow(positiveId(r.params.id),action,r.body,r.user.userId)));
+router.get('/posts',...read,handle(r=>listPosts(r.query,r.user)));
+router.post('/posts',authenticate,authorizeRoles('ENTERPRISE'),handle(r=>submitPost(r.body,r.user),201));
+router.get('/posts/:id',...read,handle(r=>postDetails(positiveId(r.params.id),r.user)));
+router.post('/posts/:id/review',...staff,handle(r=>reviewPost(positiveId(r.params.id),r.body,r.user)));
+router.post('/posts/:id/close',...staff,handle(r=>reviewPost(positiveId(r.params.id),r.body,r.user,true)));
+export default router;

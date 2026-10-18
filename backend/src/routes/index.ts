@@ -1,4 +1,6 @@
 import qhdnRoutes from '../modules/qhdn/qhdn.routes';
+import recruitmentRoutes from '../modules/recruitment/recruitment.routes';
+import enterpriseRoutes from '../modules/qhdn/enterprise.routes';
 import reportingRoutes from '../modules/academic-reporting/report.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import resultRoutes from '../modules/ojt-results/result.routes';
@@ -22,6 +24,8 @@ router.use(createJsonInputRouter(router));
 router.use(adminRoutes);
 router.use(academicRoutes);
 router.use(qhdnRoutes);
+router.use('/recruitment', recruitmentRoutes);
+router.use('/enterprise', enterpriseRoutes);
 router.use(reportingRoutes);
 router.use(resultRoutes);
 router.use(workflowRoutes);
