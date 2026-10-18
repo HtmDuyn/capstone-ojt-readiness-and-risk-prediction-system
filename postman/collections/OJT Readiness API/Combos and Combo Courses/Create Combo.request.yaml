@@ -1,0 +1,27 @@
+$kind: http-request
+name: Create Combo
+order: 2000
+method: POST
+url: '{{baseUrl}}/curricula/:id/combos'
+pathVariables:
+  - key: id
+    value: '{{curriculumId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "code": "AI",
+      "name": "Artificial Intelligence",
+      "selectionGroup": "SPECIALIZATION",
+      "note": "AI specialization combo"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Combo created', () => pm.expect(pm.response.code).to.eql(201));
+      const json = pm.response.json();
+      if (json.data && json.data.id) pm.collectionVariables.set('comboId', String(json.data.id));

@@ -1,0 +1,39 @@
+$kind: http-request
+name: Replace Combo Courses
+order: 3000
+method: PUT
+url: '{{baseUrl}}/combos/:id/courses'
+pathVariables:
+  - key: id
+    value: '{{comboId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "courses": [
+        {
+          "courseCode": "AIL301",
+          "credits": 3,
+          "semester": 5,
+          "prerequisiteText": null,
+          "note": "Core AI course",
+          "slotCourseIds": [1]
+        }
+      ],
+      "choiceGroups": [
+        {
+          "code": "AI-CORE",
+          "minCourses": 1,
+          "maxCourses": 1,
+          "courseIds": [1]
+        }
+      ]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Combo courses replaced', () => pm.expect(pm.response.code).to.eql(200));

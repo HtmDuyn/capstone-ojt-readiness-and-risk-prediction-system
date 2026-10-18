@@ -1,0 +1,17 @@
+$kind: http-request
+name: Get Student Eligibility
+order: 3000
+method: GET
+url: '{{baseUrl}}/students/:id/eligibility'
+pathVariables:
+  - key: id
+    value: '1'
+queryParams:
+  - key: ojtSemesterId
+    value: '{{ojtSemesterId}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Student eligibility returned', () => pm.expect(pm.response.code).to.eql(200));
+      pm.test('Standard response envelope', () => pm.expect(pm.response.json()).to.have.property('data'));

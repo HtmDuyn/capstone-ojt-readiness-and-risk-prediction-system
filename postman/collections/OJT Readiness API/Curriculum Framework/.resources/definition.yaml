@@ -1,0 +1,4 @@
+$kind: collection
+name: Curriculum Framework
+description: 'Implemented in curriculum.routes.ts. All requests require Bearer JWT and ADMIN or ACADEMIC role.'
+order: 2000

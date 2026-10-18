@@ -1,0 +1,24 @@
+$kind: http-request
+name: Create Eligibility Check Run
+order: 1000
+method: POST
+url: '{{baseUrl}}/eligibility-check-runs'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "ojtSemesterId": {{ojtSemesterId}},
+      "programIds": [{{programId}}],
+      "groupCodes": ["A", "B", "C", "D"],
+      "idempotencyKey": "postman-eligibility-run-001"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Eligibility run accepted', () => pm.expect(pm.response.code).to.eql(202));
+      const json = pm.response.json();
+      if (json.data && json.data.runId) pm.collectionVariables.set('runId', String(json.data.runId));

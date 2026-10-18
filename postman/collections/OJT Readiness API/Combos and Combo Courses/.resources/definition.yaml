@@ -1,0 +1,4 @@
+$kind: collection
+name: Combos and Combo Courses
+description: 'Implemented curriculum combo endpoints. Requires Bearer JWT and ADMIN or ACADEMIC role.'
+order: 3000

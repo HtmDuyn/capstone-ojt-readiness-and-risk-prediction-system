@@ -1007,6 +1007,72 @@ const EducationOjtRegistrationPeriod: React.FC = () => {
                     </p>
                   )}
               </div>
+              {/* CHƯƠNG TRÌNH ĐÀO TẠO */}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Chương trình đào tạo áp dụng
+                </label>
+
+                <p className="mb-3 text-xs text-slate-500">
+                  Chọn một hoặc nhiều chương trình dành cho đợt đăng ký này.
+                </p>
+
+                <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
+                  {programs.map((program) => (
+                    <label
+                      key={program.id}
+                      className="flex cursor-pointer items-start gap-3 rounded-lg p-3 transition hover:bg-orange-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={createForm.programIds.includes(program.id)}
+                        onChange={(event) =>
+                          setCreateForm((current) => ({
+                            ...current,
+                            programIds: event.target.checked
+                              ? [...current.programIds, program.id]
+                              : current.programIds.filter(
+                                  (id) => id !== program.id,
+                                ),
+                          }))
+                        }
+                        disabled={loadingCreateOptions}
+                        className="mt-1 h-4 w-4 accent-orange-500"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800">
+                          {program.code}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          {program.name}
+                        </p>
+
+                        <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                          {program.status}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+
+                  {!loadingCreateOptions && programs.length === 0 && (
+                    <p className="py-4 text-center text-sm text-slate-500">
+                      Chưa có chương trình đào tạo nào.
+                    </p>
+                  )}
+
+                  {loadingCreateOptions && (
+                    <p className="py-4 text-center text-sm text-slate-500">
+                      Đang tải chương trình đào tạo...
+                    </p>
+                  )}
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Đã chọn {createForm.programIds.length} chương trình.
+                </p>
+              </div>
               {/* TÊN */}
 
               <div>

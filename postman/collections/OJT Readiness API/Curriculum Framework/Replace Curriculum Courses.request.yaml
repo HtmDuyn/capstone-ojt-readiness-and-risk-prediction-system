@@ -1,0 +1,39 @@
+$kind: http-request
+name: Replace Curriculum Courses
+order: 5000
+method: PUT
+url: '{{baseUrl}}/curricula/:id/courses'
+pathVariables:
+  - key: id
+    value: '{{curriculumId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "courses": [
+        {
+          "courseCode": "OJT",
+          "credits": 10,
+          "semester": 6,
+          "isRequired": true,
+          "entryKind": "COURSE",
+          "prerequisiteText": null
+        },
+        {
+          "courseCode": "COMBO_SLOT_1",
+          "credits": 3,
+          "semester": 5,
+          "isRequired": true,
+          "entryKind": "COMBO_SLOT",
+          "prerequisiteText": null
+        }
+      ]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Curriculum courses replaced', () => pm.expect(pm.response.code).to.eql(200));

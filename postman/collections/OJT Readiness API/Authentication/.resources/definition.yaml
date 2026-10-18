@@ -1,0 +1,4 @@
+$kind: collection
+name: Authentication
+description: 'Login is public. The other requests inherit Bearer authentication and require ADMIN or ACADEMIC roles.'
+order: 1000

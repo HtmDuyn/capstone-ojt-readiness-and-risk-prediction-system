@@ -1,0 +1,22 @@
+$kind: http-request
+name: Get Eligibility Run Results
+order: 2000
+method: GET
+url: '{{baseUrl}}/eligibility-check-runs/:id'
+pathVariables:
+  - key: id
+    value: '{{runId}}'
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '100'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Run results returned', () => pm.expect(pm.response.code).to.eql(200));
+      const json = pm.response.json();
+      pm.test('Response contains run items', () => pm.expect(json.data.items).to.be.an('array'));
+      const eligible = json.data.items.filter(item => item.status === 'COMPLETED' && item.result && item.result.eligible === true);
+      console.log('Eligible students', eligible);

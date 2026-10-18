@@ -1,0 +1,25 @@
+$kind: collection
+name: OJT Readiness & Risk Prediction API
+description: 'Collection generated from implemented Express routes and validation/service source. Prioritizes curriculum frameworks, combos and combo courses, and OJT eligibility batch results.'
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000/api'
+    description: Backend API base URL from src/server.ts and src/app.ts.
+  - key: token
+    value: ''
+    description: JWT returned by POST /auth/login.
+  - key: curriculumId
+    value: '1'
+  - key: comboId
+    value: '1'
+  - key: ojtSemesterId
+    value: '1'
+  - key: programId
+    value: '1'
+  - key: runId
+    value: '1'
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{token}}'

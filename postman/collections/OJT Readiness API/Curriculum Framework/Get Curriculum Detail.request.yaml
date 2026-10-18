@@ -1,0 +1,14 @@
+$kind: http-request
+name: Get Curriculum Detail
+order: 2000
+method: GET
+url: '{{baseUrl}}/curricula/:id'
+pathVariables:
+  - key: id
+    value: '{{curriculumId}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Successful response', () => pm.expect(pm.response.code).to.eql(200));
+      pm.test('Returns data', () => pm.expect(pm.response.json()).to.have.property('data'));

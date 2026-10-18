@@ -1,0 +1,24 @@
+$kind: http-request
+name: Login
+order: 1000
+method: POST
+url: '{{baseUrl}}/auth/login'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@ojtrpa.edu.vn",
+      "password": "Admin@123"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Login succeeded', () => pm.expect(pm.response.code).to.eql(200));
+      const json = pm.response.json();
+      if (json.token) pm.collectionVariables.set('token', json.token);

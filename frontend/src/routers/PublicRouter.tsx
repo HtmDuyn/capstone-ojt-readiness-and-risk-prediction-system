@@ -22,7 +22,6 @@ import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
 import EducationAiClassProposals from "@/pages/education/EducationAiClassProposals";
-import EducationOjtRegistrationPeriod from "@/pages/education/EducationOjtRegistrationPeriod";
 import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
 import type { UserRole } from "@/types/auth.types";
 
@@ -320,11 +319,6 @@ export const router = createBrowserRouter([
           {
             path: "/education/student-status",
             element: <EducationStudentStatus />,
-          },
-
-          {
-            path: "/education/ojt-registration-period",
-            element: <EducationOjtRegistrationPeriod />,
           },
           {
             path: "/education/ojt-final-results",

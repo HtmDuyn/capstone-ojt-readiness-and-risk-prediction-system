@@ -1,0 +1,14 @@
+$kind: http-request
+name: List Curriculum Combos
+order: 1000
+method: GET
+url: '{{baseUrl}}/curricula/:id/combos'
+pathVariables:
+  - key: id
+    value: '{{curriculumId}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Combos returned', () => pm.expect(pm.response.code).to.eql(200));
+      pm.test('Standard response envelope', () => pm.expect(pm.response.json()).to.have.property('success', true));

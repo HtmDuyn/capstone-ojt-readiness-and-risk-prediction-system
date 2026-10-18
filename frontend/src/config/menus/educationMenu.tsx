@@ -140,18 +140,6 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
     icon: <CalendarDays size={20} />,
     children: [
       {
-        id: 'ojt-registration-period',
-        label: 'Mở đợt đăng ký OJT',
-        path: '/education/ojt-registration-period',
-        icon: <CalendarDays size={20} />,
-        banner: {
-          title: 'Mở đợt Đăng ký OJT',
-          description:
-            'Quản lý các đợt đăng ký nguyện vọng OJT dành cho sinh viên.',
-          badge: 'Quản lý OJT',
-        },
-      },
-      {
         id: 'ojt-final-results',
         label: 'Kết quả OJT cuối kỳ',
         path: '/education/ojt-final-results',
