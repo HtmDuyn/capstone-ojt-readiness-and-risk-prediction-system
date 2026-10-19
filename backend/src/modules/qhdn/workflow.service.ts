@@ -1,3 +1,4 @@
+import { registrationRecord, eligibleOfficial } from '../ojt-registration/registration.service';
 import type { PoolClient } from 'pg';
 import { assertPublishedPosition } from '../recruitment/recruitment.repository';
 import { academicTransaction } from '../academic/academic.repository';
@@ -10,9 +11,10 @@ import { api, record, staff, assertScope, persist, occupied, refreshSlots, log }
 const accepted=(value:unknown)=>['ACCEPTED','ACCEPT','APPROVED'].includes(String(value).toUpperCase());
 const rejected=(value:unknown)=>['REJECTED','REJECT'].includes(String(value).toUpperCase());
 async function registration(c:PoolClient,id:number){
-  const r=(await c.query('SELECT * FROM "OJTRegistrations" WHERE "RegistrationID"=$1 FOR UPDATE',[id])).rows[0];
+  const r=await registrationRecord(c,id);
   if(!r)throw invalid('Registration not found.',404);
   if(r.Status!=='HANDED_OFF'||!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "RegistrationID"=$1 AND "OJTSemesterID"=$2 AND "StudentID"=$3',[id,r.OJTSemesterID,r.StudentID])).rowCount)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
+  await eligibleOfficial(c,r);
   return r;
 }
 async function latest(c:PoolClient,r:Row,coordinationId:number){
@@ -42,10 +44,11 @@ async function replay(c:PoolClient,key:string,hash:string,actor:Actor){
   return {...out,replayed:true};
 }
 export async function coordinate(body:unknown,actor:Actor,previousId?:number){
-  staff(actor);const b=inputObject(body,previousId?['positionId','reason','idempotencyKey']:['registrationId','positionId','reason','idempotencyKey']);
+  staff(actor);const b=inputObject(body,previousId?['positionId','reason','idempotencyKey']:['registrationId','positionId','applicationId','reason','idempotencyKey']);
   const positionId=positiveId(b.positionId,'positionId'),reason=requiredText(b.reason,'reason',2000),key=requiredText(b.idempotencyKey,'idempotencyKey',100);
   const registrationId=previousId?null:positiveId(b.registrationId,'registrationId');
-  const hash=fingerprint({previousId:previousId??null,registrationId,positionId,reason});
+  const applicationId=b.applicationId===undefined?null:positiveId(b.applicationId,'applicationId');
+  const hash=fingerprint({previousId:previousId??null,registrationId,positionId,...(applicationId===null?{}:{applicationId}),reason});
   return academicTransaction(async c=>{
     const prior=await replay(c,key,hash,actor);if(prior)return prior;
     const previous=previousId?await record(c,'coordinations',previousId):null;
@@ -54,7 +57,10 @@ export async function coordinate(body:unknown,actor:Actor,previousId?:number){
     if(previous){await latest(c,r,previousId!);if(!rejected(previous.Decision))throw invalid('Only rejected coordinations can be reassigned.',409,'COORDINATION_NOT_REJECTED');if(previous.PositionID===positionId)throw invalid('Choose a different position for reassignment.');}
     else if((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1',[r.RegistrationID])).rowCount)throw invalid('Coordination already exists. Use reassign after rejection.',409,'COORDINATION_EXISTS');
     const p=await availablePosition(c,positionId,r.OJTSemesterID);
-    const after=await persist(c,'coordinations',{RegistrationID:r.RegistrationID,OJTSemesterID:r.OJTSemesterID,EnterpriseID:p.EnterpriseID,PositionID:positionId,CoordinatedBy:actor.userId,Decision:'PENDING',PreviousCoordinationID:previousId??null});
+    const application=(await c.query(`SELECT * FROM "JobApplications" WHERE "RegistrationID"=$1 AND "PositionID"=$2 AND ($3::int IS NULL OR "ApplicationID"=$3) AND "Status" NOT IN ('REJECTED','WITHDRAWN') ORDER BY "ApplicationID" DESC LIMIT 1`,[r.RegistrationID,positionId,applicationId])).rows[0];
+    if(applicationId&&!application)throw invalid('Ứng tuyển không khớp hồ sơ/vị trí hoặc đã kết thúc.',409,'APPLICATION_POSITION_MISMATCH');
+    if(!previous&&!application&&(await c.query('SELECT 1 FROM "JobApplications" WHERE "RegistrationID"=$1',[r.RegistrationID])).rowCount)throw invalid('Chọn vị trí sinh viên đã ứng tuyển.',409,'APPLICATION_POSITION_MISMATCH');
+    const after=await persist(c,'coordinations',{ApplicationID:application?.ApplicationID??null,RegistrationID:r.RegistrationID,OJTSemesterID:r.OJTSemesterID,EnterpriseID:p.EnterpriseID,PositionID:positionId,CoordinatedBy:actor.userId,Decision:'PENDING',PreviousCoordinationID:previousId??null});
     await log(c,'coordinations',null,after,actor,previous?'REASSIGN':'COORDINATE',reason,{idempotencyKey:key,requestHash:hash});
     return {...api('coordinations',after),replayed:false};
   });
@@ -69,6 +75,7 @@ export async function decision(id:number,body:unknown,actor:Actor){
     if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)throw invalid('Coordination already has an assignment.',409);
     if(value==='ACCEPTED')await availablePosition(c,before.PositionID,r.OJTSemesterID);
     const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];
+    if(before.ApplicationID)await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4 WHERE "ApplicationID"=$1',[before.ApplicationID,value,actor.userId,reason]);
     await log(c,'coordinations',before,after,actor,'ENTERPRISE_DECISION',reason);return {...api('coordinations',after),replayed:false};
   });
 }

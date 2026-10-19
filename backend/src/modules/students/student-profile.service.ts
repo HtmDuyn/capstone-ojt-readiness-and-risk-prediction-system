@@ -1,3 +1,4 @@
+import { predictionSelect } from '../admin/admin.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { studentSelect, resultSelect } from './student.service';
 import { academicProgressWithClient } from './academic-progress';
@@ -40,12 +41,19 @@ export async function studentProfile(id:number,params:Row,actor:Actor) {
       LEFT JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID"
       LEFT JOIN "OJTResults" outcome ON outcome."AssignmentID"=a."AssignmentID" LEFT JOIN "Users" school ON school."UserID"=a."AcademicSupervisorID"
       WHERE r."StudentID"=$1 AND ($2::int IS NULL OR r."OJTSemesterID"=$2) ORDER BY r."RegistrationID" DESC LIMIT $3 OFFSET $4`,[id,selected,ojtPage.limit,ojtPage.offset,actor.roleCode!=='STUDENT'])).rows;
+    for(const registration of registrations){
+      const {cvUrl,...application}=registration.application??{};
+      registration.application={...application,cv:profile.cv};
+    }
     // The selected semester is independent of pagination of historical registrations.
     const semesterId=selected??(await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID??
       (await c.query('SELECT o."OJTSemesterID" FROM "AcademicPeriods" p JOIN "OJTSemesters" o ON o."AcademicPeriodID"=COALESCE(p."ParentPeriodID",p."AcademicPeriodID") WHERE p."AcademicPeriodID"=$1',[profile.currentAcademicPeriodId])).rows[0]?.OJTSemesterID??null;
-    return {...profile,academicProgress,comboSelections,
+    const forecast=(await c.query(predictionSelect+' WHERE p."StudentID"=$1 AND ($2::int IS NULL OR j."OJTSemesterID"=$2) ORDER BY p."PredictionID" DESC LIMIT 1',[id,semesterId])).rows[0]??null;
+    const official=semesterId?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null;
+    const officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;
+    return {...profile,academicProgress,comboSelections,forecast:{advisoryOnly:true,grantsOjtPermission:false,prediction:forecast},officialDecision,
       courseResults:{items:resultItems,total:totalResults,page:resultsPage.page,limit:resultsPage.limit},
       ojtRegistrations:{items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit},
-      ojtSemesterId:semesterId,officialEligibility:semesterId?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null};
+      ojtSemesterId:semesterId,officialEligibility:official};
   });
 }

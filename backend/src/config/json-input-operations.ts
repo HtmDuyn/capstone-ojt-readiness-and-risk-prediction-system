@@ -59,6 +59,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
         };
       }
       const searchId:Record<string,string>={
+        '/api/job-applications':'applicationId',
         '/api/companies':'companyId','/api/positions':'positionId','/api/assignments':'assignmentId',
         '/api/academic-periods':'academicPeriodId','/api/accounts':'userId','/api/ojt-coordinations':'coordinationId','/api/internship-evaluations':'evaluationId','/api/enterprise/candidates':'candidateId',
         '/api/assessment-templates':'templateId','/api/admin/models':'modelId','/api/alerts':'alertId'
@@ -70,6 +71,10 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       if(sourceMethod==='get'&&sourcePath==='/api/qhdn/registered-students')operation.requestBody.content['application/json'].examples={
         all:{summary:'Tất cả sinh viên đã đăng ký OJT',value:{page:1,limit:20}},
         notHandedOff:{summary:'Sinh viên có hồ sơ chưa bàn giao',value:{handoffStatus:'NOT_HANDED_OFF',page:1,limit:20}}
+      };
+      if(sourceMethod==='get'&&sourcePath==='/api/students/{id}/cv')operation.requestBody.content['application/json'].examples={
+        latest:{summary:'CV mới nhất của sinh viên',value:{studentId:1}},
+        version:{summary:'Một phiên bản CV cụ thể',value:{studentId:1,cvFileId:1}}
       };
       // Original examples lack newly required IDs/filters; let the expanded schema expose every field.
       operation['x-original-operation']={method:sourceMethod.toUpperCase(),path:sourcePath};

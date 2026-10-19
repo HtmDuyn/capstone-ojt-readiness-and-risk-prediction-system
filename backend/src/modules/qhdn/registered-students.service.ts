@@ -44,7 +44,7 @@ export async function registeredStudents(params:Row,actor:Actor) {
       for(const r of rows){
         let item=byStudent.get(r.StudentID);
         if(!item){
-          item={id:r.StudentID,studentId:r.StudentID,studentCode:r.StudentCode,fullName:r.FullName,email:r.Email,phone:r.Phone,studentStatus:r.StudentStatus,accountStatus:r.AccountStatus,programId:r.CurrentProgramID,programCode:r.CurrentProgramCode,programName:r.CurrentProgramName,cohortId:r.CohortID,cohortName:r.CohortName,groupCode:r.GroupCode,registrations:[]};
+          item={id:r.StudentID,studentId:r.StudentID,studentCode:r.StudentCode,fullName:r.FullName,email:r.Email,phone:r.Phone,studentStatus:r.StudentStatus,accountStatus:r.AccountStatus,programId:r.CurrentProgramID,programCode:r.CurrentProgramCode,programName:r.CurrentProgramName,cohortId:r.CohortID,cohortName:r.CohortName,groupCode:r.GroupCode,cv:r.CV??null,registrations:[]};
           byStudent.set(r.StudentID,item);
         }
         item.registrations.push({...registrationApi(r),registrationId:r.RegistrationID,semester:r.semester,academicPeriod:r.academicPeriod,window:r.window,handoffStatus:r.HandoffID?'HANDED_OFF':'NOT_HANDED_OFF'});

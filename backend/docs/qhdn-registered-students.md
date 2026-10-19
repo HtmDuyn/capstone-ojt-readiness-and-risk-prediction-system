@@ -45,4 +45,6 @@ ADMIN/OJT_COORD được đọc; ACADEMIC/STUDENT/ENTERPRISE không được g�
 
 API mới chỉ mở quyền quan sát. POST /api/json/ojt-registrations/search và /api/json/ojt-semesters/students/search đối với QHDN vẫn chỉ trả hồ sơ đã bàn giao. Chi tiết hồ sơ nghiệp vụ trước bàn giao vẫn bị chặn với QHDN; review chỉ Admin/Đào tạo, coordinate vẫn yêu cầu HANDED_OFF hợp lệ. Không có thay đổi trạng thái, cập nhật hồ sơ hoặc tạo bản ghi điều phối khi gọi API mới.
 
-Không sửa FE hoặc DB chính. Swagger hiện có 155 API: Admin 146, Phòng đào tạo 88, Phòng QHDN 38, Doanh nghiệp 10, Sinh viên 15, Auth 3.
+Không sửa FE hoặc DB chính. Swagger hiện có 160 API: Admin 148, Phòng đào tạo 89, Phòng QHDN 40, Doanh nghiệp 10, Sinh viên 20, Auth 3.
+
+Metadata CV mới nhất ở items[].cv và registrations[].application.cv; tải file theo studentId/cvFileId qua POST /api/json/students/cv/search. File CV không còn phụ thuộc đăng ký. Xem student-cv-upload.md.

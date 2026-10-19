@@ -14,6 +14,7 @@ import { buildJsonInputOperations, documentJsonInputOperations } from './json-in
 import { groupSwaggerByRole } from './swagger-role-groups';
 import { describeMergedSearchResponses } from './swagger-search-contracts';
 import { describeFeResponses } from './swagger-fe-contracts';
+import { describeStudentWorkflow } from '../modules/students/student-workflow.openapi';
 
 const modulesDirectory =
   path.resolve(
@@ -368,6 +369,8 @@ addEnterpriseOperations(swaggerWithQhdn as Record<string, any>);
 addRecruitmentOperations(swaggerWithQhdn as Record<string, any>);
 describeMergedSearchResponses(swaggerWithQhdn);
 describeFeResponses(swaggerWithQhdn);
-const originalSpec = groupSwaggerByRole(describeManualInputs(swaggerWithQhdn));
+const describedSpec = describeManualInputs(swaggerWithQhdn);
+describeStudentWorkflow(describedSpec);
+const originalSpec = groupSwaggerByRole(describedSpec);
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
 export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

@@ -340,11 +340,7 @@
  *                                           "type": "string",
  *                                           "nullable": true
  *                                         },
- *                                         "cvUrl": {
- *                                           "type": "string",
- *                                           "format": "uri",
- *                                           "nullable": true
- *                                         },
+ *                                         "cv": { "type": "object", "nullable": true, "properties": { "fileName": { "type": "string" }, "mimeType": { "type": "string" }, "size": { "type": "integer" }, "sha256": { "type": "string" }, "uploadedAt": { "type": "string", "format": "date-time" } } },
  *                                         "note": {
  *                                           "type": "string",
  *                                           "nullable": true

@@ -443,11 +443,6 @@
  *                         "maxLength": 100,
  *                         "format": "email"
  *                       },
- *                       "cvUrl": {
- *                         "type": "string",
- *                         "maxLength": 2000,
- *                         "format": "uri"
- *                       },
  *                       "note": {
  *                         "type": "string",
  *                         "maxLength": 2000

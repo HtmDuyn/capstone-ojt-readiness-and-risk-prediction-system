@@ -1,7 +1,7 @@
 # Đầu vào API dành cho FE và test thủ công
 
 Nguồn: OpenAPI hiện tại của backend. Tạo lại bằng `npm run docs:api` sau `npm run build`.
-Phạm vi: 155 operations; 0 path parameters; 0 query parameters; 149 request bodies.
+Phạm vi: 160 operations; 0 path parameters; 0 query parameters; 154 request bodies.
 
 
 FE nhập ID, bộ lọc và dữ liệu trong JSON body. Các API trước đây dùng path/query có cách gọi mới tại `/api/json/...`; API đọc có đầu vào chuyển sang POST. Các API vốn chỉ nhận JSON và API không có đầu vào giữ đường dẫn hiện tại. API cũ vẫn hoạt động để tương thích. Không cần gọi GET trước khi đã biết ID và không cần chạy lại chuỗi API trong cùng phiên. Token hợp lệ, quan hệ dữ liệu, version và trạng thái nghiệp vụ vẫn bắt buộc.
@@ -139,6 +139,9 @@ Bạn tự insert dữ liệu mẫu: dùng đúng bảng/ID, FK, trạng thái, 
 | PATCH /api/recruitment/posts/{id} | PATCH /api/json/recruitment/posts | postId (bắt buộc) |
 | POST /api/recruitment/posts/{id}/review | POST /api/json/recruitment/posts/review | postId (bắt buộc) |
 | POST /api/recruitment/posts/{id}/close | POST /api/json/recruitment/posts/close | postId (bắt buộc) |
+| GET /api/students/{id}/cv | POST /api/json/students/cv/search | studentId (bắt buộc), cvFileId |
+| GET /api/job-applications | POST /api/json/job-applications/search | applicationId, studentId, registrationId, ojtSemesterId, companyId, positionId, page, limit, status |
+| GET /api/students/me/opportunities | POST /api/json/students/me/opportunities/search | ojtSemesterId (bắt buộc), page, limit |
 
 ## POST /api/academic-periods
 
@@ -892,6 +895,25 @@ enterprise:
   ]
 }
 ```
+
+## POST /api/job-applications
+
+Ứng tuyển vị trí doanh nghiệp
+
+Cần hồ sơ OJT của mình, xác nhận ELIGIBLE còn hiệu lực, đợt đăng ký sinh viên đang mở, tin đã công bố còn hạn và vị trí còn chỉ tiêu. Lưu doanh nghiệp/vị trí, kết quả chính thức và phiên bản CV hiện tại. Không tự bàn giao hoặc điều phối.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| registrationId | integer | Có | minimum=1 |  |
+| postId | integer | Có | minimum=1 |  |
+| positionId | integer | Có | minimum=1 |  |
+| coverLetter | string | Không / theo điều kiện nghiệp vụ | maxLength=5000 |  |
 
 ## POST /api/json/academic-imports/detail
 
@@ -2400,6 +2422,49 @@ Body: application/json — bắt buộc.
 | reason | string | Có | maxLength=2000 | Lý do thực hiện. |
 | interventionId | integer | Có | minimum=1; maximum=2147483647 | ID: bản ghi. |
 
+## POST /api/json/job-applications/search
+
+Danh sách hồ sơ ứng tuyển doanh nghiệp
+
+Sinh viên xem hồ sơ của mình; Admin/QHDN xem được trước bàn giao. Kèm vị trí, doanh nghiệp, tin tuyển, CV đã dùng và trạng thái điều phối.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| applicationId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| registrationId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| companyId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| positionId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| status | string ∈ "SUBMITTED", "REVIEWING", "INTERVIEW", "OFFERED", "ACCEPTED", "REJECTED", "WITHDRAWN" | Không / theo điều kiện nghiệp vụ |  |  |
+
+list:
+
+```json
+{
+  "page": 1,
+  "limit": 20
+}
+```
+
+record:
+
+```json
+{
+  "applicationId": 1,
+  "page": 1,
+  "limit": 20
+}
+```
+
 ## POST /api/json/majors/search
 
 Danh sách chuyên ngành
@@ -3385,6 +3450,40 @@ Body: application/json — bắt buộc.
 | academicPeriodId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ học hoặc Block 3. |
 | status | string ∈ "PASSED", "FAILED", "IN_PROGRESS", "WITHDRAWN", "RECOGNIZED" | Không / theo điều kiện nghiệp vụ |  |  |
 
+## POST /api/json/students/cv/search
+
+Tải CV của sinh viên
+
+Mặc định tải CV mới nhất. cvFileId để tải phiên bản cũ. QHDN chỉ xem sinh viên đã đăng ký OJT; sinh viên chỉ xem CV của mình.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 |  |
+| cvFileId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+
+latest:
+
+```json
+{
+  "studentId": 1
+}
+```
+
+version:
+
+```json
+{
+  "studentId": 1,
+  "cvFileId": 1
+}
+```
+
 ## POST /api/json/students/detail
 
 Hồ sơ học vụ tổng hợp
@@ -3490,6 +3589,24 @@ Body: application/json — bắt buộc.
 | limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Số bản ghi mỗi trang. |
 | status | string ∈ "PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED" | Không / theo điều kiện nghiệp vụ |  |  |
 
+## POST /api/json/students/me/opportunities/search
+
+Vị trí tuyển dụng và quyền ứng tuyển
+
+Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1 |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+
 ## POST /api/json/students/search
 
 Tìm kiếm và lọc sinh viên
@@ -3546,6 +3663,7 @@ Body: application/json — bắt buộc.
 | positionId | integer | Có | minimum=1 | ID vị trí thực tập. |
 | reason | string | Có | maxLength=2000 | Lý do thực hiện. |
 | idempotencyKey | string | Có | maxLength=100 | Khóa chống trùng yêu cầu; dùng lại cùng khóa và dữ liệu khi gửi lại. |
+| applicationId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Ứng tuyển của sinh viên tại đúng hồ sơ và vị trí; bỏ trống để tự tìm hồ sơ phù hợp. |
 
 ## POST /api/ojt-registration-windows
 
@@ -3579,6 +3697,8 @@ Body: application/json — bắt buộc.
 
 Nộp hồ sơ đăng ký OJT
 
+Đăng ký tham gia OJT bằng JSON. CV tải riêng trong hồ sơ sinh viên; đăng ký OJT không phải ứng tuyển doanh nghiệp.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
@@ -3592,7 +3712,6 @@ Body: application/json — bắt buộc.
 | application | object | Không / theo điều kiện nghiệp vụ |  |  |
 | application.contactPhone | string | Không / theo điều kiện nghiệp vụ | maxLength=30 |  |
 | application.contactEmail | string | Không / theo điều kiện nghiệp vụ | format="email"; maxLength=100 |  |
-| application.cvUrl | string | Không / theo điều kiện nghiệp vụ | format="uri"; maxLength=2000 |  |
 | application.note | string | Không / theo điều kiện nghiệp vụ | maxLength=2000 |  |
 
 ## POST /api/ojt-results
@@ -3716,3 +3835,19 @@ Body: application/json — bắt buộc.
 | enrollmentYear | integer | Không / theo điều kiện nghiệp vụ | minimum=1900; maximum=2200 |  |
 | currentSemester | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100 | Kỳ chuyên ngành hiện tại, tính từ lộ trình thực tế. |
 | className | string | Không / theo điều kiện nghiệp vụ | maxLength=20 |  |
+
+## POST /api/students/me/cv
+
+Upload hoặc thay CV cá nhân
+
+Sinh viên tải PDF tối đa 10 MB; không cần đăng ký OJT hoặc đợt mở đơn. Lưu file nhị phân trong DB, không nhận URL. Giữ phiên bản CV đã gắn ứng tuyển.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: multipart/form-data — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| cv | string | Có | format="binary" |  |
