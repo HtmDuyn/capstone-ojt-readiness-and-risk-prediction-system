@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { pagination } from '../students/student.validation';
@@ -90,7 +91,7 @@ export async function selectionReport(id:number,params:Record<string,unknown>) {
   return academicTransaction(async client=>{
     const w=await windowRecord(client,id),all=await roster(client,id);const rows=all.map(r=>({...r,status:r.outcome??(r.eventId?'SUBMITTED':'MISSING')}));
     const filtered=filter?rows.filter(r=>r.status===filter):rows;
-    return {window:asWindow(w),summary:{total:all.length,submitted:all.filter(r=>r.eventId).length,missing:all.filter(r=>!r.eventId).length,applied:all.filter(r=>r.outcome==='APPLIED').length,unselected:all.filter(r=>r.outcome==='UNSELECTED').length},items:filtered.slice(p.offset,p.offset+p.limit),total:filtered.length,page:p.page,limit:p.limit};
+    return {window:asWindow(w),summary:{total:all.length,submitted:all.filter(r=>r.eventId).length,missing:all.filter(r=>!r.eventId).length,applied:all.filter(r=>r.outcome==='APPLIED').length,unselected:all.filter(r=>r.outcome==='UNSELECTED').length},items:await enrichListRows(client,filtered.slice(p.offset,p.offset+p.limit)),total:filtered.length,page:p.page,limit:p.limit};
   });
 }
 

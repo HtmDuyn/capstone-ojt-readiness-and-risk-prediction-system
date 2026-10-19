@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, positiveId, requiredText, optionalText, score, enumValue, pagination } from '../students/student.validation';
@@ -6,12 +7,12 @@ import { syncOfficialGrade } from './grade-sync';
 
 type Row = Record<string, any>;
 export const statuses = ['PENDING_ACADEMIC_CONFIRMATION', 'REVISION_REQUESTED', 'CONFIRMED'];
-const select = `SELECT r.*, s."StudentCode", u."FullName", e."Name" AS "EnterpriseName", t."SemesterCode"
+const select = `SELECT r.*, s."StudentCode", u."FullName", e."Name" AS "EnterpriseName",a."EnterpriseID" AS "EnterpriseID",a."PositionID",s."ProgramID", t."SemesterCode"
  FROM "OJTResults" r JOIN "Students" s ON s."StudentID"=r."StudentID"
  JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipAssignments" a ON a."AssignmentID"=r."AssignmentID"
  JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "OJTSemesters" t ON t."OJTSemesterID"=r."OJTSemesterID"`;
 export function resultApi(r: Row) {
-  return { id:r.ResultID, assignmentId:r.AssignmentID, studentId:r.StudentID, studentCode:r.StudentCode,
+  return { id:r.ResultID, assignmentId:r.AssignmentID, studentId:r.StudentID,companyId:r.EnterpriseID,positionId:r.PositionID,programId:r.ProgramID, studentCode:r.StudentCode,
     fullName:r.FullName, enterpriseName:r.EnterpriseName, ojtSemesterId:r.OJTSemesterID, semesterCode:r.SemesterCode,
     status:r.Status, version:r.Version, dossier:r.Dossier, source:r.SourceSnapshot,
     officialScore:r.OfficialScore == null ? null : Number(r.OfficialScore), outcome:r.Outcome,
@@ -142,7 +143,7 @@ export async function list(params:Row,semesterId?:number,exportAll=false) {
     const count=(await c.query(`SELECT count(*)::int AS total FROM (${sql}) data`,args)).rows[0].total;
     if(exportAll&&count>10000)throw invalid('Export exceeds 10000 results. Narrow the filters.',422,'OJT_EXPORT_TOO_LARGE');
     const rows=(await c.query(`${sql} ORDER BY r."ResultID" ${exportAll?'':`LIMIT $${args.length+1} OFFSET $${args.length+2}`}`,exportAll?args:[...args,p.limit,p.offset])).rows;
-    return {items:rows.map(resultApi),total:count,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
+    return {items:await enrichListRows(c,rows.map(resultApi)),total:count,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
   });
 }
 export function resultCsv(items:ReturnType<typeof resultApi>[]) {

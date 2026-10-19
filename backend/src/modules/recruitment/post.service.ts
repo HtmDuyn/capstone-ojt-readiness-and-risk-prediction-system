@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { academicTransaction,audit } from '../academic/academic.repository';
 import { timestamp } from '../combo-registration/combo.validation';
 import { dayString } from '../academic/workflow-policy';
@@ -53,7 +54,7 @@ export async function listPosts(params:Row,actor:Actor) {
   const sql=postSelect+(where.length?' WHERE '+where.join(' AND '):'');
   const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) posts`,args)).rows[0].n;
   const rows=(await c.query(`${sql} ORDER BY p."PostID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
-  return {items:rows.map(postApi),total,page:p.page,limit:p.limit};
+  return {items:await enrichListRows(c,rows.map(postApi)),total,page:p.page,limit:p.limit};
  });
 }
 export async function updatePost(id:number,body:unknown,actor:Actor) {

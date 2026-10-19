@@ -1,3 +1,5 @@
+import { enrichListRows } from '../../shared/list-context';
+import { cvMetadataSql } from '../students/cv.service';
 import { readTransaction } from './read.repository';
 import { templateField } from './context-fields';
 import { enterpriseScope, api } from './catalog.service';
@@ -27,7 +29,7 @@ const candidateFrom = `FROM "StudentEnterpriseCoordination" co
   JOIN "Students" s ON s."StudentID"=r."StudentID"
   JOIN "Users" u ON u."UserID"=s."UserID"
   JOIN "InternshipPositions" p ON p."PositionID"=co."PositionID"`;
-const candidateFields = `co."CoordinationID" AS id,${student} AS student,${position} AS position,
+const candidateFields = `co."CoordinationID" AS id,r."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",co."PositionID" AS "positionId",co."ApplicationID" AS "applicationId",r."RegistrationID" AS "registrationId",${student} AS student,${position} AS position,
   COALESCE(co."Decision",'PENDING') AS decision,co."CoordinatedAt" AS "introducedAt",
   co."DecisionAt" AS "decisionAt",co."RejectReason" AS "rejectReason",
   NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID") AS "isLatestCoordination"`;
@@ -45,10 +47,10 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
       for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','co."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
       if (params.decision!==undefined) add(`COALESCE(co."Decision",'PENDING')=?`,enumValue(params.decision,['PENDING','ACCEPTED','REJECTED'],'decision'));
       if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
-    const sql = `SELECT ${candidateFields},r."Application" AS application ${candidateFrom} WHERE ${where.join(' AND ')}`;
+    const sql = `SELECT ${candidateFields},r."Application"-'cvUrl' AS application,(SELECT jsonb_build_object('id',ja."ApplicationID",'postId',ja."PostID",'coverLetter',ja."CoverLetter",'appliedAt',ja."AppliedAt",'status',ja."Status",'cv',CASE WHEN cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('cv')} END) FROM "JobApplications" ja LEFT JOIN "StudentCVFiles" cv ON cv."CVFileID"=ja."CVFileID" WHERE ja."ApplicationID"=co."ApplicationID") AS "jobApplication" ${candidateFrom} WHERE ${where.join(' AND ')}`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) candidates`,args)).rows[0].n;
     const items = (await c.query(`${sql} ORDER BY co."CoordinationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
-    return {items,total,page:page.page,limit:page.limit};
+    return {items:await enrichListRows(c,items),total,page:page.page,limit:page.limit};
   });
 }
 
@@ -60,10 +62,10 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
     for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','a."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
     if (params.status!==undefined) add(`COALESCE(UPPER(a."Status"),'ASSIGNED')=?`,enumValue(params.status,['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED'],'status'));
     if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
-    const sql = `SELECT a."AssignmentID" AS id,${student} AS student,${position} AS position,
+    const sql = `SELECT a."AssignmentID" AS id,a."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",a."PositionID" AS "positionId",co."ApplicationID" AS "applicationId",r."RegistrationID" AS "registrationId",${student} AS student,${position} AS position,
       a."CoordinationID" AS "coordinationId",a."EnterpriseSupervisorName" AS "enterpriseSupervisorName",
       a."StartDate" AS "startDate",a."EndDate" AS "endDate",a."Status" AS status,
-      r."Application" AS application,
+      r."Application"-'cvUrl' AS application,(SELECT jsonb_build_object('id',ja."ApplicationID",'postId',ja."PostID",'coverLetter',ja."CoverLetter",'appliedAt',ja."AppliedAt",'status',ja."Status",'cv',CASE WHEN cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('cv')} END) FROM "JobApplications" ja LEFT JOIN "StudentCVFiles" cv ON cv."CVFileID"=ja."CVFileID" WHERE ja."ApplicationID"=co."ApplicationID") AS "jobApplication",
       CASE WHEN supervisor."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',supervisor."UserID",'fullName',supervisor."FullName",'email',supervisor."Email",'phone',supervisor."Phone") END AS "academicSupervisor",
       CASE WHEN v."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object(
         'id',v."EvaluationID",'templateId',v."TemplateID",'scoreDetails',v."ScoreDetails",'evaluatedBy',v."EvaluatedBy",'completionScore',v."CompletionScore",'attitudeScore',v."AttitudeScore",
@@ -84,6 +86,6 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       WHERE ${where.join(' AND ')}`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) internships`,args)).rows[0].n;
     const items = (await c.query(`${sql} ORDER BY a."AssignmentID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
-    return {items,total,page:page.page,limit:page.limit};
+    return {items:await enrichListRows(c,items),total,page:page.page,limit:page.limit};
   });
 }

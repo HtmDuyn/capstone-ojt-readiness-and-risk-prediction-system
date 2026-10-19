@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { ensureOjtSemesterForPeriod } from '../academic/ojt-semester-link';
@@ -16,7 +17,7 @@ export async function listWindows(params:Row,actor:Actor) {
   const from=`FROM "RecruitmentWindows" w JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=w."AcademicPeriodID"${where.length?' WHERE '+where.join(' AND '):''}`;
   const total=(await c.query('SELECT count(*)::int AS n '+from,args)).rows[0].n;
   const rows=(await c.query(`SELECT w.*,ap."PeriodCode",ap."Name" AS "PeriodName",ap."Status" AS "PeriodStatus",clock_timestamp() AS "DatabaseNow" ${from} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
-  return {items:rows.map(windowApi),total,page:p.page,limit:p.limit};
+  return {items:await enrichListRows(c,rows.map(windowApi)),total,page:p.page,limit:p.limit};
  });
 }
 async function saveWindowFields(body:unknown,actor:number,id:number|undefined,client:PoolClient) {

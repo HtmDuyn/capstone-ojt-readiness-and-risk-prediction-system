@@ -18,8 +18,12 @@ for (const path of ['/preview', '/commit']) {
 }
 router.get('/emails', authorizeRoles('ADMIN'), async (_req, res, next) => {
   try {
-    const result = await query('SELECT "EmailID","UserID","Recipient","Status","Attempts","SentAt","ExpiresAt","LastError" FROM "EmailOutbox" ORDER BY "EmailID" DESC LIMIT 100');
-    res.json({ success: true, emails: result.rows });
+    const result = await query(`SELECT e."EmailID",e."UserID",e."Recipient",e."Status",e."Attempts",e."SentAt",e."ExpiresAt",e."LastError",count(*) OVER()::int AS "totalCount",
+      CASE WHEN u."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',u."UserID",'fullName',u."FullName",'email',u."Email") END AS "user",
+      COALESCE(e."Status"='FAILED' AND e."ExpiresAt">now() AND e."EncryptedPayload" IS NOT NULL AND u."MustChangePassword" AND u."TemporaryPasswordExpiresAt">now() AND u."Status"='ACTIVE' AND lower(u."Email")=lower(e."Recipient"),false) AS "canRetry"
+      FROM "EmailOutbox" e LEFT JOIN "Users" u ON u."UserID"=e."UserID" ORDER BY e."EmailID" DESC LIMIT 100`);
+    const total=Number(result.rows[0]?.totalCount??0);
+    res.json({ success: true, emails: result.rows.map(({totalCount,...row})=>row),total,limit:100,hasMore:total>100 });
   } catch (error) { next(error); }
 });
 router.post('/emails/:emailId/retry', authorizeRoles('ADMIN'), async (req, res, next) => {

@@ -18,19 +18,19 @@ export function assertOpen(w: Row) {
  if(w.Status!=='OPEN'||w.DatabaseNow<new Date(w.StartsAt)||w.DatabaseNow>=new Date(w.EndsAt))
   throw invalid('Recruitment intake is closed or outside its deadline.',409,'RECRUITMENT_WINDOW_CLOSED');
 }
-export const windowApi=(w:Row)=>({id:w.WindowID,academicPeriodId:w.AcademicPeriodID,periodCode:w.PeriodCode,
+export const windowApi=(w:Row)=>({id:w.WindowID,ojtSemesterId:w.OJTSemesterID,academicPeriodId:w.AcademicPeriodID,periodCode:w.PeriodCode,
  periodName:w.PeriodName,name:w.Name,startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status,
  accepting:w.Status==='OPEN'&&new Date(w.StartsAt)<=new Date(w.DatabaseNow)&&new Date(w.EndsAt)>new Date(w.DatabaseNow)&&!['CLOSED','ARCHIVED'].includes(w.PeriodStatus),
  createdAt:w.CreatedAt,updatedAt:w.UpdatedAt});
 
 export const postSelect=`SELECT p.*,w."AcademicPeriodID",ap."PeriodCode",e."Name" AS "CompanyName",
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',pos."PositionID",'code',pos."RecruitmentCode",'title',pos."Title",
- 'description',pos."Description",'requirements',pos."Requirements",'capacity',pos."Capacity",'remainingSlots',pos."RemainingSlots",'status',pos."Status",'location',pos."Location",'workMode',pos."WorkMode") ORDER BY pos."PositionID")
+ 'description',pos."Description",'requirements',pos."Requirements",'capacity',pos."Capacity",'remainingSlots',GREATEST(0,pos."Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" slot WHERE slot."PositionID"=pos."PositionID" AND COALESCE(UPPER(slot."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))),'status',pos."Status",'location',pos."Location",'workMode',pos."WorkMode") ORDER BY pos."PositionID")
  FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos ON pos."PositionID"=pp."PositionID" WHERE pp."PostID"=p."PostID"),'[]'::jsonb) AS positions
  FROM "RecruitmentPosts" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
  LEFT JOIN "RecruitmentWindows" w ON w."WindowID"=p."WindowID"
  LEFT JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=w."AcademicPeriodID"`;
-export const postApi=(p:Row)=>({id:p.PostID,windowId:p.WindowID,academicPeriodId:p.AcademicPeriodID,periodCode:p.PeriodCode,
+export const postApi=(p:Row)=>({id:p.PostID,ojtSemesterId:p.OJTSemesterID,windowId:p.WindowID,academicPeriodId:p.AcademicPeriodID,periodCode:p.PeriodCode,
  companyId:p.EnterpriseID,companyName:p.CompanyName,title:p.Title,content:p.Content,benefits:p.Benefits,
  applicationInstructions:p.ApplicationInstructions,status:p.Status==='PUBLISHED'&&p.DeadlineAt&&new Date(p.DeadlineAt).getTime()<=Date.now()?'CLOSED':p.Status,deadlineAt:p.DeadlineAt,publishedAt:p.PublishedAt,
  reviewReason:p.ReviewReason,reviewedAt:p.ReviewedAt,positions:p.positions,createdAt:p.CreatedAt,updatedAt:p.UpdatedAt});

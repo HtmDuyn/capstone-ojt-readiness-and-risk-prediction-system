@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { pool, query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicError, pageInput, positiveId, statusInput } from './academic.schema';
@@ -53,7 +54,7 @@ export async function listRecords(resource: Resource, params: Record<string, unk
   const result = await query(`WITH filtered AS (SELECT t.* ${grouped} FROM "${c.table}" t ${where}), page AS (
     SELECT * FROM filtered ORDER BY "${c.id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}
   ) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(page) ORDER BY page."${c.id}" DESC) FILTER (WHERE page."${c.id}" IS NOT NULL),'[]'::jsonb) AS items FROM page`, [...args, p.limit, p.offset]);
-  return { items: result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r)), page: p.page, limit: p.limit, total: result.rows[0].total };
+  return { items: await enrichListRows({query},result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r))), page: p.page, limit: p.limit, total: result.rows[0].total };
 }
 
 export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {

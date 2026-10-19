@@ -1,9 +1,10 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { pool, query } from '../../config/database';
 import { invalid, positiveId, requiredText, enumValue } from './curriculum.validation';
 import { pagination } from '../students/student.validation';
 
-export const curriculumSelect=`SELECT p."ProgramID" AS id,p."ProgramCode" AS code,p."ProgramName" AS name,p."Version" AS version,p."SpecializationID" AS "majorId",s."SpecializationName" AS "majorName",p."TotalCredits"::float8 AS "totalCredits",p."EffectiveYear" AS "effectiveYear",p."Status" AS status,p."PrerequisitesReviewed" AS "prerequisitesReviewed",p."EquivalencesReviewed" AS "equivalencesReviewed",p."CreatedBy" AS "createdBy",p."CreatedAt" AS "createdAt",p."UpdatedAt" AS "updatedAt",p."PublishedBy" AS "publishedBy",p."PublishedAt" AS "publishedAt",gp."GpaScale" AS "gpaScale",gp."RetakePolicy" AS "retakePolicy" FROM "TrainingPrograms" p LEFT JOIN "Specializations" s ON s."SpecializationID"=p."SpecializationID" LEFT JOIN "AcademicGradingPolicies" gp ON gp."ProgramID"=p."ProgramID"`;
+export const curriculumSelect=`SELECT p."ProgramID" AS id,p."ProgramCode" AS code,p."ProgramName" AS name,p."Version" AS version,p."SpecializationID" AS "majorId",s."SpecializationName" AS "majorName",s."SpecializationCode" AS "majorCode",p."TotalCredits"::float8 AS "totalCredits",p."EffectiveYear" AS "effectiveYear",p."Status" AS status,p."PrerequisitesReviewed" AS "prerequisitesReviewed",p."EquivalencesReviewed" AS "equivalencesReviewed",p."CreatedBy" AS "createdBy",p."CreatedAt" AS "createdAt",p."UpdatedAt" AS "updatedAt",p."PublishedBy" AS "publishedBy",p."PublishedAt" AS "publishedAt",gp."GpaScale" AS "gpaScale",gp."RetakePolicy" AS "retakePolicy" FROM "TrainingPrograms" p LEFT JOIN "Specializations" s ON s."SpecializationID"=p."SpecializationID" LEFT JOIN "AcademicGradingPolicies" gp ON gp."ProgramID"=p."ProgramID"`;
 export async function listCatalog(kind:'majors'|'courses'|'curricula',params:Record<string,unknown>) {
   const allowed=kind==='curricula'?['search','status','majorId','version']:kind==='majors'?['search','parentMajorId']:['search'];
   const p=pagination(params,allowed),args:unknown[]=[],filters:string[]=[];
@@ -11,7 +12,7 @@ export async function listCatalog(kind:'majors'|'courses'|'curricula',params:Rec
   if(params.search!==undefined){args.push(`%${requiredText(params.search,'search',100)}%`);filters.push(`(code ILIKE $${args.length} OR name ILIKE $${args.length})`);}
   for(const key of ['status','majorId','parentMajorId','version'])if(params[key]!==undefined){args.push(key==='status'?enumValue(params[key],['DRAFT','PUBLISHED'],'status'):key==='version'?requiredText(params[key],'version',10):positiveId(params[key],key));filters.push(`"${key}"=$${args.length}`);}
   const row=(await query(`WITH catalog AS (${select}), filtered AS (SELECT * FROM catalog ${filters.length?'WHERE '+filters.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
-  return {...row,page:p.page,limit:p.limit};
+  return {...row,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
 export async function curriculumRecord(client:PoolClient,id:number) {
   const row=(await client.query(`${curriculumSelect} WHERE p."ProgramID"=$1`,[id])).rows[0];

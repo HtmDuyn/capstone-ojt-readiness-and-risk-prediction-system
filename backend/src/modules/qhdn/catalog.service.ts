@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from './read.repository';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -113,7 +114,7 @@ export async function list(resource:Resource,params:Row,actor:Actor){
         item.coordinationHistoryPagination={total:chainTotal,page:chainPaging.page,limit:chainPaging.limit};
       }
     }
-    return {items,total:count,page:p.page,limit:p.limit};
+    return {items:await enrichListRows(c,items),total:count,page:p.page,limit:p.limit};
   });
 }
 export async function saveCompany(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);

@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { query } from '../../config/database';
 import { pagination } from '../students/student.validation';
@@ -18,7 +19,7 @@ export async function listWindows(params:Record<string,unknown>) {
   const p=pagination(params,['phase','status','academicPeriodId']),args:unknown[]=[],where:string[]=[];
   for(const [key,col] of [['phase','Phase'],['status','Status'],['academicPeriodId','AcademicPeriodID']])if(params[key]!==undefined){args.push(key==='academicPeriodId'?positiveId(params[key],key):enumValue(params[key],key==='phase'?['INITIAL','CONFIRMATION']:['DRAFT','OPEN','CLOSED','FINALIZED'],key));where.push(`"${col}"=$${args.length}`);}
   const row=(await query(`WITH filtered AS (SELECT * FROM (${comboWindowSelect}) enriched ${where.length?'WHERE '+where.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY "WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "WindowID" DESC) FILTER (WHERE "WindowID" IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
-  return {...row,items:row.items.map(asWindow),page:p.page,limit:p.limit};
+  return {...row,items:await enrichListRows({query},row.items.map(asWindow)),page:p.page,limit:p.limit};
 }
 export async function matchingStudents(client:PoolClient,w:Row) {
   const sc=w.Scope;

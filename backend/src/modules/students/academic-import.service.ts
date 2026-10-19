@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { query } from '../../config/database';
@@ -87,7 +88,7 @@ export async function importHistory(params:Record<string,unknown>) {
   const p=pagination(params,['kind','status']),args:unknown[]=[],filters:string[]=[];
   for (const key of ['kind','status']) if (params[key]!==undefined) {args.push(enumValue(params[key],key==='kind'?['STUDENT','COURSE_RESULT','CURRICULUM']:['COMPLETED','REJECTED','FAILED'],key));filters.push(`"${key==='kind'?'Kind':'Status'}"=$${args.length}`);}
   const row=(await query(`WITH filtered AS (SELECT "BatchID" AS id,"Kind" AS kind,"SourceName" AS "sourceName","ImportedBy" AS "importedBy","Status" AS status,"Summary" AS summary,"CreatedAt" AS "createdAt","SourceAccountBatchID" AS "sourceAccountBatchId" FROM "AcademicImportBatches" ${filters.length?'WHERE '+filters.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
-  return {...row,page:p.page,limit:p.limit};
+  return {...row,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
 export async function importDetails(value:unknown,params:Record<string,unknown>) {
   const id=batchId(value),p=pagination(params,[]);

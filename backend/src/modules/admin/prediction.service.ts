@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { createHash } from 'node:crypto';
 import { pool, query } from '../../config/database';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -58,7 +59,7 @@ export async function predictionJob(id:number,params:Row) {
   (SELECT COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "studentId"),'[]'::jsonb) FROM paged) AS items
  FROM "PredictionJobs" j CROSS JOIN counts WHERE j."JobID"=$1`,[id,p.limit,p.offset])).rows[0];
  if(!job)throw invalid('Prediction job not found.',404);
- return {...job,progressPercent:job.total?Math.round((job.completed+job.failed)*100/job.total):0,page:p.page,limit:p.limit};
+ return {...(await enrichListRows({query},[job]))[0],items:await enrichListRows({query},job.items),progressPercent:job.total?Math.round((job.completed+job.failed)*100/job.total):0,page:p.page,limit:p.limit};
 }
 export async function predictions(params:Row) {const f=predictionFilters(params);return pageSql(predictionSelect+(f.where.length?' WHERE '+f.where.join(' AND '):''),f.args,f.page);}
 export async function predictionDetail(id:number) {

@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { readTransaction } from '../qhdn/read.repository';
@@ -63,7 +64,7 @@ export async function listApplications(params:Row,actor:Actor) {
     const sql=applicationSelect+(where.length?' WHERE '+where.join(' AND '):'');
     const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) x`,args)).rows[0].n;
     const items=(await c.query(sql+` ORDER BY a."ApplicationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
-    return {items,total,page:p.page,limit:p.limit};
+    return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit};
   });
 }
 

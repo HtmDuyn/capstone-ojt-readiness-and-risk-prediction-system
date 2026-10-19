@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from "pg";
 import {
   query,
@@ -41,7 +42,7 @@ export const findAccounts = async (page:number,limit:number,search?:string,roleC
     AND ($4::int IS NULL OR u."UserID"=$4)
  ), paged AS (SELECT * FROM filtered ORDER BY id LIMIT $5 OFFSET $6)
  SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id) FILTER(WHERE id IS NOT NULL),'[]'::jsonb) AS data FROM paged`,[search?'%'+search+'%':null,roleCode??null,status??null,userId??null,limit,(page-1)*limit]);
- return {...result.rows[0],page,limit};
+ return {...result.rows[0],data:await enrichListRows({query},result.rows[0].data),page,limit};
 };
 
 export const findAccountById = async (

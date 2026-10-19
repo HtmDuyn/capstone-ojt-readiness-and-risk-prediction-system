@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from './read.repository';
 import { registrationApi, registrationSelect } from '../ojt-registration/registration.service';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
@@ -51,6 +52,10 @@ export async function registeredStudents(params:Row,actor:Actor) {
       }
       for(const id of studentIds)items.push(byStudent.get(id)!);
     }
-    return {items,total,page:p.page,limit:p.limit};
+    const enriched=await enrichListRows(c,items);
+    const registrations=enriched.flatMap(item=>item.registrations);
+    const expanded=await enrichListRows(c,registrations);
+    let offset=0;for(const item of enriched){item.registrations=expanded.slice(offset,offset+item.registrations.length);offset+=item.registrations.length;}
+    return {items:enriched,total,page:p.page,limit:p.limit};
   });
 }

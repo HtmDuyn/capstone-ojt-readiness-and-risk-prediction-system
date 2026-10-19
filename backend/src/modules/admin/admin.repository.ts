@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { query } from '../../config/database';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
@@ -23,7 +24,7 @@ export async function detail(config:Catalog,id:number) {
 }
 export async function pageSql(sql:string,args:unknown[],p:{page:number;limit:number;offset:number},run:typeof query=query):Promise<{total:number;items:Row[];page:number;limit:number}> {
  const row=(await run(`WITH filtered AS (${sql}), paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER(WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
- return {total:row.total,items:row.items,page:p.page,limit:p.limit};
+ return {total:row.total,items:await enrichListRows({query:run},row.items),page:p.page,limit:p.limit};
 }
 export async function listCatalog(config:Catalog,params:Row) {
  const p=pagination(params,['search',...Object.keys(config.filters)]),args:unknown[]=[],where=config.softDelete?['t."DeletedAt" IS NULL']:[];
