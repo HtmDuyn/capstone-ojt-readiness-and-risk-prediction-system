@@ -4,14 +4,14 @@ Swagger `/api-docs` hiển thị đúng sáu nhóm theo thứ tự:
 
 | Nhóm | Số operation hiển thị |
 | --- | ---: |
-| Admin | 145 |
+| Admin | 146 |
 | Phòng đào tạo | 88 |
-| Phòng QHDN | 37 |
+| Phòng QHDN | 38 |
 | Doanh nghiệp | 10 |
 | Sinh viên | 15 |
 | Auth | 3 |
 
-Có 154 operation duy nhất. API dùng chung xuất hiện trong từng nhóm role được phép gọi nên tổng số ở các nhóm lớn hơn 154. Phạm vi bản ghi vẫn theo kiểm tra trong service: sinh viên chỉ xem hồ sơ của mình, doanh nghiệp chỉ thao tác dữ liệu thuộc doanh nghiệp của mình.
+Có 155 operation duy nhất. API dùng chung xuất hiện trong từng nhóm role được phép gọi nên tổng số ở các nhóm lớn hơn 155. Phạm vi bản ghi vẫn theo kiểm tra trong service: sinh viên chỉ xem hồ sơ của mình, doanh nghiệp chỉ thao tác dữ liệu thuộc doanh nghiệp của mình.
 
 Auth chứa đăng nhập, thông tin phiên và đổi mật khẩu. Đặt lại mật khẩu theo userId dành cho Admin. Health công khai được đặt ở nhóm Admin để không phát sinh nhóm thứ bảy.
 

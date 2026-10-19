@@ -67,6 +67,10 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
         list:{summary:'Danh sách hồ sơ',value:{page:1,limit:20}},
         record:{summary:'Một hồ sơ theo ID',value:{[searchId[sourcePath]]:1,page:1,limit:20}}
       };
+      if(sourceMethod==='get'&&sourcePath==='/api/qhdn/registered-students')operation.requestBody.content['application/json'].examples={
+        all:{summary:'Tất cả sinh viên đã đăng ký OJT',value:{page:1,limit:20}},
+        notHandedOff:{summary:'Sinh viên có hồ sơ chưa bàn giao',value:{handoffStatus:'NOT_HANDED_OFF',page:1,limit:20}}
+      };
       // Original examples lack newly required IDs/filters; let the expanded schema expose every field.
       operation['x-original-operation']={method:sourceMethod.toUpperCase(),path:sourcePath};
       result.push({method,path,sourceMethod,sourcePath,inputs,bodySchema,operation,protected:!!original.security?.length});

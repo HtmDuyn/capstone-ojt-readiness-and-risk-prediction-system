@@ -1,17 +1,17 @@
 # Danh sách API theo 6 nhóm Swagger
 
-Tổng 154 API duy nhất, lấy trực tiếp từ Swagger hiện tại. API được cấp quyền cho nhiều vai trò xuất hiện trong nhiều nhóm.
+Tổng 155 API duy nhất; API dùng chung hiển thị trong từng nhóm được cấp quyền.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
-| Admin | 145 |
+| Admin | 146 |
 | Phòng đào tạo | 88 |
-| Phòng QHDN | 37 |
+| Phòng QHDN | 38 |
 | Doanh nghiệp | 10 |
 | Sinh viên | 15 |
 | Auth | 3 |
 
-## Admin — 145 API
+## Admin — 146 API
 
 | # | Method | Đường dẫn | Chức năng |
 |---:|---|---|---|
@@ -123,43 +123,44 @@ Tổng 154 API duy nhất, lấy trực tiếp từ Swagger hiện tại. API đ
 | 106 | POST | `/api/json/ojt-coordinations/decision` | Ghi nhận quyết định tiếp nhận sinh viên. Admin hoặc Phòng QHDN ghi nhận thay doanh nghiệp; cần lý do. |
 | 107 | POST | `/api/json/ojt-coordinations/reassign` | Điều phối lại sinh viên. Chuyển hồ sơ bị từ chối sang vị trí khác; cần lý do. |
 | 108 | PUT | `/api/json/assignments/internship-evaluation` | Ghi nhận đánh giá thực tập. Admin hoặc Phòng QHDN nhập thay doanh nghiệp; cần lý do. |
-| 109 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN. Tổng hợp bàn giao, tiếp nhận và sức chứa; dùng lần điều phối mới nhất. |
-| 110 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN. Định dạng CSV hoặc JSON; tối đa 10.000 dòng, không phân trang. |
-| 111 | POST | `/api/json/qhdn/reports/search` | Báo cáo QHDN theo loại. type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang. |
-| 112 | POST | `/api/json/students/search` | Tìm kiếm và lọc sinh viên |
-| 113 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp. Kèm GPA, tín chỉ, điểm, combo và OJT; điểm và lịch sử đăng ký có phân trang. |
-| 114 | PATCH | `/api/json/students` | Cập nhật hồ sơ và lộ trình học vụ. Chỉ gửi trường cần sửa; placement chứa khóa, nhóm và kỳ học. |
-| 115 | DELETE | `/api/json/students` | Xóa hồ sơ sinh viên. Xóa mềm hồ sơ và vô hiệu hóa tài khoản. |
-| 116 | POST | `/api/json/students/course-results/search` | Điểm, lần học và trạng thái môn |
-| 117 | POST | `/api/json/students/academic-progress/search` | GPA, tín chỉ và tiến độ học tập. GPA lấy lần học gần nhất. Tín chỉ không cộng trùng học lại, môn tương đương và môn được công nhận. |
-| 118 | PATCH | `/api/json/course-results` | Sửa kết quả học tập và ghi lý do |
-| 119 | POST | `/api/json/academic-imports/search` | Lịch sử nhập dữ liệu học vụ |
-| 120 | POST | `/api/json/academic-imports/detail` | Chi tiết và lỗi nhập dữ liệu học vụ |
-| 121 | POST | `/api/json/auth/users/password-reset` | Đặt lại mật khẩu. Gửi mật khẩu tạm qua email và thu hồi phiên cũ. |
-| 122 | POST | `/api/json/admin/dashboard/search` | Tổng quan hệ thống và thống kê dự đoán. section: summary/readiness/risks/trends/all. Summary luôn là tổng toàn hệ thống. |
-| 123 | POST | `/api/json/students/export` | Xuất danh sách sinh viên |
-| 124 | DELETE | `/api/json/positions` | Xóa vị trí thực tập. Xóa mềm vị trí theo điều kiện dữ liệu liên quan. |
-| 125 | POST | `/api/json/assessment-templates/search` | Danh sách và hồ sơ bộ tiêu chí đánh giá. Lọc templateId để lấy một bộ tiêu chí đầy đủ. |
-| 126 | PATCH | `/api/json/assessment-templates` | Sửa bộ tiêu chí đánh giá. Chỉ sửa phiên bản còn nháp. |
-| 127 | POST | `/api/json/assessment-templates/publish` | Ban hành bộ tiêu chí đánh giá. Phiên bản đã ban hành không được sửa. |
-| 128 | POST | `/api/json/admin/prediction-jobs/detail` | Tiến độ dự đoán và lỗi theo sinh viên |
-| 129 | POST | `/api/json/predictions/search` | Lịch sử dự đoán |
-| 130 | POST | `/api/json/predictions/detail` | Chi tiết dự đoán. Kèm dữ liệu đầu vào và phiên bản mô hình đã sử dụng. |
-| 131 | POST | `/api/json/admin/models/search` | Danh sách và hồ sơ phiên bản mô hình. Lọc modelId; kết quả kèm thông số và cấu trúc đầu vào. |
-| 132 | POST | `/api/json/alerts/search` | Danh sách và hồ sơ cảnh báo rủi ro. Lọc alertId để lấy cảnh báo kèm hoạt động hỗ trợ phân trang. |
-| 133 | PATCH | `/api/json/alerts/status` | Tiếp nhận hoặc đóng cảnh báo |
-| 134 | POST | `/api/json/alerts/interventions` | Tạo hoạt động hỗ trợ sinh viên |
-| 135 | POST | `/api/json/students/interventions/search` | Lịch sử hỗ trợ sinh viên |
-| 136 | PATCH | `/api/json/interventions` | Cập nhật hoạt động hỗ trợ |
-| 137 | POST | `/api/json/admin/reports/readiness/search` | Báo cáo mức sẵn sàng và rủi ro. Lấy dự đoán mới nhất của từng sinh viên trong mỗi kỳ. |
-| 138 | POST | `/api/json/admin/reports/export` | Xuất báo cáo dự đoán. Tối đa 10.000 bản ghi dự đoán mới nhất. |
-| 139 | POST | `/api/json/admin/audit-logs/search` | Nhật ký hoạt động hệ thống. Ẩn các trường dữ liệu nhạy cảm. |
-| 140 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
-| 141 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng. Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason. |
-| 142 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng. Kèm vị trí và chỉ tiêu; doanh nghiệp chỉ xem tin của mình. |
-| 143 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng. Tin chuyển về chờ duyệt; vị trí có lịch sử chỉ được sửa sức chứa. |
-| 144 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng. Vị trí được mở sau khi tin được công bố. |
-| 145 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng. Ngừng nhận ứng viên vào các vị trí liên quan. |
+| 109 | POST | `/api/json/qhdn/registered-students/search` | Xem sinh viên đã đăng ký OJT. Admin/QHDN chỉ xem sinh viên đã có đăng ký OJT, kể cả chưa bàn giao. Mỗi sinh viên một dòng, các hồ sơ khớp bộ lọc nằm trong registrations; total và phân trang tính theo sinh viên. Không cấp quyền duyệt hoặc điều phối trước bàn giao. |
+| 110 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN. Tổng hợp bàn giao, tiếp nhận và sức chứa; dùng lần điều phối mới nhất. |
+| 111 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN. Định dạng CSV hoặc JSON; tối đa 10.000 dòng, không phân trang. |
+| 112 | POST | `/api/json/qhdn/reports/search` | Báo cáo QHDN theo loại. type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang. |
+| 113 | POST | `/api/json/students/search` | Tìm kiếm và lọc sinh viên |
+| 114 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp. Kèm GPA, tín chỉ, điểm, combo và OJT; điểm và lịch sử đăng ký có phân trang. |
+| 115 | PATCH | `/api/json/students` | Cập nhật hồ sơ và lộ trình học vụ. Chỉ gửi trường cần sửa; placement chứa khóa, nhóm và kỳ học. |
+| 116 | DELETE | `/api/json/students` | Xóa hồ sơ sinh viên. Xóa mềm hồ sơ và vô hiệu hóa tài khoản. |
+| 117 | POST | `/api/json/students/course-results/search` | Điểm, lần học và trạng thái môn |
+| 118 | POST | `/api/json/students/academic-progress/search` | GPA, tín chỉ và tiến độ học tập. GPA lấy lần học gần nhất. Tín chỉ không cộng trùng học lại, môn tương đương và môn được công nhận. |
+| 119 | PATCH | `/api/json/course-results` | Sửa kết quả học tập và ghi lý do |
+| 120 | POST | `/api/json/academic-imports/search` | Lịch sử nhập dữ liệu học vụ |
+| 121 | POST | `/api/json/academic-imports/detail` | Chi tiết và lỗi nhập dữ liệu học vụ |
+| 122 | POST | `/api/json/auth/users/password-reset` | Đặt lại mật khẩu. Gửi mật khẩu tạm qua email và thu hồi phiên cũ. |
+| 123 | POST | `/api/json/admin/dashboard/search` | Tổng quan hệ thống và thống kê dự đoán. section: summary/readiness/risks/trends/all. Summary luôn là tổng toàn hệ thống. |
+| 124 | POST | `/api/json/students/export` | Xuất danh sách sinh viên |
+| 125 | DELETE | `/api/json/positions` | Xóa vị trí thực tập. Xóa mềm vị trí theo điều kiện dữ liệu liên quan. |
+| 126 | POST | `/api/json/assessment-templates/search` | Danh sách và hồ sơ bộ tiêu chí đánh giá. Lọc templateId để lấy một bộ tiêu chí đầy đủ. |
+| 127 | PATCH | `/api/json/assessment-templates` | Sửa bộ tiêu chí đánh giá. Chỉ sửa phiên bản còn nháp. |
+| 128 | POST | `/api/json/assessment-templates/publish` | Ban hành bộ tiêu chí đánh giá. Phiên bản đã ban hành không được sửa. |
+| 129 | POST | `/api/json/admin/prediction-jobs/detail` | Tiến độ dự đoán và lỗi theo sinh viên |
+| 130 | POST | `/api/json/predictions/search` | Lịch sử dự đoán |
+| 131 | POST | `/api/json/predictions/detail` | Chi tiết dự đoán. Kèm dữ liệu đầu vào và phiên bản mô hình đã sử dụng. |
+| 132 | POST | `/api/json/admin/models/search` | Danh sách và hồ sơ phiên bản mô hình. Lọc modelId; kết quả kèm thông số và cấu trúc đầu vào. |
+| 133 | POST | `/api/json/alerts/search` | Danh sách và hồ sơ cảnh báo rủi ro. Lọc alertId để lấy cảnh báo kèm hoạt động hỗ trợ phân trang. |
+| 134 | PATCH | `/api/json/alerts/status` | Tiếp nhận hoặc đóng cảnh báo |
+| 135 | POST | `/api/json/alerts/interventions` | Tạo hoạt động hỗ trợ sinh viên |
+| 136 | POST | `/api/json/students/interventions/search` | Lịch sử hỗ trợ sinh viên |
+| 137 | PATCH | `/api/json/interventions` | Cập nhật hoạt động hỗ trợ |
+| 138 | POST | `/api/json/admin/reports/readiness/search` | Báo cáo mức sẵn sàng và rủi ro. Lấy dự đoán mới nhất của từng sinh viên trong mỗi kỳ. |
+| 139 | POST | `/api/json/admin/reports/export` | Xuất báo cáo dự đoán. Tối đa 10.000 bản ghi dự đoán mới nhất. |
+| 140 | POST | `/api/json/admin/audit-logs/search` | Nhật ký hoạt động hệ thống. Ẩn các trường dữ liệu nhạy cảm. |
+| 141 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
+| 142 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng. Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason. |
+| 143 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng. Kèm vị trí và chỉ tiêu; doanh nghiệp chỉ xem tin của mình. |
+| 144 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng. Tin chuyển về chờ duyệt; vị trí có lịch sử chỉ được sửa sức chứa. |
+| 145 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng. Vị trí được mở sau khi tin được công bố. |
+| 146 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng. Ngừng nhận ứng viên vào các vị trí liên quan. |
 
 ## Phòng đào tạo — 88 API
 
@@ -254,7 +255,7 @@ Tổng 154 API duy nhất, lấy trực tiếp từ Swagger hiện tại. API đ
 | 87 | POST | `/api/json/academic-imports/search` | Lịch sử nhập dữ liệu học vụ |
 | 88 | POST | `/api/json/academic-imports/detail` | Chi tiết và lỗi nhập dữ liệu học vụ |
 
-## Phòng QHDN — 37 API
+## Phòng QHDN — 38 API
 
 | # | Method | Đường dẫn | Chức năng |
 |---:|---|---|---|
@@ -286,15 +287,16 @@ Tổng 154 API duy nhất, lấy trực tiếp từ Swagger hiện tại. API đ
 | 26 | POST | `/api/json/ojt-coordinations/decision` | Ghi nhận quyết định tiếp nhận sinh viên. Admin hoặc Phòng QHDN ghi nhận thay doanh nghiệp; cần lý do. |
 | 27 | POST | `/api/json/ojt-coordinations/reassign` | Điều phối lại sinh viên. Chuyển hồ sơ bị từ chối sang vị trí khác; cần lý do. |
 | 28 | PUT | `/api/json/assignments/internship-evaluation` | Ghi nhận đánh giá thực tập. Admin hoặc Phòng QHDN nhập thay doanh nghiệp; cần lý do. |
-| 29 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN. Tổng hợp bàn giao, tiếp nhận và sức chứa; dùng lần điều phối mới nhất. |
-| 30 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN. Định dạng CSV hoặc JSON; tối đa 10.000 dòng, không phân trang. |
-| 31 | POST | `/api/json/qhdn/reports/search` | Báo cáo QHDN theo loại. type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang. |
-| 32 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
-| 33 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng. Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason. |
-| 34 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng. Kèm vị trí và chỉ tiêu; doanh nghiệp chỉ xem tin của mình. |
-| 35 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng. Tin chuyển về chờ duyệt; vị trí có lịch sử chỉ được sửa sức chứa. |
-| 36 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng. Vị trí được mở sau khi tin được công bố. |
-| 37 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng. Ngừng nhận ứng viên vào các vị trí liên quan. |
+| 29 | POST | `/api/json/qhdn/registered-students/search` | Xem sinh viên đã đăng ký OJT. Admin/QHDN chỉ xem sinh viên đã có đăng ký OJT, kể cả chưa bàn giao. Mỗi sinh viên một dòng, các hồ sơ khớp bộ lọc nằm trong registrations; total và phân trang tính theo sinh viên. Không cấp quyền duyệt hoặc điều phối trước bàn giao. |
+| 30 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN. Tổng hợp bàn giao, tiếp nhận và sức chứa; dùng lần điều phối mới nhất. |
+| 31 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN. Định dạng CSV hoặc JSON; tối đa 10.000 dòng, không phân trang. |
+| 32 | POST | `/api/json/qhdn/reports/search` | Báo cáo QHDN theo loại. type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang. |
+| 33 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
+| 34 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng. Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason. |
+| 35 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng. Kèm vị trí và chỉ tiêu; doanh nghiệp chỉ xem tin của mình. |
+| 36 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng. Tin chuyển về chờ duyệt; vị trí có lịch sử chỉ được sửa sức chứa. |
+| 37 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng. Vị trí được mở sau khi tin được công bố. |
+| 38 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng. Ngừng nhận ứng viên vào các vị trí liên quan. |
 
 ## Doanh nghiệp — 10 API
 
