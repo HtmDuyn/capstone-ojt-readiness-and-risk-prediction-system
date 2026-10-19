@@ -42,9 +42,9 @@ Backend kiểm tra quyền sở hữu, hồ sơ đang hoạt động, kết qu�
 
 Lưu RegistrationID, StudentID, EnterpriseID, PositionID, PostID, OJTSemesterID, OfficialCheckID và CVFileID hiện tại (null nếu sinh viên chưa upload). Tạo FK đối chiếu đúng sinh viên/kỳ và đúng phiên bản CV. Gửi lại cùng hồ sơ/vị trí/tin và coverLetter không tạo ứng tuyển trùng.
 
-`POST /api/json/job-applications/search` nhận bộ lọc applicationId/studentId/registrationId/ojtSemesterId/companyId/positionId/status và page/limit. Sinh viên chỉ thấy ứng tuyển của mình; Admin/QHDN xem cả trước bàn giao. Response kèm sinh viên, công ty, vị trí, tin, phiên bản CV đã gửi, xác nhận chính thức được dùng, trạng thái bàn giao/điều phối.
+`POST /api/json/job-applications/list` nhận bộ lọc applicationId/studentId/registrationId/ojtSemesterId/companyId/positionId/status và page/limit. Sinh viên chỉ thấy ứng tuyển của mình; Admin/QHDN xem cả trước bàn giao. Response kèm sinh viên, công ty, vị trí, tin, phiên bản CV đã gửi, xác nhận chính thức được dùng, trạng thái bàn giao/điều phối.
 
-`POST /api/json/students/me/opportunities/search` nhận ojtSemesterId, page/limit. Trả vị trí còn công bố và thông tin FE cần, kèm canApply/blockers cho từng vị trí, chỉ tiêu còn, applicationId đã ứng tuyển, registrationId và officialEligibility. canApply tổng thể là điều kiện ở cấp sinh viên; FE dùng canApply trên từng item cho nút ứng tuyển. Backend luôn kiểm tra lại khi gửi.
+`POST /api/json/students/me/opportunities/list` nhận ojtSemesterId, page/limit. Trả vị trí còn công bố và thông tin FE cần, kèm canApply/blockers cho từng vị trí, chỉ tiêu còn, applicationId đã ứng tuyển, registrationId và officialEligibility. canApply tổng thể là điều kiện ở cấp sinh viên; FE dùng canApply trên từng item cho nút ứng tuyển. Backend luôn kiểm tra lại khi gửi.
 
 ## Dự báo và bàn giao
 

@@ -9,7 +9,6 @@ export function describeStudentWorkflow(spec: Record<string, any>) {
   const registration={type:'object',additionalProperties:true,properties:{id,studentId:id,status:text,application:{type:'object',properties:{contactPhone:{...text,nullable:true},contactEmail:{...text,nullable:true},note:{...text,nullable:true},cv}}}};
   submit.responses['201']=response(registration);
   spec.paths['/api/ojt-registrations'].get.responses['200']=response(page(registration));
-  spec.paths['/api/ojt-registrations/{id}'].get.responses['200']=response(registration);
   submit.description='Đăng ký tham gia OJT bằng JSON. CV tải riêng trong hồ sơ sinh viên; đăng ký OJT không phải ứng tuyển doanh nghiệp.';
   delete submit.requestBody.content['multipart/form-data'];
   spec.paths['/api/students/me/cv']={post:{tags:['Sinh viên'],summary:'Upload hoặc thay CV cá nhân',description:'Sinh viên tải PDF tối đa 10 MB; không cần đăng ký OJT hoặc đợt mở đơn. Lưu file nhị phân trong DB, không nhận URL. Giữ phiên bản CV đã gắn ứng tuyển.',security,requestBody:{required:true,content:{'multipart/form-data':{schema:{type:'object',additionalProperties:false,required:['cv'],properties:{cv:{type:'string',format:'binary'}}}}}},responses:{201:response(cv),400:{description:'File PDF không hợp lệ'},413:{description:'File vượt 10 MB'}}}};

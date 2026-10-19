@@ -1,3 +1,5 @@
+import { readTransaction } from '../qhdn/read.repository';
+import { detailPagination } from '../../shared/detail-pagination';
 import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -90,13 +92,6 @@ export async function transfer(body:unknown,actor:number,id?:number) {
     return {...resultApi(after),replayed:false};
   });
 }
-export async function details(id:number) {
-  return academicTransaction(async c=>{
-    const r=await record(c,id),history=(await c.query(`SELECT "EventID" AS id,"Version" AS version,"Action" AS action,"Snapshot" AS snapshot,
-      "Reason" AS reason,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt" FROM "OJTResultEvents" WHERE "ResultID"=$1 ORDER BY "EventID"`,[id])).rows;
-    return {...resultApi(r),history};
-  });
-}
 export async function change(id:number,body:unknown,actor:number,action:'REVISION_REQUESTED'|'UPDATED'|'CONFIRMED') {
   const b=inputObject(body,action==='UPDATED'?['expectedVersion','officialScore','outcome','academicNote','reason']:['expectedVersion','reason']);
   positiveId(b.expectedVersion,'expectedVersion');const reason=requiredText(b.reason,'reason',2000);
@@ -127,23 +122,32 @@ export async function change(id:number,body:unknown,actor:number,action:'REVISIO
   });
 }
 export async function list(params:Row,semesterId?:number,exportAll=false) {
-  const p=pagination(params,['status','ojtSemesterId','studentId','search',...(exportAll?['format']:[])]);
+  const p=pagination(params,['status','ojtSemesterId','studentId','search',...(exportAll?['format']:['resultId','historyPage','historyLimit'])]);
   if(p.offset>2147483647)throw invalid('Pagination exceeds the allowed range.');
+  const resultId=params.resultId===undefined?undefined:positiveId(params.resultId,'resultId');
+  const hp=detailPagination(params,'resultId','history');
   const args:unknown[]=[],filters:string[]=[];
   const add=(column:string,value:unknown)=>{args.push(value);filters.push(`${column}=$${args.length}`);};
+  if(resultId!==undefined)add('r."ResultID"',resultId);
   if(params.status!==undefined)add('r."Status"',enumValue(params.status,statuses,'status'));
   if(params.studentId!==undefined)add('r."StudentID"',positiveId(params.studentId,'studentId'));
   if(params.ojtSemesterId!==undefined){const term=positiveId(params.ojtSemesterId,'ojtSemesterId');if(semesterId&&semesterId!==term)throw invalid('ojtSemesterId conflicts with the path.');semesterId=term;}
   if(semesterId)add('r."OJTSemesterID"',semesterId);
   if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`);}
   if(exportAll&&(params.page!==undefined||params.limit!==undefined))throw invalid('Export does not support pagination.');
-  return academicTransaction(async c=>{
+  return readTransaction(async c=>{
     if(semesterId&&!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[semesterId])).rowCount)throw invalid('OJT semester not found.',404);
     const sql=`${select} ${filters.length?'WHERE '+filters.join(' AND '):''}`;
     const count=(await c.query(`SELECT count(*)::int AS total FROM (${sql}) data`,args)).rows[0].total;
     if(exportAll&&count>10000)throw invalid('Export exceeds 10000 results. Narrow the filters.',422,'OJT_EXPORT_TOO_LARGE');
     const rows=(await c.query(`${sql} ORDER BY r."ResultID" ${exportAll?'':`LIMIT $${args.length+1} OFFSET $${args.length+2}`}`,exportAll?args:[...args,p.limit,p.offset])).rows;
-    return {items:await enrichListRows(c,rows.map(resultApi)),total:count,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
+    const items:(ReturnType<typeof resultApi>&Row)[]=await enrichListRows(c,rows.map(resultApi));
+    if(resultId!==undefined)for(const item of items){
+      const total=(await c.query('SELECT count(*)::int AS n FROM "OJTResultEvents" WHERE "ResultID"=$1',[item.id])).rows[0].n;
+      const history=(await c.query(`SELECT "EventID" AS id,"Version" AS version,"Action" AS action,"Snapshot" AS snapshot,"Reason" AS reason,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt" FROM "OJTResultEvents" WHERE "ResultID"=$1 ORDER BY "EventID" DESC LIMIT $2 OFFSET $3`,[item.id,hp.limit,hp.offset])).rows;
+      item.history=await enrichListRows(c,history);item.historyPagination={total,page:hp.page,limit:hp.limit};
+    }
+    return {items,total:count,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
   });
 }
 export function resultCsv(items:ReturnType<typeof resultApi>[]) {

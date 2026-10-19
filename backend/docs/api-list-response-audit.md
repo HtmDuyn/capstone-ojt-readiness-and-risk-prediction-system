@@ -1,5 +1,7 @@
 # Rà soát response danh sách API
 
+> Đây là báo cáo trước lượt gộp bốn API detail. Hợp đồng hiện tại: [gộp detail vào list](api-detail-list-consolidation.md), [danh sách Swagger mới](swagger-api-by-role.md). Các URL detail đã xóa trong bảng dưới chỉ là lịch sử rà soát.
+
 ## Phạm vi và kết quả
 
 Đã đọc các service/repository và gọi HTTP toàn bộ 45 operation có phân trang trong Swagger. Kiểm tra thêm ba danh sách không phân trang: vai trò, email khởi tạo và lịch chọn combo theo kỳ. Tổng API giữ nguyên 160 operation, sáu nhóm Swagger. Không thêm endpoint hoặc thay đổi DB trong đợt rà soát này.
@@ -33,51 +35,51 @@ HTTP 200 được kiểm tra trong schema riêng với dữ liệu fixture; đâ
 
 | API | Nhóm Swagger | Context có trong mẫu kiểm tra | Kết quả |
 | --- | --- | --- | --- |
-| `POST /api/json/academic-years/search` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/academic-periods/search` | Admin, Phòng đào tạo, Phòng QHDN | `academicYear` | 200 |
-| `POST /api/json/cohorts/search` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/academic/alerts/search` | Admin, Phòng đào tạo | `student`, `program`, `cohort` | 200 |
-| `POST /api/json/academic/course-demand/search` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/accounts/search` | Admin | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/combo-registration-windows/search` | Admin, Phòng đào tạo, Sinh viên | `semester`, `academicPeriod`, `createdByUser` | 200 |
-| `POST /api/json/combo-registration-windows/selections/search` | Admin, Phòng đào tạo | `student`, `program` | 200 |
-| `POST /api/json/students/combo-selections/search` | Admin, Phòng đào tạo, Sinh viên | Mảng rỗng hợp lệ | 200 |
-| `POST /api/json/majors/search` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/courses/search` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/curricula/search` | Admin, Phòng đào tạo | `createdByUser`, `publishedByUser` | 200 |
-| `POST /api/json/ojt-rule-sets/search` | Admin, Phòng đào tạo | `program`, `semester`, `createdByUser`, `publishedByUser` | 200 |
-| `POST /api/json/students/eligibility-checks/search` | Admin, Phòng đào tạo, Sinh viên | `student`, `semester`, `ruleSet`, `checkedByUser` | 200 |
+| `POST /api/json/academic-years/list` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/academic-periods/list` | Admin, Phòng đào tạo, Phòng QHDN | `academicYear` | 200 |
+| `POST /api/json/cohorts/list` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/academic/alerts/list` | Admin, Phòng đào tạo | `student`, `program`, `cohort` | 200 |
+| `POST /api/json/academic/course-demand/list` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/accounts/list` | Admin | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/combo-registration-windows/list` | Admin, Phòng đào tạo, Sinh viên | `semester`, `academicPeriod`, `createdByUser` | 200 |
+| `POST /api/json/combo-registration-windows/selections/list` | Admin, Phòng đào tạo | `student`, `program` | 200 |
+| `POST /api/json/students/combo-selections/list` | Admin, Phòng đào tạo, Sinh viên | Mảng rỗng hợp lệ | 200 |
+| `POST /api/json/majors/list` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/courses/list` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/curricula/list` | Admin, Phòng đào tạo | `createdByUser`, `publishedByUser` | 200 |
+| `POST /api/json/ojt-rule-sets/list` | Admin, Phòng đào tạo | `program`, `semester`, `createdByUser`, `publishedByUser` | 200 |
+| `POST /api/json/students/eligibility-checks/list` | Admin, Phòng đào tạo, Sinh viên | `student`, `semester`, `ruleSet`, `checkedByUser` | 200 |
 | `POST /api/json/eligibility-check-runs/detail` | Admin, Phòng đào tạo | `student`, `program`, `ruleSet` | 200 |
-| `POST /api/json/ojt-registration-windows/search` | Admin, Phòng đào tạo, Sinh viên | `semester`, `academicPeriod`, `createdByUser`, `openedByUser` | 200 |
-| `POST /api/json/ojt-registrations/search` | Admin, Phòng đào tạo, Phòng QHDN, Sinh viên | `window`, `handoff`, `student`, `program`, `currentProgram`, `cohort`, `semester`, `submittedByUser` | 200 |
-| `POST /api/json/ojt-semesters/eligible-student-handoffs/search` | Admin, Phòng đào tạo, Phòng QHDN | `semester`, `createdByUser` | 200 |
-| `POST /api/json/ojt-semesters/students/search` | Admin, Phòng đào tạo, Phòng QHDN, Sinh viên | `cv`, `window`, `handoff`, `officialEligibility`, `student`, `program`, `cohort`, `semester`, `company`, `position` | 200 |
-| `POST /api/json/ojt-results/search` | Admin, Phòng đào tạo, Phòng QHDN | `student`, `program`, `semester`, `company`, `position`, `transferredByUser` | 200 |
-| `POST /api/json/companies/search` | Admin, Phòng QHDN | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/positions/search` | Admin, Phòng QHDN | `semester`, `company` | 200 |
-| `POST /api/json/ojt-coordinations/search` | Admin, Phòng QHDN | `student`, `company`, `position`, `semester`, `coordinatedByUser` | 200 |
-| `POST /api/json/assignments/search` | Admin, Phòng QHDN | `student`, `company`, `position`, `semester` | 200 |
-| `POST /api/json/internship-evaluations/search` | Admin, Phòng QHDN | `student`, `company`, `position`, `semester`, `evaluatedByUser` | 200 |
-| `POST /api/json/qhdn/registered-students/search` | Admin, Phòng QHDN | `cv`, `student`, `program`, `cohort` | 200 |
-| `POST /api/json/qhdn/reports/search` | Admin, Phòng QHDN | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/students/search` | Admin, Phòng đào tạo | `cv`, `cohort`, `program` | 200 |
-| `POST /api/json/students/course-results/search` | Admin, Phòng đào tạo, Sinh viên | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/academic-imports/search` | Admin, Phòng đào tạo | `importedByUser` | 200 |
+| `POST /api/json/ojt-registration-windows/list` | Admin, Phòng đào tạo, Sinh viên | `semester`, `academicPeriod`, `createdByUser`, `openedByUser` | 200 |
+| `POST /api/json/ojt-registrations/list` | Admin, Phòng đào tạo, Phòng QHDN, Sinh viên | `window`, `handoff`, `student`, `program`, `currentProgram`, `cohort`, `semester`, `submittedByUser` | 200 |
+| `POST /api/json/ojt-semesters/eligible-student-handoffs/list` | Admin, Phòng đào tạo, Phòng QHDN | `semester`, `createdByUser` | 200 |
+| `POST /api/json/ojt-semesters/students/list` | Admin, Phòng đào tạo, Phòng QHDN, Sinh viên | `cv`, `window`, `handoff`, `officialEligibility`, `student`, `program`, `cohort`, `semester`, `company`, `position` | 200 |
+| `POST /api/json/ojt-results/list` | Admin, Phòng đào tạo, Phòng QHDN | `student`, `program`, `semester`, `company`, `position`, `transferredByUser` | 200 |
+| `POST /api/json/companies/list` | Admin, Phòng QHDN | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/positions/list` | Admin, Phòng QHDN | `semester`, `company` | 200 |
+| `POST /api/json/ojt-coordinations/list` | Admin, Phòng QHDN | `student`, `company`, `position`, `semester`, `coordinatedByUser` | 200 |
+| `POST /api/json/assignments/list` | Admin, Phòng QHDN | `student`, `company`, `position`, `semester` | 200 |
+| `POST /api/json/internship-evaluations/list` | Admin, Phòng QHDN | `student`, `company`, `position`, `semester`, `evaluatedByUser` | 200 |
+| `POST /api/json/qhdn/registered-students/list` | Admin, Phòng QHDN | `cv`, `student`, `program`, `cohort` | 200 |
+| `POST /api/json/qhdn/reports/list` | Admin, Phòng QHDN | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/students/list` | Admin, Phòng đào tạo | `cv`, `cohort`, `program` | 200 |
+| `POST /api/json/students/course-results/list` | Admin, Phòng đào tạo, Sinh viên | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/academic-imports/list` | Admin, Phòng đào tạo | `importedByUser` | 200 |
 | `POST /api/json/academic-imports/detail` | Admin, Phòng đào tạo | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/assessment-templates/search` | Admin | Mảng rỗng hợp lệ | 200 |
+| `POST /api/json/assessment-templates/list` | Admin | Mảng rỗng hợp lệ | 200 |
 | `POST /api/json/admin/prediction-jobs/detail` | Admin | `student` | 200 |
-| `POST /api/json/predictions/search` | Admin | `student`, `semester`, `model` | 200 |
-| `POST /api/json/admin/models/search` | Admin | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/alerts/search` | Admin | `student`, `semester` | 200 |
-| `POST /api/json/students/interventions/search` | Admin | `student`, `createdByUser`, `assignedToUser` | 200 |
-| `POST /api/json/admin/reports/readiness/search` | Admin | `student`, `semester`, `model` | 200 |
-| `POST /api/json/admin/audit-logs/search` | Admin | Thông tin chính của bản ghi đã có | 200 |
-| `POST /api/json/enterprise/candidates/search` | Doanh nghiệp | `student`, `position`, `jobApplication`, `semester` | 200 |
-| `POST /api/json/enterprise/internships/search` | Doanh nghiệp | `student`, `position`, `jobApplication`, `semester` | 200 |
-| `POST /api/json/recruitment/windows/search` | Admin, Phòng QHDN, Doanh nghiệp | `semester`, `academicPeriod` | 200 |
-| `POST /api/json/recruitment/posts/search` | Admin, Phòng QHDN, Doanh nghiệp | `semester`, `academicPeriod`, `company` | 200 |
-| `POST /api/json/job-applications/search` | Admin, Phòng QHDN, Sinh viên | `company`, `position`, `cv`, `student`, `semester` | 200 |
-| `POST /api/json/students/me/opportunities/search` | Sinh viên | `company` | 200 |
+| `POST /api/json/predictions/list` | Admin | `student`, `semester`, `model` | 200 |
+| `POST /api/json/admin/models/list` | Admin | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/alerts/list` | Admin | `student`, `semester` | 200 |
+| `POST /api/json/students/interventions/list` | Admin | `student`, `createdByUser`, `assignedToUser` | 200 |
+| `POST /api/json/admin/reports/readiness/list` | Admin | `student`, `semester`, `model` | 200 |
+| `POST /api/json/admin/audit-logs/list` | Admin | Thông tin chính của bản ghi đã có | 200 |
+| `POST /api/json/enterprise/candidates/list` | Doanh nghiệp | `student`, `position`, `jobApplication`, `semester` | 200 |
+| `POST /api/json/enterprise/internships/list` | Doanh nghiệp | `student`, `position`, `jobApplication`, `semester` | 200 |
+| `POST /api/json/recruitment/windows/list` | Admin, Phòng QHDN, Doanh nghiệp | `semester`, `academicPeriod` | 200 |
+| `POST /api/json/recruitment/posts/list` | Admin, Phòng QHDN, Doanh nghiệp | `semester`, `academicPeriod`, `company` | 200 |
+| `POST /api/json/job-applications/list` | Admin, Phòng QHDN, Sinh viên | `company`, `position`, `cv`, `student`, `semester` | 200 |
+| `POST /api/json/students/me/opportunities/list` | Sinh viên | `company` | 200 |
 
 ## Kiểm chứng
 

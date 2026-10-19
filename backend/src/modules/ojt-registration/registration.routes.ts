@@ -4,7 +4,7 @@ import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
 import { studentWindows } from '../students/registration-options.service';
 import { listWindows,saveWindow } from './window.service';
-import { submit,listRegistrations,registrationDetails,review } from './registration.service';
+import { submit,listRegistrations,review } from './registration.service';
 import { handoff,handoffHistory,semesterStudents } from './handoff.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','STUDENT')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
@@ -13,7 +13,6 @@ router.post('/ojt-registration-windows',...staff,handle(req=>saveWindow(req.body
 router.patch('/ojt-registration-windows/:id',...staff,handle(req=>saveWindow(req.body,req.user.userId,positiveId(req.params.id))));
 router.post('/ojt-registrations',authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT'),handle(req=>submit(req.body,req.user),201));
 router.get('/ojt-registrations',...read,handle(req=>listRegistrations(req.query,req.user)));
-router.get('/ojt-registrations/:id',...read,handle(req=>registrationDetails(positiveId(req.params.id),req.user)));
 router.post('/ojt-registrations/:id/review',...staff,handle(req=>review(positiveId(req.params.id),req.body,req.user.userId)));
 router.post('/ojt-semesters/:id/eligible-student-handoffs',...staff,handle(req=>handoff(positiveId(req.params.id),req.body,req.user.userId),201));
 router.get('/ojt-semesters/:id/eligible-student-handoffs',authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD'),handle(req=>handoffHistory(positiveId(req.params.id),req.query)));

@@ -5,7 +5,7 @@
 ## Luồng đã triển khai
 
 1. ADMIN/ACADEMIC tạo học kỳ `SEMESTER` qua `/api/academic-periods`. Hệ thống tự tạo liên kết kỹ thuật trong `OJTSemesters`, trả thêm `ojtSemesterId`. Block 3 không tạo kỳ tuyển dụng riêng.
-2. QHDN đọc học kỳ có sẵn bằng `POST /api/json/academic-periods/search`, với `kind: SEMESTER`; tạo đợt bằng **academicPeriodId**, tên và thời hạn. Không nhập mã kỳ OJT, năm học hay ngày học lần nữa.
+2. QHDN đọc học kỳ có sẵn bằng `POST /api/json/academic-periods/list`, với `kind: SEMESTER`; tạo đợt bằng **academicPeriodId**, tên và thời hạn. Không nhập mã kỳ OJT, năm học hay ngày học lần nữa.
 3. QHDN mở đợt. Doanh nghiệp đã có tài khoản xem đợt mở, gửi nhu cầu gồm tin và 1–50 vị trí. Doanh nghiệp lấy từ JWT, không nhận companyId.
 4. QHDN có thể import doanh nghiệp/vị trí qua `/api/imports/preview` và `/api/imports/commit`, `kind: ENTERPRISE`, **windowId**. Tin trực tiếp và tin nhập đều ở PENDING_REVIEW, vị trí CLOSED. QHDN duyệt PUBLISH để công bố/mở vị trí hoặc REJECT kèm lý do.
 5. Đóng đợt chỉ ngừng nhận nhu cầu mới; tin đã công bố tiếp tục tới hạn riêng của tin hoặc tới khi QHDN đóng. Worker tự đóng đợt/tin hết hạn mỗi phút, chạy độc lập cấu hình SMTP. Vị trí chưa công bố hoặc tin đã đóng/hết hạn không nhận điều phối/phân công mới.
@@ -18,13 +18,13 @@ Nhóm `QHDN recruitment`. Các API chung có thêm tag `Enterprise`. Cần JWT, 
 
 | Method | URL | Quyền / chức năng |
 |---|---|---|
-| POST | `/api/json/recruitment/windows/search` | ADMIN/OJT_COORD: tất cả đợt; ENTERPRISE: chỉ đợt OPEN chưa hết hạn |
+| POST | `/api/json/recruitment/windows/list` | ADMIN/OJT_COORD: tất cả đợt; ENTERPRISE: chỉ đợt OPEN chưa hết hạn |
 | POST | `/api/recruitment/windows` | ADMIN/OJT_COORD tạo đợt từ học kỳ có sẵn |
 | PATCH | `/api/json/recruitment/windows` | ADMIN/OJT_COORD sửa đợt |
 | POST | `/api/json/recruitment/windows/open` | ADMIN/OJT_COORD mở đợt |
 | POST | `/api/json/recruitment/windows/close` | ADMIN/OJT_COORD đóng đợt |
 | POST | `/api/recruitment/posts` | ENTERPRISE gửi tin và các vị trí |
-| POST | `/api/json/recruitment/posts/search` | QHDN xem mọi tin; ENTERPRISE chỉ xem tin của mình |
+| POST | `/api/json/recruitment/posts/list` | QHDN xem mọi tin; ENTERPRISE chỉ xem tin của mình |
 | POST | `/api/json/recruitment/posts/detail` | Chi tiết tin kèm vị trí/chỉ tiêu, kiểm tra quyền sở hữu |
 | POST | `/api/json/recruitment/posts/review` | ADMIN/OJT_COORD công bố hoặc từ chối |
 | POST | `/api/json/recruitment/posts/close` | ADMIN/OJT_COORD đóng tin, đóng vị trí không còn tin khác đang công bố |

@@ -4,9 +4,8 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './student.validation';
 import { assertStudentAccess, listStudents, patchStudent, results, patchResult } from './student.service';
-import { academicProgress } from './academic-progress';
 import { studentProfile } from './student-profile.service';
-import { courseResultImport, importHistory, importDetails } from './academic-import.service';
+import { courseResultImport, importHistory } from './academic-import.service';
 import { receiveCV, uploadStudentCV, readCV } from './cv.service';
 
 const router=Router();
@@ -29,11 +28,10 @@ router.get('/students',...staff,handle(req=>listStudents(req.query)));
 router.get('/students/:id',...read,handle(req=>studentProfile(positiveId(req.params.id),req.query,req.user)));
 router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.params.id),req.body,req.user.userId)));
 router.get('/students/:id/course-results',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
-router.get('/students/:id/academic-progress',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return academicProgress(id);}));
 router.patch('/course-results/:id',...staff,handle(req=>patchResult(positiveId(req.params.id),req.body,req.user.userId)));
 for(const mode of ['preview','commit']) router.post(`/course-result-imports/${mode}`,...staff,async(req,res,next)=>{
   try{const data=await courseResultImport(req.body,req.user!.userId,mode==='preview');res.status((data as any).rejectedBatch?422:200).json({success:!(data as any).rejectedBatch,data});}catch(error){next(error);}
 });
 router.get('/academic-imports',...staff,handle(req=>importHistory(req.query)));
-router.get('/academic-imports/:id',...staff,handle(req=>importDetails(req.params.id,req.query)));
+
 export default router;

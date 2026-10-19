@@ -1,17 +1,17 @@
 # Danh sách API theo 6 nhóm Swagger
 
-Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm được cấp quyền.
+Tổng 149 API duy nhất; API dùng chung hiển thị trong từng nhóm được cấp quyền.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
-| Admin | 148 |
-| Phòng đào tạo | 89 |
-| Phòng QHDN | 40 |
+| Admin | 137 |
+| Phòng đào tạo | 79 |
+| Phòng QHDN | 38 |
 | Doanh nghiệp | 10 |
-| Sinh viên | 20 |
+| Sinh viên | 18 |
 | Auth | 3 |
 
-## Admin — 148 API
+## Admin — 137 API
 
 | # | Method | Đường dẫn | Chức năng |
 |---:|---|---|---|
@@ -46,13 +46,13 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 29 | POST | `/api/assessment-templates` | Tạo bộ tiêu chí đánh giá |
 | 30 | POST | `/api/admin/prediction-jobs` | Tạo tác vụ dự đoán |
 | 31 | POST | `/api/recruitment/windows` | Tạo đợt nhận nhu cầu tuyển dụng |
-| 32 | POST | `/api/json/academic-years/search` | Danh sách năm học |
+| 32 | POST | `/api/json/academic-years/list` | Danh sách năm học |
 | 33 | PATCH | `/api/json/academic-years` | Cập nhật năm học |
-| 34 | POST | `/api/json/academic-periods/search` | Danh sách kỳ học và Block 3 |
+| 34 | POST | `/api/json/academic-periods/list` | Danh sách kỳ học và Block 3 |
 | 35 | PATCH | `/api/json/academic-periods` | Cập nhật kỳ học và Block 3 |
-| 36 | POST | `/api/json/cohorts/search` | Danh sách khóa và nhóm |
+| 36 | POST | `/api/json/cohorts/list` | Danh sách khóa và nhóm |
 | 37 | PATCH | `/api/json/cohorts` | Cập nhật khóa và nhóm |
-| 38 | POST | `/api/json/academic-periods/combo-phase-schedules/search` | Xem mốc chọn và xác nhận combo |
+| 38 | POST | `/api/json/academic-periods/combo-phase-schedules/list` | Xem mốc chọn và xác nhận combo |
 | 39 | PUT | `/api/json/academic-periods/combo-phase-schedules` | Thiết lập mốc chọn và xác nhận combo |
 | 40 | POST | `/api/json/ojt-semesters/assessment-window/search` | Xem đợt xét điều kiện chính thức |
 | 41 | PUT | `/api/json/ojt-semesters/assessment-window` | Thiết lập đợt xét điều kiện chính thức |
@@ -64,107 +64,96 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 47 | POST | `/api/json/ojt-registration-windows/semester-exceptions/revoke` | Thu hồi ngoại lệ kỳ đăng ký OJT |
 | 48 | POST | `/api/json/combo-registration-windows/preview` | Xem ảnh hưởng của combo dự kiến |
 | 49 | POST | `/api/json/academic/dashboard/search` | Tổng quan và thống kê điều kiện OJT |
-| 50 | POST | `/api/json/academic/alerts/search` | Danh sách cảnh báo thiếu điều kiện OJT |
-| 51 | POST | `/api/json/academic/course-demand/search` | Thống kê nhu cầu học môn còn thiếu |
+| 50 | POST | `/api/json/academic/alerts/list` | Danh sách cảnh báo thiếu điều kiện OJT |
+| 51 | POST | `/api/json/academic/course-demand/list` | Thống kê nhu cầu học môn còn thiếu |
 | 52 | POST | `/api/json/academic/course-demand/export` | Xuất nhu cầu học theo môn, kỳ và Block |
-| 53 | POST | `/api/json/accounts/search` | Danh sách tài khoản |
+| 53 | POST | `/api/json/accounts/list` | Danh sách tài khoản |
 | 54 | PATCH | `/api/json/accounts` | Cập nhật tài khoản |
-| 55 | POST | `/api/json/combo-registration-windows/search` | Danh sách đợt chọn combo |
+| 55 | POST | `/api/json/combo-registration-windows/list` | Danh sách đợt chọn combo |
 | 56 | PATCH | `/api/json/combo-registration-windows` | Cập nhật hoặc mở/đóng đợt chọn combo |
 | 57 | POST | `/api/json/combo-registration-windows/extensions` | Gia hạn chọn combo |
-| 58 | POST | `/api/json/combo-registration-windows/selections/search` | Theo dõi lựa chọn combo |
+| 58 | POST | `/api/json/combo-registration-windows/selections/list` | Theo dõi lựa chọn combo |
 | 59 | POST | `/api/json/combo-registration-windows/selections` | Gửi lựa chọn combo |
 | 60 | POST | `/api/json/combo-registration-windows/reminders` | Gửi nhắc chọn combo |
-| 61 | POST | `/api/json/students/combo-selections/search` | Lịch sử lựa chọn combo của sinh viên |
+| 61 | POST | `/api/json/students/combo-selections/list` | Lịch sử lựa chọn combo của sinh viên |
 | 62 | POST | `/api/json/combo-registration-windows/finalize` | Chốt lựa chọn combo |
-| 63 | POST | `/api/json/majors/search` | Danh sách chuyên ngành |
-| 64 | POST | `/api/json/courses/search` | Danh sách môn học |
-| 65 | POST | `/api/json/curricula/search` | Danh sách chương trình đào tạo đã nhập |
+| 63 | POST | `/api/json/majors/list` | Danh sách chuyên ngành |
+| 64 | POST | `/api/json/courses/list` | Danh sách môn học |
+| 65 | POST | `/api/json/curricula/list` | Danh sách chương trình đào tạo đã nhập |
 | 66 | PATCH | `/api/json/courses` | Cập nhật môn học |
 | 67 | POST | `/api/json/curricula/detail` | Chi tiết chương trình đào tạo |
-| 68 | PATCH | `/api/json/curricula` | Sửa thông tin chương trình đã nhập |
-| 69 | PUT | `/api/json/curricula/courses` | Thiết lập môn, tín chỉ và kỳ học |
-| 70 | PUT | `/api/json/curricula/prerequisites` | Thiết lập môn tiên quyết |
-| 71 | PUT | `/api/json/curricula/course-equivalences` | Thiết lập công nhận và tương đương môn |
-| 72 | PUT | `/api/json/combos/courses` | Thiết lập môn thuộc combo |
-| 73 | POST | `/api/json/curricula/publish` | Ban hành phiên bản chương trình |
-| 74 | POST | `/api/json/ojt-rule-sets/search` | Danh sách bộ quy tắc OJT |
-| 75 | PATCH | `/api/json/ojt-rule-sets` | Sửa bộ quy tắc chưa ban hành |
-| 76 | POST | `/api/json/ojt-rule-sets/publish` | Ban hành bộ quy tắc OJT |
-| 77 | POST | `/api/json/students/eligibility-checks/search` | Lịch sử kiểm tra điều kiện OJT |
-| 78 | POST | `/api/json/students/eligibility-checks` | Kiểm tra điều kiện OJT của sinh viên |
-| 79 | POST | `/api/json/students/eligibility/search` | Kết quả OJT và điều kiện còn thiếu |
-| 80 | POST | `/api/json/eligibility-checks/confirm` | Xác nhận kết quả xét điều kiện OJT |
-| 81 | POST | `/api/json/eligibility-check-runs/detail` | Tiến độ và kết quả kiểm tra hàng loạt |
-| 82 | POST | `/api/json/imports/emails/retry` | Gửi lại email bị lỗi |
-| 83 | POST | `/api/json/ojt-registration-windows/search` | Danh sách đợt đăng ký OJT |
-| 84 | PATCH | `/api/json/ojt-registration-windows` | Cập nhật hoặc mở/đóng đợt đăng ký OJT |
-| 85 | POST | `/api/json/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT |
-| 86 | POST | `/api/json/ojt-registrations/detail` | Chi tiết hồ sơ đăng ký OJT |
-| 87 | POST | `/api/json/ojt-registrations/review` | Duyệt hoặc từ chối hồ sơ OJT |
-| 88 | POST | `/api/json/ojt-semesters/eligible-student-handoffs/search` | Lịch sử bàn giao sinh viên cho QHDN |
-| 89 | POST | `/api/json/ojt-semesters/eligible-student-handoffs` | Bàn giao sinh viên đủ điều kiện cho QHDN |
-| 90 | POST | `/api/json/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ |
-| 91 | POST | `/api/json/ojt-results/search` | Danh sách kết quả OJT đã chuyển |
-| 92 | POST | `/api/json/ojt-results/detail` | Chi tiết đánh giá và hồ sơ OJT |
-| 93 | PATCH | `/api/json/ojt-results` | Cập nhật điểm và kết quả OJT chính thức |
-| 94 | POST | `/api/json/ojt-results/revision-requests` | Yêu cầu bổ sung hồ sơ kết quả OJT |
-| 95 | POST | `/api/json/ojt-results/transfer` | Gửi lại hồ sơ OJT đã bổ sung |
-| 96 | POST | `/api/json/ojt-results/confirm` | Xác nhận kết quả OJT |
-| 97 | POST | `/api/json/ojt-semesters/results/export` | Xuất báo cáo kết quả OJT theo kỳ |
-| 98 | POST | `/api/json/companies/search` | Danh sách và hồ sơ doanh nghiệp |
-| 99 | PATCH | `/api/json/companies` | Cập nhật doanh nghiệp |
-| 100 | DELETE | `/api/json/companies` | Xóa doanh nghiệp |
-| 101 | POST | `/api/json/positions/search` | Danh sách và hồ sơ vị trí thực tập |
-| 102 | POST | `/api/json/ojt-coordinations/search` | Danh sách và hồ sơ điều phối |
-| 103 | POST | `/api/json/assignments/search` | Danh sách và hồ sơ phân công thực tập |
-| 104 | PATCH | `/api/json/assignments` | Cập nhật thông tin và trạng thái thực tập |
-| 105 | POST | `/api/json/internship-evaluations/search` | Danh sách đánh giá thực tập |
-| 106 | POST | `/api/json/ojt-coordinations/decision` | Ghi nhận quyết định tiếp nhận sinh viên |
-| 107 | POST | `/api/json/ojt-coordinations/reassign` | Điều phối lại sinh viên |
-| 108 | PUT | `/api/json/assignments/internship-evaluation` | Ghi nhận đánh giá thực tập |
-| 109 | POST | `/api/json/qhdn/registered-students/search` | Xem sinh viên đã đăng ký OJT |
-| 110 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN |
-| 111 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN |
-| 112 | POST | `/api/json/qhdn/reports/search` | Báo cáo QHDN theo loại |
-| 113 | POST | `/api/json/students/search` | Tìm kiếm và lọc sinh viên |
-| 114 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp |
-| 115 | PATCH | `/api/json/students` | Cập nhật hồ sơ và lộ trình học vụ |
-| 116 | DELETE | `/api/json/students` | Xóa hồ sơ sinh viên |
-| 117 | POST | `/api/json/students/course-results/search` | Điểm, lần học và trạng thái môn |
-| 118 | POST | `/api/json/students/academic-progress/search` | GPA, tín chỉ và tiến độ học tập |
-| 119 | PATCH | `/api/json/course-results` | Sửa kết quả học tập và ghi lý do |
-| 120 | POST | `/api/json/academic-imports/search` | Lịch sử nhập dữ liệu học vụ |
-| 121 | POST | `/api/json/academic-imports/detail` | Chi tiết và lỗi nhập dữ liệu học vụ |
-| 122 | POST | `/api/json/auth/users/password-reset` | Đặt lại mật khẩu |
-| 123 | POST | `/api/json/admin/dashboard/search` | Tổng quan hệ thống và thống kê dự đoán |
-| 124 | POST | `/api/json/students/export` | Xuất danh sách sinh viên |
-| 125 | DELETE | `/api/json/positions` | Xóa vị trí thực tập |
-| 126 | POST | `/api/json/assessment-templates/search` | Danh sách và hồ sơ bộ tiêu chí đánh giá |
-| 127 | PATCH | `/api/json/assessment-templates` | Sửa bộ tiêu chí đánh giá |
-| 128 | POST | `/api/json/assessment-templates/publish` | Ban hành bộ tiêu chí đánh giá |
-| 129 | POST | `/api/json/admin/prediction-jobs/detail` | Tiến độ dự đoán và lỗi theo sinh viên |
-| 130 | POST | `/api/json/predictions/search` | Lịch sử dự đoán |
-| 131 | POST | `/api/json/predictions/detail` | Chi tiết dự đoán |
-| 132 | POST | `/api/json/admin/models/search` | Danh sách và hồ sơ phiên bản mô hình |
-| 133 | POST | `/api/json/alerts/search` | Danh sách và hồ sơ cảnh báo rủi ro |
-| 134 | PATCH | `/api/json/alerts/status` | Tiếp nhận hoặc đóng cảnh báo |
-| 135 | POST | `/api/json/alerts/interventions` | Tạo hoạt động hỗ trợ sinh viên |
-| 136 | POST | `/api/json/students/interventions/search` | Lịch sử hỗ trợ sinh viên |
-| 137 | PATCH | `/api/json/interventions` | Cập nhật hoạt động hỗ trợ |
-| 138 | POST | `/api/json/admin/reports/readiness/search` | Báo cáo mức sẵn sàng và rủi ro |
-| 139 | POST | `/api/json/admin/reports/export` | Xuất báo cáo dự đoán |
-| 140 | POST | `/api/json/admin/audit-logs/search` | Nhật ký hoạt động hệ thống |
-| 141 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
-| 142 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng |
-| 143 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng |
-| 144 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng |
-| 145 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng |
-| 146 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng |
-| 147 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
-| 148 | POST | `/api/json/job-applications/search` | Danh sách hồ sơ ứng tuyển doanh nghiệp |
+| 68 | POST | `/api/json/ojt-rule-sets/list` | Danh sách bộ quy tắc OJT |
+| 69 | PATCH | `/api/json/ojt-rule-sets` | Sửa bộ quy tắc chưa ban hành |
+| 70 | POST | `/api/json/ojt-rule-sets/publish` | Ban hành bộ quy tắc OJT |
+| 71 | POST | `/api/json/students/eligibility-checks/list` | Lịch sử kiểm tra điều kiện OJT |
+| 72 | POST | `/api/json/students/eligibility-checks` | Kiểm tra điều kiện OJT của sinh viên |
+| 73 | POST | `/api/json/students/eligibility/search` | Kết quả OJT và điều kiện còn thiếu |
+| 74 | POST | `/api/json/eligibility-checks/confirm` | Xác nhận kết quả xét điều kiện OJT |
+| 75 | POST | `/api/json/eligibility-check-runs/detail` | Tiến độ và kết quả kiểm tra hàng loạt |
+| 76 | POST | `/api/json/imports/emails/retry` | Gửi lại email bị lỗi |
+| 77 | POST | `/api/json/ojt-registration-windows/list` | Danh sách đợt đăng ký OJT |
+| 78 | PATCH | `/api/json/ojt-registration-windows` | Cập nhật hoặc mở/đóng đợt đăng ký OJT |
+| 79 | POST | `/api/json/ojt-registrations/list` | Danh sách hồ sơ đăng ký OJT |
+| 80 | POST | `/api/json/ojt-registrations/review` | Duyệt hoặc từ chối hồ sơ OJT |
+| 81 | POST | `/api/json/ojt-semesters/eligible-student-handoffs/list` | Lịch sử bàn giao sinh viên cho QHDN |
+| 82 | POST | `/api/json/ojt-semesters/eligible-student-handoffs` | Bàn giao sinh viên đủ điều kiện cho QHDN |
+| 83 | POST | `/api/json/ojt-semesters/students/list` | Theo dõi trạng thái OJT theo kỳ |
+| 84 | POST | `/api/json/ojt-results/list` | Danh sách kết quả OJT đã chuyển |
+| 85 | PATCH | `/api/json/ojt-results` | Cập nhật điểm và kết quả OJT chính thức |
+| 86 | POST | `/api/json/ojt-results/revision-requests` | Yêu cầu bổ sung hồ sơ kết quả OJT |
+| 87 | POST | `/api/json/ojt-results/transfer` | Gửi lại hồ sơ OJT đã bổ sung |
+| 88 | POST | `/api/json/ojt-results/confirm` | Xác nhận kết quả OJT |
+| 89 | POST | `/api/json/ojt-semesters/results/export` | Xuất báo cáo kết quả OJT theo kỳ |
+| 90 | POST | `/api/json/companies/list` | Danh sách và hồ sơ doanh nghiệp |
+| 91 | PATCH | `/api/json/companies` | Cập nhật doanh nghiệp |
+| 92 | DELETE | `/api/json/companies` | Xóa doanh nghiệp |
+| 93 | POST | `/api/json/positions/list` | Danh sách và hồ sơ vị trí thực tập |
+| 94 | POST | `/api/json/ojt-coordinations/list` | Danh sách và hồ sơ điều phối |
+| 95 | POST | `/api/json/assignments/list` | Danh sách và hồ sơ phân công thực tập |
+| 96 | PATCH | `/api/json/assignments` | Cập nhật thông tin và trạng thái thực tập |
+| 97 | POST | `/api/json/internship-evaluations/list` | Danh sách đánh giá thực tập |
+| 98 | POST | `/api/json/ojt-coordinations/decision` | Ghi nhận quyết định tiếp nhận sinh viên |
+| 99 | POST | `/api/json/ojt-coordinations/reassign` | Điều phối lại sinh viên |
+| 100 | PUT | `/api/json/assignments/internship-evaluation` | Ghi nhận đánh giá thực tập |
+| 101 | POST | `/api/json/qhdn/registered-students/list` | Xem sinh viên đã đăng ký OJT |
+| 102 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN |
+| 103 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN |
+| 104 | POST | `/api/json/qhdn/reports/list` | Báo cáo QHDN theo loại |
+| 105 | POST | `/api/json/students/list` | Tìm kiếm và lọc sinh viên |
+| 106 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp |
+| 107 | PATCH | `/api/json/students` | Cập nhật hồ sơ và lộ trình học vụ |
+| 108 | DELETE | `/api/json/students` | Xóa hồ sơ sinh viên |
+| 109 | POST | `/api/json/students/course-results/list` | Điểm, lần học và trạng thái môn |
+| 110 | PATCH | `/api/json/course-results` | Sửa kết quả học tập và ghi lý do |
+| 111 | POST | `/api/json/academic-imports/list` | Lịch sử nhập dữ liệu học vụ |
+| 112 | POST | `/api/json/auth/users/password-reset` | Đặt lại mật khẩu |
+| 113 | POST | `/api/json/admin/dashboard/search` | Tổng quan hệ thống và thống kê dự đoán |
+| 114 | POST | `/api/json/students/export` | Xuất danh sách sinh viên |
+| 115 | DELETE | `/api/json/positions` | Xóa vị trí thực tập |
+| 116 | POST | `/api/json/assessment-templates/list` | Danh sách và hồ sơ bộ tiêu chí đánh giá |
+| 117 | PATCH | `/api/json/assessment-templates` | Sửa bộ tiêu chí đánh giá |
+| 118 | POST | `/api/json/assessment-templates/publish` | Ban hành bộ tiêu chí đánh giá |
+| 119 | POST | `/api/json/admin/prediction-jobs/detail` | Tiến độ dự đoán và lỗi theo sinh viên |
+| 120 | POST | `/api/json/predictions/list` | Lịch sử dự đoán |
+| 121 | POST | `/api/json/admin/models/list` | Danh sách và hồ sơ phiên bản mô hình |
+| 122 | POST | `/api/json/alerts/list` | Danh sách và hồ sơ cảnh báo rủi ro |
+| 123 | PATCH | `/api/json/alerts/status` | Tiếp nhận hoặc đóng cảnh báo |
+| 124 | POST | `/api/json/alerts/interventions` | Tạo hoạt động hỗ trợ sinh viên |
+| 125 | POST | `/api/json/students/interventions/list` | Lịch sử hỗ trợ sinh viên |
+| 126 | PATCH | `/api/json/interventions` | Cập nhật hoạt động hỗ trợ |
+| 127 | POST | `/api/json/admin/reports/readiness/list` | Báo cáo mức sẵn sàng và rủi ro |
+| 128 | POST | `/api/json/admin/reports/export` | Xuất báo cáo dự đoán |
+| 129 | POST | `/api/json/admin/audit-logs/list` | Nhật ký hoạt động hệ thống |
+| 130 | POST | `/api/json/recruitment/windows/list` | Danh sách đợt tuyển dụng theo học kỳ |
+| 131 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng |
+| 132 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng |
+| 133 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng |
+| 134 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng |
+| 135 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng |
+| 136 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
+| 137 | POST | `/api/json/job-applications/list` | Danh sách hồ sơ ứng tuyển doanh nghiệp |
 
-## Phòng đào tạo — 89 API
+## Phòng đào tạo — 79 API
 
 | # | Method | Đường dẫn | Chức năng |
 |---:|---|---|---|
@@ -186,13 +175,13 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 16 | POST | `/api/ojt-registrations` | Nộp hồ sơ đăng ký OJT |
 | 17 | POST | `/api/course-result-imports/preview` | Kiểm tra dữ liệu nhập kết quả học tập |
 | 18 | POST | `/api/course-result-imports/commit` | Nhập kết quả học tập |
-| 19 | POST | `/api/json/academic-years/search` | Danh sách năm học |
+| 19 | POST | `/api/json/academic-years/list` | Danh sách năm học |
 | 20 | PATCH | `/api/json/academic-years` | Cập nhật năm học |
-| 21 | POST | `/api/json/academic-periods/search` | Danh sách kỳ học và Block 3 |
+| 21 | POST | `/api/json/academic-periods/list` | Danh sách kỳ học và Block 3 |
 | 22 | PATCH | `/api/json/academic-periods` | Cập nhật kỳ học và Block 3 |
-| 23 | POST | `/api/json/cohorts/search` | Danh sách khóa và nhóm |
+| 23 | POST | `/api/json/cohorts/list` | Danh sách khóa và nhóm |
 | 24 | PATCH | `/api/json/cohorts` | Cập nhật khóa và nhóm |
-| 25 | POST | `/api/json/academic-periods/combo-phase-schedules/search` | Xem mốc chọn và xác nhận combo |
+| 25 | POST | `/api/json/academic-periods/combo-phase-schedules/list` | Xem mốc chọn và xác nhận combo |
 | 26 | PUT | `/api/json/academic-periods/combo-phase-schedules` | Thiết lập mốc chọn và xác nhận combo |
 | 27 | POST | `/api/json/ojt-semesters/assessment-window/search` | Xem đợt xét điều kiện chính thức |
 | 28 | PUT | `/api/json/ojt-semesters/assessment-window` | Thiết lập đợt xét điều kiện chính thức |
@@ -204,61 +193,51 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 34 | POST | `/api/json/ojt-registration-windows/semester-exceptions/revoke` | Thu hồi ngoại lệ kỳ đăng ký OJT |
 | 35 | POST | `/api/json/combo-registration-windows/preview` | Xem ảnh hưởng của combo dự kiến |
 | 36 | POST | `/api/json/academic/dashboard/search` | Tổng quan và thống kê điều kiện OJT |
-| 37 | POST | `/api/json/academic/alerts/search` | Danh sách cảnh báo thiếu điều kiện OJT |
-| 38 | POST | `/api/json/academic/course-demand/search` | Thống kê nhu cầu học môn còn thiếu |
+| 37 | POST | `/api/json/academic/alerts/list` | Danh sách cảnh báo thiếu điều kiện OJT |
+| 38 | POST | `/api/json/academic/course-demand/list` | Thống kê nhu cầu học môn còn thiếu |
 | 39 | POST | `/api/json/academic/course-demand/export` | Xuất nhu cầu học theo môn, kỳ và Block |
-| 40 | POST | `/api/json/combo-registration-windows/search` | Danh sách đợt chọn combo |
+| 40 | POST | `/api/json/combo-registration-windows/list` | Danh sách đợt chọn combo |
 | 41 | PATCH | `/api/json/combo-registration-windows` | Cập nhật hoặc mở/đóng đợt chọn combo |
 | 42 | POST | `/api/json/combo-registration-windows/extensions` | Gia hạn chọn combo |
-| 43 | POST | `/api/json/combo-registration-windows/selections/search` | Theo dõi lựa chọn combo |
+| 43 | POST | `/api/json/combo-registration-windows/selections/list` | Theo dõi lựa chọn combo |
 | 44 | POST | `/api/json/combo-registration-windows/selections` | Gửi lựa chọn combo |
 | 45 | POST | `/api/json/combo-registration-windows/reminders` | Gửi nhắc chọn combo |
-| 46 | POST | `/api/json/students/combo-selections/search` | Lịch sử lựa chọn combo của sinh viên |
+| 46 | POST | `/api/json/students/combo-selections/list` | Lịch sử lựa chọn combo của sinh viên |
 | 47 | POST | `/api/json/combo-registration-windows/finalize` | Chốt lựa chọn combo |
-| 48 | POST | `/api/json/majors/search` | Danh sách chuyên ngành |
-| 49 | POST | `/api/json/courses/search` | Danh sách môn học |
-| 50 | POST | `/api/json/curricula/search` | Danh sách chương trình đào tạo đã nhập |
+| 48 | POST | `/api/json/majors/list` | Danh sách chuyên ngành |
+| 49 | POST | `/api/json/courses/list` | Danh sách môn học |
+| 50 | POST | `/api/json/curricula/list` | Danh sách chương trình đào tạo đã nhập |
 | 51 | PATCH | `/api/json/courses` | Cập nhật môn học |
 | 52 | POST | `/api/json/curricula/detail` | Chi tiết chương trình đào tạo |
-| 53 | PATCH | `/api/json/curricula` | Sửa thông tin chương trình đã nhập |
-| 54 | PUT | `/api/json/curricula/courses` | Thiết lập môn, tín chỉ và kỳ học |
-| 55 | PUT | `/api/json/curricula/prerequisites` | Thiết lập môn tiên quyết |
-| 56 | PUT | `/api/json/curricula/course-equivalences` | Thiết lập công nhận và tương đương môn |
-| 57 | PUT | `/api/json/combos/courses` | Thiết lập môn thuộc combo |
-| 58 | POST | `/api/json/curricula/publish` | Ban hành phiên bản chương trình |
-| 59 | POST | `/api/json/ojt-rule-sets/search` | Danh sách bộ quy tắc OJT |
-| 60 | PATCH | `/api/json/ojt-rule-sets` | Sửa bộ quy tắc chưa ban hành |
-| 61 | POST | `/api/json/ojt-rule-sets/publish` | Ban hành bộ quy tắc OJT |
-| 62 | POST | `/api/json/students/eligibility-checks/search` | Lịch sử kiểm tra điều kiện OJT |
-| 63 | POST | `/api/json/students/eligibility-checks` | Kiểm tra điều kiện OJT của sinh viên |
-| 64 | POST | `/api/json/students/eligibility/search` | Kết quả OJT và điều kiện còn thiếu |
-| 65 | POST | `/api/json/eligibility-checks/confirm` | Xác nhận kết quả xét điều kiện OJT |
-| 66 | POST | `/api/json/eligibility-check-runs/detail` | Tiến độ và kết quả kiểm tra hàng loạt |
-| 67 | POST | `/api/json/ojt-registration-windows/search` | Danh sách đợt đăng ký OJT |
-| 68 | PATCH | `/api/json/ojt-registration-windows` | Cập nhật hoặc mở/đóng đợt đăng ký OJT |
-| 69 | POST | `/api/json/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT |
-| 70 | POST | `/api/json/ojt-registrations/detail` | Chi tiết hồ sơ đăng ký OJT |
-| 71 | POST | `/api/json/ojt-registrations/review` | Duyệt hoặc từ chối hồ sơ OJT |
-| 72 | POST | `/api/json/ojt-semesters/eligible-student-handoffs/search` | Lịch sử bàn giao sinh viên cho QHDN |
-| 73 | POST | `/api/json/ojt-semesters/eligible-student-handoffs` | Bàn giao sinh viên đủ điều kiện cho QHDN |
-| 74 | POST | `/api/json/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ |
-| 75 | POST | `/api/json/ojt-results/search` | Danh sách kết quả OJT đã chuyển |
-| 76 | POST | `/api/json/ojt-results/detail` | Chi tiết đánh giá và hồ sơ OJT |
-| 77 | PATCH | `/api/json/ojt-results` | Cập nhật điểm và kết quả OJT chính thức |
-| 78 | POST | `/api/json/ojt-results/revision-requests` | Yêu cầu bổ sung hồ sơ kết quả OJT |
-| 79 | POST | `/api/json/ojt-results/confirm` | Xác nhận kết quả OJT |
-| 80 | POST | `/api/json/ojt-semesters/results/export` | Xuất báo cáo kết quả OJT theo kỳ |
-| 81 | POST | `/api/json/students/search` | Tìm kiếm và lọc sinh viên |
-| 82 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp |
-| 83 | PATCH | `/api/json/students` | Cập nhật hồ sơ và lộ trình học vụ |
-| 84 | POST | `/api/json/students/course-results/search` | Điểm, lần học và trạng thái môn |
-| 85 | POST | `/api/json/students/academic-progress/search` | GPA, tín chỉ và tiến độ học tập |
-| 86 | PATCH | `/api/json/course-results` | Sửa kết quả học tập và ghi lý do |
-| 87 | POST | `/api/json/academic-imports/search` | Lịch sử nhập dữ liệu học vụ |
-| 88 | POST | `/api/json/academic-imports/detail` | Chi tiết và lỗi nhập dữ liệu học vụ |
-| 89 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
+| 53 | POST | `/api/json/ojt-rule-sets/list` | Danh sách bộ quy tắc OJT |
+| 54 | PATCH | `/api/json/ojt-rule-sets` | Sửa bộ quy tắc chưa ban hành |
+| 55 | POST | `/api/json/ojt-rule-sets/publish` | Ban hành bộ quy tắc OJT |
+| 56 | POST | `/api/json/students/eligibility-checks/list` | Lịch sử kiểm tra điều kiện OJT |
+| 57 | POST | `/api/json/students/eligibility-checks` | Kiểm tra điều kiện OJT của sinh viên |
+| 58 | POST | `/api/json/students/eligibility/search` | Kết quả OJT và điều kiện còn thiếu |
+| 59 | POST | `/api/json/eligibility-checks/confirm` | Xác nhận kết quả xét điều kiện OJT |
+| 60 | POST | `/api/json/eligibility-check-runs/detail` | Tiến độ và kết quả kiểm tra hàng loạt |
+| 61 | POST | `/api/json/ojt-registration-windows/list` | Danh sách đợt đăng ký OJT |
+| 62 | PATCH | `/api/json/ojt-registration-windows` | Cập nhật hoặc mở/đóng đợt đăng ký OJT |
+| 63 | POST | `/api/json/ojt-registrations/list` | Danh sách hồ sơ đăng ký OJT |
+| 64 | POST | `/api/json/ojt-registrations/review` | Duyệt hoặc từ chối hồ sơ OJT |
+| 65 | POST | `/api/json/ojt-semesters/eligible-student-handoffs/list` | Lịch sử bàn giao sinh viên cho QHDN |
+| 66 | POST | `/api/json/ojt-semesters/eligible-student-handoffs` | Bàn giao sinh viên đủ điều kiện cho QHDN |
+| 67 | POST | `/api/json/ojt-semesters/students/list` | Theo dõi trạng thái OJT theo kỳ |
+| 68 | POST | `/api/json/ojt-results/list` | Danh sách kết quả OJT đã chuyển |
+| 69 | PATCH | `/api/json/ojt-results` | Cập nhật điểm và kết quả OJT chính thức |
+| 70 | POST | `/api/json/ojt-results/revision-requests` | Yêu cầu bổ sung hồ sơ kết quả OJT |
+| 71 | POST | `/api/json/ojt-results/confirm` | Xác nhận kết quả OJT |
+| 72 | POST | `/api/json/ojt-semesters/results/export` | Xuất báo cáo kết quả OJT theo kỳ |
+| 73 | POST | `/api/json/students/list` | Tìm kiếm và lọc sinh viên |
+| 74 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp |
+| 75 | PATCH | `/api/json/students` | Cập nhật hồ sơ và lộ trình học vụ |
+| 76 | POST | `/api/json/students/course-results/list` | Điểm, lần học và trạng thái môn |
+| 77 | PATCH | `/api/json/course-results` | Sửa kết quả học tập và ghi lý do |
+| 78 | POST | `/api/json/academic-imports/list` | Lịch sử nhập dữ liệu học vụ |
+| 79 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
 
-## Phòng QHDN — 40 API
+## Phòng QHDN — 38 API
 
 | # | Method | Đường dẫn | Chức năng |
 |---:|---|---|---|
@@ -271,37 +250,35 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 7 | POST | `/api/ojt-coordinations` | Giới thiệu sinh viên cho doanh nghiệp |
 | 8 | POST | `/api/assignments` | Phân công sinh viên thực tập |
 | 9 | POST | `/api/recruitment/windows` | Tạo đợt nhận nhu cầu tuyển dụng |
-| 10 | POST | `/api/json/academic-periods/search` | Danh sách kỳ học và Block 3 |
-| 11 | POST | `/api/json/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT |
-| 12 | POST | `/api/json/ojt-registrations/detail` | Chi tiết hồ sơ đăng ký OJT |
-| 13 | POST | `/api/json/ojt-semesters/eligible-student-handoffs/search` | Lịch sử bàn giao sinh viên cho QHDN |
-| 14 | POST | `/api/json/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ |
-| 15 | POST | `/api/json/ojt-results/search` | Danh sách kết quả OJT đã chuyển |
-| 16 | POST | `/api/json/ojt-results/detail` | Chi tiết đánh giá và hồ sơ OJT |
-| 17 | POST | `/api/json/ojt-results/transfer` | Gửi lại hồ sơ OJT đã bổ sung |
-| 18 | POST | `/api/json/ojt-semesters/results/export` | Xuất báo cáo kết quả OJT theo kỳ |
-| 19 | POST | `/api/json/companies/search` | Danh sách và hồ sơ doanh nghiệp |
-| 20 | PATCH | `/api/json/companies` | Cập nhật doanh nghiệp |
-| 21 | POST | `/api/json/positions/search` | Danh sách và hồ sơ vị trí thực tập |
-| 22 | POST | `/api/json/ojt-coordinations/search` | Danh sách và hồ sơ điều phối |
-| 23 | POST | `/api/json/assignments/search` | Danh sách và hồ sơ phân công thực tập |
-| 24 | PATCH | `/api/json/assignments` | Cập nhật thông tin và trạng thái thực tập |
-| 25 | POST | `/api/json/internship-evaluations/search` | Danh sách đánh giá thực tập |
-| 26 | POST | `/api/json/ojt-coordinations/decision` | Ghi nhận quyết định tiếp nhận sinh viên |
-| 27 | POST | `/api/json/ojt-coordinations/reassign` | Điều phối lại sinh viên |
-| 28 | PUT | `/api/json/assignments/internship-evaluation` | Ghi nhận đánh giá thực tập |
-| 29 | POST | `/api/json/qhdn/registered-students/search` | Xem sinh viên đã đăng ký OJT |
-| 30 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN |
-| 31 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN |
-| 32 | POST | `/api/json/qhdn/reports/search` | Báo cáo QHDN theo loại |
-| 33 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
-| 34 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng |
-| 35 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng |
-| 36 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng |
-| 37 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng |
-| 38 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng |
-| 39 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
-| 40 | POST | `/api/json/job-applications/search` | Danh sách hồ sơ ứng tuyển doanh nghiệp |
+| 10 | POST | `/api/json/academic-periods/list` | Danh sách kỳ học và Block 3 |
+| 11 | POST | `/api/json/ojt-registrations/list` | Danh sách hồ sơ đăng ký OJT |
+| 12 | POST | `/api/json/ojt-semesters/eligible-student-handoffs/list` | Lịch sử bàn giao sinh viên cho QHDN |
+| 13 | POST | `/api/json/ojt-semesters/students/list` | Theo dõi trạng thái OJT theo kỳ |
+| 14 | POST | `/api/json/ojt-results/list` | Danh sách kết quả OJT đã chuyển |
+| 15 | POST | `/api/json/ojt-results/transfer` | Gửi lại hồ sơ OJT đã bổ sung |
+| 16 | POST | `/api/json/ojt-semesters/results/export` | Xuất báo cáo kết quả OJT theo kỳ |
+| 17 | POST | `/api/json/companies/list` | Danh sách và hồ sơ doanh nghiệp |
+| 18 | PATCH | `/api/json/companies` | Cập nhật doanh nghiệp |
+| 19 | POST | `/api/json/positions/list` | Danh sách và hồ sơ vị trí thực tập |
+| 20 | POST | `/api/json/ojt-coordinations/list` | Danh sách và hồ sơ điều phối |
+| 21 | POST | `/api/json/assignments/list` | Danh sách và hồ sơ phân công thực tập |
+| 22 | PATCH | `/api/json/assignments` | Cập nhật thông tin và trạng thái thực tập |
+| 23 | POST | `/api/json/internship-evaluations/list` | Danh sách đánh giá thực tập |
+| 24 | POST | `/api/json/ojt-coordinations/decision` | Ghi nhận quyết định tiếp nhận sinh viên |
+| 25 | POST | `/api/json/ojt-coordinations/reassign` | Điều phối lại sinh viên |
+| 26 | PUT | `/api/json/assignments/internship-evaluation` | Ghi nhận đánh giá thực tập |
+| 27 | POST | `/api/json/qhdn/registered-students/list` | Xem sinh viên đã đăng ký OJT |
+| 28 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN |
+| 29 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN |
+| 30 | POST | `/api/json/qhdn/reports/list` | Báo cáo QHDN theo loại |
+| 31 | POST | `/api/json/recruitment/windows/list` | Danh sách đợt tuyển dụng theo học kỳ |
+| 32 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng |
+| 33 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng |
+| 34 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng |
+| 35 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng |
+| 36 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng |
+| 37 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
+| 38 | POST | `/api/json/job-applications/list` | Danh sách hồ sơ ứng tuyển doanh nghiệp |
 
 ## Doanh nghiệp — 10 API
 
@@ -310,15 +287,15 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 1 | PATCH | `/api/accounts/me/profile` | Cập nhật hồ sơ cá nhân |
 | 2 | GET | `/api/enterprise/profile` | Hồ sơ doanh nghiệp |
 | 3 | POST | `/api/recruitment/posts` | Gửi nhu cầu tuyển dụng |
-| 4 | POST | `/api/json/enterprise/candidates/search` | Danh sách và hồ sơ ứng viên |
+| 4 | POST | `/api/json/enterprise/candidates/list` | Danh sách và hồ sơ ứng viên |
 | 5 | PATCH | `/api/json/enterprise/candidates/decision` | Tiếp nhận hoặc từ chối ứng viên |
-| 6 | POST | `/api/json/enterprise/internships/search` | Danh sách sinh viên thực tập |
+| 6 | POST | `/api/json/enterprise/internships/list` | Danh sách sinh viên thực tập |
 | 7 | PUT | `/api/json/enterprise/internships/evaluation` | Gửi hoặc cập nhật đánh giá thực tập |
-| 8 | POST | `/api/json/recruitment/windows/search` | Danh sách đợt tuyển dụng theo học kỳ |
-| 9 | POST | `/api/json/recruitment/posts/search` | Danh sách tin tuyển dụng |
+| 8 | POST | `/api/json/recruitment/windows/list` | Danh sách đợt tuyển dụng theo học kỳ |
+| 9 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng |
 | 10 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng |
 
-## Sinh viên — 20 API
+## Sinh viên — 18 API
 
 | # | Method | Đường dẫn | Chức năng |
 |---:|---|---|---|
@@ -327,21 +304,19 @@ Tổng 160 API duy nhất; API dùng chung hiển thị trong từng nhóm đư�
 | 3 | POST | `/api/students/me/cv` | Upload hoặc thay CV cá nhân |
 | 4 | POST | `/api/job-applications` | Ứng tuyển vị trí doanh nghiệp |
 | 5 | POST | `/api/json/combo-registration-windows/preview` | Xem ảnh hưởng của combo dự kiến |
-| 6 | POST | `/api/json/combo-registration-windows/search` | Danh sách đợt chọn combo |
+| 6 | POST | `/api/json/combo-registration-windows/list` | Danh sách đợt chọn combo |
 | 7 | POST | `/api/json/combo-registration-windows/selections` | Gửi lựa chọn combo |
-| 8 | POST | `/api/json/students/combo-selections/search` | Lịch sử lựa chọn combo của sinh viên |
-| 9 | POST | `/api/json/students/eligibility-checks/search` | Lịch sử kiểm tra điều kiện OJT |
+| 8 | POST | `/api/json/students/combo-selections/list` | Lịch sử lựa chọn combo của sinh viên |
+| 9 | POST | `/api/json/students/eligibility-checks/list` | Lịch sử kiểm tra điều kiện OJT |
 | 10 | POST | `/api/json/students/eligibility/search` | Kết quả OJT và điều kiện còn thiếu |
-| 11 | POST | `/api/json/ojt-registration-windows/search` | Danh sách đợt đăng ký OJT |
-| 12 | POST | `/api/json/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT |
-| 13 | POST | `/api/json/ojt-registrations/detail` | Chi tiết hồ sơ đăng ký OJT |
-| 14 | POST | `/api/json/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ |
-| 15 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp |
-| 16 | POST | `/api/json/students/course-results/search` | Điểm, lần học và trạng thái môn |
-| 17 | POST | `/api/json/students/academic-progress/search` | GPA, tín chỉ và tiến độ học tập |
-| 18 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
-| 19 | POST | `/api/json/job-applications/search` | Danh sách hồ sơ ứng tuyển doanh nghiệp |
-| 20 | POST | `/api/json/students/me/opportunities/search` | Vị trí tuyển dụng và quyền ứng tuyển |
+| 11 | POST | `/api/json/ojt-registration-windows/list` | Danh sách đợt đăng ký OJT |
+| 12 | POST | `/api/json/ojt-registrations/list` | Danh sách hồ sơ đăng ký OJT |
+| 13 | POST | `/api/json/ojt-semesters/students/list` | Theo dõi trạng thái OJT theo kỳ |
+| 14 | POST | `/api/json/students/detail` | Hồ sơ học vụ tổng hợp |
+| 15 | POST | `/api/json/students/course-results/list` | Điểm, lần học và trạng thái môn |
+| 16 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên |
+| 17 | POST | `/api/json/job-applications/list` | Danh sách hồ sơ ứng tuyển doanh nghiệp |
+| 18 | POST | `/api/json/students/me/opportunities/list` | Vị trí tuyển dụng và quyền ứng tuyển |
 
 ## Auth — 3 API
 

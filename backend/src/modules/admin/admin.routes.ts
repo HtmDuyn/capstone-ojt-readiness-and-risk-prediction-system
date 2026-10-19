@@ -7,7 +7,7 @@ import { catalogs, listCatalog, csv } from './admin.repository';
 import { saveCompany, softDelete, saveTemplate, publishTemplate } from './catalog.service';
 import { createStudent, deleteStudent, exportStudents } from './student-admin.service';
 import { saveAssignment } from './assignment.service';
-import { createPredictionJob, predictionJob, predictions, predictionDetail } from './prediction.service';
+import { createPredictionJob, predictionJob, predictions } from './prediction.service';
 import { alerts, changeAlert, interventions, saveIntervention, auditLogs } from './monitoring.service';
 import { predictionDashboard, predictionReport } from './reporting.service';
 
@@ -44,7 +44,6 @@ router.post('/assessment-templates/:id/publish',...admin,handle(r=>publishTempla
 router.post('/admin/prediction-jobs',...admin,handle(r=>createPredictionJob(r.body,r.user.userId),202));
 router.get('/admin/prediction-jobs/:id',...admin,handle(r=>predictionJob(positiveId(r.params.id),r.query)));
 router.get('/predictions',...admin,handle(r=>predictions(r.query)));
-router.get('/predictions/:id',...admin,handle(r=>predictionDetail(positiveId(r.params.id))));
 router.get('/admin/models',...admin,handle(r=>listCatalog(catalogs.models,r.query)));
 router.get('/alerts',...admin,handle(r=>alerts(r.query)));
 router.patch('/alerts/:id/status',...admin,handle(r=>changeAlert(positiveId(r.params.id),r.body,r.user.userId)));

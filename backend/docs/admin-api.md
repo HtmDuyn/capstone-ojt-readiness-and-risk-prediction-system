@@ -39,7 +39,7 @@ Ví dụ tương đương:
 
 ```http
 GET /api/companies?page=1&limit=20
-POST /api/json/companies/search
+POST /api/json/companies/list
 {"page":1,"limit":20}
 
 GET /api/admin/models/1

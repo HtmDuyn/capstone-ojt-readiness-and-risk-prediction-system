@@ -588,53 +588,6 @@
  *         }
  *       }
  *     },
- *     "/api/ojt-registrations/{id}": {
- *       "get": {
- *         "tags": [
- *           "OJT registration and handoff"
- *         ],
- *         "summary": "Application, current official eligibility, history and immutable handoff snapshot",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success: {success:true,data:...}"
- *           },
- *           "400": {
- *             "description": "Invalid input"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Fixed role, ownership or window scope violation"
- *           },
- *           "404": {
- *             "description": "Record missing"
- *           },
- *           "409": {
- *             "description": "Invalid state, deadline, stale eligibility or replay conflict"
- *           },
- *           "422": {
- *             "description": "No eligible approved roster or handoff too large"
- *           }
- *         }
- *       }
- *     },
  *     "/api/ojt-registrations/{id}/review": {
  *       "post": {
  *         "tags": [

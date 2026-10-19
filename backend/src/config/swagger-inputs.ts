@@ -90,12 +90,7 @@ describe('/majors', { get: 'Danh sách chuyên ngành', post: 'Tạo chuyên ng�
 describe('/courses', { get: 'Danh sách môn học', post: 'Tạo môn học' });
 describe('/courses/{id}', { patch: 'Cập nhật môn học' });
 describe('/curricula', { get: 'Danh sách chương trình đào tạo đã nhập' });
-describe('/curricula/{id}', { get: 'Chi tiết chương trình đào tạo', patch: ['Sửa thông tin chương trình đã nhập', 'Chỉ sửa bản nháp; tạo phiên bản mới bằng import.'] });
-describe('/curricula/{id}/courses', { put: 'Thiết lập môn, tín chỉ và kỳ học' });
-describe('/curricula/{id}/prerequisites', { put: 'Thiết lập môn tiên quyết' });
-describe('/curricula/{id}/course-equivalences', { put: 'Thiết lập công nhận và tương đương môn' });
-describe('/combos/{id}/courses', { put: 'Thiết lập môn thuộc combo' });
-describe('/curricula/{id}/publish', { post: 'Ban hành phiên bản chương trình' });
+describe('/curricula/{id}', { get: 'Chi tiết chương trình đào tạo' });
 for (const [resource, name] of Object.entries({ 'curriculum-imports': 'khung chương trình', 'course-result-imports': 'kết quả học tập', imports: 'sinh viên hoặc doanh nghiệp' })) {
   describe('/' + resource + '/preview', { post: 'Kiểm tra dữ liệu nhập ' + name });
   describe('/' + resource + '/commit', { post: 'Nhập ' + name });
@@ -114,23 +109,20 @@ describe('/imports/archive', { post: 'Lưu trữ tuyển dụng sau hai học k�
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
 describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post: 'Nộp hồ sơ đăng ký OJT' });
-describe('/ojt-registrations/{id}', { get: 'Chi tiết hồ sơ đăng ký OJT' });
 describe('/ojt-registrations/{id}/review', { post: 'Duyệt hoặc từ chối hồ sơ OJT' });
 describe('/ojt-semesters/{id}/eligible-student-handoffs', { get: 'Lịch sử bàn giao sinh viên cho QHDN', post: 'Bàn giao sinh viên đủ điều kiện cho QHDN' });
 describe('/ojt-semesters/{id}/students', { get: 'Theo dõi trạng thái OJT theo kỳ' });
 describe('/ojt-results', { get: 'Danh sách kết quả OJT đã chuyển', post: 'Chuyển đánh giá và hồ sơ OJT cho phòng đào tạo' });
-describe('/ojt-results/{id}', { get: 'Chi tiết đánh giá và hồ sơ OJT', patch: 'Cập nhật điểm và kết quả OJT chính thức' });
+describe('/ojt-results/{id}', { patch: 'Cập nhật điểm và kết quả OJT chính thức' });
 describe('/ojt-results/{id}/revision-requests', { post: 'Yêu cầu bổ sung hồ sơ kết quả OJT' });
 describe('/ojt-results/{id}/transfer', { post: 'Gửi lại hồ sơ OJT đã bổ sung' });
 describe('/ojt-results/{id}/confirm', { post: ['Xác nhận kết quả OJT', 'Ghi nhận kết quả môn học và trạng thái thực tập theo cấu hình quy đổi điểm.'] });
 describe('/ojt-semesters/{id}/results/export', { get: 'Xuất báo cáo kết quả OJT theo kỳ' });
 describe('/students', { get: 'Tìm kiếm và lọc sinh viên' });
-describe('/students/{id}', { get: ['Hồ sơ học vụ tổng hợp', 'Kèm GPA, tín chỉ, điểm, combo và OJT; điểm và lịch sử đăng ký có phân trang.'], patch: ['Cập nhật hồ sơ và lộ trình học vụ', 'Chỉ gửi trường cần sửa; placement chứa khóa, nhóm và kỳ học.'] });
+describe('/students/{id}', { get: ['Hồ sơ học vụ tổng hợp', 'Kèm GPA, tín chỉ, điểm, combo và OJT; section=academicProgress chỉ lấy thông tin sinh viên và tiến độ, mặc định all.'], patch: ['Cập nhật hồ sơ và lộ trình học vụ', 'Chỉ gửi trường cần sửa; placement chứa khóa, nhóm và kỳ học.'] });
 describe('/students/{id}/course-results', { get: 'Điểm, lần học và trạng thái môn' });
-describe('/students/{id}/academic-progress', { get: ['GPA, tín chỉ và tiến độ học tập', 'GPA lấy lần học gần nhất. Tín chỉ không cộng trùng học lại, môn tương đương và môn được công nhận.'] });
 describe('/course-results/{id}', { patch: 'Sửa kết quả học tập và ghi lý do' });
 describe('/academic-imports', { get: 'Lịch sử nhập dữ liệu học vụ' });
-describe('/academic-imports/{id}', { get: 'Chi tiết và lỗi nhập dữ liệu học vụ' });
 describe('/health', { get: 'Kiểm tra backend và cơ sở dữ liệu' });
 describe('/roles', { get: 'Danh sách vai trò' });
 
@@ -152,7 +144,6 @@ describe('/assessment-templates/{id}/publish', { post: ['Ban hành bộ tiêu ch
 describe('/admin/prediction-jobs', { post: ['Tạo tác vụ dự đoán', 'Sử dụng mô hình dự đoán đã cấu hình.'] });
 describe('/admin/prediction-jobs/{id}', { get: 'Tiến độ dự đoán và lỗi theo sinh viên' });
 describe('/predictions', { get: 'Lịch sử dự đoán' });
-describe('/predictions/{id}', { get: ['Chi tiết dự đoán', 'Kèm dữ liệu đầu vào và phiên bản mô hình đã sử dụng.'] });
 describe('/admin/models', { get: ['Danh sách và hồ sơ phiên bản mô hình', 'Lọc modelId; kết quả kèm thông số và cấu trúc đầu vào.'] });
 describe('/alerts', { get: ['Danh sách và hồ sơ cảnh báo rủi ro', 'Lọc alertId để lấy cảnh báo kèm hoạt động hỗ trợ phân trang.'] });
 describe('/alerts/{id}/status', { patch: 'Tiếp nhận hoặc đóng cảnh báo' });

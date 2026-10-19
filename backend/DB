@@ -5537,12 +5537,16 @@ CREATE UNIQUE INDEX "UQ_Course_Code" ON "Courses"(upper("CourseCode"));
 CREATE UNIQUE INDEX "UQ_Specialization_Code" ON "Specializations"(upper("SpecializationCode"));
 ALTER TABLE "AcademicImportBatches" DROP CONSTRAINT "AcademicImportBatches_Kind_check", ADD CONSTRAINT "AcademicImportBatches_Kind_check" CHECK ("Kind" IN ('STUDENT','COURSE_RESULT','CURRICULUM')),
  ADD COLUMN "CurriculumID" int REFERENCES "TrainingPrograms"("ProgramID");
-COMMENT ON COLUMN "TrainingPrograms"."Status" IS 'Existing catalogs remain DRAFT until staff review and publish; publication is explicit, never inferred from imported text.';
-COMMENT ON COLUMN "TrainingPrograms"."Version" IS 'A new version is a separate ProgramID, preserving Students.ProgramID and historical curriculum data.';
--- Keep published curriculum snapshots immutable even when a caller bypasses the API.
+COMMENT ON COLUMN "TrainingPrograms"."Status" IS 'Catalogs lacking verified structure remain DRAFT. Validated curriculum imports automatically publish with actor and timestamp in the same transaction; DRAFT is the internal assembly state.';
+COMMENT ON COLUMN "TrainingPrograms"."Version" IS 'Imported metadata. A matching curriculum code replaces the existing ProgramID and republishes it after validation.';
+-- Published content must first be reopened as DRAFT for a complete replacement import.
 CREATE OR REPLACE FUNCTION "GuardPublishedProgram"() RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
 BEGIN
  IF TG_OP<>'INSERT' AND OLD."Status"='PUBLISHED' THEN
+  IF TG_OP='UPDATE' AND NEW."Status"='DRAFT' AND NEW."PublishedBy" IS NULL AND NEW."PublishedAt" IS NULL
+     AND (to_jsonb(NEW)-ARRAY['Status','PublishedBy','PublishedAt','UpdatedAt'])=(to_jsonb(OLD)-ARRAY['Status','PublishedBy','PublishedAt','UpdatedAt']) THEN
+   RETURN NEW;
+  END IF;
   RAISE EXCEPTION 'Published curriculum versions are immutable' USING ERRCODE='23514';
  END IF;
  IF TG_OP='DELETE' THEN RETURN OLD; END IF;

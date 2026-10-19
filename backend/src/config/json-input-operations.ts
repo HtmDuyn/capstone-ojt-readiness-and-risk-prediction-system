@@ -34,7 +34,14 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       }));
       let path='/api/json'+sourcePath.slice(4).replace(/\/\{[^}]+\}/g,'');
       const method=sourceMethod==='get'?'post':sourceMethod;
-      if(sourceMethod==='get'&&!sourcePath.endsWith('/export'))path+=/\{[^}]+\}$/.test(sourcePath)?'/detail':'/search';
+      if(sourceMethod==='get'&&!sourcePath.endsWith('/export')){
+        const response=resolve(original.responses?.['200']);
+        const schema=resolve(response?.content?.['application/json']?.schema);
+        const data=resolve(schema?.properties?.data);
+        const returnsList=params.some(p=>['page','limit'].includes(p.name))||
+          schema?.type==='array'||data?.type==='array'||!!schema?.properties?.items||!!data?.properties?.items;
+        path+=/\{[^}]+\}$/.test(sourcePath)?'/detail':returnsList?'/list':'/search';
+      }
       const key=method+' '+path;if(seen.has(key)||spec.paths[path]?.[method])throw Error('Conflicting JSON route: '+key);seen.add(key);
       const body=resolve(original.requestBody),media=body?.content?.['application/json'];
       if(body&&!media)throw Error('A non-JSON body needs a dedicated adapter: '+sourcePath);
@@ -58,15 +65,16 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
           submitted:{summary:'Hồ sơ đã nộp',value:{status:'SUBMITTED',page:1,limit:20}}
         };
       }
-      const searchId:Record<string,string>={
+      const listId:Record<string,string>={
+        '/api/ojt-registrations':'registrationId','/api/ojt-results':'resultId','/api/academic-imports':'importId','/api/predictions':'predictionId',
         '/api/job-applications':'applicationId',
         '/api/companies':'companyId','/api/positions':'positionId','/api/assignments':'assignmentId',
         '/api/academic-periods':'academicPeriodId','/api/accounts':'userId','/api/ojt-coordinations':'coordinationId','/api/internship-evaluations':'evaluationId','/api/enterprise/candidates':'candidateId',
         '/api/assessment-templates':'templateId','/api/admin/models':'modelId','/api/alerts':'alertId'
       };
-      if(sourceMethod==='get'&&searchId[sourcePath])operation.requestBody.content['application/json'].examples={
+      if(sourceMethod==='get'&&listId[sourcePath])operation.requestBody.content['application/json'].examples={
         list:{summary:'Danh sách hồ sơ',value:{page:1,limit:20}},
-        record:{summary:'Một hồ sơ theo ID',value:{[searchId[sourcePath]]:1,page:1,limit:20}}
+        record:{summary:'Một hồ sơ theo ID',value:{[listId[sourcePath]]:sourcePath==='/api/academic-imports'?'1':1,page:1,limit:20}}
       };
       if(sourceMethod==='get'&&sourcePath==='/api/qhdn/registered-students')operation.requestBody.content['application/json'].examples={
         all:{summary:'Tất cả sinh viên đã đăng ký OJT',value:{page:1,limit:20}},

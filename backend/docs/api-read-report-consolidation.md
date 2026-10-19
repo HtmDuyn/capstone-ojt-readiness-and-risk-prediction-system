@@ -8,11 +8,11 @@ Tất cả search dưới đây dùng POST. Không giữ alias endpoint cũ; nat
 
 | API đã xóa | API giữ lại | Bộ lọc chính xác | Dữ liệu nằm ở |
 |---|---|---|---|
-| /api/json/academic-periods/detail | /api/json/academic-periods/search | academicPeriodId | items[0] |
-| /api/json/accounts/detail | /api/json/accounts/search (Admin); /api/auth/me (cá nhân) | userId trong search | data[0] hoặc user |
-| /api/json/ojt-coordinations/detail | /api/json/ojt-coordinations/search | coordinationId | data.items[0] |
-| /api/json/internship-evaluations/detail | /api/json/internship-evaluations/search | evaluationId | data.items[0] |
-| /api/json/enterprise/candidates/detail | /api/json/enterprise/candidates/search | candidateId | data.items[0] |
+| /api/json/academic-periods/detail | /api/json/academic-periods/list | academicPeriodId | items[0] |
+| /api/json/accounts/detail | /api/json/accounts/list (Admin); /api/auth/me (cá nhân) | userId trong search | data[0] hoặc user |
+| /api/json/ojt-coordinations/detail | /api/json/ojt-coordinations/list | coordinationId | data.items[0] |
+| /api/json/internship-evaluations/detail | /api/json/internship-evaluations/list | evaluationId | data.items[0] |
+| /api/json/enterprise/candidates/detail | /api/json/enterprise/candidates/list | candidateId | data.items[0] |
 
 Các bộ lọc kết hợp AND. Tìm một hồ sơ nên đặt page=1 và bỏ bộ lọc không cần thiết. Không tìm thấy trả HTTP 200 với mảng rỗng; ID không hợp lệ trả 400. Giữ envelope cũ của từng search để không làm hỏng danh sách FE đang dùng.
 
@@ -22,7 +22,7 @@ Search ứng viên mặc định vẫn lấy lần giới thiệu mới nhất t
 
 ## 2. Một API báo cáo QHDN
 
-POST /api/json/qhdn/reports/search:
+POST /api/json/qhdn/reports/list:
 
 ```json
 {"type":"acceptance","ojtSemesterId":6,"companyId":1,"page":1,"limit":20}

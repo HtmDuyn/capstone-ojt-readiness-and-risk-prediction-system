@@ -9,10 +9,10 @@ Nhóm Swagger: **Enterprise**. Tất cả yêu cầu JWT `ENTERPRISE` liên kế
 | Method | Đường dẫn trên Swagger | Body |
 |---|---|---|
 | GET | `/api/enterprise/profile` | Không có |
-| POST | `/api/json/enterprise/candidates/search` | `{}` hoặc `page`, `limit`, `ojtSemesterId`, `positionId`, `decision`, `search` |
+| POST | `/api/json/enterprise/candidates/list` | `{}` hoặc `page`, `limit`, `ojtSemesterId`, `positionId`, `decision`, `search` |
 | POST | `/api/json/enterprise/candidates/detail` | `candidateId` |
 | PATCH | `/api/json/enterprise/candidates/decision` | `candidateId`, `decision`, `reason` |
-| POST | `/api/json/enterprise/internships/search` | `{}` hoặc `page`, `limit`, `ojtSemesterId`, `positionId`, `status`, `search` |
+| POST | `/api/json/enterprise/internships/list` | `{}` hoặc `page`, `limit`, `ojtSemesterId`, `positionId`, `status`, `search` |
 | PUT | `/api/json/enterprise/internships/evaluation` | `internshipId`, `completionScore`, `attitudeScore`, `skillScore`, `overallScore`, `reason`; `comments` tùy chọn |
 
 - `candidateId` là `CoordinationID`; `internshipId` là `AssignmentID`.

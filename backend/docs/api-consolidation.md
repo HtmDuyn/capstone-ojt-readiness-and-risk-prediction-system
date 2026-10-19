@@ -1,3 +1,5 @@
+> Cập nhật mới nhất: [API đã xóa theo luồng hiện tại](api-unused-cleanup.md); còn 149 API. Các bảng lịch sử bên dưới không thay thế danh sách Swagger hiện hành.
+
 # API sau khi xóa/gộp
 
 Danh sách và JSON body hiện hành: [api-input-reference.md](api-input-reference.md). Sau hai lượt gộp, Swagger còn 176 operation (ban đầu 196). Xem [sáu cặp search/detail vừa gộp](api-search-consolidation.md). Các URL cũ trong bảng dưới đã bị xóa cả route và Swagger; adapter JSON tương ứng cũng bị xóa. Những native route còn lại được giữ vì adapter JSON đang sử dụng chúng.
@@ -6,13 +8,13 @@ Danh sách và JSON body hiện hành: [api-input-reference.md](api-input-refere
 | --- | --- |
 | GET, POST `/api/ojt-semesters`; GET, PATCH `/api/ojt-semesters/{id}` | Học kỳ do Đào tạo tạo qua `/api/academic-periods`; bản ghi OJT kỹ thuật được tự liên kết. Search/detail học kỳ trả `ojtSemesterId` và `ojt`. PATCH học kỳ nhận cấu hình `ojt` lồng bên trong. |
 | PATCH `/api/students/academic-placement` | Giữ PATCH `/api/students/{id}/academic-placement`, hiển thị qua PATCH `/api/json/students/academic-placement` với `studentId` trong body. |
-| GET `/api/students/{id}/predictions` | POST `/api/json/predictions/search` với `studentId`. |
+| GET `/api/students/{id}/predictions` | POST `/api/json/predictions/list` với `studentId`. |
 | POST, PATCH `/api/positions`, `/api/positions/{id}` | Tạo vị trí cùng tin tuyển dụng; sửa/thêm vị trí qua PATCH `/api/json/recruitment/posts` với `postId`, `positions`, `reason`. Search/detail vị trí cho quản trị vẫn giữ. |
 | GET `/api/curricula/{id}/combos` | POST `/api/json/curricula/detail`; danh sách combo trong `data.combos`. |
-| GET `/api/assessments`, `/api/assessments/{id}` | POST `/api/json/internship-evaluations/search` và `/detail`. Giữ thông tin template, điểm chi tiết, sinh viên, học kỳ và lịch sử; search hỗ trợ `templateId`. |
+| GET `/api/assessments`, `/api/assessments/{id}` | POST `/api/json/internship-evaluations/list` và `/detail`. Giữ thông tin template, điểm chi tiết, sinh viên, học kỳ và lịch sử; search hỗ trợ `templateId`. |
 | GET `/api/admin/dashboard/readiness`, `/risks`, `/trends` | POST `/api/json/admin/dashboard/search`; `section` là `all`, `readiness`, `risks`, `trends`; mặc định trả cả ba trong cùng snapshot. |
-| GET `/api/admin/reports/risks` | POST `/api/json/admin/reports/readiness/search`; dữ liệu chứa cả readiness và risk. |
-| GET `/api/recruitment/posts/{id}` | POST `/api/json/recruitment/posts/search` với `postId`; trả đầy đủ vị trí, vẫn áp dụng phạm vi doanh nghiệp. |
+| GET `/api/admin/reports/risks` | POST `/api/json/admin/reports/readiness/list`; dữ liệu chứa cả readiness và risk. |
+| GET `/api/recruitment/posts/{id}` | POST `/api/json/recruitment/posts/list` với `postId`; trả đầy đủ vị trí, vẫn áp dụng phạm vi doanh nghiệp. |
 | POST `/api/auth/logout` | Client xóa token đang lưu. Endpoint cũ chỉ trả thành công, không thu hồi JWT trên server. |
 
 PUT `/api/json/accounts` chỉ dành cho ADMIN sửa tài khoản theo `userId`. Người dùng tự xem/sửa thông tin qua GET/PATCH `/api/accounts/me/profile`.
