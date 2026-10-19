@@ -1,3 +1,5 @@
+> Cập nhật kỳ 5: Student nộp hồ sơ khi đã có official ELIGIBLE còn hiệu lực; academicPeriodId là kỳ chuẩn bị/đăng ký, khác đợt OJT mục tiêu. Đợt xét có revision và mở lại có audit. Xem [student-portal-api.md](student-portal-api.md).
+
 # API đăng ký OJT và bàn giao cho QHDN
 
 > Cập nhật G01–G05: xem [cấu hình kỳ đăng ký, lịch combo, preview, mốc xét và đồng bộ điểm OJT](academic-workflow-gaps.md). Các ràng buộc mới này được áp dụng cùng các API bên dưới.
@@ -128,22 +130,16 @@ Trả `registrationStatus` (NOT_REGISTERED/SUBMITTED/APPROVED/REJECTED/HANDED_OF
 Schema duy nhất trong `backend/DB`, phần `20261008 OJT registration and academic handoffs`, version `20261008_ojt_registration`. Tận dụng OJTRegistrations, StudentEnterpriseCoordination, InternshipAssignments; thêm bảng đợt, lịch sử và snapshot bàn giao. Không có DDL/seed trong runtime API. File DB đầy đủ là script reset; với DB đã có dữ liệu chỉ áp dụng phần mới trong transaction.
 
 Swagger: `/api-docs`, nhóm `OJT registration and handoff`. Nhóm API không phụ thuộc SMTP hoặc worker.
-## Mở rộng QHDN (12/10/2026)
 
-`GET /api/ojt-semesters` cho phép ADMIN/ACADEMIC/OJT_COORD. Chỉ mở quyền GET danh sách kỳ; quyền POST/PATCH và các danh mục học vụ khác giữ nguyên.
+## API dùng lại cho QHDN (OJT_COORD)
 
-`GET /api/ojt-semesters/:id/students` bổ sung bộ lọc kết hợp AND:
+- GET /api/ojt-semesters: mở quyền đọc OJT_COORD; tạo/sửa vẫn chỉ ADMIN/ACADEMIC.
+- GET /api/ojt-semesters/:id/students: QHDN chỉ thấy hồ sơ đã bàn giao. Thêm enterpriseId, coordinationStatus, assignmentStatus; kết hợp AND trước phân trang và tính tổng.
+- enterpriseId: doanh nghiệp phân công gần nhất thuộc điều phối gần nhất, nếu chưa phân công dùng doanh nghiệp điều phối.
+- coordinationStatus: quyết định doanh nghiệp của điều phối gần nhất, không phân biệt hoa/thường; null là PENDING. NOT_COORDINATED chọn hồ sơ chưa điều phối.
+- assignmentStatus: trạng thái phân công gần nhất thuộc điều phối gần nhất, không phân biệt hoa/thường. NOT_ASSIGNED chọn hồ sơ chưa phân công. Hai trạng thái nhận chuỗi tối đa 30 ký tự để hỗ trợ dữ liệu hiện có.
+- GET /api/ojt-registrations/:id: dùng làm nguồn hồ sơ điều phối; giữ kiểm tra đã bàn giao cho QHDN.
+- GET /api/ojt-semesters/:id/results/export?format=csv|json: dùng lại cho báo cáo; PDF chưa được hỗ trợ.
+- POST /api/ojt-semesters/:id/eligible-student-handoffs: vẫn chỉ ADMIN/ACADEMIC.
 
-| Query | Giá trị |
-| --- | --- |
-| `enterpriseId` | ID doanh nghiệp dương, tương ứng `Enterprises.EnterpriseID` |
-| `coordinationStatus` | `NOT_COORDINATED`, `PENDING`, `ACCEPTED`, `REJECTED` |
-| `assignmentStatus` | `UNASSIGNED`, `ASSIGNED`, `ACTIVE`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, `CANCELED`, `FAILED` |
-
-Bộ lọc áp dụng trên lượt điều phối mới nhất (CoordinationID lớn nhất) và phân công gắn với lượt đó, không tìm theo lịch sử. `PENDING` gồm lượt có Decision rỗng hoặc chưa có quyết định chấp nhận/từ chối; `NOT_COORDINATED` là chưa có lượt điều phối. `UNASSIGNED` là chưa có bản ghi phân công; phân công đã tồn tại nhưng Status rỗng được xem là `ASSIGNED` khi lọc. Decision legacy ACCEPT/APPROVED được xem là ACCEPTED và REJECT được xem là REJECTED. Trạng thái phân công được so sánh không phân biệt hoa thường; ACTIVE và IN_PROGRESS vẫn là hai giá trị riêng.
-
-Ví dụ: `/api/ojt-semesters/1/students?enterpriseId=2&coordinationStatus=ACCEPTED&assignmentStatus=ASSIGNED&page=1&limit=20`.
-
-QHDN vẫn chỉ thấy sinh viên đã bàn giao; count và items dùng chung điều kiện lọc. ID/trạng thái không hợp lệ trả 400; không có dữ liệu phù hợp trả danh sách rỗng.
-
-`GET /api/ojt-registrations/:id` tiếp tục là nguồn hồ sơ cho điều phối: thông tin đăng ký, `officialEligibility`, `handoffSnapshot`, `history`, `coordination`, `assignments`. QHDN xem hồ sơ chưa bàn giao nhận 403. API chỉ đọc, không tự tạo điều phối hoặc phân công.
+Ví dụ: GET /api/ojt-semesters/1/students?enterpriseId=2&coordinationStatus=ACCEPTED&assignmentStatus=IN_PROGRESS (ID minh họa).

@@ -13,6 +13,7 @@ export const errorHandler: ErrorRequestHandler =
   ) => {
     logger.error(error);
 
+    if(error?.name==='MulterError'){res.status(error.code==='LIMIT_FILE_SIZE'?413:400).json({success:false,errorCode:error.code,message:'Upload exceeds allowed file/field limits.'});return;}
     const statusCode =
       typeof error?.statusCode ===
       "number"

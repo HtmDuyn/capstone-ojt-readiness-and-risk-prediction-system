@@ -11,6 +11,7 @@ import {
 
 import type {
   AuthError,
+  AuthUserRecord,
 } from "./auth.types";
 
 const createAuthError = (
@@ -47,6 +48,27 @@ export const verifyPassword = async (
     return false;
   }
 };
+
+export const getUserById = async (
+  userId: unknown,
+): Promise<AuthUserRecord | null> => {
+  const id = Number(userId);
+
+  if (
+    !Number.isInteger(id) ||
+    id <= 0
+  ) {
+    return null;
+  }
+
+  return findById(id);
+};
+
+export async function actorProfileIds(userId: number, roleCode: string | null) {
+  if (roleCode === 'STUDENT') return { studentId: (await query('SELECT "StudentID" FROM "Students" WHERE "UserID"=$1 AND "DeletedAt" IS NULL',[userId])).rows[0]?.StudentID ?? null };
+  if (roleCode === 'ENTERPRISE') return { enterpriseId: (await query('SELECT "EnterpriseID" FROM "EnterpriseUsers" WHERE "UserID"=$1',[userId])).rows[0]?.EnterpriseID ?? null };
+  return {};
+}
 
 export const loginUser = async (
   email: unknown,

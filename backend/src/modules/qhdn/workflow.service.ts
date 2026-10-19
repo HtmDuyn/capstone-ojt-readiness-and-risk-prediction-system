@@ -113,6 +113,7 @@ async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolCl
     if(current===value)return {...api('assignments',before),replayed:true};
     const transitions:Row={ASSIGNED:['ACTIVE','CANCELLED'],ACTIVE:['COMPLETED','CANCELLED'],IN_PROGRESS:['COMPLETED','CANCELLED']};
     if(!transitions[current]?.includes(value))throw invalid('Invalid assignment status transition.',409,'ASSIGNMENT_STATUS_CONFLICT');
+    if(value==='COMPLETED'&&!(await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "OverallScore" IS NOT NULL',[id])).rowCount)throw invalid('Submit an evaluation before completing the assignment.',409,'EVALUATION_REQUIRED');
     // An already transferred dossier must be revised through the results workflow, never orphaned by cancellation.
     if(value==='CANCELLED'&&(await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1',[id])).rowCount)throw invalid('Cannot cancel an assignment with a transferred result.',409,'ASSIGNMENT_HAS_RESULT');
     await record(c,'positions',before.PositionID);

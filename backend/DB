@@ -6332,13 +6332,6 @@ INSERT INTO "SchemaMigrations"("Version") VALUES ('20261013_student_portal');
 COMMIT;
 
 
-
-
--- TEST CASES: 11 STUDENTS (fixed quoted STUDENT role)
--- TEST DATA ONLY. Re-runnable. Existing Users, Students and snapshots are not updated.
--- This seeds 11 Users + 11 Students and initial snapshot only where no snapshot exists.
--- StudentAcademicSnapshot is a test fixture, not an official grade transcript.
--- OJT decisions are authoritative only after official course results/imports are complete.
 BEGIN;
 SET LOCAL search_path=public,pg_catalog;
 

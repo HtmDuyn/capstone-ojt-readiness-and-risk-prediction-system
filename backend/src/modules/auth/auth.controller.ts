@@ -103,3 +103,15 @@ export const getCurrentUser = async (
     next(error);
   }
 };
+
+export const logout = async (
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> => {
+  res.status(200).json({
+    success: true,
+    message:
+      "Logout successful",
+  });
+};
