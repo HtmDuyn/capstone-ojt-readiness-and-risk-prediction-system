@@ -252,6 +252,8 @@ export const createNewAccount = async (
     );
   }
 
+  if (['STUDENT','ENTERPRISE'].includes(role.code)) throw createError('Student and enterprise accounts must be created through import.',403,'IMPORT_REQUIRED');
+
   const passwordHash =
     await bcrypt.hash(
       password,
@@ -288,6 +290,7 @@ export const updateAccount = async (
     if (userId === currentUserId && roleId !== existing.role_id) throw createError('You cannot change your own role.',400,'SELF_ROLE_CHANGE_NOT_ALLOWED');
     const role = (await client.query('SELECT "RoleCode" AS code FROM "Roles" WHERE "RoleID"=$1',[roleId])).rows[0];
     if (!role) throw createError('Role not found.',404,'ROLE_NOT_FOUND');
+    if (roleId !== existing.role_id && ['STUDENT','ENTERPRISE'].includes(role.code)) throw createError('Use import to provision student or enterprise identities.',403,'IMPORT_REQUIRED');
     if ((existing.studentId !== null && role.code !== 'STUDENT') || (existing.enterpriseId !== null && role.code !== 'ENTERPRISE')) throw createError('Role conflicts with the linked student or enterprise profile.',409,'ROLE_PROFILE_CONFLICT');
     if ((await client.query('SELECT 1 FROM "Users" WHERE LOWER("Email")=LOWER($1) AND "UserID"<>$2',[email,userId])).rowCount) throw createError('Email already exists.',409,'EMAIL_EXISTS');
     await client.query('UPDATE "Users" SET "FullName"=$2,"Phone"=$3,"Email"=$4,"Status"=$5::varchar,"RoleID"=$6::int, "AuthVersion"="AuthVersion" + CASE WHEN "Status" IS DISTINCT FROM $5::varchar OR "RoleID" IS DISTINCT FROM $6::int THEN 1 ELSE 0 END, "UpdatedAt"=CURRENT_TIMESTAMP WHERE "UserID"=$1',[userId,fullName,phone,email,status,roleId]);

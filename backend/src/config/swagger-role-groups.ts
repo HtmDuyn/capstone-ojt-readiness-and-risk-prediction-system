@@ -9,6 +9,8 @@ const roleNames: Record<RoleCode, string> = {
 };
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
+  {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
+  {roles:['ADMIN','OJT_COORD','ENTERPRISE','STUDENT'],operations:['GET /api/internship-tasks']},
   {roles:['STUDENT'],operations:['POST /api/students/me/cv','POST /api/job-applications','GET /api/students/me/opportunities']},
   {roles:['ADMIN','OJT_COORD','STUDENT'],operations:['GET /api/job-applications']},
   { roles: ["ADMIN","ACADEMIC"], operations: [
@@ -48,8 +50,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/combo-registration-windows/{id}/extensions",
     "POST /api/combo-registration-windows/{id}/finalize",
     "POST /api/combo-registration-windows/{id}/reminders",
-    "POST /api/course-result-imports/commit",
-    "POST /api/course-result-imports/preview",
     "POST /api/courses",
     "POST /api/curriculum-imports/commit",
     "POST /api/curriculum-imports/preview",
@@ -100,7 +100,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/assessment-templates/{id}/publish",
     "POST /api/auth/users/{userId}/password-reset",
     "POST /api/imports/emails/{emailId}/retry",
-    "POST /api/students",
     "PATCH /api/accounts/{userId}",
   ] },
   { roles: ["ADMIN","ACADEMIC","OJT_COORD","ENTERPRISE","STUDENT"], operations: [
@@ -131,7 +130,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PATCH /api/companies/{id}",
     "PATCH /api/recruitment/windows/{id}",
     "POST /api/assignments",
-    "POST /api/companies",
     "POST /api/imports/archive",
     "POST /api/ojt-coordinations",
     "POST /api/ojt-coordinations/{id}/decision",
@@ -163,7 +161,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/enterprise/internships",
     "GET /api/enterprise/profile",
     "PATCH /api/enterprise/candidates/{id}/decision",
-    "POST /api/recruitment/posts",
     "PUT /api/enterprise/internships/{id}/evaluation",
   ] },
   { roles: ["ADMIN","ACADEMIC","OJT_COORD","STUDENT"], operations: [

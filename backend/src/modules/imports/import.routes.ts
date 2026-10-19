@@ -11,7 +11,7 @@ for (const path of ['/preview', '/commit']) {
   router.post(path, async (req, res, next) => {
     try {
       const role = req.user!.roleCode;
-      if (role !== 'ADMIN' && !((role === 'ACADEMIC' && req.body?.kind === 'STUDENT') || (role === 'OJT_COORD' && req.body?.kind === 'ENTERPRISE'))) throw fail('This role cannot import this account type.', 403, 'FORBIDDEN');
+      if (!((['ADMIN','ACADEMIC'].includes(role!) && req.body?.kind === 'STUDENT') || (role === 'OJT_COORD' && req.body?.kind === 'ENTERPRISE'))) throw fail('Only QHDN can import enterprises; academic staff import students.', 403, 'FORBIDDEN');
       res.json({ success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview') });
     } catch (error) { next(error); }
   });

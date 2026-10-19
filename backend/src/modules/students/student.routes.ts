@@ -5,7 +5,8 @@ import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './student.validation';
 import { assertStudentAccess, listStudents, patchStudent, results, patchResult } from './student.service';
 import { studentProfile } from './student-profile.service';
-import { courseResultImport, importHistory } from './academic-import.service';
+import { importHistory } from './academic-import.service';
+import { listTasks } from '../qhdn/task.service';
 import { receiveCV, uploadStudentCV, readCV } from './cv.service';
 
 const router=Router();
@@ -29,9 +30,7 @@ router.get('/students/:id',...read,handle(req=>studentProfile(positiveId(req.par
 router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.params.id),req.body,req.user.userId)));
 router.get('/students/:id/course-results',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
 router.patch('/course-results/:id',...staff,handle(req=>patchResult(positiveId(req.params.id),req.body,req.user.userId)));
-for(const mode of ['preview','commit']) router.post(`/course-result-imports/${mode}`,...staff,async(req,res,next)=>{
-  try{const data=await courseResultImport(req.body,req.user!.userId,mode==='preview');res.status((data as any).rejectedBatch?422:200).json({success:!(data as any).rejectedBatch,data});}catch(error){next(error);}
-});
+router.get('/internship-tasks',authenticate,authorizeRoles('STUDENT','ENTERPRISE','OJT_COORD','ADMIN'),handle(req=>listTasks(req.query,req.user)));
 router.get('/academic-imports',...staff,handle(req=>importHistory(req.query)));
 
 export default router;

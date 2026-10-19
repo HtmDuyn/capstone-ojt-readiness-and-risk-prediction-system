@@ -5,7 +5,7 @@ import { positiveId, enumValue } from '../students/student.validation';
 import { student } from '../students/student.service';
 import { catalogs, listCatalog, csv } from './admin.repository';
 import { saveCompany, softDelete, saveTemplate, publishTemplate } from './catalog.service';
-import { createStudent, deleteStudent, exportStudents } from './student-admin.service';
+import { deleteStudent, exportStudents } from './student-admin.service';
 import { saveAssignment } from './assignment.service';
 import { createPredictionJob, predictionJob, predictions } from './prediction.service';
 import { alerts, changeAlert, interventions, saveIntervention, auditLogs } from './monitoring.service';
@@ -27,11 +27,9 @@ const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async
  try{const data=await work(req);if(status===204){res.status(204).end();return;}res.status(status).json({success:true,data});}catch(error){next(error);}
 };
 router.get('/admin/dashboard',...admin,handle(r=>predictionDashboard(r.query)));
-router.post('/students',...admin,handle(r=>createStudent(r.body,r.user.userId),201));
 // Must be mounted before existing /students/:id.
 router.get('/students/export',...admin,async(req,res,next)=>{try{const rows=await exportStudents(req.query);res.attachment('students.csv').type('text/csv; charset=utf-8').send(csv(rows,['id','studentCode','fullName','email','programId','cohortId','groupCode','className','status']));}catch(error){next(error);}});
 router.delete('/students/:id',...admin,handle(r=>deleteStudent(positiveId(r.params.id),r.user.userId),204));
-router.post('/companies',...adminForShared,handle(r=>saveCompany(r.body,r.user.userId),201));
 router.patch('/companies/:id',...adminForShared,handle(r=>saveCompany(r.body,r.user.userId,positiveId(r.params.id))));
 router.delete('/companies/:id',...admin,handle(r=>softDelete('companies',positiveId(r.params.id),r.user.userId),204));
 router.delete('/positions/:id',...admin,handle(r=>softDelete('positions',positiveId(r.params.id),r.user.userId),204));

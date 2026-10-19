@@ -5,6 +5,7 @@ import { encryptEmail, emailKey } from './email.crypto';
 import { fail, validateImport } from './import.validation';
 import { saveHistory, recordRejected, safeRow } from '../students/academic-import.service';
 import { windowRecord, assertOpen } from '../recruitment/recruitment.repository';
+import { importAcademicProfile } from '../students/complete-import.service';
 
 export async function importAccounts(body: unknown, actorId: number, preview = false) {
   try { return await performAccountImport(body,actorId,preview); }
@@ -23,7 +24,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    if (input.kind === 'ENTERPRISE') await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
     // Serialize identity checks and recruitment writes, including repeated batches in one intake.
     await client.query("SELECT pg_advisory_xact_lock(hashtext('account-provisioning'))");
     const old = await client.query('SELECT * FROM "AccountImportBatches" WHERE "IdempotencyKey"=$1', [input.idempotencyKey]);
@@ -51,6 +52,11 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
         ? await client.query('SELECT s."StudentID" AS entity_id,u."UserID",u."Email",r."RoleCode" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(s."StudentCode")=$1', [row.code])
         : await client.query('SELECT e."EnterpriseID" AS entity_id,u."UserID",u."Email",r."RoleCode" FROM "Enterprises" e LEFT JOIN "EnterpriseUsers" eu ON eu."EnterpriseID"=e."EnterpriseID" LEFT JOIN "Users" u ON u."UserID"=eu."UserID" LEFT JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(e."EnterpriseCode")=$1 ORDER BY u."UserID"', [row.code]);
       const match = existing.rows.find(r => r.Email?.toLowerCase() === row.email) ?? existing.rows[0];
+      if (input.kind === 'ENTERPRISE' && match) {
+        if (!match.UserID || match.RoleCode !== 'ENTERPRISE') throw fail(`Row ${i + 1}: existing enterprise has no valid enterprise account.`,409,'IDENTITY_CONFLICT');
+        plans.push({row,userId:match.UserID,entityId:match.entity_id,action:'UPDATED'});
+        continue;
+      }
       if (match?.UserID && (match.RoleCode !== input.kind || match.Email.toLowerCase() !== row.email)) throw fail(`Row ${i + 1}: account email/role does not match existing identity.`, 409, 'IDENTITY_CONFLICT');
       const email = await client.query('SELECT "UserID" FROM "Users" WHERE lower("Email")=$1', [row.email]);
       if (email.rows.length && email.rows[0].UserID !== match?.UserID) throw fail(`Row ${i + 1}: email belongs to another account.`, 409, 'IDENTITY_CONFLICT');
@@ -59,11 +65,11 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       plans.push({ row, userId: match?.UserID, entityId: match?.entity_id, action: match?.UserID ? 'UPDATED' : 'CREATED' });
     }
     const summary = { created: plans.filter(p => p.action === 'CREATED').length, updated: plans.filter(p => p.action === 'UPDATED').length, total: plans.length };
-    if (preview) {
+    if (preview && input.kind === 'ENTERPRISE') {
       await client.query('ROLLBACK');
       return { ...summary, preview: true, rows: plans.map((p, i) => ({ rowNumber: i + 1, code: p.row.code, action: p.action })) };
     }
-    if (summary.created) {
+    if (summary.created && !preview) {
       emailKey();
       const url = new URL(process.env.FRONTEND_LOGIN_URL ?? '');
       if (!['http:', 'https:'].includes(url.protocol)) throw fail('Configure FRONTEND_LOGIN_URL.', 503);
@@ -79,12 +85,15 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
         const user = await client.query('INSERT INTO "Users" ("Username","Email","FullName","PasswordHash","RoleID","MustChangePassword","TemporaryPasswordExpiresAt") SELECT $1,$2,$3,$4,"RoleID",true,$5 FROM "Roles" WHERE "RoleCode"=$6 RETURNING "UserID"', [`${input.kind.toLowerCase()}_${row.code}`, row.email, row.fullName, hash, expiresAt, input.kind]);
         if (!user.rows.length) throw fail('Required role is missing.', 503);
         p.userId = user.rows[0].UserID;
+        if (!preview) {
         const payload = encryptEmail({ subject: 'Tài khoản hệ thống OJT', text: `Xin chào ${row.fullName},\nEmail đăng nhập: ${row.email}\nTên tài khoản: ${input.kind.toLowerCase()}_${row.code}\nMật khẩu tạm: ${password}\nĐăng nhập: ${process.env.FRONTEND_LOGIN_URL}\nMật khẩu tạm hết hạn: ${expiresAt.toISOString()}. Bạn phải đổi mật khẩu sau khi đăng nhập.` });
         await client.query('INSERT INTO "EmailOutbox" ("UserID","Recipient","EncryptedPayload","ExpiresAt") VALUES ($1,$2,$3,$4)', [p.userId, row.email, payload, expiresAt]);
+        }
       }
       if (input.kind === 'STUDENT') {
-        if (!p.entityId) await client.query('INSERT INTO "Students" ("UserID","StudentCode","Status") VALUES ($1,$2,\'ACTIVE\')', [p.userId, row.code]);
+        if (!p.entityId) p.entityId = (await client.query('INSERT INTO "Students" ("UserID","StudentCode","Status") VALUES ($1,$2,\'ACTIVE\') RETURNING "StudentID"', [p.userId, row.code])).rows[0].StudentID;
         else await client.query('UPDATE "Users" SET "FullName"=$2,"UpdatedAt"=now() WHERE "UserID"=$1', [p.userId, row.fullName]);
+        await importAcademicProfile(client,p.entityId!,row.academic,actorId);
       } else {
         if (!p.entityId) {
           const ent = await client.query('INSERT INTO "Enterprises" ("EnterpriseCode","Name","Address","ContactEmail","ContactPersonName","Status") VALUES ($1,$2,$3,$4,$5,\'ACTIVE\') RETURNING "EnterpriseID"', [row.code, row.name, row.address ?? null, row.email, row.fullName]);
@@ -101,6 +110,10 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       await client.query('INSERT INTO "AccountImportRows" ("BatchID","RowNumber","SourceCode","UserID","Action") VALUES ($1,$2,$3,$4,$5)', [batchId, i + 1, row.code, p.userId, p.action]);
     }
     let academicImportId:string|undefined;
+    if (preview) {
+      await client.query('ROLLBACK');
+      return {...summary,preview:true,rows:plans.map((p,i)=>({rowNumber:i+1,code:p.row.code,action:p.action}))};
+    }
     if (input.kind==='STUDENT') academicImportId=await saveHistory(client,{kind:'STUDENT',key:input.idempotencyKey,hash:payloadHash,status:'COMPLETED',summary,sourceAccountBatchId:batchId},actorId,plans.map(p=>({raw:safeRow(p.row,'STUDENT'),normalized:{userId:p.userId,action:p.action},status:'IMPORTED'})));
     await client.query('COMMIT');
     return { ...summary, batchId, academicImportId, replayed: false };

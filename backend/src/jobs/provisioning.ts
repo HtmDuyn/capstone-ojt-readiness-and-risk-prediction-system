@@ -1,4 +1,5 @@
 import { academicAlertEmailIsCurrent } from '../modules/academic-reporting/notification.service';
+import { notifyCompletedInternships } from '../modules/ojt-results/completion-notification.service';
 import nodemailer from 'nodemailer';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
@@ -86,7 +87,7 @@ export function startProvisioningJobs() {
   const tick = async () => {
     if (busy || stopped) return;
     busy = true;
-    try { await archiveRecruitment(); await deliverEmails(); }
+    try { await archiveRecruitment(); await deliverEmails(); await notifyCompletedInternships(); }
     catch { console.error('Provisioning job failed; check database migration and SMTP configuration.'); }
     finally { busy = false; }
   };

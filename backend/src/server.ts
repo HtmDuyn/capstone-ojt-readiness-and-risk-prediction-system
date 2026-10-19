@@ -31,7 +31,7 @@ const startServer =
       const stopRecruitment = startRecruitmentWorker();
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
       const stopPredictions = process.env.PREDICTION_WORKER_ENABLED === 'true' ? startPredictionWorker() : () => {};
-      const stopJobs = process.env.PROVISIONING_JOBS_ENABLED === 'true' ? startProvisioningJobs() : () => {};
+      const stopJobs = process.env.PROVISIONING_JOBS_ENABLED !== 'false' ? startProvisioningJobs() : () => {};
 
       const server =
         app.listen(

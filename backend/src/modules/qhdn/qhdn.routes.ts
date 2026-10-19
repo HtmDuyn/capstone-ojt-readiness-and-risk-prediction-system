@@ -13,7 +13,6 @@ router.get('/qhdn/registered-students',...staff,handle(req=>registeredStudents(r
 for(const [path,resource] of [['companies','companies'],['positions','positions'],['ojt-coordinations','coordinations'],['assignments','assignments'],['internship-evaluations','evaluations']] as const){
   router.get(`/${path}`,...staff,handle(req=>list(resource,req.query,req.user)));
 }
-router.post('/companies',...staff,handle(req=>saveCompany(req.body,req.user),201));
 router.patch('/companies/:id',...staff,handle(req=>saveCompany(req.body,req.user,positiveId(req.params.id))));
 router.post('/ojt-coordinations',...staff,handle(req=>coordinate(req.body,req.user),201));
 router.post('/ojt-coordinations/:id/decision',...staff,handle(req=>decision(positiveId(req.params.id),req.body,req.user)));
