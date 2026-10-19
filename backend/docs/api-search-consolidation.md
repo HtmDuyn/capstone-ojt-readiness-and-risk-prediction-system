@@ -4,18 +4,18 @@ Backend còn 176 API trên Swagger. Sáu operation detail đã bị xóa cả ro
 
 | POST đã xóa | POST giữ lại | Trường lọc |
 | --- | --- | --- |
-| `/api/json/companies/detail` | `/api/json/companies/search` | companyId |
-| `/api/json/positions/detail` | `/api/json/positions/search` | positionId |
-| `/api/json/assignments/detail` | `/api/json/assignments/search` | assignmentId |
-| `/api/json/assessment-templates/detail` | `/api/json/assessment-templates/search` | templateId |
-| `/api/json/admin/models/detail` | `/api/json/admin/models/search` | modelId |
-| `/api/json/alerts/detail` | `/api/json/alerts/search` | alertId |
+| `/api/json/companies/detail` | `/api/json/companies/list` | companyId |
+| `/api/json/positions/detail` | `/api/json/positions/list` | positionId |
+| `/api/json/assignments/detail` | `/api/json/assignments/list` | assignmentId |
+| `/api/json/assessment-templates/detail` | `/api/json/assessment-templates/list` | templateId |
+| `/api/json/admin/models/detail` | `/api/json/admin/models/list` | modelId |
+| `/api/json/alerts/detail` | `/api/json/alerts/list` | alertId |
 
 Các GET gốc `/api/companies/{id}`, `/api/positions/{id}`, `/api/assignments/{id}`, `/api/assessment-templates/{id}`, `/api/admin/models/{id}`, `/api/alerts/{id}` cũng đã xóa. Các thao tác PATCH/DELETE/POST khác trên cùng tài nguyên vẫn tồn tại theo quyền cũ.
 
 ## Cách gọi và đọc response
 
-Ví dụ POST `/api/json/assignments/search`:
+Ví dụ POST `/api/json/assignments/list`:
 
 ```json
 {

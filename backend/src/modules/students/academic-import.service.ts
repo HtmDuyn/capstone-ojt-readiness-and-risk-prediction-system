@@ -1,7 +1,8 @@
+import { readTransaction } from '../qhdn/read.repository';
+import { detailPagination } from '../../shared/detail-pagination';
 import { enrichListRows } from '../../shared/list-context';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
-import { query } from '../../config/database';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, requiredText, optionalText, positiveId, resultValues, pagination, batchId, enumValue } from './student.validation';
 import { resultPeriod } from './student.service';
@@ -85,16 +86,19 @@ export async function courseResultImport(body:unknown,actorId:number,preview:boo
   }
 }
 export async function importHistory(params:Record<string,unknown>) {
-  const p=pagination(params,['kind','status']),args:unknown[]=[],filters:string[]=[];
-  for (const key of ['kind','status']) if (params[key]!==undefined) {args.push(enumValue(params[key],key==='kind'?['STUDENT','COURSE_RESULT','CURRICULUM']:['COMPLETED','REJECTED','FAILED'],key));filters.push(`"${key==='kind'?'Kind':'Status'}"=$${args.length}`);}
-  const row=(await query(`WITH filtered AS (SELECT "BatchID" AS id,"Kind" AS kind,"SourceName" AS "sourceName","ImportedBy" AS "importedBy","Status" AS status,"Summary" AS summary,"CreatedAt" AS "createdAt","SourceAccountBatchID" AS "sourceAccountBatchId" FROM "AcademicImportBatches" ${filters.length?'WHERE '+filters.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
-  return {...row,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
-}
-export async function importDetails(value:unknown,params:Record<string,unknown>) {
-  const id=batchId(value),p=pagination(params,[]);
-  const batch=(await query(`SELECT "BatchID" AS id,"Kind" AS kind,"Status" AS status,"Summary" AS summary,"SourceName" AS "sourceName","ImportedBy" AS "importedBy","CreatedAt" AS "createdAt","SourceAccountBatchID" AS "sourceAccountBatchId" FROM "AcademicImportBatches" WHERE "BatchID"=$1`,[id])).rows[0];
-  if (!batch) throw invalid('Import batch not found.',404,'IMPORT_NOT_FOUND');
-  const rows=(await query(`SELECT "RowNumber" AS "rowNumber","RawData" AS "rawData","NormalizedData" AS "normalizedData","Status" AS status,"Errors" AS errors,"ResultID" AS "resultId" FROM "AcademicImportRows" WHERE "BatchID"=$1 ORDER BY "RowNumber" LIMIT $2 OFFSET $3`,[id,p.limit,p.offset])).rows;
-  const total=(await query('SELECT count(*)::int AS total FROM "AcademicImportRows" WHERE "BatchID"=$1',[id])).rows[0].total;
-  return {...batch,rows,page:p.page,limit:p.limit,total};
+ const p=pagination(params,['importId','kind','status','rowsPage','rowsLimit']);if(p.offset>2147483647)throw invalid('Pagination exceeds the allowed range.');
+ const id=params.importId===undefined?undefined:batchId(params.importId),rp=detailPagination(params,'importId','rows');
+ const args:unknown[]=[],filters:string[]=[];
+ for(const key of ['kind','status'])if(params[key]!==undefined){args.push(enumValue(params[key],key==='kind'?['STUDENT','COURSE_RESULT','CURRICULUM']:['COMPLETED','REJECTED','FAILED'],key));filters.push(`"${key==='kind'?'Kind':'Status'}"=$${args.length}`);}
+ if(id!==undefined){args.push(id);filters.push('"BatchID"=$'+args.length+'::bigint');}
+ return readTransaction(async c=>{
+  const row=(await c.query(`WITH filtered AS (SELECT "BatchID" AS id,"Kind" AS kind,"SourceName" AS "sourceName","ImportedBy" AS "importedBy","Status" AS status,"Summary" AS summary,"CreatedAt" AS "createdAt","SourceAccountBatchID" AS "sourceAccountBatchId" FROM "AcademicImportBatches" ${filters.length?'WHERE '+filters.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged)||jsonb_build_object('id',paged.id::text,'sourceAccountBatchId',paged."sourceAccountBatchId"::text) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
+  const items=await enrichListRows(c,row.items);
+  if(id!==undefined)for(const item of items){
+   const total=(await c.query('SELECT count(*)::int AS total FROM "AcademicImportRows" WHERE "BatchID"=$1',[item.id])).rows[0].total;
+   item.rows=(await c.query(`SELECT "RowNumber" AS "rowNumber","RawData" AS "rawData","NormalizedData" AS "normalizedData","Status" AS status,"Errors" AS errors,"ResultID" AS "resultId" FROM "AcademicImportRows" WHERE "BatchID"=$1 ORDER BY "RowNumber" LIMIT $2 OFFSET $3`,[item.id,rp.limit,rp.offset])).rows;
+   item.rowsPagination={total,page:rp.page,limit:rp.limit};
+  }
+  return {...row,items,page:p.page,limit:p.limit};
+ });
 }

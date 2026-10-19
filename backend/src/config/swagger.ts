@@ -16,6 +16,7 @@ import { describeMergedSearchResponses } from './swagger-search-contracts';
 import { describeFeResponses } from './swagger-fe-contracts';
 import { describeStudentWorkflow } from '../modules/students/student-workflow.openapi';
 import { describeListResponses } from './swagger-list-contracts';
+import { describeMergedDetailLists } from './swagger-merged-details';
 
 const modulesDirectory =
   path.resolve(
@@ -373,6 +374,7 @@ describeFeResponses(swaggerWithQhdn);
 const describedSpec = describeManualInputs(swaggerWithQhdn);
 describeStudentWorkflow(describedSpec);
 describeListResponses(describedSpec);
+describeMergedDetailLists(describedSpec);
 const originalSpec = groupSwaggerByRole(describedSpec);
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
 export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

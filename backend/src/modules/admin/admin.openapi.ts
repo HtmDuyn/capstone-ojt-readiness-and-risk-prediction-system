@@ -35,7 +35,7 @@ export function addAdminOperations(spec:Schema):Schema {
  add('patch','/api/assessment-templates/{id}','Edit draft template',{name:template.name,criteria:template.criteria});add('post','/api/assessment-templates/{id}/publish','Publish immutable template');
  add('post','/api/admin/prediction-jobs','Queue predictions using a configured external model',{modelId:id,ojtSemesterId:id,studentIds:{type:'array',items:id,minItems:1,maxItems:1000,uniqueItems:true},idempotencyKey:text(100)},['modelId','ojtSemesterId','idempotencyKey'],undefined,202);
  add('get','/api/admin/prediction-jobs/{id}','Prediction job progress and per-student errors',undefined,[],paged);
- add('get','/api/predictions','Prediction history',undefined,[],{...paged,...predictionQuery});add('get','/api/predictions/{id}','Prediction detail and input/model snapshots');
+ add('get','/api/predictions','Prediction history',undefined,[],{...paged,...predictionQuery});
  add('get','/api/admin/models','List registered model versions',undefined,[],{...paged,modelId:id,search:text(100),status:status('ACTIVE','INACTIVE')});
  add('get','/api/alerts','List prediction risk alerts',undefined,[],{...paged,alertId:id,studentId:id,ojtSemesterId:id,status:status('OPEN','ACKNOWLEDGED','RESOLVED','DISMISSED'),interventionPage:id,interventionLimit:{type:'integer',minimum:1,maximum:100}});
  add('patch','/api/alerts/{id}/status','Acknowledge or close alert',{status:status('ACKNOWLEDGED','RESOLVED','DISMISSED'),reason},['status','reason']);

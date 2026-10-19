@@ -403,6 +403,20 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "section",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "string",
+ *               "enum": [
+ *                 "all",
+ *                 "academicProgress"
+ *               ],
+ *               "default": "all"
+ *             },
+ *             "description": "all: hồ sơ đầy đủ; academicProgress: thông tin sinh viên và tiến độ học tập."
  *           }
  *         ],
  *         "responses": {
@@ -553,53 +567,6 @@
  *                 "WITHDRAWN",
  *                 "RECOGNIZED"
  *               ]
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "400": {
- *             "description": "Invalid input"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or ownership denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate result or idempotency conflict"
- *           },
- *           "422": {
- *             "description": "Import rejected atomically; inspect data.batchId and row errors"
- *           }
- *         }
- *       }
- *     },
- *     "/api/students/{id}/academic-progress": {
- *       "get": {
- *         "tags": [
- *           "Student academic records"
- *         ],
- *         "summary": "Live deduplicated credits and latest-attempt GPA",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
  *             }
  *           }
  *         ],
@@ -859,74 +826,7 @@
  *           }
  *         }
  *       }
- *     },
- *     "/api/academic-imports/{id}": {
- *       "get": {
- *         "tags": [
- *           "Student academic records"
- *         ],
- *         "summary": "Import row history and errors",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "string",
- *               "pattern": "^[1-9][0-9]*$"
- *             }
- *           },
- *           {
- *             "name": "page",
- *             "in": "query",
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "default": 1
- *             }
- *           },
- *           {
- *             "name": "limit",
- *             "in": "query",
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 100,
- *               "default": 20
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "400": {
- *             "description": "Invalid input"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role or ownership denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Duplicate result or idempotency conflict"
- *           },
- *           "422": {
- *             "description": "Import rejected atomically; inspect data.batchId and row errors"
- *           }
- *         }
- *       }
  *     }
  *   }
  * }
  */
-export const studentApiDocumentation = true;

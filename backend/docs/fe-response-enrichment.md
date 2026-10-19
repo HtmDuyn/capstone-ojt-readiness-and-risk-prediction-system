@@ -37,12 +37,12 @@ Ngoài thông tin cơ bản trong `data`, response có:
 
 `ojtSemesterId` là tùy chọn; nếu gửi, phải là kỳ tồn tại. Sinh viên chỉ xem được hồ sơ của mình. Điểm/kết luận OJT chính thức chưa xác nhận được ẩn với sinh viên; Admin/Đào tạo vẫn đọc được dữ liệu theo quyền. Chưa có dữ liệu trả null hoặc danh sách rỗng. Chương trình thiếu cấu hình trả trạng thái/vấn đề thực tế, không giả GPA hoặc điểm.
 
-POST `/api/json/students/search` và các response cập nhật hồ sơ cũng kèm tên chương trình/chuyên ngành/khóa/kỳ. Không tính GPA cho từng dòng danh sách để tránh tải không cần thiết.
+POST `/api/json/students/list` và các response cập nhật hồ sơ cũng kèm tên chương trình/chuyên ngành/khóa/kỳ. Không tính GPA cho từng dòng danh sách để tránh tải không cần thiết.
 
 ## Sinh viên tự xem đợt đăng ký
 
-- POST `/api/json/ojt-registration-windows/search`: chỉ trả đợt không phải nháp và khớp đồng thời phạm vi chương trình/khóa/ngành/nhóm/sinh viên của người đăng nhập.
-- POST `/api/json/combo-registration-windows/search`: chỉ trả đợt không phải nháp có sinh viên trong danh sách đã chốt phạm vi.
+- POST `/api/json/ojt-registration-windows/list`: chỉ trả đợt không phải nháp và khớp đồng thời phạm vi chương trình/khóa/ngành/nhóm/sinh viên của người đăng nhập.
+- POST `/api/json/combo-registration-windows/list`: chỉ trả đợt không phải nháp có sinh viên trong danh sách đã chốt phạm vi.
 
 Sinh viên không truyền studentId. Không trả Scope chứa ID sinh viên khác, danh sách roster hay tổng kết nội bộ. Các bộ lọc và phân trang cũ vẫn dùng được.
 

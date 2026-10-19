@@ -3,12 +3,13 @@ import { readTransaction } from '../qhdn/read.repository';
 import { studentSelect, resultSelect } from './student.service';
 import { academicProgressWithClient } from './academic-progress';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
-import { invalid, pagination, positiveId } from './student.validation';
+import { invalid, pagination, positiveId, enumValue } from './student.validation';
 import type { Actor } from '../ojt-registration/window.service';
 
 type Row = Record<string, any>;
 export async function studentProfile(id:number,params:Row,actor:Actor) {
-  const allowed=['resultsPage','resultsLimit','ojtPage','ojtLimit','ojtSemesterId'];
+  const section=enumValue(params.section??'all',['all','academicProgress'],'section');
+  const allowed=['section','resultsPage','resultsLimit','ojtPage','ojtLimit','ojtSemesterId'];
   for(const key of Object.keys(params))if(!allowed.includes(key))throw invalid('Unknown profile parameter: '+key);
   const resultsPage=pagination({page:params.resultsPage,limit:params.resultsLimit},[]);
   const ojtPage=pagination({page:params.ojtPage,limit:params.ojtLimit},[]);
@@ -20,6 +21,7 @@ export async function studentProfile(id:number,params:Row,actor:Actor) {
     if(!['ADMIN','ACADEMIC'].includes(actor.roleCode)&&(actor.roleCode!=='STUDENT'||profile.userId!==actor.userId))throw invalid('You cannot access this student.',403,'FORBIDDEN');
     if(selected&&!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[selected])).rowCount)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
     const academicProgress=await academicProgressWithClient(c,id);
+    if(section==='academicProgress')return {...profile,academicProgress};
     const totalResults=(await c.query('SELECT count(*)::int AS n FROM "StudentCourseResults" WHERE "StudentID"=$1',[id])).rows[0].n;
     const resultItems=(await c.query(resultSelect+' WHERE r."StudentID"=$1 ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC LIMIT $2 OFFSET $3',[id,resultsPage.limit,resultsPage.offset])).rows;
     const comboSelections=(await c.query(`SELECT sc."SelectionID" AS id,sc."ProgramComboID" AS "comboId",sc."SelectionPurpose" AS purpose,

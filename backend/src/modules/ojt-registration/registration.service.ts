@@ -1,3 +1,5 @@
+import { readTransaction } from '../qhdn/read.repository';
+import { detailPagination } from '../../shared/detail-pagination';
 import { enrichListRows } from '../../shared/list-context';
 import { currentCVSql } from '../students/cv.service';
 import type { PoolClient } from 'pg';
@@ -30,7 +32,41 @@ export async function review(id:number,body:unknown,actor:number) {const b=input
  if(!r.WindowID)throw invalid('Legacy applications must be reconciled before using the new review workflow.',409,'LEGACY_REGISTRATION');if(r.HandoffID||r.Status==='HANDED_OFF')throw invalid('The registration has already been handed to QHDN.',409,'REGISTRATION_HANDED_OFF');if(r.Status!=='SUBMITTED'&&!(r.Status==='APPROVED'&&decision==='REJECT'))throw invalid('Only submitted applications can be approved/rejected; approved applications can be rejected before handoff.',409,'REGISTRATION_NOT_REVIEWABLE');
  const check=decision==='APPROVE'?await eligibleOfficial(c,r):null,status=decision==='APPROVE'?'APPROVED':'REJECTED';await c.query(`UPDATE "OJTRegistrations" SET "Status"=$2,"ReviewCheckID"=$3,"ReviewedBy"=$4,"ReviewedAt"=now(),"ReviewReason"=$5,"UpdatedAt"=now() WHERE "RegistrationID"=$1`,[id,status,check?.checkId??null,actor,reason]);const after=await registrationRecord(c,id);await event(c,after,actor,status,reason,key,hash);await audit(c,actor,'OJTRegistrations',id,'REVIEW',registrationApi(r),registrationApi(after),reason);return {...registrationApi(after),replayed:false};
  });}
-export async function registrationDetails(id:number,actor:Actor) {return academicTransaction(async c=>{const r=await registrationRecord(c,id);await assertRecordAccess(c,r,actor);const history=(await c.query(`SELECT "EventID" AS id,"Action" AS action,"Snapshot" AS snapshot,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt","Reason" AS reason FROM "OJTRegistrationEvents" WHERE "RegistrationID"=$1 ORDER BY "EventID"`,[id])).rows;const official=await officialEligibilityWithClient(c,r.StudentID,r.OJTSemesterID);const coordination=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC',[id])).rows;const assignments=(await c.query(`SELECT a.* FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1 ORDER BY a."AssignmentID" DESC`,[id])).rows;const handoffSnapshot=(await c.query('SELECT "Snapshot" FROM "EligibleStudentHandoffItems" WHERE "RegistrationID"=$1',[id])).rows[0]?.Snapshot??null;return {...registrationApi(r),officialEligibility:official,handoffSnapshot,history,coordination,assignments};});}
-export async function listRegistrations(params:Row,actor:Actor) {const p=pagination(params,['ojtSemesterId','windowId','status','studentId','programId','cohortId','groupCode','search']);const args:any[]=[],filters:string[]=[];const add=(condition:string,value:any)=>{args.push(value);filters.push(condition.replace('?',`$${args.length}`));};
- for(const [key,col] of Object.entries({ojtSemesterId:'r."OJTSemesterID"',windowId:'r."WindowID"',studentId:'r."StudentID"',programId:'r."ProgramID"',cohortId:'p."CohortID"'}))if(params[key]!==undefined)add(`${col}=?`,positiveId(params[key],key));if(params.status!==undefined)add('r."Status"=?',enumValue(params.status,['SUBMITTED','APPROVED','REJECTED','HANDED_OFF'],'status'));if(params.groupCode!==undefined)add('p."GroupCode"=?',enumValue(params.groupCode,['A','B','C','D'],'groupCode'));if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length} OR u."Email" ILIKE $${args.length})`);}if(actor.roleCode==='OJT_COORD')filters.push('i."HandoffID" IS NOT NULL');else if(actor.roleCode==='STUDENT')add('s."UserID"=?',actor.userId);
- return academicTransaction(async c=>{const sql=registrationSelect+(filters.length?' WHERE '+filters.join(' AND '):'');const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) filtered`,args)).rows[0].n;const items=(await c.query(`${sql} ORDER BY r."RegistrationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows.map(registrationApi);return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit};});}
+export async function listRegistrations(params:Row,actor:Actor) {
+ if(!['ADMIN','ACADEMIC','OJT_COORD','STUDENT'].includes(actor.roleCode))throw invalid('Role not permitted.',403,'FORBIDDEN');
+ const p=pagination(params,['registrationId','ojtSemesterId','windowId','status','studentId','programId','cohortId','groupCode','search','historyPage','historyLimit','coordinationPage','coordinationLimit','assignmentPage','assignmentLimit']);
+ if(p.offset>2147483647)throw invalid('Pagination exceeds the allowed range.');
+ const registrationId=params.registrationId===undefined?undefined:positiveId(params.registrationId,'registrationId');
+ const hp=detailPagination(params,'registrationId','history'),cp=detailPagination(params,'registrationId','coordination'),ap=detailPagination(params,'registrationId','assignment');
+ const args:any[]=[],filters:string[]=[];
+ const add=(col:string,value:any)=>{args.push(value);filters.push(col+'=$'+args.length);};
+ for(const [key,col]of Object.entries({registrationId:'r."RegistrationID"',ojtSemesterId:'r."OJTSemesterID"',windowId:'r."WindowID"',studentId:'r."StudentID"',programId:'r."ProgramID"',cohortId:'p."CohortID"'}))if(params[key]!==undefined)add(col,positiveId(params[key],key));
+ if(params.status!==undefined)add('r."Status"',enumValue(params.status,['SUBMITTED','APPROVED','REJECTED','HANDED_OFF'],'status'));
+ if(params.groupCode!==undefined)add('p."GroupCode"',enumValue(params.groupCode,['A','B','C','D'],'groupCode'));
+ if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length} OR u."Email" ILIKE $${args.length})`);}
+ if(actor.roleCode==='OJT_COORD')filters.push('i."HandoffID" IS NOT NULL');else if(actor.roleCode==='STUDENT')add('s."UserID"',actor.userId);
+ return readTransaction(async c=>{
+  // Preserve the old detail access check, even if other list filters would hide this ID.
+  if(registrationId!==undefined){const selected=(await c.query(registrationSelect+' WHERE r."RegistrationID"=$1',[registrationId])).rows[0];if(selected)await assertRecordAccess(c,selected,actor);}
+  const sql=registrationSelect+(filters.length?' WHERE '+filters.join(' AND '):'');
+  const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) filtered`,args)).rows[0].n;
+  const rows=(await c.query(`${sql} ORDER BY r."RegistrationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
+  const items:Row[]=await enrichListRows(c,rows.map(registrationApi));
+  if(registrationId!==undefined)for(const item of items){
+   item.officialEligibility=await officialEligibilityWithClient(c,item.studentId,item.ojtSemesterId,{lockSource:false});
+   item.handoffSnapshot=(await c.query('SELECT "Snapshot" FROM "EligibleStudentHandoffItems" WHERE "RegistrationID"=$1',[item.id])).rows[0]?.Snapshot??null;
+   const historyTotal=(await c.query('SELECT count(*)::int AS n FROM "OJTRegistrationEvents" WHERE "RegistrationID"=$1',[item.id])).rows[0].n;
+   const history=(await c.query(`SELECT "EventID" AS id,"Action" AS action,"Snapshot" AS snapshot,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt","Reason" AS reason FROM "OJTRegistrationEvents" WHERE "RegistrationID"=$1 ORDER BY "EventID" DESC LIMIT $2 OFFSET $3`,[item.id,hp.limit,hp.offset])).rows;
+   item.history=await enrichListRows(c,history);item.historyPagination={total:historyTotal,page:hp.page,limit:hp.limit};
+   const coordinationTotal=(await c.query('SELECT count(*)::int AS n FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1',[item.id])).rows[0].n;
+   const coordination=(await c.query('SELECT * FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT $2 OFFSET $3',[item.id,cp.limit,cp.offset])).rows;
+   item.coordination=await enrichListRows(c,coordination.map(row=>({...row,id:row.CoordinationID,registrationId:row.RegistrationID,applicationId:row.ApplicationID,companyId:row.EnterpriseID,positionId:row.PositionID,ojtSemesterId:row.OJTSemesterID,decision:row.Decision,coordinatedBy:row.CoordinatedBy})));
+   item.coordinationPagination={total:coordinationTotal,page:cp.page,limit:cp.limit};
+   const assignmentTotal=(await c.query(`SELECT count(*)::int AS n FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1`,[item.id])).rows[0].n;
+   const assignments=(await c.query(`SELECT a.* FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1 ORDER BY a."AssignmentID" DESC LIMIT $2 OFFSET $3`,[item.id,ap.limit,ap.offset])).rows;
+   item.assignments=await enrichListRows(c,assignments.map(row=>({...row,id:row.AssignmentID,coordinationId:row.CoordinationID,studentId:row.StudentID,companyId:row.EnterpriseID,positionId:row.PositionID,status:row.Status,startDate:row.StartDate,endDate:row.EndDate})));
+   item.assignmentsPagination={total:assignmentTotal,page:ap.page,limit:ap.limit};
+  }
+  return {items,total,page:p.page,limit:p.limit};
+ });
+}
