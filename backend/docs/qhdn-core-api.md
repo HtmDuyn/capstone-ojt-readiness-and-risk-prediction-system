@@ -1,110 +1,186 @@
-> Luồng này đã được mở rộng với applicationId, kiểm tra lại official eligibility, import sheet và CV riêng tư. Xem hợp đồng hiện tại tại [student-portal-api.md](student-portal-api.md).
+> Sáu cặp search/detail đã gộp: xem [hợp đồng mới](api-search-consolidation.md).
 
-# API nghiệp vụ QHDN
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
 
-Base URL: `/api`. Tất cả endpoint yêu cầu `Authorization: Bearer <token>`.
+# API nghiệp vụ cốt lõi QHDN
 
-## Phân quyền
+Luồng nhận đăng ký tuyển dụng doanh nghiệp theo học kỳ phòng đào tạo: xem [recruitment-api.md](recruitment-api.md). QHDN chọn academicPeriodId, mở đợt và import bằng windowId; không tạo kỳ OJT thủ công.
 
-| Nhóm thao tác | ADMIN | OJT_COORD | ENTERPRISE |
-|---|---|---|---|
-| Đọc doanh nghiệp/vị trí/điều phối/phân công/đánh giá | Toàn bộ | Toàn bộ | Chỉ doanh nghiệp liên kết qua EnterpriseUsers |
-| Tạo/sửa doanh nghiệp, vị trí | Có | Có | Không |
-| Gửi/điều phối lại, tạo/sửa phân công, đổi trạng thái | Có | Có | Không |
-| Quyết định tiếp nhận/từ chối, nộp/sửa đánh giá | Nhập thay, bắt buộc reason | Nhập thay, bắt buộc reason | Chỉ hồ sơ thuộc doanh nghiệp của mình |
+Cập nhật: 12/10/2026. Base path `/api`. Header `Authorization: Bearer <JWT>`.
+Response thành công: `{ "success": true, "data": ... }`. Danh sách trả `data: {items,total,page,limit}`; mặc định page=1, limit=20, tối đa 100.
 
-Doanh nghiệp cần liên kết `EnterpriseUsers`, có trạng thái ACTIVE và chưa xóa mềm. Không nhận enterpriseId từ body để xác định quyền quyết định hoặc đánh giá. ADMIN/ACADEMIC vẫn là các vai trò duy nhất được tạo đợt bàn giao; các API mới không mở quyền này cho QHDN.
+## Quyền truy cập
 
-## Danh mục
+- ADMIN/OJT_COORD: quản lý doanh nghiệp, vị trí, điều phối, phân công; đọc các hồ sơ nghiệp vụ.
+- ENTERPRISE: dùng 6 API riêng trong `docs/enterprise-api.md`. Các endpoint QHDN bên dưới chỉ dành cho ADMIN/OJT_COORD.
+- Phạm vi doanh nghiệp lấy từ JWT và EnterpriseUsers; xem tài liệu Enterprise để biết contract mới.
+- STUDENT/ACADEMIC không truy cập module mới. Các API học vụ hiện có giữ nguyên quyền.
+- Mọi thao tác ghi yêu cầu `reason`. AuditLogs ghi người thao tác, vai trò, lý do và dữ liệu trước/sau. Khi OJT_COORD quyết định hoặc nộp/cập nhật đánh giá thay DN, audit có `enteredOnBehalf: true`.
 
-| Endpoint | Input |
-|---|---|
-| `GET /companies` | page, limit, search (mã/tên), status, industry |
-| `GET /companies/:id` | Hồ sơ doanh nghiệp và lịch sử audit |
-| `POST /companies` | enterpriseCode hoặc code, name; tùy chọn address, industry, contactPersonName, contactPhone, contactEmail, status, reason |
-| `PATCH /companies/:id` | Các trường trên; phải có ít nhất một trường thông tin |
-| `GET /positions` | page, limit, search (tiêu đề/mã tuyển), enterpriseId hoặc companyId, ojtSemesterId, status |
-| `GET /positions/:id` | Vị trí, capacity, remainingSlots và lịch sử |
-| `POST /positions` | enterpriseId hoặc companyId, ojtSemesterId, title, capacity; tùy chọn description, requirements, recruitmentCode, location, workMode, status, reason |
-| `PATCH /positions/:id` | Các trường trên; capacity không được thấp hơn số chỗ đã giữ/phân công |
+`companyId` trong module này tương ứng `Enterprises.EnterpriseID`. API danh sách sinh viên bàn giao hiện có dùng tên query `enterpriseId`.
 
-Trạng thái doanh nghiệp: ACTIVE/INACTIVE. Vị trí: OPEN/CLOSED. `workMode`: ONSITE/REMOTE/HYBRID hoặc null. `capacity` là số nguyên 0–2147483647; không nhận `remainingSlots` từ client. Doanh nghiệp/kỳ của vị trí đã có điều phối không được đổi. Danh sách/chi tiết loại bỏ bản ghi đã xóa mềm.
+## Danh sách endpoint
 
-`remainingSlots` tính từ số phân công chưa hủy (kể cả đã hoàn thành/trượt) cộng lượt tiếp nhận chưa phân công và chưa bị điều phối lại. Khi DN chấp nhận, hệ thống giữ chỗ trong transaction; tạo phân công không giữ chỗ lần thứ hai. Hủy phân công hoặc điều phối lại một lượt chưa phân công sẽ giải phóng chỗ. Hồ sơ đang chờ quyết định chưa giữ chỗ.
+| Method | Endpoint | Quyền | Input |
+| --- | --- | --- | --- |
+| GET | `/companies` | Staff | search, status, page, limit |
+| GET | `/companies/:id` | Staff | ID doanh nghiệp |
+| POST | `/companies` | Staff | code, name, thông tin liên hệ, status, reason |
+| PATCH | `/companies/:id` | Staff | Trường cần sửa và reason |
+| GET | `/positions` | Staff | companyId, ojtSemesterId, status, search, page, limit |
+| GET | `/positions/:id` | Staff | ID vị trí |
+| POST | `/positions` | Staff | companyId, ojtSemesterId, title, capacity, description, requirements, status, reason |
+| PATCH | `/positions/:id` | Staff | title, capacity, description, requirements, status, reason |
+| GET | `/ojt-coordinations` | Staff | companyId, ojtSemesterId, studentId, positionId, registrationId, decision/status, search, page, limit |
+| GET | `/ojt-coordinations/:id` | Staff | Chi tiết, application, lịch sử điều phối và audit |
+| POST | `/ojt-coordinations` | Staff | registrationId, positionId, reason, idempotencyKey |
+| POST | `/ojt-coordinations/:id/decision` | Staff nhập thay | decision, reason |
+| POST | `/ojt-coordinations/:id/reassign` | Staff | positionId, reason, idempotencyKey |
+| GET | `/assignments` | Staff | companyId, ojtSemesterId, studentId, positionId, status, search, page, limit |
+| GET | `/assignments/:id` | Staff | Chi tiết và audit |
+| POST | `/assignments` | Staff | coordinationId, startDate, endDate, enterpriseSupervisorName, reason |
+| PATCH | `/assignments/:id` | Staff | startDate, endDate, enterpriseSupervisorName, reason |
+| PATCH | `/assignments/:id/status` | Staff | status, reason |
+| GET | `/internship-evaluations` | Staff | companyId, ojtSemesterId, studentId, positionId, assignmentId, status, search, page, limit |
+| GET | `/internship-evaluations/:id` | Staff | Điểm, nhận xét, người đánh giá, audit |
+| PUT | `/assignments/:id/internship-evaluation` | Staff nhập thay | completionScore, attitudeScore, skillScore, overallScore, comments, reason |
 
-## Điều phối
+Staff = ADMIN/OJT_COORD; DN = ENTERPRISE trong phạm vi doanh nghiệp.
 
-| Endpoint | Input |
-|---|---|
-| `GET /ojt-coordinations` | page, limit, search (mã/tên SV), enterpriseId/companyId, ojtSemesterId, registrationId, decision |
-| `GET /ojt-coordinations/:id` | Chi tiết, history (audit của lượt), coordinationHistory (các lượt của hồ sơ, lọc theo DN nếu người đọc là DN) |
-| `POST /ojt-coordinations` | registrationId, positionId, reason |
-| `POST /ojt-coordinations/:id/decision` | decision: ACCEPTED/REJECTED; reason bắt buộc nếu từ chối hoặc staff nhập thay, tối đa 300 ký tự |
-| `POST /ojt-coordinations/:id/reassign` | positionId khác vị trí cũ, reason |
+## Ví dụ body và quy tắc
 
-Chỉ gửi hồ sơ có trạng thái HANDED_OFF và có dòng bàn giao thực tế trong `EligibleStudentHandoffItems`. Sinh viên và tài khoản phải đang ACTIVE, sinh viên chưa bị xóa mềm. Vị trí phải thuộc cùng kỳ với hồ sơ, đang OPEN, doanh nghiệp ACTIVE và còn chỉ tiêu.
-
-Luồng quyết định: PENDING → ACCEPTED hoặc REJECTED. Không sửa quyết định đã ghi; dùng reassign khi cần chuyển vị trí. Reassign chỉ áp dụng lượt mới nhất, không có phân công hoặc phân công đã hủy; lượt cũ thành REASSIGNED và lượt mới là PENDING. Không ghi đè hoặc xóa lịch sử cũ.
-
-Ví dụ DN tiếp nhận:
-
-```json
-{"decision":"ACCEPTED"}
-```
-
-Ví dụ QHDN nhập thay:
-
-```json
-{"decision":"REJECTED","reason":"Nhập theo email từ chối của doanh nghiệp ngày 13/10/2026"}
-```
-
-## Phân công
-
-| Endpoint | Input |
-|---|---|
-| `GET /assignments` | page, limit, search (mã/tên SV), enterpriseId/companyId, ojtSemesterId, studentId, positionId, status |
-| `GET /assignments/:id` | Chi tiết giám sát, thời gian, trạng thái và audit |
-| `POST /assignments` | coordinationId, startDate, endDate; tùy chọn academicSupervisorId, enterpriseSupervisorName, reason |
-| `PATCH /assignments/:id` | academicSupervisorId, enterpriseSupervisorName, startDate, endDate; bắt buộc reason |
-| `PATCH /assignments/:id/status` | status: IN_PROGRESS/COMPLETED/CANCELLED, reason |
-
-Tạo từ lượt điều phối mới nhất đã ACCEPTED. Không tự tạo quyết định chấp nhận. Một sinh viên chỉ có một phân công chưa hủy trong cùng kỳ; mỗi lượt điều phối chỉ tạo một phân công. Ngày theo YYYY-MM-DD, endDate ≥ startDate. Giám sát học vụ phải là tài khoản ACADEMIC đang ACTIVE.
-
-Trạng thái: ASSIGNED → IN_PROGRESS → COMPLETED; ASSIGNED/IN_PROGRESS → CANCELLED. `ACTIVE` vẫn được nhận/đọc để tương thích trạng thái Admin cũ. Hoàn thành yêu cầu đã có đánh giá với overallScore. COMPLETED/FAILED/CANCELLED không được mở lại bằng API này. Muốn chuyển vị trí: hủy phân công, reassign và chờ DN mới chấp nhận.
-
-Tương thích Admin: `POST /assignments` vẫn nhận registrationId và positionId; backend tìm lượt điều phối mới nhất và yêu cầu đã chấp nhận, không còn tự tạo ACCEPTED từ hồ sơ APPROVED. Các tên code/companyId vẫn được hỗ trợ và trả kèm enterpriseCode/enterpriseId. Các giá trị alias mâu thuẫn bị từ chối.
-
-## Đánh giá
-
-| Endpoint | Input |
-|---|---|
-| `GET /internship-evaluations` | page, limit, search (mã/tên SV), enterpriseId/companyId, ojtSemesterId, studentId, assignmentId, status |
-| `GET /internship-evaluations/:id` | Điểm, nhận xét, evaluatedBy/evaluatedAt và audit |
-| `PUT /assignments/:id/internship-evaluation` | completionScore, attitudeScore, skillScore, overallScore; tùy chọn comments, reason |
-
-Các điểm bắt buộc, từ 0–10, tối đa hai chữ số thập phân. OverallScore do DN xác nhận, không tự suy ra trọng số. Chỉ đánh giá phân công IN_PROGRESS/ACTIVE/COMPLETED/FAILED, không nhận phân công chưa bắt đầu hoặc đã hủy. PUT cập nhật một đánh giá duy nhất cho mỗi phân công và giữ lịch sử trước/sau.
+### 1. Doanh nghiệp
 
 ```json
 {
-  "completionScore": 8,
-  "attitudeScore": 9,
-  "skillScore": 8.5,
-  "overallScore": 8.5,
-  "comments": "Hoàn thành các nhiệm vụ được giao",
-  "reason": "QHDN nhập theo phiếu đánh giá đã ký của doanh nghiệp"
+  "code": "DN001",
+  "name": "Công ty Công nghệ ABC",
+  "address": "Hà Nội",
+  "industry": "Công nghệ thông tin",
+  "contactPersonName": "Nguyễn Văn A",
+  "contactPhone": "0901234567",
+  "contactEmail": "hr@example.com",
+  "status": "ACTIVE",
+  "reason": "Bổ sung doanh nghiệp đối tác"
 }
 ```
 
-Nếu staff nhập thay, reason bắt buộc. `EvaluatedBy` luôn là tài khoản thực sự nhập; audit lưu actorId, thời gian, dữ liệu trước/sau, reason, enteredByRole và onBehalfOfEnterprise. Không cho client giả danh người đánh giá. DN không được sửa đánh giá của DN khác.
+Bắt buộc code (20 ký tự), name (200 ký tự), reason (2.000 ký tự). Status ACTIVE mặc định hoặc INACTIVE. PATCH yêu cầu ít nhất một trường chỉnh sửa. Không vô hiệu hóa DN khi còn phân công ASSIGNED/ACTIVE/IN_PROGRESS. Mã trùng trả 409. Không có API xóa để bảo toàn lịch sử.
 
-Sau khi hồ sơ kết quả đã chuyển sang Đào tạo, không sửa nguồn phân công/đánh giá khi OJTResults đang PENDING_ACADEMIC_CONFIRMATION hoặc CONFIRMED. Đào tạo phải yêu cầu REVISION_REQUESTED trước khi DN/QHDN cập nhật nguồn và QHDN chuyển lại kết quả theo luồng có sẵn.
+### 2. Vị trí/chỉ tiêu
 
-## Hợp đồng, Swagger và kiểm thử
+```json
+{
+  "companyId": 1,
+  "ojtSemesterId": 1,
+  "title": "Backend Intern",
+  "description": "Phát triển API",
+  "requirements": "Node.js và SQL",
+  "capacity": 5,
+  "status": "OPEN",
+  "reason": "Mở chỉ tiêu kỳ OJT"
+}
+```
 
-Response: `{success:true,data:...}`. Danh sách: data gồm items/total/page/limit; mặc định 20 dòng, tối đa 100. `search` tối đa 100 ký tự; từ chối query/body không được hỗ trợ. Các bộ lọc kết hợp AND, áp dụng trước đếm/phân trang.
+Capacity là số nguyên dương. Status OPEN mặc định hoặc CLOSED. Backend tự tính remainingSlots; không nhận số chỗ còn lại từ client. Company/kỳ không đổi sau tạo. OPEN yêu cầu doanh nghiệp ACTIVE; capacity không được thấp hơn số chỗ đã dùng. Chỉ các phân công CANCELLED/CANCELED mới trả lại chỗ; COMPLETED/FAILED vẫn tính vào chỉ tiêu của kỳ.
 
-HTTP: 400 input sai; 401 chưa đăng nhập; 403 sai vai trò/phạm vi; 404 không tìm thấy; 409 sai trạng thái, thiếu bàn giao/tiếp nhận hoặc hết chỉ tiêu.
+### 3. Điều phối và quyết định
 
-Swagger hiện có cơ chế chuyển input URL sang `/api/json/...` trong tài liệu; các endpoint REST ở trên vẫn hoạt động. Ví dụ `POST /api/json/ojt-coordinations/decision` nhận coordinationId cùng decision/reason; `PUT /api/json/assignments/internship-evaluation` nhận assignmentId cùng các điểm. Các route trùng của Admin đã được hợp nhất vào module QHDN để phân quyền và nghiệp vụ nhất quán.
+```json
+{
+  "registrationId": 1,
+  "positionId": 1,
+  "reason": "Gửi hồ sơ phù hợp tới doanh nghiệp",
+  "idempotencyKey": "coord-registration-1-attempt-1"
+}
+```
 
-Không thêm bảng hay chạy migration/reset DB. Cần schema hiện có trong backend/DB, gồm phần Admin management APIs (DeletedAt/AcademicSupervisorID) và các cột tuyển dụng đã có.
+Hồ sơ phải có trạng thái HANDED_OFF và bản ghi bàn giao khớp sinh viên/kỳ. Vị trí phải cùng kỳ, OPEN, DN ACTIVE và còn chỉ tiêu. POST lần đầu không được tạo lượt thứ hai cho cùng đăng ký; dùng reassign sau khi bị từ chối.
+
+Trạng thái: PENDING → ACCEPTED hoặc REJECTED. Chỉ lượt mới nhất được quyết định/điều phối lại. Quyết định đã chốt không đổi sang quyết định khác.
+
+```json
+{ "decision": "REJECTED", "reason": "Vị trí không phù hợp với hồ sơ" }
+```
+
+Decision chỉ nhận ACCEPTED/REJECTED. Lý do từ chối tối đa 300 ký tự. Chấp nhận phải kiểm tra lại vị trí và sức chứa. DN không tự tạo phân công khi chấp nhận.
+
+```json
+{
+  "positionId": 2,
+  "reason": "Điều phối sang vị trí khác sau từ chối",
+  "idempotencyKey": "coord-registration-1-attempt-2"
+}
+```
+
+Reassign tạo bản ghi mới với PreviousCoordinationID, giữ nguyên lượt từ chối. Vị trí mới phải khác vị trí trước. GET detail trả `coordinationHistory`; DN chỉ thấy các lượt thuộc DN mình.
+
+Idempotency key bắt buộc, tối đa 100 ký tự. Gửi lại cùng key, người gửi và payload trả snapshot ban đầu với `replayed: true`; đổi payload hoặc người gửi trả 409. Khóa được lưu trong audit và kiểm tra bên trong transaction.
+
+**Chỗ chờ tiếp nhận không giữ chỉ tiêu.** Backend kiểm tra sức chứa tại gửi điều phối, chấp nhận và tạo phân công. ACCEPTED chưa đảm bảo có chỗ nếu phân công khác đã dùng hết chỉ tiêu.
+
+### 4. Phân công
+
+```json
+{
+  "coordinationId": 2,
+  "enterpriseSupervisorName": "Trần Thị B",
+  "startDate": "2026-10-15",
+  "endDate": "2027-01-15",
+  "reason": "Phân công sau doanh nghiệp tiếp nhận"
+}
+```
+
+Chỉ tạo từ lượt mới nhất ACCEPTED và hồ sơ đã bàn giao hợp lệ. Backend suy ra sinh viên, doanh nghiệp, vị trí; không nhận các ID đó từ client. Một sinh viên chỉ có một phân công chưa hủy trong cùng kỳ. Mỗi coordination chỉ tạo được một assignment, kể cả assignment đó đã hủy. Ngày bắt buộc đúng YYYY-MM-DD và ngày kết thúc không trước ngày bắt đầu.
+
+Tạo mới ASSIGNED. PATCH chỉ đổi giám sát/ngày khi ASSIGNED/ACTIVE/IN_PROGRESS; không đổi sinh viên, doanh nghiệp hoặc vị trí trực tiếp.
+
+```json
+{ "status": "ACTIVE", "reason": "Sinh viên bắt đầu thực tập" }
+```
+
+Chuyển trạng thái:
+
+- ASSIGNED → ACTIVE hoặc CANCELLED.
+- ACTIVE/IN_PROGRESS → COMPLETED hoặc CANCELLED.
+- Trạng thái kết thúc không mở lại.
+
+Đã chuyển hồ sơ kết quả thì không hủy phân công. Kết quả CONFIRMED khóa việc sửa phân công và đánh giá. Hoàn thành thực tập không tự chốt điểm học vụ; vẫn dùng API OJT results hiện có.
+
+Tạo phân công khóa vị trí, kiểm tra lại số chỗ, chống trùng sinh viên, cập nhật RemainingSlots và ghi audit trong cùng transaction. Dùng transaction helper hiện có, bao gồm advisory lock dùng chung của dự án.
+
+### 5. Đánh giá thực tập
+
+```json
+{
+  "completionScore": 8.5,
+  "attitudeScore": 9,
+  "skillScore": 8,
+  "overallScore": 8.5,
+  "comments": "Sinh viên đáp ứng yêu cầu thực tập",
+  "reason": "Nộp đánh giá cuối kỳ"
+}
+```
+
+Cả bốn điểm bắt buộc, 0–10, tối đa hai chữ số thập phân. Backend không tự suy ra overallScore hoặc ngưỡng đạt. Comments tối đa 5.000 ký tự. Chỉ đánh giá phân công ACTIVE/IN_PROGRESS/COMPLETED. PUT tạo hoặc cập nhật cùng EvaluationID, lưu EvaluatedBy/EvaluatedAt và audit.
+
+Nếu đánh giá thay đổi sau chuyển hồ sơ kết quả, API kết quả hiện có phát hiện source thay đổi: Đào tạo yêu cầu bổ sung, QHDN chuyển lại trước khi sửa/chốt điểm. Kết quả đã CONFIRMED không cho sửa đánh giá.
+
+## Swagger và adapter JSON
+
+Swagger của dự án ưu tiên input JSON; các route REST ở trên vẫn được mount. Adapter được sinh từ OpenAPI và dùng cùng middleware/service, ví dụ:
+
+| REST | Adapter JSON |
+| --- | --- |
+| GET `/companies?search=ABC` | POST `/json/companies/search`, body `{ "search": "ABC" }` |
+| GET `/companies/1` | POST `/json/companies/detail`, body `{ "companyId": 1 }` |
+| PATCH `/positions/2` | PATCH `/json/positions`, body `{ "positionId": 2, "capacity": 10, "reason": "Tăng chỉ tiêu" }` |
+| POST `/ojt-coordinations/3/decision` | POST `/json/ojt-coordinations/decision`, body `{ "coordinationId": 3, "decision": "ACCEPTED", "reason": "Đồng ý tiếp nhận" }` |
+| PUT `/assignments/4/internship-evaluation` | PUT `/json/assignments/internship-evaluation`, body chứa `assignmentId: 4` và các trường đánh giá |
+
+ID path được đặt tên companyId/positionId/coordinationId/assignmentId/evaluationId trong adapter JSON. Các endpoint POST tạo mới vẫn dùng đường dẫn REST gốc vì không có path/query input cần chuyển đổi.
+
+## Triển khai
+
+
+Module tái sử dụng bảng/cột đã có trong schema đầy đủ hiện tại, không cần migration riêng. Không chạy lại file DB trên database đang có dữ liệu để triển khai module: file đó là bộ khởi tạo có thao tác reset. Khi triển khai, dùng database đã được cập nhật đúng phiên bản schema, cài dependencies và chạy build. Kiểm thử kết nối/quyền DB thực tế ở môi trường triển khai vẫn cần thực hiện.

@@ -195,6 +195,18 @@
  *             "type": "string",
  *             "format": "date-time",
  *             "example": "2026-10-09T08:00:00+07:00"
+ *           },
+ *           "status": {
+ *             "type": "string",
+ *             "enum": [
+ *               "OPEN",
+ *               "CLOSED"
+ *             ],
+ *             "description": "Mở/đóng đợt; bắt buộc reason khi gửi status."
+ *           },
+ *           "reason": {
+ *             "type": "string",
+ *             "maxLength": 2000
  *           }
  *         },
  *         "required": []
@@ -527,120 +539,6 @@
  *             "application/json": {
  *               "schema": {
  *                 "$ref": "#/components/schemas/ComboWindowPatch"
- *               }
- *             }
- *           }
- *         }
- *       }
- *     },
- *     "/api/combo-registration-windows/{id}/open": {
- *       "post": {
- *         "tags": [
- *           "Combo registration"
- *         ],
- *         "summary": "Freeze/reuse actual semester-4 roster and open",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid scope, deadline or choice group"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role, ownership or frozen scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Window state, expired deadline, overlap, missing choices or changed placement conflict"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/ComboWindowAction"
- *               }
- *             }
- *           }
- *         }
- *       }
- *     },
- *     "/api/combo-registration-windows/{id}/close": {
- *       "post": {
- *         "tags": [
- *           "Combo registration"
- *         ],
- *         "summary": "Close window and cancel queued reminders",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid scope, deadline or choice group"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "Role, ownership or frozen scope denied"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Window state, expired deadline, overlap, missing choices or changed placement conflict"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/ComboWindowAction"
  *               }
  *             }
  *           }

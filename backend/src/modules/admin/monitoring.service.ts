@@ -3,14 +3,22 @@ import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
 import { dateInput } from '../academic/academic.schema';
 import { pageSql, type Row } from './admin.repository';
+import { readTransaction } from '../qhdn/read.repository';
 
-const alertSelect=`SELECT a."AlertID" AS id,a."PredictionID" AS "predictionId",p."StudentID" AS "studentId",j."OJTSemesterID" AS "ojtSemesterId",p."RiskLevel" AS "riskLevel",p."RiskScore"::float8 AS "riskScore",a."Status" AS status,a."ResolutionNote" AS "resolutionNote",a."CreatedAt" AS "createdAt",a."UpdatedAt" AS "updatedAt",a."UpdatedBy" AS "updatedBy" FROM "RiskAlerts" a JOIN "Predictions" p ON p."PredictionID"=a."PredictionID" JOIN "PredictionJobs" j ON j."JobID"=p."JobID"`;
+const alertSelect=`SELECT a."AlertID" AS id,a."PredictionID" AS "predictionId",p."StudentID" AS "studentId",s."StudentCode" AS "studentCode",u."FullName" AS "fullName",j."OJTSemesterID" AS "ojtSemesterId",p."RiskLevel" AS "riskLevel",p."RiskScore"::float8 AS "riskScore",a."Status" AS status,a."ResolutionNote" AS "resolutionNote",a."CreatedAt" AS "createdAt",a."UpdatedAt" AS "updatedAt",a."UpdatedBy" AS "updatedBy" FROM "RiskAlerts" a JOIN "Predictions" p ON p."PredictionID"=a."PredictionID" JOIN "PredictionJobs" j ON j."JobID"=p."JobID" JOIN "Students" s ON s."StudentID"=p."StudentID" JOIN "Users" u ON u."UserID"=s."UserID"`;
 export async function alerts(params:Row) {
- const p=pagination(params,['studentId','ojtSemesterId','status']),args:unknown[]=[],where:string[]=[];
- for(const [key,col]of Object.entries({studentId:'p."StudentID"',ojtSemesterId:'j."OJTSemesterID"',status:'a."Status"'}))if(params[key]!==undefined){args.push(key==='status'?enumValue(params[key],['OPEN','ACKNOWLEDGED','RESOLVED','DISMISSED'],'status'):positiveId(params[key],key));where.push(`${col}=$${args.length}`);}
- return pageSql(alertSelect+(where.length?' WHERE '+where.join(' AND '):''),args,p);
+ const p=pagination(params,['alertId','studentId','ojtSemesterId','status','interventionPage','interventionLimit']),args:unknown[]=[],where:string[]=[];
+ const ip=pagination({page:params.interventionPage,limit:params.interventionLimit},[]);
+ if(p.offset>2147483647||ip.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
+ if(params.alertId===undefined&&(params.interventionPage!==undefined||params.interventionLimit!==undefined))throw invalid('Select alertId before paging its interventions.');
+ for(const [key,col]of Object.entries({alertId:'a."AlertID"',studentId:'p."StudentID"',ojtSemesterId:'j."OJTSemesterID"',status:'a."Status"'}))if(params[key]!==undefined){args.push(key==='status'?enumValue(params[key],['OPEN','ACKNOWLEDGED','RESOLVED','DISMISSED'],'status'):positiveId(params[key],key));where.push(`${col}=$${args.length}`);}
+ return readTransaction(async c=>{
+   const run=c.query.bind(c) as typeof query;
+   const data=await pageSql(alertSelect+(where.length?' WHERE '+where.join(' AND '):''),args,p,run);
+   if(params.alertId!==undefined)for(const item of data.items)item.interventions=await pageSql(interventionSelect+' WHERE i."AlertID"=$1',[item.id],ip,run);
+   return data;
+ });
 }
-export async function alertDetail(id:number) {const row=(await query(alertSelect+' WHERE a."AlertID"=$1',[id])).rows[0];if(!row)throw invalid('Alert not found.',404);return row;}
 export async function changeAlert(id:number,body:unknown,actor:number) {
  const b=inputObject(body,['status','reason']),status=enumValue(b.status,['ACKNOWLEDGED','RESOLVED','DISMISSED'],'status'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
@@ -44,13 +52,6 @@ export async function saveIntervention(alertId:number|null,body:unknown,actor:nu
   await audit(c,actor,'StudentInterventions',row.InterventionID,id?'UPDATE':'CREATE',old,row,b.reason as string|undefined);return (await c.query(interventionSelect+' WHERE i."InterventionID"=$1',[row.InterventionID])).rows[0];
  });
 }
-const assessmentSelect=`SELECT e."EvaluationID" AS id,e."AssignmentID" AS "assignmentId",a."StudentID" AS "studentId",p."OJTSemesterID" AS "ojtSemesterId",e."TemplateID" AS "templateId",e."EvaluatedBy" AS "evaluatedBy",e."EvaluatedAt" AS "evaluatedAt",e."CompletionScore"::float8 AS "completionScore",e."AttitudeScore"::float8 AS "attitudeScore",e."SkillScore"::float8 AS "skillScore",e."OverallScore"::float8 AS "overallScore",e."ScoreDetails" AS "scoreDetails",e."Comments" AS comments,e."Status" AS status FROM "InternshipEvaluations" e JOIN "InternshipAssignments" a ON a."AssignmentID"=e."AssignmentID" JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"`;
-export async function assessments(params:Row) {
- const p=pagination(params,['studentId','ojtSemesterId','templateId','status']),args:unknown[]=[],where:string[]=[];
- for(const [key,col]of Object.entries({studentId:'a."StudentID"',ojtSemesterId:'p."OJTSemesterID"',templateId:'e."TemplateID"',status:'e."Status"'}))if(params[key]!==undefined){args.push(key==='status'?requiredText(params[key],key,20):positiveId(params[key],key));where.push(`${col}=$${args.length}`);}
- return pageSql(assessmentSelect+(where.length?' WHERE '+where.join(' AND '):''),args,p);
-}
-export async function assessmentDetail(id:number) {const r=(await query(assessmentSelect+' WHERE e."EvaluationID"=$1',[id])).rows[0];if(!r)throw invalid('Assessment not found.',404);return r;}
 export function redact(value:any):any {
  if(Array.isArray(value))return value.map(redact);
  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,/password|token|secret|encrypted|authorization/i.test(k)?'[REDACTED]':redact(v)]));

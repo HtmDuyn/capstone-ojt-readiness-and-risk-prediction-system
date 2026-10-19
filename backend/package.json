@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
     "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",

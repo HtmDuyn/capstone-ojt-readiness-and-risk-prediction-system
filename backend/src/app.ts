@@ -103,7 +103,7 @@ app.use(
     swaggerSpec,
     {
       customSiteTitle:
-        "OJT Management API",
+        "API quản lý OJT",
 
       customCssUrl:
         "/swagger-static/swagger-custom.css",

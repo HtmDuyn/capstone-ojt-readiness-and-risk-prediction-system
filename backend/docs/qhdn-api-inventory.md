@@ -1,3 +1,5 @@
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Danh sách API Phòng Quan hệ doanh nghiệp (QHDN)
 
 Ngày rà soát: 08/10/2026. Vai trò backend: `OJT_COORD`. Base path: `/api`.

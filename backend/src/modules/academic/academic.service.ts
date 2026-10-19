@@ -1,9 +1,10 @@
 import type { PoolClient } from 'pg';
+import { ensureOjtSemesterForPeriod } from './ojt-semester-link';
 import { academicError, dateInput, dateRange, inputObject, positiveId, requiredText, statusInput } from './academic.schema';
 import { academicTransaction, asApi, audit, findRecord, resources, type AcademicRecord, type Resource } from './academic.repository';
 
 function parseResource(resource: Resource, input: unknown, old?: AcademicRecord): AcademicRecord {
-  const keys = [...Object.keys(resources[resource].fields), ...(resource === 'cohorts' ? ['groups'] : [])];
+  const keys = [...Object.keys(resources[resource].fields), ...(resource === 'cohorts' ? ['groups'] : resource === 'academic-periods' ? ['ojt'] : [])];
   const patch = inputObject(input, keys);
   const row = { ...old, ...patch };
   row.status = statusInput(row.status, resource === 'cohorts' ? 'ACTIVE' : 'PLANNED');
@@ -34,15 +35,11 @@ function parseResource(resource: Resource, input: unknown, old?: AcademicRecord)
     if (row.kind === 'BLOCK3') row.parentPeriodId = positiveId(row.parentPeriodId, 'parentPeriodId');
     else if (row.parentPeriodId !== null) throw academicError('SEMESTER cannot have parentPeriodId. Set it to null when changing kind.');
   }
-  if (resource === 'ojt-semesters') {
-    row.academicPeriodId = row.academicPeriodId == null ? null : positiveId(row.academicPeriodId, 'academicPeriodId');
-    row.regStartDate = row.regStartDate ?? null; row.regEndDate = row.regEndDate ?? null;
-    if ((row.regStartDate === null) !== (row.regEndDate === null)) throw academicError('Provide both registration dates or set both to null.');
-    if (row.regStartDate !== null) {
-      row.regStartDate = dateInput(row.regStartDate, 'regStartDate'); row.regEndDate = dateInput(row.regEndDate, 'regEndDate');
-      dateRange(row.regStartDate, row.regEndDate, 'registration');
-      if (row.regEndDate > row.startDate) throw academicError('Registration must end on or before the OJT start date.');
-    }
+  delete row.ojt;
+  if (resource === 'academic-periods' && patch.ojt !== undefined) {
+    if (row.kind !== 'SEMESTER') throw academicError('Block 3 does not have a separate OJT record.');
+    row.ojt = inputObject(patch.ojt, ['startDate','endDate','regStartDate','regEndDate','status']);
+    if (!Object.keys(row.ojt).length) throw academicError('Provide at least one OJT field.');
   }
   return row;
 }
@@ -95,6 +92,24 @@ export async function saveResource(resource: Resource, input: unknown, actorId: 
       ? await client.query(`INSERT INTO "${config.table}" (${entries.map(([,column]) => `"${column}"`).join(',')}) VALUES (${values.map((_,i) => `$${i+1}`).join(',')}) RETURNING *`, values)
       : await client.query(`UPDATE "${config.table}" SET ${entries.map(([,column],i) => `"${column}"=$${i+1}`).join(',')} WHERE "${config.id}"=$${values.length+1} RETURNING *`, [...values,id]);
     const saved = asApi(resource, result.rows[0]);
+    if (resource === 'academic-periods' && saved.kind === 'SEMESTER') {
+      saved.ojtSemesterId = await ensureOjtSemesterForPeriod(client, saved.id);
+      if (row.ojt !== undefined || before?.ojt) {
+        const ojt = row.ojt ?? {};
+        const oldOjt = (await client.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1 FOR UPDATE', [saved.ojtSemesterId])).rows[0];
+        const day = (value: any) => value instanceof Date ? `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}` : value;
+        const start = dateInput(ojt.startDate ?? (before?.ojt?.startDate === before?.startDate ? row.startDate : before?.ojt?.startDate) ?? day(oldOjt.StartDate), 'ojt.startDate');
+        const end = dateInput(ojt.endDate ?? (before?.ojt?.endDate === before?.endDate ? row.endDate : before?.ojt?.endDate) ?? day(oldOjt.EndDate), 'ojt.endDate');
+        dateRange(start, end, 'OJT');
+        if (start < row.startDate || end > row.endDate) throw academicError('OJT dates must be within the academic semester.');
+        const regStart = 'regStartDate' in ojt ? ojt.regStartDate : day(oldOjt.RegStartDate);
+        const regEnd = 'regEndDate' in ojt ? ojt.regEndDate : day(oldOjt.RegEndDate);
+        if ((regStart == null) !== (regEnd == null)) throw academicError('Provide both OJT registration dates or clear both.');
+        if (regStart != null) { dateRange(dateInput(regStart,'ojt.regStartDate'), dateInput(regEnd,'ojt.regEndDate')); if (regEnd > start) throw academicError('OJT registration must end on or before its start date.'); }
+        await client.query('UPDATE "OJTSemesters" SET "StartDate"=$2,"EndDate"=$3,"RegStartDate"=$4,"RegEndDate"=$5,"Status"=$6 WHERE "OJTSemesterID"=$1', [saved.ojtSemesterId,start,end,regStart??null,regEnd??null,statusInput(ojt.status??oldOjt.Status)]);
+      }
+      Object.assign(saved, await findRecord(client, resource, saved.id));
+    }
     if (resource === 'cohorts') {
       for (const group of row.groups) await client.query(`INSERT INTO "CohortGroups" ("CohortID","GroupCode","EntryAcademicPeriodID") VALUES ($1,$2,$3)
         ON CONFLICT ("CohortID","GroupCode") DO UPDATE SET "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID"`, [saved.id, group.groupCode, group.entryAcademicPeriodId]);
@@ -107,10 +122,10 @@ export async function saveResource(resource: Resource, input: unknown, actorId: 
   });
 }
 
-export async function assignPlacement(studentId: number, input: unknown, actorId: number) {
+export async function assignPlacementWithClient(client:PoolClient,studentId:number,input:unknown,actorId:number) {
   const patch = inputObject(input, ['cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId','programId','reason']);
   const reason = requiredText(patch.reason, 'reason', 1000);
-  return academicTransaction(async client => {
+
     const student = (await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1 FOR UPDATE', [studentId])).rows[0];
     if (!student) throw academicError('Student not found.', 404, 'STUDENT_NOT_FOUND');
     const previous = (await client.query('SELECT * FROM "StudentAcademicPlacements" WHERE "StudentID"=$1 FOR UPDATE', [studentId])).rows[0];
@@ -139,5 +154,5 @@ export async function assignPlacement(studentId: number, input: unknown, actorId
       FROM "StudentAcademicPlacements" p JOIN "Students" s ON s."StudentID"=p."StudentID" WHERE p."StudentID"=$1`, [studentId])).rows[0];
     await audit(client, actorId, 'StudentAcademicPlacements', studentId, 'UPDATE_ACADEMIC_PLACEMENT', { placement: previous ?? null, programId: student.ProgramID, currentSemester: student.CurrentSemester }, result, reason);
     return result;
-  });
+
 }
