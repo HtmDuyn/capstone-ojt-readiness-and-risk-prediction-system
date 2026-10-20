@@ -7,7 +7,7 @@ Tất cả API dùng `Authorization: Bearer <JWT>`. ADMIN và ACADEMIC quản l�
 ## Định nghĩa điều kiện
 
 - Tín chỉ tích lũy **>= 70**, theo chương trình và combo đã xác nhận hiện tại. Dùng chung thuật toán tiến độ: học lại, công nhận và tương đương chỉ ghi nhận tín chỉ một lần.
-- Số môn chưa đạt **<= 2**. `debtBasis: "FAILED_ATTEMPTS"`: đếm môn thuộc chương trình/combo hiện tại đã trượt và chưa từng đạt hoặc được công nhận. Môn chưa học/đang học chưa có kết quả trượt không được tính là môn nợ; các môn tương đương tính một môn.
+- Số môn còn nợ **<= 2**. `debtBasis: "FAILED_ATTEMPTS"`: đếm môn thuộc chương trình/combo hiện tại đã trượt và chưa từng đạt hoặc được công nhận. Môn chưa học/đang học chưa có kết quả trượt không được tính là môn nợ; các môn tương đương tính một môn.
 - Không xét GPA. Thiếu cấu hình tín chỉ, combo, chương trình đã ban hành, quy tắc đã ban hành hoặc sinh viên/tài khoản không ACTIVE trả `REVIEW_REQUIRED` và lý do; không tự coi là đủ điều kiện.
 - `ELIGIBLE`: đủ điều kiện; `NOT_ELIGIBLE`: thiếu tín chỉ hoặc vượt số môn nợ. Kết quả trả `earnedCredits`, `missingCredits`, `unpassedCourseCount`, `unpassedCourses`, `excessUnpassedCourses`, `reasons` và bản quy tắc.
 

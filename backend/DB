@@ -1,3 +1,9 @@
+-- UPDATED FULL DATABASE BUILD (EMPTY/TEST DATABASE ONLY)
+-- Based on the supplied 2026-10-19 script. Scoped edits ONLY to TrainingPrograms
+-- and direct dependencies of the removed columns/publication workflow.
+-- DANGER: THIS FILE STILL CONTAINS THE ORIGINAL RESET AND WILL DELETE DATA.
+-- NEVER RUN ON THE EXISTING SUPABASE DATABASE. For existing DB use the separate migration.
+
 -- Centralized database schema and catalog data. Resets application tables; initialize deliberately.
 
 BEGIN;
@@ -6,7 +12,7 @@ SET LOCAL search_path=public,pg_catalog;
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
  SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
+ WHERE n.nspname='public' AND c.relname IN ('OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
 ), edges AS (
  SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
  UNION
@@ -126,10 +132,7 @@ CREATE TABLE "TrainingPrograms" (
     "ProgramID" INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "ProgramCode" VARCHAR(20) NOT NULL UNIQUE,
     "ProgramName" VARCHAR(150) NOT NULL,
-    "Specialty" VARCHAR(10),
-    "TotalCredits" INT,
-    "Version" VARCHAR(10),
-    "EffectiveYear" INT
+    "TotalCredits" INT
 );
 
 CREATE TABLE "Courses" (
@@ -170,7 +173,7 @@ CREATE TABLE "ProgramCourses" (
 
    Students.ProgramID
         -> TrainingPrograms.ProgramID
-        -> TrainingPrograms.Specialty
+        -> TrainingPrograms.SpecializationID
 */
 
 CREATE TABLE "Students" (
@@ -727,13 +730,8 @@ CROSS JOIN (VALUES ('SE','Kỹ thuật phần mềm'),('IA','An toàn thông tin
 ALTER TABLE "TrainingPrograms"
   ALTER COLUMN "ProgramCode" TYPE varchar(100),
   ALTER COLUMN "ProgramName" TYPE text,
-  ADD COLUMN "SpecializationID" int REFERENCES "Specializations"("SpecializationID"),
-  ADD COLUMN "CatalogManaged" boolean NOT NULL DEFAULT false;
--- Do not guess the exact cohort of legacy students, or turn DS into AI.
-UPDATE "TrainingPrograms" p SET "SpecializationID"=s."SpecializationID"
-FROM "Specializations" s WHERE p."Specialty"=s."SpecializationCode";
+  ADD COLUMN "SpecializationID" int REFERENCES "Specializations"("SpecializationID");
 COMMENT ON COLUMN "TrainingPrograms"."ProgramCode" IS 'Exact curriculum_code, including hyphens, underscores and cohort suffixes.';
-COMMENT ON COLUMN "TrainingPrograms"."Specialty" IS 'Legacy compatibility field. Use SpecializationID for normalized joins.';
 ALTER TABLE "Courses" ALTER COLUMN "CourseName" TYPE text;
 COMMENT ON COLUMN "Courses"."Credits" IS 'Legacy/default only. Use ProgramCourses.Credits or verified slot credits for a student curriculum.';
 COMMENT ON COLUMN "Courses"."IsOJTPrerequisite" IS 'Legacy global flag. New eligibility rules must be scoped to a program/condition.';
@@ -4651,12 +4649,12 @@ INSERT INTO st_catalog VALUES
 ('BSS301','AI-Augmented Backend Systems & Intelligent Services_Hệ thống Backend và Dịch vụ Thông minh được tăng cường bằng AI'),
 ('DDP301','Software Delivery, DevOps & Platform Engineering_Triển khai Phần mềm, DevOps và Kỹ thuật Nền tảng');
 
-INSERT INTO "TrainingPrograms" ("ProgramCode","ProgramName","Specialty","TotalCredits","SpecializationID","CatalogManaged")
-SELECT x.code,x.name,x.specialization,x.credits,s."SpecializationID",true
+INSERT INTO "TrainingPrograms" ("ProgramCode","ProgramName","TotalCredits","SpecializationID")
+SELECT x.code,x.name,x.credits,s."SpecializationID"
 FROM st_programs x JOIN "Specializations" s ON s."SpecializationCode"=x.specialization
 ON CONFLICT ("ProgramCode") DO UPDATE SET "ProgramName"=EXCLUDED."ProgramName",
- "Specialty"=EXCLUDED."Specialty","TotalCredits"=EXCLUDED."TotalCredits",
- "SpecializationID"=EXCLUDED."SpecializationID","CatalogManaged"=true;
+ "TotalCredits"=EXCLUDED."TotalCredits",
+ "SpecializationID"=EXCLUDED."SpecializationID";
 INSERT INTO "Courses" ("CourseCode","CourseName","Credits") SELECT code,name,NULL FROM st_catalog
 ON CONFLICT ("CourseCode") DO NOTHING;
 INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","RecommendedSemester","Credits","PrerequisiteText","EntryKind","IsRequired")
@@ -5216,7 +5214,7 @@ COMMENT ON COLUMN "Students"."CohortCode" IS 'Source cohort, e.g. K19; do not in
 
 -- Final installation checks within the same transaction.
 DO $$ BEGIN
- IF (SELECT count(*) FROM "TrainingPrograms" WHERE "CatalogManaged")<>40
+ IF (SELECT count(*) FROM "TrainingPrograms")<>40
  OR (SELECT count(*) FROM "ProgramCourses")<>1924
  OR (SELECT count(*) FROM "ProgramCombos")<>279
  OR (SELECT count(*) FROM "ComboCourses")<>1029 THEN
@@ -5615,19 +5613,10 @@ END $$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_student_academic_records');
 -- SECTION: 20261008 curriculum management and publication
 ALTER TABLE "Courses" ALTER COLUMN "Credits" TYPE numeric(6,2);
-ALTER TABLE "TrainingPrograms"
- DROP CONSTRAINT "TrainingPrograms_ProgramCode_key",
- ALTER COLUMN "TotalCredits" TYPE numeric(6,2),
- ADD COLUMN "Status" text NOT NULL DEFAULT 'DRAFT' CHECK ("Status" IN ('DRAFT','PUBLISHED')),
- ADD COLUMN "PrerequisitesReviewed" boolean NOT NULL DEFAULT false,
- ADD COLUMN "EquivalencesReviewed" boolean NOT NULL DEFAULT false,
- ADD COLUMN "CreatedBy" int REFERENCES "Users"("UserID"),
- ADD COLUMN "CreatedAt" timestamptz NOT NULL DEFAULT now(),
- ADD COLUMN "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
- ADD COLUMN "PublishedBy" int REFERENCES "Users"("UserID"),
- ADD COLUMN "PublishedAt" timestamptz,
- ADD CONSTRAINT "CK_CurriculumPublication" CHECK (("Status"='PUBLISHED')=("PublishedAt" IS NOT NULL AND "PublishedBy" IS NOT NULL));
-CREATE UNIQUE INDEX "UQ_Curriculum_CodeVersion" ON "TrainingPrograms"(upper("ProgramCode"),COALESCE(upper("Version"),''));
+-- Curriculum simplification: keep ProgramID, ProgramCode, ProgramName,
+-- TotalCredits and SpecializationID. No publication workflow for TrainingPrograms.
+ALTER TABLE "TrainingPrograms" ALTER COLUMN "TotalCredits" TYPE numeric(6,2);
+CREATE UNIQUE INDEX "UQ_Curriculum_ProgramCode_CI" ON "TrainingPrograms"(upper("ProgramCode"));
 ALTER TABLE "ProgramCombos" ALTER COLUMN "SourceComboID" DROP NOT NULL, ADD COLUMN "CoursesReviewed" boolean NOT NULL DEFAULT false;
 CREATE UNIQUE INDEX "UQ_Combo_Code" ON "ProgramCombos"("ProgramID",upper("ComboCode"));
 ALTER TABLE "ComboCourses" ALTER COLUMN "SourceComboSubjectID" DROP NOT NULL;
@@ -5636,50 +5625,8 @@ CREATE UNIQUE INDEX "UQ_Course_Code" ON "Courses"(upper("CourseCode"));
 CREATE UNIQUE INDEX "UQ_Specialization_Code" ON "Specializations"(upper("SpecializationCode"));
 ALTER TABLE "AcademicImportBatches" DROP CONSTRAINT "AcademicImportBatches_Kind_check", ADD CONSTRAINT "AcademicImportBatches_Kind_check" CHECK ("Kind" IN ('STUDENT','COURSE_RESULT','CURRICULUM')),
  ADD COLUMN "CurriculumID" int REFERENCES "TrainingPrograms"("ProgramID");
-COMMENT ON COLUMN "TrainingPrograms"."Status" IS 'Existing catalogs remain DRAFT until staff review and publish; publication is explicit, never inferred from imported text.';
-COMMENT ON COLUMN "TrainingPrograms"."Version" IS 'A new version is a separate ProgramID, preserving Students.ProgramID and historical curriculum data.';
--- Keep published curriculum snapshots immutable even when a caller bypasses the API.
-CREATE OR REPLACE FUNCTION "GuardPublishedProgram"() RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
-BEGIN
- IF TG_OP<>'INSERT' AND OLD."Status"='PUBLISHED' THEN
-  RAISE EXCEPTION 'Published curriculum versions are immutable' USING ERRCODE='23514';
- END IF;
- IF TG_OP='DELETE' THEN RETURN OLD; END IF;
- IF TG_OP='INSERT' AND NEW."Status"='PUBLISHED' THEN
-  RAISE EXCEPTION 'Create a draft and publish it after validation' USING ERRCODE='23514';
- END IF;
- RETURN NEW;
-END $$;
-CREATE TRIGGER "TR_Immutable_TrainingPrograms" BEFORE INSERT OR UPDATE OR DELETE ON "TrainingPrograms" FOR EACH ROW EXECUTE FUNCTION "GuardPublishedProgram"();
-CREATE OR REPLACE FUNCTION "GuardPublishedProgramChild"() RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
-DECLARE old_id int; new_id int; target_id int; target_status text; old_data jsonb; new_data jsonb;
-BEGIN
- IF TG_OP<>'INSERT' THEN old_data:=to_jsonb(OLD); END IF;
- IF TG_OP<>'DELETE' THEN new_data:=to_jsonb(NEW); END IF;
- IF TG_ARGV[0]='ProgramID' THEN
-  old_id:=(old_data->>'ProgramID')::int; new_id:=(new_data->>'ProgramID')::int;
- ELSE
-  SELECT "ProgramID" INTO old_id FROM "ProgramCombos" WHERE "ProgramComboID"=(old_data->>'ProgramComboID')::int;
-  SELECT "ProgramID" INTO new_id FROM "ProgramCombos" WHERE "ProgramComboID"=(new_data->>'ProgramComboID')::int;
- END IF;
- FOREACH target_id IN ARRAY ARRAY[old_id,new_id] LOOP
-  SELECT "Status" INTO target_status FROM "TrainingPrograms" WHERE "ProgramID"=target_id FOR SHARE;
-  IF target_status='PUBLISHED' THEN
-   RAISE EXCEPTION 'Published curriculum contents are immutable' USING ERRCODE='23514';
-  END IF;
- END LOOP;
- IF TG_OP='DELETE' THEN RETURN OLD; END IF;
- RETURN NEW;
-END $$;
-DO $$ DECLARE t text;
-BEGIN
- FOREACH t IN ARRAY ARRAY['ProgramCourses','ProgramCombos','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','ProgramCourseEquivalences','AcademicGradingPolicies'] LOOP
-  EXECUTE format('CREATE TRIGGER %I BEFORE INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION "GuardPublishedProgramChild"(''ProgramID'')','TR_Immutable_'||t,t);
- END LOOP;
- FOREACH t IN ARRAY ARRAY['ComboCourses','ComboCourseChoiceGroups','ComboCourseChoiceMembers'] LOOP
-  EXECUTE format('CREATE TRIGGER %I BEFORE INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION "GuardPublishedProgramChild"(''ProgramComboID'')','TR_Immutable_'||t,t);
- END LOOP;
-END $$;
+-- Publication-specific columns, constraints and immutable triggers are intentionally omitted.
+-- All other academic, combo and import tables remain unchanged.
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_curriculum_management');
 -- SECTION: 20261008 combo registration windows and confirmed choices
 CREATE TABLE "ComboRegistrationWindows" (
@@ -6315,4 +6262,153 @@ BEGIN
  END LOOP;
 END $$;
 INSERT INTO "SchemaMigrations"("Version") VALUES ('20261008_admin_api');
+COMMIT;
+
+-- SECTION: Semester 5 student portal APIs
+BEGIN;
+ALTER TABLE "OJTAssessmentWindows" ADD COLUMN "AssessmentAcademicPeriodID" int REFERENCES "AcademicPeriods"("AcademicPeriodID"), ADD COLUMN "RequiredRelativeSemester" int NOT NULL DEFAULT 5 CHECK ("RequiredRelativeSemester"=5), ADD COLUMN "Revision" int NOT NULL DEFAULT 1 CHECK ("Revision">=1);
+UPDATE "OJTAssessmentWindows" w SET "AssessmentAcademicPeriodID"=p."ParentPeriodID" FROM "AcademicPeriods" p WHERE p."AcademicPeriodID"=w."BlockPeriodID";
+CREATE TABLE "StudentCVVersions" (
+ "CVID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"StudentID" int NOT NULL REFERENCES "Students"("StudentID"),
+ "Filename" varchar(150) NOT NULL,"MimeType" text NOT NULL CHECK ("MimeType"='application/pdf'),"Sha256" text NOT NULL,
+ "EncryptedContent" bytea NOT NULL,"SizeBytes" int NOT NULL CHECK ("SizeBytes" BETWEEN 1 AND 5242880),
+ "CreatedAt" timestamptz NOT NULL DEFAULT now(),"RetiredAt" timestamptz,"CreatedBy" int NOT NULL REFERENCES "Users"("UserID")
+);
+CREATE UNIQUE INDEX "UQ_CurrentStudentCV" ON "StudentCVVersions"("StudentID") WHERE "RetiredAt" IS NULL;
+ALTER TABLE "JobApplications" ADD COLUMN "CVID" int REFERENCES "StudentCVVersions"("CVID"), ADD COLUMN "PositionSnapshot" jsonb;
+CREATE TABLE "ApplicationEvents" (
+ "EventID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"ApplicationID" int NOT NULL REFERENCES "JobApplications"("ApplicationID"),
+ "Action" text NOT NULL,"ActorID" int NOT NULL REFERENCES "Users"("UserID"),"Reason" text,"Snapshot" jsonb NOT NULL,"CreatedAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE "CVAnalysisJobs" (
+ "AnalysisID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"StudentID" int NOT NULL REFERENCES "Students"("StudentID"),"CVID" int NOT NULL REFERENCES "StudentCVVersions"("CVID"),
+ "Status" text NOT NULL CHECK ("Status" IN ('RUNNING','COMPLETED','FAILED')),"Result" jsonb,"ErrorCode" text,"CreatedAt" timestamptz NOT NULL DEFAULT now(),"CompletedAt" timestamptz
+);
+CREATE TABLE "CompanyImportBatches" (
+ "BatchID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"OJTSemesterID" int REFERENCES "OJTSemesters"("OJTSemesterID"),
+ "IdempotencyKey" varchar(100) NOT NULL,"RequestHash" text NOT NULL,"SourceName" varchar(200),"Mapping" jsonb,
+ "Status" text NOT NULL CHECK ("Status" IN ('COMPLETED','REJECTED')),"Summary" jsonb NOT NULL,"CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),"CreatedAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX "UQ_CompanyImportCommit" ON "CompanyImportBatches"("IdempotencyKey") WHERE "Status"='COMPLETED';
+CREATE TABLE "CompanyImportRows" (
+ "BatchID" int NOT NULL REFERENCES "CompanyImportBatches"("BatchID"),"RowNumber" int NOT NULL,"EnterpriseID" int REFERENCES "Enterprises"("EnterpriseID"),
+ "SourceCode" text,"Action" text NOT NULL,"Errors" jsonb NOT NULL DEFAULT '[]',"PositionIDs" jsonb NOT NULL DEFAULT '[]',PRIMARY KEY("BatchID","RowNumber")
+);
+CREATE TABLE "OJTAdvisorySchedules" (
+ "AcademicPeriodID" int PRIMARY KEY REFERENCES "AcademicPeriods"("AcademicPeriodID"),"OJTSemesterID" int NOT NULL REFERENCES "OJTSemesters"("OJTSemesterID"),
+ "SendAt" timestamptz NOT NULL,"AssessmentDeadline" timestamptz NOT NULL,"Scope" jsonb NOT NULL,"Enabled" boolean NOT NULL DEFAULT true,
+ "Version" int NOT NULL DEFAULT 1,"UpdatedBy" int NOT NULL REFERENCES "Users"("UserID"),"UpdatedAt" timestamptz NOT NULL DEFAULT now(),CHECK ("SendAt"<"AssessmentDeadline")
+);
+CREATE TABLE "OJTAdvisoryRuns" (
+ "RunID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"Kind" text NOT NULL CHECK("Kind" IN ('SUMMARY','ELIGIBILITY')),
+ "IdempotencyKey" varchar(100) NOT NULL UNIQUE,"RequestHash" text NOT NULL,"Request" jsonb NOT NULL,"Status" text NOT NULL DEFAULT 'PENDING' CHECK("Status" IN ('PENDING','COMPLETED','COMPLETED_WITH_ERRORS')),
+ "CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),"CreatedAt" timestamptz NOT NULL DEFAULT now(),"CompletedAt" timestamptz
+);
+CREATE TABLE "OJTAdvisoryRunItems" (
+ "RunID" int NOT NULL REFERENCES "OJTAdvisoryRuns"("RunID"),"StudentID" int NOT NULL REFERENCES "Students"("StudentID"),
+ "Status" text NOT NULL DEFAULT 'PENDING' CHECK ("Status" IN ('PENDING','COMPLETED','FAILED')),"Snapshot" jsonb,"NotificationID" int REFERENCES "Notifications"("NotificationID"),"ErrorCode" text,PRIMARY KEY("RunID","StudentID")
+);
+-- Preserve only historical facts recorded by the previous enterprise import flow.
+INSERT INTO "CompanyImportBatches" ("OJTSemesterID","IdempotencyKey","RequestHash","Status","Summary","CreatedBy","CreatedAt")
+ SELECT "OJTSemesterID","IdempotencyKey","PayloadHash",'COMPLETED',"Summary" || '{"legacyImport":true}'::jsonb,"ImportedBy","CreatedAt" FROM "AccountImportBatches" WHERE "Kind"='ENTERPRISE';
+INSERT INTO "CompanyImportRows" ("BatchID","RowNumber","SourceCode","Action","EnterpriseID")
+ SELECT b."BatchID",r."RowNumber",r."SourceCode",r."Action",e."EnterpriseID" FROM "AccountImportRows" r JOIN "AccountImportBatches" old ON old."BatchID"=r."BatchID" JOIN "CompanyImportBatches" b ON b."IdempotencyKey"=old."IdempotencyKey" LEFT JOIN "Enterprises" e ON upper(e."EnterpriseCode")=upper(r."SourceCode") WHERE old."Kind"='ENTERPRISE';
+CREATE INDEX "IX_ApplicationEvents_Application" ON "ApplicationEvents"("ApplicationID","EventID");
+CREATE INDEX "IX_CVAnalysis_Student" ON "CVAnalysisJobs"("StudentID","AnalysisID");
+CREATE INDEX "IX_AdvisoryPending" ON "OJTAdvisoryRunItems"("RunID","StudentID") WHERE "Status"='PENDING';
+DO $$ DECLARE t text; role_name text; seq text; BEGIN
+ FOREACH t IN ARRAY ARRAY['StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems'] LOOP
+  EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t); EXECUTE format('REVOKE ALL ON TABLE %I FROM PUBLIC',t);
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON TABLE %I FROM %I',t,role_name); END IF; END LOOP;
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT ALL ON TABLE %I TO service_role',t); END IF;
+ END LOOP;
+ FOR seq IN SELECT pg_get_serial_sequence(format('%I',v.t),v.c) FROM (VALUES ('StudentCVVersions','CVID'),('CVAnalysisJobs','AnalysisID'),('ApplicationEvents','EventID'),('CompanyImportBatches','BatchID'),('OJTAdvisoryRuns','RunID')) v(t,c) LOOP
+  EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM PUBLIC',seq);
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON SEQUENCE %s FROM %I',seq,role_name); END IF; END LOOP;
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT USAGE,SELECT ON SEQUENCE %s TO service_role',seq); END IF;
+ END LOOP;
+END $$;
+INSERT INTO "SchemaMigrations"("Version") VALUES ('20261013_student_portal');
+COMMIT;
+
+
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM "Roles" WHERE "RoleCode" = 'STUDENT') THEN
+  RAISE EXCEPTION 'Role STUDENT does not exist';
+ END IF;
+END $$;
+
+CREATE TEMP TABLE _seed_student_cases (n int PRIMARY KEY, credits int, failed int, description text) ON COMMIT DROP;
+INSERT INTO _seed_student_cases VALUES
+ (1,70,2,'ELIGIBLE boundary'),
+ (2,69,2,'Missing 1 credit'),
+ (3,70,3,'One extra failed course'),
+ (4,69,3,'Both conditions fail'),
+ (5,70,0,'Eligible zero fails'),
+ (6,85,2,'Eligible two fails'),
+ (7,50,0,'Low credits'),
+ (8,100,4,'Many failed'),
+ (9,NULL,1,'Unknown credits'),
+ (10,73,NULL,'Unknown failed count'),
+ (11,73,2,'Eligible 73 and 2');
+
+-- Reuse the original student01 password hash; existing credentials remain unchanged.
+INSERT INTO "Users" ("Username","PasswordHash","Email","FullName","RoleID","Status")
+SELECT ('student'||lpad(x.n::text,2,'0')),
+ '$2b$12$/7w0sgql7uF34ubVsXY4eOztDZ3XG7jUXXE/qhDOVPz3CU/HsLlRm',
+ ('student'||lpad(x.n::text,2,'0')||'@student.edu.vn'),
+ ('Student '||lpad(x.n::text,2,'0')),r."RoleID",'ACTIVE'
+FROM _seed_student_cases x JOIN "Roles" r ON r."RoleCode"='STUDENT'
+WHERE NOT EXISTS (SELECT 1 FROM "Users" u WHERE u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn'))
+ON CONFLICT DO NOTHING;
+
+-- Student01 profile is preserved if already present. New profiles are inserted only.
+INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
+SELECT u."UserID", ('SE18'||lpad(x.n::text,4,'0')),
+  (SELECT p."ProgramID" FROM "TrainingPrograms" p JOIN "Specializations" sp ON sp."SpecializationID"=p."SpecializationID"
+    WHERE sp."SpecializationCode"='SE' ORDER BY (p."ProgramCode" LIKE '%K18%') DESC, p."ProgramID" LIMIT 1),
+ 2022, 5, 'SE18A', 'ACTIVE'
+FROM _seed_student_cases x JOIN "Users" u ON u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn')
+WHERE NOT EXISTS (SELECT 1 FROM "Students" s WHERE s."UserID"=u."UserID")
+  AND NOT EXISTS (SELECT 1 FROM "Students" s WHERE s."StudentCode"=('SE18'||lpad(x.n::text,4,'0')))
+ON CONFLICT DO NOTHING;
+
+-- One fixture snapshot per new test profile; NEVER overwrite prior snapshots.
+INSERT INTO "StudentAcademicSnapshot" ("StudentID","SnapshotDate","AccumulatedCredits","FailedCoursesCount","CurrentSemester","RemainingCredits")
+SELECT s."StudentID", DATE '2026-10-19', x.credits,x.failed,5,
+ CASE WHEN x.credits IS NULL OR p."TotalCredits" IS NULL THEN NULL ELSE GREATEST(p."TotalCredits"-x.credits,0) END
+FROM _seed_student_cases x
+JOIN "Users" u ON u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn')
+JOIN "Students" s ON s."UserID"=u."UserID"
+LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
+WHERE NOT EXISTS (SELECT 1 FROM "StudentAcademicSnapshot" a WHERE a."StudentID"=s."StudentID");
+
+-- Verify profiles and latest snapshot; case labels describe intended test cases only.
+SELECT x.n, x.description, u."Username", s."StudentCode", p."ProgramCode",
+ a."AccumulatedCredits",a."FailedCoursesCount",
+ CASE WHEN a."AccumulatedCredits" IS NULL OR a."FailedCoursesCount" IS NULL THEN 'UNKNOWN'
+ WHEN a."AccumulatedCredits">=70 AND a."FailedCoursesCount"<=2 THEN 'ELIGIBLE' ELSE 'NOT_ELIGIBLE' END AS "IllustrativeOutcome"
+FROM _seed_student_cases x
+LEFT JOIN "Users" u ON u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn')
+LEFT JOIN "Students" s ON s."UserID"=u."UserID"
+LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
+LEFT JOIN LATERAL (SELECT * FROM "StudentAcademicSnapshot" a WHERE a."StudentID"=s."StudentID" ORDER BY a."SnapshotDate" DESC,a."SnapshotID" DESC LIMIT 1) a ON true
+ORDER BY x.n;
+COMMIT;
+BEGIN;
+ALTER TABLE "EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
+ALTER TABLE "EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
+  CHECK ("Kind" IN ('ACCOUNT','COMBO_REMINDER','ACADEMIC_ALERT','OJT_RESULT'));
+CREATE TABLE IF NOT EXISTS "OJTCompletionDeliveries" (
+  "EvaluationID" int NOT NULL REFERENCES "InternshipEvaluations"("EvaluationID"),
+  "EvaluatedAt" timestamp NOT NULL,
+  "UserID" int NOT NULL REFERENCES "Users"("UserID"),
+  "EmailID" bigint NOT NULL REFERENCES "EmailOutbox"("EmailID"),
+  PRIMARY KEY ("EvaluationID","EvaluatedAt","UserID")
+);
+ALTER TABLE "OJTCompletionDeliveries" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON "OJTCompletionDeliveries" FROM PUBLIC;
 COMMIT;

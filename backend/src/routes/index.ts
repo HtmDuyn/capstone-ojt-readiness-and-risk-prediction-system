@@ -1,3 +1,7 @@
+import qhdnRoutes from '../modules/qhdn/qhdn.routes';
+import portalRoutes from '../modules/student-portal/portal.routes';
+import recruitmentRoutes from '../modules/recruitment/recruitment.routes';
+import enterpriseRoutes from '../modules/qhdn/enterprise.routes';
 import reportingRoutes from '../modules/academic-reporting/report.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import resultRoutes from '../modules/ojt-results/result.routes';
@@ -20,6 +24,10 @@ const router = Router();
 router.use(createJsonInputRouter(router));
 router.use(adminRoutes);
 router.use(academicRoutes);
+router.use(qhdnRoutes);
+router.use(portalRoutes);
+router.use('/recruitment', recruitmentRoutes);
+router.use('/enterprise', enterpriseRoutes);
 router.use(reportingRoutes);
 router.use(resultRoutes);
 router.use(workflowRoutes);

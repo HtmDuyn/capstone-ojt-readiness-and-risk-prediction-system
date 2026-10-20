@@ -122,6 +122,41 @@
  *               "CLOSED",
  *               "ARCHIVED"
  *             ]
+ *           },
+ *           "ojt": {
+ *             "type": "object",
+ *             "minProperties": 1,
+ *             "additionalProperties": false,
+ *             "description": "Chỉ SEMESTER; thông tin vận hành OJT gắn với học kỳ, không tạo kỳ OJT riêng.",
+ *             "properties": {
+ *               "startDate": {
+ *                 "type": "string",
+ *                 "format": "date"
+ *               },
+ *               "endDate": {
+ *                 "type": "string",
+ *                 "format": "date"
+ *               },
+ *               "regStartDate": {
+ *                 "type": "string",
+ *                 "format": "date",
+ *                 "nullable": true
+ *               },
+ *               "regEndDate": {
+ *                 "type": "string",
+ *                 "format": "date",
+ *                 "nullable": true
+ *               },
+ *               "status": {
+ *                 "type": "string",
+ *                 "enum": [
+ *                   "PLANNED",
+ *                   "ACTIVE",
+ *                   "CLOSED",
+ *                   "ARCHIVED"
+ *                 ]
+ *               }
+ *             }
  *           }
  *         },
  *         "required": [
@@ -192,137 +227,41 @@
  *               "CLOSED",
  *               "ARCHIVED"
  *             ]
- *           }
- *         }
- *       },
- *       "OJTSemesterCreate": {
- *         "type": "object",
- *         "additionalProperties": false,
- *         "properties": {
- *           "academicYearId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647
  *           },
- *           "semesterCode": {
- *             "type": "string",
- *             "maxLength": 20
- *           },
- *           "name": {
- *             "type": "string",
- *             "maxLength": 100
- *           },
- *           "academicPeriodId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647,
- *             "nullable": true
- *           },
- *           "startDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "endDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "regStartDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01",
- *             "nullable": true
- *           },
- *           "regEndDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01",
- *             "nullable": true
- *           },
- *           "status": {
- *             "type": "string",
- *             "enum": [
- *               "PLANNED",
- *               "ACTIVE",
- *               "CLOSED",
- *               "ARCHIVED"
- *             ]
- *           }
- *         },
- *         "required": [
- *           "academicYearId",
- *           "semesterCode",
- *           "name",
- *           "startDate",
- *           "endDate"
- *         ],
- *         "example": {
- *           "academicYearId": 1,
- *           "semesterCode": "OJT-FALL2026",
- *           "name": "OJT Fall 2026",
- *           "academicPeriodId": 1,
- *           "startDate": "2026-09-01",
- *           "endDate": "2026-12-10",
- *           "regStartDate": "2026-08-01",
- *           "regEndDate": "2026-08-25",
- *           "status": "PLANNED"
- *         }
- *       },
- *       "OJTSemesterPatch": {
- *         "type": "object",
- *         "minProperties": 1,
- *         "additionalProperties": false,
- *         "properties": {
- *           "academicYearId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647
- *           },
- *           "semesterCode": {
- *             "type": "string",
- *             "maxLength": 20
- *           },
- *           "name": {
- *             "type": "string",
- *             "maxLength": 100
- *           },
- *           "academicPeriodId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647,
- *             "nullable": true
- *           },
- *           "startDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "endDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "regStartDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01",
- *             "nullable": true
- *           },
- *           "regEndDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01",
- *             "nullable": true
- *           },
- *           "status": {
- *             "type": "string",
- *             "enum": [
- *               "PLANNED",
- *               "ACTIVE",
- *               "CLOSED",
- *               "ARCHIVED"
- *             ]
+ *           "ojt": {
+ *             "type": "object",
+ *             "minProperties": 1,
+ *             "additionalProperties": false,
+ *             "description": "Chỉ SEMESTER; thông tin vận hành OJT gắn với học kỳ, không tạo kỳ OJT riêng.",
+ *             "properties": {
+ *               "startDate": {
+ *                 "type": "string",
+ *                 "format": "date"
+ *               },
+ *               "endDate": {
+ *                 "type": "string",
+ *                 "format": "date"
+ *               },
+ *               "regStartDate": {
+ *                 "type": "string",
+ *                 "format": "date",
+ *                 "nullable": true
+ *               },
+ *               "regEndDate": {
+ *                 "type": "string",
+ *                 "format": "date",
+ *                 "nullable": true
+ *               },
+ *               "status": {
+ *                 "type": "string",
+ *                 "enum": [
+ *                   "PLANNED",
+ *                   "ACTIVE",
+ *                   "CLOSED",
+ *                   "ARCHIVED"
+ *                 ]
+ *               }
+ *             }
  *           }
  *         }
  *       },
@@ -515,64 +454,6 @@
  *           }
  *         },
  *         "example": {
- *           "cohortId": 1,
- *           "groupCode": "A",
- *           "currentAcademicPeriodId": 1,
- *           "reason": "Gan lo trinh dau nam hoc"
- *         }
- *       },
- *       "AcademicPlacementBodyPatch": {
- *         "type": "object",
- *         "additionalProperties": false,
- *         "required": [
- *           "studentId",
- *           "reason"
- *         ],
- *         "properties": {
- *           "studentId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647,
- *             "description": "Existing StudentID in the database, not UserID or student code."
- *           },
- *           "cohortId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647
- *           },
- *           "groupCode": {
- *             "type": "string",
- *             "enum": [
- *               "A",
- *               "B",
- *               "C",
- *               "D"
- *             ]
- *           },
- *           "entryAcademicPeriodId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647,
- *             "description": "Optional actual entry override. New cohort/group defaults to its configured entry semester."
- *           },
- *           "currentAcademicPeriodId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647,
- *             "description": "Required for first placement; a regular semester or its Block 3."
- *           },
- *           "programId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647
- *           },
- *           "reason": {
- *             "type": "string",
- *             "maxLength": 1000
- *           }
- *         },
- *         "example": {
- *           "studentId": 1,
  *           "cohortId": 1,
  *           "groupCode": "A",
  *           "currentAcademicPeriodId": 1,
@@ -824,6 +705,16 @@
  *                 "BLOCK3"
  *               ]
  *             }
+ *           },
+ *           {
+ *             "in": "query",
+ *             "name": "academicPeriodId",
+ *             "required": false,
+ *             "schema": {
+ *               "type": "integer",
+ *               "minimum": 1,
+ *               "maximum": 2147483647
+ *             }
  *           }
  *         ],
  *         "responses": {
@@ -918,186 +809,6 @@
  *             "application/json": {
  *               "schema": {
  *                 "$ref": "#/components/schemas/AcademicPeriodPatch"
- *               }
- *             }
- *           }
- *         },
- *         "responses": {
- *           "200": {
- *             "description": "Updated record in data"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       }
- *     },
- *     "/api/ojt-semesters": {
- *       "get": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "List ojt-semesters with pagination",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "query",
- *             "name": "page",
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "default": 1
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "limit",
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 100,
- *               "default": 20
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "search",
- *             "schema": {
- *               "type": "string",
- *               "maxLength": 100
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "status",
- *             "schema": {
- *               "type": "string",
- *               "enum": [
- *                 "PLANNED",
- *                 "ACTIVE",
- *                 "CLOSED",
- *                 "ARCHIVED"
- *               ]
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "academicYearId",
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 2147483647
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "success, items, page, limit, total"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       },
- *       "post": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Create OJTSemester",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/OJTSemesterCreate"
- *               }
- *             }
- *           }
- *         },
- *         "responses": {
- *           "201": {
- *             "description": "Created record in data"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       }
- *     },
- *     "/api/ojt-semesters/{id}": {
- *       "patch": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Partially update OJTSemester",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 2147483647
- *             }
- *           }
- *         ],
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/OJTSemesterPatch"
  *               }
  *             }
  *           }
@@ -1276,107 +987,6 @@
  *         "responses": {
  *           "200": {
  *             "description": "Updated record in data"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       }
- *     },
- *     "/api/students/{id}/academic-placement": {
- *       "patch": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Assign actual academic placement and compute specialized semester",
- *         "description": "First assignment requires cohortId, groupCode and currentAcademicPeriodId. SEMESTER periods are counted from actual entry to the current semester; Block 3 does not advance the count. Updates preserve existing actual entry unless group/cohort changes or an override is supplied. All changes are audited.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 2147483647
- *             }
- *           }
- *         ],
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/AcademicPlacementPatch"
- *               }
- *             }
- *           }
- *         },
- *         "responses": {
- *           "200": {
- *             "description": "Placement data includes studentId, cohortId, groupCode, entryAcademicPeriodId, currentAcademicPeriodId, currentSemester, enrollmentYear, programId and updatedAt"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       }
- *     },
- *     "/api/students/academic-placement": {
- *       "patch": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Assign actual academic placement using studentId in JSON",
- *         "description": "Same business rules, authorization, transaction and audit as the path-ID endpoint. Supply an existing studentId in the JSON body. Referenced student, cohort/group and academic periods must already exist; no prerequisite APIs need rerunning when data is already configured.",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [],
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/AcademicPlacementBodyPatch"
- *               }
- *             }
- *           }
- *         },
- *         "responses": {
- *           "200": {
- *             "description": "Placement data includes studentId, cohortId, groupCode, entryAcademicPeriodId, currentAcademicPeriodId, currentSemester, enrollmentYear, programId and updatedAt"
  *           },
  *           "400": {
  *             "description": "Invalid JSON, date, identifier or enum"

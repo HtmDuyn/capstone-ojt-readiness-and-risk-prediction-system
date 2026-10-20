@@ -1,9 +1,11 @@
+import { currentCVSql } from './cv.service';
+import { assignPlacementWithClient } from '../academic/academic.service';
 import { query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, pagination, positiveId, inputObject, requiredText, optionalText, enumValue, resultValues } from './student.validation';
 
-const studentSelect = `SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",s."UserID" AS "userId",u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,u."Status" AS "accountStatus",s."ProgramID" AS "programId",s."EnrollmentYear" AS "enrollmentYear",s."CurrentSemester" AS "currentSemester",s."ClassName" AS "className",s."Status" AS status,p."CohortID" AS "cohortId",p."GroupCode" AS "groupCode",p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"`;
+export const studentSelect = `SELECT s."StudentID" AS id,${currentCVSql('s."StudentID"')} AS cv,s."StudentCode" AS "studentCode",s."UserID" AS "userId",u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,u."Status" AS "accountStatus",s."ProgramID" AS "programId",s."EnrollmentYear" AS "enrollmentYear",s."CurrentSemester" AS "currentSemester",s."ClassName" AS "className",s."Status" AS status,p."CohortID" AS "cohortId",p."GroupCode" AS "groupCode",p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId",CASE WHEN tp."ProgramID" IS NULL THEN NULL ELSE jsonb_build_object('id',tp."ProgramID",'code',tp."ProgramCode",'name',tp."ProgramName",'version',tp."Version",'status',tp."Status",'totalCredits',tp."TotalCredits",'majorId',tp."SpecializationID",'majorName',major."SpecializationName",'majorCode',major."SpecializationCode") END AS program,CASE WHEN cohort."CohortID" IS NULL THEN NULL ELSE jsonb_build_object('id',cohort."CohortID",'code',cohort."CohortCode",'name',cohort."Name") END AS cohort,CASE WHEN entry."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',entry."AcademicPeriodID",'code',entry."PeriodCode",'name',entry."Name",'kind',entry."Kind",'startDate',entry."StartDate",'endDate',entry."EndDate") END AS "entryAcademicPeriod",CASE WHEN current_period."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',current_period."AcademicPeriodID",'code',current_period."PeriodCode",'name',current_period."Name",'kind',current_period."Kind",'startDate',current_period."StartDate",'endDate',current_period."EndDate") END AS "currentAcademicPeriod" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" LEFT JOIN "Specializations" major ON major."SpecializationID"=tp."SpecializationID" LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=p."CohortID" LEFT JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=p."EntryAcademicPeriodID" LEFT JOIN "AcademicPeriods" current_period ON current_period."AcademicPeriodID"=p."CurrentAcademicPeriodID"`;
 export async function student(id: number) {
   const row = (await query(`${studentSelect} WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL`,[id])).rows[0];
   if (!row) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
@@ -28,7 +30,7 @@ export async function listStudents(params: Record<string,unknown>, exporting=fal
   return {total:row.total,items:row.items,page:p.page,limit:p.limit};
 }
 export async function patchStudent(id: number, body: unknown, actorId: number) {
-  const input=inputObject(body,['fullName','phone','className','status','programId','reason']);
+  const input=inputObject(body,['fullName','phone','className','status','programId','placement','reason']);
   const reason=requiredText(input.reason,'reason',2000);
   const fields: Record<string,unknown>={};
   if ('className' in input) fields.ClassName=optionalText(input.className,'className',20);
@@ -37,7 +39,7 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
   const userFields: Record<string,unknown>={};
   if ('fullName' in input) userFields.FullName=requiredText(input.fullName,'fullName',100);
   if ('phone' in input) userFields.Phone=optionalText(input.phone,'phone',20);
-  if (!Object.keys(fields).length && !Object.keys(userFields).length) throw invalid('Provide at least one profile field.');
+  if (!Object.keys(fields).length && !Object.keys(userFields).length && input.placement===undefined) throw invalid('Provide at least one profile field.');
   return academicTransaction(async client => {
     const before=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL FOR UPDATE',[id])).rows[0];
     if (!before) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
@@ -45,6 +47,11 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
     for (const [table,key,keyId,values] of [['Students','StudentID',id,fields],['Users','UserID',before.UserID,userFields]] as const) {
       const entries=Object.entries(values);
       if (entries.length) await client.query(`UPDATE "${table}" SET ${entries.map(([col],i)=>`"${col}"=$${i+2}`).join(',')}${table==='Users'?',"UpdatedAt"=now()':''} WHERE "${key}"=$1`,[keyId,...entries.map(([,v])=>v)]);
+    }
+    if(input.placement!==undefined) {
+      const placement=inputObject(input.placement,['cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId']);
+      if(!Object.keys(placement).length)throw invalid('Provide at least one placement field.');
+      await assignPlacementWithClient(client,id,{...placement,reason},actorId);
     }
     await audit(client,actorId,'Students',id,'UPDATE_PROFILE',{...before,...beforeUser},{...before,...beforeUser,...fields,...userFields},reason);
     return (await client.query(`${studentSelect} WHERE s."StudentID"=$1`,[id])).rows[0];

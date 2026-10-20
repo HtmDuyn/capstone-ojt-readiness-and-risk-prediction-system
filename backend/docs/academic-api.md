@@ -8,7 +8,7 @@ All 13 endpoints require a bearer token for `ACADEMIC` or `ADMIN`. Accounts with
 |---|---|---|---|
 | Academic years | `GET /api/academic-years` | `POST /api/academic-years` | `PATCH /api/academic-years/:id` |
 | Specialized semesters / Block 3 | `GET /api/academic-periods` | `POST /api/academic-periods` | `PATCH /api/academic-periods/:id` |
-| OJT semesters | `GET /api/ojt-semesters` | `POST /api/ojt-semesters` | `PATCH /api/ojt-semesters/:id` |
+| OJT metadata | Trong search/detail academic-periods | Tự tạo khi tạo học kỳ | PATCH academic-periods với `ojt` |
 | Cohorts / groups A–D | `GET /api/cohorts` | `POST /api/cohorts` | `PATCH /api/cohorts/:id` |
 
 The final endpoint is `PATCH /api/students/:id/academic-placement`. `:id` is a `StudentID`, not a `UserID`.
@@ -86,25 +86,7 @@ Configure the full school calendar, including past regular semesters needed to c
 
 ## 3. OJT semester
 
-`POST /api/ojt-semesters`
-
-```json
-{
-  "academicYearId": 1,
-  "semesterCode": "OJT-FALL2026",
-  "name": "Kỳ OJT Fall 2026",
-  "academicPeriodId": 1,
-  "startDate": "2026-09-01",
-  "endDate": "2026-12-10",
-  "regStartDate": "2026-08-01",
-  "regEndDate": "2026-08-25",
-  "status": "PLANNED"
-}
-```
-
-`academicPeriodId` is optional and may be null. When provided it must be a regular semester in the same year, and OJT dates must fall within it. Registration dates are optional as a pair: provide both or set both to null. Registration ends on or before the OJT start date. Registration may begin before the academic year starts.
-
-Existing enterprise import/retention logic continues to use `OJTSemesters`; this API does not import recruitment or create registrations.
+Thông tin OJT được trả trong `ojt` và `ojtSemesterId` của học kỳ. Đào tạo cấu hình qua PATCH học kỳ; QHDN chọn học kỳ có sẵn để mở đợt tuyển dụng. Các API tạo/search/detail/sửa kỳ OJT độc lập đã xóa. Xem [hợp đồng mới](api-consolidation.md).
 
 ## 4. Cohort and groups
 

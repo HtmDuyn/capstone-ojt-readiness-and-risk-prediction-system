@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -103,11 +104,11 @@ export async function finalizeWindow(id:number,body:unknown,actorId:number) {
   });
 }
 export async function studentComboHistory(studentId:number,params:Record<string,unknown>,user:{userId:number;roleCode:string}) {
-  await assertStudentAccess(studentId,user);await student(studentId);const p=pagination(params,[]);
+  await assertStudentAccess(studentId,user);const profile=await student(studentId);const p=pagination(params,[]);
   return academicTransaction(async client=>{
     const current=(await client.query('SELECT "ProgramID" FROM "Students" WHERE "StudentID"=$1',[studentId])).rows[0];
     const count=(await client.query('SELECT count(*)::int AS n FROM "StudentComboSelectionEvents" WHERE "StudentID"=$1',[studentId])).rows[0].n;
     const events=(await client.query(`SELECT e."EventID" AS id,e."WindowID" AS "windowId",w."Phase" AS phase,w."InitialWindowID" AS "initialWindowId",e."EventType" AS type,e."ChoiceSnapshot" AS choice,e."PreviousSnapshot" AS previous,e."CreatedBy" AS "createdBy",e."CreatedAt" AS "createdAt",e."Reason" AS reason,e."SourceEventID" AS "sourceEventId",r."Progress" AS progress,r."Eligibility" AS eligibility FROM "StudentComboSelectionEvents" e JOIN "ComboRegistrationWindows" w ON w."WindowID"=e."WindowID" LEFT JOIN "StudentAcademicRecalculations" r ON r."EventID"=e."EventID" WHERE e."StudentID"=$1 ORDER BY e."EventID" DESC LIMIT $2 OFFSET $3`,[studentId,p.limit,p.offset])).rows;
-    return {studentId,current:await activeChoice(client,studentId,current.ProgramID),items:events,total:count,page:p.page,limit:p.limit};
+    return {studentId,student:profile,current:await activeChoice(client,studentId,current.ProgramID),items:await enrichListRows(client,events),total:count,page:p.page,limit:p.limit};
   });
 }

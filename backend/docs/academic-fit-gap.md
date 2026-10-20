@@ -1,3 +1,5 @@
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Fit-gap API phòng đào tạo
 
 Ngày kiểm tra: 08/10/2026. Đối chiếu mã nguồn, Swagger, backend đang chạy, schema và dữ liệu cấu hình hiện tại. Bản đánh giá gốc được giữ bên dưới; G01–G05 đã được xử lý bằng thay đổi API/schema và kiểm thử riêng. Không chạy reset DB trên dữ liệu đang sử dụng.
@@ -6,11 +8,11 @@ Ngày kiểm tra: 08/10/2026. Đối chiếu mã nguồn, Swagger, backend đang
 
 1. Proposal PDF: [Proposal PDF](C:/Users/tthuh/Downloads/OJT-RPA_Proposal_hoan_chinh.pdf). Các mục đối chiếu chính: 7.1–7.3, trang 5; 8.2, trang 6; luồng 2/3/6, trang 7; nguyên tắc AI, trang 8; các điểm cần xác nhận, trang 11–12.
 2. Tám bảng API phòng đào tạo do người dùng yêu cầu trong hội thoại, cùng các điều chỉnh về JSON, tài khoản import, GPA, điều kiện OJT và bỏ permission.
-3. Phạm vi AI mới nhất: **chỉ gọi model để đề xuất doanh nghiệp đang tuyển dụng phù hợp cho sinh viên**. Không dùng AI xét điều kiện, dự báo rủi ro học vụ, tư vấn lộ trình học, cảnh báo hoặc thống kê nhu cầu học.
+3. Phạm vi AI mới nhất: **chỉ gọi model AI để hỗ trợ sinh viên đánh giá mức độ phù hợp và đề xuất doanh nghiệp/vị trí OJT đang tuyển dụng**. Không dùng AI xét điều kiện, dự báo rủi ro học vụ, tư vấn lộ trình học, cảnh báo hoặc thống kê nhu cầu học.
 
 Khi nội dung proposal khác với yêu cầu đã chốt trong hội thoại, dùng yêu cầu mới nhất. Vì vậy:
 
-- Điều kiện cứng hiện tại: ít nhất 70 tín chỉ và tối đa 2 môn chưa đạt; không tự thêm GPA hay tiên quyết vào điều kiện OJT.
+- Điều kiện cứng hiện tại: ít nhất 70 tín chỉ và tối đa 2 môn còn nợ; không tự thêm GPA hay tiên quyết vào điều kiện OJT.
 - GPA lấy lần học hoàn tất gần nhất; công nhận/tương đương/học lại không cộng trùng tín chỉ.
 - Backend nhận JSON để test và dùng API; upload CSV/Excel trực tiếp chưa thuộc phạm vi đã yêu cầu. Frontend hoặc công cụ import có thể chuyển file thành JSON.
 - Chỉ thống kê và xuất nhu cầu học; không tạo lớp, thông báo mở lớp hoặc nhận đăng ký lớp.
@@ -191,7 +193,6 @@ Danh sách operation dưới đây là phạm vi 85 API đã kiểm tra, không 
 | POST | `/api/courses` |
 | PATCH | `/api/courses/{id}` |
 | GET | `/api/curricula` |
-| POST | `/api/curricula` |
 | GET | `/api/curricula/{id}` |
 | PATCH | `/api/curricula/{id}` |
 | POST | `/api/curriculum-imports/preview` |
@@ -200,7 +201,6 @@ Danh sách operation dưới đây là phạm vi 85 API đã kiểm tra, không 
 | PUT | `/api/curricula/{id}/prerequisites` |
 | PUT | `/api/curricula/{id}/course-equivalences` |
 | GET | `/api/curricula/{id}/combos` |
-| POST | `/api/curricula/{id}/combos` |
 | PUT | `/api/combos/{id}/courses` |
 | POST | `/api/curricula/{id}/publish` |
 

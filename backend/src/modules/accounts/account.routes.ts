@@ -10,13 +10,9 @@ import {
 
 import {
   createAccount,
-  getAccount,
-  getMyProfile,
   listAccounts,
   updateAccountById,
   updateMyProfile,
-  updateRole,
-  updateStatus,
 } from "./account.controller";
 
 const router = Router();
@@ -38,6 +34,11 @@ const router = Router();
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: integer
+ *           minimum: 1
  *       - in: query
  *         name: page
  *         schema:
@@ -147,29 +148,6 @@ router.post(
 /**
  * @swagger
  * /api/accounts/me/profile:
- *   get:
- *     summary: Get current user's profile
- *     tags:
- *       - Accounts
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Profile retrieved successfully
- *       401:
- *         description: Authentication required
- *       404:
- *         description: Account not found
- */
-router.get(
-  "/me/profile",
-  authenticate,
-  getMyProfile,
-);
-
-/**
- * @swagger
- * /api/accounts/me/profile:
  *   patch:
  *     summary: Update current user's profile
  *     description: User can update only allowed personal profile fields.
@@ -208,40 +186,9 @@ router.patch(
 /**
  * @swagger
  * /api/accounts/{userId}:
- *   get:
- *     summary: Get account by ID
- *     description: ADMIN can access any account. Other users can only access their own account.
- *     tags:
- *       - Accounts
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *         example: 4
- *     responses:
- *       200:
- *         description: Account retrieved successfully
- *       403:
- *         description: Resource forbidden
- *       404:
- *         description: Account not found
- */
-router.get(
-  "/:userId",
-  authenticate,
-  getAccount,
-);
-
-/**
- * @swagger
- * /api/accounts/{userId}:
- *   put:
+ *   patch:
  *     summary: Update account
- *     description: ADMIN can update supported account fields. Other users may only update permitted fields of their own account.
+ *     description: Admin cập nhật thông tin, trạng thái và vai trò trong một lần. Chỉ gửi trường cần thay đổi.
  *     tags:
  *       - Accounts
  *     security:
@@ -271,6 +218,12 @@ router.get(
  *                 format: email
  *                 description: ADMIN only
  *                 example: newemail@example.com
+ *               status:
+ *                 type: string
+ *                 enum: [ACTIVE, LOCKED, INACTIVE]
+ *               roleId:
+ *                 type: integer
+ *                 minimum: 1
  *     responses:
  *       200:
  *         description: Account updated successfully
@@ -279,98 +232,11 @@ router.get(
  *       404:
  *         description: Account not found
  */
-router.put(
+router.patch(
   "/:userId",
   authenticate,
+  authorizeRoles('ADMIN'),
   updateAccountById,
-);
-
-/**
- * @swagger
- * /api/accounts/{userId}/status:
- *   patch:
- *     summary: Change account status
- *     tags:
- *       - Accounts
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *             properties:
- *               status:
- *                 type: string
- *                 enum:
- *                   - ACTIVE
- *                   - LOCKED
- *                   - INACTIVE
- *                 example: LOCKED
- *     responses:
- *       200:
- *         description: Account status updated successfully
- *       403:
- *         description: ADMIN role required
- *       404:
- *         description: Account not found
- */
-router.patch(
-  "/:userId/status",
-  authenticate,
-  authorizeRoles("ADMIN"),
-  updateStatus,
-);
-
-/**
- * @swagger
- * /api/accounts/{userId}/role:
- *   patch:
- *     summary: Change account role
- *     tags:
- *       - Accounts
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - roleId
- *             properties:
- *               roleId:
- *                 type: integer
- *                 example: 4
- *     responses:
- *       200:
- *         description: Account role updated successfully
- *       403:
- *         description: ADMIN role required
- *       404:
- *         description: Account or role not found
- */
-router.patch(
-  "/:userId/role",
-  authenticate,
-  authorizeRoles("ADMIN"),
-  updateRole,
 );
 
 export default router;

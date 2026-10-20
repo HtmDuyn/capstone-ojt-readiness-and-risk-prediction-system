@@ -1,3 +1,7 @@
+> Sáu cặp search/detail đã gộp: xem [hợp đồng mới](api-search-consolidation.md).
+
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # API quản trị
 
 Các endpoint dưới đây dùng tiền tố `/api`, yêu cầu JWT và role `ADMIN`.
@@ -10,16 +14,11 @@ Trong thư mục `backend`:
 
 ```sh
 npm install
-npm run db:migrate:admin
 npm run build
 npm start
 ```
 
-`backend/DB` là nguồn schema duy nhất; không có file database hoặc migration SQL riêng.
-`db:migrate:admin` đọc phần `Admin management APIs` ngay trong `DB`, áp dụng các thay đổi cộng thêm và bỏ qua nếu đã cài.
-Script dùng kết nối backend trong `.env`; cần tài khoản có quyền thay đổi schema.
-File `DB` đã được cập nhật cho cài đặt mới, nhưng là script **reset dữ liệu**, không dùng để nâng cấp database đang sử dụng.
-Phải chạy migration trước khi dùng backend mới vì API sinh viên hiện có cũng sử dụng cột `DeletedAt`.
+Trước khi khởi động backend, chạy toàn bộ `backend/DB` trên PostgreSQL theo [hướng dẫn khởi tạo DB](database-reset.md). Đây là file định nghĩa database duy nhất, đã chứa đầy đủ cấu trúc quản trị và tuyển dụng. Script xóa dữ liệu ứng dụng cũ và tạo lại DB; không cần chạy migration riêng.
 
 ## Hợp đồng chung
 
@@ -40,7 +39,7 @@ Ví dụ tương đương:
 
 ```http
 GET /api/companies?page=1&limit=20
-POST /api/json/companies/search
+POST /api/json/companies/list
 {"page":1,"limit":20}
 
 GET /api/admin/models/1

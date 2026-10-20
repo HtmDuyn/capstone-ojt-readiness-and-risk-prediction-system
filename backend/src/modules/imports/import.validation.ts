@@ -2,8 +2,8 @@ export const fail = (message: string, statusCode = 400, errorCode = 'INVALID_IMP
   Object.assign(new Error(message), { statusCode, errorCode });
 
 export interface PositionInput { code: string; title: string; description: string; requirements: string; capacity: number }
-export interface ImportRow { code: string; email: string; fullName: string; name?: string; address?: string; positions?: PositionInput[] }
-export interface ImportInput { kind: 'STUDENT' | 'ENTERPRISE'; idempotencyKey: string; semesterId?: number; rows: ImportRow[] }
+export interface ImportRow { code: string; email: string; fullName: string; name?: string; address?: string; positions?: PositionInput[]; academic?: Record<string, any> }
+export interface ImportInput { kind: 'STUDENT' | 'ENTERPRISE'; idempotencyKey: string; windowId?: number; semesterId?: number; rows: ImportRow[] }
 
 const text = (v: unknown, label: string, max: number) => {
   if (typeof v !== 'string' || !v.trim() || v.trim().length > max) throw fail(`${label} is required (maximum ${max} characters).`);
@@ -15,8 +15,9 @@ export function validateImport(body: unknown): ImportInput {
   if (b.kind !== 'STUDENT' && b.kind !== 'ENTERPRISE') throw fail('kind must be STUDENT or ENTERPRISE.');
   const idempotencyKey = text(b.idempotencyKey, 'idempotencyKey', 100);
   if (!Array.isArray(b.rows) || b.rows.length < 1 || b.rows.length > 500) throw fail('Import between 1 and 500 rows per batch.');
-  const semesterId = b.kind === 'ENTERPRISE' ? Number(b.semesterId) : undefined;
-  if (b.kind === 'ENTERPRISE' && (!Number.isSafeInteger(semesterId) || semesterId! <= 0)) throw fail('semesterId is required.');
+  if (b.kind === 'ENTERPRISE' && b.semesterId !== undefined) throw fail('Use windowId of the academic recruitment intake, not semesterId.');
+  const windowId = b.kind === 'ENTERPRISE' ? Number(b.windowId) : undefined;
+  if (b.kind === 'ENTERPRISE' && (!Number.isSafeInteger(windowId) || windowId! <= 0 || windowId! > 2147483647)) throw fail('A valid recruitment windowId is required.');
   const codes = new Set<string>(), emails = new Set<string>();
   const rows = b.rows.map((raw, index) => {
     try {
@@ -29,6 +30,10 @@ export function validateImport(body: unknown): ImportInput {
       if (codes.has(code) || emails.has(email)) throw fail('Duplicate code or email within the file.');
       codes.add(code); emails.add(email);
       const row: ImportRow = { code, email, fullName: text(r.fullName, 'fullName', 150) };
+      if (b.kind === 'STUDENT') {
+        if (!r.academic || typeof r.academic !== 'object' || Array.isArray(r.academic)) throw fail('academic profile, placement and courseResults are required.');
+        row.academic = r.academic as Record<string, any>;
+      }
       if (b.kind === 'ENTERPRISE') {
         row.name = text(r.name, 'name', 200);
         row.address = r.address === undefined ? undefined : text(r.address, 'address', 300);
@@ -46,5 +51,5 @@ export function validateImport(body: unknown): ImportInput {
       return row;
     } catch (error) { throw fail(`Row ${index + 1}: ${(error as Error).message}`); }
   });
-  return { kind: b.kind, idempotencyKey, semesterId, rows };
+  return { kind: b.kind, idempotencyKey, windowId, rows };
 }

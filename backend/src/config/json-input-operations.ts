@@ -4,16 +4,52 @@ export type JsonInputOperation = {
   inputs: { name: string; sourceName: string; location: 'path'|'query'; required: boolean; schema: RecordValue }[];
   bodySchema: RecordValue; operation: RecordValue; protected: boolean;
 };
-const idFields: Record<string,string> = {
-  students:'studentId',accounts:'userId','academic-years':'academicYearId','academic-periods':'academicPeriodId',
-  'ojt-semesters':'ojtSemesterId',cohorts:'cohortId',curricula:'programId',courses:'courseId',combos:'comboId',
-  'course-results':'courseResultId','academic-imports':'importId','ojt-rule-sets':'ruleSetId',
-  'eligibility-checks':'checkId','eligibility-check-runs':'runId',
-  'combo-registration-windows':'windowId','ojt-registration-windows':'windowId',
-  'ojt-registrations':'registrationId','ojt-results':'resultId',
-  companies:'companyId',positions:'positionId',assignments:'assignmentId',
-  'assessment-templates':'templateId',assessments:'assessmentId',predictions:'predictionId',
-  alerts:'alertId',interventions:'interventionId','prediction-jobs':'jobId',models:'modelId'
+const idFields: Record<string, string> = {
+  candidates: 'candidateId',
+  internships: 'internshipId',
+  windows: 'windowId',
+  posts: 'postId',
+  companies: 'companyId',
+  positions: 'positionId',
+  'ojt-coordinations': 'coordinationId',
+  assignments: 'assignmentId',
+  'internship-evaluations': 'evaluationId',
+
+  students: 'studentId',
+  accounts: 'userId',
+  'academic-years': 'academicYearId',
+  'academic-periods': 'academicPeriodId',
+  'ojt-semesters': 'ojtSemesterId',
+  cohorts: 'cohortId',
+  curricula: 'programId',
+  courses: 'courseId',
+  combos: 'comboId',
+
+  'course-results': 'courseResultId',
+  'academic-imports': 'importId',
+  'ojt-rule-sets': 'ruleSetId',
+  'eligibility-checks': 'checkId',
+  'eligibility-check-runs': 'runId',
+
+  'combo-registration-windows': 'windowId',
+  'ojt-registration-windows': 'windowId',
+  'ojt-registrations': 'registrationId',
+  'ojt-results': 'resultId',
+
+  applications: 'applicationId',
+  'job-applications': 'applicationId',
+  'recruitment-posts': 'postId',
+  'company-imports': 'importId',
+  'advisory-runs': 'runId',
+  analyses: 'analysisId',
+
+  'assessment-templates': 'templateId',
+  assessments: 'assessmentId',
+  predictions: 'predictionId',
+  alerts: 'alertId',
+  interventions: 'interventionId',
+  'prediction-jobs': 'jobId',
+  models: 'modelId'
 };
 export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] {
   const resolve=(v:any):any=>v?.$ref?.startsWith('#/')?v.$ref.slice(2).split('/').reduce((a:any,k:string)=>a?.[k],spec):v;
@@ -32,7 +68,14 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       }));
       let path='/api/json'+sourcePath.slice(4).replace(/\/\{[^}]+\}/g,'');
       const method=sourceMethod==='get'?'post':sourceMethod;
-      if(sourceMethod==='get'&&!sourcePath.endsWith('/export'))path+=/\{[^}]+\}$/.test(sourcePath)?'/detail':'/search';
+      if(sourceMethod==='get'&&!sourcePath.endsWith('/export')){
+        const response=resolve(original.responses?.['200']);
+        const schema=resolve(response?.content?.['application/json']?.schema);
+        const data=resolve(schema?.properties?.data);
+        const returnsList=params.some(p=>['page','limit'].includes(p.name))||
+          schema?.type==='array'||data?.type==='array'||!!schema?.properties?.items||!!data?.properties?.items;
+        path+=/\{[^}]+\}$/.test(sourcePath)?'/detail':returnsList?'/list':'/search';
+      }
       const key=method+' '+path;if(seen.has(key)||spec.paths[path]?.[method])throw Error('Conflicting JSON route: '+key);seen.add(key);
       const body=resolve(original.requestBody),media=body?.content?.['application/json'];
       if(body&&!media)throw Error('A non-JSON body needs a dedicated adapter: '+sourcePath);
@@ -50,6 +93,31 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       const operation=structuredClone(original);
       operation.parameters=(operation.parameters??[]).filter((p:any)=>!['path','query'].includes(resolve(p)?.in));
       operation.requestBody={required:true,content:{'application/json':{schema:bodySchema}}};
+      if(sourceMethod==='get'&&sourcePath==='/api/ojt-registrations') {
+        operation.requestBody.content['application/json'].examples={
+          all:{summary:'Tất cả hồ sơ được phép xem',value:{page:1,limit:20}},
+          submitted:{summary:'Hồ sơ đã nộp',value:{status:'SUBMITTED',page:1,limit:20}}
+        };
+      }
+      const listId:Record<string,string>={
+        '/api/ojt-registrations':'registrationId','/api/ojt-results':'resultId','/api/academic-imports':'importId','/api/predictions':'predictionId',
+        '/api/job-applications':'applicationId',
+        '/api/companies':'companyId','/api/positions':'positionId','/api/assignments':'assignmentId',
+        '/api/academic-periods':'academicPeriodId','/api/accounts':'userId','/api/ojt-coordinations':'coordinationId','/api/internship-evaluations':'evaluationId','/api/enterprise/candidates':'candidateId',
+        '/api/assessment-templates':'templateId','/api/admin/models':'modelId','/api/alerts':'alertId'
+      };
+      if(sourceMethod==='get'&&listId[sourcePath])operation.requestBody.content['application/json'].examples={
+        list:{summary:'Danh sách hồ sơ',value:{page:1,limit:20}},
+        record:{summary:'Một hồ sơ theo ID',value:{[listId[sourcePath]]:sourcePath==='/api/academic-imports'?'1':1,page:1,limit:20}}
+      };
+      if(sourceMethod==='get'&&sourcePath==='/api/qhdn/registered-students')operation.requestBody.content['application/json'].examples={
+        all:{summary:'Tất cả sinh viên đã đăng ký OJT',value:{page:1,limit:20}},
+        notHandedOff:{summary:'Sinh viên có hồ sơ chưa bàn giao',value:{handoffStatus:'NOT_HANDED_OFF',page:1,limit:20}}
+      };
+      if(sourceMethod==='get'&&sourcePath==='/api/students/{id}/cv')operation.requestBody.content['application/json'].examples={
+        latest:{summary:'CV mới nhất của sinh viên',value:{studentId:1}},
+        version:{summary:'Một phiên bản CV cụ thể',value:{studentId:1,cvFileId:1}}
+      };
       // Original examples lack newly required IDs/filters; let the expanded schema expose every field.
       operation['x-original-operation']={method:sourceMethod.toUpperCase(),path:sourcePath};
       result.push({method,path,sourceMethod,sourcePath,inputs,bodySchema,operation,protected:!!original.security?.length});
