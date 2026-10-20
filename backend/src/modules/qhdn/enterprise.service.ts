@@ -1,3 +1,4 @@
+import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
 import { cvMetadataSql } from '../students/cv.service';
 import { readTransaction } from './read.repository';
@@ -72,7 +73,7 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
         'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",
         'status',v."Status",'evaluatedAt',v."EvaluatedAt") END AS evaluation,
       ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',CASE WHEN result."Status"='CONFIRMED' THEN result."OfficialScore" ELSE NULL END,'outcome',CASE WHEN result."Status"='CONFIRMED' THEN result."Outcome" ELSE NULL END,'confirmedAt',result."ConfirmedAt") END AS result,
-      result."Status" AS "resultStatus",COALESCE(result."Status"='CONFIRMED',false) AS "evaluationLocked"
+      result."Status" AS "resultStatus",COALESCE(result."Status"='CONFIRMED' AND GREATEST(a."EndDate",(SELECT "EndDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=r."OJTSemesterID")) < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,false) AS "evaluationLocked"
       FROM "InternshipAssignments" a
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
       JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
@@ -81,7 +82,7 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"
       LEFT JOIN "Users" supervisor ON supervisor."UserID"=a."AcademicSupervisorID"
       LEFT JOIN "InternshipEvaluations" v ON v."AssignmentID"=a."AssignmentID"
-      LEFT JOIN "OJTResults" result ON result."AssignmentID"=a."AssignmentID"
+      LEFT JOIN ${officialEvaluationRelation} result ON result."AssignmentID"=a."AssignmentID"
       LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=v."TemplateID"
       WHERE ${where.join(' AND ')}`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) internships`,args)).rows[0].n;

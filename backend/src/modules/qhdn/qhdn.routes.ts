@@ -4,7 +4,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
 import { list, saveCompany } from './catalog.service';
-import { coordinate, decision, assign, updateAssignment, evaluate } from './workflow.service';
+import { coordinate, decision, assign, updateAssignment } from './workflow.service';
 import { registeredStudents } from './registered-students.service';
 const router=Router();
 const staff=[authenticate,authorizeRoles('ADMIN','OJT_COORD')];
@@ -19,7 +19,6 @@ router.post('/ojt-coordinations/:id/decision',...staff,handle(req=>decision(posi
 router.post('/ojt-coordinations/:id/reassign',...staff,handle(req=>coordinate(req.body,req.user,positiveId(req.params.id)),201));
 router.post('/assignments',...staff,handle(req=>assign(req.body,req.user),201));
 router.patch('/assignments/:id',...staff,handle(req=>updateAssignment(positiveId(req.params.id),req.body,req.user)));
-router.put('/assignments/:id/internship-evaluation',...staff,handle(req=>evaluate(positiveId(req.params.id),req.body,req.user)));
 router.get('/qhdn/dashboard',...staff,handle(req=>dashboard(req.query,req.user)));
 router.get('/qhdn/reports',...staff,handle(req=>{
  const {type}=reportQuery(req.query,'report');return report(type!,req.query,req.user);

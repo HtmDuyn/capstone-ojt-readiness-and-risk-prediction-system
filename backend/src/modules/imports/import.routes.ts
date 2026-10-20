@@ -1,5 +1,5 @@
 import multer from 'multer';
-import { parseCompanySheet, importCompanies } from '../recruitment/company-import.service';
+import { parseImportSheet } from './import-sheet.service';
 import { Router } from 'express';
 import { archiveRecruitment } from '../../jobs/provisioning';
 import { authenticate } from '../../middleware/authenticate';
@@ -19,23 +19,8 @@ for (const path of ['/preview', '/commit']) {
         (role === 'OJT_COORD' && kind === 'ENTERPRISE'))) {
         throw fail('Only QHDN can import enterprises; academic staff import students.', 403, 'FORBIDDEN');
       }
-      if (kind === 'ENTERPRISE') {
-        let input;
-        try {
-          input = await parseCompanySheet(req.body, req.file);
-        } catch (error: any) {
-          if (error.statusCode) throw error;
-          throw fail('Invalid sheet or column mapping.', 400, 'INVALID_SHEET');
-        }
-        const data = await importCompanies(
-          input,
-          {...req.user!, roleCode: req.user!.roleCode!},
-          path === '/preview'
-        );
-        res.status(data.rejectedBatch ? 422 : 200).json({success: !data.rejectedBatch, ...data});
-      } else {
-        res.json({success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview')});
-      }
+      const input = await parseImportSheet(req.body, req.file);
+      res.json({success: true, ...await importAccounts(input, req.user!.userId, path === '/preview')});
     } catch (error) { next(error); }
   });
 }

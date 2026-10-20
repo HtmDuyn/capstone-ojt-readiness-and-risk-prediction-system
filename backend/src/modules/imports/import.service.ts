@@ -24,6 +24,8 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const actor=(await client.query('SELECT r."RoleCode" FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE u."UserID"=$1 AND u."Status"=\'ACTIVE\'',[actorId])).rows[0];
+    if(!actor || !(input.kind==='ENTERPRISE'?actor.RoleCode==='OJT_COORD':['ADMIN','ACADEMIC'].includes(actor.RoleCode)))throw fail('This role cannot import the requested account type.',403,'FORBIDDEN');
     await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
     // Serialize identity checks and recruitment writes, including repeated batches in one intake.
     await client.query("SELECT pg_advisory_xact_lock(hashtext('account-provisioning'))");
@@ -39,21 +41,20 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       const window = await windowRecord(client, input.windowId!); assertOpen(window);
       input.semesterId = window.OJTSemesterID;
       recruitmentDeadline = window.EndsAt;
-      for (const row of input.rows) {
-        const conflict = await client.query(`SELECT 1 FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
-          WHERE upper(e."EnterpriseCode")=$1 AND p."OJTSemesterID"=$2 AND p."RecruitmentCode"=ANY($3::text[])`, [row.code, input.semesterId, row.positions!.map(p=>p.code)]);
-        if (conflict.rowCount) throw fail('A recruitment position code already exists in this semester.',409,'RECRUITMENT_CODE_EXISTS');
-      }
     }
     const plans: { row: typeof input.rows[number]; userId?: number; entityId?: number; action: string }[] = [];
     for (let i = 0; i < input.rows.length; i++) {
       const row = input.rows[i];
       const existing = input.kind === 'STUDENT'
         ? await client.query('SELECT s."StudentID" AS entity_id,u."UserID",u."Email",r."RoleCode" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(s."StudentCode")=$1', [row.code])
-        : await client.query('SELECT e."EnterpriseID" AS entity_id,u."UserID",u."Email",r."RoleCode" FROM "Enterprises" e LEFT JOIN "EnterpriseUsers" eu ON eu."EnterpriseID"=e."EnterpriseID" LEFT JOIN "Users" u ON u."UserID"=eu."UserID" LEFT JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(e."EnterpriseCode")=$1 ORDER BY u."UserID"', [row.code]);
+        : await client.query('SELECT e."EnterpriseID" AS entity_id,e."EnterpriseCode",e."DeletedAt",e."Status" AS "EnterpriseStatus",u."UserID",u."Email",u."Status" AS "UserStatus",r."RoleCode" FROM "Enterprises" e LEFT JOIN "EnterpriseUsers" eu ON eu."EnterpriseID"=e."EnterpriseID" LEFT JOIN "Users" u ON u."UserID"=eu."UserID" LEFT JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(e."EnterpriseCode")=$1 OR lower(u."Email")=$2 ORDER BY u."UserID"', [row.code,row.email]);
+      if (input.kind === 'ENTERPRISE' && new Set(existing.rows.map(r=>r.entity_id)).size>1) throw fail(`Row ${i+1}: enterprise code and email identify different enterprises.`,409,'IDENTITY_CONFLICT');
       const match = existing.rows.find(r => r.Email?.toLowerCase() === row.email) ?? existing.rows[0];
       if (input.kind === 'ENTERPRISE' && match) {
-        if (!match.UserID || match.RoleCode !== 'ENTERPRISE') throw fail(`Row ${i + 1}: existing enterprise has no valid enterprise account.`,409,'IDENTITY_CONFLICT');
+        if (!match.UserID || match.RoleCode !== 'ENTERPRISE' || match.DeletedAt || match.EnterpriseStatus!=='ACTIVE' || match.UserStatus!=='ACTIVE') throw fail(`Row ${i + 1}: existing enterprise has no active enterprise account.`,409,'IDENTITY_CONFLICT');
+        if (match.Email.toLowerCase()!==row.email) throw fail(`Row ${i+1}: enterprise code is already linked to another email.`,409,'IDENTITY_CONFLICT');
+        const conflict=await client.query('SELECT 1 FROM "InternshipPositions" WHERE "EnterpriseID"=$1 AND "OJTSemesterID"=$2 AND "RecruitmentCode"=ANY($3::text[])',[match.entity_id,input.semesterId,row.positions!.map(p=>p.code)]);
+        if(conflict.rowCount)throw fail('A recruitment position code already exists; supply a new position code. Existing posts are preserved.',409,'RECRUITMENT_CODE_EXISTS');
         plans.push({row,userId:match.UserID,entityId:match.entity_id,action:'UPDATED'});
         continue;
       }
@@ -64,6 +65,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       if (!match?.UserID && (await client.query('SELECT 1 FROM "Users" WHERE "Username"=$1', [username])).rowCount) throw fail(`Row ${i + 1}: username already exists.`, 409);
       plans.push({ row, userId: match?.UserID, entityId: match?.entity_id, action: match?.UserID ? 'UPDATED' : 'CREATED' });
     }
+    if(input.kind==='ENTERPRISE' && new Set(plans.map(p=>p.entityId??p.row.email)).size!==plans.length)throw fail('Each enterprise may appear only once per batch; combine its positions.',409,'IDENTITY_CONFLICT');
     const summary = { created: plans.filter(p => p.action === 'CREATED').length, updated: plans.filter(p => p.action === 'UPDATED').length, total: plans.length };
     if (preview && input.kind === 'ENTERPRISE') {
       await client.query('ROLLBACK');

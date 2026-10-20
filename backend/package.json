@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
-    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs"
+    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs",
+    "test": "node --import tsx --test tests/*.test.cjs"
   },
   "repository": {
     "type": "git",
@@ -40,6 +41,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",

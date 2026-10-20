@@ -1,3 +1,4 @@
+import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from './read.repository';
 import type { PoolClient } from 'pg';
@@ -74,7 +75,7 @@ export async function list(resource:Resource,params:Row,actor:Actor){
       from+=` JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Enterprises" e ON e."EnterpriseID"=${companyColumn}`;
       extras=',s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."OJTSemesterID" AS "ojtSemesterId",r."StudentID" AS "studentId",e."Name" AS "companyName"';
       if(resource==='assignments'){
-        from+=' JOIN "InternshipPositions" pos ON pos."PositionID"=t."PositionID" LEFT JOIN "Users" supervisor ON supervisor."UserID"=t."AcademicSupervisorID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=t."AssignmentID" LEFT JOIN "OJTResults" outcome ON outcome."AssignmentID"=t."AssignmentID"';
+        from+=` JOIN "InternshipPositions" pos ON pos."PositionID"=t."PositionID" LEFT JOIN "Users" supervisor ON supervisor."UserID"=t."AcademicSupervisorID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=t."AssignmentID" LEFT JOIN ${officialEvaluationRelation} outcome ON outcome."AssignmentID"=t."AssignmentID"`;
         extras+=`,pos."Title" AS "positionTitle",
           jsonb_build_object('id',s."StudentID",'studentCode',s."StudentCode",'fullName',u."FullName",'email',u."Email",'phone',u."Phone") AS student,
           jsonb_build_object('id',e."EnterpriseID",'code',e."EnterpriseCode",'name',e."Name",'contactPersonName',e."ContactPersonName",'contactPhone',e."ContactPhone",'contactEmail',e."ContactEmail") AS company,

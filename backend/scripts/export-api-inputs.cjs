@@ -78,3 +78,20 @@ doc.splice(3,0,'Phạm vi: '+operations+' operations; '+pathCount+' path paramet
 fs.writeFileSync(path.resolve(__dirname,'../docs/api-input-reference.md'),doc.join('\n'));
 console.log('Input reference generated: '+operations+' operations, '+bodyCount+' bodies.');
 
+const inventory=Object.entries(spec.paths).flatMap(([url,item])=>methods.filter(method=>item[method]).map(method=>({url,method,operation:item[method]})));
+const groupRows=spec.tags.map(tag=>'| '+escape(tag.name)+' | '+inventory.filter(row=>row.operation.tags?.includes(tag.name)).length+' |');
+const grouped=['# Danh sách API theo nhóm Swagger','','Tạo từ OpenAPI hiện hành bằng `npm run docs:api` sau `npm run build`.','',
+  'Tổng '+inventory.length+' API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.','',
+  '| Nhóm | Số API hiển thị |','|---|---:|',...groupRows,''];
+for(const tag of spec.tags){
+  grouped.push('## '+tag.name,'',tag.description,'','| # | Method | Đường dẫn Swagger | Chức năng | Route gốc |','|---:|---|---|---|---|');
+  let n=0;for(const {url,method,operation} of inventory.filter(row=>row.operation.tags?.includes(tag.name))){
+    const source=operation['x-original-operation'];grouped.push('| '+[++n,method.toUpperCase(),'`'+url+'`',operation.summary,'`'+(source?source.method+' '+source.path:method.toUpperCase()+' '+url)+'`'].map(escape).join(' | ')+' |');
+  }
+  grouped.push('');
+}
+fs.writeFileSync(path.resolve(__dirname,'../docs/swagger-api-by-role.md'),grouped.join('\n'));
+fs.writeFileSync(path.resolve(__dirname,'../docs/swagger-role-groups.md'),['# Nhóm API trên Swagger','','Swagger `/api-docs`; tài liệu máy đọc `/api-docs/openapi.json`.','',
+  '| Nhóm | Số API hiển thị |','|---|---:|',...groupRows,'','Tổng '+inventory.length+' API duy nhất. Nhóm Admin chỉ hiển thị chức năng quản trị riêng; API nghiệp vụ đã có nhóm phụ trách không lặp lại trong Admin. Middleware/service và x-roles vẫn giữ nguyên quyền Admin. Tag không thay thế phân quyền và quyền sở hữu. Health công khai được đặt trong Admin.',
+  '', '`src/config/swagger-role-groups.ts` kiểm tra thiếu/trùng/dư operation. Adapter JSON kế thừa cùng nhóm và quyền từ API gốc. Xem `swagger-api-by-role.md` và `backend-workflow.md` để biết chức năng và luồng import/điểm chính thức.',''].join('\n'));
+

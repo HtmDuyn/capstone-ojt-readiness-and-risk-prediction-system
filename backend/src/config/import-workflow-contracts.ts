@@ -1,6 +1,6 @@
 export function describeImportWorkflow(spec: Record<string,any>) {
   for(const [path,method] of [
-    ['/api/students','post'],['/api/companies','post'],['/api/recruitment/posts','post'],
+    ['/api/assignments/{id}/internship-evaluation','put'],['/api/students','post'],['/api/companies','post'],['/api/recruitment/posts','post'],
     ['/api/course-result-imports/preview','post'],['/api/course-result-imports/commit','post'],
   ]) {
     if(spec.paths[path]){delete spec.paths[path][method];if(!Object.keys(spec.paths[path]).length)delete spec.paths[path];}
@@ -18,7 +18,9 @@ export function describeImportWorkflow(spec: Record<string,any>) {
   for(const mode of ['preview','commit']){
     const op=spec.paths[`/api/imports/${mode}`].post;
     op.summary=mode==='preview'?'Kiểm tra toàn bộ dữ liệu import':'Import tổng tài khoản và dữ liệu nghiệp vụ';
-    op.description='ENTERPRISE: chỉ OJT_COORD được import, bắt buộc positions và windowId. Trùng code giữ tài khoản hiện tại, chỉ thêm tin mới. STUDENT: ADMIN/ACADEMIC import tài khoản, academic, placement và courseResults trong một giao dịch. CV dùng API upload hiện tại.';
+    const schema={type:'object',required:['kind','idempotencyKey','file'],properties:{kind:{type:'string',enum:['STUDENT','ENTERPRISE']},idempotencyKey:{type:'string',maxLength:100},windowId:{type:'integer',minimum:1,description:'Required for ENTERPRISE'},mapping:{type:'string',description:'JSON map canonical field to header'},file:{type:'string',format:'binary',description:'XLSX or CSV; 8 MiB maximum. One row per course attempt or recruitment position.'}}};
+    op.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/AccountImportRequest'}},'multipart/form-data':{schema}}};
+    op.description='ENTERPRISE: chỉ OJT_COORD được import, bắt buộc positions và windowId. Trùng email giữ nguyên mã doanh nghiệp, tài khoản và tin cũ; chỉ thêm tuyển dụng với mã vị trí mới. Code/email trỏ tới hai doanh nghiệp khác nhau bị từ chối. STUDENT: ADMIN/ACADEMIC import tài khoản, academic, placement và courseResults trong một giao dịch. CV dùng API upload hiện tại.';
   }
   spec.paths['/api/enterprise/tasks/bulk']={post:{summary:'Giao nhiều task cho nhiều thực tập sinh',security:[{bearerAuth:[]}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['assignmentIds','tasks','idempotencyKey'],properties:{idempotencyKey:{type:'string',maxLength:100},assignmentIds:{type:'array',minItems:1,maxItems:500,uniqueItems:true,items:integer},tasks:{type:'array',minItems:1,maxItems:50,items:{type:'object',additionalProperties:false,required:['name','dueDate'],properties:{name:{type:'string',maxLength:200},description:{type:'string'},dueDate:{type:'string',format:'date'}}}}}}}}},responses:{200:{description:'Task IDs and replay status'},400:{description:'Invalid tasks'},403:{description:'Assignment belongs to another enterprise'},409:{description:'Inactive internship or idempotency conflict'}}}};
   spec.paths['/api/internship-tasks']={get:{summary:'Danh sách task trong phạm vi tài khoản',security:[{bearerAuth:[]}],parameters:['assignmentId','page','limit'].map(name=>({name,in:'query',schema:integer})),responses:{200:{description:'Paginated tasks'}}}};

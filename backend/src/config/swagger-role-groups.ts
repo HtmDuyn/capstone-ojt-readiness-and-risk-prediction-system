@@ -9,6 +9,8 @@ const roleNames: Record<RoleCode, string> = {
 };
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
+  {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},
+  {roles:["STUDENT"],operations:["GET /api/student/academic-summary","GET /api/student/supplementary-course-options","GET /api/student/ojt-registration-windows","GET /api/student/curriculum","GET /api/student/notifications","PATCH /api/student/notifications/{id}/read","GET /api/student/combo-registration-windows","GET /api/student/assignments/current","GET /api/student/ojt-results","GET /api/student/ojt-results/{id}","GET /api/student/dashboard","GET /api/student/risk-prediction","GET /api/student/roadmap-recommendations"]},
   {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
   {roles:['ADMIN','OJT_COORD','ENTERPRISE','STUDENT'],operations:['GET /api/internship-tasks']},
   {roles:['STUDENT'],operations:['POST /api/students/me/cv','POST /api/job-applications','GET /api/students/me/opportunities']},
@@ -39,7 +41,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PATCH /api/course-results/{id}",
     "PATCH /api/courses/{id}",
     "PATCH /api/ojt-registration-windows/{id}",
-    "PATCH /api/ojt-results/{id}",
     "PATCH /api/ojt-rule-sets/{id}",
     "PATCH /api/students/{id}",
     "POST /api/academic-periods",
@@ -60,8 +61,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/ojt-registration-windows/{id}/semester-exceptions",
     "POST /api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke",
     "POST /api/ojt-registrations/{id}/review",
-    "POST /api/ojt-results/{id}/confirm",
-    "POST /api/ojt-results/{id}/revision-requests",
     "POST /api/ojt-rule-sets",
     "POST /api/ojt-rule-sets/{id}/publish",
     "POST /api/ojt-semesters/{id}/assessment-window/close",
@@ -134,12 +133,9 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/ojt-coordinations",
     "POST /api/ojt-coordinations/{id}/decision",
     "POST /api/ojt-coordinations/{id}/reassign",
-    "POST /api/ojt-results",
-    "POST /api/ojt-results/{id}/transfer",
     "POST /api/recruitment/posts/{id}/close",
     "POST /api/recruitment/posts/{id}/review",
     "POST /api/recruitment/windows",
-    "PUT /api/assignments/{id}/internship-evaluation",
   ] },
   { roles: ["ADMIN","ACADEMIC","STUDENT"], operations: [
     "GET /api/ojt-registration-windows",
@@ -191,14 +187,17 @@ export function groupSwaggerByRole(spec: Spec): Spec {
       if (!roles) throw new Error('Missing Swagger role assignment: ' + key);
       used.add(key);
       operation['x-roles'] = operation.security?.length ? [...roles] : [];
+      // Tags organize primary functions, while x-roles retains every authorized role.
+      // Shared business APIs appear under their business roles instead of repeating under Admin.
+      const displayRoles = roles.length > 1 ? roles.filter(role => role !== 'ADMIN') : roles;
       // Authentication lives in its own group. Admin password reset stays under Admin.
       operation.tags = path.startsWith('/api/auth/') && !path.startsWith('/api/auth/users/')
-        ? ['Auth'] : roles.length ? roles.map(role => roleNames[role]) : ['Admin'];
+        ? ['Auth'] : displayRoles.length ? displayRoles.map(role => roleNames[role]) : ['Admin'];
     }
   }
   for (const key of access.keys()) if (!used.has(key)) throw new Error('Stale Swagger role assignment: ' + key);
   spec.tags = [
-    { name: 'Admin', description: 'Quản trị và theo dõi hệ thống.' },
+    { name: 'Admin', description: 'Chức năng quản trị và theo dõi hệ thống. API nghiệp vụ dùng chung hiển thị ở nhóm phụ trách; quyền Admin vẫn giữ nguyên.' },
     { name: 'Phòng đào tạo', description: 'Quản lý học vụ và xét điều kiện OJT.' },
     { name: 'Phòng QHDN', description: 'Quản lý tuyển dụng, điều phối và thực tập.' },
     { name: 'Doanh nghiệp', description: 'Quản lý hồ sơ, tuyển dụng và thực tập sinh.' },

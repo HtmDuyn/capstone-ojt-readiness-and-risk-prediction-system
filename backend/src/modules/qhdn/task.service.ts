@@ -23,7 +23,7 @@ export async function assignTasks(body: unknown, actor: Actor) {
     if(old){if(old.UserID!==actor.userId||old.data.hash!==hash)throw invalid('Idempotency key conflict.',409);return {...old.data.result,replayed:true};}
     for (const id of ids) {
       const a=await record(c,'assignments',id);await assertScope(c,actor,a.EnterpriseID);
-      if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(a.Status))throw invalid('Tasks require an accepted, ongoing internship.',409);
+      if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(a.Status).toUpperCase()))throw invalid('Tasks require an accepted, ongoing internship.',409);
       for(const t of tasks){
         const valid=(await c.query(`SELECT $1::date >= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AND $1::date BETWEEN "StartDate" AND "EndDate" AS valid FROM "InternshipAssignments" WHERE "AssignmentID"=$2`,[t.dueDate,id])).rows[0];
         if(!valid?.valid)throw invalid('Task due date must be within the internship and not in the past.');

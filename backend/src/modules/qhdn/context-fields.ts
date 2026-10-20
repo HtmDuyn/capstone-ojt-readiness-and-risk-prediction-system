@@ -1,3 +1,4 @@
+import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 // Explicit projections prevent account credentials and unrelated records entering FE responses.
 export const staffContextFields=`
   s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",
@@ -9,4 +10,4 @@ export const templateField=`CASE WHEN tmpl."TemplateID" IS NULL THEN NULL ELSE j
 export const registrationField=`jsonb_build_object('id',r."RegistrationID",'studentId',r."StudentID",'ojtSemesterId',r."OJTSemesterID",'programId',r."ProgramID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt") AS registration`;
 export const assignmentField=`jsonb_build_object('id',a."AssignmentID",'coordinationId',a."CoordinationID",'studentId',a."StudentID",'companyId',a."EnterpriseID",'positionId',a."PositionID",'startDate',a."StartDate",'endDate',a."EndDate",'status',a."Status",'enterpriseSupervisorName',a."EnterpriseSupervisorName",'academicSupervisorId',a."AcademicSupervisorID",
   'academicSupervisor',(SELECT jsonb_build_object('id',school."UserID",'fullName',school."FullName",'email',school."Email",'phone',school."Phone") FROM "Users" school WHERE school."UserID"=a."AcademicSupervisorID"),
-  'result',(SELECT jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'version',outcome."Version",'officialScore',outcome."OfficialScore",'outcome',outcome."Outcome",'confirmedAt',outcome."ConfirmedAt") FROM "OJTResults" outcome WHERE outcome."AssignmentID"=a."AssignmentID")) AS assignment`;
+  'result',(SELECT jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'version',outcome."Version",'officialScore',outcome."OfficialScore",'outcome',outcome."Outcome",'confirmedAt',outcome."ConfirmedAt") FROM ${officialEvaluationRelation} outcome WHERE outcome."AssignmentID"=a."AssignmentID")) AS assignment`;

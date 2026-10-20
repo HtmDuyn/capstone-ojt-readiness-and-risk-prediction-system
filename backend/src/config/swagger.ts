@@ -1,3 +1,4 @@
+import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
 import {
   readdirSync,
 } from "node:fs";
@@ -371,6 +372,7 @@ addAdminOperations(swaggerWithQhdn);
 mergeSharedRoleContracts(swaggerWithQhdn, qhdnOriginalPaths);
 addEnterpriseOperations(swaggerWithQhdn as Record<string, any>);
 addRecruitmentOperations(swaggerWithQhdn as Record<string, any>);
+describeOfficialResults(swaggerWithQhdn as Record<string, any>);
 describeMergedSearchResponses(swaggerWithQhdn);
 describeFeResponses(swaggerWithQhdn);
 const describedSpec = describeManualInputs(addPortalOperations(swaggerWithQhdn));
@@ -378,6 +380,7 @@ describeStudentWorkflow(describedSpec);
 describeListResponses(describedSpec);
 describeMergedDetailLists(describedSpec);
 describeImportWorkflow(describedSpec);
+describeOfficialResults(describedSpec);
 const originalSpec = groupSwaggerByRole(describedSpec);
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
 export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

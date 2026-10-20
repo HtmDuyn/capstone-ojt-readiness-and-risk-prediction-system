@@ -1,3 +1,4 @@
+import { list as listOfficialResults } from '../ojt-results/result.service';
 import type { PoolClient } from 'pg';
 import { academicTransaction } from '../academic/academic.repository';
 import { academicProgressWithClient } from '../students/academic-progress';
@@ -61,5 +62,7 @@ export async function currentAssignment(params:Row,actor:Actor) {
   pagination(params,['ojtSemesterId']);return academicTransaction(async c=>{const s=await ownStudent(c,actor);return (await c.query('SELECT a."AssignmentID" AS id,a."EnterpriseID" AS "enterpriseId",e."Name" AS "enterpriseName",a."PositionID" AS "positionId",p."Title" AS title,p."OJTSemesterID" AS "ojtSemesterId",a."EnterpriseSupervisorName" AS "enterpriseSupervisorName",a."StartDate" AS "startDate",a."EndDate" AS "endDate",a."Status" AS status FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" WHERE a."StudentID"=$1 AND COALESCE(UPPER(a."Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\') AND ($2::int IS NULL OR p."OJTSemesterID"=$2) ORDER BY a."AssignmentID" DESC LIMIT 1',[s.StudentID,params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId')])).rows[0]??null;});
 }
 export async function publishedResults(params:Row,actor:Actor,id?:number) {
-  return academicTransaction(async c=>{const s=await ownStudent(c,actor),sql='SELECT "ResultID" AS id,"OJTSemesterID" AS "ojtSemesterId","OfficialScore"::float8 AS "officialScore","Outcome" AS outcome,"ConfirmedAt" AS "confirmedAt" FROM "OJTResults" WHERE "StudentID"=$1 AND "Status"=\'CONFIRMED\' AND ($2::int IS NULL OR "ResultID"=$2) AND ($3::int IS NULL OR "OJTSemesterID"=$3)';const data=await page(c,sql,[s.StudentID,id??null,params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId')],params,['ojtSemesterId']);if(id&&!data.items.length)throw invalid('Published result not found.',404);return id?data.items[0]:data;});
+  const data=await listOfficialResults({...params,...(id?{resultId:id}:{})},undefined,false,actor.userId);
+  if(id&&!data.items.length)throw invalid('Published result not found.',404);
+  return id?data.items[0]:data;
 }

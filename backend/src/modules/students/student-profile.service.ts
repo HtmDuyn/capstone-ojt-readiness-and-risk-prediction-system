@@ -1,3 +1,4 @@
+import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { predictionSelect } from '../admin/admin.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { studentSelect, resultSelect } from './student.service';
@@ -36,13 +37,13 @@ export async function studentProfile(id:number,params:Row,actor:Actor) {
       CASE WHEN co."CoordinationID" IS NULL THEN NULL ELSE jsonb_build_object('id',co."CoordinationID",'decision',co."Decision",'rejectReason',co."RejectReason",'introducedAt',co."CoordinatedAt",'companyId',e."EnterpriseID",'companyName',e."Name",'positionId',pos."PositionID",'positionTitle',pos."Title",'company',jsonb_build_object('id',e."EnterpriseID",'name',e."Name",'address',e."Address",'contactPersonName',e."ContactPersonName",'contactPhone',e."ContactPhone",'contactEmail',e."ContactEmail"),'position',jsonb_build_object('id',pos."PositionID",'code',pos."RecruitmentCode",'title',pos."Title",'description',pos."Description",'requirements',pos."Requirements",'location',pos."Location",'workMode',pos."WorkMode")) END AS coordination,
       CASE WHEN a."AssignmentID" IS NULL THEN NULL ELSE jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate",'supervisor',a."EnterpriseSupervisorName",'academicSupervisor',CASE WHEN school."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',school."UserID",'fullName',school."FullName",'email',school."Email",'phone',school."Phone") END) END AS assignment,
       CASE WHEN ev."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object('id',ev."EvaluationID",'overallScore',ev."OverallScore",'completionScore',ev."CompletionScore",'attitudeScore',ev."AttitudeScore",'skillScore',ev."SkillScore",'comments',ev."Comments",'status',ev."Status",'templateId',ev."TemplateID",'scoreDetails',ev."ScoreDetails",'evaluatedAt',ev."EvaluatedAt") END AS evaluation,
-      CASE WHEN outcome."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'officialScore',CASE WHEN outcome."Status"='CONFIRMED' OR $5::boolean THEN outcome."OfficialScore" ELSE NULL END,'outcome',CASE WHEN outcome."Status"='CONFIRMED' OR $5::boolean THEN outcome."Outcome" ELSE NULL END,'confirmedAt',outcome."ConfirmedAt") END AS result
+      CASE WHEN outcome."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'officialScore',CASE WHEN outcome."Status"='CONFIRMED' THEN outcome."OfficialScore" ELSE NULL END,'outcome',CASE WHEN outcome."Status"='CONFIRMED' THEN outcome."Outcome" ELSE NULL END,'confirmedAt',outcome."ConfirmedAt") END AS result
       FROM "OJTRegistrations" r JOIN "OJTSemesters" term ON term."OJTSemesterID"=r."OJTSemesterID"
       LEFT JOIN LATERAL (SELECT * FROM "StudentEnterpriseCoordination" latest WHERE latest."RegistrationID"=r."RegistrationID" ORDER BY latest."CoordinationID" DESC LIMIT 1) co ON true
       LEFT JOIN "Enterprises" e ON e."EnterpriseID"=co."EnterpriseID" LEFT JOIN "InternshipPositions" pos ON pos."PositionID"=co."PositionID"
       LEFT JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID"
-      LEFT JOIN "OJTResults" outcome ON outcome."AssignmentID"=a."AssignmentID" LEFT JOIN "Users" school ON school."UserID"=a."AcademicSupervisorID"
-      WHERE r."StudentID"=$1 AND ($2::int IS NULL OR r."OJTSemesterID"=$2) ORDER BY r."RegistrationID" DESC LIMIT $3 OFFSET $4`,[id,selected,ojtPage.limit,ojtPage.offset,actor.roleCode!=='STUDENT'])).rows;
+      LEFT JOIN ${officialEvaluationRelation} outcome ON outcome."AssignmentID"=a."AssignmentID" LEFT JOIN "Users" school ON school."UserID"=a."AcademicSupervisorID"
+      WHERE r."StudentID"=$1 AND ($2::int IS NULL OR r."OJTSemesterID"=$2) ORDER BY r."RegistrationID" DESC LIMIT $3 OFFSET $4`,[id,selected,ojtPage.limit,ojtPage.offset])).rows;
     for(const registration of registrations){
       const {cvUrl,...application}=registration.application??{};
       registration.application={...application,cv:profile.cv};

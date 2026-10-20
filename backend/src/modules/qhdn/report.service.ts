@@ -1,3 +1,4 @@
+import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import type { PoolClient } from 'pg';
 import { readTransaction } from './read.repository';
 import { invalid, positiveId, enumValue, pagination } from '../students/student.validation';
@@ -80,7 +81,7 @@ SELECT a.semester_id AS "ojtSemesterId",t."SemesterCode" AS "semesterCode",a."En
  count(r."ResultID") FILTER (WHERE r."Status"='CONFIRMED' AND r."Outcome"='FAILED')::int AS "failedResults",
  ROUND(AVG(r."OfficialScore") FILTER (WHERE r."Status"='CONFIRMED'),2)::float8 AS "averageOfficialScore"
  FROM scoped_assignments a JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID"
- JOIN "OJTSemesters" t ON t."OJTSemesterID"=a.semester_id LEFT JOIN "OJTResults" r ON r."AssignmentID"=a."AssignmentID"
+ JOIN "OJTSemesters" t ON t."OJTSemesterID"=a.semester_id LEFT JOIN ${officialEvaluationRelation} r ON r."AssignmentID"=a."AssignmentID"
  GROUP BY a.semester_id,t."SemesterCode",a."EnterpriseID",e."Name"`;
 const feedbackSql=`${assignmentCte}
 SELECT a.semester_id AS "ojtSemesterId",t."SemesterCode" AS "semesterCode",a."EnterpriseID" AS "companyId",e."Name" AS "companyName",

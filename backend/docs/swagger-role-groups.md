@@ -1,20 +1,16 @@
 # Nhóm API trên Swagger
 
-Swagger `/api-docs` hiển thị đúng sáu nhóm theo thứ tự:
+Swagger `/api-docs`; tài liệu máy đọc `/api-docs/openapi.json`.
 
-| Nhóm | Số operation hiển thị |
-| --- | ---: |
-| Admin | 137 |
-| Phòng đào tạo | 79 |
-| Phòng QHDN | 38 |
-| Doanh nghiệp | 10 |
-| Sinh viên | 18 |
+| Nhóm | Số API hiển thị |
+|---|---:|
+| Admin | 29 |
+| Phòng đào tạo | 80 |
+| Phòng QHDN | 35 |
+| Doanh nghiệp | 11 |
+| Sinh viên | 32 |
 | Auth | 3 |
 
-Có 149 operation duy nhất. API dùng chung xuất hiện trong từng nhóm role được phép gọi nên tổng số ở các nhóm lớn hơn 149. Phạm vi bản ghi vẫn theo kiểm tra trong service: sinh viên chỉ xem hồ sơ của mình, doanh nghiệp chỉ thao tác dữ liệu thuộc doanh nghiệp của mình.
+Tổng 159 API duy nhất. Nhóm Admin chỉ hiển thị chức năng quản trị riêng; API nghiệp vụ đã có nhóm phụ trách không lặp lại trong Admin. Middleware/service và x-roles vẫn giữ nguyên quyền Admin. Tag không thay thế phân quyền và quyền sở hữu. Health công khai được đặt trong Admin.
 
-Auth chứa đăng nhập, thông tin phiên và đổi mật khẩu. Đặt lại mật khẩu theo userId dành cho Admin. Health công khai được đặt ở nhóm Admin để không phát sinh nhóm thứ bảy.
-
-Các nhóm luôn hiển thị; Authorize cung cấp JWT khi gọi API, không tự ẩn nhóm theo token. Thay đổi này chỉ tổ chức tài liệu, giữ nguyên URL, body, response và quyền truy cập thực tế.
-
-`src/config/swagger-role-groups.ts` khai báo quyền theo METHOD + URL gốc, đối chiếu middleware route. `swagger.ts` áp dụng nhóm trước khi sinh adapter JSON để hai hợp đồng giữ cùng metadata. `x-roles` lưu các role ở mức route; API công khai có danh sách rỗng. Khi thêm/xóa API phải cập nhật bảng quyền: thiếu, trùng hoặc dư operation sẽ báo lỗi khi sinh Swagger.
+`src/config/swagger-role-groups.ts` kiểm tra thiếu/trùng/dư operation. Adapter JSON kế thừa cùng nhóm và quyền từ API gốc. Xem `swagger-api-by-role.md` và `backend-workflow.md` để biết chức năng và luồng import/điểm chính thức.

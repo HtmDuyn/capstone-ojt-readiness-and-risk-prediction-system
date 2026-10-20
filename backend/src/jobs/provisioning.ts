@@ -87,8 +87,13 @@ export function startProvisioningJobs() {
   const tick = async () => {
     if (busy || stopped) return;
     busy = true;
-    try { await archiveRecruitment(); await deliverEmails(); await notifyCompletedInternships(); }
-    catch { console.error('Provisioning job failed; check database migration and SMTP configuration.'); }
+    try {
+      // An archive failure must not prevent account/result emails from being delivered.
+      for(const [name,job] of [['archive',archiveRecruitment],['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
+        try { await job(); }
+        catch { console.error(`Provisioning ${name} job failed; check database migration and SMTP configuration.`); }
+      }
+    }
     finally { busy = false; }
   };
   const timer = setInterval(() => void tick(), 60000);

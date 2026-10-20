@@ -112,11 +112,7 @@ describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post
 describe('/ojt-registrations/{id}/review', { post: 'Duyệt hoặc từ chối hồ sơ OJT' });
 describe('/ojt-semesters/{id}/eligible-student-handoffs', { get: 'Lịch sử bàn giao sinh viên cho QHDN', post: 'Bàn giao sinh viên đủ điều kiện cho QHDN' });
 describe('/ojt-semesters/{id}/students', { get: 'Theo dõi trạng thái OJT theo kỳ' });
-describe('/ojt-results', { get: 'Danh sách kết quả OJT đã chuyển', post: 'Chuyển đánh giá và hồ sơ OJT cho phòng đào tạo' });
-describe('/ojt-results/{id}', { patch: 'Cập nhật điểm và kết quả OJT chính thức' });
-describe('/ojt-results/{id}/revision-requests', { post: 'Yêu cầu bổ sung hồ sơ kết quả OJT' });
-describe('/ojt-results/{id}/transfer', { post: 'Gửi lại hồ sơ OJT đã bổ sung' });
-describe('/ojt-results/{id}/confirm', { post: ['Xác nhận kết quả OJT', 'Ghi nhận kết quả môn học và trạng thái thực tập theo cấu hình quy đổi điểm.'] });
+describe('/ojt-results', { get: 'Danh sách điểm OJT chính thức do doanh nghiệp đánh giá' });
 describe('/ojt-semesters/{id}/results/export', { get: 'Xuất báo cáo kết quả OJT theo kỳ' });
 describe('/students', { get: 'Tìm kiếm và lọc sinh viên' });
 describe('/students/{id}', { get: ['Hồ sơ học vụ tổng hợp', 'Kèm GPA, tín chỉ, điểm, combo và OJT; section=academicProgress chỉ lấy thông tin sinh viên và tiến độ, mặc định all.'], patch: ['Cập nhật hồ sơ và lộ trình học vụ', 'Chỉ gửi trường cần sửa; placement chứa khóa, nhóm và kỳ học.'] });
@@ -181,7 +177,7 @@ const pathEntities: Record<string, string> = {
   'ojt-rule-sets':'RuleSetID','eligibility-checks':'CheckID','eligibility-check-runs':'RunID',
   'combo-registration-windows':'WindowID trong ComboRegistrationWindows',
   'ojt-registration-windows':'WindowID trong OJTRegistrationWindows','ojt-registrations':'RegistrationID',
-  'ojt-results':'ResultID trong OJTResults'
+  'ojt-results':'EvaluationID trong InternshipEvaluations (điểm chính thức doanh nghiệp)'
 };
 
 export function describeManualInputs(spec: Spec): Spec {
