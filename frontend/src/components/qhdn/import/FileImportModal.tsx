@@ -1,19 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
-  FileText,
   FileSpreadsheet,
   Upload,
   ArrowRight,
   RotateCcw,
+  Calendar,
+  ChevronDown,
+  Check,
+  Info,
+  Download,
 } from 'lucide-react';
-import type { SelectedFileItem } from '@/types/qhdn/qhdnTypes';
+import type { SelectedFileItem, OjtSemesterItem } from '@/types/qhdn/qhdnTypes';
+
+export const IMPORT_SEMESTER_OPTIONS = [
+  { value: 'Fall 2026', label: 'Fall 2026 (01/09/2026 - 25/12/2026)', isCurrent: true },
+  { value: 'Summer 2026', label: 'Summer 2026 (01/05/2026 - 25/08/2026)', isCurrent: false },
+  { value: 'Spring 2026', label: 'Spring 2026 (05/01/2026 - 25/04/2026)', isCurrent: false },
+  { value: 'Fall 2025', label: 'Fall 2025 (01/09/2025 - 25/12/2025)', isCurrent: false },
+  { value: 'Summer 2025', label: 'Summer 2025 (01/05/2025 - 25/08/2025)', isCurrent: false },
+];
 
 interface FileImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  importMode: 'pdf' | 'excel';
-  setImportMode: (mode: 'pdf' | 'excel') => void;
+  selectedSemester?: string;
+  onSemesterChange?: (semester: string) => void;
+  semesters?: OjtSemesterItem[];
   selectedFiles: SelectedFileItem[];
   onRemoveFile: (fileName: string) => void;
   onClearAllFiles: () => void;
@@ -27,8 +40,9 @@ interface FileImportModalProps {
 export const FileImportModal: React.FC<FileImportModalProps> = ({
   isOpen,
   onClose,
-  importMode,
-  setImportMode,
+  selectedSemester,
+  onSemesterChange,
+  semesters,
   selectedFiles,
   onRemoveFile,
   onClearAllFiles,
@@ -38,6 +52,22 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
   onDragOver,
   onDrop,
 }) => {
+  const [internalSemester, setInternalSemester] = useState<string>('Fall 2026');
+  const activeSemester = selectedSemester ?? internalSemester;
+
+  const semesterOptions =
+    semesters && semesters.length > 0
+      ? semesters.map((s) => ({
+          value: s.name || s.semesterCode || `Kỳ #${s.id}`,
+          label: `${s.name || s.semesterCode} (${s.semesterCode || ''}${s.startDate ? ` | ${s.startDate} - ${s.endDate || ''}` : ''})`,
+          isCurrent: s.status === 'PLANNED' || s.status === 'ONGOING',
+        }))
+      : IMPORT_SEMESTER_OPTIONS;
+
+  const handleSemesterSelect = (sem: string) => {
+    setInternalSemester(sem);
+    onSemesterChange?.(sem);
+  };
   if (!isOpen) return null;
 
   return (
@@ -54,42 +84,105 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
         </button>
 
         {/* Header */}
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">
-            {importMode === 'pdf' ? 'Import doanh nghiệp từ PDF' : 'Import doanh nghiệp từ Excel'}
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            {importMode === 'pdf'
-              ? 'Tải lên nhiều file PDF tiếp nhận OJT để hệ thống tự động trích xuất thông tin doanh nghiệp, vị trí OJT và tạo tài khoản.'
-              : 'Tải lên file bảng tính Excel chứa danh sách doanh nghiệp đối tác, chỉ tiêu quota và thông tin liên hệ HR.'}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-xs border border-emerald-200">
+            <FileSpreadsheet size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900">
+              Import doanh nghiệp từ file Excel
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Tải lên file bảng tính Excel (.xlsx, .xls) chứa danh sách doanh nghiệp đối tác, chỉ tiêu tiếp nhận OJT và thông tin liên hệ HR.
+            </p>
+          </div>
         </div>
 
-        {/* Mode Switcher Tabs */}
-        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl w-fit">
+        {/* ─── CHỌN HỌC KỲ TIẾP NHẬN OJT ĐỂ IMPORT ─────────────────────── */}
+        <div className="bg-gradient-to-r from-purple-50/90 via-purple-50/40 to-slate-50 border border-purple-200/90 rounded-2xl p-4 sm:p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/30">
+                <Calendar size={20} />
+              </div>
+              <div>
+                <label className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  Chọn học kỳ tiếp nhận OJT
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                    Kỳ áp dụng
+                  </span>
+                </label>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Tất cả doanh nghiệp trong đợt import này sẽ được gắn trực tiếp vào học kỳ đã chọn
+                </p>
+              </div>
+            </div>
+
+            {/* Dropdown chọn học kỳ */}
+            <div className="relative min-w-[250px]">
+              <select
+                value={activeSemester}
+                onChange={(e) => handleSemesterSelect(e.target.value)}
+                className="w-full appearance-none pl-3.5 pr-10 py-2.5 bg-white border border-purple-300 rounded-xl text-xs sm:text-sm font-bold text-purple-950 shadow-xs hover:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer transition-all"
+              >
+                {semesterOptions.map((sem) => (
+                  <option key={sem.value} value={sem.value}>
+                    {sem.label} {sem.isCurrent ? '⭐ (Hiện tại)' : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-purple-600 pointer-events-none"
+              />
+            </div>
+          </div>
+
+          {/* Quick chips selector */}
+          <div className="flex items-center gap-2 pt-1 flex-wrap text-xs">
+            <span className="text-slate-500 font-medium">Chọn nhanh kỳ:</span>
+            {semesterOptions.map((sem) => {
+              const isSelected = activeSemester === sem.value;
+              return (
+                <button
+                  key={sem.value}
+                  type="button"
+                  onClick={() => handleSemesterSelect(sem.value)}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-purple-600 text-white shadow-xs font-bold scale-[1.02]'
+                      : 'bg-white hover:bg-purple-100/70 text-slate-700 border border-slate-200/90 hover:border-purple-300'
+                  }`}
+                >
+                  {isSelected && <Check size={12} className="stroke-[3]" />}
+                  {sem.value}
+                  {sem.isCurrent && !isSelected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ─── TẢI FILE MẪU EXCEL CHUẨN ──────────────────────────────── */}
+        <div className="p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <Info size={18} />
+            </div>
+            <div>
+              <span className="font-bold text-slate-800 block">Chưa có file danh sách chuẩn?</span>
+              <span className="text-slate-500">Tải file mẫu Excel (.xlsx) gồm đầy đủ cột thông tin: Tên DN, Mã DN, Ngành, HR Email, Quota.</span>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => setImportMode('pdf')}
-            className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              importMode === 'pdf'
-                ? 'bg-white text-orange-600 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            onClick={() => alert('Đang tải file mẫu: Mau_Danh_Sach_Doanh_Nghiep_Tiep_Nhan_OJT.xlsx')}
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-100/70 text-emerald-700 border border-emerald-300 font-bold cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs transition-all shrink-0 active:scale-95"
           >
-            <FileText size={16} />
-            Import từ PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => setImportMode('excel')}
-            className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              importMode === 'excel'
-                ? 'bg-white text-emerald-600 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <FileSpreadsheet size={16} />
-            Import từ Excel
+            <Download size={14} />
+            Tải mẫu Excel (.xlsx)
           </button>
         </div>
 
@@ -98,15 +191,15 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
           onDragOver={onDragOver}
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-orange-300 hover:border-orange-500 bg-orange-50/20 hover:bg-orange-50/40 rounded-2xl p-8 sm:p-10 text-center transition-all cursor-pointer group space-y-3"
+          className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/40 rounded-2xl p-8 sm:p-10 text-center transition-all cursor-pointer group space-y-3"
         >
-          <div className="w-14 h-14 rounded-2xl bg-white text-orange-500 shadow-xs border border-orange-200 mx-auto flex items-center justify-center transition-transform group-hover:scale-105">
+          <div className="w-14 h-14 rounded-2xl bg-white text-emerald-600 shadow-xs border border-emerald-200 mx-auto flex items-center justify-center transition-transform group-hover:scale-105">
             <Upload size={28} />
           </div>
 
           <div className="space-y-1">
             <p className="text-base font-bold text-slate-800">
-              {importMode === 'pdf' ? 'Kéo thả nhiều file PDF vào đây' : 'Kéo thả file Excel (.xlsx, .xls) vào đây'}
+              Kéo thả file Excel (.xlsx, .xls) vào đây
             </p>
             <p className="text-xs text-slate-400 font-medium">hoặc</p>
           </div>
@@ -118,22 +211,23 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
                 e.stopPropagation();
                 fileInputRef.current?.click();
               }}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-xs cursor-pointer transition-all active:scale-95"
+              className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs cursor-pointer transition-all active:scale-95"
             >
-              {importMode === 'pdf' ? 'Chọn file PDF từ máy tính' : 'Chọn file Excel từ máy tính'}
+              Chọn file Excel từ máy tính
             </button>
           </div>
 
           <p className="text-xs text-slate-400 pt-1">
-            Có thể chọn nhiều file cùng lúc (tối đa 100 file). Dung lượng tối đa mỗi file: 20MB.
+            Hỗ trợ định dạng .xlsx, .xls. Có thể chọn nhiều file cùng lúc. Dung lượng tối đa mỗi file: 20MB.
           </p>
         </div>
 
         {/* Selected Files List */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800">
-              {selectedFiles.length} file đã được chọn
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <FileSpreadsheet size={16} className="text-emerald-600" />
+              {selectedFiles.length} file Excel đã được chọn
             </h3>
             <button
               type="button"
@@ -148,11 +242,11 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
             {selectedFiles.map((f) => (
               <div
                 key={f.name}
-                className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all"
+                className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-emerald-300 transition-all"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
-                    {importMode === 'pdf' ? <FileText size={16} /> : <FileSpreadsheet size={16} />}
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                    <FileSpreadsheet size={16} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-slate-900 truncate" title={f.name}>
@@ -192,12 +286,12 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
                 type="button"
                 disabled={isExtracting || selectedFiles.length === 0}
                 onClick={onStartExtraction}
-                className="px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs sm:text-sm shadow-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
               >
                 {isExtracting ? (
                   <>
                     <RotateCcw size={16} className="animate-spin" />
-                    Đang trích xuất dữ liệu...
+                    Đang trích xuất dữ liệu Excel...
                   </>
                 ) : (
                   <>

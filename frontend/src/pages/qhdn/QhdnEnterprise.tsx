@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Building2,
   Layers,
@@ -26,8 +26,12 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { EnterprisePartnerDetailModal } from '@/components/qhdn/enterprise/PartnerDetailModal';
 import { EnterpriseImportExcelModal } from '@/components/qhdn/enterprise/ImportExcelModal';
 import { EnterpriseCreateModal } from '@/components/qhdn/enterprise/CreateModal';
-import { MOCK_ENTERPRISE_PARTNERS } from '@/data/qhdn/qhdnMockData';
-import type { EnterprisePartner } from '@/types/qhdn/qhdnTypes';
+import { archiveImport, createCompany, searchOjtSemesters } from '@/service/qhdnService';
+import type {
+  EnterprisePartner,
+  CreateCompanyRequest,
+  OjtSemesterItem,
+} from '@/types/qhdn/qhdnTypes';
 
 const PAGE_SIZE = 10;
 
@@ -48,6 +52,7 @@ const MOU_FILTER_OPTIONS = [
 
 export const QhdnEnterpriseManagement: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   // Active Tab: 2 clean views
   const [activeTab, setActiveTab] = useState<'partners' | 'quotas'>('partners');
 
@@ -62,36 +67,110 @@ export const QhdnEnterpriseManagement: React.FC = () => {
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [excelImportSemester, setExcelImportSemester] = useState<string>('Fall 2026');
   const [selectedEnterpriseDetail, setSelectedEnterpriseDetail] = useState<EnterprisePartner | null>(null);
 
   // Manual Add Form State
   const [newEnterpriseName, setNewEnterpriseName] = useState('');
   const [newEnterpriseCode, setNewEnterpriseCode] = useState('');
+  const [newEnterpriseAddress, setNewEnterpriseAddress] = useState('');
   const [newEnterpriseIndustry, setNewEnterpriseIndustry] = useState('');
   const [newEnterpriseQuota, setNewEnterpriseQuota] = useState(50);
   const [newEnterpriseContact, setNewEnterpriseContact] = useState('');
+  const [newEnterprisePhone, setNewEnterprisePhone] = useState('');
   const [newEnterpriseEmail, setNewEnterpriseEmail] = useState('');
+  const [newEnterpriseStatus, setNewEnterpriseStatus] = useState('ACTIVE');
+  const [newEnterpriseReason, setNewEnterpriseReason] = useState('');
   const [newEnterpriseSemesters, setNewEnterpriseSemesters] = useState<string[]>(['Summer 2026']);
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  const [createCompanyError, setCreateCompanyError] = useState<string | null>(null);
+  const [companyToast, setCompanyToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   // Excel File State
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
-  // Initialize partners with multiple consecutive semesters support
-  const [partners, setPartners] = useState<EnterprisePartner[]>(() => {
-    const semesterPatterns = [
-      ['Summer 2026', 'Fall 2026'],
-      ['Summer 2026'],
-      ['Spring 2026', 'Summer 2026', 'Fall 2026'],
-      ['Fall 2025', 'Spring 2026'],
-      ['Summer 2026', 'Fall 2026'],
-    ];
+  // Archive State
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveToast, setArchiveToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    archivedCount?: number;
+  } | null>(null);
 
-    return MOCK_ENTERPRISE_PARTNERS.map((p, idx) => ({
-      ...p,
-      semesters: p.semesters || semesterPatterns[idx % semesterPatterns.length],
-    }));
+  // Khởi tạo danh sách đối tác: KHÔNG DÙNG MOCK DATA, đọc từ localStorage đã import/tạo thực tế
+  const [partners, setPartners] = useState<EnterprisePartner[]>(() => {
+    try {
+      const saved = localStorage.getItem('ojt_imported_enterprises');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.warn('Lỗi đọc ojt_imported_enterprises từ localStorage:', err);
+    }
+    return [];
   });
+
+  // Tự động lắng nghe dữ liệu vừa được đẩy từ màn hình Import doanh nghiệp
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ojt_imported_enterprises');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setPartners(parsed);
+        }
+      }
+    } catch (err) {
+      console.warn('Lỗi đồng bộ danh sách doanh nghiệp:', err);
+    }
+
+    if (location.state && (location.state as any).justImportedCount) {
+      const count = (location.state as any).justImportedCount;
+      setCompanyToast({
+        type: 'success',
+        message: `Đã cập nhật ${count} doanh nghiệp vừa import vào danh sách chính thức!`,
+      });
+      setTimeout(() => setCompanyToast(null), 5000);
+    }
+  }, [location.state]);
+
+  // Load danh sách kỳ OJT do phòng đào tạo khởi tạo từ API POST /api/json/ojt-semesters/search
+  const [ojtSemesters, setOjtSemesters] = useState<OjtSemesterItem[]>([]);
+
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      try {
+        const res = await searchOjtSemesters({ page: 1, limit: 100 });
+        if (res && res.items) {
+          setOjtSemesters(res.items);
+        }
+      } catch (err) {
+        console.warn('Không thể tải danh sách kỳ OJT từ API:', err);
+      }
+    };
+    fetchSemesters();
+  }, []);
+
+  // Danh sách học kỳ cho bộ lọc lấy trực tiếp từ API do phòng đào tạo khởi tạo
+  const semesterFilterOptions = useMemo(() => {
+    if (ojtSemesters.length > 0) {
+      return [
+        { value: 'ALL', label: 'Tất cả học kỳ' },
+        ...ojtSemesters.map((s) => ({
+          value: s.name || s.semesterCode || `Kỳ #${s.id}`,
+          label: `${s.name || s.semesterCode}${s.status ? ` (${s.status})` : ''}`,
+        })),
+      ];
+    }
+    return SEMESTER_FILTER_OPTIONS;
+  }, [ojtSemesters]);
 
   // Sample Excel preview data
   const excelSamplePreview = [
@@ -114,9 +193,14 @@ export const QhdnEnterpriseManagement: React.FC = () => {
         partner.contactPerson.toLowerCase().includes(query);
 
       // 2. Semester filter (checks if partner accepts the chosen semester)
-      const partnerSems = partner.semesters || (partner.semester ? [partner.semester] : ['Summer 2026']);
+      const partnerSems = partner.semesters || (partner.semester ? [partner.semester] : []);
       const matchesSemester =
-        selectedSemester === 'ALL' || partnerSems.includes(selectedSemester);
+        selectedSemester === 'ALL' ||
+        partnerSems.some(
+          (sem) =>
+            sem.toLowerCase().includes(selectedSemester.toLowerCase()) ||
+            selectedSemester.toLowerCase().includes(sem.toLowerCase())
+        );
 
       // 3. MOU Status filter
       const matchesMou =
@@ -163,41 +247,93 @@ export const QhdnEnterpriseManagement: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleAddEnterprise = (e: React.FormEvent) => {
+  const handleAddEnterprise = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEnterpriseName || !newEnterpriseCode) return;
+    if (!newEnterpriseName.trim() || !newEnterpriseCode.trim()) return;
 
-    const newPartner: EnterprisePartner = {
-      id: `ent-${Date.now()}`,
-      name: newEnterpriseName,
-      code: newEnterpriseCode.toUpperCase(),
-      industry: newEnterpriseIndustry || 'Công nghệ thông tin',
-      tier: 'Tier-3 Standard',
-      contactPerson: newEnterpriseContact || 'Đang cập nhật',
-      contactEmail: newEnterpriseEmail || 'contact@company.com',
-      contactPhone: '0900 000 000',
-      address: 'Đang cập nhật địa chỉ trụ sở',
-      mouStatus: 'Active',
-      mouSignedDate: new Date().toISOString().split('T')[0],
-      mouExpiryDate: '2028-12-31',
-      totalQuota: Number(newEnterpriseQuota),
-      acceptedCount: 0,
-      availableQuota: Number(newEnterpriseQuota),
-      semesters: newEnterpriseSemesters.length > 0 ? newEnterpriseSemesters : ['Summer 2026'],
+    setIsCreatingCompany(true);
+    setCreateCompanyError(null);
+
+    const payload: CreateCompanyRequest = {
+      enterpriseCode: newEnterpriseCode.trim().toUpperCase(),
+      code: newEnterpriseCode.trim().toUpperCase(),
+      name: newEnterpriseName.trim(),
+      address: newEnterpriseAddress.trim() || 'Chưa cập nhật địa chỉ',
+      industry: newEnterpriseIndustry.trim() || 'Công nghệ thông tin',
+      contactPersonName: newEnterpriseContact.trim() || 'Đang cập nhật',
+      contactPhone: newEnterprisePhone.trim() || '0900 000 000',
+      contactEmail: newEnterpriseEmail.trim() || 'contact@company.com',
+      status: newEnterpriseStatus || 'ACTIVE',
+      reason: newEnterpriseReason.trim() || 'Thêm mới doanh nghiệp qua hệ thống',
     };
 
-    setPartners([newPartner, ...partners]);
-    setCurrentPage(1);
-    setIsAddModalOpen(false);
+    try {
+      const response = await createCompany(payload);
+      const createdData = response?.data;
 
-    // Reset Form
-    setNewEnterpriseName('');
-    setNewEnterpriseCode('');
-    setNewEnterpriseIndustry('');
-    setNewEnterpriseQuota(50);
-    setNewEnterpriseContact('');
-    setNewEnterpriseEmail('');
-    setNewEnterpriseSemesters(['Summer 2026']);
+      const newPartner: EnterprisePartner = {
+        id: `ent-${createdData?.id || Date.now()}`,
+        name: createdData?.name || newEnterpriseName,
+        code: createdData?.enterpriseCode || createdData?.code || newEnterpriseCode.toUpperCase(),
+        industry: createdData?.industry || newEnterpriseIndustry || 'Công nghệ thông tin',
+        tier: 'Tier-3 Standard',
+        contactPerson: createdData?.contactPersonName || newEnterpriseContact || 'Đang cập nhật',
+        contactEmail: createdData?.contactEmail || newEnterpriseEmail || 'contact@company.com',
+        contactPhone: createdData?.contactPhone || newEnterprisePhone || '0900 000 000',
+        address: createdData?.address || newEnterpriseAddress || 'Đang cập nhật địa chỉ trụ sở',
+        mouStatus: 'Active',
+        mouSignedDate: createdData?.createdAt
+          ? createdData.createdAt.split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        mouExpiryDate: '2028-12-31',
+        totalQuota: Number(newEnterpriseQuota) || 50,
+        acceptedCount: 0,
+        availableQuota: Number(newEnterpriseQuota) || 50,
+        semesters: newEnterpriseSemesters.length > 0 ? newEnterpriseSemesters : ['Summer 2026'],
+      };
+
+      setPartners((prev) => {
+        const updated = [newPartner, ...prev];
+        localStorage.setItem('ojt_imported_enterprises', JSON.stringify(updated));
+        return updated;
+      });
+      setCurrentPage(1);
+      setIsAddModalOpen(false);
+
+      // Reset Form
+      setNewEnterpriseName('');
+      setNewEnterpriseCode('');
+      setNewEnterpriseAddress('');
+      setNewEnterpriseIndustry('');
+      setNewEnterpriseQuota(50);
+      setNewEnterpriseContact('');
+      setNewEnterprisePhone('');
+      setNewEnterpriseEmail('');
+      setNewEnterpriseStatus('ACTIVE');
+      setNewEnterpriseReason('');
+      setNewEnterpriseSemesters(['Summer 2026']);
+
+      setCompanyToast({
+        type: 'success',
+        message: `Thêm doanh nghiệp "${createdData?.name || newEnterpriseName}" thành công (ID: ${createdData?.id || ''}, Mã: ${createdData?.enterpriseCode || newEnterpriseCode})!`,
+      });
+      setTimeout(() => setCompanyToast(null), 5000);
+    } catch (err: any) {
+      console.error('Lỗi khi gọi API POST /api/companies:', err);
+      const errorMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Không thể tạo doanh nghiệp. Vui lòng kiểm tra lại thông tin!';
+      setCreateCompanyError(errorMsg);
+      setCompanyToast({
+        type: 'error',
+        message: errorMsg,
+      });
+      setTimeout(() => setCompanyToast(null), 6000);
+    } finally {
+      setIsCreatingCompany(false);
+    }
   };
 
   const handleConfirmExcelImport = () => {
@@ -219,7 +355,7 @@ export const QhdnEnterpriseManagement: React.FC = () => {
         totalQuota: item.quota,
         acceptedCount: 0,
         availableQuota: item.quota,
-        semesters: item.semesters.split(',').map((s) => s.trim()),
+        semesters: Array.from(new Set([excelImportSemester, ...item.semesters.split(',').map((s) => s.trim())])),
       }));
 
       setPartners([...importedPartners, ...partners]);
@@ -233,9 +369,44 @@ export const QhdnEnterpriseManagement: React.FC = () => {
   const handleDeleteEnterprise = (partner: EnterprisePartner) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa doanh nghiệp "${partner.name}"?`)) return;
 
-    setPartners((current) => current.filter((item) => item.id !== partner.id));
+    setPartners((current) => {
+      const updated = current.filter((item) => item.id !== partner.id);
+      localStorage.setItem('ojt_imported_enterprises', JSON.stringify(updated));
+      return updated;
+    });
     if (selectedEnterpriseDetail?.id === partner.id) {
       setSelectedEnterpriseDetail(null);
+    }
+  };
+
+  // ─── Gọi API POST /api/imports/archive ───────────────────────────────
+  const handleArchive = async () => {
+    const confirmed = window.confirm(
+      'Bạn có chắc chắn muốn lưu trữ tuyển dụng sau 2 học kỳ?\n' +
+      'Hành động này sẽ đánh dấu các bản ghi được lưu trữ và không thể hoàn tác.'
+    );
+    if (!confirmed) return;
+
+    setIsArchiving(true);
+    setArchiveToast(null);
+    try {
+      const result = await archiveImport();
+      setArchiveToast({
+        type: 'success',
+        message: result.archivedCount > 0
+          ? `Đã lưu trữ thành công ${result.archivedCount} bản ghi tuyển dụng.`
+          : 'Không có bản ghi nào cần lưu trữ tại thời điểm này.',
+        archivedCount: result.archivedCount,
+      });
+    } catch (err: unknown) {
+      setArchiveToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Lỗi khi lưu trữ. Vui lòng thử lại.',
+      });
+    } finally {
+      setIsArchiving(false);
+      // Tự ẩn toast sau 5 giây
+      setTimeout(() => setArchiveToast(null), 5000);
     }
   };
 
@@ -247,6 +418,68 @@ export const QhdnEnterpriseManagement: React.FC = () => {
         description="Mạng lưới doanh nghiệp tiếp nhận thực tập OJT, hợp đồng MOU và theo dõi chỉ tiêu quota theo từng kỳ học."
         badge="Phòng QHDN"
       />
+
+      {/* ─── ARCHIVE TOAST NOTIFICATION ──────────────────── */}
+      {archiveToast && (
+        <div
+          className={`flex items-start gap-3 p-4 rounded-2xl border text-sm transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
+            archiveToast.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          {archiveToast.type === 'success' ? (
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+          ) : (
+            <X size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <p className="font-bold">
+              {archiveToast.type === 'success' ? 'Lưu trữ thành công' : 'Lỗi lưu trữ'}
+            </p>
+            <p className="text-xs mt-0.5 opacity-80">{archiveToast.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setArchiveToast(null)}
+            className="text-current opacity-50 hover:opacity-100 cursor-pointer"
+            aria-label="Đóng thông báo"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* ─── CREATE COMPANY TOAST NOTIFICATION ────────────── */}
+      {companyToast && (
+        <div
+          className={`flex items-start gap-3 p-4 rounded-2xl border text-sm transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
+            companyToast.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          {companyToast.type === 'success' ? (
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+          ) : (
+            <X size={18} className="text-rose-600 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <p className="font-bold">
+              {companyToast.type === 'success' ? 'Tạo doanh nghiệp thành công (201 Created)' : 'Lỗi tạo doanh nghiệp'}
+            </p>
+            <p className="text-xs mt-0.5 opacity-80">{companyToast.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCompanyToast(null)}
+            className="text-current opacity-50 hover:opacity-100 cursor-pointer"
+            aria-label="Đóng thông báo"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* ─── UNIFIED CONTROL CARD: Tabs + Actions + Filters ─ */}
       <div className="card-glass border border-slate-200/80 shadow-xs overflow-hidden">
@@ -291,11 +524,30 @@ export const QhdnEnterpriseManagement: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/qhdn/enterprises/import?openModal=true')}
-              className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-98"
-              title="Import hàng loạt doanh nghiệp từ PDF hoặc Excel"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-98"
+              title="Import hàng loạt doanh nghiệp từ file Excel"
             >
-              <Upload size={16} />
-              Import DN (PDF / Excel)
+              <FileSpreadsheet size={16} />
+              Import DN (Excel)
+            </button>
+            <button
+              type="button"
+              onClick={handleArchive}
+              disabled={isArchiving}
+              className="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Lưu trữ tuyển dụng sau 2 học kỳ kể từ khi sinh viên đi OJT"
+            >
+              {isArchiving ? (
+                <>
+                  <RotateCcw size={15} className="animate-spin" />
+                  Đang lưu trữ...
+                </>
+              ) : (
+                <>
+                  <Download size={15} />
+                  Lưu trữ tuyển dụng
+                </>
+              )}
             </button>
             <button
               type="button"
@@ -348,7 +600,7 @@ export const QhdnEnterpriseManagement: React.FC = () => {
               aria-label="Lọc theo học kỳ tiếp nhận"
               className="w-full pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
             >
-              {SEMESTER_FILTER_OPTIONS.map((opt) => (
+              {semesterFilterOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -434,21 +686,52 @@ export const QhdnEnterpriseManagement: React.FC = () => {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {paginatedPartners.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="h-[580px] text-center">
-                      <div className="max-w-xs mx-auto space-y-2">
-                        <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                          <Building2 size={24} />
+                    <td colSpan={7} className="h-[400px] text-center">
+                      <div className="max-w-md mx-auto space-y-3 p-6">
+                        <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto border border-orange-200">
+                          <Building2 size={28} />
                         </div>
-                        <p className="text-sm font-semibold text-slate-700">Không tìm thấy doanh nghiệp phù hợp</p>
-                        <p className="text-xs text-slate-400">Hãy thử điều chỉnh lại từ khóa hoặc bộ lọc học kỳ.</p>
-                        {hasActiveFilters && (
-                          <button
-                            type="button"
-                            onClick={handleResetFilters}
-                            className="mt-2 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
-                          >
-                            Xóa bộ lọc
-                          </button>
+                        {partners.length === 0 ? (
+                          <>
+                            <p className="text-base font-bold text-slate-800">
+                              Chưa có doanh nghiệp nào trong danh sách
+                            </p>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                              Dữ liệu mẫu đã được xóa hoàn toàn. Bạn hãy nhấn <strong>"Import DN (Excel)"</strong> để nhập danh sách từ file hoặc <strong>"Thêm DN đối tác mới"</strong>.
+                            </p>
+                            <div className="pt-2 flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => navigate('/qhdn/enterprises/import?openModal=true')}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <FileSpreadsheet size={15} />
+                                Import DN từ Excel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 cursor-pointer"
+                              >
+                                <Plus size={15} />
+                                Thêm thủ công
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-slate-700">Không tìm thấy doanh nghiệp phù hợp</p>
+                            <p className="text-xs text-slate-400">Hãy thử điều chỉnh lại từ khóa hoặc bộ lọc học kỳ.</p>
+                            {hasActiveFilters && (
+                              <button
+                                type="button"
+                                onClick={handleResetFilters}
+                                className="mt-2 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
+                              >
+                                Xóa bộ lọc
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -850,26 +1133,42 @@ export const QhdnEnterpriseManagement: React.FC = () => {
         excelSamplePreview={excelSamplePreview}
         isImporting={isImporting}
         onConfirmImport={handleConfirmExcelImport}
+        selectedSemester={excelImportSemester}
+        onSemesterChange={setExcelImportSemester}
       />
 
       {/* ─── MODAL 3: THÊM DOANH NGHIỆP BẰNG TAY ─────────── */}
       <EnterpriseCreateModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setCreateCompanyError(null);
+        }}
         name={newEnterpriseName}
         setName={setNewEnterpriseName}
         code={newEnterpriseCode}
         setCode={setNewEnterpriseCode}
+        address={newEnterpriseAddress}
+        setAddress={setNewEnterpriseAddress}
         semesters={newEnterpriseSemesters}
         setSemesters={setNewEnterpriseSemesters}
+        availableSemesters={ojtSemesters.map((s) => s.name || s.semesterCode || `Kỳ #${s.id}`)}
         industry={newEnterpriseIndustry}
         setIndustry={setNewEnterpriseIndustry}
         quota={newEnterpriseQuota}
         setQuota={setNewEnterpriseQuota}
         contact={newEnterpriseContact}
         setContact={setNewEnterpriseContact}
+        phone={newEnterprisePhone}
+        setPhone={setNewEnterprisePhone}
         email={newEnterpriseEmail}
         setEmail={setNewEnterpriseEmail}
+        status={newEnterpriseStatus}
+        setStatus={setNewEnterpriseStatus}
+        reason={newEnterpriseReason}
+        setReason={setNewEnterpriseReason}
+        isSubmitting={isCreatingCompany}
+        errorMessage={createCompanyError}
         onSubmit={handleAddEnterprise}
       />
     </div>

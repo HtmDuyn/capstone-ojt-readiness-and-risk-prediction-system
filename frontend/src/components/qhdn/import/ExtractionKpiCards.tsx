@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  FileText,
+  FileSpreadsheet,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -16,7 +16,7 @@ interface ExtractionKpiCardsProps {
 }
 
 export const ExtractionKpiCards: React.FC<ExtractionKpiCardsProps> = ({
-  totalFiles = 58,
+  totalFiles = 0,
   validCount,
   reviewCount,
   errorCount,
@@ -24,14 +24,14 @@ export const ExtractionKpiCards: React.FC<ExtractionKpiCardsProps> = ({
 }) => {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-      {/* Card 1: Tổng số file */}
+      {/* Card 1: Tổng số file Excel */}
       <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
-          <FileText size={22} />
+        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+          <FileSpreadsheet size={22} />
         </div>
         <div>
           <span className="text-2xl font-black text-slate-900 leading-none">{totalFiles}</span>
-          <p className="text-xs text-slate-500 font-medium mt-1">Tổng số file</p>
+          <p className="text-xs text-slate-500 font-medium mt-1">Tổng doanh nghiệp</p>
         </div>
       </div>
 
@@ -42,7 +42,7 @@ export const ExtractionKpiCards: React.FC<ExtractionKpiCardsProps> = ({
         </div>
         <div>
           <span className="text-2xl font-black text-emerald-700 leading-none">
-            {validCount + 34}
+            {validCount}
           </span>
           <p className="text-xs text-slate-500 font-medium mt-1">Đủ dữ liệu</p>
         </div>
@@ -66,7 +66,7 @@ export const ExtractionKpiCards: React.FC<ExtractionKpiCardsProps> = ({
         </div>
         <div>
           <span className="text-2xl font-black text-amber-700 leading-none">
-            {reviewCount + 10}
+            {reviewCount}
           </span>
           <p className="text-xs text-slate-500 font-medium mt-1">Cần kiểm tra</p>
         </div>
@@ -79,7 +79,7 @@ export const ExtractionKpiCards: React.FC<ExtractionKpiCardsProps> = ({
         </div>
         <div>
           <span className="text-2xl font-black text-rose-700 leading-none">
-            {errorCount + 3}
+            {errorCount}
           </span>
           <p className="text-xs text-slate-500 font-medium mt-1">Lỗi trích xuất</p>
         </div>

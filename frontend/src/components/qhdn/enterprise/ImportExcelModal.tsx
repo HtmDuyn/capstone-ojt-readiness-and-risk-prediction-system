@@ -1,11 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   FileSpreadsheet,
   Upload,
   Info,
   Download,
+  Calendar,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
+
+const EXCEL_SEMESTER_OPTIONS = [
+  { value: 'Fall 2026', label: 'Fall 2026 (01/09 - 25/12/2026)' },
+  { value: 'Summer 2026', label: 'Summer 2026 (01/05 - 25/08/2026)' },
+  { value: 'Spring 2026', label: 'Spring 2026 (05/01 - 25/04/2026)' },
+  { value: 'Fall 2025', label: 'Fall 2025 (01/09 - 25/12/2025)' },
+  { value: 'Summer 2025', label: 'Summer 2025 (01/05 - 25/08/2025)' },
+];
 
 interface ExcelPreviewItem {
   name: string;
@@ -22,6 +33,8 @@ interface EnterpriseImportExcelModalProps {
   excelSamplePreview: ExcelPreviewItem[];
   isImporting: boolean;
   onConfirmImport: () => void;
+  selectedSemester?: string;
+  onSemesterChange?: (semester: string) => void;
 }
 
 export const EnterpriseImportExcelModal: React.FC<EnterpriseImportExcelModalProps> = ({
@@ -32,12 +45,22 @@ export const EnterpriseImportExcelModal: React.FC<EnterpriseImportExcelModalProp
   excelSamplePreview,
   isImporting,
   onConfirmImport,
+  selectedSemester,
+  onSemesterChange,
 }) => {
+  const [internalSemester, setInternalSemester] = useState<string>('Fall 2026');
+  const activeSemester = selectedSemester ?? internalSemester;
+
+  const handleSemesterSelect = (sem: string) => {
+    setInternalSemester(sem);
+    onSemesterChange?.(sem);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+      <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center font-bold">
@@ -60,6 +83,55 @@ export const EnterpriseImportExcelModal: React.FC<EnterpriseImportExcelModalProp
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* ─── CHỌN HỌC KỲ TIẾP NHẬN ─────────────────────────── */}
+        <div className="bg-purple-50/70 border border-purple-200/80 rounded-xl p-3.5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-purple-600 shrink-0" />
+              <label className="text-xs font-bold text-slate-800">
+                Học kỳ tiếp nhận áp dụng <span className="text-rose-500">*</span>
+              </label>
+            </div>
+            <div className="relative min-w-[200px]">
+              <select
+                value={activeSemester}
+                onChange={(e) => handleSemesterSelect(e.target.value)}
+                className="w-full appearance-none pl-3 pr-8 py-1.5 bg-white border border-purple-300 rounded-lg text-xs font-bold text-purple-950 shadow-2xs hover:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
+              >
+                {EXCEL_SEMESTER_OPTIONS.map((sem) => (
+                  <option key={sem.value} value={sem.value}>
+                    {sem.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-600 pointer-events-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+            <span className="text-slate-500 font-medium">Chọn nhanh:</span>
+            {EXCEL_SEMESTER_OPTIONS.map((sem) => {
+              const isSelected = activeSemester === sem.value;
+              return (
+                <button
+                  key={sem.value}
+                  type="button"
+                  onClick={() => handleSemesterSelect(sem.value)}
+                  className={`px-2.5 py-0.5 rounded-md font-semibold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-purple-600 text-white font-bold'
+                      : 'bg-white hover:bg-purple-100 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  {sem.value}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Drag and Drop Zone */}

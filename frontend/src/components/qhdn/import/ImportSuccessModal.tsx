@@ -3,9 +3,8 @@ import {
   X,
   Check,
   Building2,
-  Users,
-  AlertTriangle,
-  Clock,
+  RefreshCw,
+  Hash,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -13,18 +12,25 @@ interface ImportSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateToList: () => void;
-  importedCount?: number;
-  totalBatchCount?: number;
+  /** Từ API response commit */
+  batchId?: number;
+  replayed?: boolean;
+  created?: number;
+  updated?: number;
 }
 
 export const ImportSuccessModal: React.FC<ImportSuccessModalProps> = ({
   isOpen,
   onClose,
   onNavigateToList,
-  importedCount = 50,
-  totalBatchCount = 58,
+  batchId,
+  replayed,
+  created = 0,
+  updated = 0,
 }) => {
   if (!isOpen) return null;
+
+  const total = created + updated;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -46,42 +52,48 @@ export const ImportSuccessModal: React.FC<ImportSuccessModalProps> = ({
           </div>
           <h2 className="text-2xl font-black text-slate-900">Import thành công!</h2>
           <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            Đã import {importedCount}/{totalBatchCount} doanh nghiệp
+            Đã commit {total} doanh nghiệp vào hệ thống
           </p>
         </div>
 
-        {/* 4 Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Batch info from API */}
+        <div className="flex flex-wrap items-center gap-3 justify-center">
+          {batchId !== undefined && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold">
+              <Hash size={12} />
+              Batch ID: {batchId}
+            </span>
+          )}
+          {replayed !== undefined && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                replayed
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              }`}
+            >
+              <RefreshCw size={12} />
+              {replayed ? 'Replayed (idempotent)' : 'Import mới'}
+            </span>
+          )}
+        </div>
+
+        {/* 2 Summary Cards */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-center space-y-1">
-            <div className="text-xl font-black text-emerald-700">{importedCount}</div>
+            <div className="text-xl font-black text-emerald-700">{created}</div>
             <div className="w-6 h-6 rounded-md bg-emerald-200/60 text-emerald-800 mx-auto flex items-center justify-center">
               <Building2 size={13} />
             </div>
-            <p className="text-[10px] text-slate-600 font-medium">Đã import thành công</p>
+            <p className="text-[10px] text-slate-600 font-medium">Doanh nghiệp tạo mới</p>
           </div>
 
           <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100 text-center space-y-1">
-            <div className="text-xl font-black text-blue-700">48</div>
+            <div className="text-xl font-black text-blue-700">{updated}</div>
             <div className="w-6 h-6 rounded-md bg-blue-200/60 text-blue-800 mx-auto flex items-center justify-center">
-              <Users size={13} />
+              <RefreshCw size={13} />
             </div>
-            <p className="text-[10px] text-slate-600 font-medium">Đã tạo/cập nhật tài khoản</p>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-100 text-center space-y-1">
-            <div className="text-xl font-black text-amber-700">4</div>
-            <div className="w-6 h-6 rounded-md bg-amber-200/60 text-amber-800 mx-auto flex items-center justify-center">
-              <AlertTriangle size={13} />
-            </div>
-            <p className="text-[10px] text-slate-600 font-medium">Bị bỏ qua (lỗi)</p>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-orange-50 border border-orange-100 text-center space-y-1">
-            <div className="text-xl font-black text-orange-700">12</div>
-            <div className="w-6 h-6 rounded-md bg-orange-200/60 text-orange-800 mx-auto flex items-center justify-center">
-              <Clock size={13} />
-            </div>
-            <p className="text-[10px] text-slate-600 font-medium">Cần bổ sung thông tin</p>
+            <p className="text-[10px] text-slate-600 font-medium">Doanh nghiệp cập nhật</p>
           </div>
         </div>
 
@@ -91,16 +103,14 @@ export const ImportSuccessModal: React.FC<ImportSuccessModalProps> = ({
           <ul className="space-y-1.5 text-xs text-slate-600">
             <li className="flex items-center gap-2">
               <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-              Đã tạo/cập nhật {importedCount} doanh nghiệp vào hệ thống
+              Đã tạo mới {created} doanh nghiệp vào hệ thống
             </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-              Đã tạo/cập nhật 48 tài khoản doanh nghiệp và gửi email kích hoạt
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-              Các doanh nghiệp bị lỗi đã được lưu trong danh sách để xử lý sau
-            </li>
+            {updated > 0 && (
+              <li className="flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                Đã cập nhật thông tin {updated} doanh nghiệp hiện có
+              </li>
+            )}
             <li className="flex items-center gap-2">
               <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
               Bạn có thể xem lại chi tiết trong danh sách doanh nghiệp
@@ -112,17 +122,17 @@ export const ImportSuccessModal: React.FC<ImportSuccessModalProps> = ({
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={onNavigateToList}
+            onClick={onClose}
             className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 cursor-pointer"
           >
-            Xem danh sách doanh nghiệp
+            Đóng
           </button>
           <button
             type="button"
             onClick={onNavigateToList}
             className="px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
           >
-            Hoàn tất
+            Xem danh sách doanh nghiệp
           </button>
         </div>
       </div>
