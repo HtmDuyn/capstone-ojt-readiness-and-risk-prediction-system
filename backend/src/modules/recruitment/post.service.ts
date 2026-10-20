@@ -5,42 +5,8 @@ import { dayString } from '../academic/workflow-policy';
 import { inputObject,invalid,positiveId,requiredText,optionalText,pagination,enumValue } from '../students/student.validation';
 import { enterpriseScope } from '../qhdn/catalog.service';
 import { readTransaction } from '../qhdn/read.repository';
-import { fingerprint } from '../eligibility/eligibility.service';
 import { windowRecord,assertOpen,postSelect,postApi,postRecord,closeUnusedPositions,type Row,type Actor } from './recruitment.repository';
 
-export async function submitPost(body:unknown,actor:Actor) {
- const b=inputObject(body,['windowId','idempotencyKey','title','content','benefits','applicationInstructions','deadlineAt','positions']);
- const windowId=positiveId(b.windowId,'windowId'),key=requiredText(b.idempotencyKey,'idempotencyKey',100);
- const form={title:requiredText(b.title,'title',200),content:requiredText(b.content,'content',20000),
-  benefits:optionalText(b.benefits,'benefits',10000),instructions:optionalText(b.applicationInstructions,'applicationInstructions',10000),
-  deadline:b.deadlineAt===undefined?null:timestamp(b.deadlineAt,'deadlineAt')};
- if(!Array.isArray(b.positions)||!b.positions.length||b.positions.length>50)throw invalid('Submit 1–50 recruitment positions.');
- const positions=b.positions.map(v=>{
-  const p=inputObject(v,['code','title','description','requirements','capacity']);const capacity=positiveId(p.capacity,'capacity');
-  if(capacity>100000)throw invalid('capacity must not exceed 100000.');
-  return {code:requiredText(p.code,'code',60).toUpperCase(),title:requiredText(p.title,'title',150),
-   description:requiredText(p.description,'description',10000),requirements:requiredText(p.requirements,'requirements',10000),capacity};
- });
- if(new Set(positions.map(p=>p.code)).size!==positions.length)throw invalid('Position codes must be distinct.');
- const hash=fingerprint({windowId,form,positions});
- return academicTransaction(async c=>{
-  const companyId=await enterpriseScope(c,actor);
-  const prior=(await c.query('SELECT "PostID","CreatedBy","RequestHash" FROM "RecruitmentPosts" WHERE "SubmissionKey"=$1',[key])).rows[0];
-  if(prior){if(prior.CreatedBy!==actor.userId||prior.RequestHash!==hash)throw invalid('Idempotency key belongs to another request.',409,'IDEMPOTENCY_CONFLICT');return {...postApi(await postRecord(c,prior.PostID,actor)),replayed:true};}
-  const w=await windowRecord(c,windowId);assertOpen(w);
-  const deadline=form.deadline??new Date(w.EndsAt).toISOString(),periodEnd=new Date(new Date(dayString(w.PeriodEndDate)+'T00:00:00+07:00').getTime()+86400000);
-  if(new Date(deadline)<=w.DatabaseNow||new Date(deadline)>periodEnd)throw invalid('The vacancy deadline must be in the future and within the selected academic semester.');
-  if((await c.query('SELECT 1 FROM "InternshipPositions" WHERE "EnterpriseID"=$1 AND "OJTSemesterID"=$2 AND "RecruitmentCode"=ANY($3::text[])',[companyId,w.OJTSemesterID,positions.map(p=>p.code)])).rowCount)throw invalid('A position code already exists for this enterprise and semester.',409,'RECRUITMENT_CODE_EXISTS');
-  const post=(await c.query(`INSERT INTO "RecruitmentPosts" ("EnterpriseID","OJTSemesterID","WindowID","Title","Content","Benefits","ApplicationInstructions","DeadlineAt","Status","CreatedBy","SubmissionKey","RequestHash")
-   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PENDING_REVIEW',$9,$10,$11) RETURNING "PostID"`,[companyId,w.OJTSemesterID,windowId,form.title,form.content,form.benefits,form.instructions,deadline,actor.userId,key,hash])).rows[0];
-  for(const p of positions){
-   const pos=(await c.query(`INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","RecruitmentCode","Title","Description","Requirements","Capacity","RemainingSlots","Status")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$7,'CLOSED') RETURNING "PositionID"`,[companyId,w.OJTSemesterID,p.code,p.title,p.description,p.requirements,p.capacity])).rows[0];
-   await c.query('INSERT INTO "RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID") VALUES ($1,$2,$3,$4)',[post.PostID,pos.PositionID,companyId,w.OJTSemesterID]);
-  }
-  const after=postApi(await postRecord(c,post.PostID,actor));await audit(c,actor.userId,'RecruitmentPosts',post.PostID,'SUBMIT',null,after);return {...after,replayed:false};
- });
-}
 export async function listPosts(params:Row,actor:Actor) {
  const p=pagination(params,['postId','windowId','academicPeriodId','status']),args:unknown[]=[],where:string[]=[];
  return readTransaction(async c=>{
@@ -62,6 +28,11 @@ export async function updatePost(id:number,body:unknown,actor:Actor) {
  const reason=requiredText(b.reason,'reason',2000);
  if(Object.keys(b).every(k=>k==='reason'))throw invalid('Provide an editable field.');
  if(b.positions!==undefined&&(!Array.isArray(b.positions)||!b.positions.length||b.positions.length>50))throw invalid('Provide 1–50 position changes.');
+ for(const raw of (b.positions??[]) as unknown[]){
+  const position=inputObject(raw,['positionId','code','title','description','requirements','capacity','location','workMode']);
+  if(position.positionId===undefined)throw invalid('New recruitment positions must be added through the QHDN import API.',403,'IMPORT_REQUIRED');
+  positiveId(position.positionId,'positionId');
+ }
  return academicTransaction(async c=>{
   const before=await postRecord(c,id,actor,true);
   if(!['PENDING_REVIEW','REJECTED','PUBLISHED'].includes(before.Status)||!before.WindowID)throw invalid('Only an active intake post can be edited.',409,'RECRUITMENT_POST_STATE_CONFLICT');
@@ -78,26 +49,25 @@ export async function updatePost(id:number,body:unknown,actor:Actor) {
    values[column]=['title','content'].includes(key)?requiredText(b[key],key,max):optionalText(b[key],key,max);
    if(hasHistory&&values[column]!==before[column])throw invalid('Post content with application or internship history is immutable.',409,'RECRUITMENT_POST_HAS_HISTORY');
   }
-  const seen=new Set<number>();let added=0;
+  const seen=new Set<number>();
   for(const value of (b.positions??[]) as unknown[]){
    const p=inputObject(value,['positionId','code','title','description','requirements','capacity','location','workMode']);
-   const positionId=p.positionId===undefined?null:positiveId(p.positionId,'positionId');
-   if(positionId!==null&&seen.has(positionId))throw invalid('Duplicate positionId.');
-   if(positionId!==null)seen.add(positionId);
-   const old=positionId===null?null:positions.find(row=>row.PositionID===positionId);
-   if(positionId!==null&&(!old||old.DeletedAt))throw invalid('Position does not belong to this recruitment post.',404,'POSITION_NOT_FOUND');
-   if(old&&(await c.query('SELECT 1 FROM "RecruitmentPostPositions" WHERE "PositionID"=$1 AND "PostID"<>$2 LIMIT 1',[positionId,id])).rowCount)throw invalid('A shared legacy position must be reconciled before editing.',409);
+   const positionId=positiveId(p.positionId,'positionId');
+   if(seen.has(positionId))throw invalid('Duplicate positionId.');
+   seen.add(positionId);
+   const old=positions.find(row=>row.PositionID===positionId);
+   if(!old||old.DeletedAt)throw invalid('Position does not belong to this recruitment post.',404,'POSITION_NOT_FOUND');
+   if((await c.query('SELECT 1 FROM "RecruitmentPostPositions" WHERE "PositionID"=$1 AND "PostID"<>$2 LIMIT 1',[positionId,id])).rowCount)throw invalid('A shared legacy position must be reconciled before editing.',409);
    if(old&&Object.keys(p).every(k=>k==='positionId'))throw invalid('Provide a position field to change.');
-   if(!old){assertOpen(w);added++;if(positions.length+added>50)throw invalid('A post supports at most 50 positions.');}
    const next:Row={};
    for(const [key,column,max] of [['code','RecruitmentCode',60],['title','Title',150],['description','Description',10000],['requirements','Requirements',10000],['location','Location',300]] as const){
-    if(key in p||(!old&&key!=='location'))next[column]=key==='location'?optionalText(p[key],key,max):requiredText(p[key],key,max);
+    if(key in p)next[column]=key==='location'?optionalText(p[key],key,max):requiredText(p[key],key,max);
    }
    if(next.RecruitmentCode)next.RecruitmentCode=next.RecruitmentCode.toUpperCase();
    if(p.workMode!==undefined)next.WorkMode=p.workMode===null?null:enumValue(p.workMode,['ONSITE','REMOTE','HYBRID'],'workMode');
-   if(p.capacity!==undefined||!old){next.Capacity=positiveId(p.capacity,'capacity');if(next.Capacity>100000)throw invalid('capacity must not exceed 100000.');}
+   if(p.capacity!==undefined){next.Capacity=positiveId(p.capacity,'capacity');if(next.Capacity>100000)throw invalid('capacity must not exceed 100000.');}
    if(next.RecruitmentCode&&(await c.query('SELECT 1 FROM "InternshipPositions" WHERE "EnterpriseID"=$1 AND "OJTSemesterID"=$2 AND "RecruitmentCode"=$3 AND ($4::int IS NULL OR "PositionID"<>$4) LIMIT 1',[before.EnterpriseID,before.OJTSemesterID,next.RecruitmentCode,positionId])).rowCount)throw invalid('Position code already exists.',409,'RECRUITMENT_CODE_EXISTS');
-   if(old){
+   {
     const referenced=(await c.query(`SELECT 1 FROM "JobApplications" WHERE "PositionID"=$1 UNION ALL SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "PositionID"=$1 UNION ALL SELECT 1 FROM "InternshipAssignments" WHERE "PositionID"=$1 LIMIT 1`,[positionId])).rowCount;
     if(referenced&&Object.keys(next).some(key=>key!=='Capacity'&&next[key]!==old[key]))throw invalid('A position with recruitment history only permits capacity changes.',409,'POSITION_HAS_HISTORY');
     const used=(await c.query(`SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "PositionID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[positionId])).rows[0].n;
@@ -106,10 +76,7 @@ export async function updatePost(id:number,body:unknown,actor:Actor) {
     const keys=Object.keys(next),params=Object.values(next);
     const after=(await c.query(`UPDATE "InternshipPositions" SET ${keys.map((key,i)=>`"${key}"=$${i+2}`).join(',')} WHERE "PositionID"=$1 RETURNING *`,[positionId,...params])).rows[0];
     await audit(c,actor.userId,'InternshipPositions',positionId!,'UPDATE',old,after,reason);
-   }else{
-    const after=(await c.query(`INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","RecruitmentCode","Title","Description","Requirements","Capacity","RemainingSlots","Status","Location","WorkMode") VALUES ($1,$2,$3,$4,$5,$6,$7,$7,'CLOSED',$8,$9) RETURNING *`,[before.EnterpriseID,before.OJTSemesterID,next.RecruitmentCode,next.Title,next.Description,next.Requirements,next.Capacity,next.Location??null,next.WorkMode??null])).rows[0];
-    await c.query('INSERT INTO "RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID") VALUES ($1,$2,$3,$4)',[id,after.PositionID,before.EnterpriseID,before.OJTSemesterID]);
-    await audit(c,actor.userId,'InternshipPositions',after.PositionID,'CREATE',null,after,reason);
+
    }
   }
   const keys=Object.keys(values),params=Object.values(values);

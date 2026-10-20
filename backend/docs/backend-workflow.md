@@ -16,6 +16,7 @@ Dùng `POST /api/imports/preview` hoặc `POST /api/imports/commit`:
 - Mã doanh nghiệp và email trỏ tới hai doanh nghiệp khác nhau: 409 `IDENTITY_CONFLICT`. Mã đã tồn tại nhưng email khác: 409, không tự đổi email tài khoản.
 - Mỗi vị trí mới cần `positions[].code` mới trong cùng doanh nghiệp/kỳ. Trùng mã vị trí trả 409 `RECRUITMENT_CODE_EXISTS`, không ghi đè hoặc xóa bài cũ. Tin cũ có thể được worker đóng/lưu trữ theo vòng đời hiện có, vẫn giữ dữ liệu.
 - Doanh nghiệp mới: tạo mật khẩu ngẫu nhiên 24 ký tự bằng `randomBytes`, chỉ lưu hash bcrypt; email outbox lưu payload mã hóa. Email chứa tài khoản/email đăng nhập, mật khẩu tạm và link đăng nhập. Mật khẩu tạm hết hạn sau 72 giờ, bắt buộc đổi trước khi gọi API nghiệp vụ.
+- Không có API tạo tin tuyển dụng riêng. API sửa tin bắt buộc có positionId cho mỗi vị trí và chỉ sửa vị trí đã thuộc tin; không cho thêm vị trí mới qua PATCH. Tạo tin/vị trí mới phải qua import của QHDN.
 - Tin import ở trạng thái `PENDING_REVIEW`, vị trí `CLOSED` tới khi QHDN duyệt công bố qua API tuyển dụng hiện có.
 
 Ví dụ JSON doanh nghiệp:
