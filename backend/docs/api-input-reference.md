@@ -1158,6 +1158,8 @@ Body: application/json — bắt buộc.
 
 trạng thái/lỗi từng sinh viên.
 
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
@@ -1173,6 +1175,8 @@ Body: application/json — bắt buộc.
 ## POST /api/json/academic/advisory-runs/list
 
 lịch sử batch thông báo khi có worker.
+
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1236,6 +1240,8 @@ Body: application/json — bắt buộc.
 ## POST /api/json/academic/course-demand/list
 
 Thống kê nhu cầu học môn còn thiếu
+
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -2359,6 +2365,8 @@ record:
 
 Danh sách task trong phạm vi tài khoản
 
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
@@ -2696,7 +2704,7 @@ Body: application/json — bắt buộc.
 
 Danh sách điểm OJT chính thức do doanh nghiệp đánh giá
 
-OverallScore của đánh giá SUBMITTED là điểm chính thức; phòng đào tạo không nhập lại hoặc xác nhận. resultId là EvaluationID.
+OverallScore của đánh giá SUBMITTED là điểm chính thức; phòng đào tạo không nhập lại hoặc xác nhận. resultId là EvaluationID. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -2877,6 +2885,8 @@ Body: application/json — bắt buộc.
 ## POST /api/json/ojt-semesters/eligible-student-handoffs/list
 
 Lịch sử bàn giao sinh viên cho QHDN
+
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -3123,7 +3133,7 @@ Body: application/json — bắt buộc.
 
 Báo cáo QHDN theo loại
 
-type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang.
+type: acceptance, internships hoặc enterprise-feedback; giữ lọc kỳ/doanh nghiệp và phân trang. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -3159,7 +3169,7 @@ Body: application/json — bắt buộc.
 | applicationInstructions | string | Không / theo điều kiện nghiệp vụ | maxLength=10000; nullable=true |  |
 | deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" |  |
 | positions | array<object> | Không / theo điều kiện nghiệp vụ | minItems=1; maxItems=50 |  |
-| positions[].positionId | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID vị trí thực tập. |
+| positions[].positionId | integer | Có | minimum=1; maximum=2147483647 | ID vị trí thực tập. |
 | positions[].code | string | Không / theo điều kiện nghiệp vụ | maxLength=60 |  |
 | positions[].title | string | Không / theo điều kiện nghiệp vụ | maxLength=150 |  |
 | positions[].description | string | Không / theo điều kiện nghiệp vụ | maxLength=10000 |  |
@@ -3298,6 +3308,8 @@ Body: application/json — bắt buộc.
 
 các đợt/lựa chọn khả dụng
 
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
@@ -3326,6 +3338,8 @@ Body: application/json — bắt buộc.
 ## POST /api/json/student/notifications/list
 
 thông báo/lọc unread/phân trang, trả unreadCount cùng response
+
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -3357,6 +3371,8 @@ Body: application/json — bắt buộc.
 
 scope/deadline, canRegister/blockReasons
 
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
@@ -3387,6 +3403,8 @@ Body: application/json — bắt buộc.
 ## POST /api/json/student/ojt-results/list
 
 chỉ kết quả của mình được công bố
+
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -3504,6 +3522,8 @@ Body: application/json — bắt buộc.
 ## POST /api/json/students/course-results/list
 
 Điểm, lần học và trạng thái môn
+
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -3664,6 +3684,8 @@ Body: application/json — bắt buộc.
 
 Tìm kiếm và lọc sinh viên
 
+Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
@@ -3686,7 +3708,7 @@ Body: application/json — bắt buộc.
 
 Vị trí tuyển dụng và quyền ứng tuyển
 
-Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển.
+Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 

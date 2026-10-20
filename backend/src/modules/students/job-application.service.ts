@@ -85,6 +85,6 @@ export async function studentOpportunities(params:Row,actor:Actor) {
     const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) x`,[semesterId,s.StudentID])).rows[0].n;
     const rows=(await c.query(sql+' ORDER BY p."PositionID",post."PostID" LIMIT $3 OFFSET $4',[semesterId,s.StudentID,p.limit,p.offset])).rows;
     const items=rows.map(pos=>{const reasons=[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[]),...(pos.applicationId?['APPLICATION_EXISTS']:[])];return {...pos,remainingSlots:Number(pos.remainingSlots),canApply:!reasons.length,blockers:reasons};});
-    return {items,total,page:p.page,limit:p.limit,registrationId:r?.RegistrationID??null,officialEligibility:official,canApply:!blockers.length,blockers};
+    return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:r?.RegistrationID??null,officialEligibility:official,canApply:!blockers.length,blockers};
   });
 }

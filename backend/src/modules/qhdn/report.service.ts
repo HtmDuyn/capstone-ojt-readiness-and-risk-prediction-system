@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import type { PoolClient } from 'pg';
 import { readTransaction } from './read.repository';
@@ -118,7 +119,7 @@ export async function report(type:ReportType,params:Row,actor:Actor,exportAll=fa
     FROM report_page`,pageArgs)).rows[0];
   if(exportAll&&total>10000)throw invalid('Export exceeds 10000 rows. Narrow the filters.',422,'QHDN_EXPORT_TOO_LARGE');
   if(type==='enterprise-feedback')for(const row of rows)if(row.lastEvaluatedAt!==null)row.lastEvaluatedAt=new Date(row.lastEvaluatedAt).toISOString();
-  return {type,filters:q.filters,items:rows,total,...(exportAll?{}:{page:q.page,limit:q.limit})};
+  return {type,filters:q.filters,items:await enrichListRows(c,rows),total,...(exportAll?{}:{page:q.page,limit:q.limit})};
  });
 }
 export async function dashboard(params:Row,actor:Actor){

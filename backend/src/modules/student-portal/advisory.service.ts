@@ -33,7 +33,17 @@ export async function createAdvisoryRun(body:unknown,actor:Actor,kind:'SUMMARY'|
   });
 }
 export async function advisoryRuns(params:Row,actor:Actor,id?:number) {
-  staff(actor);return academicTransaction(async c=>{const data=await page(c,'SELECT "RunID" AS id,"Kind" AS kind,"Status" AS status,"CreatedAt" AS "createdAt","CompletedAt" AS "completedAt" FROM "OJTAdvisoryRuns" WHERE ($1::int IS NULL OR "RunID"=$1)',[id??null],id?{}:params,[]);if(id){if(!data.items.length)throw invalid('Advisory run not found.',404);const items=await page(c,'SELECT "StudentID" AS id,"Status" AS status,"NotificationID" AS "notificationId","ErrorCode" AS "errorCode","Snapshot" AS snapshot FROM "OJTAdvisoryRunItems" WHERE "RunID"=$1',[id],params,[]);return {...data.items[0],...items};}return data;});
+  staff(actor);return academicTransaction(async c=>{
+    const data=await page(c,`SELECT "RunID" AS id,"Kind" AS kind,"Status" AS status,"CreatedBy" AS "createdBy",
+      ("Request"->>'ojtSemesterId')::int AS "ojtSemesterId",("Request"->>'academicPeriodId')::int AS "academicPeriodId",
+      "CreatedAt" AS "createdAt","CompletedAt" AS "completedAt" FROM "OJTAdvisoryRuns" WHERE ($1::int IS NULL OR "RunID"=$1)`,[id??null],id?{}:params,[]);
+    if(id){
+      if(!data.items.length)throw invalid('Advisory run not found.',404);
+      const items=await page(c,'SELECT "StudentID" AS id,"StudentID" AS "studentId","Status" AS status,"NotificationID" AS "notificationId","ErrorCode" AS "errorCode","Snapshot" AS snapshot FROM "OJTAdvisoryRunItems" WHERE "RunID"=$1',[id],params,[]);
+      return {...data.items[0],...items};
+    }
+    return data;
+  });
 }
 export async function processAdvisoryItem() {
   return academicTransaction(async c=>{
