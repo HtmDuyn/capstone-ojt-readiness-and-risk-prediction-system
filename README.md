@@ -157,7 +157,7 @@ The system supports five main user groups:
 ### System Administration
 
 - User Management
-- Role & Permission Management
+- Account role assignment using five fixed actors (ADMIN, ACADEMIC, OJT_COORD, ENTERPRISE, STUDENT)
 - System Configuration
 
 ### AI Administration

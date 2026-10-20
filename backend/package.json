@@ -4,10 +4,14 @@
   "description": "A full-stack web system for managing OJT processes and connecting **Students, Universities, and Companies**.",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
+    "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "test": "node --test"
+    "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
+    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs",
+    "test": "node --import tsx --test tests/*.test.cjs"
   },
   "repository": {
     "type": "git",
@@ -22,26 +26,31 @@
   },
   "homepage": "https://github.com/hana353/Project-Capstone---Fall2026#readme",
   "dependencies": {
+    "@types/pdfkit": "^0.17.6",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.16",
+    "pdfkit": "^0.20.2",
     "pg": "^8.23.0",
-    "postgres": "^3.4.9",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.15.5",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "nodemon": "^3.1.14",
-    "supertest": "^7.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

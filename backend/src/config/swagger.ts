@@ -1,3 +1,4 @@
+import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
 import {
   readdirSync,
 } from "node:fs";
@@ -5,6 +6,20 @@ import {
 import path from "node:path";
 
 import swaggerJSDoc from "swagger-jsdoc";
+import { describeManualInputs } from './swagger-inputs';
+import { addAdminOperations } from '../modules/admin/admin.openapi';
+import { addPortalOperations } from '../modules/student-portal/portal.openapi';
+import { mergeSharedRoleContracts } from './shared-role-contracts';
+import { addEnterpriseOperations } from '../modules/qhdn/enterprise.openapi';
+import { addRecruitmentOperations } from '../modules/recruitment/recruitment.openapi';
+import { buildJsonInputOperations, documentJsonInputOperations } from './json-input-operations';
+import { groupSwaggerByRole } from './swagger-role-groups';
+import { describeMergedSearchResponses } from './swagger-search-contracts';
+import { describeFeResponses } from './swagger-fe-contracts';
+import { describeStudentWorkflow } from '../modules/students/student-workflow.openapi';
+import { describeListResponses } from './swagger-list-contracts';
+import { describeMergedDetailLists } from './swagger-merged-details';
+import { describeImportWorkflow } from './import-workflow-contracts';
 
 const modulesDirectory =
   path.resolve(
@@ -52,13 +67,13 @@ const options: swaggerJSDoc.Options =
 
       info: {
         title:
-          "OJT Management API",
+          "API quản lý OJT",
 
         version:
           "1.0.0",
 
         description:
-          "API for OJT Management and AI Risk Prediction System",
+          "Quản lý học vụ, tuyển dụng và thực tập OJT.",
       },
 
       servers: [
@@ -67,7 +82,7 @@ const options: swaggerJSDoc.Options =
             "http://localhost:3000",
 
           description:
-            "Local Development",
+            "Máy chủ phát triển",
         },
 
         {
@@ -75,7 +90,7 @@ const options: swaggerJSDoc.Options =
             "https://capstone-ojt-readiness-and-risk.onrender.com",
 
           description:
-            "Production Server",
+            "Máy chủ triển khai",
         },
       ],
 
@@ -200,6 +215,11 @@ const options: swaggerJSDoc.Options =
                 example:
                   "eyJhbGciOiJIUzI1NiIs...",
               },
+              mustChangePassword: {
+                type: "boolean",
+                description: "Change the temporary password before using protected business APIs.",
+                example: false,
+              },
             },
           },
 
@@ -213,6 +233,7 @@ const options: swaggerJSDoc.Options =
               "object",
 
             properties: {
+              mustChangePassword: { type: "boolean", example: false },
               id: {
                 type:
                   "integer",
@@ -345,5 +366,21 @@ const options: swaggerJSDoc.Options =
       ),
   };
 
-export const swaggerSpec =
-  swaggerJSDoc(options);
+const swaggerWithQhdn = swaggerJSDoc(options);
+const qhdnOriginalPaths = structuredClone((swaggerWithQhdn as Record<string, any>).paths ?? {});
+addAdminOperations(swaggerWithQhdn);
+mergeSharedRoleContracts(swaggerWithQhdn, qhdnOriginalPaths);
+addEnterpriseOperations(swaggerWithQhdn as Record<string, any>);
+addRecruitmentOperations(swaggerWithQhdn as Record<string, any>);
+describeOfficialResults(swaggerWithQhdn as Record<string, any>);
+describeMergedSearchResponses(swaggerWithQhdn);
+describeFeResponses(swaggerWithQhdn);
+const describedSpec = describeManualInputs(addPortalOperations(swaggerWithQhdn));
+describeStudentWorkflow(describedSpec);
+describeListResponses(describedSpec);
+describeMergedDetailLists(describedSpec);
+describeImportWorkflow(describedSpec);
+describeOfficialResults(describedSpec);
+const originalSpec = groupSwaggerByRole(describedSpec);
+export const jsonInputOperations = buildJsonInputOperations(originalSpec);
+export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

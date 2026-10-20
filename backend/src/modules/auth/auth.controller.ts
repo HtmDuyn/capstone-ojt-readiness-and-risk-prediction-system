@@ -1,3 +1,5 @@
+import { getOwnProfile } from '../accounts/account.service';
+import { personalAccountView } from '../accounts/account.dto';
 import type {
   NextFunction,
   Request,
@@ -9,9 +11,7 @@ import {
 } from "./auth.schema";
 
 import {
-  getUserById,
   loginUser,
-  logoutUser,
 } from "./auth.service";
 
 export const login = async (
@@ -39,6 +39,7 @@ export const login = async (
         "Login successful",
       token:
         result.token,
+      mustChangePassword: result.mustChangePassword,
     });
   } catch (error) {
     next(error);
@@ -55,8 +56,8 @@ export const getCurrentUser = async (
       req.user?.userId;
 
     const user =
-      await getUserById(
-        userId,
+      await getOwnProfile(
+        userId!,
       );
 
     if (!user) {
@@ -96,28 +97,7 @@ export const getCurrentUser = async (
       message:
         "User profile retrieved successfully",
 
-      user: {
-        id:
-          user.id,
-
-        username:
-          user.username,
-
-        email:
-          user.email,
-
-        fullName:
-          user.full_name,
-
-        status:
-          user.status,
-
-        roleCode:
-          user.role_code,
-
-        roleName:
-          user.role_name,
-      },
+      user: personalAccountView(user),
     });
   } catch (error) {
     next(error);
@@ -125,39 +105,13 @@ export const getCurrentUser = async (
 };
 
 export const logout = async (
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ): Promise<void> => {
-  try {
-    const sessionId =
-      req.user?.sessionId;
-
-    if (!sessionId) {
-      res.status(401).json({
-        success: false,
-
-        errorCode:
-          "AUTH_REQUIRED",
-
-        message:
-          "Authentication required.",
-      });
-
-      return;
-    }
-
-    await logoutUser(
-      sessionId,
-    );
-
-    res.status(200).json({
-      success: true,
-
-      message:
-        "Logout successful",
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.status(200).json({
+    success: true,
+    message:
+      "Logout successful",
+  });
 };

@@ -156,34 +156,7 @@
 }
 
 
-/* ============================================================
-   HIDE "PARAMETERS" WHEN THERE ARE NO PARAMETERS
-   ============================================================ */
-
-/*
-   Swagger displays:
-
-   Parameters
-   No parameters
-
-   for endpoints such as POST /login.
-
-   Hide the entire parameter section.
-*/
-
-.swagger-ui .parameters-container {
-    display: none !important;
-}
-
-
-/* ============================================================
-   HIDE "NO PARAMETERS"
-   ============================================================ */
-
-.swagger-ui .parameters-col_description {
-    display: none !important;
-}
-
+/* Keep Swagger path/query parameters and their input fields visible. */
 
 /* ============================================================
    REQUEST BODY
