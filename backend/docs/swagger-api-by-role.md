@@ -67,8 +67,8 @@ Quản lý học vụ và xét điều kiện OJT.
 | 10 | POST | `/api/curriculum-imports/commit` | Nhập khung chương trình | `POST /api/curriculum-imports/commit` |
 | 11 | POST | `/api/ojt-rule-sets` | Tạo bộ quy tắc OJT | `POST /api/ojt-rule-sets` |
 | 12 | POST | `/api/eligibility-check-runs` | Kiểm tra điều kiện OJT hàng loạt | `POST /api/eligibility-check-runs` |
-| 13 | POST | `/api/imports/preview` | Kiểm tra toàn bộ dữ liệu import | `POST /api/imports/preview` |
-| 14 | POST | `/api/imports/commit` | Import tổng tài khoản và dữ liệu nghiệp vụ | `POST /api/imports/commit` |
+| 13 | POST | `/api/imports/preview` | Kiểm tra import doanh nghiệp hoặc sinh viên | `POST /api/imports/preview` |
+| 14 | POST | `/api/imports/commit` | Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin) | `POST /api/imports/commit` |
 | 15 | POST | `/api/ojt-registration-windows` | Tạo đợt đăng ký OJT | `POST /api/ojt-registration-windows` |
 | 16 | POST | `/api/ojt-registrations` | Nộp hồ sơ đăng ký OJT | `POST /api/ojt-registrations` |
 | 17 | POST | `/api/academic/academic-summary-notifications` | gửi snapshot giữa kỳ cho cả scope, kể cả SV không có cảnh báo; có thể gửi thủ công trước. | `POST /api/academic/academic-summary-notifications` |
@@ -143,8 +143,8 @@ Quản lý tuyển dụng, điều phối và thực tập.
 | # | Method | Đường dẫn Swagger | Chức năng | Route gốc |
 |---:|---|---|---|---|
 | 1 | PATCH | `/api/accounts/me/profile` | Cập nhật hồ sơ cá nhân | `PATCH /api/accounts/me/profile` |
-| 2 | POST | `/api/imports/preview` | Kiểm tra toàn bộ dữ liệu import | `POST /api/imports/preview` |
-| 3 | POST | `/api/imports/commit` | Import tổng tài khoản và dữ liệu nghiệp vụ | `POST /api/imports/commit` |
+| 2 | POST | `/api/imports/preview` | Kiểm tra import doanh nghiệp hoặc sinh viên | `POST /api/imports/preview` |
+| 3 | POST | `/api/imports/commit` | Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin) | `POST /api/imports/commit` |
 | 4 | POST | `/api/imports/archive` | Lưu trữ tuyển dụng sau hai học kỳ | `POST /api/imports/archive` |
 | 5 | POST | `/api/ojt-coordinations` | Giới thiệu sinh viên cho doanh nghiệp | `POST /api/ojt-coordinations` |
 | 6 | POST | `/api/assignments` | Phân công sinh viên thực tập | `POST /api/assignments` |

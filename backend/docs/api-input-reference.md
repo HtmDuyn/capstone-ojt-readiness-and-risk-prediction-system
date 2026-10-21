@@ -742,7 +742,7 @@ Không có request body.
 
 ## POST /api/imports/commit
 
-Import tổng tài khoản và dữ liệu nghiệp vụ
+Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin)
 
 ENTERPRISE: chỉ OJT_COORD được import, bắt buộc positions và windowId. Trùng email giữ nguyên mã doanh nghiệp, tài khoản và tin cũ; chỉ thêm tuyển dụng với mã vị trí mới. Code/email trỏ tới hai doanh nghiệp khác nhau bị từ chối. STUDENT: ADMIN/ACADEMIC import tài khoản, academic, placement và courseResults trong một giao dịch. CV dùng API upload hiện tại.
 
@@ -789,7 +789,35 @@ Body: application/json — bắt buộc.
 | rows[].academic.courseResults[].grade | string | Không / theo điều kiện nghiệp vụ | nullable=true |  |
 | rows[].academic.courseResults[].sourceReference | string | Không / theo điều kiện nghiệp vụ | nullable=true |  |
 
-Ví dụ:
+enterprise:
+
+```json
+{
+  "kind": "ENTERPRISE",
+  "idempotencyKey": "enterprise-import-001",
+  "windowId": 1,
+  "rows": [
+    {
+      "code": "DN001",
+      "email": "hr@example.com",
+      "fullName": "Nguyễn Thị Mai",
+      "name": "Công ty ABC",
+      "address": "123 Nguyễn Văn Linh, TP. Hồ Chí Minh",
+      "positions": [
+        {
+          "code": "DEV001",
+          "title": "Thực tập lập trình",
+          "description": "Tham gia phát triển phần mềm",
+          "requirements": "Kiến thức TypeScript và SQL",
+          "capacity": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+student:
 
 ```json
 {
@@ -846,7 +874,7 @@ Không có request body.
 
 ## POST /api/imports/preview
 
-Kiểm tra toàn bộ dữ liệu import
+Kiểm tra import doanh nghiệp hoặc sinh viên
 
 ENTERPRISE: chỉ OJT_COORD được import, bắt buộc positions và windowId. Trùng email giữ nguyên mã doanh nghiệp, tài khoản và tin cũ; chỉ thêm tuyển dụng với mã vị trí mới. Code/email trỏ tới hai doanh nghiệp khác nhau bị từ chối. STUDENT: ADMIN/ACADEMIC import tài khoản, academic, placement và courseResults trong một giao dịch. CV dùng API upload hiện tại.
 
@@ -893,7 +921,35 @@ Body: application/json — bắt buộc.
 | rows[].academic.courseResults[].grade | string | Không / theo điều kiện nghiệp vụ | nullable=true |  |
 | rows[].academic.courseResults[].sourceReference | string | Không / theo điều kiện nghiệp vụ | nullable=true |  |
 
-Ví dụ:
+enterprise:
+
+```json
+{
+  "kind": "ENTERPRISE",
+  "idempotencyKey": "enterprise-import-001",
+  "windowId": 1,
+  "rows": [
+    {
+      "code": "DN001",
+      "email": "hr@example.com",
+      "fullName": "Nguyễn Thị Mai",
+      "name": "Công ty ABC",
+      "address": "123 Nguyễn Văn Linh, TP. Hồ Chí Minh",
+      "positions": [
+        {
+          "code": "DEV001",
+          "title": "Thực tập lập trình",
+          "description": "Tham gia phát triển phần mềm",
+          "requirements": "Kiến thức TypeScript và SQL",
+          "capacity": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+student:
 
 ```json
 {
