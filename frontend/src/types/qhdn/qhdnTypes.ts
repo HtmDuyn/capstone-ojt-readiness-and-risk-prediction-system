@@ -235,6 +235,12 @@ export interface PositionListItem {
     contactPersonName?: string | null;
   } | null;
   semesterCode?: string;
+  semester?: {
+    id: number;
+    code?: string;
+    name?: string;
+    status?: string;
+  } | null;
 }
 
 export interface PositionListResponse {

@@ -26,11 +26,18 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { EnterprisePartnerDetailModal } from '@/components/qhdn/enterprise/PartnerDetailModal';
 import { EnterpriseImportExcelModal } from '@/components/qhdn/enterprise/ImportExcelModal';
 import { EnterpriseCreateModal } from '@/components/qhdn/enterprise/CreateModal';
-import { archiveImport, createCompany, listCompanies, searchOjtSemesters } from '@/service/qhdnService';
+import {
+  archiveImport,
+  createCompany,
+  listCompanies,
+  listPositions,
+  searchOjtSemesters,
+} from '@/service/qhdnService';
 import type {
   EnterprisePartner,
   CreateCompanyRequest,
   OjtSemesterItem,
+  PositionListItem,
 } from '@/types/qhdn/qhdnTypes';
 
 const PAGE_SIZE = 10;
@@ -142,6 +149,35 @@ export const QhdnEnterpriseManagement: React.FC = () => {
           companies.push(...nextPage.data.items);
         }
 
+        let positions: PositionListItem[] = [];
+        try {
+          const firstPositionPage = await listPositions({ page: 1, limit: 20 });
+          positions = [...firstPositionPage.data.items];
+          const totalPositionPages = Math.ceil(
+            firstPositionPage.data.total / firstPositionPage.data.limit
+          );
+
+          for (let page = 2; page <= totalPositionPages; page += 1) {
+            const nextPage = await listPositions({ page, limit: firstPositionPage.data.limit });
+            positions.push(...nextPage.data.items);
+          }
+        } catch (error) {
+          console.error('Không thể tải học kỳ và chỉ tiêu từ danh sách vị trí:', error);
+          if (isActive) {
+            setCompanyToast({
+              type: 'error',
+              message: 'Không tải được học kỳ tiếp nhận và quota từ danh sách vị trí.',
+            });
+          }
+        }
+
+        const positionsByCompany = new Map<number, PositionListItem[]>();
+        positions.forEach((position) => {
+          const companyPositions = positionsByCompany.get(position.companyId) || [];
+          companyPositions.push(position);
+          positionsByCompany.set(position.companyId, companyPositions);
+        });
+
         const loadedPartners: EnterprisePartner[] = companies.map((company) => {
           const cached = cachedPartners.find(
             (partner) =>
@@ -150,7 +186,29 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                 company.contactEmail &&
                 partner.contactEmail.toLowerCase() === company.contactEmail.toLowerCase())
           );
-          const totalQuota = cached?.totalQuota ?? 0;
+          const companyPositions = positionsByCompany.get(company.id) || [];
+          const totalQuota = companyPositions.length
+            ? companyPositions.reduce((total, position) => total + position.capacity, 0)
+            : cached?.totalQuota ?? 0;
+          const availableQuota = companyPositions.length
+            ? companyPositions.reduce((total, position) => total + position.remainingSlots, 0)
+            : cached?.availableQuota ?? totalQuota;
+          const acceptedCount = companyPositions.length
+            ? totalQuota - availableQuota
+            : cached?.acceptedCount ?? 0;
+          const semesters = Array.from(
+            new Set(
+              companyPositions
+                .map(
+                  (position) =>
+                    position.semester?.name ||
+                    position.semester?.code ||
+                    position.semesterCode ||
+                    `Kỳ #${position.ojtSemesterId}`
+                )
+                .filter(Boolean)
+            )
+          );
 
           return {
             id: String(company.id),
@@ -166,9 +224,9 @@ export const QhdnEnterpriseManagement: React.FC = () => {
             mouSignedDate: cached?.mouSignedDate || company.createdAt?.split('T')[0] || '',
             mouExpiryDate: cached?.mouExpiryDate || '',
             totalQuota,
-            acceptedCount: cached?.acceptedCount ?? 0,
-            availableQuota: cached?.availableQuota ?? totalQuota,
-            semesters: cached?.semesters || [],
+            acceptedCount,
+            availableQuota,
+            semesters: semesters.length ? semesters : cached?.semesters || [],
           };
         });
 
@@ -810,9 +868,15 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                 ) : (
                   <>
                     {paginatedPartners.map((partner, index) => {
-                      const fillPercentage = Math.round((partner.acceptedCount / partner.totalQuota) * 100);
+                      const fillPercentage = partner.totalQuota
+                        ? Math.round((partner.acceptedCount / partner.totalQuota) * 100)
+                        : 0;
                       const rowNumber = (safeCurrentPage - 1) * PAGE_SIZE + index + 1;
-                      const partnerSemesters = partner.semesters || (partner.semester ? [partner.semester] : ['Summer 2026']);
+                      const partnerSemesters = partner.semesters?.length
+                        ? partner.semesters
+                        : partner.semester
+                          ? [partner.semester]
+                          : [];
 
                       return (
                         <tr
@@ -855,6 +919,9 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                                   {sem}
                                 </span>
                               ))}
+                              {partnerSemesters.length === 0 && (
+                                <span className="text-xs text-slate-400">Chưa có kỳ tiếp nhận</span>
+                              )}
                             </div>
                           </td>
 
@@ -1053,9 +1120,15 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                 ) : (
                   <>
                     {paginatedPartners.map((partner, index) => {
-                      const fillPercentage = Math.round((partner.acceptedCount / partner.totalQuota) * 100);
+                      const fillPercentage = partner.totalQuota
+                        ? Math.round((partner.acceptedCount / partner.totalQuota) * 100)
+                        : 0;
                       const rowNumber = (safeCurrentPage - 1) * PAGE_SIZE + index + 1;
-                      const partnerSemesters = partner.semesters || (partner.semester ? [partner.semester] : ['Summer 2026']);
+                      const partnerSemesters = partner.semesters?.length
+                        ? partner.semesters
+                        : partner.semester
+                          ? [partner.semester]
+                          : [];
 
                       return (
                         <tr key={partner.id} className="h-[58px] hover:bg-slate-50 transition-colors">
@@ -1078,6 +1151,9 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                                   {sem}
                                 </span>
                               ))}
+                              {partnerSemesters.length === 0 && (
+                                <span className="text-xs text-slate-400">Chưa có kỳ tiếp nhận</span>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-center font-bold text-slate-900 text-sm">

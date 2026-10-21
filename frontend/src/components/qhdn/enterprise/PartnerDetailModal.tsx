@@ -95,7 +95,12 @@ export const EnterprisePartnerDetailModal: React.FC<EnterprisePartnerDetailModal
             <div className="flex items-center gap-2 text-slate-700">
               <span className="font-medium text-slate-400 w-24">Kỳ tiếp nhận:</span>
               <span className="font-semibold text-slate-800">
-                {(partner.semesters || [partner.semester || 'Summer 2026']).join(' • ')}
+                {(partner.semesters?.length
+                  ? partner.semesters
+                  : partner.semester
+                    ? [partner.semester]
+                    : ['Chưa có kỳ tiếp nhận']
+                ).join(' • ')}
               </span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
