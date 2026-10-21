@@ -21,6 +21,7 @@ import EnterpriseJobs from "@/pages/enterprise/EnterpriseJobs";
 import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
 import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
 import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
+import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -236,6 +237,10 @@ export const router = createBrowserRouter([
           {
             path: "/enterprise/evaluation",
             element: <EnterpriseEvaluation />,
+          },
+          {
+            path: "/enterprise/profile",
+            element: <EnterpriseProfile />,
           },
         ],
       },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   Briefcase,
@@ -10,14 +10,18 @@ import {
   UserCheck,
   ChevronRight,
   Send,
+  Building2,
+  ExternalLink,
+  Layers,
+  FileCheck2,
 } from 'lucide-react';
-import {
-  MOCK_ENTERPRISE_JOBS,
-  MOCK_ENTERPRISE_CANDIDATES,
-  MOCK_ENTERPRISE_INTERNS,
-} from '@/data/enterprise/mockEnterpriseData';
+import { enterpriseService } from '@/service/enterpriseService';
+import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
+import { Link } from 'react-router-dom';
 
 export const EnterpriseDashboard: React.FC = () => {
+  const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [incidentReport, setIncidentReport] = useState({
     studentId: '',
@@ -27,15 +31,22 @@ export const EnterpriseDashboard: React.FC = () => {
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const pendingCandidates = MOCK_ENTERPRISE_CANDIDATES.filter(
-    (c) => c.status === 'PENDING'
-  );
-  const ongoingInterns = MOCK_ENTERPRISE_INTERNS.filter(
-    (i) => i.status === 'ONGOING'
-  );
-  const riskInterns = MOCK_ENTERPRISE_INTERNS.filter(
-    (i) => i.status === 'RISK'
-  );
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoading(true);
+      try {
+        const res = await enterpriseService.getProfile();
+        if (res && res.success && res.data) {
+          setProfile(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load enterprise profile in dashboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProfile();
+  }, []);
 
   const handleSendIncident = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,16 +56,16 @@ export const EnterpriseDashboard: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const summary = profile?.summary;
+  const companyName = profile?.name || 'Doanh nghiệp Đối tác';
+
   return (
     <div className="space-y-6 pb-12">
+      {/* Banner without buttons */}
       <PageBanner
-        title="Cổng Quản lý Thực tập Doanh nghiệp Đối tác"
-        description="Chào mừng FPT Software. Quản lý các vị trí thực tập, tiếp nhận ứng viên sinh viên FPT và theo dõi tiến độ OJT."
-        badge="FPT Enterprise Partner"
-        primaryAction={{
-          label: "Gửi báo cáo sự cố",
-          onClick: () => setShowIncidentModal(true),
-        }}
+        title={`Cổng Quản lý Thực tập: ${companyName}`}
+        description={`Chào mừng ${companyName} (${profile?.code || 'OJT Partner'}). Quản lý các vị trí thực tập, tiếp nhận ứng viên sinh viên và theo dõi tiến độ OJT.`}
+        badge={profile?.status === 'ACTIVE' ? 'Đối tác chính thức (ACTIVE)' : 'Doanh nghiệp Đối tác'}
       />
 
       {toastMessage && (
@@ -72,258 +83,255 @@ export const EnterpriseDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Overview Stat Cards */}
+      {/* Real Overview Stat Cards from /api/enterprise/profile summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
+        {/* Vị trí tuyển OJT */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Vị trí tuyển OJT
+              Vị trí tuyển OJT đã đăng
             </p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {MOCK_ENTERPRISE_JOBS.length} <span className="text-xs text-slate-400 font-normal">vị trí</span>
+            <h3 className="text-2xl font-black text-slate-900 mt-1">
+              {loading ? '...' : summary?.publishedPosts ?? 0}{' '}
+              <span className="text-xs text-slate-400 font-normal">vị trí</span>
             </h3>
-            <p className="text-xs text-emerald-600 font-medium mt-1">
-              Tổng chỉ tiêu: {MOCK_ENTERPRISE_JOBS.reduce((acc, curr) => acc + curr.slotsTotal, 0)} sinh viên
+            <p className="text-xs text-amber-600 font-medium mt-1">
+              Chờ duyệt: <strong>{summary?.pendingPosts ?? 0}</strong> vị trí
             </p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shadow-xs">
             <Briefcase className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
+        {/* Hồ sơ chờ duyệt */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Hồ sơ chờ duyệt
+              Hồ sơ chờ xét duyệt
             </p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {pendingCandidates.length} <span className="text-xs text-slate-400 font-normal">ứng viên</span>
+            <h3 className="text-2xl font-black text-slate-900 mt-1">
+              {loading ? '...' : summary?.pendingCandidates ?? 0}{' '}
+              <span className="text-xs text-slate-400 font-normal">ứng viên</span>
             </h3>
-            <p className="text-xs text-amber-600 font-medium mt-1">Cần phản hồi trong 48h</p>
+            <p className="text-xs text-blue-600 font-medium mt-1">Nguyện vọng vào doanh nghiệp</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
             <Users className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
+        {/* Sinh viên đang thực tập */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Interns đang thực tập
+              Sinh viên đang thực tập
             </p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {ongoingInterns.length} <span className="text-xs text-slate-400 font-normal">sinh viên</span>
+            <h3 className="text-2xl font-black text-slate-900 mt-1">
+              {loading ? '...' : summary?.activeInterns ?? 0}{' '}
+              <span className="text-xs text-slate-400 font-normal">sinh viên</span>
             </h3>
-            <p className="text-xs text-emerald-600 font-medium mt-1">
-              Hoàn thành TB: 82% task
-            </p>
+            <p className="text-xs text-emerald-600 font-medium mt-1">Đang tiếp nhận OJT</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
             <UserCheck className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
+        {/* Đánh giá OJT chờ xử lý */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Cảnh báo tiến độ OJT
+              Đánh giá OJT chờ xử lý
             </p>
-            <h3 className="text-2xl font-bold text-rose-600 mt-1">
-              {riskInterns.length} <span className="text-xs text-slate-400 font-normal">sinh viên</span>
+            <h3 className="text-2xl font-black text-purple-600 mt-1">
+              {loading ? '...' : summary?.pendingEvaluations ?? 0}{' '}
+              <span className="text-xs text-slate-400 font-normal">phiếu</span>
             </h3>
-            <p className="text-xs text-rose-500 font-medium mt-1">Chậm tiến độ / Vắng nhiều</p>
+            <p className="text-xs text-purple-500 font-medium mt-1">Đánh giá kết thúc kỳ</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-            <AlertTriangle className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-xs">
+            <FileCheck2 className="w-6 h-6" />
           </div>
         </div>
       </div>
 
       {/* Main Grid Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Hồ sơ sinh viên chờ duyệt & Vị trí tuyển dụng */}
+        {/* Left Column (2 cols): Summary overview & Quick Navigation */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Pending Applications Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          {/* Card: Hồ sơ Sinh viên Chờ duyệt Tiếp nhận */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Hồ sơ Sinh viên Chờ duyệt Tiếp nhận</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Sinh viên FPT đăng ký OJT nguyện vọng vào doanh nghiệp</p>
+                <h3 className="font-bold text-slate-900 text-base">Hồ sơ Sinh viên Chờ duyệt</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Sinh viên đăng ký OJT nguyện vọng vào doanh nghiệp
+                </p>
               </div>
-              <a
-                href="/enterprise/candidates"
+              <Link
+                to="/enterprise/candidates"
                 className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center space-x-1"
               >
                 <span>Xem tất cả</span>
                 <ChevronRight className="w-4 h-4" />
-              </a>
+              </Link>
             </div>
 
-            <div className="divide-y divide-slate-100">
-              {MOCK_ENTERPRISE_CANDIDATES.slice(0, 3).map((candidate) => (
-                <div key={candidate.id} className="p-4 hover:bg-slate-50/70 transition-colors flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-sm">
-                      {candidate.fullName.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-slate-900 text-sm">{candidate.fullName}</span>
-                        <span className="text-xs text-slate-400">({candidate.studentCode})</span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {candidate.appliedRole} • GPA: <strong className="text-slate-700">{candidate.gpa}</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        AI Match: {candidate.aiMatchScore}%
-                      </span>
-                      <p className="text-[11px] text-slate-400 mt-0.5">{candidate.appliedDate}</p>
-                    </div>
-
-                    <a
-                      href="/enterprise/candidates"
-                      className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors"
+            <div className="p-6 text-center">
+              {summary && summary.pendingCandidates > 0 ? (
+                <div className="text-xs text-slate-600">
+                  Có <strong>{summary.pendingCandidates}</strong> ứng viên mới cần duyệt hồ sơ.
+                  <div className="mt-3">
+                    <Link
+                      to="/enterprise/candidates"
+                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1"
                     >
-                      Xem CV & Duyệt
-                    </a>
+                      <span>Vào duyệt hồ sơ ngay</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
-              ))}
+              ) : (
+                <div className="py-6 space-y-2 text-slate-400">
+                  <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-medium text-slate-500">
+                    Hiện chưa có hồ sơ ứng viên nào đang chờ duyệt tiếp nhận.
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Hồ sơ mới đăng ký của sinh viên sẽ tự động hiển thị tại đây.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Active Job Postings Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          {/* Card: Vị trí Thực tập Đang mở */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Vị trí Thực tập Đang mở</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Danh sách job OJT tuyển sinh viên kỳ này</p>
+                <h3 className="font-bold text-slate-900 text-base">Vị trí Thực tập OJT</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Danh sách chỉ tiêu tiếp nhận sinh viên thực tập của doanh nghiệp
+                </p>
               </div>
-              <a
-                href="/enterprise/jobs"
+              <Link
+                to="/enterprise/jobs"
                 className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center space-x-1"
               >
                 <span>Quản lý vị trí</span>
                 <ChevronRight className="w-4 h-4" />
-              </a>
+              </Link>
             </div>
 
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {MOCK_ENTERPRISE_JOBS.map((job) => (
-                <div key={job.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all">
-                  <div className="flex items-start justify-between">
-                    <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{job.title}</h4>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                        job.status === 'OPEN'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
+            <div className="p-6 text-center">
+              {summary && summary.publishedPosts > 0 ? (
+                <div className="text-xs text-slate-600">
+                  Doanh nghiệp đang mở tuyển <strong>{summary.publishedPosts}</strong> vị trí OJT.
+                </div>
+              ) : (
+                <div className="py-6 space-y-3 text-slate-400">
+                  <Briefcase className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-medium text-slate-500">
+                    Chưa có vị trí tuyển dụng thực tập nào đang mở.
+                  </p>
+                  <div>
+                    <Link
+                      to="/enterprise/jobs"
+                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1 transition-all"
                     >
-                      {job.status === 'OPEN' ? 'Đang tuyển' : 'Đủ chỉ tiêu'}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-500 mt-1">{job.department}</p>
-
-                  <div className="mt-3 flex items-center justify-between text-xs text-slate-600">
-                    <span>Đã nhận: <strong>{job.slotsFilled}/{job.slotsTotal}</strong></span>
-                    <span className="text-orange-600 font-semibold">{job.salaryAllowance}</span>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="mt-2 w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className="bg-orange-500 h-1.5 rounded-full"
-                      style={{ width: `${(job.slotsFilled / job.slotsTotal) * 100}%` }}
-                    />
+                      <span>+ Đăng vị trí tuyển mới</span>
+                    </Link>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column: Cảnh báo & Tiện ích nhanh */}
+        {/* Right Column (1 col): Thao tác nhanh & Thông tin doanh nghiệp */}
         <div className="space-y-6">
           {/* Action Hub Card */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg space-y-4">
             <h3 className="font-bold text-base flex items-center space-x-2 text-amber-400">
               <TrendingUp className="w-5 h-5" />
-              <span>Thao tác Nhanh Doanh nghiệp</span>
+              <span>Thao tác Doanh nghiệp</span>
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Các quy trình làm việc chính dành cho cán bộ tuyển dụng & quản lý thực tập tại doanh nghiệp đối tác.
+              Các chức năng quản lý chính dành cho cán bộ tuyển dụng & quản lý thực tập tại doanh nghiệp đối tác.
             </p>
 
             <div className="space-y-2 pt-2">
-              <a
-                href="/enterprise/jobs"
+              <Link
+                to="/enterprise/profile"
+                className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
+              >
+                <div className="flex items-center space-x-2">
+                  <Building2 className="w-4 h-4 text-orange-400" />
+                  <span>Hồ sơ Doanh nghiệp ({profile?.code || 'TechViet'})</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </Link>
+
+              <Link
+                to="/enterprise/jobs"
                 className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
               >
                 <span>+ Đăng vị trí tuyển dụng mới</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
-              </a>
+              </Link>
 
-              <a
-                href="/enterprise/candidates"
+              <Link
+                to="/enterprise/candidates"
                 className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
               >
-                <span>Duyệt danh sách tiếp nhận OJT</span>
+                <span>Duyệt hồ sơ sinh viên ứng tuyển</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
-              </a>
+              </Link>
 
-              <a
-                href="/enterprise/interns"
+              <Link
+                to="/enterprise/interns"
                 className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
               >
-                <span>Giao nhiệm vụ & Điểm danh tuần</span>
+                <span>Giao nhiệm vụ & Theo dõi thực tập</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
-              </a>
+              </Link>
 
-              <a
-                href="/enterprise/evaluation"
+              <Link
+                to="/enterprise/evaluation"
                 className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
               >
-                <span>Đánh giá kết quả OJT sinh viên</span>
+                <span>Đánh giá kết quả OJT kết thúc kỳ</span>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
-              </a>
+              </Link>
             </div>
           </div>
 
-          {/* Risk Warnings Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
-            <div className="flex items-center space-x-2 text-rose-600 font-bold text-sm">
-              <AlertTriangle className="w-5 h-5" />
-              <span>Sinh viên Cần lưu ý đặc biệt</span>
+          {/* Quick Enterprise Info Card */}
+          {profile && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-3 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="font-bold text-slate-900">Thông tin liên hệ HR</span>
+                <Link
+                  to="/enterprise/profile"
+                  className="text-orange-600 hover:underline font-semibold text-[11px]"
+                >
+                  Xem chi tiết
+                </Link>
+              </div>
+              <div className="space-y-1.5 text-slate-600">
+                <p>
+                  Đại diện: <strong>{profile.contactPersonName}</strong>
+                </p>
+                <p>
+                  Email: <strong>{profile.contactEmail}</strong>
+                </p>
+                <p>
+                  Ngành nghề: <strong>{profile.industry}</strong>
+                </p>
+              </div>
             </div>
-
-            <div className="space-y-3">
-              {riskInterns.map((intern) => (
-                <div key={intern.id} className="p-3 rounded-xl bg-rose-50/70 border border-rose-100 text-xs space-y-1">
-                  <div className="flex items-center justify-between font-bold text-slate-900">
-                    <span>{intern.fullName} ({intern.studentCode})</span>
-                    <span className="text-rose-600 font-semibold">Tiến độ {intern.progressPercent}%</span>
-                  </div>
-                  <p className="text-slate-600">Vị trí: {intern.position}</p>
-                  <p className="text-slate-500">Mentor: {intern.mentorName}</p>
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={() => setShowIncidentModal(true)}
-                      className="px-2.5 py-1 rounded bg-rose-600 text-white text-[11px] font-semibold hover:bg-rose-700 transition-colors"
-                    >
-                      Báo cáo sự cố về Trường
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -347,21 +355,18 @@ export const EnterpriseDashboard: React.FC = () => {
             <form onSubmit={handleSendIncident} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Chọn sinh viên phát sinh sự cố
+                  Mã hoặc Tên sinh viên phát sinh sự cố
                 </label>
-                <select
+                <input
+                  type="text"
                   required
+                  placeholder="Ví dụ: SE170012 - Phạm Minh Tuấn"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
                   value={incidentReport.studentId}
-                  onChange={(e) => setIncidentReport({ ...incidentReport, studentId: e.target.value })}
-                >
-                  <option value="">-- Chọn sinh viên --</option>
-                  {MOCK_ENTERPRISE_INTERNS.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.fullName} ({i.studentCode}) - {i.position}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(e) =>
+                    setIncidentReport({ ...incidentReport, studentId: e.target.value })
+                  }
+                />
               </div>
 
               <div>
@@ -371,7 +376,9 @@ export const EnterpriseDashboard: React.FC = () => {
                 <select
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
                   value={incidentReport.severity}
-                  onChange={(e) => setIncidentReport({ ...incidentReport, severity: e.target.value })}
+                  onChange={(e) =>
+                    setIncidentReport({ ...incidentReport, severity: e.target.value })
+                  }
                 >
                   <option value="LOW">Thấp (Nhắc nhở nội bộ)</option>
                   <option value="MEDIUM">Trung bình (Vắng 3 ngày không phép / Chậm tiến độ)</option>
@@ -389,7 +396,9 @@ export const EnterpriseDashboard: React.FC = () => {
                   placeholder="Ví dụ: Sinh viên nghỉ tự do 3 ngày liên tiếp không lý do"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
                   value={incidentReport.title}
-                  onChange={(e) => setIncidentReport({ ...incidentReport, title: e.target.value })}
+                  onChange={(e) =>
+                    setIncidentReport({ ...incidentReport, title: e.target.value })
+                  }
                 />
               </div>
 
@@ -403,7 +412,9 @@ export const EnterpriseDashboard: React.FC = () => {
                   placeholder="Mô tả hoàn cảnh, thái độ và đề xuất phương án xử lý từ phía Doanh nghiệp..."
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
                   value={incidentReport.description}
-                  onChange={(e) => setIncidentReport({ ...incidentReport, description: e.target.value })}
+                  onChange={(e) =>
+                    setIncidentReport({ ...incidentReport, description: e.target.value })
+                  }
                 />
               </div>
 

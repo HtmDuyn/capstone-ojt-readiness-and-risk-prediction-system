@@ -52,6 +52,8 @@ export interface InternTask {
   deadline: string;
   status: 'TODO' | 'IN_PROGRESS' | 'DONE';
   assignedBy: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  createdAt?: string;
 }
 
 export interface InternEvaluation {
@@ -68,4 +70,33 @@ export interface InternEvaluation {
   feedback: string;
   evaluatedDate?: string;
   status: 'DRAFT' | 'SUBMITTED';
+}
+
+export interface EnterpriseProfileSummary {
+  scope: string;
+  publishedPosts: number;
+  pendingPosts: number;
+  pendingCandidates: number;
+  activeInterns: number;
+  pendingEvaluations: number;
+}
+
+export interface EnterpriseProfileData {
+  id: number;
+  code: string;
+  name: string;
+  address: string | null;
+  industry: string;
+  contactPersonName: string;
+  contactPhone: string | null;
+  contactEmail: string;
+  status: string;
+  createdAt: string;
+  summary: EnterpriseProfileSummary;
+}
+
+export interface EnterpriseProfileResponse {
+  success: boolean;
+  data: EnterpriseProfileData;
+  message?: string;
 }

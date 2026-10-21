@@ -2,7 +2,7 @@ import React from 'react';
 import {
   DashboardGridIcon,
 } from '@/components/common/icons/AppIcons';
-import { Briefcase, Users, CheckSquare, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { Briefcase, Users, CheckSquare, ClipboardCheck, AlertTriangle, Building2 } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
