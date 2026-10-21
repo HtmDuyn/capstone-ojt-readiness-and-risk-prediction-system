@@ -51,8 +51,8 @@ const listContexts:Record<string,string[]>={
  '/api/admin/prediction-jobs/{id}':['student'], '/api/predictions':['student','semester','model'],
  '/api/alerts':['student','semester','updatedByUser'], '/api/students/{id}/interventions':['student','assignedToUser','createdByUser'],
  '/api/admin/reports/readiness':['student','semester','model'], '/api/admin/audit-logs':['user'],
- '/api/enterprise/candidates':['student','position','semester'], '/api/enterprise/internships':['student','position','semester'],
- '/api/recruitment/windows':['academicPeriod','semester','createdByUser'], '/api/recruitment/posts':['company','semester','academicPeriod'],
+ '/api/enterprise/candidates':['student','company','position','semester'], '/api/enterprise/internships':['student','company','position','semester'],
+ '/api/recruitment/posts':['company','semester','academicPeriod'],
  '/api/job-applications':['student','company','position','semester'],
 };
 
@@ -94,8 +94,11 @@ export function describeListResponses(spec:Schema):void {
  Object.assign(history.properties,{id,ojtSemesterId:id,registrationIds:{type:'array',items:id},recipientRole:text,reason:text,createdBy:id,createdAt:time,studentCount:{type:'integer',minimum:0}});
  for(const path of ['/api/enterprise/candidates','/api/enterprise/internships']){
   const fields=spec.paths[path].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
-  Object.assign(fields,{studentId:id,ojtSemesterId:id,registrationId:id,positionId:id,applicationId:{...id,nullable:true},jobApplication:{type:'object',nullable:true,additionalProperties:true}});
+  Object.assign(fields.student.properties,{accountStatus:text,enrollmentYear:{type:'integer',nullable:true},currentSemester:{type:'integer',nullable:true},className:{...text,nullable:true}});
+  Object.assign(fields,{companyId:id,studentId:id,ojtSemesterId:id,registrationId:id,positionId:id,applicationId:{...id,nullable:true},jobApplication:obj({id,postId:id,coverLetter:{...text,nullable:true},appliedAt:time,status:text,cv:obj({id,studentId:id,filename:text,fileName:text,mimeType:text,sizeBytes:{type:'integer'},size:{type:'integer'},sha256:text,createdAt:time,uploadedAt:time})})});
  }
+ const candidateFields=spec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
+ Object.assign(candidateFields,{companyId:id,company:contexts.company,coordinatedBy:{...id,nullable:true},coordinatedByUser:user,registration:contexts.registration,application:{type:'object',additionalProperties:true},decision:text,introducedAt:time,decisionAt:{...time,nullable:true},rejectReason:{...text,nullable:true},isLatestCoordination:{type:'boolean'},recruitmentPost:{type:'object',nullable:true,properties:{...spec.paths['/api/recruitment/posts'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties}}});
  const emails=spec.paths['/api/imports/emails'].get;
  emails.responses['200']={description:'Tối đa 100 email mới nhất; kèm tổng số và quyền gửi lại, không có nội dung mã hóa.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},emails:{type:'array',items:{type:'object',properties:{EmailID:id,UserID:id,Recipient:text,Status:text,Attempts:{type:'integer'},SentAt:time,ExpiresAt:time,LastError:{...text,nullable:true},user:obj({id,fullName:text,email:text}),canRetry:{type:'boolean'}}}},total:{type:'integer'},limit:{type:'integer',enum:[100]},hasMore:{type:'boolean'}}}}}};
  const schedules=spec.paths['/api/academic-periods/{id}/combo-phase-schedules'].get;

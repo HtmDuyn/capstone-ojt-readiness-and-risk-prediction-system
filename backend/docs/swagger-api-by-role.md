@@ -2,14 +2,14 @@
 
 Tạo từ OpenAPI hiện hành bằng `npm run docs:api` sau `npm run build`.
 
-Tổng 159 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
+Tổng 157 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
 | Admin | 29 |
 | Phòng đào tạo | 80 |
-| Phòng QHDN | 35 |
-| Doanh nghiệp | 11 |
+| Phòng QHDN | 33 |
+| Doanh nghiệp | 9 |
 | Sinh viên | 32 |
 | Auth | 3 |
 
@@ -166,17 +166,15 @@ Quản lý tuyển dụng, điều phối và thực tập.
 | 22 | POST | `/api/json/qhdn/dashboard/search` | Tổng quan QHDN | `GET /api/qhdn/dashboard` |
 | 23 | POST | `/api/json/qhdn/reports/export` | Xuất báo cáo QHDN | `GET /api/qhdn/reports/export` |
 | 24 | POST | `/api/json/qhdn/reports/list` | Báo cáo QHDN theo loại | `GET /api/qhdn/reports` |
-| 25 | POST | `/api/json/recruitment/windows/list` | Danh sách đợt tuyển dụng theo học kỳ | `GET /api/recruitment/windows` |
-| 26 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng | `PATCH /api/recruitment/windows/{id}` |
-| 27 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
-| 28 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng | `PATCH /api/recruitment/posts/{id}` |
-| 29 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng | `POST /api/recruitment/posts/{id}/review` |
-| 30 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng | `POST /api/recruitment/posts/{id}/close` |
-| 31 | POST | `/api/json/ojt-results/list` | Danh sách điểm OJT chính thức do doanh nghiệp đánh giá | `GET /api/ojt-results` |
-| 32 | POST | `/api/json/ojt-semesters/results/export` | Xuất danh sách điểm OJT chính thức | `GET /api/ojt-semesters/{id}/results/export` |
-| 33 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
-| 34 | POST | `/api/json/job-applications/list` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
-| 35 | POST | `/api/json/internship-tasks/list` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 25 | PATCH | `/api/json/recruitment/windows` | Cập nhật hoặc mở/đóng đợt tuyển dụng | `PATCH /api/recruitment/windows/{id}` |
+| 26 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
+| 27 | POST | `/api/json/recruitment/posts/review` | Duyệt hoặc từ chối tin tuyển dụng | `POST /api/recruitment/posts/{id}/review` |
+| 28 | POST | `/api/json/recruitment/posts/close` | Đóng tin tuyển dụng | `POST /api/recruitment/posts/{id}/close` |
+| 29 | POST | `/api/json/ojt-results/list` | Danh sách điểm OJT chính thức do doanh nghiệp đánh giá | `GET /api/ojt-results` |
+| 30 | POST | `/api/json/ojt-semesters/results/export` | Xuất danh sách điểm OJT chính thức | `GET /api/ojt-semesters/{id}/results/export` |
+| 31 | POST | `/api/json/students/cv/search` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
+| 32 | POST | `/api/json/job-applications/list` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
+| 33 | POST | `/api/json/internship-tasks/list` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
 
 ## Doanh nghiệp
 
@@ -191,10 +189,8 @@ Quản lý hồ sơ, tuyển dụng và thực tập sinh.
 | 5 | PATCH | `/api/json/enterprise/candidates/decision` | Tiếp nhận hoặc từ chối ứng viên | `PATCH /api/enterprise/candidates/{id}/decision` |
 | 6 | POST | `/api/json/enterprise/internships/list` | Danh sách sinh viên thực tập | `GET /api/enterprise/internships` |
 | 7 | PUT | `/api/json/enterprise/internships/evaluation` | Gửi hoặc cập nhật đánh giá thực tập | `PUT /api/enterprise/internships/{id}/evaluation` |
-| 8 | POST | `/api/json/recruitment/windows/list` | Danh sách đợt tuyển dụng theo học kỳ | `GET /api/recruitment/windows` |
-| 9 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
-| 10 | PATCH | `/api/json/recruitment/posts` | Sửa tin và vị trí tuyển dụng | `PATCH /api/recruitment/posts/{id}` |
-| 11 | POST | `/api/json/internship-tasks/list` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 8 | POST | `/api/json/recruitment/posts/list` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
+| 9 | POST | `/api/json/internship-tasks/list` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
 
 ## Sinh viên
 

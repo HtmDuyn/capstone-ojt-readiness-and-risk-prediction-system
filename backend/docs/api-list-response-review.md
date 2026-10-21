@@ -1,6 +1,6 @@
 # Rà soát response API list
 
-Phạm vi: 49 API `/list` từ Swagger hiện hành. Bảng dưới mô tả các trường trong OpenAPI; không phải dữ liệu lấy từ production.
+Phạm vi: 48 API `/list` từ Swagger hiện hành. Bảng dưới mô tả các trường trong OpenAPI; không phải dữ liệu lấy từ production.
 
 Đã đối chiếu SQL/serializer của các danh sách. Ngoài các API `/list`, danh sách vai trò và email vẫn có mã/tên hoặc người nhận/trạng thái đầy đủ.
 
@@ -49,9 +49,8 @@ Phạm vi: 49 API `/list` từ Swagger hiện hành. Bảng dưới mô tả cá
 | POST /api/json/students/interventions/list | id, alertId, studentId, assignedTo, createdBy, description, status, outcome, dueDate, createdAt, updatedAt, student, assignedToUser, createdByUser |
 | POST /api/json/admin/reports/readiness/list | student, semester, model, id, studentId, studentCode, fullName, jobId, ojtSemesterId, modelId, readinessScore, readinessLevel, riskScore, riskLevel, factors, modelSnapshot, createdAt, inputSnapshot |
 | POST /api/json/admin/audit-logs/list | id, userId, entityId, entityType, action, detail, createdAt, user |
-| POST /api/json/enterprise/candidates/list | id, student, position, application, decision, introducedAt, decisionAt, rejectReason, isLatestCoordination, semester, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication |
-| POST /api/json/enterprise/internships/list | id, student, position, application, academicSupervisor, coordinationId, enterpriseSupervisorName, startDate, endDate, status, resultStatus, evaluation, template, result, evaluationLocked, semester, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication |
-| POST /api/json/recruitment/windows/list | id, ojtSemesterId, academicPeriodId, periodCode, periodName, name, status, startsAt, endsAt, accepting, createdAt, updatedAt, academicPeriod, semester, createdByUser |
+| POST /api/json/enterprise/candidates/list | id, student, position, application, decision, introducedAt, decisionAt, rejectReason, isLatestCoordination, company, semester, companyId, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication, coordinatedBy, coordinatedByUser, registration, recruitmentPost |
+| POST /api/json/enterprise/internships/list | id, student, position, application, academicSupervisor, coordinationId, enterpriseSupervisorName, startDate, endDate, status, resultStatus, evaluation, template, result, evaluationLocked, company, semester, companyId, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication |
 | POST /api/json/recruitment/posts/list | id, ojtSemesterId, windowId, academicPeriodId, companyId, periodCode, companyName, title, content, benefits, applicationInstructions, status, reviewReason, deadlineAt, publishedAt, reviewedAt, positions, createdAt, updatedAt, company, semester, academicPeriod |
 | POST /api/json/ojt-results/list | id, evaluationId, assignmentId, studentId, companyId, positionId, programId, studentCode, fullName, enterpriseName, ojtSemesterId, semesterCode, status, officialScore, completionScore, attitudeScore, skillScore, comments, evaluatedBy, confirmedBy, confirmedAt, source, outcome, student, program, company, position, semester, evaluatedByUser, confirmedByUser |
 | POST /api/json/academic/advisory-runs/list | academicPeriod, semester, createdByUser, id, kind, status, createdBy, ojtSemesterId, academicPeriodId, createdAt, completedAt |

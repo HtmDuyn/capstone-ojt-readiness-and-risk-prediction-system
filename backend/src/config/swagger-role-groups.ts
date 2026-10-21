@@ -166,8 +166,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   ] },
   { roles: ["ADMIN","OJT_COORD","ENTERPRISE"], operations: [
     "GET /api/recruitment/posts",
-    "GET /api/recruitment/windows",
-    "PATCH /api/recruitment/posts/{id}",
+
   ] },
 ];
 

@@ -22,7 +22,6 @@ const base:Record<string,Schema>={
  '/api/academic/course-demand':{courseId:id,courseCode:text,courseName:text,academicPeriodId:id,periodCode:text,periodKind:text,...numbers('studentCount retakeCount inProgressCount')},
  '/api/students/{id}/interventions':{id,...ids('alertId studentId assignedTo createdBy'),...strings('description status outcome'),dueDate:{...date,nullable:true},createdAt:time,updatedAt:time},
  '/api/admin/audit-logs':{id,...ids('userId entityId'),...strings('entityType action'),detail:{nullable:true},createdAt:time},
- '/api/recruitment/windows':{id,...ids('ojtSemesterId academicPeriodId'),...strings('periodCode periodName name status'),startsAt:time,endsAt:time,accepting:{type:'boolean'},createdAt:time,updatedAt:time},
  '/api/recruitment/posts':{id,...ids('ojtSemesterId windowId academicPeriodId companyId'),...strings('periodCode companyName title content benefits applicationInstructions status reviewReason'),deadlineAt:{...time,nullable:true},publishedAt:{...time,nullable:true},reviewedAt:{...time,nullable:true},positions:objectArray,createdAt:time,updatedAt:time},
  '/api/student/ojt-registration-windows':{id,...ids('ojtSemesterId academicPeriodId requiredRelativeSemester registrationId'),...strings('name status registrationStatus'),...objects('period'),startsAt:time,endsAt:time,canRegister:{type:'boolean'},blockReasons:array(text)},
  '/api/student/combo-registration-windows':{id,...ids('ojtSemesterId academicPeriodId initialWindowId'),...strings('name phase status'),...objects('period'),startsAt:time,endsAt:time,effectiveEndsAt:time,canSelect:{type:'boolean'},choices:objectArray},
@@ -45,4 +44,8 @@ export function describeListBaseFields(spec:Schema) {
  const source=spec.paths['/api/predictions'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items;
  const report=spec.paths['/api/admin/reports/readiness'].get.responses['200'].content['application/json'].schema.properties.data.properties.items;
  report.items=structuredClone(source);
+ const post=spec.paths['/api/recruitment/posts'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items;
+ post.properties.positions={type:'array',items:{type:'object',properties:{id,code:{type:'string'},title:{type:'string'},description:{type:'string'},requirements:{type:'string'},capacity:{type:'integer'},remainingSlots:{type:'integer',minimum:0},status:{type:'string'},location:{type:'string',nullable:true},workMode:{type:'string',nullable:true}}}};
+ const candidate=spec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items;
+ candidate.properties.recruitmentPost={...structuredClone(post),nullable:true};
 }
