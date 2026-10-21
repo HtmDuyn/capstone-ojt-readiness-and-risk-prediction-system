@@ -150,10 +150,84 @@ export interface EnterpriseInternshipTask {
   studentId: number;
   name: string;
   status: string;
+  dueDate?: string | null;
+  companyId?: number;
+  positionId?: number;
+  description?: string | null;
+  assignedDate?: string | null;
+  ojtSemesterId?: number;
+  studentCode?: string;
+  fullName?: string;
+  companyName?: string;
+  positionTitle?: string;
+  semesterCode?: string;
+  assignment?: {
+    id: number;
+    status: string;
+    startDate?: string | null;
+    endDate?: string | null;
+  } | null;
   student?: {
+    id?: number;
+    code?: string;
     studentCode?: string;
     fullName?: string;
+    email?: string;
+    phone?: string | null;
+    status?: string;
+    programCode?: string;
+    programName?: string;
   } | null;
+  company?: {
+    id: number;
+    code?: string;
+    name: string;
+    status?: string;
+    address?: string | null;
+    industry?: string;
+    contactEmail?: string;
+    contactPhone?: string | null;
+    contactPersonName?: string;
+  } | null;
+  position?: {
+    id: number;
+    code?: string;
+    title: string;
+    status?: string;
+    capacity?: number;
+    location?: string | null;
+    workMode?: string | null;
+    companyId?: number;
+    description?: string;
+    requirements?: string;
+    ojtSemesterId?: number;
+    remainingSlots?: number;
+  } | null;
+  semester?: {
+    id: number;
+    code?: string;
+    name?: string;
+    status?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    academicYearId?: number;
+    academicPeriodId?: number;
+    academicPeriod?: {
+      id: number;
+      code?: string;
+      kind?: string;
+      name?: string;
+      status?: string;
+      startDate?: string | null;
+      endDate?: string | null;
+    } | null;
+  } | null;
+}
+
+export interface InternshipTaskListRequest {
+  assignmentId?: number;
+  page?: number;
+  limit?: number;
 }
 
 // ─── Service ─────────────────────────────────────────────────
@@ -205,10 +279,14 @@ export const enterpriseService = {
     return response.data;
   },
 
-  listInternshipTasks: async (params: PaginatedRequest = { page: 1, limit: 100 }): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
-    const response = await API.get<PaginatedResponse<EnterpriseInternshipTask>>(
-      '/internship-tasks',
-      { params: { page: params.page ?? 1, limit: params.limit ?? 100, ...params } }
+  listInternshipTasks: async (params: InternshipTaskListRequest = {}): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
+    const response = await API.post<PaginatedResponse<EnterpriseInternshipTask>>(
+      '/json/internship-tasks/list',
+      {
+        page: params.page ?? 1,
+        limit: params.limit ?? 100,
+        ...(params.assignmentId !== undefined ? { assignmentId: params.assignmentId } : {}),
+      }
     );
     return response.data;
   },
