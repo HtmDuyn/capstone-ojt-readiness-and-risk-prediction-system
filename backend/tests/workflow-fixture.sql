@@ -60,3 +60,8 @@ ALTER TABLE "StudentEnterpriseCoordination" ADD COLUMN "RegistrationID" int,ADD 
 ALTER TABLE "OJTRegistrations" ADD COLUMN "Application" jsonb DEFAULT '{}';
 ALTER TABLE "JobApplications" ADD COLUMN "ApplicationID" serial PRIMARY KEY,ADD COLUMN "CVID" int,ADD COLUMN "CoverLetter" text,ADD COLUMN "AppliedAt" timestamptz DEFAULT now(),ADD COLUMN "Status" text;
 CREATE TABLE "StudentCVVersions" ("CVID" serial PRIMARY KEY,"StudentID" int,"Filename" text,"MimeType" text,"SizeBytes" int,"Sha256" text,"CreatedAt" timestamptz DEFAULT now());
+
+ALTER TABLE "Users" ADD COLUMN "CreatedAt" timestamptz DEFAULT now(),ADD COLUMN "LastLoginAt" timestamptz;
+
+ALTER TABLE "Enterprises" ADD COLUMN "CreatedAt" timestamp DEFAULT now();
+ALTER TABLE "EnterpriseUsers" ADD COLUMN "EnterpriseUserID" serial;

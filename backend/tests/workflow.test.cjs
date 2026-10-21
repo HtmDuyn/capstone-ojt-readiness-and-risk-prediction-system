@@ -321,3 +321,37 @@ test('all JSON lists document complete explicit identity inputs and required sel
  const post=swaggerSpec.paths['/api/json/enterprise/candidates/list'].post.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties.recruitmentPost;
  assert.ok(post.properties.content);assert.ok(post.properties.positions);
 });
+
+
+
+test('separate enterprise profile edits imported fields, preserves recruitment and enforces ownership',async()=>{
+ await services.importAccounts(enterprise(),1);
+ await services.importAccounts(enterprise('second','DN02','second@example.test','DEV02'),1);
+ const {updateEnterpriseProfile:update}=require('../src/modules/qhdn/enterprise-profile.service.ts');
+ const recruitmentBefore=await rows('SELECT * FROM "RecruitmentPosts" ORDER BY "PostID"');
+ const positionsBefore=await rows('SELECT * FROM "InternshipPositions" ORDER BY "PositionID"');
+ const result=await update({companyId:1,name:'Updated Company',address:'Address',industry:'Software',contactPersonName:'HR Contact',contactPhone:'0901234567',contactEmail:'HR@example.test',positionTitle:'HR Manager'},actor);
+ assert.ok(result.createdAt);assert.ok(result.representative.id);
+ assert.equal(result.id,1);assert.equal(result.name,'Updated Company');assert.equal(result.contactEmail,'hr@example.test');assert.equal(result.representative.positionTitle,'HR Manager');assert.equal(result.representative.fullName,'HR Demo');
+ assert.equal(result.summary,undefined);assert.equal(result.posts,undefined);
+ const partial=await update({companyId:1,address:null},actor);assert.equal(partial.address,null);assert.equal(partial.name,'Updated Company');
+ await assert.rejects(()=>update({companyId:2,name:'Foreign'},actor),e=>e.statusCode===403);
+ await assert.rejects(()=>update({companyId:1,name:'Forbidden'},{userId:1,roleCode:'OJT_COORD'}),e=>e.statusCode===403);
+ for(const body of [{},{companyId:1},{name:'Missing ID'},{companyId:1,name:''},{companyId:1,contactEmail:'invalid'},{companyId:1,address:'x'.repeat(301)},{companyId:1,contactEmail:'a'.repeat(90)+'@example.test'},{companyId:1,status:'INACTIVE'},{companyId:1,positions:[]},{companyId:1,fullName:'Personal'}])await assert.rejects(()=>update(body,actor),e=>e.statusCode===400);
+ assert.deepEqual(await rows('SELECT * FROM "RecruitmentPosts" ORDER BY "PostID"'),recruitmentBefore);
+ assert.deepEqual(await rows('SELECT * FROM "InternshipPositions" ORDER BY "PositionID"'),positionsBefore);
+ assert.equal((await rows('SELECT "Name" FROM "Enterprises" WHERE "EnterpriseID"=2'))[0].Name,'Demo Enterprise');
+ assert.ok((await rows(`SELECT * FROM "AuditLogs" WHERE "Action"='UPDATE_OWN_PROFILE'`)).length);
+ const {parseUpdateOwnProfileInput:parse}=require('../src/modules/accounts/account.schema.ts');
+ assert.throws(()=>parse({companyId:1,company:{name:'Wrong endpoint'}}),e=>e.statusCode===400);
+ const {swaggerSpec}=require('../src/config/swagger.ts');assert.ok(swaggerSpec.paths['/api/enterprise/profile'].get);assert.ok(swaggerSpec.paths['/api/enterprise/profile'].patch);
+ assert.equal(swaggerSpec.paths['/api/accounts/me/profile'].patch.requestBody.content['application/json'].schema.properties.company,undefined);
+ await query('UPDATE "Users" SET "MustChangePassword"=false WHERE "UserID"=5');
+ const app=require('../src/app.ts').default,jwt=require('jsonwebtoken');let server;
+ await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});
+ try{
+  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/enterprise/profile',{method:'PATCH',headers:{Authorization:'Bearer '+jwt.sign({userId:5,authVersion:0},process.env.JWT_SECRET),'Content-Type':'application/json'},body:JSON.stringify({companyId:1,industry:'IT Services'})});
+  assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const body=await response.json();assert.equal(body.data.industry,'IT Services');assert.equal(body.data.representative.userId,5);assert.equal(body.data.posts,undefined);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+
+});

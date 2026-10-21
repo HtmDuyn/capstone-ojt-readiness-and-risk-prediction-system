@@ -1,7 +1,7 @@
 # Đầu vào API dành cho FE và test thủ công
 
 Nguồn: OpenAPI hiện tại của backend. Tạo lại bằng `npm run docs:api` sau `npm run build`.
-Phạm vi: 157 operations; 0 path parameters; 0 query parameters; 150 request bodies.
+Phạm vi: 158 operations; 0 path parameters; 0 query parameters; 151 request bodies.
 
 
 FE nhập ID, bộ lọc và dữ liệu trong JSON body. Các API trước đây dùng path/query có cách gọi mới tại `/api/json/...`; API đọc có đầu vào chuyển sang POST. Các API vốn chỉ nhận JSON và API không có đầu vào giữ đường dẫn hiện tại. API cũ vẫn hoạt động để tương thích. Không cần gọi GET trước khi đã biết ID và không cần chạy lại chuỗi API trong cùng phiên. Token hợp lệ, quan hệ dữ liệu, version và trạng thái nghiệp vụ vẫn bắt buộc.
@@ -317,8 +317,8 @@ Body: application/json — bắt buộc.
 
 | Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
 | --- | --- | --- | --- | --- |
-| fullName | string | Không / theo điều kiện nghiệp vụ |  |  |
-| phone | string | Không / theo điều kiện nghiệp vụ | nullable=true |  |
+| fullName | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=150 |  |
+| phone | string | Không / theo điều kiện nghiệp vụ | maxLength=20; nullable=true |  |
 
 ## POST /api/admin/prediction-jobs
 
@@ -677,6 +677,29 @@ Xác thực: Bearer token; role/ownership theo chức năng.
 Không có tham số URL/query.
 
 Không có request body.
+
+## PATCH /api/enterprise/profile
+
+Cập nhật hồ sơ doanh nghiệp đã được import
+
+Chỉ sửa hồ sơ doanh nghiệp đã có từ import. companyId bắt buộc cùng ít nhất một trường cần sửa. Trường bỏ qua giữ nguyên; null hoặc chuỗi rỗng xóa trường tùy chọn. name không được rỗng. Không sửa mã, trạng thái, tài khoản đăng nhập và không tạo/sửa tin hay vị trí tuyển dụng. positionTitle thuộc tài khoản hiện tại; fullName/phone cá nhân sửa qua /api/accounts/me/profile.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| companyId | integer | Có | minimum=1; maximum=2147483647 | ID doanh nghiệp. |
+| name | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=200 |  |
+| address | string | Không / theo điều kiện nghiệp vụ | maxLength=300; nullable=true |  |
+| industry | string | Không / theo điều kiện nghiệp vụ | maxLength=100; nullable=true |  |
+| contactPersonName | string | Không / theo điều kiện nghiệp vụ | maxLength=100; nullable=true |  |
+| contactPhone | string | Không / theo điều kiện nghiệp vụ | maxLength=20; nullable=true |  |
+| contactEmail | string | Không / theo điều kiện nghiệp vụ | format="email"; maxLength=100; nullable=true |  |
+| positionTitle | string | Không / theo điều kiện nghiệp vụ | maxLength=100; nullable=true | Chức danh của tài khoản đang đăng nhập tại doanh nghiệp. |
 
 ## POST /api/enterprise/tasks/bulk
 
