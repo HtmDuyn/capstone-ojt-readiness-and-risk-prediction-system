@@ -1,3 +1,5 @@
+import { getOwnProfile } from '../accounts/account.service';
+import { personalAccountView } from '../accounts/account.dto';
 import type {
   NextFunction,
   Request,
@@ -9,8 +11,6 @@ import {
 } from "./auth.schema";
 
 import {
-  actorProfileIds,
-  getUserById,
   loginUser,
 } from "./auth.service";
 
@@ -56,8 +56,8 @@ export const getCurrentUser = async (
       req.user?.userId;
 
     const user =
-      await getUserById(
-        userId,
+      await getOwnProfile(
+        userId!,
       );
 
     if (!user) {
@@ -97,30 +97,7 @@ export const getCurrentUser = async (
       message:
         "User profile retrieved successfully",
 
-      user: {
-        ...await actorProfileIds(user.id, user.role_code),
-        mustChangePassword: user.must_change_password,
-        id:
-          user.id,
-
-        username:
-          user.username,
-
-        email:
-          user.email,
-
-        fullName:
-          user.full_name,
-
-        status:
-          user.status,
-
-        roleCode:
-          user.role_code,
-
-        roleName:
-          user.role_name,
-      },
+      user: personalAccountView(user),
     });
   } catch (error) {
     next(error);

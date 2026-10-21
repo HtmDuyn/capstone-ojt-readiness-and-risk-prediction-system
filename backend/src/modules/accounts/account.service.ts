@@ -9,15 +9,12 @@ import {
 } from "../system/roles/role.repository";
 
 import {
+  accountTransaction,
   createAccount,
   existsByEmail,
   existsByUsername,
   findAccountById,
   findAccounts,
-  updateAccountByAdmin,
-  updateAccountRole,
-  updateAccountStatus,
-  updateOwnProfile,
 } from "./account.repository";
 
 import type {
@@ -25,8 +22,6 @@ import type {
   AccountRecord,
   CreateAccountInput,
   UpdateAccountInput,
-  UpdateAccountRoleInput,
-  UpdateAccountStatusInput,
   UpdateOwnProfileInput,
 } from "./account.types";
 
@@ -50,8 +45,9 @@ const parseId = (
     Number(value);
 
   if (
+    (typeof value!=="number" && !(typeof value==="string" && /^[1-9]\d*$/.test(value))) ||
     !Number.isInteger(id) ||
-    id <= 0
+    id <= 0 || id > 2147483647
   ) {
     throw createError(
       "Invalid ID.",
@@ -128,6 +124,7 @@ const normalizeEmail = (
 
 export const getAccounts = async (
   queryInput: {
+    userId?: unknown;
     page?: unknown;
     limit?: unknown;
     search?: unknown;
@@ -135,24 +132,9 @@ export const getAccounts = async (
     status?: unknown;
   },
 ): Promise<AccountListResult> => {
-  const page =
-    Math.max(
-      1,
-      Number(
-        queryInput.page ?? 1,
-      ) || 1,
-    );
-
-  const limit =
-    Math.min(
-      100,
-      Math.max(
-        1,
-        Number(
-          queryInput.limit ?? 20,
-        ) || 20,
-      ),
-    );
+  const page=queryInput.page===undefined?1:parseId(queryInput.page);
+  const limit=queryInput.limit===undefined?20:parseId(queryInput.limit);
+  if(limit>100||(page-1)*limit>2147483647)throw createError('Invalid pagination.',400,'INVALID_PAGINATION');
 
   const search =
     typeof queryInput.search ===
@@ -182,44 +164,8 @@ export const getAccounts = async (
     search || undefined,
     roleCode || undefined,
     status || undefined,
+    queryInput.userId===undefined?undefined:parseId(queryInput.userId),
   );
-};
-
-export const getAccountById = async (
-  requestedUserId: unknown,
-  currentUserId: number,
-  currentRole: RoleCode | null,
-): Promise<AccountRecord> => {
-  const userId =
-    parseId(
-      requestedUserId,
-    );
-
-  if (
-    currentRole !== "ADMIN" &&
-    currentUserId !== userId
-  ) {
-    throw createError(
-      "You may only access your own account.",
-      403,
-      "RESOURCE_FORBIDDEN",
-    );
-  }
-
-  const account =
-    await findAccountById(
-      userId,
-    );
-
-  if (!account) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  return account;
 };
 
 export const createNewAccount = async (
@@ -305,6 +251,8 @@ export const createNewAccount = async (
     );
   }
 
+  if (['STUDENT','ENTERPRISE'].includes(role.code)) throw createError('Student and enterprise accounts must be created through import.',403,'IMPORT_REQUIRED');
+
   const passwordHash =
     await bcrypt.hash(
       password,
@@ -322,115 +270,31 @@ export const createNewAccount = async (
 };
 
 export const updateAccount = async (
-  requestedUserId: unknown,
-  input: UpdateAccountInput,
-  currentUserId: number,
-  currentRole: RoleCode | null,
+  requestedUserId: unknown, input: UpdateAccountInput, currentUserId: number, currentRole: RoleCode | null,
 ): Promise<AccountRecord> => {
-  const userId =
-    parseId(
-      requestedUserId,
-    );
-
-  const existing =
-    await findAccountById(
-      userId,
-    );
-
-  if (!existing) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  const isAdmin =
-    currentRole === "ADMIN";
-
-  const isOwn =
-    currentUserId === userId;
-
-  if (!isAdmin && !isOwn) {
-    throw createError(
-      "You may only update your own account.",
-      403,
-      "RESOURCE_FORBIDDEN",
-    );
-  }
-
-  /*
-   * Non-admin không được đổi email
-   * qua endpoint này.
-   */
-  if (
-    !isAdmin &&
-    input.email !== undefined
-  ) {
-    throw createError(
-      "You are not allowed to change email through this endpoint.",
-      403,
-      "FIELD_FORBIDDEN",
-    );
-  }
-
-  const fullName =
-    input.fullName !== undefined
-      ? normalizeRequiredString(
-          input.fullName,
-          "fullName",
-        )
-      : existing.full_name;
-
-  const phone =
-    input.phone !== undefined
-      ? normalizePhone(
-          input.phone,
-        )
-      : existing.phone;
-
-  if (isAdmin) {
-    const email =
-      input.email !== undefined
-        ? normalizeEmail(
-            input.email,
-          )
-        : existing.email;
-
-    if (
-      email !==
-        existing.email.toLowerCase() &&
-      await existsByEmail(
-        email,
-        userId,
-      )
-    ) {
-      throw createError(
-        "Email already exists.",
-        409,
-        "EMAIL_EXISTS",
-      );
-    }
-
-    await updateAccountByAdmin(
-      userId,
-      fullName,
-      phone,
-      email,
-    );
-  } else {
-    await updateOwnProfile(
-      userId,
-      fullName,
-      phone,
-    );
-  }
-
-  return (
-    await findAccountById(
-      userId,
-    )
-  )!;
+  if (currentRole !== 'ADMIN') throw createError('Use your own profile endpoint to update personal information.',403,'RESOURCE_FORBIDDEN');
+  const userId = parseId(requestedUserId);
+  if (!Object.values(input).some(value => value !== undefined)) throw createError('Provide at least one field to update.',400,'INVALID_ACCOUNT_INPUT');
+  return accountTransaction(async client => {
+    await client.query('SELECT "UserID" FROM "Users" WHERE "UserID"=$1 FOR UPDATE',[userId]);
+    const existing = await findAccountById(userId,client);
+    if (!existing) throw createError('Account not found.',404,'ACCOUNT_NOT_FOUND');
+    const fullName = input.fullName !== undefined ? normalizeRequiredString(input.fullName,'fullName') : existing.full_name;
+    const phone = input.phone !== undefined ? normalizePhone(input.phone) : existing.phone;
+    const email = input.email !== undefined ? normalizeEmail(input.email) : existing.email;
+    const status = input.status !== undefined ? normalizeRequiredString(input.status,'status').toUpperCase() : existing.status;
+    const roleId = input.roleId !== undefined ? parseId(input.roleId) : existing.role_id;
+    if (!['ACTIVE','LOCKED','INACTIVE'].includes(status)) throw createError('Invalid account status.',400,'INVALID_STATUS');
+    if (userId === currentUserId && status !== 'ACTIVE') throw createError('You cannot deactivate your current account.',400,'SELF_STATUS_CHANGE_NOT_ALLOWED');
+    if (userId === currentUserId && roleId !== existing.role_id) throw createError('You cannot change your own role.',400,'SELF_ROLE_CHANGE_NOT_ALLOWED');
+    const role = (await client.query('SELECT "RoleCode" AS code FROM "Roles" WHERE "RoleID"=$1',[roleId])).rows[0];
+    if (!role) throw createError('Role not found.',404,'ROLE_NOT_FOUND');
+    if (roleId !== existing.role_id && ['STUDENT','ENTERPRISE'].includes(role.code)) throw createError('Use import to provision student or enterprise identities.',403,'IMPORT_REQUIRED');
+    if ((existing.studentId !== null && role.code !== 'STUDENT') || (existing.enterpriseId !== null && role.code !== 'ENTERPRISE')) throw createError('Role conflicts with the linked student or enterprise profile.',409,'ROLE_PROFILE_CONFLICT');
+    if ((await client.query('SELECT 1 FROM "Users" WHERE LOWER("Email")=LOWER($1) AND "UserID"<>$2',[email,userId])).rowCount) throw createError('Email already exists.',409,'EMAIL_EXISTS');
+    await client.query('UPDATE "Users" SET "FullName"=$2,"Phone"=$3,"Email"=$4,"Status"=$5::varchar,"RoleID"=$6::int, "AuthVersion"="AuthVersion" + CASE WHEN "Status" IS DISTINCT FROM $5::varchar OR "RoleID" IS DISTINCT FROM $6::int THEN 1 ELSE 0 END, "UpdatedAt"=CURRENT_TIMESTAMP WHERE "UserID"=$1',[userId,fullName,phone,email,status,roleId]);
+    return (await findAccountById(userId,client))!;
+  });
 };
 
 export const getOwnProfile = async (
@@ -452,186 +316,15 @@ export const getOwnProfile = async (
   return account;
 };
 
-export const updateProfile = async (
-  userId: number,
-  input: UpdateOwnProfileInput,
-): Promise<AccountRecord> => {
-  const existing =
-    await findAccountById(
-      userId,
-    );
-
-  if (!existing) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  const fullName =
-    input.fullName !== undefined
-      ? normalizeRequiredString(
-          input.fullName,
-          "fullName",
-        )
-      : existing.full_name;
-
-  const phone =
-    input.phone !== undefined
-      ? normalizePhone(
-          input.phone,
-        )
-      : existing.phone;
-
-  await updateOwnProfile(
-    userId,
-    fullName,
-    phone,
-  );
-
-  return (
-    await findAccountById(
-      userId,
-    )
-  )!;
-};
-
-export const changeAccountStatus = async (
-  requestedUserId: unknown,
-  input: UpdateAccountStatusInput,
-  currentUserId: number,
-): Promise<AccountRecord> => {
-  const userId =
-    parseId(
-      requestedUserId,
-    );
-
-  const status =
-    normalizeRequiredString(
-      input.status,
-      "status",
-    ).toUpperCase();
-
-  const allowed =
-    [
-      "ACTIVE",
-      "LOCKED",
-      "INACTIVE",
-    ];
-
-  if (
-    !allowed.includes(
-      status,
-    )
-  ) {
-    throw createError(
-      "Invalid account status.",
-      400,
-      "INVALID_STATUS",
-    );
-  }
-
-  /*
-   * Tránh Admin tự khóa tài khoản
-   * đang sử dụng.
-   */
-  if (
-    userId === currentUserId &&
-    status !== "ACTIVE"
-  ) {
-    throw createError(
-      "You cannot deactivate your current account.",
-      400,
-      "SELF_STATUS_CHANGE_NOT_ALLOWED",
-    );
-  }
-
-  const existing =
-    await findAccountById(
-      userId,
-    );
-
-  if (!existing) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  await updateAccountStatus(
-    userId,
-    status,
-  );
-
-  return (
-    await findAccountById(
-      userId,
-    )
-  )!;
-};
-
-export const changeAccountRole = async (
-  requestedUserId: unknown,
-  input: UpdateAccountRoleInput,
-  currentUserId: number,
-): Promise<AccountRecord> => {
-  const userId =
-    parseId(
-      requestedUserId,
-    );
-
-  const roleId =
-    parseId(
-      input.roleId,
-    );
-
-  if (
-    userId ===
-    currentUserId
-  ) {
-    throw createError(
-      "You cannot change your own role.",
-      400,
-      "SELF_ROLE_CHANGE_NOT_ALLOWED",
-    );
-  }
-
-  const existing =
-    await findAccountById(
-      userId,
-    );
-
-  if (!existing) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  const role =
-    await findRoleById(
-      roleId,
-    );
-
-  if (!role) {
-    throw createError(
-      "Role not found.",
-      404,
-      "ROLE_NOT_FOUND",
-    );
-  }
-
-  await updateAccountRole(
-    userId,
-    roleId,
-  );
-
-  return (
-    await findAccountById(
-      userId,
-    )
-  )!;
-};
+export const updateProfile = async (userId:number,input:UpdateOwnProfileInput):Promise<AccountRecord> => accountTransaction(async client=>{
+ await client.query('SELECT "UserID" FROM "Users" WHERE "UserID"=$1 FOR UPDATE',[userId]);
+ const existing=await findAccountById(userId,client);
+ if(!existing)throw createError('Account not found.',404,'ACCOUNT_NOT_FOUND');
+ const fields:Record<string,unknown>={};
+ if(input.fullName!==undefined){fields.FullName=normalizeRequiredString(input.fullName,'fullName');if(String(fields.FullName).length>150)throw createError('fullName must not exceed 150 characters.',400,'INVALID_PROFILE_INPUT');}
+ if(input.phone!==undefined){fields.Phone=normalizePhone(input.phone);if(String(fields.Phone??'').length>20)throw createError('phone must not exceed 20 characters.',400,'INVALID_PROFILE_INPUT');}
+ const keys=Object.keys(fields);
+ if(!keys.length)throw createError('Provide personal profile fields to update.',400,'INVALID_PROFILE_INPUT');
+ await client.query('UPDATE "Users" SET '+keys.map((key,i)=>'"'+key+'"=$'+(i+2)).join(',')+',"UpdatedAt"=CURRENT_TIMESTAMP WHERE "UserID"=$1',[userId,...Object.values(fields)]);
+ return (await findAccountById(userId,client))!;
+});

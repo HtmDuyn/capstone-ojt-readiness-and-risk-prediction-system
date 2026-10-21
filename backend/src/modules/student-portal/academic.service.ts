@@ -1,3 +1,5 @@
+import { enrichListRows } from '../../shared/list-context';
+import { list as listOfficialResults } from '../ojt-results/result.service';
 import type { PoolClient } from 'pg';
 import { academicTransaction } from '../academic/academic.repository';
 import { academicProgressWithClient } from '../students/academic-progress';
@@ -27,7 +29,8 @@ export async function supplementary(params:Row,actor:Actor) {
   pagination(params,['ojtSemesterId']);return academicTransaction(async c=>{
     const s=await ownStudent(c,actor),data=await summaryWithClient(c,s.StudentID,positiveId(params.ojtSemesterId,'ojtSemesterId'));
     const prerequisites=(await c.query('SELECT pc."CourseID" AS "courseId",g."MinimumPassed" AS "minimumPassed",COALESCE(jsonb_agg(m."CourseID") FILTER(WHERE m."CourseID" IS NOT NULL),\'[]\'::jsonb) AS "courseIds" FROM "ProgramPrerequisiteGroups" g JOIN "ProgramCourses" pc ON pc."ProgramCourseID"=g."ProgramCourseID" LEFT JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID" WHERE g."ProgramID"=$1 GROUP BY pc."CourseID",g."GroupID"',[s.ProgramID])).rows;
-    return {studentId:s.StudentID,missingCredits:data.missingCredits,items:data.outstandingCourses.filter((r:Row)=>r.learningStatus!=='IN_PROGRESS').map((r:Row)=>({requirementId:r.id,courseId:r.courseId,courseCode:r.courseCode,name:r.name,choices:r.choices,credits:r.credits,reason:r.learningStatus==='FAILED'?'RETAKE':'UNCOMPLETED_REQUIREMENT',prerequisites:prerequisites.filter(p=>r.choices.includes(p.courseId)),availability:'NOT_MANAGED',isAiRecommendation:false})),issues:data.issues};
+    const displayPrerequisites=await enrichListRows(c,prerequisites);
+    return {studentId:s.StudentID,missingCredits:data.missingCredits,items:await enrichListRows(c,data.outstandingCourses.filter((r:Row)=>r.learningStatus!=='IN_PROGRESS').map((r:Row)=>({requirementId:r.id,courseId:r.courseId,courseCode:r.courseCode,name:r.name,choices:r.choices,credits:r.credits,reason:r.learningStatus==='FAILED'?'RETAKE':'UNCOMPLETED_REQUIREMENT',prerequisites:displayPrerequisites.filter(p=>r.choices.includes(p.courseId)),availability:'NOT_MANAGED',isAiRecommendation:false}))),issues:data.issues};
   });
 }
 export async function curriculum(actor:Actor) {
@@ -43,13 +46,13 @@ export async function registrationWindows(params:Row,actor:Actor) {
       const registration=(await c.query('SELECT "RegistrationID","Status" FROM "OJTRegistrations" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2',[s.StudentID,w.OJTSemesterID])).rows[0];
       if(registration&&registration.Status!=='REJECTED')reasons.push('REGISTRATION_EXISTS');
       const {scope,createdBy,...dto}=windowApi(w);void scope;void createdBy;items.push({...dto,registrationId:registration?.RegistrationID??null,registrationStatus:registration?.Status??null,canRegister:reasons.length===0,blockReasons:reasons});
-    }const p=pagination(params,['ojtSemesterId']);return {items:items.slice(p.offset,p.offset+p.limit),total:items.length,page:p.page,limit:p.limit};
+    }const p=pagination(params,['ojtSemesterId']);return {items:await enrichListRows(c,items.slice(p.offset,p.offset+p.limit)),total:items.length,page:p.page,limit:p.limit};
   });
 }
 export async function comboWindows(params:Row,actor:Actor) {
   const p=pagination(params,[]);return academicTransaction(async c=>{
     const s=await ownStudent(c,actor),rows=(await c.query('SELECT w.* FROM "ComboRegistrationWindows" w JOIN "ComboWindowStudents" r ON r."WindowID"=w."WindowID" WHERE r."StudentID"=$1 ORDER BY w."WindowID" DESC',[s.StudentID])).rows;
-    const items=[];for(const w of rows.slice(p.offset,p.offset+p.limit)){const own=(await roster(c,w.WindowID)).find(r=>r.studentId===s.StudentID);const {scope,createdBy,finalizeSummary,...dto}=asWindow(w);void scope;void createdBy;void finalizeSummary;items.push({...dto,effectiveEndsAt:own?.effectiveEndsAt,canSelect:w.Status==='OPEN'&&Date.now()>=new Date(w.StartsAt).getTime()&&Date.now()<new Date(own?.effectiveEndsAt??w.EndsAt).getTime(),choices:await activeChoice(c,s.StudentID,s.ProgramID)});}return {items,total:rows.length,page:p.page,limit:p.limit};
+    const items=[];for(const w of rows.slice(p.offset,p.offset+p.limit)){const own=(await roster(c,w.WindowID)).find(r=>r.studentId===s.StudentID);const {scope,createdBy,finalizeSummary,...dto}=asWindow(w);void scope;void createdBy;void finalizeSummary;items.push({...dto,effectiveEndsAt:own?.effectiveEndsAt,canSelect:w.Status==='OPEN'&&Date.now()>=new Date(w.StartsAt).getTime()&&Date.now()<new Date(own?.effectiveEndsAt??w.EndsAt).getTime(),choices:await activeChoice(c,s.StudentID,s.ProgramID)});}return {items:await enrichListRows(c,items),total:rows.length,page:p.page,limit:p.limit};
   });
 }
 export async function notifications(params:Row,actor:Actor) {
@@ -61,5 +64,7 @@ export async function currentAssignment(params:Row,actor:Actor) {
   pagination(params,['ojtSemesterId']);return academicTransaction(async c=>{const s=await ownStudent(c,actor);return (await c.query('SELECT a."AssignmentID" AS id,a."EnterpriseID" AS "enterpriseId",e."Name" AS "enterpriseName",a."PositionID" AS "positionId",p."Title" AS title,p."OJTSemesterID" AS "ojtSemesterId",a."EnterpriseSupervisorName" AS "enterpriseSupervisorName",a."StartDate" AS "startDate",a."EndDate" AS "endDate",a."Status" AS status FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" WHERE a."StudentID"=$1 AND COALESCE(UPPER(a."Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\') AND ($2::int IS NULL OR p."OJTSemesterID"=$2) ORDER BY a."AssignmentID" DESC LIMIT 1',[s.StudentID,params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId')])).rows[0]??null;});
 }
 export async function publishedResults(params:Row,actor:Actor,id?:number) {
-  return academicTransaction(async c=>{const s=await ownStudent(c,actor),sql='SELECT "ResultID" AS id,"OJTSemesterID" AS "ojtSemesterId","OfficialScore"::float8 AS "officialScore","Outcome" AS outcome,"ConfirmedAt" AS "confirmedAt" FROM "OJTResults" WHERE "StudentID"=$1 AND "Status"=\'CONFIRMED\' AND ($2::int IS NULL OR "ResultID"=$2) AND ($3::int IS NULL OR "OJTSemesterID"=$3)';const data=await page(c,sql,[s.StudentID,id??null,params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId')],params,['ojtSemesterId']);if(id&&!data.items.length)throw invalid('Published result not found.',404);return id?data.items[0]:data;});
+  const data=await listOfficialResults({...params,...(id?{resultId:id}:{})},undefined,false,actor.userId);
+  if(id&&!data.items.length)throw invalid('Published result not found.',404);
+  return id?data.items[0]:data;
 }

@@ -39,11 +39,6 @@ export async function normalizeCombo(client:PoolClient,raw:unknown,programCourse
   if(courses.length!==members.length)throw invalid('Every combo course must belong to exactly one explicit choice group.');
   return {courses,choiceGroups:groups};
 }
-export async function scopeCourses(client:PoolClient,id:number) {
-  const program=(await client.query(`SELECT "ProgramCourseID" AS id,"CourseID" AS "courseId","Credits"::float8 AS credits,"RecommendedSemester" AS semester,"IsRequired" AS "isRequired","EntryKind" AS "entryKind" FROM "ProgramCourses" WHERE "ProgramID"=$1`,[id])).rows;
-  const combo=(await client.query(`SELECT c."CourseID" AS "courseId",c."Semester" AS semester FROM "ComboCourses" c JOIN "ProgramCombos" b ON b."ProgramComboID"=c."ProgramComboID" WHERE b."ProgramID"=$1`,[id])).rows;
-  return {program,combo};
-}
 export function normalizePrerequisites(raw:unknown,program:Row[],combo:Row[]):Row[] {
   const rows:Row[]=[],keys:string[]=[],edges=new Map<number,Set<number>>();
   const real=new Set([...program.filter(c=>c.entryKind==='COURSE'),...combo].map(c=>c.courseId));

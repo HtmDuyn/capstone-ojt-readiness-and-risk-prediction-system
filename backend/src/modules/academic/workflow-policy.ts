@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from './academic.repository';
 import { invalid,inputObject,positiveId,requiredText,enumValue,score,optionalText } from '../students/student.validation';
@@ -73,7 +74,7 @@ export async function saveComboSchedule(periodId:number,body:unknown,actor:numbe
  await audit(c,actor,'AcademicPeriods',periodId,'SET_COMBO_PHASE_SCHEDULE',before,after,reason);return after;
  });
 }
-export async function getComboSchedules(periodId:number) {return academicTransaction(async c=>{await actualPeriod(c,periodId);return (await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 ORDER BY "Phase"',[periodId])).rows;});}
+export async function getComboSchedules(periodId:number) {return academicTransaction(async c=>{await actualPeriod(c,periodId);const rows=(await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 ORDER BY "Phase"',[periodId])).rows;return enrichListRows(c,rows.map(row=>({...row,academicPeriodId:row.AcademicPeriodID,confirmedBy:row.ConfirmedBy})));});}
 export async function getAssessment(c:PoolClient,semesterId:number) {
  const w=(await c.query('SELECT * FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1 FOR UPDATE',[semesterId])).rows[0];
  if(!w)throw invalid('Configure the post-Block-3 assessment window first.',409,'OJT_ASSESSMENT_NOT_CONFIGURED');return w;

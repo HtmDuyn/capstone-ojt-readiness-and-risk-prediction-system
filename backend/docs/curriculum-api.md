@@ -1,3 +1,9 @@
+> Hợp đồng cập nhật: [chỉ import và ghi đè theo mã](curriculum-import-only.md).
+
+> Luồng mới: [khung chương trình tạo bằng import](curriculum-import-only.md). Chỉ import để tạo/thay thế; không còn API sửa riêng metadata, môn, tiên quyết, tương đương hoặc combo.
+
+> Cập nhật hợp đồng API: xem [API sau khi xóa/gộp](api-consolidation.md) và [danh sách hiện hành](api-input-reference.md). Các endpoint cũ được thay thế theo bảng chuyển đổi.
+
 # Chương trình đào tạo và combo
 
 Base URL `http://localhost:3000/api`; gửi Bearer token của ADMIN hoặc ACADEMIC. Swagger JSON tại `http://localhost:3000/api-docs`. Các ID dưới đây chỉ là ví dụ: thay bằng ID thực trả về từ API.
@@ -23,9 +29,9 @@ Tín chỉ mặc định có thể là số thập phân hoặc null. Tính ti�
 ## Chương trình và phiên bản
 
 - `GET /curricula`: lọc `search`, `majorId`, `version`, `status` DRAFT/PUBLISHED, `page`, `limit`.
-- `POST /curricula`: tạo một phiên bản nháp.
+- `POST /curriculum-imports/preview` và `/commit`: kiểm tra và nhập toàn bộ khung và tự công bố PUBLISHED; không có API tạo khung thủ công.
 - `GET /curricula/:id`: trả metadata, môn, tiên quyết, combo/nhóm chọn/slot, tương đương môn.
-- `PATCH /curricula/:id`: sửa các trường metadata đã gửi, chỉ cho nháp chưa gán sinh viên.
+- Trùng `curriculum.code` (curriculum_code), không phân biệt hoa thường: thay thế toàn bộ bản cũ, giữ ProgramID; version là metadata, không phải khóa tạo bản mới.
 
 ```json
 {
@@ -43,7 +49,7 @@ Khóa phiên bản là code + version, không phân biệt hoa thường. Cùng 
 
 ## Môn, tín chỉ và kỳ học
 
-`PUT /curricula/:id/courses` thay toàn bộ danh sách môn. Dòng được giữ lại giữ nguyên ProgramCourseID. Xóa môn còn được tiên quyết/slot tham chiếu sẽ bị từ chối; cần cập nhật các tham chiếu trước.
+Trường `courses` trong payload import thay toàn bộ khung môn:
 
 ```json
 {
@@ -57,17 +63,17 @@ Khóa phiên bản là code + version, không phân biệt hoa thường. Cùng 
 
 Mỗi dòng gửi đúng một trong `courseId` hoặc `courseCode`; môn phải tồn tại trong danh mục. `credits` >= 0, tối đa hai chữ số thập phân; `semester` 0–20 (0 cho môn nền tảng), `isRequired` phải xác nhận true/false. `entryKind` COURSE/COMBO_SLOT/ELECTIVE_SLOT, mặc định COURSE. `prerequisiteText` chỉ lưu mô tả nguồn, không tự thực thi.
 
-Thay khung môn sẽ đánh dấu cần rà soát lại tiên quyết, tương đương và các combo. Không sửa được chương trình đang được sinh viên sử dụng hoặc đã ban hành; tạo bản mới để giữ lịch sử.
+Import lại thay thế toàn bộ cấu trúc, giữ ID các môn/combo còn tồn tại và tự công bố PUBLISHED, kể cả bản đã ban hành. Không xóa combo/môn combo đã được sinh viên chọn; lỗi sẽ rollback toàn bộ.
 
 ## Combo, nhóm chọn và slot
 
-`GET/POST /curricula/:id/combos`. Tạo combo:
+Combo mới được gửi trong `combos` của payload import, kèm `courses` và `choiceGroups`. Xem combo qua `POST /api/json/curricula/detail`, trường `data.combos`. Metadata combo trong dữ liệu import:
 
 ```json
 {"code":"COM_SE","name":"Combo kỹ thuật phần mềm","selectionGroup":"SPECIALIZATION"}
 ```
 
-`PUT /combos/:id/courses` thay toàn bộ môn, nhóm chọn và ánh xạ slot:
+Trong từng phần tử `combos` của import, gửi toàn bộ môn, nhóm chọn và ánh xạ slot:
 
 ```json
 {
@@ -87,7 +93,7 @@ Khi ban hành, mọi môn combo phải có slot và giới hạn các nhóm ph�
 
 ## Tiên quyết và tương đương
 
-`PUT /curricula/:id/prerequisites`:
+Trường `prerequisites` trong payload import:
 
 ```json
 {
@@ -99,7 +105,7 @@ Khi ban hành, mọi môn combo phải có slot và giới hạn các nhóm ph�
 
 Các nhóm của cùng một môn kết hợp AND. Bên trong nhóm cần đạt ít nhất minimumPassed môn: 1 trong nhiều môn là OR; số lượng bằng toàn bộ nhóm là AND. Môn tiên quyết thuộc các môn thực của chương trình/combo; không dùng placeholder, không tự tham chiếu hoặc tạo chu trình. `prerequisites: []` xác nhận chương trình không có điều kiện tiên quyết cần lưu.
 
-`PUT /curricula/:id/course-equivalences`:
+Trường `equivalences` trong payload import:
 
 ```json
 {
@@ -143,22 +149,12 @@ API tính tiến độ đã dùng các ánh xạ này để công nhận tín ch
 }
 ```
 
-Các danh sách đều phải gửi; dùng [] nếu không có. Import tạo phiên bản nháp mới, không ghi đè một phiên bản đang có và không tự tạo môn chưa tồn tại. Chuẩn bị danh mục môn/chuyên ngành trước. Giới hạn 500 môn/nhóm chọn/ánh xạ, 100 combo và 1000 nhóm tiên quyết; toàn bộ body tuân giới hạn JSON 1MB của backend.
+Các danh sách đều phải gửi; dùng [] nếu không có. Import tạo mới khi chưa có mã; trùng mã thì ghi đè bản cũ và tự công bố PUBLISHED khi hợp lệ, không tự tạo môn chưa tồn tại. Chuẩn bị danh mục môn/chuyên ngành trước. Giới hạn 500 môn/nhóm chọn/ánh xạ, 100 combo và 1000 nhóm tiên quyết; toàn bộ body tuân giới hạn JSON 1MB của backend.
 
-Preview đọc và kiểm tra, không ghi bất kỳ dữ liệu/lịch sử nào. Lỗi preview trả `data.canCommit: false` cùng errors. Commit lỗi rollback toàn bộ khung, trả lỗi và `importBatchId` khi đã lưu lịch sử. Thành công trả `curriculumId`, `batchId`, DRAFT. Cùng khóa/payload/người nhập trả `replayed: true`; payload khác hoặc người khác dùng khóa đó bị từ chối. Lô lỗi có thể sửa và gửi lại vì chưa có commit thành công.
+Preview đọc và kiểm tra, không ghi bất kỳ dữ liệu/lịch sử nào. Lỗi preview trả `data.canCommit: false` cùng errors. Commit lỗi rollback toàn bộ khung, trả lỗi và `importBatchId` khi đã lưu lịch sử. Thành công trả `curriculumId`, `batchId`, PUBLISHED. Cùng khóa/payload/người nhập trả `replayed: true`; payload khác hoặc người khác dùng khóa đó bị từ chối. Lô lỗi có thể sửa và gửi lại vì chưa có commit thành công.
 
-Tra lịch sử qua `GET /academic-imports?kind=CURRICULUM` và `GET /academic-imports/:id`. Không tự ban hành từ import; còn bước rà soát publish.
+Tra lịch sử qua `POST /api/json/academic-imports/list` với kind CURRICULUM; lấy chi tiết bằng importId trong cùng API. Import tự kiểm tra điều kiện ban hành và công bố; không cần gọi publish riêng.
 
-## Ban hành
+## Công bố tự động
 
-`POST /curricula/:id/publish`:
-
-```json
-{"reason":"Ban hành theo quyết định chương trình đào tạo năm 2026"}
-```
-
-Kiểm tra version, chuyên ngành, năm hiệu lực, thang GPA, tín chỉ/kỳ học/bắt buộc từng môn; rà soát tiên quyết và tương đương; combo và giới hạn nhóm chọn; slot được ánh xạ; tổng tín chỉ bằng các môn thường đã khử trùng tương đương cộng slot, không cộng thêm môn combo. Chưa đạt trả HTTP 422 với `data.issues`.
-
-Đạt sẽ chuyển PUBLISHED, lưu người/thời điểm/lý do trong cùng giao dịch và AuditLogs. Bản đã ban hành bị khóa cả ở API lẫn ràng buộc trigger DB; muốn thay đổi tạo version mới. Gọi publish lại trả bản đã ban hành, không đổi người/thời điểm ban hành ban đầu.
-
-Các thao tác quản lý đều lưu người thực hiện và dữ liệu trước/sau. Các catalog cũ vẫn là DRAFT chưa xác nhận, không tự giả định là bản đã ban hành.
+Import kiểm tra đầy đủ điều kiện công bố rồi tự đặt PUBLISHED, lưu PublishedBy/PublishedAt. API publish riêng đã xóa; chương trình nháp cũ cần import lại toàn bộ dữ liệu hợp lệ. Lỗi sẽ rollback và giữ bản cũ.

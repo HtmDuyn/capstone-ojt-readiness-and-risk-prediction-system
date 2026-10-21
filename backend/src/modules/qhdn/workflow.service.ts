@@ -1,168 +1,156 @@
-import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
+import { registrationRecord, eligibleOfficial } from '../ojt-registration/registration.service';
 import type { PoolClient } from 'pg';
-import { applicationEvent } from '../recruitment/recruitment.service';
-import { academicTransaction, audit } from '../academic/academic.repository';
+import { assertPublishedPosition } from '../recruitment/recruitment.repository';
+import { academicTransaction } from '../academic/academic.repository';
 import { dateInput, dateRange } from '../academic/academic.schema';
-import { inputObject, positiveId, requiredText, optionalText, invalid, enumValue, score } from '../students/student.validation';
-import { asApi, record, requireStaff, assertAccess, remaining, syncSlots, type Actor, type Row } from './qhdn.repository';
+import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, score } from '../students/student.validation';
+import { fingerprint } from '../eligibility/eligibility.service';
+import type { Actor, Row } from '../ojt-registration/window.service';
+import { api, record, staff, assertScope, persist, occupied, refreshSlots, log } from './catalog.service';
 
-const accepted = (decision: unknown) => ['ACCEPTED','ACCEPT','APPROVED'].includes(String(decision).toUpperCase());
-async function latest(c: PoolClient, row: Row) {
-  if ((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 AND "CoordinationID">$2',[row.RegistrationID,row.CoordinationID])).rowCount) throw invalid('This coordination has been superseded.',409,'COORDINATION_SUPERSEDED');
-}
-async function registration(c: PoolClient, id: number) {
-  const r = (await c.query('SELECT * FROM "OJTRegistrations" WHERE "RegistrationID"=$1 FOR UPDATE',[id])).rows[0];
-  if (!r) throw invalid('Registration not found.',404);
-  if (r.Status !== 'HANDED_OFF' || !(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "RegistrationID"=$1',[id])).rowCount) throw invalid('Only handed-off registrations can be coordinated.',409,'HANDOFF_REQUIRED');
-  const student = (await c.query('SELECT s.*,u."Status" AS "AccountStatus" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."StudentID"=$1 FOR UPDATE OF s,u',[r.StudentID])).rows[0];
-  if (!student || student.DeletedAt || student.Status !== 'ACTIVE' || student.AccountStatus !== 'ACTIVE') throw invalid('An active student and account are required.',409,'STUDENT_INACTIVE');
-  if(r.WindowID){const official=await officialEligibilityWithClient(c,r.StudentID,r.OJTSemesterID);if(!official||official.status!=='ELIGIBLE'||official.isStale||official.programId!==r.ProgramID)throw invalid('Handed-off eligibility requires academic reconciliation before further coordination.',409,'OFFICIAL_ELIGIBILITY_STALE');}
+const accepted=(value:unknown)=>['ACCEPTED','ACCEPT','APPROVED'].includes(String(value).toUpperCase());
+const rejected=(value:unknown)=>['REJECTED','REJECT'].includes(String(value).toUpperCase());
+async function registration(c:PoolClient,id:number){
+  const r=await registrationRecord(c,id);
+  if(!r)throw invalid('Registration not found.',404);
+  if(r.Status!=='HANDED_OFF'||!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "RegistrationID"=$1 AND "OJTSemesterID"=$2 AND "StudentID"=$3',[id,r.OJTSemesterID,r.StudentID])).rowCount)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
+  await eligibleOfficial(c,r);
   return r;
 }
-async function openPosition(c: PoolClient, id: number, semesterId: number) {
-  const p = await record(c,'positions',id), company = await record(c,'companies',p.EnterpriseID);
-  if (p.OJTSemesterID !== semesterId) throw invalid('Position and registration must belong to the same semester.',409,'POSITION_SEMESTER_MISMATCH');
-  if (p.Status !== 'OPEN' || company.Status !== 'ACTIVE') throw invalid('Position and enterprise must be open/active.',409,'POSITION_CLOSED');
+async function latest(c:PoolClient,r:Row,coordinationId:number){
+  const row=(await c.query('SELECT "CoordinationID" FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1',[r.RegistrationID])).rows[0];
+  if(row?.CoordinationID!==coordinationId)throw invalid('Only the latest coordination can change.',409,'COORDINATION_SUPERSEDED');
+}
+async function availablePosition(c:PoolClient,id:number,semesterId:number){
+  await assertPublishedPosition(c,id);
+  const p=await record(c,'positions',id),company=await record(c,'companies',p.EnterpriseID);
+  if(p.OJTSemesterID!==semesterId)throw invalid('Position belongs to a different semester.',409,'POSITION_SEMESTER_MISMATCH');
+  if(company.Status!=='ACTIVE'||p.Status!=='OPEN')throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');
+  if(p.Capacity==null||await occupied(c,id)>=p.Capacity)throw invalid('No remaining position capacity.',409,'POSITION_FULL');
   return p;
 }
-export async function coordinate(body: unknown, actor: Actor, previousId?: number) {
-  requireStaff(actor);
-  const b = inputObject(body,previousId === undefined ? ['registrationId','positionId','applicationId','reason'] : ['positionId','applicationId','reason']);
-  const reason = requiredText(b.reason,'reason',2000);
-  return academicTransaction(async c => {
-    const previous = previousId === undefined ? null : await record(c,'coordinations',previousId);
-    const app=b.applicationId===undefined?null:(await c.query('SELECT * FROM "JobApplications" WHERE "ApplicationID"=$1 FOR UPDATE',[positiveId(b.applicationId,'applicationId')])).rows[0];
-    if(b.applicationId!==undefined&&!app)throw invalid('Application not found.',404);
-    const positionId=positiveId(b.positionId??app?.PositionID,'positionId');
-    const r = await registration(c,previous ? previous.RegistrationID : positiveId(b.registrationId??app?.RegistrationID,'registrationId'));
-    if(app&&(app.RegistrationID!==r.RegistrationID||app.PositionID!==positionId||app.OJTSemesterID!==r.OJTSemesterID||!['SUBMITTED','REVIEWING','INTERVIEW','OFFERED'].includes(app.Status)))throw invalid('Application does not match this coordination or is no longer pending.',409,'APPLICATION_CONTEXT_MISMATCH');
-    if(!app&&(await c.query('SELECT 1 FROM "JobApplications" WHERE "RegistrationID"=$1',[r.RegistrationID])).rowCount)throw invalid('Select the applicationId for this registration.',400,'APPLICATION_REQUIRED');
-    if (previous) {
-      await latest(c,previous);
-      if ((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1 AND COALESCE(UPPER("Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\')',[previousId])).rowCount) throw invalid('Cancel the existing assignment before reassigning.',409,'ASSIGNMENT_EXISTS');
-      if (previous.PositionID === positionId) throw invalid('Reassignment requires a different position.');
-    } else if ((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1',[r.RegistrationID])).rowCount) throw invalid('Use reassign for an already coordinated registration.',409,'COORDINATION_EXISTS');
-    const p = await openPosition(c,positionId,r.OJTSemesterID);
-    if ((await remaining(c,positionId)).remainingSlots < 1) throw invalid('The position has no remaining seats.',409,'POSITION_FULL');
-    if (previous) {
-      await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=\'REASSIGNED\',"DecisionAt"=now() WHERE "CoordinationID"=$1',[previousId]);
-      if(previous.ApplicationID){await c.query('UPDATE "JobApplications" SET "Status"=\'WITHDRAWN\',"UpdatedAt"=now() WHERE "ApplicationID"=$1',[previous.ApplicationID]);await applicationEvent(c,previous.ApplicationID,'REASSIGNED',actor.userId,{status:'WITHDRAWN',newPositionId:positionId},reason);}
-      await audit(c,actor.userId,'StudentEnterpriseCoordination',previousId!,'REASSIGN',previous,{...previous,Decision:'REASSIGNED',newPositionId:positionId},reason);
-    }
-    const row = (await c.query('INSERT INTO "StudentEnterpriseCoordination" ("RegistrationID","EnterpriseID","PositionID","OJTSemesterID","CoordinatedBy","Decision","PreviousCoordinationID","ApplicationID") VALUES ($1,$2,$3,$4,$5,\'PENDING\',$6,$7) RETURNING *',[r.RegistrationID,p.EnterpriseID,positionId,r.OJTSemesterID,actor.userId,previousId ?? null,app?.ApplicationID??null])).rows[0];
-    if (previous) await syncSlots(c,previous.PositionID);
-    if(app){await c.query('UPDATE "JobApplications" SET "Status"=\'REVIEWING\',"UpdatedAt"=now() WHERE "ApplicationID"=$1',[app.ApplicationID]);await applicationEvent(c,app.ApplicationID,'COORDINATED',actor.userId,{coordinationId:row.CoordinationID,status:'REVIEWING'},reason);}
-    await audit(c,actor.userId,'StudentEnterpriseCoordination',row.CoordinationID,'COORDINATE',null,row,reason);
-    return asApi('coordinations',row);
+async function noAssignment(c:PoolClient,r:Row){
+  if((await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID" WHERE a."StudentID"=$1 AND r."OJTSemesterID"=$2 AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') LIMIT 1`,[r.StudentID,r.OJTSemesterID])).rowCount)throw invalid('Student already has an assignment in this semester.',409,'ASSIGNMENT_EXISTS');
+}
+async function mutableAssignment(c:PoolClient,id:number){
+  if((await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1 AND "Status"=\'CONFIRMED\'',[id])).rowCount)throw invalid('Confirmed results lock the assignment and evaluation.',409,'OJT_RESULT_CONFIRMED');
+}
+// The existing transaction helper serializes all academic/OJT writes, including idempotency checks.
+async function replay(c:PoolClient,key:string,hash:string,actor:Actor){
+  const prior=(await c.query(`SELECT "UserID","Detail"::jsonb AS detail FROM "AuditLogs" WHERE "EntityType"='StudentEnterpriseCoordination' AND "Detail"::jsonb->'after'->>'idempotencyKey'=$1 ORDER BY "LogID" LIMIT 1`,[key])).rows[0];
+  if(!prior)return null;
+  if(prior.UserID!==actor.userId||prior.detail.after.requestHash!==hash)throw invalid('Idempotency key belongs to another request.',409,'IDEMPOTENCY_CONFLICT');
+  const {idempotencyKey,requestHash,actorRole,enteredOnBehalf,...out}=prior.detail.after;
+  return {...out,replayed:true};
+}
+export async function coordinate(body:unknown,actor:Actor,previousId?:number){
+  staff(actor);const b=inputObject(body,previousId?['positionId','reason','idempotencyKey']:['registrationId','positionId','applicationId','reason','idempotencyKey']);
+  const positionId=positiveId(b.positionId,'positionId'),reason=requiredText(b.reason,'reason',2000),key=requiredText(b.idempotencyKey,'idempotencyKey',100);
+  const registrationId=previousId?null:positiveId(b.registrationId,'registrationId');
+  const applicationId=b.applicationId===undefined?null:positiveId(b.applicationId,'applicationId');
+  const hash=fingerprint({previousId:previousId??null,registrationId,positionId,...(applicationId===null?{}:{applicationId}),reason});
+  return academicTransaction(async c=>{
+    const prior=await replay(c,key,hash,actor);if(prior)return prior;
+    const previous=previousId?await record(c,'coordinations',previousId):null;
+    const r=await registration(c,previous?.RegistrationID??registrationId!);
+    await noAssignment(c,r);
+    if(previous){await latest(c,r,previousId!);if(!rejected(previous.Decision))throw invalid('Only rejected coordinations can be reassigned.',409,'COORDINATION_NOT_REJECTED');if(previous.PositionID===positionId)throw invalid('Choose a different position for reassignment.');}
+    else if((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1',[r.RegistrationID])).rowCount)throw invalid('Coordination already exists. Use reassign after rejection.',409,'COORDINATION_EXISTS');
+    const p=await availablePosition(c,positionId,r.OJTSemesterID);
+    const application=(await c.query(`SELECT * FROM "JobApplications" WHERE "RegistrationID"=$1 AND "PositionID"=$2 AND ($3::int IS NULL OR "ApplicationID"=$3) AND "Status" NOT IN ('REJECTED','WITHDRAWN') ORDER BY "ApplicationID" DESC LIMIT 1`,[r.RegistrationID,positionId,applicationId])).rows[0];
+    if(applicationId&&!application)throw invalid('Ứng tuyển không khớp hồ sơ/vị trí hoặc đã kết thúc.',409,'APPLICATION_POSITION_MISMATCH');
+    if(!previous&&!application&&(await c.query('SELECT 1 FROM "JobApplications" WHERE "RegistrationID"=$1',[r.RegistrationID])).rowCount)throw invalid('Chọn vị trí sinh viên đã ứng tuyển.',409,'APPLICATION_POSITION_MISMATCH');
+    const after=await persist(c,'coordinations',{ApplicationID:application?.ApplicationID??null,RegistrationID:r.RegistrationID,OJTSemesterID:r.OJTSemesterID,EnterpriseID:p.EnterpriseID,PositionID:positionId,CoordinatedBy:actor.userId,Decision:'PENDING',PreviousCoordinationID:previousId??null});
+    await log(c,'coordinations',null,after,actor,previous?'REASSIGN':'COORDINATE',reason,{idempotencyKey:key,requestHash:hash});
+    return {...api('coordinations',after),replayed:false};
   });
 }
-export async function decision(id: number, body: unknown, actor: Actor) {
-  const b = inputObject(body,['decision','reason']), value = enumValue(b.decision,['ACCEPTED','REJECTED'],'decision');
-  const reason = actor.roleCode !== 'ENTERPRISE' || value === 'REJECTED' ? requiredText(b.reason,'reason',300) : optionalText(b.reason,'reason',300);
-  return academicTransaction(async c => {
-    const row = await record(c,'coordinations',id); await assertAccess(c,'coordinations',row,actor); await latest(c,row);
-    await registration(c,row.RegistrationID);
-    if (row.Decision != null && row.Decision !== 'PENDING') throw invalid('A decision has already been recorded; use reassignment for further changes.',409,'COORDINATION_DECIDED');
-    if(row.ApplicationID){const a=(await c.query('SELECT * FROM "JobApplications" WHERE "ApplicationID"=$1 FOR UPDATE',[row.ApplicationID])).rows[0];if(!a||!['SUBMITTED','REVIEWING','INTERVIEW','OFFERED'].includes(a.Status))throw invalid('Application is no longer pending.',409,'APPLICATION_NOT_PENDING');}
-    if (value === 'ACCEPTED') {
-      if((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" co LEFT JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID" WHERE co."RegistrationID"=$1 AND co."CoordinationID"<>$2 AND UPPER(co."Decision") IN (\'ACCEPTED\',\'ACCEPT\',\'APPROVED\') AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" n WHERE n."PreviousCoordinationID"=co."CoordinationID") AND (a."AssignmentID" IS NULL OR COALESCE(UPPER(a."Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\'))',[row.RegistrationID,id])).rowCount)throw invalid('This student already has an accepted coordination.',409,'STUDENT_ALREADY_ACCEPTED');
-      await openPosition(c,row.PositionID,row.OJTSemesterID);
-      if ((await remaining(c,row.PositionID)).remainingSlots < 1) throw invalid('The position has no remaining seats.',409,'POSITION_FULL');
-    }
-    const after = (await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value === 'REJECTED' ? reason : null])).rows[0];
-    await syncSlots(c,row.PositionID);
-    if(row.ApplicationID){await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4,"UpdatedAt"=now() WHERE "ApplicationID"=$1',[row.ApplicationID,value,actor.userId,reason]);await applicationEvent(c,row.ApplicationID,value,actor.userId,{coordinationId:id,status:value},reason??undefined);}
-    await audit(c,actor.userId,'StudentEnterpriseCoordination',id,actor.roleCode === 'ENTERPRISE' ? 'ENTERPRISE_DECISION' : 'PROXY_ENTERPRISE_DECISION',row,{...after,enteredBy:actor.userId,enteredByRole:actor.roleCode,onBehalfOfEnterprise:actor.roleCode !== 'ENTERPRISE'},reason ?? undefined);
-    return asApi('coordinations',after);
+export async function decision(id:number,body:unknown,actor:Actor){
+  const b=inputObject(body,['decision','reason']),value=enumValue(b.decision,['ACCEPTED','REJECTED'],'decision'),reason=requiredText(b.reason,'reason',value==='REJECTED'?300:2000);
+  return academicTransaction(async c=>{
+    const before=await record(c,'coordinations',id);await assertScope(c,actor,before.EnterpriseID);
+    const r=await registration(c,before.RegistrationID);await latest(c,r,id);
+    if(before.Decision===value&&before.RejectReason===(value==='REJECTED'?reason:null))return {...api('coordinations',before),replayed:true};
+    if(accepted(before.Decision)||rejected(before.Decision))throw invalid('The enterprise decision is already final.',409,'DECISION_FINAL');
+    if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)throw invalid('Coordination already has an assignment.',409);
+    if(value==='ACCEPTED')await availablePosition(c,before.PositionID,r.OJTSemesterID);
+    const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];
+    if(before.ApplicationID)await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4 WHERE "ApplicationID"=$1',[before.ApplicationID,value,actor.userId,reason]);
+    await log(c,'coordinations',before,after,actor,'ENTERPRISE_DECISION',reason);return {...api('coordinations',after),replayed:false};
   });
 }
-function assignmentFields(b: Row, before?: Row) {
-  const values: Row = {};
-  if ('academicSupervisorId' in b) values.AcademicSupervisorID = b.academicSupervisorId === null ? null : positiveId(b.academicSupervisorId,'academicSupervisorId');
-  if ('enterpriseSupervisorName' in b) values.EnterpriseSupervisorName = optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100);
-  for (const [key,col] of [['startDate','StartDate'],['endDate','EndDate']] as const) if (!before || key in b) values[col] = dateInput(b[key],key);
-  const date = (value: unknown) => value instanceof Date ? value.toISOString().slice(0,10) : String(value).slice(0,10);
-  const merged = {...before,...values};
-  if (!merged.StartDate || !merged.EndDate) throw invalid('Assignment startDate and endDate are required.');
-  dateRange(date(merged.StartDate),date(merged.EndDate),'assignment');
-  return values;
+function assignmentDates(b:Row,before?:Row){
+  const day=(v:any)=>v instanceof Date?`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`:v;
+  const start=dateInput(b.startDate??day(before?.StartDate),'startDate'),end=dateInput(b.endDate??day(before?.EndDate),'endDate');dateRange(start,end);return {StartDate:start,EndDate:end};
 }
-async function academicSupervisor(c: PoolClient, id: unknown) {
-  if (id != null && !(await c.query('SELECT 1 FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE u."UserID"=$1 AND u."Status"=\'ACTIVE\' AND r."RoleCode"=\'ACADEMIC\'',[id])).rowCount) throw invalid('Academic supervisor must be an active ACADEMIC user.');
-}
-export async function assign(body: unknown, actor: Actor) {
-  requireStaff(actor);
-  const b = inputObject(body,['coordinationId','registrationId','positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate','reason']);
-  const reason = optionalText(b.reason,'reason',2000), fields = assignmentFields(b);
-  return academicTransaction(async c => {
-    const id = b.coordinationId !== undefined ? positiveId(b.coordinationId,'coordinationId') : (await c.query('SELECT "CoordinationID" FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1',[positiveId(b.registrationId,'registrationId')])).rows[0]?.CoordinationID;
-    if (!id) throw invalid('An existing accepted coordination is required.',409,'ENTERPRISE_ACCEPTANCE_REQUIRED');
-    const co = await record(c,'coordinations',id); await latest(c,co); const r = await registration(c,co.RegistrationID);
-    if (b.registrationId !== undefined && positiveId(b.registrationId,'registrationId') !== co.RegistrationID) throw invalid('registrationId conflicts with coordinationId.');
-    if (b.positionId !== undefined && positiveId(b.positionId,'positionId') !== co.PositionID) throw invalid('positionId conflicts with accepted coordination.');
-    await academicSupervisor(c,fields.AcademicSupervisorID);
-    if (!accepted(co.Decision)) throw invalid('Enterprise acceptance is required before assignment.',409,'ENTERPRISE_ACCEPTANCE_REQUIRED');
-    if ((await c.query('SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE a."CoordinationID"=$1 OR (a."StudentID"=$2 AND co."OJTSemesterID"=$3 AND COALESCE(UPPER(a."Status"),\'\') NOT IN (\'CANCELLED\',\'CANCELED\'))',[id,r.StudentID,r.OJTSemesterID])).rowCount) throw invalid('A non-cancelled assignment already exists for this student and semester, or this coordination was already assigned.',409,'ASSIGNMENT_EXISTS');
-    const p = await record(c,'positions',co.PositionID), slots = await remaining(c,co.PositionID);
-    if (slots.used > slots.capacity) throw invalid('Position is over capacity.',409,'POSITION_CAPACITY_CONFLICT');
-    if (p.EnterpriseID !== co.EnterpriseID || p.OJTSemesterID !== r.OJTSemesterID) throw invalid('Assignment context conflicts with the position.',409);
-    const company = await record(c,'companies',co.EnterpriseID);
-    if (company.Status !== 'ACTIVE') throw invalid('Enterprise is inactive.',409);
-    const row = (await c.query('INSERT INTO "InternshipAssignments" ("CoordinationID","StudentID","EnterpriseID","PositionID","AcademicSupervisorID","EnterpriseSupervisorName","StartDate","EndDate","Status") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,\'ASSIGNED\') RETURNING *',[id,r.StudentID,co.EnterpriseID,co.PositionID,fields.AcademicSupervisorID ?? null,fields.EnterpriseSupervisorName ?? null,fields.StartDate,fields.EndDate])).rows[0];
-    await syncSlots(c,co.PositionID); await audit(c,actor.userId,'InternshipAssignments',row.AssignmentID,'ASSIGN',null,row,reason ?? undefined);
-    return {...asApi('assignments',row),ojtSemesterId:co.OJTSemesterID};
+export async function assign(body:unknown,actor:Actor){staff(actor);const b=inputObject(body,['coordinationId','enterpriseSupervisorName','startDate','endDate','reason']);
+  const coordinationId=positiveId(b.coordinationId,'coordinationId'),reason=requiredText(b.reason,'reason',2000),dates=assignmentDates(b);
+  return academicTransaction(async c=>{
+    const co=await record(c,'coordinations',coordinationId),r=await registration(c,co.RegistrationID);await latest(c,r,coordinationId);
+    if(!accepted(co.Decision))throw invalid('An accepted coordination is required.',409,'COORDINATION_NOT_ACCEPTED');
+    await noAssignment(c,r);
+    if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[coordinationId])).rowCount)throw invalid('Coordination already has an assignment.',409,'ASSIGNMENT_EXISTS');
+    const p=await availablePosition(c,co.PositionID,r.OJTSemesterID);
+    if(p.EnterpriseID!==co.EnterpriseID)throw invalid('Coordination and position company do not match.',409);
+    const after=await persist(c,'assignments',{CoordinationID:coordinationId,StudentID:r.StudentID,EnterpriseID:co.EnterpriseID,PositionID:co.PositionID,EnterpriseSupervisorName:optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100),...dates,Status:'ASSIGNED'});
+    await refreshSlots(c,p.PositionID);await log(c,'assignments',null,after,actor,'ASSIGN',reason);return api('assignments',after);
   });
 }
-async function mutableAssignment(c: PoolClient, id: number) {
-  const row = await record(c,'assignments',id);
-  // Once transferred, source changes must follow the existing academic revision workflow.
-  if ((await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1 AND "Status"<>\'REVISION_REQUESTED\'',[id])).rowCount) throw invalid('Request an academic revision before modifying a transferred assignment or evaluation.',409,'OJT_RESULT_LOCKED');
-  return row;
+async function updateAssignmentFields(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','reason']),reason=requiredText(b.reason,'reason',2000);
+  if(!['enterpriseSupervisorName','startDate','endDate'].some(k=>k in b))throw invalid('Provide an editable field.');
+  const c=client;
+    const before=await record(c,'assignments',id);await mutableAssignment(c,id);
+    if((await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "Status"=\'SUBMITTED\'',[id])).rowCount)throw invalid('An officially evaluated assignment cannot be edited.',409,'OJT_SCORE_FINALIZED');
+    if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(before.Status).toUpperCase()))throw invalid('Only pending or active assignments can change.',409);
+    const values:Row=assignmentDates(b,before);
+    if('enterpriseSupervisorName' in b)values.EnterpriseSupervisorName=optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100);
+    const after=await persist(c,'assignments',values,id);await log(c,'assignments',before,after,actor,'UPDATE_ASSIGNMENT',reason);return api('assignments',after);
+
 }
-export async function updateAssignment(id: number, body: unknown, actor: Actor) {
-  requireStaff(actor);
-  const b = inputObject(body,['positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate','reason']), reason = requiredText(b.reason,'reason',2000);
-  return academicTransaction(async c => {
-    const before = await mutableAssignment(c,id);
-    if (!['ASSIGNED','IN_PROGRESS','ACTIVE'].includes(before.Status)) throw invalid('Only assigned or in-progress assignments can be edited.',409);
-    if (b.positionId !== undefined && positiveId(b.positionId,'positionId') !== before.PositionID) throw invalid('Cancel and reassign through an accepted coordination to change position.',409);
-    const fields = assignmentFields(b,before), entries = Object.entries(fields);
-    await academicSupervisor(c,fields.AcademicSupervisorID);
-    if (!entries.length) throw invalid('Provide at least one assignment field.');
-    const after = (await c.query(`UPDATE "InternshipAssignments" SET ${entries.map(([key],i)=>`"${key}"=$${i+2}`).join(',')} WHERE "AssignmentID"=$1 RETURNING *`,[id,...entries.map(([,v])=>v)])).rows[0];
-    await audit(c,actor.userId,'InternshipAssignments',id,'UPDATE',before,after,reason); return asApi('assignments',after);
-  });
+async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['status','reason']),value=enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'),reason=requiredText(b.reason,'reason',2000);
+  const c=client;
+    const before=await record(c,'assignments',id);await mutableAssignment(c,id);
+    const current=String(before.Status??'ASSIGNED').toUpperCase();
+    if(current===value)return {...api('assignments',before),replayed:true};
+    const transitions:Row={ASSIGNED:['ACTIVE','CANCELLED'],ACTIVE:['COMPLETED','CANCELLED'],IN_PROGRESS:['COMPLETED','CANCELLED']};
+    if(!transitions[current]?.includes(value))throw invalid('Invalid assignment status transition.',409,'ASSIGNMENT_STATUS_CONFLICT');
+    if(value==='COMPLETED'&&!(await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "OverallScore" IS NOT NULL',[id])).rowCount)throw invalid('Submit an evaluation before completing the assignment.',409,'EVALUATION_REQUIRED');
+    if(value==='CANCELLED'&&(await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1 UNION ALL SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "Status"=\'SUBMITTED\'',[id])).rowCount)throw invalid('Cannot cancel an assignment with an official result.',409,'ASSIGNMENT_HAS_RESULT');
+    await record(c,'positions',before.PositionID);
+    const after=await persist(c,'assignments',{Status:value},id);await refreshSlots(c,before.PositionID);await log(c,'assignments',before,after,actor,'ASSIGNMENT_STATUS',reason);return api('assignments',after);
+
 }
-export async function assignmentStatus(id: number, body: unknown, actor: Actor) {
-  requireStaff(actor);
-  const b = inputObject(body,['status','reason']), status = enumValue(b.status,['IN_PROGRESS','ACTIVE','COMPLETED','CANCELLED'],'status'), reason = requiredText(b.reason,'reason',2000);
-  return academicTransaction(async c => {
-    const before = await mutableAssignment(c,id);
-    const transitions: Record<string,string[]> = { ASSIGNED:['IN_PROGRESS','ACTIVE','CANCELLED'],IN_PROGRESS:['COMPLETED','CANCELLED'],ACTIVE:['COMPLETED','CANCELLED'] };
-    if (!transitions[before.Status]?.includes(status)) throw invalid('Invalid assignment status transition.',409,'INVALID_ASSIGNMENT_TRANSITION');
-    if (status === 'COMPLETED' && !(await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "OverallScore" IS NOT NULL',[id])).rowCount) throw invalid('Submit an evaluation before completing the assignment.',409,'EVALUATION_REQUIRED');
-    const after = (await c.query('UPDATE "InternshipAssignments" SET "Status"=$2 WHERE "AssignmentID"=$1 RETURNING *',[id,status])).rows[0];
-    await record(c,'positions',before.PositionID); await syncSlots(c,before.PositionID);
-    if(status==='CANCELLED'){const co=await record(c,'coordinations',before.CoordinationID);if(co.ApplicationID){await c.query('UPDATE "JobApplications" SET "Status"=\'WITHDRAWN\',"UpdatedAt"=now() WHERE "ApplicationID"=$1',[co.ApplicationID]);await applicationEvent(c,co.ApplicationID,'ASSIGNMENT_CANCELLED',actor.userId,{assignmentId:id,status:'WITHDRAWN'},reason);}}
-    await audit(c,actor.userId,'InternshipAssignments',id,'CHANGE_STATUS',before,after,reason); return asApi('assignments',after);
-  });
-}
-export async function evaluate(id: number, body: unknown, actor: Actor) {
-  const b = inputObject(body,['completionScore','attitudeScore','skillScore','overallScore','comments','reason']);
-  const reason = actor.roleCode === 'ENTERPRISE' ? optionalText(b.reason,'reason',2000) : requiredText(b.reason,'reason',2000);
-  const fields: Row = {};
-  for (const key of ['completionScore','attitudeScore','skillScore','overallScore']) {
-    if (b[key] == null) throw invalid(`${key} is required.`);
-    fields[key] = score(b[key],10,key);
+export async function evaluate(id:number,body:unknown,actor:Actor){
+  if(actor.roleCode!=='ENTERPRISE')throw invalid('Only the enterprise may submit official OJT scores.',403,'FORBIDDEN');
+  const b=inputObject(body,['completionScore','attitudeScore','skillScore','overallScore','comments','reason']),reason=requiredText(b.reason,'reason',2000),values:Row={};
+  for(const key of ['completionScore','attitudeScore','skillScore','overallScore']){
+    const value=score(b[key],10,key);if(value===null)throw invalid(`${key} is required.`);values[key[0].toUpperCase()+key.slice(1)]=value;
   }
-  const comments = optionalText(b.comments,'comments',10000);
-  return academicTransaction(async c => {
-    const a = await record(c,'assignments',id); await assertAccess(c,'assignments',a,actor);
-    await mutableAssignment(c,id);
-    if (!['IN_PROGRESS','ACTIVE','COMPLETED','FAILED'].includes(a.Status)) throw invalid('Evaluations require an in-progress or completed internship.',409,'ASSIGNMENT_NOT_STARTED');
-    const before = (await c.query('SELECT * FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 FOR UPDATE',[id])).rows[0] ?? null;
-    const after = (await c.query('INSERT INTO "InternshipEvaluations" ("AssignmentID","EvaluatedBy","EvaluatedAt","CompletionScore","AttitudeScore","SkillScore","OverallScore","Comments","Status") VALUES ($1,$2,now(),$3,$4,$5,$6,$7,\'SUBMITTED\') ON CONFLICT ("AssignmentID") DO UPDATE SET "EvaluatedBy"=EXCLUDED."EvaluatedBy","EvaluatedAt"=now(),"CompletionScore"=EXCLUDED."CompletionScore","AttitudeScore"=EXCLUDED."AttitudeScore","SkillScore"=EXCLUDED."SkillScore","OverallScore"=EXCLUDED."OverallScore","Comments"=EXCLUDED."Comments","Status"=EXCLUDED."Status" RETURNING *',[id,actor.userId,fields.completionScore,fields.attitudeScore,fields.skillScore,fields.overallScore,comments])).rows[0];
-    await audit(c,actor.userId,'InternshipEvaluations',after.EvaluationID,actor.roleCode === 'ENTERPRISE' ? 'ENTERPRISE_EVALUATION' : 'PROXY_ENTERPRISE_EVALUATION',before,{...after,enteredBy:actor.userId,enteredByRole:actor.roleCode,onBehalfOfEnterprise:actor.roleCode !== 'ENTERPRISE'},reason ?? undefined);
-    return asApi('evaluations',after);
+  values.Comments=optionalText(b.comments,'comments',5000);
+  return academicTransaction(async c=>{
+    const a=await record(c,'assignments',id);await assertScope(c,actor,a.EnterpriseID);await mutableAssignment(c,id);
+    if(!['ACTIVE','IN_PROGRESS','COMPLETED'].includes(String(a.Status).toUpperCase()))throw invalid('Only active or completed internships can be evaluated.',409,'ASSIGNMENT_NOT_ACTIVE');
+    const before=(await c.query('SELECT * FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 FOR UPDATE',[id])).rows[0]??null;
+    if(before?.Status==='SUBMITTED') {
+      const closed=(await c.query(`SELECT GREATEST(a."EndDate",t."EndDate") < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS closed
+        FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
+        JOIN "OJTSemesters" t ON t."OJTSemesterID"=co."OJTSemesterID" WHERE a."AssignmentID"=$1`,[id])).rows[0];
+      if(closed?.closed)throw invalid('Official scores are immutable after the OJT period ends.',409,'OJT_SCORE_FINALIZED');
+    }
+    values.AssignmentID=id;values.EvaluatedBy=actor.userId;values.EvaluatedAt=new Date();values.Status='SUBMITTED';
+    const after=await persist(c,'evaluations',values,before?.EvaluationID);await log(c,'evaluations',before,after,actor,before?'UPDATE_EVALUATION':'SUBMIT_EVALUATION',reason);return api('evaluations',after);
   });
+}
+
+export async function updateAssignment(id:number,body:unknown,actor:Actor) {
+ staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','status','reason']);
+ const {status,...fields}=b;
+ const hasFields=Object.keys(fields).some(key=>key!=='reason');
+ if(!hasFields&&status===undefined)throw invalid('Provide a field or status to update.');
+ return academicTransaction(async client=>{
+  let result;
+  if(hasFields)result=await updateAssignmentFields(id,fields,actor,client);
+  if(status!==undefined)result=await assignmentStatus(id,{status,reason:b.reason},actor,client);
+  return result;
+ });
 }

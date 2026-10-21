@@ -1,5 +1,4 @@
 import type { PoolClient } from 'pg';
-import { pool } from '../../config/database';
 import { invalid } from './student.validation';
 import { resultSelect } from './student.service';
 
@@ -120,13 +119,4 @@ export async function academicProgressWithClient(client:PoolClient, studentId:nu
     const gradeWeights=(await client.query(`SELECT cc."CourseID",cc."Credits" FROM "ComboCourses" cc JOIN "ProgramCombos" c ON c."ProgramComboID"=cc."ProgramComboID" WHERE c."ProgramID"=$1 AND c."CoursesReviewed"=true`,[s.ProgramID])).rows;
     const output=calculateProgress(program,courses,attempts,aliases,invalidGroups.length?[]:options,policy,issues,gradeWeights);
     return {studentId,...output};
-}
-export async function academicProgress(studentId:number) {
-  if (!pool) throw invalid('Database is unavailable.',503);
-  const client=await pool.connect();
-  try {
-    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    const output=await academicProgressWithClient(client,studentId);
-    await client.query('COMMIT');return output;
-  } catch(error) {await client.query('ROLLBACK');throw error;} finally {client.release();}
 }

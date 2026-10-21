@@ -1,4 +1,5 @@
 import { academicAlertEmailIsCurrent } from '../modules/academic-reporting/notification.service';
+import { notifyCompletedInternships } from '../modules/ojt-results/completion-notification.service';
 import nodemailer from 'nodemailer';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
@@ -12,7 +13,9 @@ export async function archiveRecruitment() {
     // Backfill retention for older/manual posts from the next chronological semester.
     await client.query(`UPDATE "RecruitmentPosts" p SET "RetentionSemesterID"=(
       SELECT n."OJTSemesterID" FROM "OJTSemesters" n JOIN "OJTSemesters" s ON s."OJTSemesterID"=p."OJTSemesterID"
-      WHERE n."StartDate">s."StartDate" ORDER BY n."StartDate",n."OJTSemesterID" LIMIT 1
+      WHERE n."StartDate">s."StartDate" AND (s."AcademicPeriodID" IS NULL OR EXISTS (
+        SELECT 1 FROM "AcademicPeriods" ap WHERE ap."AcademicPeriodID"=n."AcademicPeriodID" AND ap."Kind"='SEMESTER'))
+      ORDER BY n."StartDate",n."OJTSemesterID" LIMIT 1
     ) WHERE p."RetentionSemesterID" IS NULL`);
     await client.query(`UPDATE "RecruitmentPosts" SET "Status"='CLOSED',"UpdatedAt"=now()
       WHERE "Status"='PUBLISHED' AND "DeadlineAt"<=now()`);
@@ -84,8 +87,13 @@ export function startProvisioningJobs() {
   const tick = async () => {
     if (busy || stopped) return;
     busy = true;
-    try { await archiveRecruitment(); await deliverEmails(); }
-    catch { console.error('Provisioning job failed; check database migration and SMTP configuration.'); }
+    try {
+      // An archive failure must not prevent account/result emails from being delivered.
+      for(const [name,job] of [['archive',archiveRecruitment],['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
+        try { await job(); }
+        catch { console.error(`Provisioning ${name} job failed; check database migration and SMTP configuration.`); }
+      }
+    }
     finally { busy = false; }
   };
   const timer = setInterval(() => void tick(), 60000);

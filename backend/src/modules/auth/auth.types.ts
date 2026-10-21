@@ -8,6 +8,8 @@ export type RoleCode =
   | "ENTERPRISE";
 
 export interface AuthUserRecord {
+  studentId: number | null;
+  enterpriseId: number | null;
   id: number;
   username: string;
   email: string;
