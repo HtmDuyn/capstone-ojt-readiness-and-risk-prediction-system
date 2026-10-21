@@ -366,7 +366,7 @@ export const EnterpriseProfile: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                   <Layers className="w-5 h-5 text-orange-600" />
-                  <span>Tổng quan Số liệu Tuyển dụng & OJT</span>
+                  <span>Tổng quan Hoạt động OJT</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Số liệu cập nhật theo thời gian thực từ cơ sở dữ liệu hệ thống
@@ -377,34 +377,7 @@ export const EnterpriseProfile: React.FC = () => {
               </span>
             </div>
 
-            {/* 5 Real Metric Cards from summary */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-              {/* Published Posts */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                  Vị trí đã đăng
-                </span>
-                <span className="text-2xl font-black text-slate-900 block">
-                  {profile.summary?.publishedPosts ?? 0}
-                </span>
-                <span className="text-[10px] text-emerald-600 font-medium block">
-                  Đang mở tuyển
-                </span>
-              </div>
-
-              {/* Pending Posts */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                  Vị trí chờ duyệt
-                </span>
-                <span className="text-2xl font-black text-amber-600 block">
-                  {profile.summary?.pendingPosts ?? 0}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium block">
-                  Chờ trường duyệt
-                </span>
-              </div>
-
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
               {/* Pending Candidates */}
               <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
@@ -432,7 +405,7 @@ export const EnterpriseProfile: React.FC = () => {
               </div>
 
               {/* Pending Evaluations */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1 col-span-2 md:col-span-1">
+              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                   Đánh giá chờ xử lý
                 </span>
@@ -448,13 +421,6 @@ export const EnterpriseProfile: React.FC = () => {
             {/* Quick Links Section */}
             <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
               <span className="text-xs font-semibold text-slate-400">Truy cập nhanh:</span>
-              <Link
-                to="/enterprise/jobs"
-                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center space-x-1 transition-colors"
-              >
-                <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-                <span>Quản lý Vị trí Tuyển</span>
-              </Link>
               <Link
                 to="/enterprise/candidates"
                 className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center space-x-1 transition-colors"

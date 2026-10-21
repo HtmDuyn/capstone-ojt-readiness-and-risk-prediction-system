@@ -1,27 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { PageBanner } from '@/components/common/PageBanner';
 import {
-  Briefcase,
   Users,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
   TrendingUp,
   UserCheck,
   ChevronRight,
-  Send,
   Building2,
-  ExternalLink,
-  Layers,
   FileCheck2,
+  ClipboardCheck,
+  ListChecks,
+  Loader2,
+  AlertCircle,
+  Send,
+  AlertTriangle,
 } from 'lucide-react';
-import { enterpriseService } from '@/service/enterpriseService';
+import { enterpriseService, type EnterpriseInternshipTask } from '@/service/enterpriseService';
 import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
+
+interface StudentTaskProgress {
+  studentId: number;
+  studentName: string;
+  studentCode: string;
+  completed: number;
+  inProgress: number;
+  todo: number;
+  total: number;
+}
+
+const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgress[] => {
+  const progressByStudent = new Map<number, StudentTaskProgress>();
+
+  for (const task of tasks) {
+    const progress = progressByStudent.get(task.studentId) ?? {
+      studentId: task.studentId,
+      studentName: task.student?.fullName || 'Sinh viên',
+      studentCode: task.student?.studentCode || '',
+      completed: 0,
+      inProgress: 0,
+      todo: 0,
+      total: 0,
+    };
+    const status = task.status.toUpperCase();
+    progress.total += 1;
+    if (status === 'DONE' || status === 'COMPLETED') {
+      progress.completed += 1;
+    } else if (status === 'IN_PROGRESS') {
+      progress.inProgress += 1;
+    } else {
+      progress.todo += 1;
+    }
+    progressByStudent.set(task.studentId, progress);
+  }
+
+  return [...progressByStudent.values()].sort(
+    (a, b) => b.total - a.total || a.studentName.localeCompare(b.studentName)
+  );
+};
 
 export const EnterpriseDashboard: React.FC = () => {
   const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [taskProgress, setTaskProgress] = useState<StudentTaskProgress[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksError, setTasksError] = useState<string | null>(null);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [incidentReport, setIncidentReport] = useState({
     studentId: '',
@@ -48,6 +90,39 @@ export const EnterpriseDashboard: React.FC = () => {
     loadProfile();
   }, []);
 
+  useEffect(() => {
+    const loadTaskProgress = async () => {
+      setTasksLoading(true);
+      setTasksError(null);
+      try {
+        const firstPage = await enterpriseService.listInternshipTasks({ page: 1, limit: 100 });
+        if (!firstPage?.success || !firstPage.data) {
+          throw new Error('Không thể tải dữ liệu tiến độ task');
+        }
+
+        const tasks = [...firstPage.data.items];
+        const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
+        for (let page = 2; page <= totalPages; page += 1) {
+          const response = await enterpriseService.listInternshipTasks({ page, limit: 100 });
+          if (!response?.success || !response.data) {
+            throw new Error(`Không thể tải dữ liệu task ở trang ${page}`);
+          }
+          tasks.push(...response.data.items);
+        }
+
+        setTaskProgress(buildTaskProgress(tasks));
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu tiến độ task';
+        setTasksError(message);
+        console.error('Failed to load enterprise task progress:', err);
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+
+    void loadTaskProgress();
+  }, []);
+
   const handleSendIncident = (e: React.FormEvent) => {
     e.preventDefault();
     setToastMessage('Đã gửi báo cáo sự cố về Phòng QHDN Trường FPT thành công!');
@@ -60,13 +135,35 @@ export const EnterpriseDashboard: React.FC = () => {
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Banner without buttons */}
-      <PageBanner
-        title={`Cổng Quản lý Thực tập: ${companyName}`}
-        description={`Chào mừng ${companyName} (${profile?.code || 'OJT Partner'}). Quản lý các vị trí thực tập, tiếp nhận ứng viên sinh viên và theo dõi tiến độ OJT.`}
-        badge={profile?.status === 'ACTIVE' ? 'Đối tác chính thức (ACTIVE)' : 'Doanh nghiệp Đối tác'}
-      />
+    <div className="space-y-5 pb-12">
+      <section className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-950 via-indigo-950 to-slate-900 px-6 py-8 text-white shadow-xl shadow-indigo-950/15 sm:px-9 sm:py-10">
+        <div className="absolute -right-12 -top-24 -z-10 h-72 w-72 rounded-full bg-orange-500/25 blur-3xl" />
+        <div className="absolute -bottom-32 right-1/3 -z-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-indigo-100 backdrop-blur">
+              <Building2 className="h-3.5 w-3.5 text-orange-300" />
+              <span>CỔNG QUẢN LÝ THỰC TẬP DOANH NGHIỆP</span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+              {companyName}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-indigo-100/80">
+              Tiếp nhận ứng viên, theo dõi tiến độ công việc và đồng hành cùng sinh viên trong kỳ thực tập OJT.
+            </p>
+          </div>
+          <span
+            className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
+              profile?.status === 'ACTIVE'
+                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                : 'border-white/15 bg-white/10 text-indigo-100'
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+            {profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
+          </span>
+        </div>
+      </section>
 
       {toastMessage && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm font-medium flex items-center justify-between animate-fadeIn shadow-sm">
@@ -83,86 +180,185 @@ export const EnterpriseDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Real Overview Stat Cards from /api/enterprise/profile summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Vị trí tuyển OJT */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Vị trí tuyển OJT đã đăng
-            </p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">
-              {loading ? '...' : summary?.publishedPosts ?? 0}{' '}
-              <span className="text-xs text-slate-400 font-normal">vị trí</span>
-            </h3>
-            <p className="text-xs text-amber-600 font-medium mt-1">
-              Chờ duyệt: <strong>{summary?.pendingPosts ?? 0}</strong> vị trí
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shadow-xs">
-            <Briefcase className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* Hồ sơ chờ duyệt */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Hồ sơ chờ xét duyệt
-            </p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">
-              {loading ? '...' : summary?.pendingCandidates ?? 0}{' '}
-              <span className="text-xs text-slate-400 font-normal">ứng viên</span>
-            </h3>
-            <p className="text-xs text-blue-600 font-medium mt-1">Nguyện vọng vào doanh nghiệp</p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
-            <Users className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* Sinh viên đang thực tập */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Sinh viên đang thực tập
-            </p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">
-              {loading ? '...' : summary?.activeInterns ?? 0}{' '}
-              <span className="text-xs text-slate-400 font-normal">sinh viên</span>
-            </h3>
-            <p className="text-xs text-emerald-600 font-medium mt-1">Đang tiếp nhận OJT</p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
-            <UserCheck className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* Đánh giá OJT chờ xử lý */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Đánh giá OJT chờ xử lý
-            </p>
-            <h3 className="text-2xl font-black text-purple-600 mt-1">
-              {loading ? '...' : summary?.pendingEvaluations ?? 0}{' '}
-              <span className="text-xs text-slate-400 font-normal">phiếu</span>
-            </h3>
-            <p className="text-xs text-purple-500 font-medium mt-1">Đánh giá kết thúc kỳ</p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shadow-xs">
-            <FileCheck2 className="w-6 h-6" />
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {[
+          {
+            label: 'Hồ sơ chờ xét duyệt',
+            value: summary?.pendingCandidates ?? 0,
+            unit: 'ứng viên',
+            detail: 'Ứng tuyển vào doanh nghiệp',
+            icon: Users,
+            color: 'blue',
+            to: '/enterprise/candidates',
+          },
+          {
+            label: 'Sinh viên đang thực tập',
+            value: summary?.activeInterns ?? 0,
+            unit: 'sinh viên',
+            detail: 'Đang tham gia kỳ OJT',
+            icon: UserCheck,
+            color: 'emerald',
+            to: '/enterprise/interns',
+          },
+          {
+            label: 'Đánh giá OJT chờ xử lý',
+            value: summary?.pendingEvaluations ?? 0,
+            unit: 'phiếu',
+            detail: 'Cần hoàn tất đánh giá',
+            icon: FileCheck2,
+            color: 'violet',
+            to: '/enterprise/evaluation',
+          },
+        ].map((stat) => {
+          const Icon = stat.icon;
+          const colors = {
+            blue: 'bg-blue-50 text-blue-600 ring-blue-100',
+            emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+            violet: 'bg-violet-50 text-violet-600 ring-violet-100',
+          }[stat.color];
+          return (
+            <Link
+              key={stat.label}
+              to={stat.to}
+              className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    {stat.label}
+                  </p>
+                  <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                    {loading ? '...' : stat.value}
+                    <span className="ml-1.5 text-xs font-medium text-slate-400">{stat.unit}</span>
+                  </p>
+                </div>
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${colors}`}>
+                  <Icon className="h-5 w-5" />
+                </span>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-500">{stat.detail}</span>
+                <ChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-orange-500" />
+              </div>
+            </Link>
+          );
+        })}
       </div>
 
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-slate-900">
+              <ListChecks className="h-5 w-5 text-orange-500" />
+              Tiến độ Task của sinh viên
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Tỷ lệ task đã hoàn thành trên tổng số task được giao.
+            </p>
+          </div>
+          <Link
+            to="/enterprise/interns"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Quản lý task
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          {tasksLoading ? (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+              <p className="text-xs font-medium text-slate-500">Đang tải tiến độ task...</p>
+            </div>
+          ) : tasksError ? (
+            <div className="rounded-xl bg-rose-50 p-5 text-center">
+              <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
+              <p className="text-sm font-medium text-rose-700">{tasksError}</p>
+            </div>
+          ) : taskProgress.length === 0 ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
+              <ListChecks className="mx-auto mb-2 h-7 w-7 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-600">Chưa có task để thống kê.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Tiến độ sẽ hiển thị tại đây khi task được giao cho sinh viên.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-medium text-slate-500">
+                <span><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />Tỷ lệ task đã hoàn thành</span>
+              </div>
+
+              <div className="flex">
+                <div className="flex h-56 w-9 shrink-0 flex-col justify-between pb-8 pr-2 text-right text-[10px] text-slate-400">
+                  <span>100%</span>
+                  <span>75%</span>
+                  <span>50%</span>
+                  <span>25%</span>
+                  <span>0%</span>
+                </div>
+
+                <div className="min-w-0 flex-1 overflow-x-auto">
+                  <div
+                    className="relative h-56"
+                    style={{ minWidth: `${Math.max(100, taskProgress.length * 76)}px` }}
+                  >
+                    <div className="absolute inset-x-0 bottom-8 top-0 flex flex-col justify-between" aria-hidden="true">
+                      {[0, 1, 2, 3, 4].map((tick) => (
+                        <span key={tick} className="border-t border-dashed border-slate-200" />
+                      ))}
+                    </div>
+
+                    <div className="absolute inset-0 flex gap-2">
+                      {taskProgress.map((student) => {
+                        const completion = Math.round((student.completed / student.total) * 100);
+                        const barHeight = completion * (192 / 224);
+                        return (
+                          <div
+                            key={student.studentId}
+                            className="relative h-full min-w-0 flex-1"
+                            role="img"
+                            aria-label={`${student.studentName}: ${completion}% hoàn thành, ${student.completed} task xong, ${student.inProgress} đang làm, ${student.todo} chưa bắt đầu`}
+                          >
+                            <span
+                              className="absolute z-10 w-full rounded bg-white/90 text-center text-[10px] font-bold text-slate-600"
+                              style={{ top: `${Math.max(0, 192 - barHeight - 16)}px` }}
+                            >
+                              {completion}%
+                            </span>
+                            <div
+                              className="absolute bottom-8 left-1/2 w-8 -translate-x-1/2 rounded-t-md bg-emerald-500 shadow-sm transition-all hover:w-10 hover:bg-emerald-600 sm:w-10 sm:hover:w-12"
+                              style={{ height: `${barHeight}%` }}
+                              title={`${student.studentName}: ${student.completed}/${student.total} hoàn thành, ${student.inProgress} đang làm, ${student.todo} chưa bắt đầu`}
+                            />
+                            <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden text-center">
+                              <p className="truncate text-[10px] font-semibold text-slate-700">
+                                {student.studentCode || student.studentName}
+                              </p>
+                              <p className="text-[9px] text-slate-400">
+                                {student.completed}/{student.total} task
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Main Grid Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         {/* Left Column (2 cols): Summary overview & Quick Navigation */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-5 xl:col-span-2">
           {/* Card: Hồ sơ Sinh viên Chờ duyệt Tiếp nhận */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Hồ sơ Sinh viên Chờ duyệt</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -178,27 +374,34 @@ export const EnterpriseDashboard: React.FC = () => {
               </Link>
             </div>
 
-            <div className="p-6 text-center">
+            <div className="p-5 sm:p-6">
               {summary && summary.pendingCandidates > 0 ? (
-                <div className="text-xs text-slate-600">
-                  Có <strong>{summary.pendingCandidates}</strong> ứng viên mới cần duyệt hồ sơ.
-                  <div className="mt-3">
+                <div className="flex flex-col gap-4 rounded-xl bg-orange-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-orange-600 shadow-sm">
+                      <Users className="h-5 w-5" />
+                    </span>
+                    <p className="text-sm text-slate-700">
+                      Có <strong>{summary.pendingCandidates}</strong> ứng viên mới cần duyệt hồ sơ.
+                    </p>
+                  </div>
                     <Link
                       to="/enterprise/candidates"
-                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600"
                     >
                       <span>Vào duyệt hồ sơ ngay</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
-                  </div>
                 </div>
               ) : (
-                <div className="py-6 space-y-2 text-slate-400">
-                  <Users className="w-8 h-8 text-slate-300 mx-auto" />
-                  <p className="text-xs font-medium text-slate-500">
+                <div className="flex flex-col items-center rounded-xl bg-slate-50 px-4 py-7 text-center">
+                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </span>
+                  <p className="text-sm font-semibold text-slate-700">
                     Hiện chưa có hồ sơ ứng viên nào đang chờ duyệt tiếp nhận.
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="mt-1 text-xs text-slate-400">
                     Hồ sơ mới đăng ký của sinh viên sẽ tự động hiển thị tại đây.
                   </p>
                 </div>
@@ -206,110 +409,61 @@ export const EnterpriseDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Card: Vị trí Thực tập Đang mở */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Vị trí Thực tập OJT</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Danh sách chỉ tiêu tiếp nhận sinh viên thực tập của doanh nghiệp
-                </p>
-              </div>
-              <Link
-                to="/enterprise/jobs"
-                className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center space-x-1"
-              >
-                <span>Quản lý vị trí</span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            <div className="p-6 text-center">
-              {summary && summary.publishedPosts > 0 ? (
-                <div className="text-xs text-slate-600">
-                  Doanh nghiệp đang mở tuyển <strong>{summary.publishedPosts}</strong> vị trí OJT.
-                </div>
-              ) : (
-                <div className="py-6 space-y-3 text-slate-400">
-                  <Briefcase className="w-8 h-8 text-slate-300 mx-auto" />
-                  <p className="text-xs font-medium text-slate-500">
-                    Chưa có vị trí tuyển dụng thực tập nào đang mở.
-                  </p>
-                  <div>
-                    <Link
-                      to="/enterprise/jobs"
-                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1 transition-all"
-                    >
-                      <span>+ Đăng vị trí tuyển mới</span>
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Right Column (1 col): Thao tác nhanh & Thông tin doanh nghiệp */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Action Hub Card */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg space-y-4">
-            <h3 className="font-bold text-base flex items-center space-x-2 text-amber-400">
-              <TrendingUp className="w-5 h-5" />
-              <span>Thao tác Doanh nghiệp</span>
+          <div className="space-y-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-lg sm:p-6">
+            <h3 className="flex items-center gap-2 font-bold text-base text-amber-300">
+              <TrendingUp className="h-5 w-5" />
+              Thao tác nhanh
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Các chức năng quản lý chính dành cho cán bộ tuyển dụng & quản lý thực tập tại doanh nghiệp đối tác.
+            <p className="text-xs leading-relaxed text-slate-300">
+              Truy cập nhanh các công việc quản lý ứng viên và thực tập.
             </p>
 
-            <div className="space-y-2 pt-2">
+            <div className="space-y-2 pt-1">
               <Link
                 to="/enterprise/profile"
-                className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
+                className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/10 p-3 text-xs font-semibold text-white transition hover:bg-white/15"
               >
                 <div className="flex items-center space-x-2">
-                  <Building2 className="w-4 h-4 text-orange-400" />
-                  <span>Hồ sơ Doanh nghiệp ({profile?.code || 'TechViet'})</span>
+                  <Building2 className="h-4 w-4 text-orange-300" />
+                  <span>Hồ sơ doanh nghiệp ({profile?.code || '...'})</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              </Link>
-
-              <Link
-                to="/enterprise/jobs"
-                className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
-              >
-                <span>+ Đăng vị trí tuyển dụng mới</span>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>
 
               <Link
                 to="/enterprise/candidates"
-                className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
+                className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/10 p-3 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                <span>Duyệt hồ sơ sinh viên ứng tuyển</span>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <span className="flex items-center gap-2"><Users className="h-4 w-4 text-blue-300" />Duyệt hồ sơ ứng viên</span>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>
 
               <Link
                 to="/enterprise/interns"
-                className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
+                className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/10 p-3 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                <span>Giao nhiệm vụ & Theo dõi thực tập</span>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <span className="flex items-center gap-2"><UserCheck className="h-4 w-4 text-emerald-300" />Theo dõi sinh viên thực tập</span>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>
 
               <Link
                 to="/enterprise/evaluation"
-                className="w-full p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center justify-between text-xs font-medium text-white"
+                className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/10 p-3 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                <span>Đánh giá kết quả OJT kết thúc kỳ</span>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <span className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-violet-300" />Đánh giá kết quả OJT</span>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>
             </div>
           </div>
 
           {/* Quick Enterprise Info Card */}
           {profile && (
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-3 text-xs">
+            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 text-xs shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="font-bold text-slate-900">Thông tin liên hệ HR</span>
                 <Link

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   DashboardGridIcon,
 } from '@/components/common/icons/AppIcons';
-import { Briefcase, Users, CheckSquare, ClipboardCheck, AlertTriangle, Building2 } from 'lucide-react';
+import { Briefcase, Users, CheckSquare, ClipboardCheck } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
@@ -13,21 +13,8 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
     icon: <DashboardGridIcon size={20} />,
     banner: {
       title: 'Cổng Quản lý Thực tập Doanh nghiệp Đối tác',
-      description: 'Chào mừng Quý Doanh nghiệp. Quản lý tuyển dụng, tiếp nhận sinh viên FPT và theo dõi tiến độ OJT.',
+      description: 'Chào mừng Quý Doanh nghiệp. Quản lý hồ sơ ứng viên, tiếp nhận sinh viên FPT và theo dõi tiến độ OJT.',
       badge: 'FPT Partner Portal',
-      primaryActionLabel: 'Đăng vị trí mới',
-    },
-  },
-  {
-    id: 'enterprise-jobs',
-    label: 'Quản lý Vị trí Thực tập',
-    path: '/enterprise/jobs',
-    icon: <Briefcase size={20} />,
-    banner: {
-      title: 'Quản lý Vị trí & Chỉ tiêu Đón nhận OJT',
-      description: 'Đăng tin tuyển dụng thực tập, cập nhật thông tin yêu cầu và số lượng chỉ tiêu cho từng vị trí.',
-      badge: 'Vị trí Tuyển dụng',
-      primaryActionLabel: '+ Tạo vị trí tuyển mới',
     },
   },
   {
@@ -40,6 +27,17 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
       description: 'Xem CV, điểm khớp nối AI Matching, phỏng vấn và xác nhận hoặc từ chối tiếp nhận sinh viên.',
       badge: 'Xét duyệt OJT',
       primaryActionLabel: 'Duyệt nhanh danh sách',
+    },
+  },
+  {
+    id: 'enterprise-jobs',
+    label: 'Thông tin Vị trí Tuyển dụng',
+    path: '/enterprise/jobs',
+    icon: <Briefcase size={20} />,
+    banner: {
+      title: 'Thông tin Vị trí Tuyển dụng',
+      description: 'Tra cứu vị trí thực tập, yêu cầu và chỉ tiêu tiếp nhận đã được ghi nhận. Trang này chỉ cung cấp thông tin, không hỗ trợ đăng tuyển.',
+      badge: 'Thông tin chỉ đọc',
     },
   },
   {

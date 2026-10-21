@@ -1,32 +1,3 @@
-export type CandidateStatus = 'PENDING' | 'INTERVIEWING' | 'ACCEPTED' | 'REJECTED';
-
-export interface OjtJobPosting {
-  id: string;
-  title: string;
-  department: string;
-  slotsTotal: number;
-  slotsFilled: number;
-  techStack: string[];
-  location: string;
-  salaryAllowance: string;
-  status: 'OPEN' | 'CLOSED';
-  createdDate: string;
-}
-
-export interface EnterpriseCandidate {
-  id: string;
-  studentCode: string;
-  fullName: string;
-  major: string;
-  gpa: number;
-  aiMatchScore: number;
-  appliedRole: string;
-  appliedDate: string;
-  cvUrl: string;
-  status: CandidateStatus;
-  notes?: string;
-}
-
 export interface EnterpriseIntern {
   id: string;
   studentCode: string;
@@ -54,22 +25,6 @@ export interface InternTask {
   assignedBy: string;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   createdAt?: string;
-}
-
-export interface InternEvaluation {
-  id: string;
-  internId: string;
-  studentCode: string;
-  fullName: string;
-  position: string;
-  technicalScore: number; // 40%
-  attitudeScore: number;  // 30%
-  disciplineScore: number;// 20%
-  softSkillsScore: number; // 10%
-  finalGrade: number;
-  feedback: string;
-  evaluatedDate?: string;
-  status: 'DRAFT' | 'SUBMITTED';
 }
 
 export interface EnterpriseProfileSummary {

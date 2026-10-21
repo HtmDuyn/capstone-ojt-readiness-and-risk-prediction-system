@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   CheckSquare,
@@ -21,12 +21,58 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
-import { MOCK_ENTERPRISE_INTERNS, MOCK_INTERN_TASKS } from '@/data/enterprise/mockEnterpriseData';
+import { enterpriseService, type EnterpriseInternshipItem } from '@/service/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
+import { Loader2, AlertCircle } from 'lucide-react';
+
+// Adapter: map API data to existing UI's expected format
+const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): EnterpriseIntern => ({
+  id: String(item.id),
+  studentCode: item.student?.studentCode || '',
+  fullName: item.student?.fullName || '',
+  major: item.student?.programName || item.student?.programCode || '',
+  position: item.position?.title || '',
+  mentorName: item.enterpriseSupervisorName || item.academicSupervisor ? (item.academicSupervisor as any)?.fullName || 'Chưa phân công' : 'Chưa phân công',
+  mentorEmail: item.academicSupervisor ? (item.academicSupervisor as any)?.email || '' : '',
+  startDate: item.startDate ? new Date(item.startDate).toLocaleDateString('vi-VN') : '',
+  progressPercent: item.evaluation ? ((item.evaluation as any)?.overallScore || 0) : 0,
+  completedTasks: 0,
+  totalTasks: 0,
+  attendanceDays: 0,
+  status: (['CANCELLED', 'CANCELED', 'FAILED'].includes(item.status?.toUpperCase() || '') ? 'RISK' : item.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'ONGOING') as 'ONGOING' | 'COMPLETED' | 'RISK',
+});
 
 export const EnterpriseInterns: React.FC = () => {
-  const [interns, setInterns] = useState<EnterpriseIntern[]>(MOCK_ENTERPRISE_INTERNS);
-  const [tasks, setTasks] = useState<InternTask[]>(MOCK_INTERN_TASKS);
+  const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
+  const [tasks, setTasks] = useState<InternTask[]>([]);
+  const [apiLoading, setApiLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [apiTotal, setApiTotal] = useState(0);
+  const [apiPage, setApiPage] = useState(1);
+  const apiLimit = 20;
+
+  const fetchInternships = useCallback(async () => {
+    setApiLoading(true);
+    setApiError(null);
+    try {
+      const res = await enterpriseService.listInternships({ page: apiPage, limit: apiLimit });
+      if (res?.success && res.data) {
+        const mapped = (res.data.items || []).map(mapApiToIntern);
+        setInterns(mapped);
+        setApiTotal(res.data.total || 0);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh';
+      setApiError(message);
+      console.error('Failed to load internships:', err);
+    } finally {
+      setApiLoading(false);
+    }
+  }, [apiPage]);
+
+  useEffect(() => {
+    fetchInternships();
+  }, [fetchInternships]);
 
   // Selected intern for task detail modal
   const [viewingIntern, setViewingIntern] = useState<EnterpriseIntern | null>(null);
@@ -388,6 +434,33 @@ export const EnterpriseInterns: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* API Loading State */}
+      {apiLoading && (
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+            <p className="text-xs text-slate-500 font-medium">Đang tải danh sách thực tập sinh...</p>
+          </div>
+        </div>
+      )}
+
+      {/* API Error State */}
+      {apiError && !apiLoading && (
+        <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-center">
+          <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+          <p className="text-sm text-rose-700 font-medium">{apiError}</p>
+          <button
+            onClick={fetchInternships}
+            className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
+
+      {!apiLoading && !apiError && (
+      <>
 
       {/* 2. Main Action Toolbar (Buttons moved down from banner + Dropdown filters) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-3">
@@ -1175,6 +1248,8 @@ export const EnterpriseInterns: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

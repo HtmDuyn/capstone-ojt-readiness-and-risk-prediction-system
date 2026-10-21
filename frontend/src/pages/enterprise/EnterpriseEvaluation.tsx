@@ -1,331 +1,405 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { ClipboardCheck, CheckCircle2, Award, Download, Save, Send } from 'lucide-react';
-import { MOCK_INTERN_EVALUATIONS } from '@/data/enterprise/mockEnterpriseData';
-import { InternEvaluation } from '@/types/enterprise/enterpriseTypes';
+import { Award, CheckCircle2, ClipboardCheck, Loader2, AlertCircle, Send } from 'lucide-react';
+import {
+  enterpriseService,
+  type EnterpriseInternshipItem,
+} from '@/service/enterpriseService';
+
+interface EvaluationRow {
+  id: number;
+  studentCode: string;
+  fullName: string;
+  position: string;
+  completionScore: number | null;
+  attitudeScore: number | null;
+  skillScore: number | null;
+  overallScore: number | null;
+  comments: string;
+  status: 'DRAFT' | 'SUBMITTED';
+  evaluationLocked: boolean;
+}
+
+interface EvaluationForm {
+  completionScore: string;
+  attitudeScore: string;
+  skillScore: string;
+  overallScore: string;
+  comments: string;
+  reason: string;
+}
+
+type EvaluationScoreKey = keyof Pick<
+  EvaluationForm,
+  'completionScore' | 'attitudeScore' | 'skillScore' | 'overallScore'
+>;
+
+const scoreFields: { key: EvaluationScoreKey; label: string }[] = [
+  { key: 'completionScore', label: 'Điểm hoàn thành' },
+  { key: 'attitudeScore', label: 'Điểm thái độ' },
+  { key: 'skillScore', label: 'Điểm kỹ năng' },
+  { key: 'overallScore', label: 'Điểm tổng kết OJT' },
+];
+
+const emptyForm: EvaluationForm = {
+  completionScore: '',
+  attitudeScore: '',
+  skillScore: '',
+  overallScore: '',
+  comments: '',
+  reason: '',
+};
+
+const toEvaluationRow = (item: EnterpriseInternshipItem): EvaluationRow => {
+  const evaluation = item.evaluation;
+  return {
+    id: item.id,
+    studentCode: item.student?.studentCode || '',
+    fullName: item.student?.fullName || '',
+    position: item.position?.title || '',
+    completionScore: evaluation?.completionScore ?? null,
+    attitudeScore: evaluation?.attitudeScore ?? null,
+    skillScore: evaluation?.skillScore ?? null,
+    overallScore: evaluation?.overallScore ?? null,
+    comments: evaluation?.comments || '',
+    status: evaluation?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT',
+    evaluationLocked: item.evaluationLocked === true,
+  };
+};
 
 export const EnterpriseEvaluation: React.FC = () => {
-  const [evaluations, setEvaluations] = useState<InternEvaluation[]>(MOCK_INTERN_EVALUATIONS);
-  const [selectedEval, setSelectedEval] = useState<InternEvaluation | null>(null);
+  const [evaluations, setEvaluations] = useState<EvaluationRow[]>([]);
+  const [selectedEval, setSelectedEval] = useState<EvaluationRow | null>(null);
+  const [scores, setScores] = useState<EvaluationForm>(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [scores, setScores] = useState({
-    technicalScore: 8.0,
-    attitudeScore: 8.5,
-    disciplineScore: 9.0,
-    softSkillsScore: 8.0,
-    feedback: '',
-  });
+  const fetchEvaluations = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const firstPage = await enterpriseService.listInternships({ page: 1, limit: 100 });
+      if (!firstPage?.success || !firstPage.data) {
+        throw new Error('Không thể tải danh sách sinh viên thực tập');
+      }
 
-  const handleOpenEvaluation = (evalItem: InternEvaluation) => {
-    setSelectedEval(evalItem);
+      const items = [...firstPage.data.items];
+      const total = firstPage.data.total;
+      const totalPages = Math.ceil(total / firstPage.data.limit);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const response = await enterpriseService.listInternships({ page, limit: 100 });
+        if (!response?.success || !response.data) {
+          throw new Error(`Không thể tải danh sách thực tập ở trang ${page}`);
+        }
+        items.push(...response.data.items);
+      }
+
+      setEvaluations(
+        items
+          .filter((item) =>
+            ['ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status?.toUpperCase() || '')
+          )
+          .map(toEvaluationRow)
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể tải danh sách đánh giá OJT';
+      setError(message);
+      console.error('Failed to load internship evaluations:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchEvaluations();
+  }, [fetchEvaluations]);
+
+  const handleOpenEvaluation = (item: EvaluationRow) => {
+    setSelectedEval(item);
+    setActionError(null);
     setScores({
-      technicalScore: evalItem.technicalScore,
-      attitudeScore: evalItem.attitudeScore,
-      disciplineScore: evalItem.disciplineScore,
-      softSkillsScore: evalItem.softSkillsScore,
-      feedback: evalItem.feedback || '',
+      completionScore: item.completionScore == null ? '' : String(item.completionScore),
+      attitudeScore: item.attitudeScore == null ? '' : String(item.attitudeScore),
+      skillScore: item.skillScore == null ? '' : String(item.skillScore),
+      overallScore: item.overallScore == null ? '' : String(item.overallScore),
+      comments: item.comments,
+      reason: '',
     });
   };
 
-  const calculateFinalGrade = (
-    tech: number,
-    att: number,
-    disc: number,
-    soft: number
-  ) => {
-    return Number((tech * 0.4 + att * 0.3 + disc * 0.2 + soft * 0.1).toFixed(2));
-  };
-
-  const handleSubmitEvaluation = (e: React.FormEvent) => {
+  const handleSubmitEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEval) return;
 
-    const finalGrade = calculateFinalGrade(
-      scores.technicalScore,
-      scores.attitudeScore,
-      scores.disciplineScore,
-      scores.softSkillsScore
-    );
+    const scoreValues = {
+      completionScore: Number(scores.completionScore),
+      attitudeScore: Number(scores.attitudeScore),
+      skillScore: Number(scores.skillScore),
+      overallScore: Number(scores.overallScore),
+    };
+    if (
+      Object.values(scoreValues).some(
+        (score) => !Number.isFinite(score) || score < 0 || score > 10
+      )
+    ) {
+      setActionError('Vui lòng nhập đầy đủ điểm từ 0 đến 10 cho tất cả tiêu chí.');
+      return;
+    }
 
-    const updated = evaluations.map((item) =>
-      item.id === selectedEval.id
-        ? {
-            ...item,
-            technicalScore: scores.technicalScore,
-            attitudeScore: scores.attitudeScore,
-            disciplineScore: scores.disciplineScore,
-            softSkillsScore: scores.softSkillsScore,
-            finalGrade,
-            feedback: scores.feedback,
-            evaluatedDate: new Date().toISOString().split('T')[0],
-            status: 'SUBMITTED' as const,
-          }
-        : item
-    );
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await enterpriseService.evaluateInternship(selectedEval.id, {
+        ...scoreValues,
+        comments: scores.comments,
+        reason: scores.reason,
+      });
 
-    setEvaluations(updated);
-    setSelectedEval(null);
-    setToastMessage(`Đã gửi kết quả đánh giá OJT cho sinh viên ${selectedEval.fullName} thành công!`);
-    setTimeout(() => setToastMessage(null), 4000);
+      setEvaluations((current) =>
+        current.map((item) =>
+          item.id === selectedEval.id
+            ? {
+                ...item,
+                completionScore: scoreValues.completionScore,
+                attitudeScore: scoreValues.attitudeScore,
+                skillScore: scoreValues.skillScore,
+                overallScore: scoreValues.overallScore,
+                comments: scores.comments,
+                status: 'SUBMITTED',
+              }
+            : item
+        )
+      );
+      setToastMessage(`Đã gửi đánh giá OJT cho sinh viên ${selectedEval.fullName} thành công.`);
+      setSelectedEval(null);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể gửi đánh giá OJT';
+      setActionError(message);
+      console.error('Failed to submit internship evaluation:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const submittedCount = evaluations.filter((item) => item.status === 'SUBMITTED').length;
 
   return (
     <div className="space-y-6 pb-12">
       <PageBanner
         title="Đánh giá & Chấm điểm Kết quả Thực tập OJT"
-        description="Đánh giá năng lực sinh viên theo 4 tiêu chí chuẩn FPT Edu: Chuyên môn (40%), Thái độ (30%), Kỷ luật (20%), Kỹ năng mềm (10%)."
+        description="Đánh giá điểm hoàn thành, thái độ, kỹ năng và kết quả OJT của sinh viên đang thực tập."
         badge="Chấm điểm OJT"
       />
 
       {toastMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm font-medium flex items-center justify-between animate-fadeIn shadow-sm">
-          <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
             <span>{toastMessage}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-emerald-500 font-bold">
+          <button onClick={() => setToastMessage(null)} className="font-bold text-emerald-500">
             ✕
           </button>
         </div>
       )}
 
-      {/* Evaluations Table List */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-bold text-slate-900 text-base">Danh sách Phiếu Chấm điểm OJT</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Sinh viên kỳ thực tập OJT hiện tại</p>
+            <h2 className="font-bold text-slate-900">Danh sách đánh giá OJT</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Dữ liệu sinh viên và điểm số được tải từ hệ thống.
+            </p>
           </div>
-
           <span className="text-xs font-semibold text-slate-500">
-            Đã hoàn thành: {evaluations.filter((e) => e.status === 'SUBMITTED').length} / {evaluations.length} phiếu
+            Đã nộp: {submittedCount} / {evaluations.length} phiếu
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-3.5">Sinh viên</th>
-                <th className="px-5 py-3.5">Vị trí thực tập</th>
-                <th className="px-5 py-3.5 text-center">Chuyên môn (40%)</th>
-                <th className="px-5 py-3.5 text-center">Thái độ (30%)</th>
-                <th className="px-5 py-3.5 text-center">Điểm tổng kết OJT</th>
-                <th className="px-5 py-3.5 text-center">Trạng thái</th>
-                <th className="px-5 py-3.5 text-right">Hành động</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {evaluations.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-5 py-4">
-                    <div>
+        {loading ? (
+          <div className="flex flex-col items-center gap-3 py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <p className="text-xs font-medium text-slate-500">Đang tải danh sách đánh giá...</p>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <AlertCircle className="mx-auto mb-2 h-8 w-8 text-rose-400" />
+            <p className="text-sm font-medium text-rose-700">{error}</p>
+            <button
+              onClick={() => void fetchEvaluations()}
+              className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : evaluations.length === 0 ? (
+          <div className="p-10 text-center">
+            <ClipboardCheck className="mx-auto mb-3 h-9 w-9 text-slate-300" />
+            <p className="text-sm font-semibold text-slate-600">Chưa có sinh viên đủ điều kiện đánh giá.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Sinh viên có trạng thái đang thực tập hoặc đã hoàn thành sẽ hiển thị tại đây.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-5 py-3.5">Sinh viên</th>
+                  <th className="px-5 py-3.5">Vị trí thực tập</th>
+                  <th className="px-5 py-3.5 text-center">Hoàn thành</th>
+                  <th className="px-5 py-3.5 text-center">Thái độ</th>
+                  <th className="px-5 py-3.5 text-center">Kỹ năng</th>
+                  <th className="px-5 py-3.5 text-center">Điểm OJT</th>
+                  <th className="px-5 py-3.5 text-center">Trạng thái</th>
+                  <th className="px-5 py-3.5 text-right">Hành động</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {evaluations.map((item) => (
+                  <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
+                    <td className="px-5 py-4">
                       <div className="font-bold text-slate-900">{item.fullName}</div>
                       <div className="text-[11px] text-slate-400">{item.studentCode}</div>
-                    </div>
-                  </td>
+                    </td>
+                    <td className="px-5 py-4 text-slate-700">{item.position || '—'}</td>
+                    <td className="px-5 py-4 text-center">{item.completionScore ?? '—'}</td>
+                    <td className="px-5 py-4 text-center">{item.attitudeScore ?? '—'}</td>
+                    <td className="px-5 py-4 text-center">{item.skillScore ?? '—'}</td>
+                    <td className="px-5 py-4 text-center">
+                      <span className="font-extrabold text-sm text-orange-600">
+                        {item.overallScore == null ? '—' : `${item.overallScore} / 10`}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          item.status === 'SUBMITTED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {item.status === 'SUBMITTED' ? 'Đã nộp' : 'Chưa đánh giá'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        onClick={() => handleOpenEvaluation(item)}
+                        disabled={item.evaluationLocked}
+                        className="rounded-lg bg-orange-500 px-3 py-1.5 font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {item.evaluationLocked
+                          ? 'Đã khóa'
+                          : item.status === 'SUBMITTED'
+                            ? 'Chỉnh sửa'
+                            : 'Đánh giá'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
-                  <td className="px-5 py-4 text-slate-700">{item.position}</td>
-
-                  <td className="px-5 py-4 text-center font-semibold text-slate-800">
-                    {item.technicalScore} / 10
-                  </td>
-
-                  <td className="px-5 py-4 text-center font-semibold text-slate-800">
-                    {item.attitudeScore} / 10
-                  </td>
-
-                  <td className="px-5 py-4 text-center">
-                    <span className="font-extrabold text-sm text-orange-600">
-                      {item.finalGrade} / 10
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4 text-center">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                        item.status === 'SUBMITTED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {item.status === 'SUBMITTED' ? 'Đã nộp về Trường' : 'Bản nháp'}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4 text-right space-x-2">
-                    <button
-                      onClick={() => handleOpenEvaluation(item)}
-                      className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors"
-                    >
-                      {item.status === 'SUBMITTED' ? 'Chỉnh sửa' : 'Chấm điểm'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Evaluation Grading Form Modal */}
       {selectedEval && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-6 border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl space-y-5 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
-                  <Award className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                  <Award className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base">
-                    Phiếu Chấm điểm Thực tập OJT
-                  </h3>
+                  <h3 className="font-extrabold text-slate-900">Đánh giá thực tập OJT</h3>
                   <p className="text-xs text-slate-500">
-                    Sinh viên: <strong className="text-slate-900">{selectedEval.fullName}</strong> ({selectedEval.studentCode})
+                    {selectedEval.fullName} ({selectedEval.studentCode})
                   </p>
                 </div>
               </div>
-
               <button
                 onClick={() => setSelectedEval(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                aria-label="Đóng biểu mẫu"
+                className="font-bold text-slate-400 hover:text-slate-600"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmitEvaluation} className="space-y-5 text-xs">
-              {/* Score Sliders */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-50 space-y-2 border border-slate-200/60">
-                  <div className="flex justify-between font-bold">
-                    <span className="text-slate-700">1. Kỹ năng Chuyên môn (Tỉ trọng 40%)</span>
-                    <span className="text-orange-600 text-sm">{scores.technicalScore} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    className="w-full accent-orange-500 cursor-pointer"
-                    value={scores.technicalScore}
-                    onChange={(e) =>
-                      setScores({ ...scores, technicalScore: parseFloat(e.target.value) })
-                    }
-                  />
-                  <p className="text-[11px] text-slate-400">Khả năng nắm bắt công nghệ, chất lượng code/sản phẩm.</p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 space-y-2 border border-slate-200/60">
-                  <div className="flex justify-between font-bold">
-                    <span className="text-slate-700">2. Thái độ Làm việc (Tỉ trọng 30%)</span>
-                    <span className="text-orange-600 text-sm">{scores.attitudeScore} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    className="w-full accent-orange-500 cursor-pointer"
-                    value={scores.attitudeScore}
-                    onChange={(e) =>
-                      setScores({ ...scores, attitudeScore: parseFloat(e.target.value) })
-                    }
-                  />
-                  <p className="text-[11px] text-slate-400">Tính chủ động, thần cầu tiến và tiếp thu góp ý.</p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 space-y-2 border border-slate-200/60">
-                  <div className="flex justify-between font-bold">
-                    <span className="text-slate-700">3. Kỷ luật & Điểm danh (Tỉ trọng 20%)</span>
-                    <span className="text-orange-600 text-sm">{scores.disciplineScore} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    className="w-full accent-orange-500 cursor-pointer"
-                    value={scores.disciplineScore}
-                    onChange={(e) =>
-                      setScores({ ...scores, disciplineScore: parseFloat(e.target.value) })
-                    }
-                  />
-                  <p className="text-[11px] text-slate-400">Đúng giờ, tuân thủ quy định nội bộ và bảo mật thông tin.</p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 space-y-2 border border-slate-200/60">
-                  <div className="flex justify-between font-bold">
-                    <span className="text-slate-700">4. Kỹ năng Mềm (Tỉ trọng 10%)</span>
-                    <span className="text-orange-600 text-sm">{scores.softSkillsScore} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    className="w-full accent-orange-500 cursor-pointer"
-                    value={scores.softSkillsScore}
-                    onChange={(e) =>
-                      setScores({ ...scores, softSkillsScore: parseFloat(e.target.value) })
-                    }
-                  />
-                  <p className="text-[11px] text-slate-400">Giao tiếp, làm việc nhóm và kỹ năng thuyết trình.</p>
-                </div>
+            <form onSubmit={handleSubmitEvaluation} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {scoreFields.map(({ key, label }) => (
+                  <label key={key} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <span className="block font-bold text-slate-700">{label} (0–10)</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.01"
+                        required
+                        inputMode="decimal"
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        value={scores[key]}
+                        onChange={(e) => setScores({ ...scores, [key]: e.target.value })}
+                      />
+                      <span className="text-slate-400">/ 10 điểm</span>
+                    </div>
+                  </label>
+                ))}
               </div>
 
-              {/* Calculated Final Grade Preview */}
-              <div className="p-4 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-900 text-xs">Điểm tổng kết OJT dự kiến:</span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Công thức: (Tech × 0.4) + (Attitude × 0.3) + (Discipline × 0.2) + (Soft × 0.1)
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-orange-600">
-                    {calculateFinalGrade(
-                      scores.technicalScore,
-                      scores.attitudeScore,
-                      scores.disciplineScore,
-                      scores.softSkillsScore
-                    )}
-                  </span>
-                  <span className="text-xs text-slate-400"> / 10.0</span>
-                </div>
-              </div>
+              <label className="block space-y-1">
+                <span className="font-semibold text-slate-700">Lý do nộp/cập nhật đánh giá</span>
+                <input
+                  required
+                  maxLength={2000}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ví dụ: Đánh giá kết quả thực tập cuối kỳ"
+                  value={scores.reason}
+                  onChange={(e) => setScores({ ...scores, reason: e.target.value })}
+                />
+              </label>
 
-              {/* Feedback Textarea */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Nhận xét chi tiết của Doanh nghiệp & Mentor hướng dẫn
-                </label>
+              <label className="block space-y-1">
+                <span className="font-semibold text-slate-700">Nhận xét chi tiết</span>
                 <textarea
                   rows={3}
-                  required
-                  placeholder="Ghi rõ ưu điểm nổi bật và những điểm sinh viên cần phát triển thêm..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  value={scores.feedback}
-                  onChange={(e) => setScores({ ...scores, feedback: e.target.value })}
+                  maxLength={5000}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ghi rõ ưu điểm và những điểm sinh viên cần phát triển thêm..."
+                  value={scores.comments}
+                  onChange={(e) => setScores({ ...scores, comments: e.target.value })}
                 />
-              </div>
+              </label>
 
-              <div className="flex items-center justify-end space-x-3 pt-2">
+              {actionError && (
+                <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-rose-700">
+                  {actionError}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => setSelectedEval(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                  disabled={submitting}
+                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2 font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-wait disabled:opacity-60"
                 >
-                  <Send className="w-4 h-4" />
-                  <span>Xác nhận Nộp điểm về Trường FPT</span>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
                 </button>
               </div>
             </form>
