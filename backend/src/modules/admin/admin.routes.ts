@@ -13,6 +13,7 @@ import { dashboardSummary, distribution, trends, predictionReport } from './repo
 
 const router=Router();
 const admin=[authenticate,authorizeRoles('ADMIN')];
+const companyReaders=[authenticate,authorizeRoles('ADMIN','OJT_COORD')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{
  try{const data=await work(req);if(status===204){res.status(204).end();return;}res.status(status).json({success:true,data});}catch(error){next(error);}
 };
@@ -24,7 +25,7 @@ router.post('/students',...admin,handle(r=>createStudent(r.body,r.user.userId),2
 // Must be mounted before existing /students/:id.
 router.get('/students/export',...admin,async(req,res,next)=>{try{const rows=await exportStudents(req.query);res.attachment('students.csv').type('text/csv; charset=utf-8').send(csv(rows,['id','studentCode','fullName','email','programId','cohortId','groupCode','className','status']));}catch(error){next(error);}});
 router.delete('/students/:id',...admin,handle(r=>deleteStudent(positiveId(r.params.id),r.user.userId),204));
-router.get('/companies',...admin,handle(r=>listCatalog(catalogs.companies,r.query)));
+router.get('/companies',...companyReaders,handle(r=>listCatalog(catalogs.companies,r.query)));
 router.get('/companies/:id',...admin,handle(r=>detail(catalogs.companies,positiveId(r.params.id))));
 router.post('/companies',...admin,handle(r=>saveCompany(r.body,r.user.userId),201));
 router.patch('/companies/:id',...admin,handle(r=>saveCompany(r.body,r.user.userId,positiveId(r.params.id))));

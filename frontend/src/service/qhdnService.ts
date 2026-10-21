@@ -13,6 +13,8 @@ import type {
   AccountProfileResponse,
   SearchOjtRegistrationsRequest,
   SearchOjtRegistrationsResponse,
+  CompanyListResponse,
+  PositionListResponse,
 } from '@/types/qhdn/qhdnTypes';
 
 /**
@@ -58,6 +60,31 @@ export const commitImport = async (
  */
 export const archiveImport = async (): Promise<ImportArchiveResponse> => {
   const response = await API.post<ImportArchiveResponse>('/imports/archive');
+  return response.data;
+};
+
+/**
+ * GET /api/companies
+ * Danh sách doanh nghiệp đã được lưu trong hệ thống.
+ */
+export const listCompanies = async (
+  params: { page?: number; limit?: number } = { page: 1, limit: 100 }
+): Promise<CompanyListResponse> => {
+  const response = await API.get<CompanyListResponse>('/companies', { params });
+  return response.data;
+};
+
+/**
+ * POST /api/json/positions/list
+ * Danh sách vị trí thực tập kèm thông tin doanh nghiệp và học kỳ.
+ */
+export const listPositions = async (
+  params: { page?: number; limit?: number } = { page: 1, limit: 20 }
+): Promise<PositionListResponse> => {
+  const response = await API.post<PositionListResponse>('/json/positions/list', {
+    page: params.page ?? 1,
+    limit: params.limit ?? 20,
+  });
   return response.data;
 };
 

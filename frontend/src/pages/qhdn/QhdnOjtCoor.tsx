@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Handshake,
   Search,
@@ -18,12 +18,15 @@ import {
 import { PageBanner } from '@/components/common/PageBanner';
 import { StudentDetailModal } from '@/components/qhdn/coordination/StudentDetailModal';
 import { StudentMatchModal } from '@/components/qhdn/coordination/StudentMatchModal';
+import { listPositions } from '@/service/qhdnService';
 import {
   MOCK_ELIGIBLE_STUDENTS,
-  MOCK_ENTERPRISE_PARTNERS,
-  MOCK_INTERNSHIP_POSITIONS,
 } from '@/data/qhdn/qhdnMockData';
-import type { EligibleStudent } from '@/types/qhdn/qhdnTypes';
+import type {
+  EligibleStudent,
+  EnterprisePartner,
+  InternshipPosition,
+} from '@/types/qhdn/qhdnTypes';
 
 const PAGE_SIZE = 10;
 
@@ -44,6 +47,63 @@ const COHORT_OPTIONS = [
 ];
 
 export const QhdnOjtCoordination: React.FC = () => {
+  const [positions, setPositions] = useState<InternshipPosition[]>([]);
+  const [positionLoadError, setPositionLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+    const fetchPositions = async () => {
+      try {
+        const response = await listPositions({ page: 1, limit: 20 });
+        if (!isActive) return;
+
+        setPositions(
+          response.data.items.map((item) => ({
+            id: String(item.id),
+            enterpriseId: String(item.companyId),
+            enterpriseName: item.company?.name || item.companyName || 'Doanh nghiệp',
+            title: item.title,
+            department: '',
+            location: item.location || 'Chưa cập nhật',
+            workType:
+              item.workMode === 'REMOTE'
+                ? 'Remote'
+                : item.workMode === 'HYBRID'
+                  ? 'Hybrid'
+                  : 'Onsite',
+            stipend: 'Chưa cập nhật',
+            totalSlots: item.capacity,
+            filledSlots: Math.max(0, item.capacity - item.remainingSlots),
+            requiredSkills: [],
+            description: item.description,
+            requirements: item.requirements,
+            status:
+              item.status === 'OPEN'
+                ? 'Open'
+                : item.status === 'CLOSED'
+                  ? 'Closed'
+                  : 'Draft',
+          }))
+        );
+        setPositionLoadError(null);
+      } catch (error) {
+        console.error('Không thể tải danh sách vị trí thực tập:', error);
+        if (isActive) {
+          setPositionLoadError(
+            error instanceof Error
+              ? error.message
+              : 'Không thể tải danh sách vị trí thực tập.'
+          );
+        }
+      }
+    };
+
+    void fetchPositions();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const [students, setStudents] = useState<EligibleStudent[]>(() => {
     return MOCK_ELIGIBLE_STUDENTS.map((s, idx) => {
       let cohort = 'K18';
@@ -75,6 +135,38 @@ export const QhdnOjtCoordination: React.FC = () => {
   const [selectedStudentForMatch, setSelectedStudentForMatch] = useState<EligibleStudent | null>(null);
   const [selectedEnterpriseId, setSelectedEnterpriseId] = useState<string>('');
   const [selectedPositionId, setSelectedPositionId] = useState<string>('');
+
+  const partners = useMemo<EnterprisePartner[]>(() => {
+    const partnersById = new Map<string, EnterprisePartner>();
+    positions.forEach((position) => {
+      const current = partnersById.get(position.enterpriseId);
+      if (current) {
+        current.totalQuota += position.totalSlots;
+        current.availableQuota += position.totalSlots - position.filledSlots;
+        current.acceptedCount += position.filledSlots;
+        return;
+      }
+
+      partnersById.set(position.enterpriseId, {
+        id: position.enterpriseId,
+        name: position.enterpriseName,
+        code: position.enterpriseName.toUpperCase().replace(/[^A-Z0-9]+/g, '-'),
+        industry: 'Chưa cập nhật',
+        tier: 'Tier-3 Standard',
+        contactPerson: 'Chưa cập nhật',
+        contactEmail: '',
+        contactPhone: '',
+        address: 'Chưa cập nhật',
+        mouStatus: 'Active',
+        mouSignedDate: '',
+        mouExpiryDate: '',
+        totalQuota: position.totalSlots,
+        acceptedCount: position.filledSlots,
+        availableQuota: position.totalSlots - position.filledSlots,
+      });
+    });
+    return Array.from(partnersById.values());
+  }, [positions]);
 
   // Counts for tabs
   const rejectedCount = students.filter((s) => s.coordinationStatus === 'Rejected').length;
@@ -127,8 +219,8 @@ export const QhdnOjtCoordination: React.FC = () => {
     e.preventDefault();
     if (!selectedStudentForMatch || !selectedEnterpriseId) return;
 
-    const enterprise = MOCK_ENTERPRISE_PARTNERS.find((ent) => ent.id === selectedEnterpriseId);
-    const position = MOCK_INTERNSHIP_POSITIONS.find((pos) => pos.id === selectedPositionId);
+    const enterprise = partners.find((ent) => ent.id === selectedEnterpriseId);
+    const position = positions.find((pos) => pos.id === selectedPositionId);
 
     setStudents((prev) =>
       prev.map((s) => {
@@ -153,8 +245,9 @@ export const QhdnOjtCoordination: React.FC = () => {
     setSelectedPositionId('');
   };
 
-  const availablePositionsForSelectedEnterprise = MOCK_INTERNSHIP_POSITIONS.filter(
-    (p) => p.enterpriseId === selectedEnterpriseId
+  const availablePositionsForSelectedEnterprise = positions.filter(
+    (position) =>
+      position.enterpriseId === selectedEnterpriseId && position.status === 'Open'
   );
 
   return (
@@ -165,6 +258,14 @@ export const QhdnOjtCoordination: React.FC = () => {
         description="Tiếp nhận danh sách sinh viên đủ điều kiện, điều phối hồ sơ đến các doanh nghiệp đối tác và xử lý điều phối lại nếu bị từ chối."
         badge="Phòng QHDN"
       />
+      {positionLoadError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+        >
+          Không thể tải vị trí thực tập từ hệ thống: {positionLoadError}
+        </div>
+      )}
 
       {/* ─── CARD 1: THÔNG BÁO SINH VIÊN BỊ TỪ CHỐI (NẾU CÓ) ─── */}
       {rejectedCount > 0 && (
@@ -606,7 +707,7 @@ export const QhdnOjtCoordination: React.FC = () => {
         student={selectedStudentForMatch}
         isOpen={Boolean(selectedStudentForMatch)}
         onClose={() => setSelectedStudentForMatch(null)}
-        partners={MOCK_ENTERPRISE_PARTNERS}
+        partners={partners}
         selectedEnterpriseId={selectedEnterpriseId}
         onSelectEnterprise={(id) => {
           setSelectedEnterpriseId(id);

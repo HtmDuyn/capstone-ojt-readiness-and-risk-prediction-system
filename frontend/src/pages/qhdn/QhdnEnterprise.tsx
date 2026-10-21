@@ -26,7 +26,7 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { EnterprisePartnerDetailModal } from '@/components/qhdn/enterprise/PartnerDetailModal';
 import { EnterpriseImportExcelModal } from '@/components/qhdn/enterprise/ImportExcelModal';
 import { EnterpriseCreateModal } from '@/components/qhdn/enterprise/CreateModal';
-import { archiveImport, createCompany, searchOjtSemesters } from '@/service/qhdnService';
+import { archiveImport, createCompany, listCompanies, searchOjtSemesters } from '@/service/qhdnService';
 import type {
   EnterprisePartner,
   CreateCompanyRequest,
@@ -116,21 +116,88 @@ export const QhdnEnterpriseManagement: React.FC = () => {
     }
     return [];
   });
+  const [isLoadingPartners, setIsLoadingPartners] = useState(true);
 
-  // Tự động lắng nghe dữ liệu vừa được đẩy từ màn hình Import doanh nghiệp
+  // Load doanh nghiệp đã commit từ backend; localStorage chỉ bổ sung thông tin quota/học kỳ.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('ojt_imported_enterprises');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setPartners(parsed);
+    let isActive = true;
+    const loadPartners = async () => {
+      try {
+        const cachedPartners: EnterprisePartner[] = (() => {
+          try {
+            const saved = localStorage.getItem('ojt_imported_enterprises');
+            const parsed = saved ? JSON.parse(saved) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (err) {
+            console.warn('Lỗi đọc thông tin doanh nghiệp đã lưu:', err);
+            return [];
+          }
+        })();
+        const firstPage = await listCompanies({ page: 1, limit: 100 });
+        const companies = [...firstPage.data.items];
+        const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
+
+        for (let page = 2; page <= totalPages; page += 1) {
+          const nextPage = await listCompanies({ page, limit: 100 });
+          companies.push(...nextPage.data.items);
+        }
+
+        const loadedPartners: EnterprisePartner[] = companies.map((company) => {
+          const cached = cachedPartners.find(
+            (partner) =>
+              partner.code?.toUpperCase() === company.code.toUpperCase() ||
+              (partner.contactEmail &&
+                company.contactEmail &&
+                partner.contactEmail.toLowerCase() === company.contactEmail.toLowerCase())
+          );
+          const totalQuota = cached?.totalQuota ?? 0;
+
+          return {
+            id: String(company.id),
+            name: company.name,
+            code: company.code,
+            industry: company.industry || cached?.industry || 'Chưa cập nhật',
+            tier: cached?.tier || 'Tier-3 Standard',
+            contactPerson: company.contactPersonName || cached?.contactPerson || 'Chưa cập nhật',
+            contactEmail: company.contactEmail || cached?.contactEmail || '',
+            contactPhone: company.contactPhone || cached?.contactPhone || '',
+            address: company.address || cached?.address || 'Chưa cập nhật',
+            mouStatus: company.status === 'ACTIVE' ? 'Active' : 'Pending Renewal',
+            mouSignedDate: cached?.mouSignedDate || company.createdAt?.split('T')[0] || '',
+            mouExpiryDate: cached?.mouExpiryDate || '',
+            totalQuota,
+            acceptedCount: cached?.acceptedCount ?? 0,
+            availableQuota: cached?.availableQuota ?? totalQuota,
+            semesters: cached?.semesters || [],
+          };
+        });
+
+        if (isActive) {
+          setPartners(loadedPartners);
+        }
+      } catch (err) {
+        console.error('Không thể tải danh sách doanh nghiệp từ hệ thống:', err);
+        if (isActive) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : 'Không thể tải danh sách doanh nghiệp. Vui lòng thử lại.';
+          setCompanyToast({ type: 'error', message });
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingPartners(false);
         }
       }
-    } catch (err) {
-      console.warn('Lỗi đồng bộ danh sách doanh nghiệp:', err);
-    }
+    };
 
+    void loadPartners();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (location.state && (location.state as any).justImportedCount) {
       const count = (location.state as any).justImportedCount;
       setCompanyToast({
@@ -466,7 +533,7 @@ export const QhdnEnterpriseManagement: React.FC = () => {
           )}
           <div className="flex-1">
             <p className="font-bold">
-              {companyToast.type === 'success' ? 'Tạo doanh nghiệp thành công (201 Created)' : 'Lỗi tạo doanh nghiệp'}
+              {companyToast.type === 'success' ? 'Tạo doanh nghiệp thành công (201 Created)' : 'Có lỗi khi xử lý doanh nghiệp'}
             </p>
             <p className="text-xs mt-0.5 opacity-80">{companyToast.message}</p>
           </div>
@@ -691,7 +758,11 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                         <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto border border-orange-200">
                           <Building2 size={28} />
                         </div>
-                        {partners.length === 0 ? (
+                        {isLoadingPartners ? (
+                          <p className="text-sm font-semibold text-slate-700">
+                            Đang tải danh sách doanh nghiệp...
+                          </p>
+                        ) : partners.length === 0 ? (
                           <>
                             <p className="text-base font-bold text-slate-800">
                               Chưa có doanh nghiệp nào trong danh sách

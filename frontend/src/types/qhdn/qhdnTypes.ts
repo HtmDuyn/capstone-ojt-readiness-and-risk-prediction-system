@@ -96,6 +96,7 @@ export interface ExtractedEnterprise {
   id: string;
   fileName: string;
   fileSize: string;
+  code: string;
   name: string;
   shortName: string;
   email: string;
@@ -183,6 +184,67 @@ export interface ImportArchiveResponse {
   success: boolean;
   /** Số lượng bản ghi tuyển dụng đã được lưu trữ */
   archivedCount: number;
+}
+
+export interface CompanyListItem {
+  id: number;
+  code: string;
+  name: string;
+  address?: string | null;
+  industry?: string | null;
+  contactPersonName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  status: string;
+  createdAt?: string;
+}
+
+export interface CompanyListResponse {
+  success: boolean;
+  data: {
+    items: CompanyListItem[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+
+export interface PositionListItem {
+  id: number;
+  companyId: number;
+  ojtSemesterId: number;
+  recruitmentCode: string;
+  title: string;
+  description: string;
+  requirements: string;
+  capacity: number;
+  remainingSlots: number;
+  status: string;
+  location?: string | null;
+  workMode?: string | null;
+  companyName?: string;
+  company?: {
+    id: number;
+    code?: string;
+    name: string;
+    status?: string;
+    address?: string | null;
+    industry?: string | null;
+    contactEmail?: string | null;
+    contactPhone?: string | null;
+    contactPersonName?: string | null;
+  } | null;
+  semesterCode?: string;
+}
+
+export interface PositionListResponse {
+  success: boolean;
+  data: {
+    items: PositionListItem[];
+    total: number;
+    page: number;
+    limit: number;
+  };
 }
 
 /**

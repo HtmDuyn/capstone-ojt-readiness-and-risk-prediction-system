@@ -99,6 +99,7 @@ const mapPreviewToEnterprises = (
         id: `api-row-${row.rowNumber}-${code}-${idx}`,
         fileName: matched?.fileName || `import-${code}.xlsx`,
         fileSize: matched?.fileSize || '—',
+        code,
         name,
         shortName: name.length > 20 ? `${name.slice(0, 18)}...` : name,
         email: matched?.email || '',
@@ -133,6 +134,7 @@ const mapPreviewToEnterprises = (
     id: `excel-row-${parsed.code}-${idx}`,
     fileName: parsed.fileName,
     fileSize: parsed.fileSize,
+    code: parsed.code,
     name: parsed.name,
     shortName: parsed.name.length > 20 ? `${parsed.name.slice(0, 18)}...` : parsed.name,
     email: parsed.email,
@@ -638,7 +640,7 @@ export const QhdnEnterpriseImport: React.FC = () => {
         idempotencyKey: generateIdempotencyKey(),
         semesterId,
         rows: selectedEnterprises.map((r, idx) => ({
-          code: r.shortName || `DN-${String(idx + 1).padStart(3, '0')}`,
+          code: r.code || `DN-${String(idx + 1).padStart(3, '0')}`,
           email: r.email,
           fullName: r.contactPerson || 'Người phụ trách',
           name: r.name,
@@ -668,7 +670,10 @@ export const QhdnEnterpriseImport: React.FC = () => {
       const committedPartners: EnterprisePartner[] = selectedEnterprises.map((e, idx) => ({
         id: `ent-imported-${Date.now()}-${idx}`,
         name: e.name,
-        code: e.shortName || `DN-${String(idx + 1).padStart(3, '0')}`,
+        code:
+          e.code ||
+          payloadToCommit.rows.find((row) => row.email.toLowerCase() === e.email.toLowerCase())?.code ||
+          `DN-${String(idx + 1).padStart(3, '0')}`,
         industry: e.industry || 'Công nghệ thông tin',
         tier: 'Tier-3 Standard',
         contactPerson: e.contactPerson || 'Người phụ trách',
@@ -688,9 +693,9 @@ export const QhdnEnterpriseImport: React.FC = () => {
       try {
         const existingRaw = localStorage.getItem('ojt_imported_enterprises');
         const existingList: EnterprisePartner[] = existingRaw ? JSON.parse(existingRaw) : [];
-        const existingCodes = new Set(existingList.map((p) => p.code));
-        const newUnique = committedPartners.filter((p) => !existingCodes.has(p.code));
-        const merged = [...newUnique, ...existingList];
+        const updatedByCode = new Map(existingList.map((partner) => [partner.code.toUpperCase(), partner]));
+        committedPartners.forEach((partner) => updatedByCode.set(partner.code.toUpperCase(), partner));
+        const merged = Array.from(updatedByCode.values());
         localStorage.setItem('ojt_imported_enterprises', JSON.stringify(merged));
         // Xóa session trích xuất tạm vì đã commit thành công vào danh sách chính thức
         localStorage.removeItem('ojt_extraction_session');
