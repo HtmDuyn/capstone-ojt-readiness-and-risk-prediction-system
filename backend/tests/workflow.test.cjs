@@ -152,6 +152,34 @@ test('Swagger loads, all JSON adapters have route targets and removed APIs are a
 
 
 
+test('login examples remain selectable and the HTTP contract supports FE login and failures',async()=>{
+ const {swaggerSpec}=require('../src/config/swagger.ts');
+ const media=swaggerSpec.paths['/api/auth/login'].post.requestBody.content['application/json'];
+ assert.equal(media.example,undefined);
+ assert.deepEqual(Object.keys(media.examples),['admin01','academic01','ojt.coord01','student01','enterprise01']);
+ for(const example of Object.values(media.examples)) {
+  assert.deepEqual(Object.keys(example.value).sort(),['email','password']);
+  assert.equal(typeof example.value.email,'string');assert.equal(typeof example.value.password,'string');
+ }
+ const app=require('../src/app.ts').default;
+ const hash=await bcrypt.hash('Login-test@123',4);
+ await query('UPDATE "Users" SET "PasswordHash"=$1 WHERE "UserID"=4',[hash]);
+ let server;await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});
+ const login=body=>fetch('http://127.0.0.1:'+server.address().port+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ try {
+  let response=await login({email:' STUDENT@EXAMPLE.TEST ',password:'Login-test@123'});
+  assert.equal(response.status,200);const result=await response.json();
+  assert.equal(result.success,true);assert.equal(result.mustChangePassword,false);
+  assert.equal(require('jsonwebtoken').verify(result.token,process.env.JWT_SECRET).roleCode,'STUDENT');
+  for(const [body,status,code] of [[{},400,'MISSING_EMAIL'],[{email:'student@example.test'},400,'MISSING_PASSWORD'],[{email:'student@example.test',password:'wrong'},401,'INVALID_CREDENTIALS'],[{email:'missing@example.test',password:'wrong'},401,'INVALID_CREDENTIALS']]) {
+   response=await login(body);assert.equal(response.status,status);assert.equal((await response.json()).errorCode,code);
+  }
+  await query('UPDATE "Users" SET "Status"=\'LOCKED\' WHERE "UserID"=4');
+  response=await login({email:'student@example.test',password:'Login-test@123'});
+  assert.equal(response.status,403);assert.equal((await response.json()).errorCode,'ACCOUNT_INACTIVE');
+ } finally {await new Promise(resolve=>server.close(resolve));}
+});
+
 test('HTTP routes accept imports, enforce password change and roles, dispatch JSON result reads and return 404 for retired APIs',async()=>{
  const app=require('../src/app.ts').default;const jwt=require('jsonwebtoken');
  let server;await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});const base='http://127.0.0.1:'+server.address().port;
