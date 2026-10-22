@@ -6805,3 +6805,75 @@ FROM "AcademicPeriods" p WHERE p."PeriodCode" = 'DEMO-PREP-2026'
 ON CONFLICT DO NOTHING;
 COMMIT;
 -- END DEMO PREPARATION CALENDAR: 20261022
+
+
+-- BEGIN DEMO OJT READY STUDENT: 20261022
+-- Fictional curriculum, grades and account for Swagger workflow testing only.
+-- Additive seed: never changes an existing student's curriculum, grades or registrations.
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+SET LOCAL lock_timeout='10s';
+DO $demo$
+DECLARE actor_id int; program_id int; user_id int; student_id int; cohort_id int;
+        entry_id int; prep_id int; term_id int; term_period int; year_id int;
+        period_id int; course_id int; rule_id int; n int; sem int; rec record;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF EXISTS (SELECT 1 FROM "SchemaMigrations" WHERE "Version"='20261022_demo_ojt_ready_student') THEN RETURN; END IF;
+ SELECT u."UserID" INTO STRICT actor_id FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID"
+ WHERE u."Email"='academic@ojtrpa.edu.vn' AND r."RoleCode"='ACADEMIC';
+ SELECT "AcademicPeriodID" INTO STRICT prep_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-PREP-2026';
+ SELECT "OJTSemesterID","AcademicPeriodID" INTO STRICT term_id,term_period FROM "OJTSemesters" WHERE "SemesterCode"='DEMO-OJT-2027-01';
+ INSERT INTO "AcademicYears" ("YearCode","StartDate","EndDate","Status") VALUES
+ ('DEMO-2024-2025','2024-09-01','2025-08-31','CLOSED'),
+ ('DEMO-2025-2026','2025-09-01','2026-08-31','CLOSED') ON CONFLICT ("YearCode") DO NOTHING;
+ FOR rec IN SELECT * FROM (VALUES
+ ('DEMO-READY-S1','DEMO-2024-2025',DATE '2024-09-01',DATE '2024-12-31'),
+ ('DEMO-READY-S2','DEMO-2024-2025',DATE '2025-01-01',DATE '2025-04-30'),
+ ('DEMO-READY-S3','DEMO-2025-2026',DATE '2025-09-01',DATE '2025-12-31'),
+ ('DEMO-READY-S4','DEMO-2025-2026',DATE '2026-01-01',DATE '2026-04-30')) AS v(code,year_code,start_day,end_day)
+ LOOP
+  IF EXISTS (SELECT 1 FROM "AcademicPeriods" WHERE "StartDate"<=rec.end_day AND "EndDate">=rec.start_day) THEN
+   RAISE EXCEPTION 'Demo calendar overlaps an existing academic period: %',rec.code;
+  END IF;
+  SELECT "AcademicYearID" INTO STRICT year_id FROM "AcademicYears" WHERE "YearCode"=rec.year_code;
+  INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","StartDate","EndDate","Status")
+  VALUES(year_id,rec.code,'Học kỳ demo '||rec.code,'SEMESTER',rec.start_day,rec.end_day,'CLOSED');
+ END LOOP;
+ SELECT "AcademicPeriodID" INTO STRICT entry_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-READY-S1';
+ INSERT INTO "TrainingPrograms" ("ProgramCode","ProgramName","TotalCredits","SpecializationID")
+ SELECT 'DEMO-OJT-READY','Chương trình giả lập kiểm thử OJT (không phải CTĐT chính thức)',82,"SpecializationID"
+ FROM "Specializations" WHERE "SpecializationCode"='SE' RETURNING "ProgramID" INTO STRICT program_id;
+ INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","ConfirmedBy") VALUES(program_id,10,actor_id);
+ INSERT INTO "Users" ("Username","PasswordHash","Email","FullName","RoleID","Status")
+ SELECT 'demo.ojt01','$2b$12$/7w0sgql7uF34ubVsXY4eOztDZ3XG7jUXXE/qhDOVPz3CU/HsLlRm','demo.ojt01@student.edu.vn','Sinh viên demo luồng OJT',"RoleID",'ACTIVE'
+ FROM "Roles" WHERE "RoleCode"='STUDENT' RETURNING "UserID" INTO STRICT user_id;
+ INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
+ VALUES(user_id,'DEMO-OJT-001',program_id,2024,5,'DEMO-OJT','ACTIVE') RETURNING "StudentID" INTO student_id;
+ INSERT INTO "Cohorts" ("CohortCode","Name","EnrollmentYear","Status") VALUES('DEMO-READY-2024','Khóa demo OJT',2024,'ACTIVE') RETURNING "CohortID" INTO cohort_id;
+ INSERT INTO "CohortGroups" VALUES(cohort_id,'A',entry_id);
+ INSERT INTO "StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
+ VALUES(student_id,cohort_id,'A',entry_id,prep_id,actor_id);
+ FOR n IN 1..24 LOOP
+  sem:=((n-1)/6)+1;
+  INSERT INTO "Courses" ("CourseCode","CourseName","Credits") VALUES('DEMO-READY-'||lpad(n::text,2,'0'),'Môn giả lập kiểm thử '||n,3) RETURNING "CourseID" INTO course_id;
+  INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","Credits","RecommendedSemester","IsRequired","EntryKind")
+  VALUES(program_id,course_id,'Môn giả lập kiểm thử '||n,3,sem,true,'COURSE');
+  SELECT "AcademicPeriodID","AcademicYearID" INTO STRICT period_id,year_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-READY-S'||sem;
+  INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","AcademicPeriodID","Score","Grade","Status","SourceReference","RecordedBy")
+  VALUES(student_id,course_id,sem,year_id,period_id,8,'B','PASSED','DEMO-ONLY-20261022',actor_id);
+ END LOOP;
+ INSERT INTO "Courses" ("CourseCode","CourseName","Credits") VALUES('DEMO-READY-OJT','OJT giả lập kiểm thử',10) RETURNING "CourseID" INTO course_id;
+ INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","Credits","RecommendedSemester","IsRequired","EntryKind")
+ VALUES(program_id,course_id,'OJT giả lập kiểm thử',10,6,true,'COURSE');
+ INSERT INTO "OJTRuleSets" ("ProgramID","OJTSemesterID","Version","Name","CreatedBy","Status","PublishedBy","PublishedAt")
+ VALUES(program_id,term_id,1,'Quy tắc demo: 70 tín chỉ, tối đa 2 môn nợ',actor_id,'PUBLISHED',actor_id,now()) RETURNING "RuleSetID" INTO rule_id;
+ INSERT INTO "OJTActiveRuleSets" VALUES(program_id,term_id,rule_id);
+ INSERT INTO "ProgramOJTGradeMappings" ("ProgramID","OJTSemesterID","CourseID","AcademicPeriodID","GradeBands","Reason","ConfirmedBy")
+ VALUES(program_id,term_id,course_id,term_period,'[{"minimumScore":0,"outcome":"FAILED","gradePoints":0,"grade":"F"},{"minimumScore":5,"outcome":"PASSED","gradePoints":2,"grade":"C"},{"minimumScore":7,"outcome":"PASSED","gradePoints":3,"grade":"B"},{"minimumScore":8.5,"outcome":"PASSED","gradePoints":4,"grade":"A"}]','Bảng điểm giả lập chỉ dùng test',actor_id);
+ INSERT INTO "AuditLogs" ("UserID","Action","EntityType","EntityID","Detail")
+ VALUES(actor_id,'SEED_DEMO','Students',student_id,jsonb_build_object('source','20261022_demo_ojt_ready_student','fictional',true)::text);
+ INSERT INTO "SchemaMigrations" ("Version") VALUES('20261022_demo_ojt_ready_student');
+END $demo$;
+COMMIT;
+-- END DEMO OJT READY STUDENT: 20261022
