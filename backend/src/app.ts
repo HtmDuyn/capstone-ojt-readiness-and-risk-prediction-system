@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import {
   existsSync,
 } from "node:fs";
@@ -77,9 +79,6 @@ app.get(
 
         message:
           "OJT Backend is running",
-
-        health:
-          "/api/health",
 
         docs:
           "/api-docs",

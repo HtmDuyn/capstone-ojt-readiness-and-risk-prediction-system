@@ -125,16 +125,10 @@ const normalizeEmail = (
 export const getAccounts = async (
   queryInput: {
     userId?: unknown;
-    page?: unknown;
-    limit?: unknown;
     search?: unknown;
     roleCode?: unknown;
-    status?: unknown;
   },
 ): Promise<AccountListResult> => {
-  const page=queryInput.page===undefined?1:parseId(queryInput.page);
-  const limit=queryInput.limit===undefined?20:parseId(queryInput.limit);
-  if(limit>100||(page-1)*limit>2147483647)throw createError('Invalid pagination.',400,'INVALID_PAGINATION');
 
   const search =
     typeof queryInput.search ===
@@ -150,20 +144,9 @@ export const getAccounts = async (
           .toUpperCase()
       : undefined;
 
-  const status =
-    typeof queryInput.status ===
-    "string"
-      ? queryInput.status
-          .trim()
-          .toUpperCase()
-      : undefined;
-
   return findAccounts(
-    page,
-    limit,
     search || undefined,
     roleCode || undefined,
-    status || undefined,
     queryInput.userId===undefined?undefined:parseId(queryInput.userId),
   );
 };

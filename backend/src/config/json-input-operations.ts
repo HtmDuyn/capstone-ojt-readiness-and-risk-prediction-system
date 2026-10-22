@@ -44,11 +44,9 @@ const idFields: Record<string, string> = {
   'advisory-runs': 'runId',
   analyses: 'analysisId',
 
-  'assessment-templates': 'templateId',
   assessments: 'assessmentId',
   predictions: 'predictionId',
   alerts: 'alertId',
-  interventions: 'interventionId',
   'prediction-jobs': 'jobId',
   models: 'modelId'
 };
@@ -58,6 +56,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
   for(const [sourcePath,item]of Object.entries(spec.paths)as[string,RecordValue][]){
     for(const sourceMethod of ['get','post','put','patch','delete']){
       const original=item[sourceMethod];if(!original)continue;
+      if(sourceMethod==='get'&&sourcePath==='/api/accounts')continue;
       const params=[...(item.parameters??[]),...(original.parameters??[])].map(resolve)
         .filter(p=>p.in==='path'||p.in==='query');
       if(!params.length)continue;
@@ -101,11 +100,10 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
         };
       }
       const listId:Record<string,string>={
-        '/api/ojt-registrations':'registrationId','/api/ojt-results':'resultId','/api/academic-imports':'importId','/api/predictions':'predictionId',
+        '/api/ojt-registrations':'registrationId','/api/ojt-results':'resultId','/api/academic-imports':'importId',
         '/api/job-applications':'applicationId',
         '/api/companies':'companyId','/api/positions':'positionId','/api/assignments':'assignmentId',
         '/api/academic-periods':'academicPeriodId','/api/accounts':'userId','/api/ojt-coordinations':'coordinationId','/api/internship-evaluations':'evaluationId','/api/enterprise/candidates':'candidateId',
-        '/api/assessment-templates':'templateId','/api/admin/models':'modelId','/api/alerts':'alertId'
       };
       if(sourceMethod==='get'&&listId[sourcePath])operation.requestBody.content['application/json'].examples={
         list:{summary:'Danh sách hồ sơ',value:{page:1,limit:20}},
@@ -190,7 +188,7 @@ export function documentJsonInputOperations(spec:RecordValue,operations:JsonInpu
     for(const method of ['get','post','put','patch','delete']){
       const operation=item[method];if(!operation)continue;
       const parameters=[...(item.parameters??[]),...(operation.parameters??[])];
-      if(/\{[^}]+\}/.test(path)||parameters.some(p=>['path','query'].includes(p.in)))
+      if(!(path==='/api/accounts'&&method==='get')&&(/\{[^}]+\}/.test(path)||parameters.some(p=>['path','query'].includes(p.in))))
         throw Error('JSON API still exposes URL inputs: '+method.toUpperCase()+' '+path);
     }
   }

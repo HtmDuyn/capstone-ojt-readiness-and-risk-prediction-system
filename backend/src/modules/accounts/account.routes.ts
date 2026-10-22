@@ -33,44 +33,6 @@ const router = Router();
  *       - Accounts
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: userId
- *         schema:
- *           type: integer
- *           minimum: 1
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *       - in: query
- *         name: roleCode
- *         schema:
- *           type: string
- *           enum:
- *             - ADMIN
- *             - ACADEMIC
- *             - OJT_COORD
- *             - STUDENT
- *             - ENTERPRISE
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum:
- *             - ACTIVE
- *             - LOCKED
- *             - INACTIVE
  *     responses:
  *       200:
  *         description: Account list retrieved successfully
@@ -185,7 +147,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/accounts/{userId}:
+ * /api/accounts/update:
  *   patch:
  *     summary: Update account
  *     description: Admin cập nhật thông tin, trạng thái và vai trò trong một lần. Chỉ gửi trường cần thay đổi.
@@ -193,19 +155,18 @@ router.patch(
  *       - Accounts
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [userId]
  *             properties:
+ *               userId:
+ *                 type: integer
+ *                 minimum: 1
+ *                 example: 12
  *               fullName:
  *                 type: string
  *                 example: Nguyen Van A
@@ -233,7 +194,7 @@ router.patch(
  *         description: Account not found
  */
 router.patch(
-  "/:userId",
+  "/update",
   authenticate,
   authorizeRoles('ADMIN'),
   updateAccountById,

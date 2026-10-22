@@ -10,7 +10,6 @@ export function describeMergedDetailLists(spec:Schema) {
     ['/api/ojt-registrations','registrationId',['history','coordination','assignment']],
     ['/api/ojt-results','resultId',['history']],
     ['/api/academic-imports','importId',['rows']],
-    ['/api/predictions','predictionId',[]],
   ];
   for(const [path,selector,prefixes]of targets){
     const operation=spec.paths[path]?.get;if(!operation)throw Error('Missing merged list: '+path);
@@ -32,6 +31,5 @@ export function describeMergedDetailLists(spec:Schema) {
       assignments:{type:'array',items:{type:'object',additionalProperties:true}},assignmentsPagination:metadata,
     });
     if(selector==='importId')Object.assign(fields,{kind:text,status:text,sourceName:{...text,nullable:true},summary:{type:'object',additionalProperties:true},importedBy:id,createdAt:time,rows:{type:'array',items:object({rowNumber:id,rawData:{type:'object',additionalProperties:true},normalizedData:{type:'object',nullable:true,additionalProperties:true},status:text,errors:{type:'array',items:{type:'object',additionalProperties:true}},resultId:{...id,nullable:true}})},rowsPagination:metadata});
-    if(selector==='predictionId')Object.assign(fields,{studentId:id,studentCode:text,fullName:text,jobId:id,ojtSemesterId:id,modelId:id,readinessScore:{type:'number',minimum:0,maximum:100},readinessLevel:text,riskScore:{type:'number',minimum:0,maximum:100},riskLevel:text,factors:{type:'array',items:{type:'object',additionalProperties:true}},modelSnapshot:{type:'object',additionalProperties:true},createdAt:time,inputSnapshot:{type:'object',additionalProperties:true,description:'Chỉ trả khi chọn predictionId.'}});
   }
 }

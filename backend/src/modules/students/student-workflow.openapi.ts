@@ -20,7 +20,7 @@ export function describeStudentWorkflow(spec: Record<string, any>) {
   };
   spec.paths['/api/students/me/opportunities']={get:{tags:['Sinh viên'],summary:'Vị trí tuyển dụng và quyền ứng tuyển',description:'Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển.',security,parameters:[query('ojtSemesterId',true),query('page'),query('limit')],responses:{200:response({...page({type:'object',additionalProperties:true}),additionalProperties:true})}}};
   const profile=spec.paths['/api/students/{id}'].get.responses?.['200']?.content?.['application/json']?.schema?.properties?.data;
-  if(profile?.properties)Object.assign(profile.properties,{cv,forecast:{type:'object',properties:{advisoryOnly:{type:'boolean',enum:[true]},grantsOjtPermission:{type:'boolean',enum:[false]},prediction:{type:'object',nullable:true,additionalProperties:true}}},officialDecision:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']}});
+  if(profile?.properties)Object.assign(profile.properties,{cv,officialDecision:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']}});
   const coordination=spec.paths['/api/ojt-coordinations'].post.requestBody.content['application/json'].schema;
   coordination.properties.applicationId={...id,description:'Ứng tuyển của sinh viên tại đúng hồ sơ và vị trí; bỏ trống để tự tìm hồ sơ phù hợp.'};
 }

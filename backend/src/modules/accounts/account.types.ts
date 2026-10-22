@@ -44,16 +44,11 @@ export interface UpdateOwnProfileInput {
 
 export interface AccountListQuery {
   userId?: unknown;
-  page?: unknown;
-  limit?: unknown;
   search?: unknown;
   roleCode?: unknown;
-  status?: unknown;
 }
 
 export interface AccountListResult {
   data: AccountRecord[];
   total: number;
-  page: number;
-  limit: number;
 }
