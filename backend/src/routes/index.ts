@@ -17,8 +17,6 @@ import comboRoutes from '../modules/combo-registration/combo.routes';
 
 import authRoutes from "../modules/auth/auth.routes";
 import accountRoutes from "../modules/accounts/account.routes";
-import roleRoutes from "../modules/system/roles/role.routes";
-import healthRoutes from "../modules/system/health/health.routes";
 const router = Router();
 router.use(adminRoutes);
 router.use(academicRoutes);
@@ -38,16 +36,6 @@ router.use('/imports', importRoutes);
 
 /*
  * ==========================
- * HEALTH
- * ==========================
- */
-router.use(
-  "/health",
-  healthRoutes,
-);
-
-/*
- * ==========================
  * AUTH
  * ==========================
  */
@@ -64,16 +52,6 @@ router.use(
 router.use(
   "/accounts",
   accountRoutes,
-);
-
-/*
- * ==========================
- * ROLES
- * ==========================
- */
-router.use(
-  "/roles",
-  roleRoutes,
 );
 
 export default router;

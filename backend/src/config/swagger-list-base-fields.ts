@@ -20,8 +20,6 @@ const base:Record<string,Schema>={
  '/api/students/{id}/course-results':{id,...ids('studentId courseId academicPeriodId academicYearId recordedBy ojtResultId'),...strings('courseCode courseName periodCode periodKind status grade sourceReference'),...numbers('score gradePoints semesterTaken attemptNumber'),periodStartDate:date,createdAt:time,updatedAt:time},
  '/api/academic/alerts':{...ids('studentId programId cohortId majorId officialCheckId'),...strings('studentCode fullName groupCode category'),comboIds:array(id),officialStale:{type:'boolean'},...objects('evaluation'),missingRequiredCourses:objectArray,alternativeRequirements:objectArray,dataIssues:array(text),alertTypes:array(text)},
  '/api/academic/course-demand':{courseId:id,courseCode:text,courseName:text,academicPeriodId:id,periodCode:text,periodKind:text,...numbers('studentCount retakeCount inProgressCount')},
- '/api/students/{id}/interventions':{id,...ids('alertId studentId assignedTo createdBy'),...strings('description status outcome'),dueDate:{...date,nullable:true},createdAt:time,updatedAt:time},
- '/api/admin/audit-logs':{id,...ids('userId entityId'),...strings('entityType action'),detail:{nullable:true},createdAt:time},
  '/api/recruitment/posts':{id,...ids('ojtSemesterId windowId academicPeriodId companyId'),...strings('periodCode companyName title content benefits applicationInstructions status reviewReason'),deadlineAt:{...time,nullable:true},publishedAt:{...time,nullable:true},reviewedAt:{...time,nullable:true},positions:objectArray,createdAt:time,updatedAt:time},
  '/api/student/ojt-registration-windows':{id,...ids('ojtSemesterId academicPeriodId requiredRelativeSemester registrationId'),...strings('name status registrationStatus'),...objects('period'),startsAt:time,endsAt:time,canRegister:{type:'boolean'},blockReasons:array(text)},
  '/api/student/combo-registration-windows':{id,...ids('ojtSemesterId academicPeriodId initialWindowId'),...strings('name phase status'),...objects('period'),startsAt:time,endsAt:time,effectiveEndsAt:time,canSelect:{type:'boolean'},choices:objectArray},
@@ -41,9 +39,6 @@ export function describeListBaseFields(spec:Schema) {
   const list=page.properties.items??={type:'array',items:{type:'object',properties:{}}};list.items.properties??={};
   list.items.properties={...structuredClone(properties),...list.items.properties};
  }
- const source=spec.paths['/api/predictions'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items;
- const report=spec.paths['/api/admin/reports/readiness'].get.responses['200'].content['application/json'].schema.properties.data.properties.items;
- report.items=structuredClone(source);
  const post=spec.paths['/api/recruitment/posts'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items;
  post.properties.positions={type:'array',items:{type:'object',properties:{id,code:{type:'string'},title:{type:'string'},description:{type:'string'},requirements:{type:'string'},capacity:{type:'integer'},remainingSlots:{type:'integer',minimum:0},status:{type:'string'},location:{type:'string',nullable:true},workMode:{type:'string',nullable:true}}}};
  const candidate=spec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items;

@@ -1,345 +1,1242 @@
-# Đầu vào API GET danh sách
+# Rà soát đầu vào JSON của API danh sách
 
-GET dùng path/query parameters, không gửi request body. ID trong ví dụ phải thay bằng dữ liệu thật. JWT và quyền sở hữu vẫn được kiểm tra. Các route /api/json/ đã bị xóa.
+Được xuất từ hợp đồng Swagger hiện hành. Tổng 40 API danh sách.
 
-Tổng 52 API danh sách.
+FE truyền ID/bộ lọc trong JSON body; không truyền query string. Các ID trong ví dụ chỉ minh họa, cần thay bằng ID có thật trong DB. JWT vẫn bắt buộc và dùng để xác thực, kiểm tra quyền. Không tự điền companyId/studentId còn thiếu.
 
-| API | Vị trí | Trường | Bắt buộc | Ý nghĩa |
-|---|---|---|---|---|
-| GET /api/academic-years | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic-years | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/academic-years | query | search | Không |  |
-| GET /api/academic-years | query | status | Không |  |
-| GET /api/academic-periods | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic-periods | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/academic-periods | query | search | Không |  |
-| GET /api/academic-periods | query | status | Không |  |
-| GET /api/academic-periods | query | academicYearId | Không | ID năm học. |
-| GET /api/academic-periods | query | kind | Không |  |
-| GET /api/academic-periods | query | academicPeriodId | Không | ID kỳ học hoặc Block 3. |
-| GET /api/cohorts | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/cohorts | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/cohorts | query | search | Không |  |
-| GET /api/cohorts | query | status | Không |  |
-| GET /api/academic-periods/{id}/combo-phase-schedules | path | id | Có | ID: AcademicPeriodID. |
-| GET /api/academic/alerts | query | ojtSemesterId | Có | ID kỳ OJT. |
-| GET /api/academic/alerts | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/academic/alerts | query | cohortId | Không | ID khóa. |
-| GET /api/academic/alerts | query | majorId | Không | ID chuyên ngành (SpecializationID). |
-| GET /api/academic/alerts | query | comboId | Không | ID combo (ProgramComboID). |
-| GET /api/academic/alerts | query | groupCode | Không |  |
-| GET /api/academic/alerts | query | academicPeriodId | Có | ID kỳ học hoặc Block 3. |
-| GET /api/academic/alerts | query | assessmentDeadline | Có | Hạn xét điều kiện, gồm múi giờ. |
-| GET /api/academic/alerts | query | type | Không |  |
-| GET /api/academic/alerts | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic/alerts | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/academic/course-demand | query | ojtSemesterId | Có | ID kỳ OJT. |
-| GET /api/academic/course-demand | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/academic/course-demand | query | cohortId | Không | ID khóa. |
-| GET /api/academic/course-demand | query | majorId | Không | ID chuyên ngành (SpecializationID). |
-| GET /api/academic/course-demand | query | comboId | Không | ID combo (ProgramComboID). |
-| GET /api/academic/course-demand | query | groupCode | Không |  |
-| GET /api/academic/course-demand | query | academicPeriodId | Có | ID kỳ học hoặc Block 3. |
-| GET /api/academic/course-demand | query | assessmentDeadline | Không | Hạn xét điều kiện, gồm múi giờ. |
-| GET /api/academic/course-demand | query | courseId | Không | ID môn học (CourseID). |
-| GET /api/academic/course-demand | query | includeInProgress | Không |  |
-| GET /api/academic/course-demand | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic/course-demand | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/accounts | query | userId | Không | ID tài khoản. |
-| GET /api/accounts | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/accounts | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/accounts | query | search | Không |  |
-| GET /api/accounts | query | roleCode | Không |  |
-| GET /api/accounts | query | status | Không |  |
-| GET /api/combo-registration-windows | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/combo-registration-windows | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/combo-registration-windows | query | phase | Không |  |
-| GET /api/combo-registration-windows | query | status | Không |  |
-| GET /api/combo-registration-windows | query | academicPeriodId | Không | ID kỳ học hoặc Block 3. |
-| GET /api/combo-registration-windows/{id}/selections | path | id | Có | ID: WindowID trong ComboRegistrationWindows. |
-| GET /api/combo-registration-windows/{id}/selections | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/combo-registration-windows/{id}/selections | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/combo-registration-windows/{id}/selections | query | status | Không |  |
-| GET /api/students/{id}/combo-selections | path | id | Có | ID: StudentID. |
-| GET /api/students/{id}/combo-selections | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/students/{id}/combo-selections | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/majors | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/majors | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/majors | query | search | Không |  |
-| GET /api/majors | query | parentMajorId | Không | ID ngành cha (MajorID). |
-| GET /api/courses | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/courses | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/courses | query | search | Không |  |
-| GET /api/curricula | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/curricula | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/curricula | query | search | Không |  |
-| GET /api/curricula | query | majorId | Không | ID chuyên ngành (SpecializationID). |
-| GET /api/curricula | query | status | Không |  |
-| GET /api/curricula | query | version | Không |  |
-| GET /api/ojt-rule-sets | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/ojt-rule-sets | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/ojt-rule-sets | query | status | Không |  |
-| GET /api/ojt-rule-sets | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/ojt-rule-sets | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/students/{id}/eligibility-checks | path | id | Có | ID: StudentID. |
-| GET /api/students/{id}/eligibility-checks | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/students/{id}/eligibility-checks | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/students/{id}/eligibility-checks | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/eligibility-check-runs/{id} | path | id | Có | ID: RunID. |
-| GET /api/eligibility-check-runs/{id} | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/eligibility-check-runs/{id} | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/ojt-registration-windows | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/ojt-registration-windows | query | status | Không | Lọc theo trạng thái; bỏ trường này để xem tất cả. |
-| GET /api/ojt-registration-windows | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/ojt-registration-windows | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/ojt-registrations | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/ojt-registrations | query | windowId | Không | ID đợt đăng ký. |
-| GET /api/ojt-registrations | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/ojt-registrations | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/ojt-registrations | query | cohortId | Không | ID khóa. |
-| GET /api/ojt-registrations | query | groupCode | Không |  |
-| GET /api/ojt-registrations | query | status | Không | Lọc theo trạng thái; bỏ trường này để xem tất cả. |
-| GET /api/ojt-registrations | query | search | Không |  |
-| GET /api/ojt-registrations | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/ojt-registrations | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/ojt-registrations | query | registrationId | Không | Chọn một hồ sơ để trả thêm phần chi tiết. |
-| GET /api/ojt-registrations | query | historyPage | Không | Phân trang history; chỉ dùng cùng registrationId. |
-| GET /api/ojt-registrations | query | historyLimit | Không | Phân trang history; chỉ dùng cùng registrationId. |
-| GET /api/ojt-registrations | query | coordinationPage | Không | Phân trang coordination; chỉ dùng cùng registrationId. |
-| GET /api/ojt-registrations | query | coordinationLimit | Không | Phân trang coordination; chỉ dùng cùng registrationId. |
-| GET /api/ojt-registrations | query | assignmentPage | Không | Phân trang assignment; chỉ dùng cùng registrationId. |
-| GET /api/ojt-registrations | query | assignmentLimit | Không | Phân trang assignment; chỉ dùng cùng registrationId. |
-| GET /api/ojt-semesters/{id}/eligible-student-handoffs | path | id | Có | ID: OJTSemesterID. |
-| GET /api/ojt-semesters/{id}/eligible-student-handoffs | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/ojt-semesters/{id}/eligible-student-handoffs | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/ojt-semesters/{id}/students | path | id | Có | ID: OJTSemesterID. |
-| GET /api/ojt-semesters/{id}/students | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/ojt-semesters/{id}/students | query | cohortId | Không | ID khóa. |
-| GET /api/ojt-semesters/{id}/students | query | groupCode | Không |  |
-| GET /api/ojt-semesters/{id}/students | query | registrationStatus | Không |  |
-| GET /api/ojt-semesters/{id}/students | query | search | Không |  |
-| GET /api/ojt-semesters/{id}/students | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/ojt-semesters/{id}/students | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/ojt-semesters/{id}/students | query | enterpriseId | Không | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
-| GET /api/ojt-semesters/{id}/students | query | coordinationStatus | Không | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
-| GET /api/ojt-semesters/{id}/students | query | assignmentStatus | Không | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
-| GET /api/companies | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/companies | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/companies | query | search | Không |  |
-| GET /api/companies | query | status | Không |  |
-| GET /api/companies | query | companyId | Không | ID doanh nghiệp. |
-| GET /api/companies | query | historyPage | Không | Trang lịch sử khi lọc theo ID. |
-| GET /api/companies | query | historyLimit | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
-| GET /api/positions | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/positions | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/positions | query | search | Không |  |
-| GET /api/positions | query | status | Không |  |
-| GET /api/positions | query | companyId | Không | ID doanh nghiệp. |
-| GET /api/positions | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/positions | query | positionId | Không | ID vị trí thực tập. |
-| GET /api/positions | query | historyPage | Không | Trang lịch sử khi lọc theo ID. |
-| GET /api/positions | query | historyLimit | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
-| GET /api/ojt-coordinations | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/ojt-coordinations | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/ojt-coordinations | query | search | Không |  |
-| GET /api/ojt-coordinations | query | status | Không |  |
-| GET /api/ojt-coordinations | query | companyId | Không | ID doanh nghiệp. |
-| GET /api/ojt-coordinations | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/ojt-coordinations | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/ojt-coordinations | query | positionId | Không | ID vị trí thực tập. |
-| GET /api/ojt-coordinations | query | registrationId | Không |  |
-| GET /api/ojt-coordinations | query | decision | Không |  |
-| GET /api/ojt-coordinations | query | coordinationId | Không |  |
-| GET /api/ojt-coordinations | query | historyPage | Không | Trang lịch sử khi lọc theo ID. |
-| GET /api/ojt-coordinations | query | historyLimit | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
-| GET /api/ojt-coordinations | query | coordinationPage | Không |  |
-| GET /api/ojt-coordinations | query | coordinationLimit | Không |  |
-| GET /api/ojt-coordinations | query | applicationId | Không |  |
-| GET /api/assignments | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/assignments | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/assignments | query | search | Không |  |
-| GET /api/assignments | query | status | Không |  |
-| GET /api/assignments | query | companyId | Không | ID doanh nghiệp. |
-| GET /api/assignments | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/assignments | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/assignments | query | positionId | Không | ID vị trí thực tập. |
-| GET /api/assignments | query | assignmentId | Không | ID phân công thực tập. |
-| GET /api/assignments | query | historyPage | Không | Trang lịch sử khi lọc theo ID. |
-| GET /api/assignments | query | historyLimit | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
-| GET /api/internship-evaluations | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/internship-evaluations | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/internship-evaluations | query | search | Không |  |
-| GET /api/internship-evaluations | query | status | Không |  |
-| GET /api/internship-evaluations | query | companyId | Không | ID doanh nghiệp. |
-| GET /api/internship-evaluations | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/internship-evaluations | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/internship-evaluations | query | positionId | Không | ID vị trí thực tập. |
-| GET /api/internship-evaluations | query | assignmentId | Không | ID phân công thực tập. |
-| GET /api/internship-evaluations | query | templateId | Không | ID bộ tiêu chí đánh giá. |
-| GET /api/internship-evaluations | query | evaluationId | Không |  |
-| GET /api/internship-evaluations | query | historyPage | Không | Trang lịch sử khi lọc theo ID. |
-| GET /api/internship-evaluations | query | historyLimit | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
-| GET /api/qhdn/registered-students | query | registrationId | Không |  |
-| GET /api/qhdn/registered-students | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/qhdn/registered-students | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/qhdn/registered-students | query | academicPeriodId | Không | ID kỳ học hoặc Block 3. |
-| GET /api/qhdn/registered-students | query | windowId | Không | ID đợt đăng ký. |
-| GET /api/qhdn/registered-students | query | status | Không |  |
-| GET /api/qhdn/registered-students | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/qhdn/registered-students | query | cohortId | Không | ID khóa. |
-| GET /api/qhdn/registered-students | query | groupCode | Không |  |
-| GET /api/qhdn/registered-students | query | search | Không |  |
-| GET /api/qhdn/registered-students | query | handoffStatus | Không | Lọc hồ sơ chưa bàn giao hoặc đã bàn giao. |
-| GET /api/qhdn/registered-students | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/qhdn/registered-students | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/qhdn/reports | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/qhdn/reports | query | companyId | Không | ID doanh nghiệp. |
-| GET /api/qhdn/reports | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/qhdn/reports | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/qhdn/reports | query | type | Có |  |
-| GET /api/students | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/students | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/students | query | search | Không |  |
-| GET /api/students | query | status | Không |  |
-| GET /api/students | query | programId | Không | ID phiên bản chương trình đào tạo. |
-| GET /api/students | query | cohortId | Không | ID khóa. |
-| GET /api/students | query | groupCode | Không |  |
-| GET /api/students | query | enrollmentYear | Không |  |
-| GET /api/students | query | currentSemester | Không | Kỳ chuyên ngành hiện tại, tính từ lộ trình thực tế. |
-| GET /api/students/{id}/course-results | path | id | Có | ID: StudentID. |
-| GET /api/students/{id}/course-results | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/students/{id}/course-results | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/students/{id}/course-results | query | courseId | Không | ID môn học (CourseID). |
-| GET /api/students/{id}/course-results | query | academicPeriodId | Không | ID kỳ học hoặc Block 3. |
-| GET /api/students/{id}/course-results | query | status | Không |  |
-| GET /api/academic-imports | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic-imports | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/academic-imports | query | kind | Không |  |
-| GET /api/academic-imports | query | status | Không |  |
-| GET /api/academic-imports | query | importId | Không | Chọn một hồ sơ để trả thêm phần chi tiết. |
-| GET /api/academic-imports | query | rowsPage | Không | Phân trang rows; chỉ dùng cùng importId. |
-| GET /api/academic-imports | query | rowsLimit | Không | Phân trang rows; chỉ dùng cùng importId. |
-| GET /api/assessment-templates | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/assessment-templates | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/assessment-templates | query | templateId | Không | ID bộ tiêu chí đánh giá. |
-| GET /api/assessment-templates | query | search | Không |  |
-| GET /api/assessment-templates | query | status | Không |  |
-| GET /api/admin/prediction-jobs/{id} | path | id | Có | ID: bản ghi. |
-| GET /api/admin/prediction-jobs/{id} | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/admin/prediction-jobs/{id} | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/predictions | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/predictions | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/predictions | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/predictions | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/predictions | query | modelId | Không | ID phiên bản mô hình. |
-| GET /api/predictions | query | riskLevel | Không |  |
-| GET /api/predictions | query | readinessLevel | Không |  |
-| GET /api/predictions | query | from | Không |  |
-| GET /api/predictions | query | to | Không |  |
-| GET /api/predictions | query | predictionId | Không | Chọn một hồ sơ để trả thêm phần chi tiết. |
-| GET /api/admin/models | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/admin/models | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/admin/models | query | modelId | Không | ID phiên bản mô hình. |
-| GET /api/admin/models | query | search | Không |  |
-| GET /api/admin/models | query | status | Không |  |
-| GET /api/alerts | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/alerts | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/alerts | query | alertId | Không | ID cảnh báo rủi ro. |
-| GET /api/alerts | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/alerts | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/alerts | query | status | Không |  |
-| GET /api/alerts | query | interventionPage | Không | Trang hoạt động hỗ trợ khi lọc alertId. |
-| GET /api/alerts | query | interventionLimit | Không | Số hoạt động hỗ trợ mỗi trang, tối đa 100. |
-| GET /api/students/{id}/interventions | path | id | Có | ID: StudentID. |
-| GET /api/students/{id}/interventions | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/students/{id}/interventions | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/students/{id}/interventions | query | status | Không |  |
-| GET /api/admin/reports/readiness | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/admin/reports/readiness | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/admin/reports/readiness | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/admin/reports/readiness | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/admin/reports/readiness | query | modelId | Không | ID phiên bản mô hình. |
-| GET /api/admin/reports/readiness | query | riskLevel | Không |  |
-| GET /api/admin/reports/readiness | query | readinessLevel | Không |  |
-| GET /api/admin/reports/readiness | query | from | Không |  |
-| GET /api/admin/reports/readiness | query | to | Không |  |
-| GET /api/admin/audit-logs | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/admin/audit-logs | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/admin/audit-logs | query | userId | Không | ID tài khoản. |
-| GET /api/admin/audit-logs | query | entityType | Không |  |
-| GET /api/admin/audit-logs | query | entityId | Không |  |
-| GET /api/admin/audit-logs | query | action | Không |  |
-| GET /api/enterprise/candidates | query | companyId | Có | ID doanh nghiệp. |
-| GET /api/enterprise/candidates | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/enterprise/candidates | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/enterprise/candidates | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/enterprise/candidates | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/enterprise/candidates | query | positionId | Không | ID vị trí thực tập. |
-| GET /api/enterprise/candidates | query | search | Không |  |
-| GET /api/enterprise/candidates | query | candidateId | Không |  |
-| GET /api/enterprise/candidates | query | decision | Không |  |
-| GET /api/enterprise/internships | query | companyId | Có | ID doanh nghiệp. |
-| GET /api/enterprise/internships | query | studentId | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| GET /api/enterprise/internships | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/enterprise/internships | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/enterprise/internships | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/enterprise/internships | query | positionId | Không | ID vị trí thực tập. |
-| GET /api/enterprise/internships | query | search | Không |  |
-| GET /api/enterprise/internships | query | internshipId | Không |  |
-| GET /api/enterprise/internships | query | status | Không |  |
-| GET /api/recruitment/posts | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/recruitment/posts | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/recruitment/posts | query | companyId | Có | ID doanh nghiệp. |
-| GET /api/recruitment/posts | query | postId | Không |  |
-| GET /api/recruitment/posts | query | windowId | Không | ID đợt đăng ký. |
-| GET /api/recruitment/posts | query | academicPeriodId | Không | ID kỳ học hoặc Block 3. |
-| GET /api/recruitment/posts | query | status | Không |  |
-| GET /api/ojt-results | query | resultId | Không |  |
-| GET /api/ojt-results | query | studentId | Không |  |
-| GET /api/ojt-results | query | ojtSemesterId | Không |  |
-| GET /api/ojt-results | query | page | Không |  |
-| GET /api/ojt-results | query | limit | Không |  |
-| GET /api/ojt-results | query | status | Không |  |
-| GET /api/ojt-results | query | search | Không |  |
-| GET /api/ojt-semesters/{id}/results/export | path | id | Có |  |
-| GET /api/ojt-semesters/{id}/results/export | query | resultId | Không |  |
-| GET /api/ojt-semesters/{id}/results/export | query | studentId | Không |  |
-| GET /api/ojt-semesters/{id}/results/export | query | ojtSemesterId | Không |  |
-| GET /api/ojt-semesters/{id}/results/export | query | status | Không |  |
-| GET /api/ojt-semesters/{id}/results/export | query | search | Không |  |
-| GET /api/ojt-semesters/{id}/results/export | query | format | Không |  |
-| GET /api/academic/advisory-runs | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic/advisory-runs | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/academic/advisory-runs/{id} | path | id | Có | ID: bản ghi. |
-| GET /api/academic/advisory-runs/{id} | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/academic/advisory-runs/{id} | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/student/ojt-registration-windows | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/student/ojt-registration-windows | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/student/ojt-registration-windows | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/student/notifications | query | unread | Không |  |
-| GET /api/student/notifications | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/student/notifications | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/student/combo-registration-windows | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/student/combo-registration-windows | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/student/ojt-results | query | ojtSemesterId | Không | ID kỳ OJT. |
-| GET /api/student/ojt-results | query | page | Không | Trang, bắt đầu từ 1. |
-| GET /api/student/ojt-results | query | limit | Không | Số bản ghi mỗi trang. |
-| GET /api/job-applications | query | applicationId | Không |  |
-| GET /api/job-applications | query | studentId | Không |  |
-| GET /api/job-applications | query | registrationId | Không |  |
-| GET /api/job-applications | query | ojtSemesterId | Không |  |
-| GET /api/job-applications | query | companyId | Không |  |
-| GET /api/job-applications | query | positionId | Không |  |
-| GET /api/job-applications | query | page | Không |  |
-| GET /api/job-applications | query | limit | Không |  |
-| GET /api/job-applications | query | status | Không |  |
-| GET /api/students/me/opportunities | query | ojtSemesterId | Có |  |
-| GET /api/students/me/opportunities | query | page | Không |  |
-| GET /api/students/me/opportunities | query | limit | Không |  |
-| GET /api/internship-tasks | query | companyId | Không |  |
-| GET /api/internship-tasks | query | studentId | Không |  |
-| GET /api/internship-tasks | query | positionId | Không |  |
-| GET /api/internship-tasks | query | ojtSemesterId | Không |  |
-| GET /api/internship-tasks | query | assignmentId | Không |  |
-| GET /api/internship-tasks | query | page | Không |  |
-| GET /api/internship-tasks | query | limit | Không |  |
+ID quan hệ không cần nhập lặp nếu đã truy ra được từ bản ghi được chọn. Các trường lọc tùy chọn có thể bỏ để xem toàn bộ phạm vi được phép. Phân trang page/limit không yêu cầu đọc toàn bộ DB trong một response.
+
+| API | Trường bắt buộc | Điều kiện vai trò | Các trường JSON |
+|---|---|---|---|
+| POST /api/json/academic-years/list | Không có ID bắt buộc chung |  | page, limit, search, status |
+| POST /api/json/academic-periods/list | Không có ID bắt buộc chung |  | page, limit, search, status, academicYearId, kind, academicPeriodId |
+| POST /api/json/cohorts/list | Không có ID bắt buộc chung |  | page, limit, search, status |
+| POST /api/json/academic-periods/combo-phase-schedules/list | academicPeriodId |  | academicPeriodId |
+| POST /api/json/academic/alerts/list | ojtSemesterId, academicPeriodId, assessmentDeadline |  | ojtSemesterId, programId, cohortId, majorId, comboId, groupCode, academicPeriodId, assessmentDeadline, type, page, limit |
+| POST /api/json/academic/course-demand/list | ojtSemesterId, academicPeriodId |  | ojtSemesterId, programId, cohortId, majorId, comboId, groupCode, academicPeriodId, assessmentDeadline, courseId, includeInProgress, page, limit |
+| POST /api/json/combo-registration-windows/list | Không có ID bắt buộc chung | studentId: STUDENT | page, limit, phase, status, academicPeriodId, studentId |
+| POST /api/json/combo-registration-windows/selections/list | windowId |  | windowId, page, limit, status |
+| POST /api/json/students/combo-selections/list | studentId | studentId: STUDENT | studentId, page, limit |
+| POST /api/json/majors/list | Không có ID bắt buộc chung |  | page, limit, search, parentMajorId |
+| POST /api/json/courses/list | Không có ID bắt buộc chung |  | page, limit, search |
+| POST /api/json/curricula/list | Không có ID bắt buộc chung |  | page, limit, search, majorId, status, version |
+| POST /api/json/ojt-rule-sets/list | Không có ID bắt buộc chung |  | programId, ojtSemesterId, status, page, limit |
+| POST /api/json/students/eligibility-checks/list | studentId | studentId: STUDENT | studentId, ojtSemesterId, page, limit |
+| POST /api/json/ojt-registration-windows/list | Không có ID bắt buộc chung | studentId: STUDENT | ojtSemesterId, status, page, limit, studentId |
+| POST /api/json/ojt-registrations/list | Không có ID bắt buộc chung | studentId: STUDENT | ojtSemesterId, windowId, studentId, programId, cohortId, groupCode, status, search, page, limit, registrationId, historyPage, historyLimit, coordinationPage, coordinationLimit, assignmentPage, assignmentLimit |
+| POST /api/json/ojt-semesters/eligible-student-handoffs/list | ojtSemesterId |  | ojtSemesterId, page, limit |
+| POST /api/json/ojt-semesters/students/list | ojtSemesterId | studentId: STUDENT | ojtSemesterId, programId, cohortId, groupCode, registrationStatus, search, page, limit, enterpriseId, coordinationStatus, assignmentStatus, studentId |
+| POST /api/json/companies/list | Không có ID bắt buộc chung |  | page, limit, search, status, companyId, historyPage, historyLimit |
+| POST /api/json/positions/list | Không có ID bắt buộc chung |  | page, limit, search, status, companyId, ojtSemesterId, positionId, historyPage, historyLimit |
+| POST /api/json/ojt-coordinations/list | Không có ID bắt buộc chung |  | page, limit, search, status, companyId, ojtSemesterId, studentId, positionId, registrationId, decision, coordinationId, historyPage, historyLimit, coordinationPage, coordinationLimit, applicationId |
+| POST /api/json/assignments/list | Không có ID bắt buộc chung |  | page, limit, search, status, companyId, ojtSemesterId, studentId, positionId, assignmentId, historyPage, historyLimit |
+| POST /api/json/internship-evaluations/list | Không có ID bắt buộc chung |  | page, limit, search, status, companyId, ojtSemesterId, studentId, positionId, assignmentId, templateId, evaluationId, historyPage, historyLimit |
+| POST /api/json/qhdn/registered-students/list | Không có ID bắt buộc chung |  | registrationId, studentId, ojtSemesterId, academicPeriodId, windowId, status, programId, cohortId, groupCode, search, handoffStatus, page, limit |
+| POST /api/json/qhdn/reports/list | type |  | ojtSemesterId, companyId, page, limit, type |
+| POST /api/json/students/list | Không có ID bắt buộc chung |  | page, limit, search, status, programId, cohortId, groupCode, enrollmentYear, currentSemester |
+| POST /api/json/students/course-results/list | studentId | studentId: STUDENT | studentId, page, limit, courseId, academicPeriodId, status |
+| POST /api/json/academic-imports/list | Không có ID bắt buộc chung |  | page, limit, kind, status, importId, rowsPage, rowsLimit |
+| POST /api/json/enterprise/candidates/list | companyId | companyId: ENTERPRISE | companyId, studentId, page, limit, ojtSemesterId, positionId, search, candidateId, decision |
+| POST /api/json/enterprise/internships/list | companyId | companyId: ENTERPRISE | companyId, studentId, page, limit, ojtSemesterId, positionId, search, internshipId, status |
+| POST /api/json/recruitment/posts/list | companyId | companyId: mọi vai trò | page, limit, companyId, postId, windowId, academicPeriodId, status |
+| POST /api/json/ojt-results/list | Không có ID bắt buộc chung |  | resultId, studentId, ojtSemesterId, page, limit, status, search |
+| POST /api/json/academic/advisory-runs/list | Không có ID bắt buộc chung |  | page, limit |
+| POST /api/json/student/ojt-registration-windows/list | studentId | studentId: STUDENT | ojtSemesterId, page, limit, studentId |
+| POST /api/json/student/notifications/list | studentId | studentId: STUDENT | unread, page, limit, studentId |
+| POST /api/json/student/combo-registration-windows/list | studentId | studentId: STUDENT | page, limit, studentId |
+| POST /api/json/student/ojt-results/list | studentId | studentId: STUDENT | ojtSemesterId, page, limit, studentId |
+| POST /api/json/job-applications/list | Không có ID bắt buộc chung | studentId: STUDENT | applicationId, studentId, registrationId, ojtSemesterId, companyId, positionId, page, limit, status |
+| POST /api/json/students/me/opportunities/list | ojtSemesterId, studentId | studentId: STUDENT | ojtSemesterId, page, limit, studentId |
+| POST /api/json/internship-tasks/list | Không có ID bắt buộc chung | companyId: ENTERPRISE; studentId: STUDENT | companyId, studentId, positionId, ojtSemesterId, assignmentId, page, limit |
+
+## POST /api/json/academic-years/list
+
+Danh sách năm học
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (PLANNED, ACTIVE, CLOSED, ARCHIVED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo",
+  "status": "PLANNED"
+}
+~~~
+
+Trường response item: id, yearCode, startDate, endDate, status.
+
+## POST /api/json/academic-periods/list
+
+Danh sách kỳ học và Block 3
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (PLANNED, ACTIVE, CLOSED, ARCHIVED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| academicYearId | integer | Không | ID năm học. |
+| kind | string (SEMESTER, BLOCK3) | Không | Bộ lọc kind. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| academicPeriodId | integer | Không | ID kỳ học hoặc Block 3. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo",
+  "status": "PLANNED",
+  "academicYearId": 1,
+  "kind": "SEMESTER",
+  "academicPeriodId": 1
+}
+~~~
+
+Trường response item: id, academicYearId, parentPeriodId, ojtSemesterId, periodCode, name, kind, status, startDate, endDate, ojt, academicYear, semester.
+
+## POST /api/json/cohorts/list
+
+Danh sách khóa và nhóm
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (PLANNED, ACTIVE, CLOSED, ARCHIVED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo",
+  "status": "PLANNED"
+}
+~~~
+
+Trường response item: id, cohortCode, name, status, enrollmentYear, groups.
+
+## POST /api/json/academic-periods/combo-phase-schedules/list
+
+Xem mốc chọn và xác nhận combo
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| academicPeriodId | integer | Có | ID: AcademicPeriodID. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "academicPeriodId": 1
+}
+~~~
+
+Trường response item: academicPeriodId, academicPeriod, confirmedBy, confirmedByUser.
+
+## POST /api/json/academic/alerts/list
+
+Danh sách cảnh báo thiếu điều kiện OJT
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Có | ID kỳ OJT. |
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không | ID khóa. |
+| majorId | integer | Không | ID chuyên ngành (SpecializationID). |
+| comboId | integer | Không | ID combo (ProgramComboID). |
+| groupCode | string | Không | Bộ lọc groupCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| academicPeriodId | integer | Có | ID kỳ học hoặc Block 3. |
+| assessmentDeadline | string | Có | Hạn xét điều kiện, gồm múi giờ. |
+| type | string (CREDIT_SHORTFALL, MISSING_REQUIRED_COURSES, EXCESS_FAILED_COURSES) | Không | Bộ lọc type. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "programId": 1,
+  "cohortId": 1,
+  "majorId": 1,
+  "comboId": 1,
+  "groupCode": "...",
+  "academicPeriodId": 1,
+  "assessmentDeadline": "2026-12-01T00:00:00+07:00",
+  "type": "CREDIT_SHORTFALL",
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: studentId, programId, cohortId, majorId, officialCheckId, studentCode, fullName, groupCode, category, comboIds, officialStale, evaluation, missingRequiredCourses, alternativeRequirements, dataIssues, alertTypes, student, program, cohort.
+
+## POST /api/json/academic/course-demand/list
+
+Thống kê nhu cầu học môn còn thiếu
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Có | ID kỳ OJT. |
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không | ID khóa. |
+| majorId | integer | Không | ID chuyên ngành (SpecializationID). |
+| comboId | integer | Không | ID combo (ProgramComboID). |
+| groupCode | string | Không | Bộ lọc groupCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| academicPeriodId | integer | Có | ID kỳ học hoặc Block 3. |
+| assessmentDeadline | string | Không | Hạn xét điều kiện, gồm múi giờ. |
+| courseId | integer | Không | ID môn học (CourseID). |
+| includeInProgress | string | Không | Bộ lọc includeInProgress. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "programId": 1,
+  "cohortId": 1,
+  "majorId": 1,
+  "comboId": 1,
+  "groupCode": "...",
+  "academicPeriodId": 1,
+  "assessmentDeadline": "2026-12-01T00:00:00+07:00",
+  "courseId": 1,
+  "includeInProgress": "...",
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: courseId, courseCode, courseName, academicPeriodId, periodCode, periodKind, studentCount, retakeCount, inProgressCount, course, academicPeriod.
+
+## POST /api/json/combo-registration-windows/list
+
+Danh sách đợt chọn combo
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| phase | string (INITIAL, CONFIRMATION) | Không | Bộ lọc phase. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (DRAFT, OPEN, CLOSED, FINALIZED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| academicPeriodId | integer | Không | ID kỳ học hoặc Block 3. |
+| studentId | integer | Khi vai trò STUDENT | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; đây là ID xác định chủ thể cho vai trò này, các vai trò khác không truyền trường này. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "phase": "INITIAL",
+  "status": "DRAFT",
+  "academicPeriodId": 1,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, name, academicPeriodId, ojtSemesterId, period, semester, startsAt, endsAt, effectiveEndsAt, status, canSubmit, blockingReasons, blockingMessages, phase, initialWindowId, requiredRelativeSemester, pathway, selection, confirmedSelection, reasonRequiredOnChange, registration, availableCombos, academicPeriod, createdByUser.
+
+## POST /api/json/combo-registration-windows/selections/list
+
+Theo dõi lựa chọn combo
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| windowId | integer | Có | ID: WindowID trong ComboRegistrationWindows. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| status | string (SUBMITTED, MISSING, APPLIED, UNSELECTED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "windowId": 1,
+  "page": 1,
+  "limit": 20,
+  "status": "SUBMITTED"
+}
+~~~
+
+Trường response item: studentId, programId, userId, eventId, comboId, studentCode, fullName, email, outcome, studentStatus, accountStatus, courseIds, choiceSnapshot, effectiveEndsAt, submittedAt, student, program, user, combo, courses.
+
+## POST /api/json/students/combo-selections/list
+
+Lịch sử lựa chọn combo của sinh viên
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "studentId": 1,
+  "page": 1,
+  "limit": 20
+}
+~~~
+
+Trường response item: id, windowId, initialWindowId, createdBy, sourceEventId, phase, type, reason, choice, previous, progress, eligibility, createdAt, createdByUser.
+
+## POST /api/json/majors/list
+
+Danh sách chuyên ngành
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| parentMajorId | integer | Không | ID ngành cha (MajorID). |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo",
+  "parentMajorId": 1
+}
+~~~
+
+Trường response item: id, code, name, parentMajorCode, parentMajorName, parentMajorId.
+
+## POST /api/json/courses/list
+
+Danh sách môn học
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo"
+}
+~~~
+
+Trường response item: id, code, name, defaultCredits, isOjtPrerequisite.
+
+## POST /api/json/curricula/list
+
+Danh sách chương trình đào tạo đã nhập
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| majorId | integer | Không | ID chuyên ngành (SpecializationID). |
+| status | string (DRAFT, PUBLISHED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| version | string | Không | Bộ lọc version. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo",
+  "majorId": 1,
+  "status": "DRAFT",
+  "version": "..."
+}
+~~~
+
+Trường response item: id, code, name, version, majorName, majorCode, status, retakePolicy, majorId, createdBy, publishedBy, totalCredits, effectiveYear, gpaScale, prerequisitesReviewed, equivalencesReviewed, createdAt, updatedAt, publishedAt, createdByUser, publishedByUser.
+
+## POST /api/json/ojt-rule-sets/list
+
+Danh sách bộ quy tắc OJT
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| status | string | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "programId": 1,
+  "ojtSemesterId": 1,
+  "status": "...",
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: id, programId, ojtSemesterId, createdBy, publishedBy, name, version, debtBasis, status, minCredits, maxUnpassedCourses, active, createdAt, publishedAt, program, semester, createdByUser, publishedByUser.
+
+## POST /api/json/students/eligibility-checks/list
+
+Lịch sử kiểm tra điều kiện OJT
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "studentId": 1,
+  "ojtSemesterId": 1,
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: student, semester, ruleSet, checkedByUser.
+
+## POST /api/json/ojt-registration-windows/list
+
+Danh sách đợt đăng ký OJT
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| status | string (DRAFT, OPEN, CLOSED) | Không | Lọc theo trạng thái; bỏ trường này để xem tất cả. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| studentId | integer | Khi vai trò STUDENT | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; đây là ID xác định chủ thể cho vai trò này, các vai trò khác không truyền trường này. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "status": "DRAFT",
+  "page": 1,
+  "limit": 20,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, name, academicPeriodId, ojtSemesterId, period, semester, startsAt, endsAt, effectiveEndsAt, status, canSubmit, blockingReasons, blockingMessages, phase, initialWindowId, requiredRelativeSemester, pathway, selection, confirmedSelection, reasonRequiredOnChange, registration, availableCombos, academicPeriod, createdByUser.
+
+## POST /api/json/ojt-registrations/list
+
+Danh sách hồ sơ đăng ký OJT
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| windowId | integer | Không | ID đợt đăng ký. |
+| studentId | integer | Khi vai trò STUDENT | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không | ID khóa. |
+| groupCode | string (A, B, C, D) | Không | Bộ lọc groupCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (SUBMITTED, APPROVED, REJECTED, HANDED_OFF) | Không | Lọc theo trạng thái; bỏ trường này để xem tất cả. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| registrationId | integer | Không | Chọn một hồ sơ để trả thêm phần chi tiết. |
+| historyPage | integer | Không | Phân trang history; chỉ dùng cùng registrationId. |
+| historyLimit | integer | Không | Phân trang history; chỉ dùng cùng registrationId. |
+| coordinationPage | integer | Không | Phân trang coordination; chỉ dùng cùng registrationId. |
+| coordinationLimit | integer | Không | Phân trang coordination; chỉ dùng cùng registrationId. |
+| assignmentPage | integer | Không | Phân trang assignment; chỉ dùng cùng registrationId. |
+| assignmentLimit | integer | Không | Phân trang assignment; chỉ dùng cùng registrationId. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "windowId": 1,
+  "studentId": 1,
+  "programId": 1,
+  "cohortId": 1,
+  "groupCode": "A",
+  "status": "SUBMITTED",
+  "search": "demo",
+  "page": 1,
+  "limit": 20,
+  "registrationId": 1,
+  "historyPage": 1,
+  "historyLimit": 20,
+  "coordinationPage": 1,
+  "coordinationLimit": 20,
+  "assignmentPage": 1,
+  "assignmentLimit": 20
+}
+~~~
+
+Trường response item: id, studentId, status, application, student, program, currentProgram, cohort, semester, submittedByUser, history, historyPagination, studentCode, fullName, email, phone, ojtSemesterId, windowId, programId, currentProgramId, programCode, programName, cohortId, groupCode, registeredAt, updatedAt, submittedBy, window, pathway, review, handoff, officialEligibility, handoffSnapshot, coordination, coordinationPagination, assignments, assignmentsPagination.
+
+## POST /api/json/ojt-semesters/eligible-student-handoffs/list
+
+Lịch sử bàn giao sinh viên cho QHDN
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Có | ID: OJTSemesterID. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: semester, createdByUser, id, ojtSemesterId, registrationIds, recipientRole, reason, createdBy, createdAt, studentCount, registrations.
+
+## POST /api/json/ojt-semesters/students/list
+
+Theo dõi trạng thái OJT theo kỳ
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Có | ID: OJTSemesterID. |
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không | ID khóa. |
+| groupCode | string | Không | Bộ lọc groupCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| registrationStatus | string | Không | Bộ lọc registrationStatus. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| enterpriseId | integer | Không | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
+| coordinationStatus | string (NOT_COORDINATED, PENDING, ACCEPTED, REJECTED) | Không | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
+| assignmentStatus | string (UNASSIGNED, ASSIGNED, ACTIVE, IN_PROGRESS, COMPLETED, CANCELLED, CANCELED, FAILED) | Không | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
+| studentId | integer | Khi vai trò STUDENT | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; đây là ID xác định chủ thể cho vai trò này, các vai trò khác không truyền trường này. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "programId": 1,
+  "cohortId": 1,
+  "groupCode": "...",
+  "registrationStatus": "...",
+  "search": "demo",
+  "page": 1,
+  "limit": 1,
+  "enterpriseId": 1,
+  "coordinationStatus": "NOT_COORDINATED",
+  "assignmentStatus": "UNASSIGNED",
+  "studentId": 1
+}
+~~~
+
+Trường response item: student, program, cohort, semester, company, position, studentId, studentCode, fullName, email, phone, programId, programCode, programName, cohortId, cohortName, groupCode, ojtSemesterId, registrationId, handoffId, coordinationId, enterpriseId, positionId, assignmentId, registrationStatus, ojtStatus, enterpriseDecision, assignmentStatus, cv, registration, window, handoff, officialEligibility, eligibilityValidity, coordination, assignment.
+
+## POST /api/json/companies/list
+
+Danh sách và hồ sơ doanh nghiệp
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (ACTIVE, INACTIVE) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| companyId | integer | Không | ID doanh nghiệp. |
+| historyPage | integer | Không | Trang lịch sử khi lọc theo ID. |
+| historyLimit | integer | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1,
+  "search": "demo",
+  "status": "ACTIVE",
+  "companyId": 1,
+  "historyPage": 1,
+  "historyLimit": 20
+}
+~~~
+
+Trường response item: id, code, name, address, industry, contactPersonName, contactPhone, contactEmail, status, createdAt, history, historyPagination.
+
+## POST /api/json/positions/list
+
+Danh sách và hồ sơ vị trí thực tập
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (OPEN, CLOSED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| companyId | integer | Không | ID doanh nghiệp. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| positionId | integer | Không | ID vị trí thực tập. |
+| historyPage | integer | Không | Trang lịch sử khi lọc theo ID. |
+| historyLimit | integer | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1,
+  "search": "demo",
+  "status": "OPEN",
+  "companyId": 1,
+  "ojtSemesterId": 1,
+  "positionId": 1,
+  "historyPage": 1,
+  "historyLimit": 20
+}
+~~~
+
+Trường response item: id, companyId, companyName, ojtSemesterId, recruitmentCode, title, description, requirements, status, location, workMode, capacity, remainingSlots, history, historyPagination, company, semester.
+
+## POST /api/json/ojt-coordinations/list
+
+Danh sách và hồ sơ điều phối
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (PENDING, ACCEPTED, REJECTED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| companyId | integer | Không | ID doanh nghiệp. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
+| positionId | integer | Không | ID vị trí thực tập. |
+| registrationId | integer | Không | ID registrationId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| decision | string (PENDING, ACCEPTED, REJECTED) | Không | Bộ lọc decision. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| coordinationId | integer | Không | ID coordinationId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| historyPage | integer | Không | Trang lịch sử khi lọc theo ID. |
+| historyLimit | integer | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
+| coordinationPage | integer | Không | Bộ lọc coordinationPage. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| coordinationLimit | integer | Không | Bộ lọc coordinationLimit. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| applicationId | integer | Không | ID kỳ OJT. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1,
+  "search": "demo",
+  "status": "PENDING",
+  "companyId": 1,
+  "ojtSemesterId": 1,
+  "studentId": 1,
+  "positionId": 1,
+  "registrationId": 1,
+  "decision": "PENDING",
+  "coordinationId": 1,
+  "historyPage": 1,
+  "historyLimit": 1,
+  "coordinationPage": 1,
+  "coordinationLimit": 1,
+  "applicationId": 1
+}
+~~~
+
+Trường response item: id, student, company, position, template, studentId, companyId, positionId, ojtSemesterId, registrationId, assignmentId, studentCode, fullName, companyName, positionTitle, decision, status, comments, templateId, scoreDetails, completionScore, attitudeScore, skillScore, overallScore, evaluatedAt, evaluatedBy, registration, assignment, history, historyPagination, coordinationHistory, coordinationHistoryPagination, semester, coordinatedByUser.
+
+## POST /api/json/assignments/list
+
+Danh sách và hồ sơ phân công thực tập
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (ASSIGNED, ACTIVE, IN_PROGRESS, COMPLETED, CANCELLED, CANCELED, FAILED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| companyId | integer | Không | ID doanh nghiệp. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
+| positionId | integer | Không | ID vị trí thực tập. |
+| assignmentId | integer | Không | ID phân công thực tập. |
+| historyPage | integer | Không | Trang lịch sử khi lọc theo ID. |
+| historyLimit | integer | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1,
+  "search": "demo",
+  "status": "ASSIGNED",
+  "companyId": 1,
+  "ojtSemesterId": 1,
+  "studentId": 1,
+  "positionId": 1,
+  "assignmentId": 1,
+  "historyPage": 1,
+  "historyLimit": 20
+}
+~~~
+
+Trường response item: id, coordinationId, studentId, companyId, positionId, ojtSemesterId, academicSupervisorId, studentCode, fullName, companyName, positionTitle, enterpriseSupervisorName, status, startDate, endDate, student, company, academicSupervisor, position, evaluation, result, history, historyPagination, semester.
+
+## POST /api/json/internship-evaluations/list
+
+Danh sách đánh giá thực tập
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| companyId | integer | Không | ID doanh nghiệp. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
+| positionId | integer | Không | ID vị trí thực tập. |
+| assignmentId | integer | Không | ID phân công thực tập. |
+| templateId | integer | Không | ID bộ tiêu chí đánh giá. |
+| evaluationId | integer | Không | ID evaluationId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| historyPage | integer | Không | Trang lịch sử khi lọc theo ID. |
+| historyLimit | integer | Không | Số sự kiện lịch sử mỗi trang, tối đa 100. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1,
+  "search": "demo",
+  "status": "...",
+  "companyId": 1,
+  "ojtSemesterId": 1,
+  "studentId": 1,
+  "positionId": 1,
+  "assignmentId": 1,
+  "templateId": 1,
+  "evaluationId": 1,
+  "historyPage": 1,
+  "historyLimit": 1
+}
+~~~
+
+Trường response item: id, student, company, position, template, studentId, companyId, positionId, ojtSemesterId, registrationId, assignmentId, studentCode, fullName, companyName, positionTitle, decision, status, comments, templateId, scoreDetails, completionScore, attitudeScore, skillScore, overallScore, evaluatedAt, evaluatedBy, registration, assignment, history, historyPagination, semester, evaluatedByUser.
+
+## POST /api/json/qhdn/registered-students/list
+
+Xem sinh viên đã đăng ký OJT
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| registrationId | integer | Không | ID registrationId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| academicPeriodId | integer | Không | ID kỳ học hoặc Block 3. |
+| windowId | integer | Không | ID đợt đăng ký. |
+| status | string (SUBMITTED, APPROVED, REJECTED, HANDED_OFF) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không | ID khóa. |
+| groupCode | string (A, B, C, D) | Không | Bộ lọc groupCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| handoffStatus | string (NOT_HANDED_OFF, HANDED_OFF) | Không | Lọc hồ sơ chưa bàn giao hoặc đã bàn giao. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "registrationId": 1,
+  "studentId": 1,
+  "ojtSemesterId": 1,
+  "academicPeriodId": 1,
+  "windowId": 1,
+  "status": "SUBMITTED",
+  "programId": 1,
+  "cohortId": 1,
+  "groupCode": "A",
+  "search": "demo",
+  "handoffStatus": "NOT_HANDED_OFF",
+  "page": 1,
+  "limit": 20
+}
+~~~
+
+Trường response item: id, studentId, studentCode, fullName, email, phone, studentStatus, accountStatus, programId, programCode, programName, cohortId, cohortName, groupCode, registrations, student, program, cohort.
+
+## POST /api/json/qhdn/reports/list
+
+Báo cáo QHDN theo loại
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| companyId | integer | Không | ID doanh nghiệp. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| type | string (acceptance, internships, enterprise-feedback) | Có | Bộ lọc type. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "companyId": 1,
+  "page": 1,
+  "limit": 20,
+  "type": "acceptance"
+}
+~~~
+
+Trường response item: ojtSemesterId, semesterCode, companyId, companyName, currentStudents, pending, accepted, rejected, acceptanceRate, coordinationAttempts, pendingAttempts, acceptedAttempts, rejectedAttempts, totalAssignments, assigned, active, completed, failed, cancelled, assignedStudents, totalResults, pendingResults, revisionRequestedResults, confirmedResults, passedResults, failedResults, averageOfficialScore, eligibleAssignments, evaluationCount, missingEvaluations, evaluationCoverageRate, averageCompletionScore, averageAttitudeScore, averageSkillScore, averageOverallScore, commentsCount, enterpriseSubmittedCount, staffEnteredCount, lastEvaluatedAt, company, semester.
+
+## POST /api/json/students/list
+
+Tìm kiếm và lọc sinh viên
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| programId | integer | Không | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không | ID khóa. |
+| groupCode | string | Không | Bộ lọc groupCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| enrollmentYear | integer | Không | Bộ lọc enrollmentYear. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| currentSemester | integer | Không | Kỳ chuyên ngành hiện tại, tính từ lộ trình thực tế. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "search": "demo",
+  "status": "...",
+  "programId": 1,
+  "cohortId": 1,
+  "groupCode": "...",
+  "enrollmentYear": 1,
+  "currentSemester": 1
+}
+~~~
+
+Trường response item: id, studentCode, userId, fullName, email, phone, accountStatus, className, status, groupCode, programId, cohortId, currentSemester, entryAcademicPeriodId, currentAcademicPeriodId, enrollmentYear, program, cohort, entryAcademicPeriod, currentAcademicPeriod.
+
+## POST /api/json/students/course-results/list
+
+Điểm, lần học và trạng thái môn
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| courseId | integer | Không | ID môn học (CourseID). |
+| academicPeriodId | integer | Không | ID kỳ học hoặc Block 3. |
+| status | string (PASSED, FAILED, IN_PROGRESS, WITHDRAWN, RECOGNIZED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "studentId": 1,
+  "page": 1,
+  "limit": 20,
+  "courseId": 1,
+  "academicPeriodId": 1,
+  "status": "PASSED"
+}
+~~~
+
+Trường response item: id, studentId, courseId, academicPeriodId, academicYearId, recordedBy, ojtResultId, courseCode, courseName, periodCode, periodKind, status, grade, sourceReference, score, gradePoints, semesterTaken, attemptNumber, periodStartDate, createdAt, updatedAt, course, academicPeriod.
+
+## POST /api/json/academic-imports/list
+
+Lịch sử nhập dữ liệu học vụ
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| kind | string (STUDENT, COURSE_RESULT, CURRICULUM) | Không | Bộ lọc kind. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| status | string (COMPLETED, REJECTED, FAILED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| importId | string | Không | Chọn một hồ sơ để trả thêm phần chi tiết. |
+| rowsPage | integer | Không | Phân trang rows; chỉ dùng cùng importId. |
+| rowsLimit | integer | Không | Phân trang rows; chỉ dùng cùng importId. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "kind": "STUDENT",
+  "status": "COMPLETED",
+  "importId": "...",
+  "rowsPage": 1,
+  "rowsLimit": 20
+}
+~~~
+
+Trường response item: importedByUser, id, kind, status, sourceName, summary, importedBy, createdAt, rows, rowsPagination.
+
+## POST /api/json/enterprise/candidates/list
+
+Danh sách và hồ sơ ứng viên
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| companyId | integer | Có | companyId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| positionId | integer | Không | ID vị trí thực tập. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| candidateId | integer | Không | ID candidateId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| decision | string (PENDING, ACCEPTED, REJECTED) | Không | Bộ lọc decision. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "companyId": 1,
+  "studentId": 1,
+  "page": 1,
+  "limit": 20,
+  "ojtSemesterId": 1,
+  "positionId": 1,
+  "search": "demo",
+  "candidateId": 1,
+  "decision": "PENDING"
+}
+~~~
+
+Trường response item: id, student, position, application, decision, introducedAt, decisionAt, rejectReason, isLatestCoordination, company, semester, companyId, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication, coordinatedBy, coordinatedByUser, registration, recruitmentPost.
+
+## POST /api/json/enterprise/internships/list
+
+Danh sách sinh viên thực tập
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| companyId | integer | Có | companyId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| positionId | integer | Không | ID vị trí thực tập. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| internshipId | integer | Không | ID internshipId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| status | string (ASSIGNED, ACTIVE, IN_PROGRESS, COMPLETED, CANCELLED, CANCELED, FAILED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "companyId": 1,
+  "studentId": 1,
+  "page": 1,
+  "limit": 20,
+  "ojtSemesterId": 1,
+  "positionId": 1,
+  "search": "demo",
+  "internshipId": 1,
+  "status": "ASSIGNED"
+}
+~~~
+
+Trường response item: id, student, position, application, academicSupervisor, coordinationId, enterpriseSupervisorName, startDate, endDate, status, resultStatus, evaluation, template, result, evaluationLocked, company, semester, companyId, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication.
+
+## POST /api/json/recruitment/posts/list
+
+Danh sách tin tuyển dụng
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| companyId | integer | Có | companyId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| postId | integer | Không | ID kỳ học hoặc Block 3. |
+| windowId | integer | Không | ID đợt đăng ký. |
+| academicPeriodId | integer | Không | ID kỳ học hoặc Block 3. |
+| status | string (DRAFT, PENDING_REVIEW, PUBLISHED, REJECTED, CLOSED, ARCHIVED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 20,
+  "companyId": 1,
+  "postId": 1,
+  "windowId": 1,
+  "academicPeriodId": 1,
+  "status": "DRAFT"
+}
+~~~
+
+Trường response item: id, ojtSemesterId, windowId, academicPeriodId, companyId, periodCode, companyName, title, content, benefits, applicationInstructions, status, reviewReason, deadlineAt, publishedAt, reviewedAt, positions, createdAt, updatedAt, company, semester, academicPeriod.
+
+## POST /api/json/ojt-results/list
+
+Danh sách điểm OJT chính thức do doanh nghiệp đánh giá
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| resultId | integer | Không | ID resultId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| studentId | integer | Không | ID studentId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| ojtSemesterId | integer | Không | ID ojtSemesterId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| page | integer | Không | Trang kết quả, mặc định 1. |
+| limit | integer | Không | Số bản ghi mỗi trang, tối đa 100. |
+| status | string (CONFIRMED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "resultId": 1,
+  "studentId": 1,
+  "ojtSemesterId": 1,
+  "page": 1,
+  "limit": 1,
+  "status": "CONFIRMED",
+  "search": "demo"
+}
+~~~
+
+Trường response item: id, evaluationId, assignmentId, studentId, companyId, positionId, programId, studentCode, fullName, enterpriseName, ojtSemesterId, semesterCode, status, officialScore, completionScore, attitudeScore, skillScore, comments, evaluatedBy, confirmedBy, confirmedAt, source, outcome, student, program, company, position, semester, evaluatedByUser, confirmedByUser.
+
+## POST /api/json/academic/advisory-runs/list
+
+lịch sử batch thông báo khi có worker.
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: academicPeriod, semester, createdByUser, id, kind, status, createdBy, ojtSemesterId, academicPeriodId, createdAt, completedAt.
+
+## POST /api/json/student/ojt-registration-windows/list
+
+scope/deadline, canRegister/blockReasons
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "page": 1,
+  "limit": 1,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, ojtSemesterId, academicPeriodId, requiredRelativeSemester, registrationId, name, status, registrationStatus, period, startsAt, endsAt, canRegister, blockReasons, academicPeriod, semester.
+
+## POST /api/json/student/notifications/list
+
+thông báo/lọc unread/phân trang, trả unreadCount cùng response
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| unread | string (true, false) | Không | Bộ lọc unread. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "unread": "true",
+  "page": 1,
+  "limit": 1,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, title, content, sentAt, isRead.
+
+## POST /api/json/student/combo-registration-windows/list
+
+các đợt/lựa chọn khả dụng
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "page": 1,
+  "limit": 1,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, ojtSemesterId, academicPeriodId, initialWindowId, name, phase, status, period, startsAt, endsAt, effectiveEndsAt, canSelect, choices, academicPeriod, semester.
+
+## POST /api/json/student/ojt-results/list
+
+chỉ kết quả của mình được công bố
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Không | ID kỳ OJT. |
+| page | integer | Không | Trang, bắt đầu từ 1. |
+| limit | integer | Không | Số bản ghi mỗi trang. |
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "page": 1,
+  "limit": 1,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, evaluationId, assignmentId, studentId, companyId, positionId, programId, studentCode, fullName, enterpriseName, ojtSemesterId, semesterCode, status, officialScore, completionScore, attitudeScore, skillScore, comments, evaluatedBy, confirmedBy, confirmedAt, source, outcome, student, program, company, position, semester, evaluatedByUser, confirmedByUser.
+
+## POST /api/json/job-applications/list
+
+Danh sách hồ sơ ứng tuyển doanh nghiệp
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| applicationId | integer | Không | ID applicationId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| studentId | integer | Khi vai trò STUDENT | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| registrationId | integer | Không | ID registrationId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| ojtSemesterId | integer | Không | ID ojtSemesterId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| companyId | integer | Không | ID companyId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| positionId | integer | Không | ID positionId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| page | integer | Không | Trang kết quả, mặc định 1. |
+| limit | integer | Không | Số bản ghi mỗi trang, tối đa 100. |
+| status | string (SUBMITTED, REVIEWING, INTERVIEW, OFFERED, ACCEPTED, REJECTED, WITHDRAWN) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "applicationId": 1,
+  "studentId": 1,
+  "registrationId": 1,
+  "ojtSemesterId": 1,
+  "companyId": 1,
+  "positionId": 1,
+  "page": 1,
+  "limit": 1,
+  "status": "SUBMITTED"
+}
+~~~
+
+Trường response item: id, registrationId, studentId, studentCode, fullName, ojtSemesterId, postId, positionId, companyId, cvFileId, officialCheckId, status, coverLetter, appliedAt, updatedAt, cv, company, position, post, handedOff, coordination, student, semester.
+
+## POST /api/json/students/me/opportunities/list
+
+Vị trí tuyển dụng và quyền ứng tuyển
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| ojtSemesterId | integer | Có | ID ojtSemesterId dùng để chọn/lọc dữ liệu trong DB. Bắt buộc. |
+| page | integer | Không | Trang kết quả, mặc định 1. |
+| limit | integer | Không | Số bản ghi mỗi trang, tối đa 100. |
+| studentId | integer | Có | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc cho mọi vai trò. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "ojtSemesterId": 1,
+  "page": 1,
+  "limit": 1,
+  "studentId": 1
+}
+~~~
+
+Trường response item: id, ojtSemesterId, code, title, description, requirements, location, workMode, capacity, remainingSlots, company, post, applicationId, canApply, blockers, semester.
+
+## POST /api/json/internship-tasks/list
+
+Danh sách task trong phạm vi tài khoản
+
+| Trường | Kiểu | Bắt buộc | Mục đích |
+|---|---|---|---|
+| companyId | integer | Khi vai trò ENTERPRISE | companyId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò ENTERPRISE; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| studentId | integer | Khi vai trò STUDENT | studentId chọn đối tượng truy xuất, FE phải nhập; bắt buộc khi đăng nhập vai trò STUDENT; vai trò quản trị có thể bỏ để xem toàn bộ. JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này. |
+| positionId | integer | Không | ID positionId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| ojtSemesterId | integer | Không | ID ojtSemesterId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| assignmentId | integer | Không | ID assignmentId dùng để chọn/lọc dữ liệu trong DB. Tùy chọn; bỏ qua để không lọc theo ID này. |
+| page | integer | Không | Trang kết quả, mặc định 1. |
+| limit | integer | Không | Số bản ghi mỗi trang, tối đa 100. |
+
+Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
+
+~~~json
+{
+  "companyId": 1,
+  "studentId": 1,
+  "positionId": 1,
+  "ojtSemesterId": 1,
+  "assignmentId": 1,
+  "page": 1,
+  "limit": 1
+}
+~~~
+
+Trường response item: student, company, position, semester, id, assignmentId, studentId, companyId, positionId, ojtSemesterId, name, description, status, assignedDate, dueDate, assignment, studentCode, fullName, companyName, positionTitle, semesterCode.

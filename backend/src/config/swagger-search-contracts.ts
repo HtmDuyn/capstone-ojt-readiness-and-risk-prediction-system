@@ -22,14 +22,10 @@ const assignment = object({
   position:object({id,...strings('code','title','description','requirements','location','workMode'),ojtSemesterId:id}),evaluation,
   result:{...object({id,status:text,version:id,officialScore:score,outcome:{...text,nullable:true},confirmedAt:{...time,nullable:true},evaluationLocked:{type:'boolean'}}),nullable:true},...history
 });
-const template = object({id,code:text,version:id,name:text,criteria:{type:'array',items:object({code:text,name:text,weight:{type:'number'},maxScore:{type:'number'}})},status:text,createdAt:time,publishedAt:{...time,nullable:true}});
-const model = object({id,code:text,version:text,name:text,status:text,metrics:{type:'object',additionalProperties:true},featureSchema:{type:'object',additionalProperties:true},createdAt:time});
-const intervention = object({id,alertId:id,studentId:id,description:text,assignedTo:id,dueDate:{...date,nullable:true},status:text,outcome:{...text,nullable:true},createdBy:id,createdAt:time,updatedAt:time});
-const alert = object({id,predictionId:id,studentId:id,studentCode:text,fullName:text,ojtSemesterId:id,riskLevel:text,riskScore:score,status:text,resolutionNote:{...text,nullable:true},createdAt:time,updatedAt:time,updatedBy:{...id,nullable:true},interventions:page(intervention)});
 
 // Document the retained search operations as full records, not a separate detail contract.
 export function describeMergedSearchResponses(spec:Schema):void {
-  for(const [path,item]of Object.entries({'/api/companies':company,'/api/positions':position,'/api/assignments':assignment,'/api/assessment-templates':template,'/api/admin/models':model,'/api/alerts':alert})){
+  for(const [path,item]of Object.entries({'/api/companies':company,'/api/positions':position,'/api/assignments':assignment})){
     const operation=spec.paths?.[path]?.get;
     if(!operation)throw new Error('Missing consolidated search operation: '+path);
     operation.responses['200']={description:'Danh sách hồ sơ đầy đủ, có phân trang.',content:{'application/json':{schema:object({success:{type:'boolean'},data:page(item)})}}};

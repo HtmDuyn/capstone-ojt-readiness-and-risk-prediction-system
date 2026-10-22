@@ -2,7 +2,7 @@ import { Router } from "express";
 import { changePassword } from './auth.service';
 import { requestPasswordReset } from './password-reset.service';
 import { authorizeRoles } from '../../middleware/authorize';
-import { positiveId } from '../students/student.validation';
+import { positiveId, inputObject, invalid } from '../students/student.validation';
 
 import {
   authenticate,
@@ -14,8 +14,12 @@ import {
 } from "./auth.controller";
 
 const router = Router();
-router.post('/users/:userId/password-reset', authenticate, authorizeRoles('ADMIN'), async (req,res,next) => {
-  try { res.status(202).json({success:true,data:await requestPasswordReset(positiveId(req.params.userId,'userId'),req.user!.userId)}); }
+router.post('/users/password-reset', authenticate, authorizeRoles('ADMIN'), async (req,res,next) => {
+  try {
+    if(Object.keys(req.query).length)throw invalid('Provide userId in the JSON body, not query parameters.');
+    const body=inputObject(req.body,['userId']);
+    res.status(202).json({success:true,data:await requestPasswordReset(positiveId(body.userId,'userId'),req.user!.userId)});
+  }
   catch(error) { next(error); }
 });
 router.post('/change-password', authenticate, async (req, res, next) => {
