@@ -6775,3 +6775,33 @@ END $$;
 INSERT INTO "SchemaMigrations"("Version") VALUES ('20261022_handoff_before_registration') ON CONFLICT DO NOTHING;
 COMMIT;
 -- END INCREMENTAL UPDATE: 20261022_handoff_before_registration
+
+
+-- BEGIN DEMO PREPARATION CALENDAR: 20261022
+-- Demo dates support assessment opening on 2026-10-22. Existing rows are preserved.
+BEGIN;
+SET LOCAL search_path = public, pg_catalog;
+INSERT INTO "AcademicPeriods"
+  ("AcademicYearID", "PeriodCode", "Name", "Kind", "StartDate", "EndDate", "Status")
+SELECT "AcademicYearID", 'DEMO-PREP-2026', 'Học kỳ chuẩn bị OJT demo',
+       'SEMESTER', DATE '2026-09-01', DATE '2026-10-10', 'CLOSED'
+FROM "AcademicYears" WHERE "YearCode" = 'DEMO-2026-2027'
+ON CONFLICT ("PeriodCode") DO NOTHING;
+
+INSERT INTO "AcademicPeriods"
+  ("AcademicYearID", "PeriodCode", "Name", "Kind", "ParentPeriodID", "StartDate", "EndDate", "Status")
+SELECT "AcademicYearID", 'DEMO-PREP-B3-2026', 'Block 3 chuẩn bị OJT demo',
+       'BLOCK3', "AcademicPeriodID", DATE '2026-10-11', DATE '2026-10-21', 'CLOSED'
+FROM "AcademicPeriods" WHERE "PeriodCode" = 'DEMO-PREP-2026'
+ON CONFLICT ("PeriodCode") DO NOTHING;
+
+-- Match the automatic semester link created by the academic-period API.
+INSERT INTO "OJTSemesters"
+  ("AcademicYearID", "SemesterCode", "Name", "AcademicPeriodID", "StartDate", "EndDate", "Status")
+SELECT p."AcademicYearID", 'OJT-AP-' || p."AcademicPeriodID", p."Name",
+       p."AcademicPeriodID", p."StartDate", p."EndDate", 'PLANNED'
+FROM "AcademicPeriods" p WHERE p."PeriodCode" = 'DEMO-PREP-2026'
+  AND NOT EXISTS (SELECT 1 FROM "OJTSemesters" o WHERE o."AcademicPeriodID" = p."AcademicPeriodID")
+ON CONFLICT DO NOTHING;
+COMMIT;
+-- END DEMO PREPARATION CALENDAR: 20261022
