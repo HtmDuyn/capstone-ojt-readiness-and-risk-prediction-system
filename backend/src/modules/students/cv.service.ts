@@ -51,7 +51,7 @@ export async function readCV(studentId:number,actor:Actor,cvFileId?:number) {
   const s=(await c.query('SELECT "UserID" FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL',[studentId])).rows[0];
   if(!s)throw invalid('Không tìm thấy sinh viên.',404,'STUDENT_NOT_FOUND');
   const own=actor.roleCode==='STUDENT'&&s.UserID===actor.userId;
-  const coordinator=actor.roleCode==='OJT_COORD'&&(await c.query('SELECT 1 FROM "OJTRegistrations" WHERE "StudentID"=$1',[studentId])).rowCount;
+  const coordinator=actor.roleCode==='OJT_COORD'&&(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$1',[studentId])).rowCount;
   if(!own&&!['ADMIN','ACADEMIC'].includes(actor.roleCode)&&!coordinator)throw invalid('Không có quyền xem CV.',403,'FORBIDDEN');
   const file=(await c.query(`SELECT "FileName","MimeType","Content" FROM "StudentCVFiles" WHERE "StudentID"=$1 AND ($2::int IS NULL OR "CVFileID"=$2) ORDER BY "CVFileID" DESC LIMIT 1`,[studentId,cvFileId??null])).rows[0];
   if(!file)throw invalid('Sinh viên chưa có CV hoặc file không thuộc sinh viên.',404,'CV_NOT_FOUND');return file;

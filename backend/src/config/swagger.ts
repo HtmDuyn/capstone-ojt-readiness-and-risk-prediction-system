@@ -1,3 +1,4 @@
+import { describeHandoffWorkflow } from './swagger-handoff-workflow';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
 import { describeListBaseFields } from './swagger-list-base-fields';
 import {
@@ -13,7 +14,7 @@ import { addPortalOperations } from '../modules/student-portal/portal.openapi';
 import { mergeSharedRoleContracts } from './shared-role-contracts';
 import { addEnterpriseOperations } from '../modules/qhdn/enterprise.openapi';
 import { addRecruitmentOperations } from '../modules/recruitment/recruitment.openapi';
-import { buildJsonInputOperations, documentJsonInputOperations } from './json-input-operations';
+import { describeRestOperations } from './rest-operations';
 import { groupSwaggerByRole } from './swagger-role-groups';
 import { describeMergedSearchResponses } from './swagger-search-contracts';
 import { describeFeResponses } from './swagger-fe-contracts';
@@ -384,6 +385,5 @@ describeImportWorkflow(describedSpec);
 describeOfficialResults(describedSpec);
 describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
-const originalSpec = groupSwaggerByRole(describedSpec);
-export const jsonInputOperations = buildJsonInputOperations(originalSpec);
-export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);
+describeHandoffWorkflow(describedSpec);
+export const swaggerSpec = describeRestOperations(groupSwaggerByRole(describedSpec));
