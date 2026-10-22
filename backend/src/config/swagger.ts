@@ -1,3 +1,4 @@
+import { describeHandoffWorkflow } from './swagger-handoff-workflow';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
 import { describeListBaseFields } from './swagger-list-base-fields';
 import {
@@ -384,6 +385,7 @@ describeImportWorkflow(describedSpec);
 describeOfficialResults(describedSpec);
 describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
+describeHandoffWorkflow(describedSpec);
 const originalSpec = groupSwaggerByRole(describedSpec);
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
 export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

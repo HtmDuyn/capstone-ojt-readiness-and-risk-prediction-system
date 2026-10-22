@@ -132,8 +132,8 @@ function gradeBands(value:unknown,scale:number) {
 export async function saveGradeMapping(programId:number,semesterId:number,body:unknown,actor:number) {
  const b=inputObject(body,['courseId','academicPeriodId','gradeBands','reason']),courseId=positiveId(b.courseId,'courseId'),periodId=positiveId(b.academicPeriodId,'academicPeriodId'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
- const program=(await c.query(`SELECT p."Status",g."GpaScale" FROM "TrainingPrograms" p LEFT JOIN "AcademicGradingPolicies" g ON g."ProgramID"=p."ProgramID" WHERE p."ProgramID"=$1`,[programId])).rows[0];if(!program)throw invalid('Curriculum not found.',404);
- if(program.Status!=='PUBLISHED'||!program.GpaScale)throw invalid('A published curriculum with an explicit GPA scale is required.',409);
+ const program=(await c.query(`SELECT to_jsonb(p)->>'Status' AS "Status",g."GpaScale" FROM "TrainingPrograms" p LEFT JOIN "AcademicGradingPolicies" g ON g."ProgramID"=p."ProgramID" WHERE p."ProgramID"=$1`,[programId])).rows[0];if(!program)throw invalid('Curriculum not found.',404);
+ if((program.Status!=null&&program.Status!=='PUBLISHED')||!program.GpaScale)throw invalid('A published curriculum with an explicit GPA scale is required.',409);
  const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0];if(!term)throw invalid('OJT semester not found.',404);
  if(!(await c.query(`SELECT 1 FROM "ProgramCourses" WHERE "ProgramID"=$1 AND "CourseID"=$2 AND "EntryKind"='COURSE'`,[programId,courseId])).rowCount)throw invalid('OJT course must be an actual course in this curriculum.');
  const period=await actualPeriod(c,periodId);if(period.AcademicYearID!==term.AcademicYearID||(term.StartDate&&periodBounds(period).end<=new Date(dayString(term.StartDate)+'T00:00:00+07:00')))throw invalid('Grade period must belong to the OJT academic year and must not end before OJT starts.');

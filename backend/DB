@@ -6777,3 +6777,38 @@ LEFT JOIN public."RecruitmentPostPositions" rpp ON rpp."PositionID" = p."Positio
 LEFT JOIN public."RecruitmentPosts" rp ON rp."PostID" = rpp."PostID"
 WHERE e."EnterpriseCode" = 'TECHVIET' AND p."RecruitmentCode" LIKE 'DEMO-TV-%'
 ORDER BY s."SemesterCode", p."RecruitmentCode";
+
+ALTER TABLE public."AccountImportBatches"
+ADD COLUMN IF NOT EXISTS "RecruitmentWindowID" INTEGER;
+
+
+-- BEGIN INCREMENTAL UPDATE: 20261022_handoff_before_registration
+-- Existing databases: run only this block; the full file above resets data.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL search_path=public,pg_catalog;
+-- No historical row is rewritten. Existing foreign keys and append-only history remain.
+ALTER TABLE "EligibleStudentHandoffItems" ALTER COLUMN "RegistrationID" DROP NOT NULL;
+CREATE INDEX IF NOT EXISTS "IX_HandoffStudentSemester" ON "EligibleStudentHandoffItems"("StudentID","OJTSemesterID");
+CREATE OR REPLACE FUNCTION "GuardAcademicHandoff"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF NOT EXISTS (SELECT 1 FROM "EligibilityChecks" e JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID"
+   WHERE e."CheckID"=NEW."CheckID" AND e."StudentID"=NEW."StudentID" AND e."OJTSemesterID"=NEW."OJTSemesterID" AND e."Status"='ELIGIBLE') THEN
+  RAISE EXCEPTION 'Handoff requires a confirmed eligible check for this student and semester' USING ERRCODE='23514';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" i WHERE i."StudentID"=NEW."StudentID" AND i."OJTSemesterID"=NEW."OJTSemesterID") THEN
+  RAISE EXCEPTION 'Student already handed off for this semester' USING ERRCODE='23505';
+ END IF;
+ RETURN NEW;
+END $$;
+-- The application links registrations by student + semester; it never rewrites immutable handoff items.
+ALTER TABLE "AccountImportBatches" ADD COLUMN IF NOT EXISTS "RecruitmentWindowID" integer;
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='"AccountImportBatches"'::regclass AND contype='f' AND conkey=ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid='"AccountImportBatches"'::regclass AND attname='RecruitmentWindowID')]::smallint[]) THEN
+  ALTER TABLE "AccountImportBatches" ADD CONSTRAINT "FK_AccountImportRecruitmentWindow" FOREIGN KEY("RecruitmentWindowID") REFERENCES "RecruitmentWindows"("WindowID") NOT VALID;
+ END IF;
+END $$;
+INSERT INTO "SchemaMigrations"("Version") VALUES ('20261022_handoff_before_registration') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: 20261022_handoff_before_registration

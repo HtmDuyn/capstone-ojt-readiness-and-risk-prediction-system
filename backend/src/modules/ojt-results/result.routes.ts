@@ -1,3 +1,4 @@
+import { transferResult,confirmResult } from './result-workflow.service';
 import { resultPdf } from './result.pdf';
 import { Router,type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
@@ -9,6 +10,8 @@ const read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{
   try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}
 };
+router.post('/ojt-results',authenticate,authorizeRoles('ADMIN','OJT_COORD'),handle(req=>transferResult(req.body,req.user),201));
+router.post('/ojt-results/:id/confirm',authenticate,authorizeRoles('ADMIN','ACADEMIC'),handle(req=>confirmResult(positiveId(req.params.id),req.body,req.user)));
 router.get('/ojt-results',...read,handle(req=>list(req.query)));
 router.get('/ojt-semesters/:id/results/export',...read,async(req,res,next)=>{
   try{

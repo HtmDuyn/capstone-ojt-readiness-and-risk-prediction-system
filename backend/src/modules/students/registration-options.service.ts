@@ -5,7 +5,6 @@ import { combos } from '../curriculum/curriculum.repository';
 import { purpose } from '../combo-registration/combo.validation';
 import { activeChoice } from '../combo-registration/combo.repository';
 import { assertRosterContext } from '../combo-registration/selection.service';
-import { assertRegistrationSemester } from '../academic/workflow-policy';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
 const blockerLabels:Record<string,string>={
@@ -18,7 +17,7 @@ const blockerLabels:Record<string,string>={
 };
 
 async function ownStudent(c:PoolClient,userId:number):Promise<Row> {
-  const s=(await c.query(`SELECT s.*,u."FullName",u."Email",u."Phone",p."CohortID",p."GroupCode",p."EntryAcademicPeriodID",tp."Status" AS "ProgramStatus",tp."SpecializationID"
+  const s=(await c.query(`SELECT s.*,u."FullName",u."Email",u."Phone",p."CohortID",p."GroupCode",p."EntryAcademicPeriodID",to_jsonb(tp)->>'Status' AS "ProgramStatus",tp."SpecializationID"
     FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
     LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" WHERE s."UserID"=$1 AND s."DeletedAt" IS NULL`,[userId])).rows[0];
   if(!s)throw invalid('Student profile not found.',404,'STUDENT_NOT_FOUND');return s;
@@ -48,7 +47,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
     }else{
       from='FROM "OJTRegistrationWindows" w';
       // Bind the authenticated student, never a studentId supplied by the caller.
-      where.push('$1::int IS NOT NULL');
+      where.push('EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID")');
       for(const [key,value,type]of [['programIds',s.ProgramID,'int'],['cohortIds',s.CohortID,'int'],['majorIds',s.SpecializationID,'int'],['studentIds',s.StudentID,'int'],['groupCodes',s.GroupCode,'text']] as const){
         args.push(value??null);where.push(`(NOT (w."Scope" ? '${key}') OR w."Scope"->'${key}' @> jsonb_build_array($${args.length}::${type}))`);
       }
@@ -67,14 +66,14 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
     const items:Row[]=[];
     for(const w of rows){
       const end=w.EffectiveEndsAt??w.EndsAt,reasons:string[]=[];
-      if(s.Status!=='ACTIVE'||s.ProgramStatus!=='PUBLISHED')reasons.push('STUDENT_OR_CURRICULUM_INACTIVE');
+      if(s.Status!=='ACTIVE'||(s.ProgramStatus!=null&&s.ProgramStatus!=='PUBLISHED'))reasons.push('STUDENT_OR_CURRICULUM_INACTIVE');
       if(w.Status!=='OPEN')reasons.push('WINDOW_NOT_OPEN');
       if(now<new Date(w.StartsAt))reasons.push('WINDOW_NOT_STARTED');
       if(now>=new Date(end))reasons.push('WINDOW_EXPIRED');
       let pathway:unknown=null;
       const contextIssue=await blocker(async()=>{
         if(kind==='combo')await assertRosterContext(c,{studentId:s.StudentID,programId:w.RosterProgramID,scopeSnapshot:w.RosterSnapshot});
-        else pathway=await assertRegistrationSemester(c,w,s.StudentID);
+        else pathway={admissionSource:'ACADEMIC_HANDOFF'};
       });
       if(contextIssue)reasons.push(contextIssue);
       if(kind==='combo'&&!options.length)reasons.push('COMBO_OPTIONS_UNAVAILABLE');

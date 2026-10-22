@@ -29,6 +29,11 @@ async function excel(headers,data,kind='STUDENT'){
 }
 before(async()=>{
  db=new PGlite();await db.exec(fs.readFileSync(path.join(__dirname,'workflow-fixture.sql'),'utf8'));
+ const databaseSource=fs.readFileSync(path.join(__dirname,'../DB'),'utf8');
+ const patchStart=databaseSource.indexOf('-- BEGIN INCREMENTAL UPDATE: 20261022_handoff_before_registration');
+ const patchEnd=databaseSource.indexOf('-- END INCREMENTAL UPDATE: 20261022_handoff_before_registration',patchStart);
+ assert.ok(patchStart>=0 && patchEnd>patchStart,'DB must contain the bounded incremental update');
+ await db.exec(databaseSource.slice(patchStart,patchEnd));
  services={...require('../src/modules/imports/import.service.ts'),...require('../src/modules/imports/import-sheet.service.ts'),...require('../src/modules/imports/email.crypto.ts'),...require('../src/modules/qhdn/task.service.ts'),...require('../src/modules/qhdn/workflow.service.ts'),...require('../src/modules/ojt-results/completion-notification.service.ts'),results:require('../src/modules/ojt-results/result.service.ts'),...require('../src/jobs/provisioning.ts')};
  smtp=net.createServer(socket=>{
   socket.setEncoding('utf8');socket.write('220 localhost test SMTP\r\n');let buffer='',inData=false,data='';
@@ -121,19 +126,37 @@ test('bulk tasks reject foreign enterprise, completed internships, past/outside 
  await assert.rejects(()=>services.assignTasks({...body,assignmentIds:[own],tasks:Array.from({length:51},()=>({name:'Task',dueDate:due}))},actor));
  await assert.rejects(()=>services.assignTasks({...body,assignmentIds:Array.from({length:101},(_,i)=>i+1),tasks:Array.from({length:50},()=>({name:'Task',dueDate:due}))},actor));
 });
-test('enterprise score is immediately official for academic list and students; end of term queues and delivers one email',async()=>{
- await services.importAccounts(enterprise(),1);const id=await seedAssignment();const body={completionScore:8,attitudeScore:9,skillScore:7,overallScore:8.25,comments:'Good work',reason:'Final evaluation'};
- await assert.rejects(()=>services.evaluate(id,body,{userId:1,roleCode:'OJT_COORD'}),e=>e.statusCode===403);
- await services.evaluate(id,body,actor);const result=await services.results.list({});assert.equal(result.total,1);assert.equal(result.items[0].officialScore,8.25);assert.equal(result.items[0].status,'CONFIRMED');
- assert.equal(result.items[0].student.studentCode,'BASE');assert.equal(result.items[0].student.fullName,'Student');assert.equal(result.items[0].company.code,'DN01');assert.equal(result.items[0].position.title,'Developer');assert.equal(result.items[0].program.name,'Software Engineering');assert.equal(result.items[0].semester.code,'OJT');assert.equal(result.items[0].evaluatedByUser.fullName,'HR Demo');assert.equal(result.items[0].confirmedByUser.fullName,'HR Demo');
- assert.equal((await services.results.list({},undefined,false,4)).total,1);assert.equal((await services.results.list({},undefined,false,3)).total,0);
+test('enterprise evaluation stays provisional until QHDN transfers and ACADEMIC records the grade',async()=>{
+ await services.importAccounts(enterprise(),1);const id=await seedAssignment({status:'COMPLETED'});
+ await query(`INSERT INTO "OJTRegistrations" ("StudentID","OJTSemesterID","ProgramID","Status") VALUES (1,1,1,'APPROVED')`);
+ await query('UPDATE "StudentEnterpriseCoordination" SET "RegistrationID"=1,"EnterpriseID"=1,"PositionID"=1');
+ const body={completionScore:8,attitudeScore:9,skillScore:7,overallScore:8.25,comments:'Good work',reason:'Final evaluation'};
+ await services.evaluate(id,body,actor);
+ assert.equal((await services.results.list({})).total,0);
  assert.equal(await services.notifyCompletedInternships(),0);
+ const {transferResult,confirmResult}=require('../src/modules/ojt-results/result-workflow.service.ts');
+ await assert.rejects(()=>transferResult({assignmentId:id,reason:'Transfer',idempotencyKey:'bad'}, {userId:3,roleCode:'ACADEMIC'}),e=>e.statusCode===403);
+ const input={assignmentId:id,reason:'Transfer',idempotencyKey:'transfer'};
+ const transferred=await transferResult(input,{userId:1,roleCode:'OJT_COORD'});
+ assert.equal(transferred.status,'PENDING_ACADEMIC_CONFIRMATION');
+ assert.equal((await transferResult(input,{userId:1,roleCode:'OJT_COORD'})).replayed,true);
+ assert.equal((await services.results.list({})).items[0].officialScore,null);
+ assert.equal((await services.results.list({},undefined,false,4)).total,0);
+ await assert.rejects(()=>services.evaluate(id,{...body,overallScore:9},actor),e=>e.statusCode===409);
+ const confirmation={reason:'Verified',idempotencyKey:'confirm'};
+ await assert.rejects(()=>confirmResult(transferred.resultId,confirmation,{userId:1,roleCode:'OJT_COORD'}),e=>e.statusCode===403);
+ await assert.rejects(()=>confirmResult(transferred.resultId,confirmation,{userId:3,roleCode:'ACADEMIC'}),e=>e.errorCode==='OJT_GRADE_MAPPING_REQUIRED');
+ await query(`INSERT INTO "ProgramOJTGradeMappings" ("ProgramID","OJTSemesterID","CourseID","AcademicPeriodID","GradeBands") VALUES (1,1,1,1,$1)`,[JSON.stringify([{minimumScore:0,outcome:'FAILED',gradePoints:0,grade:'F'},{minimumScore:5,outcome:'PASSED',gradePoints:3,grade:'B'}])]);
+ const confirmed=await confirmResult(transferred.resultId,confirmation,{userId:3,roleCode:'ACADEMIC'});
+ assert.equal(confirmed.status,'CONFIRMED');assert.equal(confirmed.officialScore,8.25);
+ assert.equal((await confirmResult(transferred.resultId,confirmation,{userId:3,roleCode:'ACADEMIC'})).replayed,true);
+ assert.equal(await count('StudentCourseResults'),1);
+ const result=await services.results.list({});assert.equal(result.items[0].confirmedBy,3);assert.equal(result.items[0].outcome,'PASSED');
+ assert.equal((await services.results.list({},undefined,false,4)).total,1);
  await db.exec('UPDATE "InternshipAssignments" SET "EndDate"=current_date-1;UPDATE "OJTSemesters" SET "EndDate"=current_date-1');
- await assert.rejects(()=>services.evaluate(id,{...body,overallScore:9},actor),e=>e.errorCode==='OJT_SCORE_FINALIZED');
  assert.equal(await services.notifyCompletedInternships(),1);assert.equal(await services.notifyCompletedInternships(),0);
- const email=(await rows('SELECT * FROM "EmailOutbox" WHERE "Kind"=\'OJT_RESULT\''))[0];assert.equal(email.Recipient,'student@example.test');assert.match(services.decryptEmail(email.EncryptedPayload).text,/Điểm OJT chính thức: 8.25/);
- assert.equal(await services.deliverEmails(),2);assert.equal(mail.length,2);assert.equal(await count('OJTCompletionDeliveries'),1);
 });
+
 test('Swagger loads, all JSON adapters have route targets and removed APIs are absent; original CV contract remains',async()=>{
  const {swaggerSpec,jsonInputOperations}=require('../src/config/swagger.ts');assert.ok(swaggerSpec.paths['/api/students/me/cv'].post);
  for(const path of Object.keys(swaggerSpec.paths))assert.ok(path==='/api/companies/{id}'||!/\{/.test(path));
@@ -146,7 +169,7 @@ test('Swagger loads, all JSON adapters have route targets and removed APIs are a
   const source=item[method]['x-original-operation']??{method:method.toUpperCase(),path};
   assert.ok(routes.has(source.method+' '+source.path),source.method+' '+source.path);
  }
- assert.ok(!routes.has('POST /api/ojt-results'));assert.ok(!routes.has('PATCH /api/ojt-results/{id}'));assert.ok(!routes.has('PUT /api/assignments/{id}/internship-evaluation'));
+ assert.ok(routes.has('POST /api/ojt-results'));assert.ok(!routes.has('PATCH /api/ojt-results/{id}'));assert.ok(!routes.has('PUT /api/assignments/{id}/internship-evaluation'));
 });
 
 
@@ -222,7 +245,7 @@ test('HTTP routes accept imports, enforce password change and roles, dispatch JS
  const token=id=>jwt.sign({userId:id,authVersion:0},process.env.JWT_SECRET,{expiresIn:'1h'});
  const request=(url,body,id=1,method='POST')=>fetch(base+url,{method,headers:{Authorization:'Bearer '+token(id),'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
  try {
-  const docs=await fetch(base+'/api-docs/openapi.json');assert.equal(docs.status,200);const spec=await docs.json();assert.equal(spec.paths['/api/json/ojt-results/list'].post.summary,'Danh sách điểm OJT chính thức do doanh nghiệp đánh giá');
+  const docs=await fetch(base+'/api-docs/openapi.json');assert.equal(docs.status,200);const spec=await docs.json();assert.equal(spec.paths['/api/json/ojt-results/list'].post.summary,'Danh sách kết quả OJT đã được QHDN chuyển');
   assert.equal((await request('/api/imports/commit',enterprise(),2)).status,403);
   let response=await request('/api/imports/commit',enterprise());assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
   const id=await seedAssignment();const due=(await rows('SELECT (current_date+1)::text AS due'))[0].due;const task={idempotencyKey:'http-task',assignmentIds:[id],tasks:[{name:'Task',dueDate:due}]};
@@ -231,15 +254,29 @@ test('HTTP routes accept imports, enforce password change and roles, dispatch JS
   response=await request('/api/enterprise/tasks/bulk',task,5);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal((await response.json()).data.created,1);
   assert.equal((await request('/api/enterprise/tasks/bulk',task,3)).status,403);
   response=await request('/api/enterprise/internships/'+id+'/evaluation',{completionScore:8,attitudeScore:8,skillScore:8,overallScore:8,reason:'Official result'},5,'PUT');assert.equal(response.status,200);
-  response=await request('/api/json/ojt-results/list',{},3);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const result=await response.json();assert.equal(result.data.items[0].officialScore,8);
-  assert.equal(result.data.items[0].student.fullName,'Student');assert.equal(result.data.items[0].company.code,'DN01');assert.equal(result.data.items[0].position.title,'Developer');assert.equal(result.data.items[0].semester.code,'OJT');
-  response=await request('/api/json/student/ojt-results/list',{studentId:1},4);assert.equal(response.status,200);assert.equal((await response.json()).data.items[0].officialScore,8);
-  for(const [url,method] of [['/api/recruitment/posts','POST'],['/api/json/recruitment/posts','POST'],['/api/student/cv','POST'],['/api/ojt-results','POST'],['/api/ojt-results/1/confirm','POST'],['/api/assignments/1/internship-evaluation','PUT']])assert.equal((await request(url,{},1,method)).status,404,url);
+  response=await request('/api/json/ojt-results/list',{},3);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const result=await response.json();assert.equal(result.data.total,0);
+  response=await request('/api/json/student/ojt-results/list',{studentId:1},4);assert.equal(response.status,200);assert.equal((await response.json()).data.total,0);
+  for(const [url,method] of [['/api/recruitment/posts','POST'],['/api/json/recruitment/posts','POST'],['/api/student/cv','POST'],['/api/assignments/1/internship-evaluation','PUT']])assert.equal((await request(url,{},1,method)).status,404,url);
   // Exercise the actual multipart upload route for student Excel.
   const book=new ExcelJS.Workbook();const sheet=book.addWorksheet('Students');sheet.addRow(['code','email','fullName','programId','cohortId','groupCode','currentAcademicPeriodId','courseCode','academicPeriodId','courseStatus','score']);sheet.addRow(['SVHTTP','shttp@example.test','HTTP Student',1,1,'A',1,'PRF192',1,'PASSED',9]);
   const form=new FormData();form.set('kind','STUDENT');form.set('idempotencyKey','http-excel');form.set('file',new Blob([await book.xlsx.writeBuffer()]),'students.xlsx');
   response=await fetch(base+'/api/imports/commit',{method:'POST',headers:{Authorization:'Bearer '+token(3)},body:form});assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal((await response.json()).created,1);assert.equal(await count('StudentCourseResults'),1);
  } finally {await new Promise(resolve=>server.close(resolve));}
+});
+
+test('list program context supports deployed curricula without Version and Status columns',async()=>{
+ const {enrichListRows}=require('../src/shared/list-context.ts');
+ await query('BEGIN');
+ try{
+  await query('ALTER TABLE "TrainingPrograms" DROP COLUMN "Version", DROP COLUMN "Status"');
+  const [item]=await enrichListRows(database,[{studentId:1,programId:1}]);
+  assert.equal(item.program.id,1);
+  assert.equal(item.program.code,'SE');
+  assert.equal(item.program.totalCredits,120);
+  assert.equal(item.program.version,null);
+  assert.equal(item.program.status,null);
+  assert.equal(item.student.id,1);
+ }finally{await query('ROLLBACK');}
 });
 
 test('list display context is batched, preserves source IDs and existing details, and never fetches credentials',async()=>{

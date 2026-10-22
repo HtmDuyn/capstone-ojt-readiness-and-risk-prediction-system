@@ -120,7 +120,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       };
       if(sourceMethod==='get'&&sourcePath==='/api/qhdn/registered-students')operation.requestBody.content['application/json'].examples={
         all:{summary:'Tất cả sinh viên đã đăng ký OJT',value:{page:1,limit:20}},
-        notHandedOff:{summary:'Sinh viên có hồ sơ chưa bàn giao',value:{handoffStatus:'NOT_HANDED_OFF',page:1,limit:20}}
+        handedOff:{summary:'Hồ sơ thuộc danh sách đã bàn giao',value:{handoffStatus:'HANDED_OFF',page:1,limit:20}}
       };
       if(sourceMethod==='get'&&sourcePath==='/api/students/{id}/cv')operation.requestBody.content['application/json'].examples={
         latest:{summary:'CV mới nhất của sinh viên',value:{studentId:1}},

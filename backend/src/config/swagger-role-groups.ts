@@ -177,6 +177,9 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     if (access.has(key)) throw new Error('Duplicate Swagger access entry: ' + key);
     access.set(key, group.roles);
   }
+  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
+  for(const key of ['GET /api/ojt-registration-windows','POST /api/ojt-registrations','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
+  access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);
   const used = new Set<string>();
   for (const [path, item] of Object.entries(spec.paths ?? {}) as [string, Spec][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {

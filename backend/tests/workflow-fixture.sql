@@ -65,3 +65,78 @@ ALTER TABLE "Users" ADD COLUMN "CreatedAt" timestamptz DEFAULT now(),ADD COLUMN 
 
 ALTER TABLE "Enterprises" ADD COLUMN "CreatedAt" timestamp DEFAULT now();
 ALTER TABLE "EnterpriseUsers" ADD COLUMN "EnterpriseUserID" serial;
+
+
+-- Additional isolated test schema for handoff-first registration and academic result recording.
+CREATE TABLE "SchemaMigrations" ("Version" text PRIMARY KEY);
+CREATE TABLE "EligibilityChecks" ("CheckID" serial PRIMARY KEY,"StudentID" int REFERENCES "Students","OJTSemesterID" int REFERENCES "OJTSemesters","Status" text,"CheckedAt" timestamptz DEFAULT now(),"Result" jsonb,UNIQUE("CheckID","StudentID","OJTSemesterID"));
+CREATE TABLE "EligibilityConfirmations" ("CheckID" int PRIMARY KEY REFERENCES "EligibilityChecks","ConfirmedBy" int,"ConfirmedAt" timestamptz DEFAULT now());
+CREATE TABLE "OJTRegistrationWindows" ("WindowID" serial PRIMARY KEY,"OJTSemesterID" int,"AcademicPeriodID" int,"RequiredRelativeSemester" int,"Name" text,"Scope" jsonb,"StartsAt" timestamptz,"EndsAt" timestamptz,"Status" text DEFAULT 'DRAFT',"CreatedBy" int,"CreatedAt" timestamptz DEFAULT now(),"UpdatedAt" timestamptz DEFAULT now(),"OpenedBy" int,"OpenedAt" timestamptz,"ClosedBy" int,"ClosedAt" timestamptz);
+ALTER TABLE "OJTRegistrations" ADD COLUMN "WindowID" int,ADD COLUMN "ProgramID" int,ADD COLUMN "SubmittedBy" int,ADD COLUMN "UpdatedAt" timestamptz DEFAULT now(),ADD COLUMN "ReviewCheckID" int,ADD COLUMN "ReviewedBy" int,ADD COLUMN "ReviewedAt" timestamptz,ADD COLUMN "ReviewReason" text,ADD COLUMN "PathwaySnapshot" jsonb,ADD UNIQUE("RegistrationID","StudentID","OJTSemesterID"),ADD UNIQUE("StudentID","OJTSemesterID");
+CREATE TABLE "EligibleStudentHandoffs" ("HandoffID" serial PRIMARY KEY,"OJTSemesterID" int NOT NULL,"IdempotencyKey" text UNIQUE,"RequestHash" text,"RegistrationIDs" jsonb,"Reason" text,"CreatedBy" int,"CreatedAt" timestamptz DEFAULT now(),"RecipientRole" text DEFAULT 'OJT_COORD',UNIQUE("HandoffID","OJTSemesterID"));
+CREATE TABLE "EligibleStudentHandoffItems" ("HandoffID" int,"OJTSemesterID" int,"RegistrationID" int NOT NULL UNIQUE,"StudentID" int,"CheckID" int,"Snapshot" jsonb,PRIMARY KEY("HandoffID","StudentID"),FOREIGN KEY("HandoffID","OJTSemesterID") REFERENCES "EligibleStudentHandoffs"("HandoffID","OJTSemesterID"),FOREIGN KEY("RegistrationID","StudentID","OJTSemesterID") REFERENCES "OJTRegistrations"("RegistrationID","StudentID","OJTSemesterID"),FOREIGN KEY("CheckID","StudentID","OJTSemesterID") REFERENCES "EligibilityChecks"("CheckID","StudentID","OJTSemesterID"));
+CREATE FUNCTION "GuardAcademicHandoff"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+CREATE TRIGGER "TR_ValidateAcademicHandoff" BEFORE INSERT ON "EligibleStudentHandoffItems" FOR EACH ROW EXECUTE FUNCTION "GuardAcademicHandoff"();
+CREATE TABLE "OJTRegistrationEvents" ("EventID" serial PRIMARY KEY,"RegistrationID" int,"Action" text,"Snapshot" jsonb,"CreatedBy" int,"CreatedAt" timestamptz DEFAULT now(),"Reason" text,"IdempotencyKey" text,"RequestHash" text,UNIQUE("RegistrationID","IdempotencyKey"));
+CREATE TABLE "StudentCVFiles" ("CVFileID" serial PRIMARY KEY,"StudentID" int,"FileName" text,"MimeType" text,"Content" bytea,"Sha256" text,"UploadedAt" timestamptz DEFAULT now());
+ALTER TABLE "OJTResults" ADD COLUMN "ResultID" serial PRIMARY KEY,ADD COLUMN "StudentID" int,ADD COLUMN "OJTSemesterID" int,ADD COLUMN "Version" int DEFAULT 1,ADD COLUMN "Dossier" jsonb,ADD COLUMN "SourceSnapshot" jsonb,ADD COLUMN "SourceHash" text,ADD COLUMN "OfficialScore" numeric,ADD COLUMN "Outcome" text,ADD COLUMN "AcademicNote" text,ADD COLUMN "TransferredBy" int,ADD COLUMN "TransferredAt" timestamptz DEFAULT now(),ADD COLUMN "UpdatedAt" timestamptz DEFAULT now(),ADD COLUMN "ConfirmedBy" int,ADD COLUMN "ConfirmedAt" timestamptz,ADD COLUMN "ConfirmationReason" text,ADD COLUMN "CourseResultID" int UNIQUE,ADD COLUMN "GradeMappingID" int,ADD COLUMN "GradeMappingSnapshot" jsonb,ALTER COLUMN "Status" SET DEFAULT 'PENDING_ACADEMIC_CONFIRMATION',ADD UNIQUE("AssignmentID");
+CREATE TABLE "OJTResultEvents" ("EventID" serial PRIMARY KEY,"ResultID" int,"Version" int,"Action" text,"Snapshot" jsonb,"Reason" text,"CreatedBy" int,"CreatedAt" timestamptz DEFAULT now(),"IdempotencyKey" text UNIQUE,"RequestHash" text,UNIQUE("ResultID","Version"));
+CREATE TABLE "ProgramOJTGradeMappings" ("MappingID" serial PRIMARY KEY,"ProgramID" int,"OJTSemesterID" int,"CourseID" int,"AcademicPeriodID" int,"GradeBands" jsonb,UNIQUE("ProgramID","OJTSemesterID"));
+ALTER TABLE "StudentCourseResults" ADD COLUMN "OJTResultID" int UNIQUE;
+
+CREATE OR REPLACE FUNCTION "GuardOJTResult"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP<>'INSERT' AND OLD."Status"='CONFIRMED' THEN
+  RAISE EXCEPTION 'Confirmed OJT result is immutable' USING ERRCODE='23514'; END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ IF TG_OP='INSERT' AND (NEW."Status"<>'PENDING_ACADEMIC_CONFIRMATION' OR NEW."Version"<>1) THEN
+  RAISE EXCEPTION 'New OJT result must start pending at version 1' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' THEN
+  IF (NEW."AssignmentID",NEW."StudentID",NEW."OJTSemesterID") IS DISTINCT FROM
+   (OLD."AssignmentID",OLD."StudentID",OLD."OJTSemesterID") OR NEW."Version"<>OLD."Version"+1 THEN
+   RAISE EXCEPTION 'OJT context is immutable and version must advance' USING ERRCODE='23514'; END IF;
+  IF OLD."Status"='REVISION_REQUESTED' AND NEW."Status"<>'PENDING_ACADEMIC_CONFIRMATION' THEN
+   RAISE EXCEPTION 'Revised OJT result must return to pending' USING ERRCODE='23514'; END IF;
+ END IF;
+ IF NOT EXISTS (
+  SELECT 1 FROM "InternshipAssignments" a
+  JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
+  JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
+  JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"
+  WHERE a."AssignmentID"=NEW."AssignmentID" AND a."StudentID"=NEW."StudentID"
+   AND r."StudentID"=NEW."StudentID" AND r."OJTSemesterID"=NEW."OJTSemesterID"
+   AND co."OJTSemesterID"=NEW."OJTSemesterID" AND p."OJTSemesterID"=NEW."OJTSemesterID"
+   AND co."EnterpriseID"=a."EnterpriseID" AND p."EnterpriseID"=a."EnterpriseID" AND co."PositionID"=a."PositionID"
+ ) THEN RAISE EXCEPTION 'Invalid OJT result assignment context' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION "GuardOfficialOJTGrade"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP<>'INSERT' AND OLD."OJTResultID" IS NOT NULL THEN
+  RAISE EXCEPTION 'Official synchronized OJT grade is immutable' USING ERRCODE='23514'; END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ IF NEW."OJTResultID" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "OJTResults" r WHERE r."ResultID"=NEW."OJTResultID"
+  AND r."StudentID"=NEW."StudentID" AND r."OfficialScore"=NEW."Score" AND r."Outcome"=NEW."Status") THEN
+  RAISE EXCEPTION 'Official grade does not match OJT result' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION "GuardOJTGradeLink"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW."Status"='CONFIRMED' AND (NEW."GradeMappingID" IS NULL OR NEW."GradeMappingSnapshot" IS NULL OR NOT EXISTS (
+  SELECT 1 FROM "StudentCourseResults" g JOIN "ProgramOJTGradeMappings" m ON m."MappingID"=NEW."GradeMappingID"
+  WHERE g."ResultID"=NEW."CourseResultID" AND g."OJTResultID"=NEW."ResultID" AND g."StudentID"=NEW."StudentID"
+   AND g."CourseID"=m."CourseID" AND g."AcademicPeriodID"=m."AcademicPeriodID" AND m."OJTSemesterID"=NEW."OJTSemesterID"
+   AND g."Status"=NEW."Outcome" AND g."Score"=NEW."OfficialScore"
+ )) THEN RAISE EXCEPTION 'Confirmation requires synchronized official course grade and mapping' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER "TR_GuardOJTResult" BEFORE INSERT OR UPDATE OR DELETE ON "OJTResults" FOR EACH ROW EXECUTE FUNCTION "GuardOJTResult"();
+CREATE TRIGGER "TR_OfficialOJTGrade" BEFORE INSERT OR UPDATE OR DELETE ON "StudentCourseResults" FOR EACH ROW EXECUTE FUNCTION "GuardOfficialOJTGrade"();
+CREATE TRIGGER "TR_OJTGradeLink" BEFORE UPDATE OF "Status","CourseResultID","GradeMappingID" ON "OJTResults" FOR EACH ROW EXECUTE FUNCTION "GuardOJTGradeLink"();
+
+ALTER TABLE "InternshipAssignments" ADD COLUMN "EnterpriseSupervisorName" text,ADD COLUMN "AcademicSupervisorID" int;
+
+ALTER TABLE "StudentEnterpriseCoordination" ADD COLUMN "PreviousCoordinationID" int;
+ALTER TABLE "JobApplications" ADD COLUMN "RegistrationID" int;

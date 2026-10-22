@@ -4,12 +4,12 @@ import { registrationApi, registrationSelect } from '../ojt-registration/registr
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
-// Visibility before handoff is granted here only; coordination/review guards remain separate.
+// QHDN manages registrations only after an academic handoff for the same student/semester.
 export async function registeredStudents(params:Row,actor:Actor) {
   if(!['ADMIN','OJT_COORD'].includes(actor.roleCode))throw invalid('Only QHDN staff can view registered students.',403,'FORBIDDEN');
   const p=pagination(params,['registrationId','studentId','ojtSemesterId','academicPeriodId','windowId','status','programId','cohortId','groupCode','search','handoffStatus']);
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
-  const args:unknown[]=[],where:string[]=[];
+  const args:unknown[]=[],where:string[]=['r."HandoffID" IS NOT NULL'];
   const add=(column:string,value:unknown)=>{args.push(value);where.push(column+'=$'+args.length);};
   for(const [key,col] of Object.entries({registrationId:'r."RegistrationID"',studentId:'r."StudentID"',ojtSemesterId:'r."OJTSemesterID"',academicPeriodId:'o."AcademicPeriodID"',windowId:'r."WindowID"',programId:'r."ProgramID"',cohortId:'r."CohortID"'}))if(params[key]!==undefined)add(col,positiveId(params[key],key));
   if(params.status!==undefined)add('r."Status"',enumValue(params.status,['SUBMITTED','APPROVED','REJECTED','HANDED_OFF'],'status'));
