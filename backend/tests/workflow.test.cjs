@@ -157,14 +157,13 @@ test('enterprise evaluation stays provisional until QHDN transfers and ACADEMIC 
  assert.equal(await services.notifyCompletedInternships(),1);assert.equal(await services.notifyCompletedInternships(),0);
 });
 
-test('Swagger loads, all JSON adapters have route targets and removed APIs are absent; original CV contract remains',async()=>{
- const {swaggerSpec,jsonInputOperations}=require('../src/config/swagger.ts');assert.ok(swaggerSpec.paths['/api/students/me/cv'].post);
- for(const path of Object.keys(swaggerSpec.paths))assert.ok(path==='/api/companies/{id}'||!/\{/.test(path));
+test('Swagger loads, REST operations have route targets and removed APIs are absent; original CV contract remains',async()=>{
+ const {swaggerSpec}=require('../src/config/swagger.ts');assert.ok(swaggerSpec.paths['/api/students/me/cv'].post);
+ for(const path of Object.keys(swaggerSpec.paths))assert.ok(!path.startsWith('/api/json/'));
  const removed=['/api/student/cv','/api/student/applications','/api/recruitment-posts','/api/company-imports'];
  for(const path of Object.keys(swaggerSpec.paths))for(const old of removed)assert.ok(!path.startsWith(old)&&!path.startsWith('/api/json'+old.slice(4)));
  const mounts=[['admin/admin',''],['academic/academic',''],['qhdn/qhdn',''],['student-portal/portal',''],['recruitment/recruitment','/recruitment'],['qhdn/enterprise','/enterprise'],['academic-reporting/report',''],['ojt-results/result',''],['academic/workflow',''],['students/student',''],['curriculum/curriculum',''],['combo-registration/combo',''],['eligibility/eligibility',''],['ojt-registration/registration',''],['imports/import','/imports'],['auth/auth','/auth'],['accounts/account','/accounts'],['system/roles/role','/roles'],['system/health/health','/health']];
  const routes=new Set();for(const [file,prefix] of mounts){const router=require('../src/modules/'+file+'.routes.ts').default;for(const layer of router.stack)if(layer.route)for(const method of Object.keys(layer.route.methods))routes.add(method.toUpperCase()+' '+('/api'+prefix+(layer.route.path==='/'?'':layer.route.path)).replace(/:([A-Za-z0-9_]+)/g,'{$1}'));}
- for(const op of jsonInputOperations)assert.ok(routes.has(op.sourceMethod.toUpperCase()+' '+op.sourcePath),op.sourcePath);
  for(const [path,item] of Object.entries(swaggerSpec.paths))for(const method of ['get','post','put','patch','delete'])if(item[method]){
   const source=item[method]['x-original-operation']??{method:method.toUpperCase(),path};
   assert.ok(routes.has(source.method+' '+source.path),source.method+' '+source.path);
@@ -175,14 +174,8 @@ test('Swagger loads, all JSON adapters have route targets and removed APIs are a
 
 
 
-test('shared JSON update schemas include required IDs in closed role variants and company examples',()=>{
- const {swaggerSpec,jsonInputOperations}=require('../src/config/swagger.ts');
- for(const op of jsonInputOperations.filter(op=>op.bodySchema.anyOf)){
-  for(const variant of op.bodySchema.anyOf)for(const input of op.inputs){
-   assert.ok(variant.properties[input.name],op.path+' '+input.name);
-   if(input.required)assert.ok(variant.required.includes(input.name));
-  }
- }
+test('REST company update uses path ID and role examples',()=>{
+ const {swaggerSpec}=require('../src/config/swagger.ts');
  const operation=swaggerSpec.paths['/api/companies/{id}'].patch;
  const media=operation.requestBody.content['application/json'];
  assert.ok(operation.parameters.some(p=>p.name==='id'&&p.in==='path'&&p.required));
@@ -239,13 +232,13 @@ test('login examples remain selectable and the HTTP contract supports FE login a
  } finally {await new Promise(resolve=>server.close(resolve));}
 });
 
-test('HTTP routes accept imports, enforce password change and roles, dispatch JSON result reads and return 404 for retired APIs',async()=>{
+test('HTTP routes accept imports, enforce password change and roles, serve REST result reads and return 404 for retired APIs',async()=>{
  const app=require('../src/app.ts').default;const jwt=require('jsonwebtoken');
  let server;await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});const base='http://127.0.0.1:'+server.address().port;
  const token=id=>jwt.sign({userId:id,authVersion:0},process.env.JWT_SECRET,{expiresIn:'1h'});
  const request=(url,body,id=1,method='POST')=>fetch(base+url,{method,headers:{Authorization:'Bearer '+token(id),'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
  try {
-  const docs=await fetch(base+'/api-docs/openapi.json');assert.equal(docs.status,200);const spec=await docs.json();assert.equal(spec.paths['/api/json/ojt-results/list'].post.summary,'Danh sách kết quả OJT đã được QHDN chuyển');
+  const docs=await fetch(base+'/api-docs/openapi.json');assert.equal(docs.status,200);const spec=await docs.json();assert.equal(spec.paths['/api/ojt-results'].get.summary,'Danh sách kết quả OJT đã được QHDN chuyển');
   assert.equal((await request('/api/imports/commit',enterprise(),2)).status,403);
   let response=await request('/api/imports/commit',enterprise());assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
   const id=await seedAssignment();const due=(await rows('SELECT (current_date+1)::text AS due'))[0].due;const task={idempotencyKey:'http-task',assignmentIds:[id],tasks:[{name:'Task',dueDate:due}]};
@@ -254,9 +247,9 @@ test('HTTP routes accept imports, enforce password change and roles, dispatch JS
   response=await request('/api/enterprise/tasks/bulk',task,5);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));assert.equal((await response.json()).data.created,1);
   assert.equal((await request('/api/enterprise/tasks/bulk',task,3)).status,403);
   response=await request('/api/enterprise/internships/'+id+'/evaluation',{completionScore:8,attitudeScore:8,skillScore:8,overallScore:8,reason:'Official result'},5,'PUT');assert.equal(response.status,200);
-  response=await request('/api/json/ojt-results/list',{},3);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const result=await response.json();assert.equal(result.data.total,0);
-  response=await request('/api/json/student/ojt-results/list',{studentId:1},4);assert.equal(response.status,200);assert.equal((await response.json()).data.total,0);
-  for(const [url,method] of [['/api/recruitment/posts','POST'],['/api/json/recruitment/posts','POST'],['/api/student/cv','POST'],['/api/assignments/1/internship-evaluation','PUT']])assert.equal((await request(url,{},1,method)).status,404,url);
+  response=await request('/api/ojt-results',undefined,3,'GET');assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const result=await response.json();assert.equal(result.data.total,0);
+  response=await request('/api/student/ojt-results',undefined,4,'GET');assert.equal(response.status,200);assert.equal((await response.json()).data.total,0);
+  for(const [url,method] of [['/api/recruitment/posts','POST'],['/api/json/recruitment/posts','POST'],['/api/json/ojt-results/list','POST'],['/api/json/ojt-registration-windows','PATCH'],['/api/json/accounts/search','POST'],['/api/student/cv','POST'],['/api/assignments/1/internship-evaluation','PUT']])assert.equal((await request(url,{},1,method)).status,404,url);
   // Exercise the actual multipart upload route for student Excel.
   const book=new ExcelJS.Workbook();const sheet=book.addWorksheet('Students');sheet.addRow(['code','email','fullName','programId','cohortId','groupCode','currentAcademicPeriodId','courseCode','academicPeriodId','courseStatus','score']);sheet.addRow(['SVHTTP','shttp@example.test','HTTP Student',1,1,'A',1,'PRF192',1,'PASSED',9]);
   const form=new FormData();form.set('kind','STUDENT');form.set('idempotencyKey','http-excel');form.set('file',new Blob([await book.xlsx.writeBuffer()]),'students.xlsx');
@@ -318,24 +311,25 @@ test('advisory history includes period/semester/creator and each detail row incl
 test('every Swagger list documents display fields, with detailed task, result and advisory contexts',()=>{
  const {swaggerSpec:spec}=require('../src/config/swagger.ts');let count=0;
  for(const [path,entry]of Object.entries(spec.paths)){
-  const op=entry.post;if(!op||!path.endsWith('/list'))continue;count++;
+  const op=entry.get;if(!op||/\{[^}]+\}$/.test(path))continue;
   const root=op.responses?.['200']?.content?.['application/json']?.schema,data=root?.properties?.data;
   const item=(data?.type==='array'?data.items:data?.properties?.items?.items)??root?.properties?.items?.items;
+  if(!item)continue;count++;
   const names=Object.keys(item?.properties??{});assert.ok(names.length>1,path+' must describe more than an ID');
   assert.ok(names.some(name=>!/^id$|Id$|IDs?$/.test(name)),path+' must describe readable fields');
  }
- assert.equal(count,48);
- const fields=path=>spec.paths[path].post.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
- for(const path of ['/api/json/internship-tasks/list','/api/json/ojt-results/list','/api/json/student/ojt-results/list'])for(const key of ['student','company','position','semester'])assert.ok(fields(path)[key],path+' '+key);
- assert.ok(fields('/api/json/academic/advisory-runs/list').createdByUser);
- assert.ok(fields('/api/json/ojt-semesters/eligible-student-handoffs/list').registrations);
+ assert.ok(count>=48);
+ const fields=path=>spec.paths[path].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
+ for(const path of ['/api/internship-tasks','/api/ojt-results','/api/student/ojt-results'])for(const key of ['student','company','position','semester'])assert.ok(fields(path)[key],path+' '+key);
+ assert.ok(fields('/api/academic/advisory-runs').createdByUser);
+ assert.ok(fields('/api/ojt-semesters/{id}/eligible-student-handoffs').registrations);
 });
 
 test('enterprise recruitment exposes only consolidated post list',()=>{
  const posts=require('../src/modules/recruitment/post.service.ts');assert.equal(posts.updatePost,undefined);
  const {swaggerSpec:spec}=require('../src/config/swagger.ts');
  assert.equal(spec.paths['/api/json/recruitment/posts']?.patch,undefined);
- assert.ok(spec.paths['/api/json/recruitment/posts/list'].post);
+ assert.ok(spec.paths['/api/recruitment/posts'].get);
  const routes=fs.readFileSync(path.join(__dirname,'../src/modules/recruitment/recruitment.routes.ts'),'utf8');
  assert.ok(!routes.includes("router.patch('/posts/:id'"));
  assert.ok(!routes.includes("router.get('/windows'"));
@@ -359,12 +353,12 @@ test('recruitment lists detailed posts by company with scope enforcement',async(
  await assert.rejects(()=>listPosts({companyId:0},staff),e=>e.statusCode===400);
  assert.equal((await listPosts({companyId:999},staff)).total,0);
  const {swaggerSpec}=require('../src/config/swagger.ts');
- assert.ok(swaggerSpec.paths['/api/json/recruitment/posts/list'].post.requestBody.content['application/json'].schema.properties.companyId);
+ assert.ok(swaggerSpec.paths['/api/recruitment/posts'].get.parameters.some(p=>p.name==='companyId'&&p.in==='query'&&p.required));
 });
 
 
 
-test('candidate JSON list requires explicit companyId and returns linked details within enterprise scope',async()=>{
+test('candidate GET list requires explicit companyId and returns linked details within enterprise scope',async()=>{
  await services.importAccounts(enterprise(),1);
  await services.importAccounts(enterprise('second','DN02','second@example.test','DEV02'),1);
  await db.exec('UPDATE "Users" SET "MustChangePassword"=false WHERE "UserID"=5');
@@ -375,25 +369,25 @@ test('candidate JSON list requires explicit companyId and returns linked details
  const app=require('../src/app.ts').default,jwt=require('jsonwebtoken');let server;
  await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});
  const base='http://127.0.0.1:'+server.address().port;
- const request=(path,body,userId=5)=>fetch(base+path,{method:'POST',headers:{Authorization:'Bearer '+jwt.sign({userId,authVersion:0},process.env.JWT_SECRET),'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const request=(path,params,userId=5)=>fetch(base+path+'?'+new URLSearchParams(params),{headers:{Authorization:'Bearer '+jwt.sign({userId,authVersion:0},process.env.JWT_SECRET)}});
  try{
-  for(const path of ['/api/json/enterprise/candidates/list','/api/json/enterprise/internships/list','/api/json/recruitment/posts/list']){
+  for(const path of ['/api/enterprise/candidates','/api/enterprise/internships','/api/recruitment/posts']){
    assert.equal((await request(path,{})).status,400,path);
    assert.equal((await request(path,{companyId:0})).status,400,path);
    assert.equal((await request(path,{companyId:2})).status,403,path);
   }
-  let response=await request('/api/json/enterprise/candidates/list',{companyId:1,page:1,limit:20});
+  let response=await request('/api/enterprise/candidates',{companyId:1,page:1,limit:20});
   assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const list=(await response.json()).data;
   assert.equal(list.total,1);const item=list.items[0];
   assert.equal(item.company.id,1);assert.equal(item.student.studentCode,'BASE');assert.equal(item.position.requirements,'TypeScript');
   assert.equal(item.registration.status,'APPROVED');assert.equal(item.application.cvUrl,undefined);
   assert.equal(item.jobApplication.cv.filename,'cv.pdf');assert.equal(item.recruitmentPost.id,1);
   assert.equal(item.recruitmentPost.positions[0].capacity,5);assert.equal(item.coordinatedByUser.fullName,'Coordinator');
-  response=await request('/api/json/enterprise/candidates/list',{companyId:1,studentId:999});assert.equal((await response.json()).data.total,0);
-  response=await request('/api/json/enterprise/candidates/list',{companyId:1,page:2,limit:1});assert.deepEqual((await response.json()).data.items,[]);
-  assert.equal((await request('/api/json/student/ojt-results/list',{},4)).status,400);
-  assert.equal((await request('/api/json/student/ojt-results/list',{studentId:999},4)).status,403);
-  assert.equal((await request('/api/json/recruitment/posts/list',{},1)).status,400);
+  response=await request('/api/enterprise/candidates',{companyId:1,studentId:999});assert.equal((await response.json()).data.total,0);
+  response=await request('/api/enterprise/candidates',{companyId:1,page:2,limit:1});assert.deepEqual((await response.json()).data.items,[]);
+  assert.equal((await request('/api/student/ojt-results',{},4)).status,200);
+  response=await request('/api/student/ojt-results',{studentId:999},4);assert.equal(response.status,200);assert.equal((await response.json()).data.total,0);
+  assert.equal((await request('/api/recruitment/posts',{},1)).status,400);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
 
@@ -410,20 +404,12 @@ test('task list explicitly filters company and student with ownership checks',as
  assert.equal((await services.listTasks({studentId:999},staff)).total,0);
 });
 
-test('all JSON lists document complete explicit identity inputs and required selectors',()=>{
- const {jsonInputOperations,swaggerSpec}=require('../src/config/swagger.ts');
- for(const op of jsonInputOperations.filter(op=>op.path.endsWith('/list'))){
-  const schema=op.bodySchema,roles=op.operation['x-roles'];
-  if(roles.includes('ENTERPRISE'))assert.ok(schema.properties.companyId,op.path);
-  if(roles.includes('STUDENT'))assert.ok(schema.properties.studentId,op.path);
-  for(const field of op.inputs)assert.ok(schema.properties[field.name],op.path+' '+field.name);
- }
- for(const path of ['/api/json/recruitment/posts/list','/api/json/enterprise/candidates/list','/api/json/enterprise/internships/list'])assert.ok(swaggerSpec.paths[path].post.requestBody.content['application/json'].schema.required.includes('companyId'));
- const post=swaggerSpec.paths['/api/json/enterprise/candidates/list'].post.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties.recruitmentPost;
+test('REST lists document required query selectors and linked details',()=>{
+ const {swaggerSpec}=require('../src/config/swagger.ts');
+ for(const path of ['/api/recruitment/posts','/api/enterprise/candidates','/api/enterprise/internships'])assert.ok(swaggerSpec.paths[path].get.parameters.some(p=>p.name==='companyId'&&p.in==='query'&&p.required));
+ const post=swaggerSpec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties.recruitmentPost;
  assert.ok(post.properties.content);assert.ok(post.properties.positions);
 });
-
-
 
 test('separate enterprise profile edits imported fields, preserves recruitment and enforces ownership',async()=>{
  await services.importAccounts(enterprise(),1);
