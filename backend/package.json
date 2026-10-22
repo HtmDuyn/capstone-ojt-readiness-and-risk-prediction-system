@@ -10,8 +10,7 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
-    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs",
-    "test": "node --import tsx --test tests/*.test.cjs"
+    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs"
   },
   "repository": {
     "type": "git",
@@ -51,7 +50,7 @@
     "@types/pg": "^8.15.5",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "tsx": "^4.20.5",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.2"
   }
 }

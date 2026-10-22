@@ -149,10 +149,10 @@ export async function dashboard(params:Row,actor:Actor){
   ), handed_off AS (
    SELECT r."RegistrationID",lc."CoordinationID",lc."Decision",a."AssignmentID",
     CASE WHEN UPPER(lc."Decision") IN ('ACCEPTED','ACCEPT','APPROVED') THEN 'ACCEPTED' WHEN UPPER(lc."Decision") IN ('REJECTED','REJECT') THEN 'REJECTED' ELSE 'PENDING' END AS decision
-   FROM "EligibleStudentHandoffItems" h JOIN "OJTRegistrations" r ON r."RegistrationID"=h."RegistrationID"
+   FROM "EligibleStudentHandoffItems" h LEFT JOIN "OJTRegistrations" r ON r."StudentID"=h."StudentID" AND r."OJTSemesterID"=h."OJTSemesterID"
    LEFT JOIN latest_coordination lc ON lc."RegistrationID"=r."RegistrationID"
    LEFT JOIN latest_assignment a ON a."RegistrationID"=r."RegistrationID"
-   WHERE ($1::int IS NULL OR r."OJTSemesterID"=$1) AND ($2::int IS NULL OR COALESCE(a."EnterpriseID",lc."EnterpriseID")=$2)
+   WHERE ($1::int IS NULL OR h."OJTSemesterID"=$1) AND ($2::int IS NULL OR COALESCE(a."EnterpriseID",lc."EnterpriseID")=$2)
   ) SELECT count(*)::int AS "handedOff",count(*) FILTER (WHERE "AssignmentID" IS NULL)::int AS unallocated,
    count(*) FILTER (WHERE "CoordinationID" IS NULL AND "AssignmentID" IS NULL)::int AS "notCoordinated",
    count(*) FILTER (WHERE "CoordinationID" IS NOT NULL AND decision='PENDING' AND "AssignmentID" IS NULL)::int AS "waitingForEnterprise",

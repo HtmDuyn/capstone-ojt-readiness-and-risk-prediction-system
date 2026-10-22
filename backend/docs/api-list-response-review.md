@@ -1,6 +1,6 @@
 # Rà soát response API list
 
-Phạm vi: 48 API `/list` từ Swagger hiện hành. Bảng dưới mô tả các trường trong OpenAPI; không phải dữ liệu lấy từ production.
+Phạm vi: 40 API `/list` từ Swagger hiện hành. Bảng dưới mô tả các trường trong OpenAPI; không phải dữ liệu lấy từ production.
 
 Đã đối chiếu SQL/serializer của các danh sách. Ngoài các API `/list`, danh sách vai trò và email vẫn có mã/tên hoặc người nhận/trạng thái đầy đủ.
 
@@ -19,7 +19,6 @@ Phạm vi: 48 API `/list` từ Swagger hiện hành. Bảng dưới mô tả cá
 | POST /api/json/academic-periods/combo-phase-schedules/list | academicPeriodId, academicPeriod, confirmedBy, confirmedByUser |
 | POST /api/json/academic/alerts/list | studentId, programId, cohortId, majorId, officialCheckId, studentCode, fullName, groupCode, category, comboIds, officialStale, evaluation, missingRequiredCourses, alternativeRequirements, dataIssues, alertTypes, student, program, cohort |
 | POST /api/json/academic/course-demand/list | courseId, courseCode, courseName, academicPeriodId, periodCode, periodKind, studentCount, retakeCount, inProgressCount, course, academicPeriod |
-| POST /api/json/accounts/list | id, username, email, phone, full_name, status, role_code, role_name, role_id, studentId, enterpriseId, created_at, updated_at, last_login_at, mustChangePassword, student, company |
 | POST /api/json/combo-registration-windows/list | id, name, academicPeriodId, ojtSemesterId, period, semester, startsAt, endsAt, effectiveEndsAt, status, canSubmit, blockingReasons, blockingMessages, phase, initialWindowId, requiredRelativeSemester, pathway, selection, confirmedSelection, reasonRequiredOnChange, registration, availableCombos, academicPeriod, createdByUser |
 | POST /api/json/combo-registration-windows/selections/list | studentId, programId, userId, eventId, comboId, studentCode, fullName, email, outcome, studentStatus, accountStatus, courseIds, choiceSnapshot, effectiveEndsAt, submittedAt, student, program, user, combo, courses |
 | POST /api/json/students/combo-selections/list | id, windowId, initialWindowId, createdBy, sourceEventId, phase, type, reason, choice, previous, progress, eligibility, createdAt, createdByUser |
@@ -42,13 +41,6 @@ Phạm vi: 48 API `/list` từ Swagger hiện hành. Bảng dưới mô tả cá
 | POST /api/json/students/list | id, studentCode, userId, fullName, email, phone, accountStatus, className, status, groupCode, programId, cohortId, currentSemester, entryAcademicPeriodId, currentAcademicPeriodId, enrollmentYear, program, cohort, entryAcademicPeriod, currentAcademicPeriod |
 | POST /api/json/students/course-results/list | id, studentId, courseId, academicPeriodId, academicYearId, recordedBy, ojtResultId, courseCode, courseName, periodCode, periodKind, status, grade, sourceReference, score, gradePoints, semesterTaken, attemptNumber, periodStartDate, createdAt, updatedAt, course, academicPeriod |
 | POST /api/json/academic-imports/list | importedByUser, id, kind, status, sourceName, summary, importedBy, createdAt, rows, rowsPagination |
-| POST /api/json/assessment-templates/list | id, code, version, name, criteria, status, createdAt, publishedAt |
-| POST /api/json/predictions/list | student, semester, model, id, studentId, studentCode, fullName, jobId, ojtSemesterId, modelId, readinessScore, readinessLevel, riskScore, riskLevel, factors, modelSnapshot, createdAt, inputSnapshot |
-| POST /api/json/admin/models/list | id, code, version, name, status, metrics, featureSchema, createdAt |
-| POST /api/json/alerts/list | id, predictionId, studentId, studentCode, fullName, ojtSemesterId, riskLevel, riskScore, status, resolutionNote, createdAt, updatedAt, updatedBy, interventions, student, semester, updatedByUser |
-| POST /api/json/students/interventions/list | id, alertId, studentId, assignedTo, createdBy, description, status, outcome, dueDate, createdAt, updatedAt, student, assignedToUser, createdByUser |
-| POST /api/json/admin/reports/readiness/list | student, semester, model, id, studentId, studentCode, fullName, jobId, ojtSemesterId, modelId, readinessScore, readinessLevel, riskScore, riskLevel, factors, modelSnapshot, createdAt, inputSnapshot |
-| POST /api/json/admin/audit-logs/list | id, userId, entityId, entityType, action, detail, createdAt, user |
 | POST /api/json/enterprise/candidates/list | id, student, position, application, decision, introducedAt, decisionAt, rejectReason, isLatestCoordination, company, semester, companyId, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication, coordinatedBy, coordinatedByUser, registration, recruitmentPost |
 | POST /api/json/enterprise/internships/list | id, student, position, application, academicSupervisor, coordinationId, enterpriseSupervisorName, startDate, endDate, status, resultStatus, evaluation, template, result, evaluationLocked, company, semester, companyId, studentId, ojtSemesterId, registrationId, positionId, applicationId, jobApplication |
 | POST /api/json/recruitment/posts/list | id, ojtSemesterId, windowId, academicPeriodId, companyId, periodCode, companyName, title, content, benefits, applicationInstructions, status, reviewReason, deadlineAt, publishedAt, reviewedAt, positions, createdAt, updatedAt, company, semester, academicPeriod |

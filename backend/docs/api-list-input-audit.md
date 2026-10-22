@@ -1,6 +1,6 @@
 # Rà soát đầu vào JSON của API danh sách
 
-Được xuất từ hợp đồng Swagger hiện hành. Tổng 48 API danh sách.
+Được xuất từ hợp đồng Swagger hiện hành. Tổng 40 API danh sách.
 
 FE truyền ID/bộ lọc trong JSON body; không truyền query string. Các ID trong ví dụ chỉ minh họa, cần thay bằng ID có thật trong DB. JWT vẫn bắt buộc và dùng để xác thực, kiểm tra quyền. Không tự điền companyId/studentId còn thiếu.
 
@@ -14,7 +14,6 @@ ID quan hệ không cần nhập lặp nếu đã truy ra được từ bản gh
 | POST /api/json/academic-periods/combo-phase-schedules/list | academicPeriodId |  | academicPeriodId |
 | POST /api/json/academic/alerts/list | ojtSemesterId, academicPeriodId, assessmentDeadline |  | ojtSemesterId, programId, cohortId, majorId, comboId, groupCode, academicPeriodId, assessmentDeadline, type, page, limit |
 | POST /api/json/academic/course-demand/list | ojtSemesterId, academicPeriodId |  | ojtSemesterId, programId, cohortId, majorId, comboId, groupCode, academicPeriodId, assessmentDeadline, courseId, includeInProgress, page, limit |
-| POST /api/json/accounts/list | Không có ID bắt buộc chung |  | userId, page, limit, search, roleCode, status |
 | POST /api/json/combo-registration-windows/list | Không có ID bắt buộc chung | studentId: STUDENT | page, limit, phase, status, academicPeriodId, studentId |
 | POST /api/json/combo-registration-windows/selections/list | windowId |  | windowId, page, limit, status |
 | POST /api/json/students/combo-selections/list | studentId | studentId: STUDENT | studentId, page, limit |
@@ -37,13 +36,6 @@ ID quan hệ không cần nhập lặp nếu đã truy ra được từ bản gh
 | POST /api/json/students/list | Không có ID bắt buộc chung |  | page, limit, search, status, programId, cohortId, groupCode, enrollmentYear, currentSemester |
 | POST /api/json/students/course-results/list | studentId | studentId: STUDENT | studentId, page, limit, courseId, academicPeriodId, status |
 | POST /api/json/academic-imports/list | Không có ID bắt buộc chung |  | page, limit, kind, status, importId, rowsPage, rowsLimit |
-| POST /api/json/assessment-templates/list | Không có ID bắt buộc chung |  | page, limit, templateId, search, status |
-| POST /api/json/predictions/list | Không có ID bắt buộc chung |  | page, limit, ojtSemesterId, studentId, modelId, riskLevel, readinessLevel, from, to, predictionId |
-| POST /api/json/admin/models/list | Không có ID bắt buộc chung |  | page, limit, modelId, search, status |
-| POST /api/json/alerts/list | Không có ID bắt buộc chung |  | page, limit, alertId, studentId, ojtSemesterId, status, interventionPage, interventionLimit |
-| POST /api/json/students/interventions/list | studentId |  | studentId, page, limit, status |
-| POST /api/json/admin/reports/readiness/list | Không có ID bắt buộc chung |  | page, limit, ojtSemesterId, studentId, modelId, riskLevel, readinessLevel, from, to |
-| POST /api/json/admin/audit-logs/list | Không có ID bắt buộc chung |  | page, limit, userId, entityType, entityId, action |
 | POST /api/json/enterprise/candidates/list | companyId | companyId: ENTERPRISE | companyId, studentId, page, limit, ojtSemesterId, positionId, search, candidateId, decision |
 | POST /api/json/enterprise/internships/list | companyId | companyId: ENTERPRISE | companyId, studentId, page, limit, ojtSemesterId, positionId, search, internshipId, status |
 | POST /api/json/recruitment/posts/list | companyId | companyId: mọi vai trò | page, limit, companyId, postId, windowId, academicPeriodId, status |
@@ -230,34 +222,6 @@ Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cầ
 ~~~
 
 Trường response item: courseId, courseCode, courseName, academicPeriodId, periodCode, periodKind, studentCount, retakeCount, inProgressCount, course, academicPeriod.
-
-## POST /api/json/accounts/list
-
-Danh sách tài khoản
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| userId | integer | Không | ID tài khoản. |
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| roleCode | string (ADMIN, ACADEMIC, OJT_COORD, STUDENT, ENTERPRISE) | Không | Bộ lọc roleCode. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| status | string (ACTIVE, LOCKED, INACTIVE) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "userId": 1,
-  "page": 1,
-  "limit": 20,
-  "search": "demo",
-  "roleCode": "ADMIN",
-  "status": "ACTIVE"
-}
-~~~
-
-Trường response item: id, username, email, phone, full_name, status, role_code, role_name, role_id, studentId, enterpriseId, created_at, updated_at, last_login_at, mustChangePassword, student, company.
 
 ## POST /api/json/combo-registration-windows/list
 
@@ -946,212 +910,6 @@ Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cầ
 ~~~
 
 Trường response item: importedByUser, id, kind, status, sourceName, summary, importedBy, createdAt, rows, rowsPagination.
-
-## POST /api/json/assessment-templates/list
-
-Danh sách và hồ sơ bộ tiêu chí đánh giá
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| templateId | integer | Không | ID bộ tiêu chí đánh giá. |
-| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| status | string (DRAFT, PUBLISHED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "page": 1,
-  "limit": 20,
-  "templateId": 1,
-  "search": "demo",
-  "status": "DRAFT"
-}
-~~~
-
-Trường response item: id, code, version, name, criteria, status, createdAt, publishedAt.
-
-## POST /api/json/predictions/list
-
-Lịch sử dự đoán
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| ojtSemesterId | integer | Không | ID kỳ OJT. |
-| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| modelId | integer | Không | ID phiên bản mô hình. |
-| riskLevel | string (LOW, MEDIUM, HIGH) | Không | Bộ lọc riskLevel. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| readinessLevel | string (LOW, MEDIUM, HIGH) | Không | Bộ lọc readinessLevel. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| from | string | Không | Bộ lọc from. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| to | string | Không | Bộ lọc to. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| predictionId | integer | Không | Chọn một hồ sơ để trả thêm phần chi tiết. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "page": 1,
-  "limit": 20,
-  "ojtSemesterId": 1,
-  "studentId": 1,
-  "modelId": 1,
-  "riskLevel": "LOW",
-  "readinessLevel": "LOW",
-  "from": "2026-12-01T00:00:00+07:00",
-  "to": "2026-12-01T00:00:00+07:00",
-  "predictionId": 1
-}
-~~~
-
-Trường response item: student, semester, model, id, studentId, studentCode, fullName, jobId, ojtSemesterId, modelId, readinessScore, readinessLevel, riskScore, riskLevel, factors, modelSnapshot, createdAt, inputSnapshot.
-
-## POST /api/json/admin/models/list
-
-Danh sách và hồ sơ phiên bản mô hình
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| modelId | integer | Không | ID phiên bản mô hình. |
-| search | string | Không | Bộ lọc search. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| status | string (ACTIVE, INACTIVE) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "page": 1,
-  "limit": 20,
-  "modelId": 1,
-  "search": "demo",
-  "status": "ACTIVE"
-}
-~~~
-
-Trường response item: id, code, version, name, status, metrics, featureSchema, createdAt.
-
-## POST /api/json/alerts/list
-
-Danh sách và hồ sơ cảnh báo rủi ro
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| alertId | integer | Không | ID cảnh báo rủi ro. |
-| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| ojtSemesterId | integer | Không | ID kỳ OJT. |
-| status | string (OPEN, ACKNOWLEDGED, RESOLVED, DISMISSED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| interventionPage | integer | Không | Trang hoạt động hỗ trợ khi lọc alertId. |
-| interventionLimit | integer | Không | Số hoạt động hỗ trợ mỗi trang, tối đa 100. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "page": 1,
-  "limit": 20,
-  "alertId": 1,
-  "studentId": 1,
-  "ojtSemesterId": 1,
-  "status": "OPEN",
-  "interventionPage": 1,
-  "interventionLimit": 1
-}
-~~~
-
-Trường response item: id, predictionId, studentId, studentCode, fullName, ojtSemesterId, riskLevel, riskScore, status, resolutionNote, createdAt, updatedAt, updatedBy, interventions, student, semester, updatedByUser.
-
-## POST /api/json/students/interventions/list
-
-Lịch sử hỗ trợ sinh viên
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| studentId | integer | Có | ID: StudentID. |
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| status | string (PLANNED, IN_PROGRESS, COMPLETED, CANCELLED) | Không | Bộ lọc status. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "studentId": 1,
-  "page": 1,
-  "limit": 20,
-  "status": "PLANNED"
-}
-~~~
-
-Trường response item: id, alertId, studentId, assignedTo, createdBy, description, status, outcome, dueDate, createdAt, updatedAt, student, assignedToUser, createdByUser.
-
-## POST /api/json/admin/reports/readiness/list
-
-Báo cáo mức sẵn sàng và rủi ro
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| ojtSemesterId | integer | Không | ID kỳ OJT. |
-| studentId | integer | Không | ID hồ sơ sinh viên, khác ID tài khoản. |
-| modelId | integer | Không | ID phiên bản mô hình. |
-| riskLevel | string (LOW, MEDIUM, HIGH) | Không | Bộ lọc riskLevel. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| readinessLevel | string (LOW, MEDIUM, HIGH) | Không | Bộ lọc readinessLevel. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| from | string | Không | Bộ lọc from. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| to | string | Không | Bộ lọc to. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "page": 1,
-  "limit": 20,
-  "ojtSemesterId": 1,
-  "studentId": 1,
-  "modelId": 1,
-  "riskLevel": "LOW",
-  "readinessLevel": "LOW",
-  "from": "2026-12-01T00:00:00+07:00",
-  "to": "2026-12-01T00:00:00+07:00"
-}
-~~~
-
-Trường response item: student, semester, model, id, studentId, studentCode, fullName, jobId, ojtSemesterId, modelId, readinessScore, readinessLevel, riskScore, riskLevel, factors, modelSnapshot, createdAt, inputSnapshot.
-
-## POST /api/json/admin/audit-logs/list
-
-Nhật ký hoạt động hệ thống
-
-| Trường | Kiểu | Bắt buộc | Mục đích |
-|---|---|---|---|
-| page | integer | Không | Trang, bắt đầu từ 1. |
-| limit | integer | Không | Số bản ghi mỗi trang. |
-| userId | integer | Không | ID tài khoản. |
-| entityType | string | Không | Bộ lọc entityType. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-| entityId | integer | Không | ID kỳ OJT. |
-| action | string | Không | Bộ lọc action. Bỏ qua để dùng phạm vi mặc định được mô tả cho API. |
-
-Ví dụ tất cả trường có thể nhập (chỉ giữ các bộ lọc cần sử dụng; trường theo vai trò phải phù hợp tài khoản):
-
-~~~json
-{
-  "page": 1,
-  "limit": 20,
-  "userId": 1,
-  "entityType": "...",
-  "entityId": 1,
-  "action": "..."
-}
-~~~
-
-Trường response item: id, userId, entityId, entityType, action, detail, createdAt, user.
 
 ## POST /api/json/enterprise/candidates/list
 
