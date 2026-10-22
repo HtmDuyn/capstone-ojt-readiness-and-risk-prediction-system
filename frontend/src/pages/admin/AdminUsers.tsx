@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
@@ -8,8 +8,12 @@ import {
   Eye,
   Pencil,
   Trash2,
+  KeyRound,
+  Mail,
 } from 'lucide-react';
 
+import { useAuth } from '@/hooks/useAuth';
+import { createAccount, getAccounts, updateAccount, resetAccountPassword, resendAccountEmail, formatDate, type Account } from '@/services/admin';
 import { PageBanner } from '@/components/common/PageBanner';
 
 /* =========================================================
@@ -23,9 +27,12 @@ type UserRole =
   | 'Doanh nghiệp'
   | 'Quản trị viên';
 
-type UserStatus = 'Hoạt động' | 'Khóa';
+type UserStatus = 'Hoạt động' | 'Khóa' | 'Ngừng hoạt động';
 
 interface UserAccount {
+  raw: Account;
+  phone: string;
+  roleId: number;
   id: number;
   code: string;
   name: string;
@@ -35,6 +42,8 @@ interface UserAccount {
 }
 
 interface UserForm {
+  phone?: string;
+  password?: string;
   code: string;
   name: string;
   email: string;
@@ -43,65 +52,19 @@ interface UserForm {
 }
 
 /* =========================================================
-   MOCK DATA
+   API DATA
    ========================================================= */
 
-const mockUsers: UserAccount[] = [
-  {
-    id: 1,
-    code: 'SE180001',
-    name: 'Nguyễn Văn An',
-    email: 'an.nguyen@fpt.edu.vn',
-    role: 'Sinh viên',
-    status: 'Hoạt động',
-  },
-  {
-    id: 2,
-    code: 'PDT001',
-    name: 'Trần Thị Lan',
-    email: 'lan.tran@fpt.edu.vn',
-    role: 'Phòng Đào tạo',
-    status: 'Hoạt động',
-  },
-  {
-    id: 3,
-    code: 'QHDN001',
-    name: 'Lê Minh Anh',
-    email: 'anh.le@fpt.edu.vn',
-    role: 'Phòng Quan hệ Doanh nghiệp',
-    status: 'Hoạt động',
-  },
-  {
-    id: 4,
-    code: 'DN001',
-    name: 'Công ty ABC',
-    email: 'contact@abc.com',
-    role: 'Doanh nghiệp',
-    status: 'Hoạt động',
-  },
-  {
-    id: 5,
-    code: 'ADM001',
-    name: 'System Admin',
-    email: 'admin@fpt.edu.vn',
-    role: 'Quản trị viên',
-    status: 'Hoạt động',
-  },
-  {
-    id: 6,
-    code: 'SE180002',
-    name: 'Phạm Minh Tuấn',
-    email: 'tuan.pham@fpt.edu.vn',
-    role: 'Sinh viên',
-    status: 'Khóa',
-  },
-];
+const ROLE_LABELS: Record<string, UserRole> = { STUDENT: 'Sinh viên', ACADEMIC: 'Phòng Đào tạo', OJT_COORD: 'Phòng Quan hệ Doanh nghiệp', ENTERPRISE: 'Doanh nghiệp', ADMIN: 'Quản trị viên' };
+type AccountRecord = Account;
+const mapAccount = (a: AccountRecord): UserAccount => ({ raw: a, phone: a.phone ?? '', id: a.id, code: a.username, name: a.full_name, email: a.email, roleId: a.role_id, role: ROLE_LABELS[a.role_code], status: a.status === 'ACTIVE' ? 'Hoạt động' : a.status === 'LOCKED' ? 'Khóa' : 'Ngừng hoạt động' });
+const statusCode = (s: UserStatus) => s === 'Hoạt động' ? 'ACTIVE' : s === 'Khóa' ? 'LOCKED' : 'INACTIVE';
 
 const EMPTY_FORM: UserForm = {
   code: '',
   name: '',
   email: '',
-  role: 'Sinh viên',
+  role: 'Phòng Đào tạo',
   status: 'Hoạt động',
 };
 
@@ -110,12 +73,29 @@ const EMPTY_FORM: UserForm = {
    ========================================================= */
 
 const AdminUsers: React.FC = () => {
+  const { user: currentUser } = useAuth();
   /* =========================
      DATA
      ========================= */
 
   const [users, setUsers] =
-    useState<UserAccount[]>(mockUsers);
+    useState<UserAccount[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+  const loadUsers = async () => {
+    setLoading(true); setError('');
+    try { const result = await getAccounts(); setUsers(result.data.map(mapAccount)); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Không tải được tài khoản.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void loadUsers(); }, []);
+  const roleIdFor = (role: UserRole) => {
+    const id = users.find(user => user.role === role)?.roleId;
+    if (!id) throw new Error('Chưa có ID cho vai trò này trong danh sách tài khoản.');
+    return id;
+  };
 
   /* =========================
      FILTER
@@ -188,8 +168,9 @@ const AdminUsers: React.FC = () => {
      ========================================================= */
 
   const handleOpenAddModal = () => {
-    setAddForm(EMPTY_FORM);
-    setIsAddModalOpen(true);
+    const staff = users.find(user => !['Sinh viên', 'Doanh nghiệp'].includes(user.role));
+    setAddForm({ ...EMPTY_FORM, role: staff?.role ?? EMPTY_FORM.role });
+    setNotice(''); setIsAddModalOpen(true);
   };
 
   const handleCloseAddModal = () => {
@@ -197,34 +178,15 @@ const AdminUsers: React.FC = () => {
     setAddForm(EMPTY_FORM);
   };
 
-  const handleAddUser = () => {
-    if (
-      !addForm.code.trim() ||
-      !addForm.name.trim() ||
-      !addForm.email.trim()
-    ) {
-      alert(
-        'Vui lòng nhập đầy đủ mã tài khoản, họ tên và email.',
-      );
-
-      return;
-    }
-
-    const newUser: UserAccount = {
-      id: Date.now(),
-      code: addForm.code.trim(),
-      name: addForm.name.trim(),
-      email: addForm.email.trim(),
-      role: addForm.role,
-      status: addForm.status,
-    };
-
-    setUsers((current) => [
-      ...current,
-      newUser,
-    ]);
-
-    handleCloseAddModal();
+  const handleAddUser = async () => {
+    if (saving) return; setSaving(true);
+    try {
+      if (['Sinh viên', 'Doanh nghiệp'].includes(addForm.role)) throw new Error('Tài khoản sinh viên và doanh nghiệp phải được tạo qua import.');
+      if (!addForm.password || addForm.password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
+      await createAccount({ username: addForm.code.trim(), fullName: addForm.name.trim(), email: addForm.email.trim(), password: addForm.password, phone: addForm.phone?.trim() || null, roleId: roleIdFor(addForm.role) });
+      handleCloseAddModal(); setNotice('Đã tạo tài khoản.'); await loadUsers();
+    } catch (e) { alert(e instanceof Error ? e.message : 'Tạo tài khoản thất bại.'); }
+    finally { setSaving(false); }
   };
 
   /* =========================================================
@@ -251,6 +213,7 @@ const AdminUsers: React.FC = () => {
     setEditUser(user);
 
     setEditForm({
+      phone: user.phone,
       code: user.code,
       name: user.name,
       email: user.email,
@@ -264,70 +227,61 @@ const AdminUsers: React.FC = () => {
     setEditForm(EMPTY_FORM);
   };
 
-  const handleSaveEditUser = () => {
-    if (!editUser) return;
-
-    if (
-      !editForm.code.trim() ||
-      !editForm.name.trim() ||
-      !editForm.email.trim()
-    ) {
-      alert(
-        'Vui lòng nhập đầy đủ mã tài khoản, họ tên và email.',
-      );
-
-      return;
-    }
-
-    setUsers((current) =>
-      current.map((user) =>
-        user.id === editUser.id
-          ? {
-              ...user,
-              code: editForm.code.trim(),
-              name: editForm.name.trim(),
-              email: editForm.email.trim(),
-              role: editForm.role,
-              status: editForm.status,
-            }
-          : user,
-      ),
-    );
-
-    handleCloseEditUser();
+  const handleSaveEditUser = async () => {
+    if (!editUser || saving) return; setSaving(true);
+    try {
+      await updateAccount({ userId: editUser.id, fullName: editForm.name.trim(), phone: editForm.phone?.trim() || null, email: editForm.email.trim(), status: statusCode(editForm.status), roleId: editForm.role === editUser.role ? editUser.roleId : roleIdFor(editForm.role) });
+      handleCloseEditUser(); setNotice('Đã cập nhật tài khoản.'); await loadUsers();
+    } catch (e) { alert(e instanceof Error ? e.message : 'Cập nhật thất bại.'); }
+    finally { setSaving(false); }
   };
 
   /* =========================================================
      DELETE ACCOUNT
      ========================================================= */
 
-  const handleDeleteUser = (
-    user: UserAccount,
-  ) => {
-    const confirmed =
-      window.confirm(
-        `Bạn có chắc muốn xóa tài khoản ${user.code} - ${user.name} không?`,
-      );
-
-    if (!confirmed) return;
-
-    setUsers((current) =>
-      current.filter(
-        (item) => item.id !== user.id,
-      ),
-    );
+  const handleDeleteUser = async (user: UserAccount) => {
+    if (saving || !window.confirm('Ngừng hoạt động tài khoản ' + user.code + '?')) return; setSaving(true);
+    try {
+      await updateAccount({ userId: user.id, status: 'INACTIVE' });
+      setNotice('Đã ngừng hoạt động tài khoản.'); await loadUsers();
+    } catch (e) { alert(e instanceof Error ? e.message : 'Cập nhật trạng thái thất bại.'); }
+    finally { setSaving(false); }
   };
 
   /* =========================================================
      RENDER
      ========================================================= */
 
+  const handleAccountAction = async (user: UserAccount, action: 'reset' | 'resend') => {
+    if (saving) return;
+    if (action === 'reset' && String(user.id) === currentUser?.id) { alert('Để đổi mật khẩu của bạn, mở Cài đặt hệ thống → Tài khoản cá nhân.'); return; }
+    if (!window.confirm(action === 'reset' ? 'Đặt lại mật khẩu và đưa email thông tin đăng nhập vào hàng đợi cho ' + user.email + '?' : 'Gửi lại email đăng nhập bị lỗi cho ' + user.email + '?')) return;
+    setSaving(true); setNotice('');
+    try {
+      if (action === 'reset') {
+        await resetAccountPassword(user.id);
+        setNotice('Đã đưa yêu cầu đặt lại mật khẩu vào hàng đợi email.');
+      } else {
+        await resendAccountEmail(user.email);
+        setNotice('Đã đưa email lỗi vào hàng đợi gửi lại.');
+      }
+      setViewUser(null); await loadUsers();
+    } catch (e) { alert(e instanceof Error ? e.message : 'Thao tác thất bại.'); }
+    finally { setSaving(false); }
+  };
+
   return (
     <div className="space-y-6">
+      {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error} <button onClick={() => void loadUsers()} className="underline">Thử lại</button></div>}
+      {notice && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-emerald-700">{notice}</p>}
+      {loading && <p role="status">Đang tải tài khoản...</p>}
+      {saving && <p role="status">Đang lưu...</p>}
       <PageBanner
         title="Quản lý Người dùng & Phân quyền"
         description="Phân quyền 5 nhóm người dùng: Sinh viên, PĐT, QHDN, Doanh nghiệp và Admin."
         badge="5 Vai trò"
+        primaryAction={{ label: 'Thêm tài khoản', onClick: handleOpenAddModal }}
       />
 
       {/* =====================================================
@@ -523,7 +477,7 @@ const AdminUsers: React.FC = () => {
                         onClick={() =>
                           handleDeleteUser(user)
                         }
-                        title="Xóa tài khoản"
+                        title="Ngừng hoạt động tài khoản"
                         className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 transition hover:bg-red-50 hover:text-red-600"
                       >
                         <Trash2 size={17} />
@@ -571,7 +525,7 @@ const AdminUsers: React.FC = () => {
             }
           >
             <div
-              className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+              role="dialog" aria-modal="true" aria-label="Chi tiết tài khoản" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl"
               onClick={(e) =>
                 e.stopPropagation()
               }
@@ -666,6 +620,7 @@ const AdminUsers: React.FC = () => {
                 </div>
               </div>
 
+              <div className="space-y-3 border-t border-slate-100 px-6 py-4 text-sm"><p><strong>ID tài khoản:</strong> {viewUser.id}</p><p><strong>Điện thoại:</strong> {viewUser.phone || '—'}</p><p><strong>Ngày tạo:</strong> {formatDate(viewUser.raw.created_at)}</p><p><strong>Đăng nhập gần nhất:</strong> {formatDate(viewUser.raw.last_login_at)}</p><div className="flex flex-wrap gap-2"><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'reset')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><KeyRound size={16} />Đặt lại mật khẩu</button><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'resend')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><Mail size={16} />Gửi lại email lỗi</button></div><p className="text-xs text-slate-500">Chỉ gửi lại email đăng nhập bị lỗi, chưa hết hạn và đủ điều kiện theo backend.</p></div>
               {/* FOOTER */}
 
               <div className="flex justify-end border-t border-slate-200 px-6 py-4">
@@ -737,9 +692,7 @@ const AdminUsers: React.FC = () => {
 
                   <input
                     type="text"
-                    value={
-                      editForm.code
-                    }
+                    value={editForm.code} disabled title="Tên đăng nhập không thể sửa"
                     onChange={(e) =>
                       setEditForm(
                         (current) => ({
@@ -776,7 +729,8 @@ const AdminUsers: React.FC = () => {
                   />
                 </div>
 
-                <div>
+                <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Số điện thoại</label><input type="tel" maxLength={20} value={editForm.phone || ''} onChange={e => setEditForm(current => ({...current,phone:e.target.value}))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
+                  <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                     Email
                   </label>
@@ -820,23 +774,23 @@ const AdminUsers: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
-                    <option value="Sinh viên">
+                    <option value="Sinh viên" disabled={editUser?.role !== 'Sinh viên' || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Sinh viên'}>
                       Sinh viên
                     </option>
 
-                    <option value="Phòng Đào tạo">
+                    <option value="Phòng Đào tạo" disabled={!users.some(user => user.role === 'Phòng Đào tạo') || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Phòng Đào tạo'}>
                       Phòng Đào tạo
                     </option>
 
-                    <option value="Phòng Quan hệ Doanh nghiệp">
+                    <option value="Phòng Quan hệ Doanh nghiệp" disabled={!users.some(user => user.role === 'Phòng Quan hệ Doanh nghiệp') || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Phòng Quan hệ Doanh nghiệp'}>
                       Phòng Quan hệ Doanh nghiệp
                     </option>
 
-                    <option value="Doanh nghiệp">
+                    <option value="Doanh nghiệp" disabled={editUser?.role !== 'Doanh nghiệp' || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Doanh nghiệp'}>
                       Doanh nghiệp
                     </option>
 
-                    <option value="Quản trị viên">
+                    <option value="Quản trị viên" disabled={!users.some(user => user.role === 'Quản trị viên') || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Quản trị viên'}>
                       Quản trị viên
                     </option>
                   </select>
@@ -867,6 +821,7 @@ const AdminUsers: React.FC = () => {
                       Hoạt động
                     </option>
 
+                    <option value="Ngừng hoạt động">Ngừng hoạt động</option>
                     <option value="Khóa">
                       Khóa
                     </option>
@@ -889,9 +844,7 @@ const AdminUsers: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={
-                    handleSaveEditUser
-                  }
+                  disabled={saving || loading} onClick={handleSaveEditUser}
                   className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
                 >
                   Lưu thay đổi
@@ -947,7 +900,9 @@ const AdminUsers: React.FC = () => {
               {/* BODY */}
 
               <div className="space-y-4 px-6 py-6">
-                <div>
+                <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Tạo thủ công dành cho cán bộ và quản trị viên. Tài khoản sinh viên, doanh nghiệp được cấp qua import. Vai trò phải có ID trong dữ liệu tài khoản hệ thống.</p>
+                  <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Mật khẩu ban đầu</label><input type="password" autoComplete="new-password" minLength={8} value={addForm.password || ''} onChange={e => setAddForm(current => ({ ...current, password: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
+                  <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                     Mã tài khoản
                   </label>
@@ -995,7 +950,8 @@ const AdminUsers: React.FC = () => {
                   />
                 </div>
 
-                <div>
+                <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Số điện thoại</label><input type="tel" maxLength={20} value={addForm.phone || ''} onChange={e => setAddForm(current => ({...current,phone:e.target.value}))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
+                  <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                     Email
                   </label>
@@ -1040,23 +996,15 @@ const AdminUsers: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
-                    <option value="Sinh viên">
-                      Sinh viên
-                    </option>
-
-                    <option value="Phòng Đào tạo">
+                    <option value="Phòng Đào tạo" disabled={!users.some(user => user.role === 'Phòng Đào tạo')}>
                       Phòng Đào tạo
                     </option>
 
-                    <option value="Phòng Quan hệ Doanh nghiệp">
+                    <option value="Phòng Quan hệ Doanh nghiệp" disabled={!users.some(user => user.role === 'Phòng Quan hệ Doanh nghiệp')}>
                       Phòng Quan hệ Doanh nghiệp
                     </option>
 
-                    <option value="Doanh nghiệp">
-                      Doanh nghiệp
-                    </option>
-
-                    <option value="Quản trị viên">
+                    <option value="Quản trị viên" disabled={!users.some(user => user.role === 'Quản trị viên')}>
                       Quản trị viên
                     </option>
                   </select>
@@ -1068,7 +1016,7 @@ const AdminUsers: React.FC = () => {
                   </label>
 
                   <select
-                    value={
+                    disabled value={
                       addForm.status
                     }
                     onChange={(e) =>
@@ -1087,6 +1035,7 @@ const AdminUsers: React.FC = () => {
                       Hoạt động
                     </option>
 
+                    <option value="Ngừng hoạt động">Ngừng hoạt động</option>
                     <option value="Khóa">
                       Khóa
                     </option>
@@ -1109,9 +1058,7 @@ const AdminUsers: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={
-                    handleAddUser
-                  }
+                  disabled={saving || loading} onClick={handleAddUser}
                   className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
                 >
                   Thêm tài khoản

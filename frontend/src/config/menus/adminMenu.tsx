@@ -21,9 +21,8 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     banner: {
       title: 'Trung tâm Quản trị Hệ thống',
       description:
-        'Giám sát hoạt động toàn hệ thống OJT, quản lý người dùng và cấu hình AI Engine.',
+        'Quản lý tài khoản, xem tổng quan dữ liệu và nhật ký hoạt động hệ thống.',
       badge: 'Quản trị viên cấp cao',
-      primaryActionLabel: 'Kiểm tra bảo mật',
     },
   },
 
@@ -47,25 +46,23 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     path: '/admin/metrics',
     icon: <Activity size={20} />,
     banner: {
-      title: 'Chỉ số tải & Hoạt động AI Engine',
+      title: 'Giám sát & Nhật ký hoạt động',
       description:
-        'Theo dõi tài nguyên server, thời gian phản hồi API và các tác vụ dự báo nền.',
-      badge: 'Realtime Monitor',
-      primaryActionLabel: 'Xem logs hệ thống',
+        'Tra cứu nhật ký thực tế và chi tiết thao tác trên hệ thống.',
+      badge: 'Nhật ký hệ thống',
     },
   },
 
   {
     id: 'ai-config',
-    label: 'Cấu hình AI Engine',
+    label: 'Tích hợp AI tư vấn',
     path: '/admin/ai-config',
     icon: <Bot size={20} />,
     banner: {
-      title: 'Cấu hình Ngưỡng Rủi ro & Mô hình AI',
+      title: 'Tích hợp AI tư vấn',
       description:
-        'Điều chỉnh trọng số đánh giá rủi ro trượt môn và tiêu chí phân bổ OJT.',
-      badge: 'Risk Model v2.4',
-      primaryActionLabel: 'Hiệu chuẩn mô hình',
+        'Trạng thái tích hợp mô hình AI ngoài cho chức năng tư vấn.',
+      badge: 'Chưa tích hợp',
     },
   },
 
@@ -79,7 +76,6 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
       description:
         'Cấu hình các tham số toàn cục của hệ thống OJT Readiness.',
       badge: 'System Settings',
-      primaryActionLabel: 'Lưu thay đổi',
     },
   },
 ];

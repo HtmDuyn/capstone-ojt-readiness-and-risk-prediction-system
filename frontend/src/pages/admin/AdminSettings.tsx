@@ -1,3 +1,4 @@
+import AccountSettings from '@/components/admin/AccountSettings';
 import React, { useState } from "react";
 import {
   Bell,
@@ -44,6 +45,9 @@ const AdminSettings: React.FC = () => {
         badge="System Settings"
       />
 
+      <AccountSettings />
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Các cài đặt toàn hệ thống bên dưới là bản xem trước. Chưa có API đọc/lưu tên hệ thống, ngôn ngữ, kênh thông báo hoặc chế độ bảo trì.</div>
+      <fieldset disabled className="min-w-0 space-y-6 opacity-60">
       {/* Thông tin hệ thống */}
       <section className="card-glass rounded-2xl border border-slate-200/70 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-3">
@@ -283,7 +287,7 @@ const AdminSettings: React.FC = () => {
             <span className="text-sm font-medium text-slate-600">
               {maintenanceMode
                 ? "Hệ thống đang ở chế độ bảo trì"
-                : "Hệ thống đang hoạt động bình thường"}
+                : "Chưa có dữ liệu trạng thái bảo trì từ hệ thống"}
             </span>
           </div>
         </div>
@@ -296,9 +300,10 @@ const AdminSettings: React.FC = () => {
           className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
         >
           <CheckCircle2 size={17} />
-          Lưu thay đổi
+          Chưa hỗ trợ lưu cài đặt hệ thống
         </button>
       </div>
+      </fieldset>
     </div>
   );
 };
