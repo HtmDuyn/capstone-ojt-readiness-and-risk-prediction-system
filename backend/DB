@@ -1,14 +1,7 @@
--- OJT FULL DATABASE: original 2026-10-20 uploaded DB + DEMO recruitment seed
--- DANGER: FULL RESET; WILL DELETE existing application data.
--- USE ONLY ON A TEST/EMPTY DATABASE AFTER BACKUP.
--- Original DB text is preserved verbatim, with demo semester and recruitment
--- data appended after its final COMMIT. No other original statements modified.
-
--- UPDATED FULL DATABASE BUILD (EMPTY/TEST DATABASE ONLY)
--- Based on the supplied 2026-10-19 script. Scoped edits ONLY to TrainingPrograms
--- and direct dependencies of the removed columns/publication workflow.
--- DANGER: THIS FILE STILL CONTAINS THE ORIGINAL RESET AND WILL DELETE DATA.
--- NEVER RUN ON THE EXISTING SUPABASE DATABASE. For existing DB use the separate migration.
+-- OJT FULL DATABASE: schema, catalog, demo data and workflow updates (2026-10-22).
+-- FULL RESET: deletes existing application data. Use only on an empty/test database.
+-- Existing databases: run only the marked incremental update block at the end.
+-- Display-only verification queries are omitted; data and integrity checks are retained.
 
 -- Centralized database schema and catalog data. Resets application tables; initialize deliberately.
 
@@ -5228,13 +5221,7 @@ DO $$ BEGIN
  END IF;
 END $$;
 
--- Compact result summary; all detailed review queries remain in 03/06 files.
-SELECT 'Students' AS "Dataset",count(*) AS "Rows" FROM "Students"
-UNION ALL SELECT 'Curricula',count(*) FROM "TrainingPrograms"
-UNION ALL SELECT 'Curriculum courses',count(*) FROM "ProgramCourses"
-UNION ALL SELECT 'Curriculum combos',count(*) FROM "ProgramCombos"
-UNION ALL SELECT 'Combo courses',count(*) FROM "ComboCourses"
-UNION ALL SELECT 'Student combo selections',count(*) FROM "StudentComboSelections";
+
 
 /* ============================================================
    SEED TEST USERS
@@ -6392,17 +6379,7 @@ JOIN "Students" s ON s."UserID"=u."UserID"
 LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
 WHERE NOT EXISTS (SELECT 1 FROM "StudentAcademicSnapshot" a WHERE a."StudentID"=s."StudentID");
 
--- Verify profiles and latest snapshot; case labels describe intended test cases only.
-SELECT x.n, x.description, u."Username", s."StudentCode", p."ProgramCode",
- a."AccumulatedCredits",a."FailedCoursesCount",
- CASE WHEN a."AccumulatedCredits" IS NULL OR a."FailedCoursesCount" IS NULL THEN 'UNKNOWN'
- WHEN a."AccumulatedCredits">=70 AND a."FailedCoursesCount"<=2 THEN 'ELIGIBLE' ELSE 'NOT_ELIGIBLE' END AS "IllustrativeOutcome"
-FROM _seed_student_cases x
-LEFT JOIN "Users" u ON u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn')
-LEFT JOIN "Students" s ON s."UserID"=u."UserID"
-LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
-LEFT JOIN LATERAL (SELECT * FROM "StudentAcademicSnapshot" a WHERE a."StudentID"=s."StudentID" ORDER BY a."SnapshotDate" DESC,a."SnapshotID" DESC LIMIT 1) a ON true
-ORDER BY x.n;
+
 COMMIT;
 BEGIN;
 ALTER TABLE "EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
@@ -6766,20 +6743,6 @@ BEGIN
 END $seed$;
 COMMIT;
 
--- Verification: newly seeded positions and their linked post status.
-SELECT e."EnterpriseCode", s."SemesterCode", p."RecruitmentCode",
-       p."Title", p."Capacity", p."RemainingSlots", p."Status" AS "PositionStatus",
-       rp."Status" AS "PostStatus", rp."PublishedAt"
-FROM public."InternshipPositions" p
-JOIN public."Enterprises" e ON e."EnterpriseID" = p."EnterpriseID"
-JOIN public."OJTSemesters" s ON s."OJTSemesterID" = p."OJTSemesterID"
-LEFT JOIN public."RecruitmentPostPositions" rpp ON rpp."PositionID" = p."PositionID"
-LEFT JOIN public."RecruitmentPosts" rp ON rp."PostID" = rpp."PostID"
-WHERE e."EnterpriseCode" = 'TECHVIET' AND p."RecruitmentCode" LIKE 'DEMO-TV-%'
-ORDER BY s."SemesterCode", p."RecruitmentCode";
-
-ALTER TABLE public."AccountImportBatches"
-ADD COLUMN IF NOT EXISTS "RecruitmentWindowID" INTEGER;
 
 
 -- BEGIN INCREMENTAL UPDATE: 20261022_handoff_before_registration
