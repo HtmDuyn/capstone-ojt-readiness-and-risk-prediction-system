@@ -163,7 +163,7 @@ describe('/enterprise/candidates', { get: ['Danh sách và hồ sơ ứng viên'
 describe('/enterprise/candidates/{id}/decision', { patch: ['Tiếp nhận hoặc từ chối ứng viên', 'Chỉ xử lý ứng viên được giới thiệu cho doanh nghiệp đang đăng nhập.'] });
 describe('/enterprise/internships', { get: ['Danh sách sinh viên thực tập', 'Kèm người hướng dẫn, vị trí, đánh giá và kết quả; điểm chính thức chỉ hiển thị sau xác nhận.'] });
 describe('/enterprise/internships/{id}/evaluation', { put: ['Gửi hoặc cập nhật đánh giá thực tập', 'Chỉ đánh giá sinh viên của doanh nghiệp; internshipId là ID phân công.'] });
-describe('/recruitment/windows', { get: 'Danh sách đợt tuyển dụng theo học kỳ', post: ['Tạo đợt nhận nhu cầu tuyển dụng', 'Chọn học kỳ có sẵn và thời hạn nhận đơn; không tạo kỳ OJT riêng.'] });
+describe('/recruitment/windows', { post: ['Tạo đợt nhận nhu cầu tuyển dụng', 'Chọn học kỳ có sẵn và thời hạn nhận đơn; không tạo kỳ OJT riêng.'] });
 describe('/recruitment/windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt tuyển dụng', 'Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason.'] });
 describe('/recruitment/posts', { get: ['Danh sách tin tuyển dụng', 'Kèm vị trí và chỉ tiêu; doanh nghiệp chỉ xem tin của mình.'], post: ['Gửi nhu cầu tuyển dụng', 'Gửi vị trí, yêu cầu và số lượng trong đợt đang mở.'] });
 describe('/recruitment/posts/{id}', { patch: ['Sửa tin và vị trí tuyển dụng', 'Tin chuyển về chờ duyệt; vị trí có lịch sử chỉ được sửa sức chứa.'] });

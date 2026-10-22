@@ -169,7 +169,7 @@ test('HTTP routes accept imports, enforce password change and roles, dispatch JS
   response=await request('/api/enterprise/internships/'+id+'/evaluation',{completionScore:8,attitudeScore:8,skillScore:8,overallScore:8,reason:'Official result'},5,'PUT');assert.equal(response.status,200);
   response=await request('/api/json/ojt-results/list',{},3);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const result=await response.json();assert.equal(result.data.items[0].officialScore,8);
   assert.equal(result.data.items[0].student.fullName,'Student');assert.equal(result.data.items[0].company.code,'DN01');assert.equal(result.data.items[0].position.title,'Developer');assert.equal(result.data.items[0].semester.code,'OJT');
-  response=await request('/api/json/student/ojt-results/list',{},4);assert.equal(response.status,200);assert.equal((await response.json()).data.items[0].officialScore,8);
+  response=await request('/api/json/student/ojt-results/list',{studentId:1},4);assert.equal(response.status,200);assert.equal((await response.json()).data.items[0].officialScore,8);
   for(const [url,method] of [['/api/recruitment/posts','POST'],['/api/json/recruitment/posts','POST'],['/api/student/cv','POST'],['/api/ojt-results','POST'],['/api/ojt-results/1/confirm','POST'],['/api/assignments/1/internship-evaluation','PUT']])assert.equal((await request(url,{},1,method)).status,404,url);
   // Exercise the actual multipart upload route for student Excel.
   const book=new ExcelJS.Workbook();const sheet=book.addWorksheet('Students');sheet.addRow(['code','email','fullName','programId','cohortId','groupCode','currentAcademicPeriodId','courseCode','academicPeriodId','courseStatus','score']);sheet.addRow(['SVHTTP','shttp@example.test','HTTP Student',1,1,'A',1,'PRF192',1,'PASSED',9]);
@@ -200,9 +200,9 @@ test('task lists include student/company/position/semester, preserve pagination 
  await query('INSERT INTO "Users" ("Username","Email","FullName","RoleID") VALUES (\'other-student\',\'otherstudent@example.test\',\'Other Student\',4)');
  await query('INSERT INTO "Students" ("UserID","StudentCode","ProgramID") VALUES (6,\'OTHER\',1)');await query('UPDATE "InternshipAssignments" SET "StudentID"=2 WHERE "AssignmentID"=$1',[other]);
  const due=(await rows('SELECT (current_date+1)::text AS due'))[0].due;await services.assignTasks({assignmentIds:[own,other],idempotencyKey:'list-tasks',tasks:[{name:'Task',dueDate:due}]},actor);
- const all=await services.listTasks({page:1,limit:1},actor);assert.equal(all.total,2);assert.equal(all.items.length,1);assert.equal(all.page,1);
- const mine=await services.listTasks({}, {userId:4,roleCode:'STUDENT'});assert.equal(mine.total,1);const item=mine.items[0];assert.equal(item.assignmentId,own);assert.equal(item.student.fullName,'Student');assert.equal(item.company.name,'Demo Enterprise');assert.equal(item.position.title,'Developer');assert.equal(item.semester.code,'OJT');assert.equal(item.assignment.status,'ACTIVE');assert.ok(item.assignedDate);assert.ok(!JSON.stringify(mine).includes('Other Student'));
- const empty=await services.listTasks({page:99,limit:20},actor);assert.equal(empty.total,2);assert.deepEqual(empty.items,[]);
+ const all=await services.listTasks({companyId:1,page:1,limit:1},actor);assert.equal(all.total,2);assert.equal(all.items.length,1);assert.equal(all.page,1);
+ const mine=await services.listTasks({studentId:1}, {userId:4,roleCode:'STUDENT'});assert.equal(mine.total,1);const item=mine.items[0];assert.equal(item.assignmentId,own);assert.equal(item.student.fullName,'Student');assert.equal(item.company.name,'Demo Enterprise');assert.equal(item.position.title,'Developer');assert.equal(item.semester.code,'OJT');assert.equal(item.assignment.status,'ACTIVE');assert.ok(item.assignedDate);assert.ok(!JSON.stringify(mine).includes('Other Student'));
+ const empty=await services.listTasks({companyId:1,page:99,limit:20},actor);assert.equal(empty.total,2);assert.deepEqual(empty.items,[]);
 });
 
 test('advisory history includes period/semester/creator and each detail row includes the student identity',async()=>{
@@ -223,28 +223,135 @@ test('every Swagger list documents display fields, with detailed task, result an
   const names=Object.keys(item?.properties??{});assert.ok(names.length>1,path+' must describe more than an ID');
   assert.ok(names.some(name=>!/^id$|Id$|IDs?$/.test(name)),path+' must describe readable fields');
  }
- assert.equal(count,49);
+ assert.equal(count,48);
  const fields=path=>spec.paths[path].post.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
  for(const path of ['/api/json/internship-tasks/list','/api/json/ojt-results/list','/api/json/student/ojt-results/list'])for(const key of ['student','company','position','semester'])assert.ok(fields(path)[key],path+' '+key);
  assert.ok(fields('/api/json/academic/advisory-runs/list').createdByUser);
  assert.ok(fields('/api/json/ojt-semesters/eligible-student-handoffs/list').registrations);
 });
 
-test('recruitment creation exists only in QHDN import; edit cannot add new positions',async()=>{
- const posts=require('../src/modules/recruitment/post.service.ts');assert.equal(posts.submitPost,undefined);
- const body={reason:'Try to add recruitment',positions:[{code:'NEW',title:'New position',description:'New',requirements:'Test',capacity:1}]};
- for(const roleCode of ['ENTERPRISE','OJT_COORD','ADMIN'])await assert.rejects(()=>posts.updatePost(1,body,{userId:1,roleCode}),e=>e.statusCode===403&&e.errorCode==='IMPORT_REQUIRED');
- const {addRecruitmentOperations}=require('../src/modules/recruitment/recruitment.openapi.ts');const raw={paths:{}};addRecruitmentOperations(raw);assert.equal(raw.paths['/api/recruitment/posts'].post,undefined);
- const {swaggerSpec:spec}=require('../src/config/swagger.ts');assert.equal(spec.paths['/api/recruitment/posts']?.post,undefined);assert.equal(spec.paths['/api/json/recruitment/posts']?.post,undefined);
- const edit=spec.paths['/api/json/recruitment/posts'].patch;assert.ok(edit.requestBody.content['application/json'].schema.properties.positions.items.required.includes('positionId'));
- assert.ok(spec.paths['/api/json/recruitment/posts/list'].post);assert.ok(spec.paths['/api/imports/commit'].post);
+test('enterprise recruitment exposes only consolidated post list',()=>{
+ const posts=require('../src/modules/recruitment/post.service.ts');assert.equal(posts.updatePost,undefined);
+ const {swaggerSpec:spec}=require('../src/config/swagger.ts');
+ assert.equal(spec.paths['/api/json/recruitment/posts']?.patch,undefined);
+ assert.ok(spec.paths['/api/json/recruitment/posts/list'].post);
+ const routes=fs.readFileSync(path.join(__dirname,'../src/modules/recruitment/recruitment.routes.ts'),'utf8');
+ assert.ok(!routes.includes("router.patch('/posts/:id'"));
+ assert.ok(!routes.includes("router.get('/windows'"));
+ assert.equal(spec.paths['/api/json/recruitment/windows/list'],undefined);
+ assert.equal(spec.paths['/api/recruitment/windows']?.get,undefined);
+});
+
+test('recruitment lists detailed posts by company with scope enforcement',async()=>{
+ await services.importAccounts(enterprise(),1);
+ await services.importAccounts(enterprise('second','DN02','second@example.test','DEV02'),1);
+ const {listPosts}=require('../src/modules/recruitment/post.service.ts');
+ const staff={userId:1,roleCode:'OJT_COORD'};
+ await assert.rejects(()=>listPosts({},staff),e=>e.statusCode===400);
+ assert.equal((await listPosts({companyId:2},staff)).total,1);
+ const result=await listPosts({companyId:1,page:1,limit:20},staff);
+ assert.equal(result.total,1);assert.equal(result.items[0].companyId,1);
+ assert.equal(result.items[0].positions[0].requirements,'TypeScript');
+ assert.equal(result.items[0].positions[0].capacity,5);
+ assert.equal((await listPosts({companyId:1},actor)).total,1);
+ await assert.rejects(()=>listPosts({companyId:2},actor),e=>e.statusCode===403);
+ await assert.rejects(()=>listPosts({companyId:0},staff),e=>e.statusCode===400);
+ assert.equal((await listPosts({companyId:999},staff)).total,0);
+ const {swaggerSpec}=require('../src/config/swagger.ts');
+ assert.ok(swaggerSpec.paths['/api/json/recruitment/posts/list'].post.requestBody.content['application/json'].schema.properties.companyId);
 });
 
 
-test('recruitment edit still updates an imported position and rejects a position from another post',async()=>{
- await services.importAccounts(enterprise(),1);const {updatePost}=require('../src/modules/recruitment/post.service.ts');
- const result=await updatePost(1,{positions:[{positionId:1,capacity:7}],reason:'Update imported position'},actor);
- assert.equal(result.positions[0].capacity,7);assert.equal(result.positions[0].id,1);assert.equal(await count('RecruitmentPosts'),1);assert.equal(await count('InternshipPositions'),1);
- await assert.rejects(()=>updatePost(1,{positions:[{positionId:999,capacity:8}],reason:'Invalid position'},actor),e=>e.statusCode===404&&e.errorCode==='POSITION_NOT_FOUND');
- assert.equal((await rows('SELECT "Capacity" FROM "InternshipPositions" WHERE "PositionID"=1'))[0].Capacity,7);
+
+test('candidate JSON list requires explicit companyId and returns linked details within enterprise scope',async()=>{
+ await services.importAccounts(enterprise(),1);
+ await services.importAccounts(enterprise('second','DN02','second@example.test','DEV02'),1);
+ await db.exec('UPDATE "Users" SET "MustChangePassword"=false WHERE "UserID"=5');
+ await db.exec(`INSERT INTO "OJTRegistrations" ("StudentID","OJTSemesterID","Status","Application") VALUES (1,1,'APPROVED','{"skills":["TypeScript"],"cvUrl":"hidden"}');
+ INSERT INTO "StudentCVVersions" ("StudentID","Filename","MimeType","SizeBytes","Sha256") VALUES (1,'cv.pdf','application/pdf',123,'hash');
+ INSERT INTO "JobApplications" ("PostID","PositionID","CVID","CoverLetter","Status") VALUES (1,1,1,'Apply','PENDING');
+ INSERT INTO "StudentEnterpriseCoordination" ("RegistrationID","ApplicationID","EnterpriseID","PositionID","OJTSemesterID","CoordinatedBy") VALUES (1,1,1,1,1,1),(1,NULL,2,2,1,1);`);
+ const app=require('../src/app.ts').default,jwt=require('jsonwebtoken');let server;
+ await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});
+ const base='http://127.0.0.1:'+server.address().port;
+ const request=(path,body,userId=5)=>fetch(base+path,{method:'POST',headers:{Authorization:'Bearer '+jwt.sign({userId,authVersion:0},process.env.JWT_SECRET),'Content-Type':'application/json'},body:JSON.stringify(body)});
+ try{
+  for(const path of ['/api/json/enterprise/candidates/list','/api/json/enterprise/internships/list','/api/json/recruitment/posts/list']){
+   assert.equal((await request(path,{})).status,400,path);
+   assert.equal((await request(path,{companyId:0})).status,400,path);
+   assert.equal((await request(path,{companyId:2})).status,403,path);
+  }
+  let response=await request('/api/json/enterprise/candidates/list',{companyId:1,page:1,limit:20});
+  assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const list=(await response.json()).data;
+  assert.equal(list.total,1);const item=list.items[0];
+  assert.equal(item.company.id,1);assert.equal(item.student.studentCode,'BASE');assert.equal(item.position.requirements,'TypeScript');
+  assert.equal(item.registration.status,'APPROVED');assert.equal(item.application.cvUrl,undefined);
+  assert.equal(item.jobApplication.cv.filename,'cv.pdf');assert.equal(item.recruitmentPost.id,1);
+  assert.equal(item.recruitmentPost.positions[0].capacity,5);assert.equal(item.coordinatedByUser.fullName,'Coordinator');
+  response=await request('/api/json/enterprise/candidates/list',{companyId:1,studentId:999});assert.equal((await response.json()).data.total,0);
+  response=await request('/api/json/enterprise/candidates/list',{companyId:1,page:2,limit:1});assert.deepEqual((await response.json()).data.items,[]);
+  assert.equal((await request('/api/json/student/ojt-results/list',{},4)).status,400);
+  assert.equal((await request('/api/json/student/ojt-results/list',{studentId:999},4)).status,403);
+  assert.equal((await request('/api/json/recruitment/posts/list',{},1)).status,400);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
+
+test('task list explicitly filters company and student with ownership checks',async()=>{
+ await services.importAccounts(enterprise(),1);const assignmentId=await seedAssignment();
+ const due=(await rows('SELECT (current_date+1)::text AS due'))[0].due;
+ await services.assignTasks({assignmentIds:[assignmentId],idempotencyKey:'explicit-tasks',tasks:[{name:'Task',dueDate:due}]},actor);
+ await assert.rejects(()=>services.listTasks({},actor),e=>e.statusCode===400);
+ await assert.rejects(()=>services.listTasks({companyId:2},actor),e=>e.statusCode===403);
+ await assert.rejects(()=>services.listTasks({studentId:999},{userId:4,roleCode:'STUDENT'}),e=>e.statusCode===403);
+ const staff={userId:1,roleCode:'OJT_COORD'};
+ assert.equal((await services.listTasks({companyId:1,studentId:1,positionId:1,ojtSemesterId:1},staff)).total,1);
+ assert.equal((await services.listTasks({companyId:999},staff)).total,0);
+ assert.equal((await services.listTasks({studentId:999},staff)).total,0);
+});
+
+test('all JSON lists document complete explicit identity inputs and required selectors',()=>{
+ const {jsonInputOperations,swaggerSpec}=require('../src/config/swagger.ts');
+ for(const op of jsonInputOperations.filter(op=>op.path.endsWith('/list'))){
+  const schema=op.bodySchema,roles=op.operation['x-roles'];
+  if(roles.includes('ENTERPRISE'))assert.ok(schema.properties.companyId,op.path);
+  if(roles.includes('STUDENT'))assert.ok(schema.properties.studentId,op.path);
+  for(const field of op.inputs)assert.ok(schema.properties[field.name],op.path+' '+field.name);
+ }
+ for(const path of ['/api/json/recruitment/posts/list','/api/json/enterprise/candidates/list','/api/json/enterprise/internships/list'])assert.ok(swaggerSpec.paths[path].post.requestBody.content['application/json'].schema.required.includes('companyId'));
+ const post=swaggerSpec.paths['/api/json/enterprise/candidates/list'].post.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties.recruitmentPost;
+ assert.ok(post.properties.content);assert.ok(post.properties.positions);
+});
+
+
+
+test('separate enterprise profile edits imported fields, preserves recruitment and enforces ownership',async()=>{
+ await services.importAccounts(enterprise(),1);
+ await services.importAccounts(enterprise('second','DN02','second@example.test','DEV02'),1);
+ const {updateEnterpriseProfile:update}=require('../src/modules/qhdn/enterprise-profile.service.ts');
+ const recruitmentBefore=await rows('SELECT * FROM "RecruitmentPosts" ORDER BY "PostID"');
+ const positionsBefore=await rows('SELECT * FROM "InternshipPositions" ORDER BY "PositionID"');
+ const result=await update({companyId:1,name:'Updated Company',address:'Address',industry:'Software',contactPersonName:'HR Contact',contactPhone:'0901234567',contactEmail:'HR@example.test',positionTitle:'HR Manager'},actor);
+ assert.ok(result.createdAt);assert.ok(result.representative.id);
+ assert.equal(result.id,1);assert.equal(result.name,'Updated Company');assert.equal(result.contactEmail,'hr@example.test');assert.equal(result.representative.positionTitle,'HR Manager');assert.equal(result.representative.fullName,'HR Demo');
+ assert.equal(result.summary,undefined);assert.equal(result.posts,undefined);
+ const partial=await update({companyId:1,address:null},actor);assert.equal(partial.address,null);assert.equal(partial.name,'Updated Company');
+ await assert.rejects(()=>update({companyId:2,name:'Foreign'},actor),e=>e.statusCode===403);
+ await assert.rejects(()=>update({companyId:1,name:'Forbidden'},{userId:1,roleCode:'OJT_COORD'}),e=>e.statusCode===403);
+ for(const body of [{},{companyId:1},{name:'Missing ID'},{companyId:1,name:''},{companyId:1,contactEmail:'invalid'},{companyId:1,address:'x'.repeat(301)},{companyId:1,contactEmail:'a'.repeat(90)+'@example.test'},{companyId:1,status:'INACTIVE'},{companyId:1,positions:[]},{companyId:1,fullName:'Personal'}])await assert.rejects(()=>update(body,actor),e=>e.statusCode===400);
+ assert.deepEqual(await rows('SELECT * FROM "RecruitmentPosts" ORDER BY "PostID"'),recruitmentBefore);
+ assert.deepEqual(await rows('SELECT * FROM "InternshipPositions" ORDER BY "PositionID"'),positionsBefore);
+ assert.equal((await rows('SELECT "Name" FROM "Enterprises" WHERE "EnterpriseID"=2'))[0].Name,'Demo Enterprise');
+ assert.ok((await rows(`SELECT * FROM "AuditLogs" WHERE "Action"='UPDATE_OWN_PROFILE'`)).length);
+ const {parseUpdateOwnProfileInput:parse}=require('../src/modules/accounts/account.schema.ts');
+ assert.throws(()=>parse({companyId:1,company:{name:'Wrong endpoint'}}),e=>e.statusCode===400);
+ const {swaggerSpec}=require('../src/config/swagger.ts');assert.ok(swaggerSpec.paths['/api/enterprise/profile'].get);assert.ok(swaggerSpec.paths['/api/enterprise/profile'].patch);
+ assert.equal(swaggerSpec.paths['/api/accounts/me/profile'].patch.requestBody.content['application/json'].schema.properties.company,undefined);
+ await query('UPDATE "Users" SET "MustChangePassword"=false WHERE "UserID"=5');
+ const app=require('../src/app.ts').default,jwt=require('jsonwebtoken');let server;
+ await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});
+ try{
+  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/enterprise/profile',{method:'PATCH',headers:{Authorization:'Bearer '+jwt.sign({userId:5,authVersion:0},process.env.JWT_SECRET),'Content-Type':'application/json'},body:JSON.stringify({companyId:1,industry:'IT Services'})});
+  assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const body=await response.json();assert.equal(body.data.industry,'IT Services');assert.equal(body.data.representative.userId,5);assert.equal(body.data.posts,undefined);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+
 });

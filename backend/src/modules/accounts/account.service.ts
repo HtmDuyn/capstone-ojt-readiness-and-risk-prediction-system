@@ -15,7 +15,6 @@ import {
   existsByUsername,
   findAccountById,
   findAccounts,
-  updateOwnProfile,
 } from "./account.repository";
 
 import type {
@@ -317,47 +316,15 @@ export const getOwnProfile = async (
   return account;
 };
 
-export const updateProfile = async (
-  userId: number,
-  input: UpdateOwnProfileInput,
-): Promise<AccountRecord> => {
-  const existing =
-    await findAccountById(
-      userId,
-    );
-
-  if (!existing) {
-    throw createError(
-      "Account not found.",
-      404,
-      "ACCOUNT_NOT_FOUND",
-    );
-  }
-
-  const fullName =
-    input.fullName !== undefined
-      ? normalizeRequiredString(
-          input.fullName,
-          "fullName",
-        )
-      : existing.full_name;
-
-  const phone =
-    input.phone !== undefined
-      ? normalizePhone(
-          input.phone,
-        )
-      : existing.phone;
-
-  await updateOwnProfile(
-    userId,
-    fullName,
-    phone,
-  );
-
-  return (
-    await findAccountById(
-      userId,
-    )
-  )!;
-};
+export const updateProfile = async (userId:number,input:UpdateOwnProfileInput):Promise<AccountRecord> => accountTransaction(async client=>{
+ await client.query('SELECT "UserID" FROM "Users" WHERE "UserID"=$1 FOR UPDATE',[userId]);
+ const existing=await findAccountById(userId,client);
+ if(!existing)throw createError('Account not found.',404,'ACCOUNT_NOT_FOUND');
+ const fields:Record<string,unknown>={};
+ if(input.fullName!==undefined){fields.FullName=normalizeRequiredString(input.fullName,'fullName');if(String(fields.FullName).length>150)throw createError('fullName must not exceed 150 characters.',400,'INVALID_PROFILE_INPUT');}
+ if(input.phone!==undefined){fields.Phone=normalizePhone(input.phone);if(String(fields.Phone??'').length>20)throw createError('phone must not exceed 20 characters.',400,'INVALID_PROFILE_INPUT');}
+ const keys=Object.keys(fields);
+ if(!keys.length)throw createError('Provide personal profile fields to update.',400,'INVALID_PROFILE_INPUT');
+ await client.query('UPDATE "Users" SET '+keys.map((key,i)=>'"'+key+'"=$'+(i+2)).join(',')+',"UpdatedAt"=CURRENT_TIMESTAMP WHERE "UserID"=$1',[userId,...Object.values(fields)]);
+ return (await findAccountById(userId,client))!;
+});

@@ -1,3 +1,5 @@
+import { authenticate } from '../middleware/authenticate';
+import { explicitListScope } from '../shared/explicit-list-scope';
 import { Router, type RequestHandler } from 'express';
 import { jsonInputOperations } from '../config/swagger';
 import { academicError } from '../modules/academic/academic.schema';
@@ -28,7 +30,7 @@ export function createJsonInputRouter(dispatch:Router):Router {
           if(field.location==='path'){
             if(!/^[1-9]\d*$/.test(String(value)))throw academicError(field.name+' must be a positive integer.');
             path=path.replace('{'+field.sourceName+'}',encodeURIComponent(String(value)));
-          }else query.append(field.sourceName,String(value));
+          }else if(field.location!=='scope')query.append(field.sourceName,String(value));
         }
         if(rejectUnknownFields){
           for(const key of Object.keys(input))if(!sourceProperties.has(key))throw academicError('Unknown JSON field: '+key+'.');
@@ -42,7 +44,7 @@ export function createJsonInputRouter(dispatch:Router):Router {
       }catch(error){next(error);}
     };
     if(!['post','patch','put','delete'].includes(op.method))throw Error('Unsupported JSON input method: '+op.method);
-    router.route(op.path.slice(4))[op.method as 'post'|'patch'|'put'|'delete'](handle);
+    router.route(op.path.slice(4))[op.method as 'post'|'patch'|'put'|'delete'](...(op.scopeRules.length?[authenticate,explicitListScope(op.scopeRules),handle]:[handle]));
   }
   return router;
 }

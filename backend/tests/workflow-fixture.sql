@@ -54,3 +54,14 @@ ALTER TABLE "RecruitmentPosts" ADD COLUMN "Benefits" text,ADD COLUMN "Applicatio
 ALTER TABLE "InternshipPositions" ADD COLUMN "DeletedAt" timestamptz;
 ALTER TABLE "StudentEnterpriseCoordination" ADD COLUMN "PositionID" int;
 CREATE TABLE "JobApplications" ("PostID" int,"PositionID" int);
+
+-- Candidate list contracts and linked CV metadata.
+ALTER TABLE "StudentEnterpriseCoordination" ADD COLUMN "RegistrationID" int,ADD COLUMN "ApplicationID" int,ADD COLUMN "EnterpriseID" int,ADD COLUMN "CoordinatedBy" int,ADD COLUMN "CoordinatedAt" timestamptz DEFAULT now(),ADD COLUMN "Decision" text,ADD COLUMN "DecisionAt" timestamptz,ADD COLUMN "RejectReason" text;
+ALTER TABLE "OJTRegistrations" ADD COLUMN "Application" jsonb DEFAULT '{}';
+ALTER TABLE "JobApplications" ADD COLUMN "ApplicationID" serial PRIMARY KEY,ADD COLUMN "CVID" int,ADD COLUMN "CoverLetter" text,ADD COLUMN "AppliedAt" timestamptz DEFAULT now(),ADD COLUMN "Status" text;
+CREATE TABLE "StudentCVVersions" ("CVID" serial PRIMARY KEY,"StudentID" int,"Filename" text,"MimeType" text,"SizeBytes" int,"Sha256" text,"CreatedAt" timestamptz DEFAULT now());
+
+ALTER TABLE "Users" ADD COLUMN "CreatedAt" timestamptz DEFAULT now(),ADD COLUMN "LastLoginAt" timestamptz;
+
+ALTER TABLE "Enterprises" ADD COLUMN "CreatedAt" timestamp DEFAULT now();
+ALTER TABLE "EnterpriseUsers" ADD COLUMN "EnterpriseUserID" serial;

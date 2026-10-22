@@ -156,6 +156,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/enterprise/candidates",
     "GET /api/enterprise/internships",
     "GET /api/enterprise/profile",
+    "PATCH /api/enterprise/profile",
     "PATCH /api/enterprise/candidates/{id}/decision",
     "PUT /api/enterprise/internships/{id}/evaluation",
   ] },
@@ -166,8 +167,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   ] },
   { roles: ["ADMIN","OJT_COORD","ENTERPRISE"], operations: [
     "GET /api/recruitment/posts",
-    "GET /api/recruitment/windows",
-    "PATCH /api/recruitment/posts/{id}",
+
   ] },
 ];
 
@@ -189,7 +189,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
       operation['x-roles'] = operation.security?.length ? [...roles] : [];
       // Tags organize primary functions, while x-roles retains every authorized role.
       // Shared business APIs appear under their business roles instead of repeating under Admin.
-      const displayRoles = roles.length > 1 ? roles.filter(role => role !== 'ADMIN') : roles;
+      const displayRoles = roles.length > 1 ? roles.filter(role => role !== 'ADMIN' && !(path === '/api/accounts/me/profile' && role === 'ENTERPRISE')) : roles;
       // Authentication lives in its own group. Admin password reset stays under Admin.
       operation.tags = path.startsWith('/api/auth/') && !path.startsWith('/api/auth/users/')
         ? ['Auth'] : displayRoles.length ? displayRoles.map(role => roleNames[role]) : ['Admin'];

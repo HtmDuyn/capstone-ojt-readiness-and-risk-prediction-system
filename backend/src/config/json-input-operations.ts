@@ -1,8 +1,9 @@
+import type { ScopeRule } from '../shared/explicit-list-scope';
 type RecordValue = Record<string, any>;
 export type JsonInputOperation = {
   method: string; path: string; sourceMethod: string; sourcePath: string;
-  inputs: { name: string; sourceName: string; location: 'path'|'query'; required: boolean; schema: RecordValue }[];
-  bodySchema: RecordValue; operation: RecordValue; protected: boolean;
+  inputs: { name: string; sourceName: string; location: 'path'|'query'|'scope'; required: boolean; schema: RecordValue }[];
+  bodySchema: RecordValue; operation: RecordValue; protected: boolean; scopeRules: ScopeRule[];
 };
 const idFields: Record<string, string> = {
   candidates: 'candidateId',
@@ -64,7 +65,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       const pathIdName=idFields[segments[segments.indexOf('{id}')-1]]??'id';
       const inputs=params.map(p=>({
         name:p.in==='path'&&p.name==='id'?pathIdName:p.name,
-        sourceName:p.name,location:p.in as 'path'|'query',required:p.required===true,schema:structuredClone(resolve(p.schema)??{})
+        sourceName:p.name,location:p.in as 'path'|'query'|'scope',required:p.required===true,schema:structuredClone(resolve(p.schema)??{})
       }));
       let path='/api/json'+sourcePath.slice(4).replace(/\/\{[^}]+\}/g,'');
       const method=sourceMethod==='get'?'post':sourceMethod;
@@ -87,7 +88,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
       const sourceBodyFields=new Set(Object.keys(bodySchema.properties));
       for(const input of inputs){
         if(sourceBodyFields.has(input.name))throw Error('Body/URL input conflict: '+sourcePath+' '+input.name);
-        bodySchema.properties[input.name]={...input.schema,description:(params.find(p=>p.in===input.location&&p.name===input.sourceName)?.description??'')};
+        bodySchema.properties[input.name]={...input.schema,description:(params.find(p=>p.in===input.location&&p.name===input.sourceName)?.description??input.schema.description??'')};
         if(input.required&&!bodySchema.required.includes(input.name))bodySchema.required.push(input.name);
       }
       const operation=structuredClone(original);
@@ -118,9 +119,61 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
         latest:{summary:'CV mới nhất của sinh viên',value:{studentId:1}},
         version:{summary:'Một phiên bản CV cụ thể',value:{studentId:1,cvFileId:1}}
       };
+      const requiredInputs:Record<string,string[]>={
+        '/api/academic/alerts':['ojtSemesterId','academicPeriodId','assessmentDeadline'],
+        '/api/academic/course-demand':['ojtSemesterId','academicPeriodId'],
+        '/api/students/me/opportunities':['ojtSemesterId']
+      };
+      for(const name of requiredInputs[sourcePath]??[]){
+        const input=inputs.find(input=>input.name===name);if(!input)throw Error('Missing required input '+sourcePath+' '+name);
+        input.required=true;if(!bodySchema.required.includes(name))bodySchema.required.push(name);
+      }
+      const scopeRules:ScopeRule[]=[];
+      if(sourceMethod==='get'&&path.endsWith('/list')){
+        const roles:string[]=original['x-roles']??[];
+        if(roles.includes('ENTERPRISE'))scopeRules.push({field:'companyId',roles:['ENTERPRISE'],requiredForAll:sourcePath==='/api/recruitment/posts',forward:inputs.some(p=>p.name==='companyId')});
+        if(roles.includes('STUDENT'))scopeRules.push({field:'studentId',roles:['STUDENT'],forward:inputs.some(p=>p.name==='studentId')});
+        for(const rule of scopeRules){
+          const required=rule.requiredForAll||roles.every(role=>rule.roles.includes(role));
+          if(!inputs.some(p=>p.name===rule.field))inputs.push({name:rule.field,sourceName:rule.field,location:'scope',required:!!required,schema:{type:'integer',minimum:1,maximum:2147483647}});
+          const description=rule.field+' chọn đối tượng truy xuất, FE phải nhập; '+(required?'bắt buộc cho mọi vai trò.':'bắt buộc khi đăng nhập vai trò '+rule.roles.join('/')+'; '+(rule.forward?'vai trò quản trị có thể bỏ để xem toàn bộ.':'đây là ID xác định chủ thể cho vai trò này, các vai trò khác không truyền trường này.'))+' JWT chỉ dùng xác thực và kiểm tra quyền đối với ID này.';
+          bodySchema.properties[rule.field]={...bodySchema.properties[rule.field],type:'integer',minimum:1,maximum:2147483647,description,'x-required-for-roles':rule.requiredForAll?roles:rule.roles};
+          if(required&&!bodySchema.required.includes(rule.field))bodySchema.required.push(rule.field);
+          for(const input of inputs)if(input.name===rule.field&&required)input.required=true;
+        }
+        for(const [name,property]of Object.entries(bodySchema.properties) as [string,RecordValue][]){
+          if(!property.description)property.description=name==='page'?'Trang kết quả, mặc định 1.':name==='limit'?'Số bản ghi mỗi trang, tối đa 100.':name.endsWith('Id')?'ID '+name+' dùng để chọn/lọc dữ liệu trong DB. '+(bodySchema.required.includes(name)?'Bắt buộc.':'Tùy chọn; bỏ qua để không lọc theo ID này.'):'Bộ lọc '+name+'. Bỏ qua để dùng phạm vi mặc định được mô tả cho API.';
+        }
+        if(scopeRules.length){
+          operation['x-explicit-list-scope']=scopeRules;
+          operation.description=(operation.description??'').replace(/Doanh nghiệp được xác định từ JWT; không nhận companyId\./g,'FE nhập companyId trong JSON body.')+' '+scopeRules.map(rule=>bodySchema.properties[rule.field].description).join(' ');
+          const examples=operation.requestBody.content['application/json'].examples??{list:{summary:'Danh sách với ID tường minh',value:{page:1,limit:20}}};
+          for(const example of Object.values(examples) as RecordValue[])for(const rule of scopeRules)example.value={...example.value,[rule.field]:1};
+          const staffRoles=roles.filter(role=>!scopeRules.some(rule=>rule.roles.includes(role)));
+          if(staffRoles.length){
+            const value:RecordValue={page:1,limit:20};
+            for(const name of bodySchema.required)value[name]=bodySchema.properties[name]?.default??1;
+            examples.staff={summary:'Dành cho '+staffRoles.join('/')+'; bỏ bộ lọc tùy chọn để xem toàn bộ phạm vi',value};
+          }
+          for(const rule of scopeRules)for(const role of rule.roles.filter(role=>roles.includes(role))){
+            const value:RecordValue={page:1,limit:20};
+            for(const name of bodySchema.required)value[name]=bodySchema.properties[name]?.default??1;
+            value[rule.field]=1;
+            examples[role.toLowerCase()]={summary:'Dành cho '+role+': nhập '+rule.field,value};
+          }
+          operation.requestBody.content['application/json'].examples=examples;
+        }
+      }
+      if(sourceMethod==='get'&&path.endsWith('/list')){
+        const examples=operation.requestBody.content['application/json'].examples??{list:{summary:'Nhập các ID/bộ lọc cần truy xuất',value:{page:1,limit:20}}};
+        for(const example of Object.values(examples) as RecordValue[])for(const name of bodySchema.required){
+          if(example.value[name]===undefined){const property=bodySchema.properties[name];example.value[name]=property?.format==='date-time'?'2026-12-01T00:00:00+07:00':property?.default??property?.enum?.[0]??1;}
+        }
+        operation.requestBody.content['application/json'].examples=examples;
+      }
       // Original examples lack newly required IDs/filters; let the expanded schema expose every field.
       operation['x-original-operation']={method:sourceMethod.toUpperCase(),path:sourcePath};
-      result.push({method,path,sourceMethod,sourcePath,inputs,bodySchema,operation,protected:!!original.security?.length});
+      result.push({method,path,sourceMethod,sourcePath,inputs,bodySchema,operation,protected:!!original.security?.length,scopeRules});
     }
   }
   return result;
