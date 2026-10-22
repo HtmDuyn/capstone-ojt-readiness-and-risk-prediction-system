@@ -58,6 +58,7 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
   for(const [sourcePath,item]of Object.entries(spec.paths)as[string,RecordValue][]){
     for(const sourceMethod of ['get','post','put','patch','delete']){
       const original=item[sourceMethod];if(!original)continue;
+      if(sourceMethod==='patch'&&sourcePath==='/api/companies/{id}')continue;
       const params=[...(item.parameters??[]),...(original.parameters??[])].map(resolve)
         .filter(p=>p.in==='path'||p.in==='query');
       if(!params.length)continue;
@@ -90,6 +91,12 @@ export function buildJsonInputOperations(spec:RecordValue):JsonInputOperation[] 
         if(sourceBodyFields.has(input.name))throw Error('Body/URL input conflict: '+sourcePath+' '+input.name);
         bodySchema.properties[input.name]={...input.schema,description:(params.find(p=>p.in===input.location&&p.name===input.sourceName)?.description??input.schema.description??'')};
         if(input.required&&!bodySchema.required.includes(input.name))bodySchema.required.push(input.name);
+        // Closed role variants must also accept inputs moved from the URL.
+        for(const variant of bodySchema.anyOf??[]){
+          variant.properties??={};variant.required??=[];
+          variant.properties[input.name]=structuredClone(bodySchema.properties[input.name]);
+          if(input.required&&!variant.required.includes(input.name))variant.required.push(input.name);
+        }
       }
       const operation=structuredClone(original);
       operation.parameters=(operation.parameters??[]).filter((p:any)=>!['path','query'].includes(resolve(p)?.in));
@@ -185,10 +192,20 @@ export function documentJsonInputOperations(spec:RecordValue,operations:JsonInpu
     if(!Object.keys(doc.paths[entry.sourcePath]).length)delete doc.paths[entry.sourcePath];
     doc.paths[entry.path]??={};doc.paths[entry.path][entry.method]=entry.operation;
   }
-  // Fail startup when a future API accidentally exposes URL inputs in the JSON contract.
+  const companyUpdate=doc.paths['/api/companies/{id}']?.patch;
+  if(companyUpdate){
+    companyUpdate.description='Admin và Phòng QHDN cập nhật doanh nghiệp bằng ô id trong URL. Lấy id từ danh sách doanh nghiệp. Phòng QHDN (OJT_COORD) phải truyền reason và ít nhất một trường cần sửa trong body.';
+    companyUpdate.parameters=[{name:'id',in:'path',required:true,description:'ID doanh nghiệp cần cập nhật; lấy từ danh sách doanh nghiệp.',schema:{type:'integer',minimum:1,maximum:2147483647}}];
+    companyUpdate.requestBody.content['application/json'].examples={
+      qhdn:{summary:'Phòng QHDN — cập nhật doanh nghiệp',value:{name:'Doanh nghiệp công nghệ',reason:'Cập nhật tên doanh nghiệp'}},
+      admin:{summary:'Admin — cập nhật doanh nghiệp',value:{name:'Doanh nghiệp công nghệ'}}
+    };
+  }
+  // Company updates intentionally keep a separate path ID input in Swagger.
   for(const [path,item]of Object.entries(doc.paths)as[string,RecordValue][]){
     for(const method of ['get','post','put','patch','delete']){
       const operation=item[method];if(!operation)continue;
+      if(path==='/api/companies/{id}'&&method==='patch')continue;
       const parameters=[...(item.parameters??[]),...(operation.parameters??[])];
       if(/\{[^}]+\}/.test(path)||parameters.some(p=>['path','query'].includes(p.in)))
         throw Error('JSON API still exposes URL inputs: '+method.toUpperCase()+' '+path);

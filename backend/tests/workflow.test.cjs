@@ -136,7 +136,7 @@ test('enterprise score is immediately official for academic list and students; e
 });
 test('Swagger loads, all JSON adapters have route targets and removed APIs are absent; original CV contract remains',async()=>{
  const {swaggerSpec,jsonInputOperations}=require('../src/config/swagger.ts');assert.ok(swaggerSpec.paths['/api/students/me/cv'].post);
- for(const path of Object.keys(swaggerSpec.paths))assert.ok(!/\{/.test(path));
+ for(const path of Object.keys(swaggerSpec.paths))assert.ok(path==='/api/companies/{id}'||!/\{/.test(path));
  const removed=['/api/student/cv','/api/student/applications','/api/recruitment-posts','/api/company-imports'];
  for(const path of Object.keys(swaggerSpec.paths))for(const old of removed)assert.ok(!path.startsWith(old)&&!path.startsWith('/api/json'+old.slice(4)));
  const mounts=[['admin/admin',''],['academic/academic',''],['qhdn/qhdn',''],['student-portal/portal',''],['recruitment/recruitment','/recruitment'],['qhdn/enterprise','/enterprise'],['academic-reporting/report',''],['ojt-results/result',''],['academic/workflow',''],['students/student',''],['curriculum/curriculum',''],['combo-registration/combo',''],['eligibility/eligibility',''],['ojt-registration/registration',''],['imports/import','/imports'],['auth/auth','/auth'],['accounts/account','/accounts'],['system/roles/role','/roles'],['system/health/health','/health']];
@@ -151,6 +151,42 @@ test('Swagger loads, all JSON adapters have route targets and removed APIs are a
 
 
 
+
+test('shared JSON update schemas include required IDs in closed role variants and company examples',()=>{
+ const {swaggerSpec,jsonInputOperations}=require('../src/config/swagger.ts');
+ for(const op of jsonInputOperations.filter(op=>op.bodySchema.anyOf)){
+  for(const variant of op.bodySchema.anyOf)for(const input of op.inputs){
+   assert.ok(variant.properties[input.name],op.path+' '+input.name);
+   if(input.required)assert.ok(variant.required.includes(input.name));
+  }
+ }
+ const operation=swaggerSpec.paths['/api/companies/{id}'].patch;
+ const media=operation.requestBody.content['application/json'];
+ assert.ok(operation.parameters.some(p=>p.name==='id'&&p.in==='path'&&p.required));
+ assert.equal(media.schema.properties.companyId,undefined);
+ assert.equal(media.examples.qhdn.value.companyId,undefined);
+ assert.ok(media.examples.qhdn.value.reason);
+ assert.equal(media.examples.admin.value.companyId,undefined);
+ assert.ok(!swaggerSpec.paths['/api/json/companies']?.patch);
+});
+
+test('QHDN updates a company by path ID and rejects missing records and invalid requests',async()=>{
+ await services.importAccounts(enterprise(),1);
+ const app=require('../src/app.ts').default,jwt=require('jsonwebtoken');
+ let server;await new Promise(resolve=>{server=app.listen(0,'127.0.0.1',resolve);});
+ const update=(id,body,userId=1)=>fetch('http://127.0.0.1:'+server.address().port+'/api/companies/'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+jwt.sign({userId,authVersion:0},process.env.JWT_SECRET)},body:JSON.stringify(body)});
+ try{
+  let response=await update(1,{name:'Updated company',reason:'Correct company name'});
+  assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+  assert.equal((await response.json()).data.id,1);
+  assert.equal((await rows('SELECT "Name" FROM "Enterprises" WHERE "EnterpriseID"=1'))[0].Name,'Updated company');
+  response=await update(999999,{name:'Missing company',reason:'Test missing ID'});
+  assert.equal(response.status,404);assert.equal((await response.json()).errorCode,'QHDN_RECORD_NOT_FOUND');
+  assert.equal((await update('invalid',{name:'Invalid',reason:'Test'})).status,400);
+  assert.equal((await update(1,{name:'No reason'})).status,400);
+  assert.equal((await update(1,{name:'Forbidden',reason:'Test'},4)).status,403);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});
 
 test('login examples remain selectable and the HTTP contract supports FE login and failures',async()=>{
  const {swaggerSpec}=require('../src/config/swagger.ts');
