@@ -1,4 +1,5 @@
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
+import { describeListBaseFields } from './swagger-list-base-fields';
 import {
   readdirSync,
 } from "node:fs";
@@ -17,7 +18,7 @@ import { groupSwaggerByRole } from './swagger-role-groups';
 import { describeMergedSearchResponses } from './swagger-search-contracts';
 import { describeFeResponses } from './swagger-fe-contracts';
 import { describeStudentWorkflow } from '../modules/students/student-workflow.openapi';
-import { describeListResponses } from './swagger-list-contracts';
+import { describeListResponses, describeAdditionalListResponses } from './swagger-list-contracts';
 import { describeMergedDetailLists } from './swagger-merged-details';
 import { describeImportWorkflow } from './import-workflow-contracts';
 
@@ -381,6 +382,8 @@ describeListResponses(describedSpec);
 describeMergedDetailLists(describedSpec);
 describeImportWorkflow(describedSpec);
 describeOfficialResults(describedSpec);
+describeAdditionalListResponses(describedSpec);
+describeListBaseFields(describedSpec);
 const originalSpec = groupSwaggerByRole(describedSpec);
 export const jsonInputOperations = buildJsonInputOperations(originalSpec);
 export const swaggerSpec = documentJsonInputOperations(originalSpec, jsonInputOperations);

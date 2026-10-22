@@ -54,15 +54,11 @@ export const parseUpdateAccountInput = (input: unknown): UpdateAccountInput => {
 export const parseUpdateOwnProfileInput = (
   input: unknown,
 ): UpdateOwnProfileInput => {
-  const body =
-    asObject(input);
+  if(!input||typeof input!=='object'||Array.isArray(input))throw Object.assign(new Error('Provide a JSON object.'),{statusCode:400,errorCode:'INVALID_PROFILE_INPUT'});
+  const body=input as Record<string,unknown>,allowed=['fullName','phone'];
+  if(Object.keys(body).some(key=>!allowed.includes(key))||!Object.keys(body).some(key=>key!=='companyId'&&body[key]!==undefined))throw Object.assign(new Error('Provide supported profile fields to update.'),{statusCode:400,errorCode:'INVALID_PROFILE_INPUT'});
+  return body;
 
-  return {
-    fullName:
-      body.fullName,
-    phone:
-      body.phone,
-  };
 };
 
 export const parseAccountListQuery = (

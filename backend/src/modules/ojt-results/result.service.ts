@@ -1,4 +1,5 @@
 import { readTransaction } from '../qhdn/read.repository';
+import { enrichListRows } from '../../shared/list-context';
 import { invalid, positiveId, requiredText, enumValue, pagination } from '../students/student.validation';
 
 type Row = Record<string, any>;
@@ -39,7 +40,7 @@ export async function list(params:Row,semesterId?:number,exportAll=false,student
     const total=(await c.query(`SELECT count(*)::int AS total FROM (${sql}) data`,args)).rows[0].total;
     if(exportAll&&total>10000)throw invalid('Narrow exports to at most 10000 results.',422);
     const rows=(await c.query(sql+' ORDER BY ev."EvaluationID" DESC'+(exportAll?'':` LIMIT $${args.length+1} OFFSET $${args.length+2}`),exportAll?args:[...args,p.limit,p.offset])).rows;
-    return {items:rows.map(resultApi),total,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
+    return {items:await enrichListRows(c,rows.map(resultApi)),total,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
   });
 }
 export function resultCsv(items:ReturnType<typeof resultApi>[]) {

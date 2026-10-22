@@ -43,6 +43,9 @@ export function describeFeResponses(spec:Schema):void {
   const personalUser=obj({id,...fields('username','email','phone','fullName','status','roleCode','roleName'),roleId:id,studentId:nil(id),enterpriseId:nil(id),mustChangePassword:{type:'boolean'},createdAt:time,updatedAt:time,lastLoginAt:time});
   set('/api/auth/me',personalUser,'user');
   set('/api/accounts/me/profile',personalUser,'user','patch');
+  const personalUpdate=spec.paths['/api/accounts/me/profile'].patch;
+  personalUpdate.description='Chỉ cập nhật fullName và phone của tài khoản đăng nhập. Hồ sơ doanh nghiệp dùng PATCH /api/enterprise/profile riêng.';
+  personalUpdate.requestBody={required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,minProperties:1,properties:{fullName:{type:'string',minLength:1,maxLength:150},phone:{type:'string',nullable:true,maxLength:20}}}}}};
 
   set('/api/accounts/{userId}',account,'account','patch');
   spec.paths['/api/accounts'].get.responses['200']={description:'Danh sách hoặc tài khoản theo userId; giữ envelope hiện có.',content:{'application/json':{schema:obj({success:{type:'boolean'},data:arr(account),total:{type:'integer'},page:id,limit:id})}}};

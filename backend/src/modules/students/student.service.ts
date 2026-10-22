@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { currentCVSql } from './cv.service';
 import { assignPlacementWithClient } from '../academic/academic.service';
 import { query } from '../../config/database';
@@ -27,7 +28,7 @@ export async function listStudents(params: Record<string,unknown>, exporting=fal
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
   const row = (await query(`WITH filtered AS (${studentSelect}${where}), paged AS (SELECT * FROM filtered ORDER BY id LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,exporting?10001:p.limit,exporting?0:p.offset])).rows[0];
   if(exporting&&row.total>10000)throw invalid('Narrow export to at most 10000 students.',422,'EXPORT_TOO_LARGE');
-  return {total:row.total,items:row.items,page:p.page,limit:p.limit};
+  return {total:row.total,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
 export async function patchStudent(id: number, body: unknown, actorId: number) {
   const input=inputObject(body,['fullName','phone','className','status','programId','placement','reason']);
@@ -62,7 +63,8 @@ export async function results(id: number, params: Record<string,unknown>) {
   await student(id);
   const p=pagination(params,['courseId','academicPeriodId','status']), args:unknown[]=[id], filters=['r."StudentID"=$1'];
   for (const key of ['courseId','academicPeriodId','status']) if (params[key]!==undefined) { args.push(key==='status' ? enumValue(params[key],['PASSED','FAILED','IN_PROGRESS','WITHDRAWN','RECOGNIZED'],'status') : positiveId(params[key],key)); filters.push(`r."${key==='courseId'?'CourseID':key==='status'?'Status':'AcademicPeriodID'}"=$${args.length}`); }
-  return (await query(`WITH filtered AS (${resultSelect} WHERE ${filters.join(' AND ')}), paged AS (SELECT * FROM filtered ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows.map(row=>({...row,page:p.page,limit:p.limit}))[0];
+  const row=(await query(`WITH filtered AS (${resultSelect} WHERE ${filters.join(' AND ')}), paged AS (SELECT * FROM filtered ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
+  return {...row,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
 export async function resultPeriod(client: PoolClient, studentId: number, periodId: number) {
   const period=(await client.query(`SELECT p.*,COALESCE(parent."StartDate",p."StartDate") AS "SemesterStart" FROM "AcademicPeriods" p LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=p."ParentPeriodID" WHERE p."AcademicPeriodID"=$1`,[periodId])).rows[0];

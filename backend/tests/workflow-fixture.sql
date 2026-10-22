@@ -37,3 +37,31 @@ CREATE TABLE "ComboRegistrationWindows" ("WindowID" int,"Status" text);
 CREATE TABLE "ComboReminderBatches" ("BatchID" int,"Summary" jsonb);
 CREATE TABLE "StudentComboSelectionEvents" ("WindowID" int,"StudentID" int,"EventType" text);
 
+-- Additional display fields used by production list-context projections.
+ALTER TABLE "TrainingPrograms" ADD COLUMN "ProgramCode" text DEFAULT 'SE',ADD COLUMN "ProgramName" text DEFAULT 'Software Engineering',ADD COLUMN "Version" text DEFAULT '1',ADD COLUMN "TotalCredits" numeric DEFAULT 120,ADD COLUMN "Status" text DEFAULT 'PUBLISHED',ADD COLUMN "SpecializationID" int;
+ALTER TABLE "Cohorts" ADD COLUMN "CohortCode" text DEFAULT 'KTEST',ADD COLUMN "Name" text DEFAULT 'Test Cohort';
+ALTER TABLE "OJTSemesters" ADD COLUMN "Name" text DEFAULT 'OJT Term',ADD COLUMN "Status" text DEFAULT 'ACTIVE';
+ALTER TABLE "AcademicYears" ADD COLUMN "YearCode" text DEFAULT 'TEST',ADD COLUMN "Status" text DEFAULT 'ACTIVE';
+ALTER TABLE "Enterprises" ADD COLUMN "Industry" text DEFAULT 'IT',ADD COLUMN "ContactPhone" text;
+ALTER TABLE "InternshipPositions" ADD COLUMN "Location" text DEFAULT 'HCM',ADD COLUMN "WorkMode" text DEFAULT 'ONSITE';
+ALTER TABLE "Courses" ADD COLUMN "CourseName" text DEFAULT 'Programming',ADD COLUMN "Credits" numeric DEFAULT 3,ADD COLUMN "IsOJTPrerequisite" boolean DEFAULT false;
+CREATE TABLE "OJTRegistrations" ("RegistrationID" serial PRIMARY KEY,"StudentID" int REFERENCES "Students","OJTSemesterID" int REFERENCES "OJTSemesters","Status" text,"RegisteredAt" timestamptz DEFAULT now());
+CREATE TABLE "OJTAdvisoryRuns" ("RunID" serial PRIMARY KEY,"Kind" text,"Status" text,"CreatedBy" int REFERENCES "Users","Request" jsonb,"CreatedAt" timestamptz DEFAULT now(),"CompletedAt" timestamptz);
+CREATE TABLE "OJTAdvisoryRunItems" ("RunID" int REFERENCES "OJTAdvisoryRuns","StudentID" int REFERENCES "Students","Status" text,"NotificationID" int,"ErrorCode" text,"Snapshot" jsonb);
+CREATE TABLE "ProgramCombos" ("ProgramComboID" serial PRIMARY KEY,"ComboCode" text,"ComboName" text,"ProgramID" int,"SelectionGroup" text,"Note" text);
+CREATE TABLE "Specializations" ("SpecializationID" serial PRIMARY KEY,"SpecializationCode" text,"SpecializationName" text,"MajorID" int);
+ALTER TABLE "RecruitmentPosts" ADD COLUMN "Benefits" text,ADD COLUMN "ApplicationInstructions" text,ADD COLUMN "PublishedAt" timestamptz,ADD COLUMN "ReviewedBy" int,ADD COLUMN "ReviewedAt" timestamptz,ADD COLUMN "ReviewReason" text,ADD COLUMN "CreatedAt" timestamptz DEFAULT now(),ADD COLUMN "UpdatedAt" timestamptz DEFAULT now();
+ALTER TABLE "InternshipPositions" ADD COLUMN "DeletedAt" timestamptz;
+ALTER TABLE "StudentEnterpriseCoordination" ADD COLUMN "PositionID" int;
+CREATE TABLE "JobApplications" ("PostID" int,"PositionID" int);
+
+-- Candidate list contracts and linked CV metadata.
+ALTER TABLE "StudentEnterpriseCoordination" ADD COLUMN "RegistrationID" int,ADD COLUMN "ApplicationID" int,ADD COLUMN "EnterpriseID" int,ADD COLUMN "CoordinatedBy" int,ADD COLUMN "CoordinatedAt" timestamptz DEFAULT now(),ADD COLUMN "Decision" text,ADD COLUMN "DecisionAt" timestamptz,ADD COLUMN "RejectReason" text;
+ALTER TABLE "OJTRegistrations" ADD COLUMN "Application" jsonb DEFAULT '{}';
+ALTER TABLE "JobApplications" ADD COLUMN "ApplicationID" serial PRIMARY KEY,ADD COLUMN "CVID" int,ADD COLUMN "CoverLetter" text,ADD COLUMN "AppliedAt" timestamptz DEFAULT now(),ADD COLUMN "Status" text;
+CREATE TABLE "StudentCVVersions" ("CVID" serial PRIMARY KEY,"StudentID" int,"Filename" text,"MimeType" text,"SizeBytes" int,"Sha256" text,"CreatedAt" timestamptz DEFAULT now());
+
+ALTER TABLE "Users" ADD COLUMN "CreatedAt" timestamptz DEFAULT now(),ADD COLUMN "LastLoginAt" timestamptz;
+
+ALTER TABLE "Enterprises" ADD COLUMN "CreatedAt" timestamp DEFAULT now();
+ALTER TABLE "EnterpriseUsers" ADD COLUMN "EnterpriseUserID" serial;

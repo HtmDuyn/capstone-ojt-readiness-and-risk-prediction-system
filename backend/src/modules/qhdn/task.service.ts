@@ -1,4 +1,5 @@
 import { academicTransaction, audit } from '../academic/academic.repository';
+import { enrichListRows } from '../../shared/list-context';
 import { enterpriseScope, assertScope, record } from './catalog.service';
 import { inputObject, requiredText, optionalText, positiveId, invalid, pagination } from '../students/student.validation';
 import { dateInput } from '../academic/academic.schema';
@@ -38,16 +39,27 @@ export async function assignTasks(body: unknown, actor: Actor) {
 }
 
 export async function listTasks(params:Record<string,unknown>, actor:Actor){
-  const p=pagination(params,['assignmentId']);
+  const p=pagination(params,['assignmentId','companyId','studentId','positionId','ojtSemesterId']);
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const id=params.assignmentId===undefined?null:positiveId(params.assignmentId,'assignmentId');
   return academicTransaction(async c=>{
-    const company=actor.roleCode==='STUDENT'?null:await enterpriseScope(c,actor);
-    const rows=await c.query(`WITH filtered AS (SELECT t."TaskID" AS id,t."AssignmentID" AS "assignmentId",t."TaskName" AS name,t."Description" AS description,t."DueDate" AS "dueDate",t."Status" AS status
+    const company=params.companyId===undefined?null:positiveId(params.companyId,'companyId');
+    const studentId=params.studentId===undefined?null:positiveId(params.studentId,'studentId');
+    if(actor.roleCode==='ENTERPRISE'){positiveId(params.companyId,'companyId');await assertScope(c,actor,company!);}
+    else if(actor.roleCode==='STUDENT'){
+      positiveId(params.studentId,'studentId');
+      if(!(await c.query('SELECT 1 FROM "Students" WHERE "StudentID"=$1 AND "UserID"=$2',[studentId,actor.userId])).rows.length)throw invalid('Student scope denied.',403,'FORBIDDEN');
+    }else await enterpriseScope(c,actor);
+    const positionId=params.positionId===undefined?null:positiveId(params.positionId,'positionId');
+    const semesterId=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
+    const rows=await c.query(`WITH filtered AS (SELECT t."TaskID" AS id,t."AssignmentID" AS "assignmentId",t."TaskName" AS name,t."Description" AS description,t."AssignedDate" AS "assignedDate",t."DueDate" AS "dueDate",t."Status" AS status,
+      a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",co."OJTSemesterID" AS "ojtSemesterId",
+      jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate") AS assignment
       FROM "InternshipTasks" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "Students" s ON s."StudentID"=a."StudentID"
-      WHERE ($1::int IS NULL OR a."AssignmentID"=$1) AND ($2::int IS NULL OR a."EnterpriseID"=$2) AND ($3::text<>'STUDENT' OR s."UserID"=$4)
+      JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
+      WHERE ($1::int IS NULL OR a."AssignmentID"=$1) AND ($2::int IS NULL OR a."EnterpriseID"=$2) AND ($3::int IS NULL OR a."StudentID"=$3) AND ($4::int IS NULL OR a."PositionID"=$4) AND ($7::int IS NULL OR co."OJTSemesterID"=$7)
       ), paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $5 OFFSET $6)
-      SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[id,company,actor.roleCode,actor.userId,p.limit,p.offset]);
-    return {...rows.rows[0],page:p.page,limit:p.limit};
+      SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[id,company,studentId,positionId,p.limit,p.offset,semesterId]);
+    return {...rows.rows[0],items:await enrichListRows(c,rows.rows[0].items),page:p.page,limit:p.limit};
   });
 }

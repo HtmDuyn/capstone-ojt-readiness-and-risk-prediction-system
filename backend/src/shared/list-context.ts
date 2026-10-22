@@ -14,6 +14,10 @@ const entities = {
   position: `SELECT p."PositionID" AS id,p."RecruitmentCode" AS code,p."Title" AS title,p."Description" AS description,p."Requirements" AS requirements,p."Location" AS location,p."WorkMode" AS "workMode",p."EnterpriseID" AS "companyId",p."OJTSemesterID" AS "ojtSemesterId",p."Capacity" AS capacity,p."Status" AS status,GREATEST(0,p."Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=p."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))) AS "remainingSlots" FROM "InternshipPositions" p WHERE p."PositionID"=ANY($1::int[])`,
   model: `SELECT "ModelID" AS id,"Code" AS code,"Version" AS version,"Name" AS name,"Status" AS status FROM "PredictionModels" WHERE "ModelID"=ANY($1::int[])`,
   ruleSet: `SELECT "RuleSetID" AS id,"Name" AS name,"Version" AS version,"ProgramID" AS "programId","OJTSemesterID" AS "ojtSemesterId","MinCredits"::float8 AS "minCredits","MaxUnpassedCourses" AS "maxUnpassedCourses","Status" AS status FROM "OJTRuleSets" WHERE "RuleSetID"=ANY($1::int[])`,
+  course: `SELECT "CourseID" AS id,"CourseCode" AS code,"CourseName" AS name,"Credits"::float8 AS credits,"IsOJTPrerequisite" AS "isOjtPrerequisite" FROM "Courses" WHERE "CourseID"=ANY($1::int[])`,
+  combo: `SELECT "ProgramComboID" AS id,"ComboCode" AS code,"ComboName" AS name,"ProgramID" AS "programId","SelectionGroup" AS "selectionGroup","Note" AS note FROM "ProgramCombos" WHERE "ProgramComboID"=ANY($1::int[])`,
+  major: `SELECT "SpecializationID" AS id,"SpecializationCode" AS code,"SpecializationName" AS name,"MajorID" AS "parentMajorId" FROM "Specializations" WHERE "SpecializationID"=ANY($1::int[])`,
+  registration: `SELECT r."RegistrationID" AS id,r."StudentID" AS "studentId",s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."OJTSemesterID" AS "ojtSemesterId",o."SemesterCode" AS "semesterCode",r."Status" AS status,r."RegisteredAt" AS "registeredAt" FROM "OJTRegistrations" r JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "OJTSemesters" o ON o."OJTSemesterID"=r."OJTSemesterID" WHERE r."RegistrationID"=ANY($1::int[])`,
   user: `SELECT "UserID" AS id,"FullName" AS "fullName" FROM "Users" WHERE "UserID"=ANY($1::int[])`,
 };
 
@@ -22,7 +26,14 @@ const references: [string, keyof typeof entities, string][] = [
   ['cohortId','cohort','cohort'],['ojtSemesterId','semester','semester'],['academicPeriodId','academicPeriod','academicPeriod'],
   ['academicYearId','academicYear','academicYear'],['companyId','company','company'],['enterpriseId','company','company'],
   ['positionId','position','position'],['modelId','model','model'],['ruleSetId','ruleSet','ruleSet'],
+  ['courseId','course','course'],['sourceCourseId','course','sourceCourse'],['targetCourseId','course','targetCourse'],
+  ['comboId','combo','combo'],['programComboId','combo','combo'],['majorId','major','major'],
+  ['entryAcademicPeriodId','academicPeriod','entryAcademicPeriod'],['currentAcademicPeriodId','academicPeriod','currentAcademicPeriod'],
   ...['userId','createdBy','updatedBy','submittedBy','reviewedBy','confirmedBy','checkedBy','assignedTo','acknowledgedBy','closedBy','openedBy','publishedBy','coordinatedBy','evaluatedBy','transferredBy','importedBy','recordedBy'].map(key=>[key,'user',key==='userId'?'user':key+'User'] as [string,'user',string]),
+];
+// Only explicitly named relation arrays are expanded. Never inspect arbitrary snapshots or audit payloads.
+const arrayReferences: [string, keyof typeof entities, string][] = [
+  ['registrationIds','registration','registrations'],['courseIds','course','courses'],['choices','course','courseChoices'],['comboIds','combo','combos'],
 ];
 
 export async function enrichListRows<T extends Row>(client:Client,rows:T[]):Promise<T[]> {
@@ -31,7 +42,11 @@ export async function enrichListRows<T extends Row>(client:Client,rows:T[]):Prom
   const columns:string[]=[],args:number[][]=[];
   for(const entity of Object.keys(entities) as (keyof typeof entities)[]) {
     const keys=references.filter(([,type])=>type===entity).map(([key])=>key);
-    const ids=[...new Set(rows.flatMap(row=>keys.map(key=>row[key])).filter(value=>Number.isSafeInteger(value)&&value>0))];
+    const arrays=arrayReferences.filter(([,type])=>type===entity).map(([key])=>key);
+    const ids=[...new Set(rows.flatMap(row=>[
+      ...keys.map(key=>row[key]),
+      ...arrays.flatMap(key=>Array.isArray(row[key])?row[key]:[]),
+    ]).filter(value=>Number.isSafeInteger(value)&&value>0))];
     if(!ids.length)continue;
     args.push(ids);
     const sql=entities[entity].replace(/\$1\b/g,()=>'$'+args.length);
@@ -49,6 +64,12 @@ export async function enrichListRows<T extends Row>(client:Client,rows:T[]):Prom
       const context=maps.get(type)?.get(row[key]);
       if(context)item[target]={...context,...(item[target]&&typeof item[target]==='object'?item[target]:{})};
       else if(item[target]===undefined)item[target]=null;
+    }
+    for(const [key,type,target] of arrayReferences) {
+      if(!Array.isArray(row[key])||!row[key].every((value:unknown)=>Number.isSafeInteger(value)&&Number(value)>0))continue;
+      if(item[target]!==undefined)continue;
+      // Keep source IDs, their ordering and cardinality; missing references are explicit nulls.
+      item[target]=row[key].map((value:number)=>maps.get(type)?.get(value)??null);
     }
     for(const [target,key,value]of [['program','programCode','code'],['program','programName','name'],['cohort','cohortName','name'],['student','studentCode','studentCode'],['student','fullName','fullName'],['company','companyName','name'],['position','positionTitle','title'],['semester','semesterCode','code']] as const) {
       if(item[key]===undefined&&item[target])item[key]=item[target][value];

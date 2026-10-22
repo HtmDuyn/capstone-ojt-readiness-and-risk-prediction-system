@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from '../qhdn/read.repository';
 import { query } from '../../config/database';
 import { invalid } from '../students/student.validation';
@@ -33,7 +34,7 @@ export async function predictionReport(params:Row,exporting=false) {
  if(exporting){
   if(params.page!==undefined||params.limit!==undefined)throw invalid('Export does not accept pagination.');
   const rows=(await query(r.sql+' ORDER BY id LIMIT 10001',r.args)).rows;
-  if(rows.length>10000)throw invalid('Narrow export to at most 10000 records.',422,'EXPORT_TOO_LARGE');return {basis:'LATEST_PER_STUDENT_PER_SEMESTER',total:rows.length,items:rows};
+  if(rows.length>10000)throw invalid('Narrow export to at most 10000 records.',422,'EXPORT_TOO_LARGE');return {basis:'LATEST_PER_STUDENT_PER_SEMESTER',total:rows.length,items:await enrichListRows({query},rows)};
  }
  return {...await pageSql(r.sql,r.args,r.page),basis:'LATEST_PER_STUDENT_PER_SEMESTER'};
 }

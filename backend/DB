@@ -1,3 +1,9 @@
+-- OJT FULL DATABASE: original 2026-10-20 uploaded DB + DEMO recruitment seed
+-- DANGER: FULL RESET; WILL DELETE existing application data.
+-- USE ONLY ON A TEST/EMPTY DATABASE AFTER BACKUP.
+-- Original DB text is preserved verbatim, with demo semester and recruitment
+-- data appended after its final COMMIT. No other original statements modified.
+
 -- UPDATED FULL DATABASE BUILD (EMPTY/TEST DATABASE ONLY)
 -- Based on the supplied 2026-10-19 script. Scoped edits ONLY to TrainingPrograms
 -- and direct dependencies of the removed columns/publication workflow.
@@ -12,7 +18,7 @@ SET LOCAL search_path=public,pg_catalog;
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
  SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
+ WHERE n.nspname='public' AND c.relname IN ('StudentCVFiles','RecruitmentWindows','OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
 ), edges AS (
  SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
  UNION
@@ -6412,3 +6418,362 @@ CREATE TABLE IF NOT EXISTS "OJTCompletionDeliveries" (
 ALTER TABLE "OJTCompletionDeliveries" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "OJTCompletionDeliveries" FROM PUBLIC;
 COMMIT;
+
+-- SECTION: 20261018 recruitment intake and student CV upload
+CREATE UNIQUE INDEX IF NOT EXISTS "UQ_OJTSemesters_AcademicPeriod"
+  ON "OJTSemesters"("AcademicPeriodID") WHERE "AcademicPeriodID" IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS "RecruitmentWindows" (
+  "WindowID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "AcademicPeriodID" int NOT NULL REFERENCES "AcademicPeriods"("AcademicPeriodID"),
+  "OJTSemesterID" int NOT NULL REFERENCES "OJTSemesters"("OJTSemesterID"),
+  "Name" varchar(150) NOT NULL,
+  "StartsAt" timestamptz NOT NULL,
+  "EndsAt" timestamptz NOT NULL,
+  "Status" varchar(20) NOT NULL DEFAULT 'DRAFT' CHECK ("Status" IN ('DRAFT','OPEN','CLOSED')),
+  "CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),
+  "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+  "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
+  "UpdatedBy" int REFERENCES "Users"("UserID"),
+  CHECK ("EndsAt" > "StartsAt"),
+  UNIQUE("WindowID", "OJTSemesterID")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "UQ_RecruitmentWindows_OpenPeriod" 
+ON "RecruitmentWindows"("AcademicPeriodID") WHERE "Status" = 'OPEN';
+
+ALTER TABLE "RecruitmentPosts"
+  ADD COLUMN IF NOT EXISTS "WindowID" int,
+  ADD COLUMN IF NOT EXISTS "SubmissionKey" varchar(100) UNIQUE,
+  ADD COLUMN IF NOT EXISTS "RequestHash" text,
+  ADD COLUMN IF NOT EXISTS "ReviewReason" varchar(2000);
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_RecruitmentPosts_WindowSemester') THEN
+    ALTER TABLE "RecruitmentPosts"
+    ADD CONSTRAINT "FK_RecruitmentPosts_WindowSemester" 
+    FOREIGN KEY ("WindowID", "OJTSemesterID") REFERENCES "RecruitmentWindows"("WindowID", "OJTSemesterID");
+  END IF;
+END $$;
+
+ALTER TABLE "RecruitmentPosts" DROP CONSTRAINT IF EXISTS "RecruitmentPosts_Status_check";
+ALTER TABLE "RecruitmentPosts" ADD CONSTRAINT "RecruitmentPosts_Status_check"
+  CHECK ("Status" IN ('DRAFT','PENDING_REVIEW','PUBLISHED','REJECTED','CLOSED','ARCHIVED'));
+
+CREATE INDEX IF NOT EXISTS "IX_RecruitmentPosts_Window" ON "RecruitmentPosts"("WindowID", "Status");
+
+CREATE TABLE IF NOT EXISTS "StudentCVFiles" (
+  "CVFileID" INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "StudentID" INT NOT NULL REFERENCES "Students"("StudentID") ON DELETE CASCADE,
+  "FileName" VARCHAR(255) NOT NULL,
+  "MimeType" VARCHAR(100) NOT NULL CHECK ("MimeType" = 'application/pdf'),
+  "Content" BYTEA NOT NULL CHECK (octet_length("Content") BETWEEN 1 AND 10485760),
+  "Sha256" CHAR(64) NOT NULL,
+  "UploadedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "UploadedBy" INT NOT NULL REFERENCES "Users"("UserID"),
+  UNIQUE ("CVFileID", "StudentID")
+);
+
+CREATE INDEX IF NOT EXISTS "IX_StudentCVFiles_Latest" ON "StudentCVFiles"("StudentID", "CVFileID" DESC);
+ALTER TABLE "StudentCVFiles" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON "StudentCVFiles" FROM PUBLIC;
+
+ALTER TABLE "JobApplications"
+  ADD COLUMN IF NOT EXISTS "StudentID" int,
+  ADD COLUMN IF NOT EXISTS "EnterpriseID" int,
+  ADD COLUMN IF NOT EXISTS "CVFileID" int,
+  ADD COLUMN IF NOT EXISTS "OfficialCheckID" int REFERENCES "EligibilityChecks"("CheckID");
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_JobApplication_CV') THEN
+    ALTER TABLE "JobApplications" 
+    ADD CONSTRAINT "FK_JobApplication_CV" 
+    FOREIGN KEY ("CVFileID", "StudentID") REFERENCES "StudentCVFiles"("CVFileID", "StudentID");
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT ALL ON TABLE "RecruitmentWindows" TO service_role;
+    GRANT ALL ON TABLE "StudentCVFiles" TO service_role;
+    GRANT USAGE, SELECT ON SEQUENCE "StudentCVFiles_CVFileID_seq" TO service_role;
+  END IF;
+END $$;
+
+
+-- ============================================================
+-- DEMO OJT SEMESTER: only if absent. Does not change existing rows.
+-- Required for a fresh database to attach recruitment data.
+-- ============================================================
+BEGIN;
+SET LOCAL search_path = public, pg_catalog;
+INSERT INTO public."AcademicYears" ("YearCode", "StartDate", "EndDate", "Status")
+VALUES ('DEMO-2026-2027', DATE '2026-09-01', DATE '2027-08-31', 'PLANNED')
+ON CONFLICT ("YearCode") DO NOTHING;
+
+INSERT INTO public."AcademicPeriods" ("AcademicYearID", "PeriodCode", "Name", "Kind", "StartDate", "EndDate", "Status")
+SELECT y."AcademicYearID", 'DEMO-SEMESTER-2027', 'Học kỳ OJT demo đầu năm 2027', 'SEMESTER', DATE '2026-11-01', DATE '2027-04-30', 'ACTIVE'
+FROM public."AcademicYears" y
+WHERE y."YearCode" = 'DEMO-2026-2027'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."OJTSemesters"
+  ("AcademicYearID", "AcademicPeriodID", "SemesterCode", "Name", "RegStartDate", "RegEndDate", "StartDate", "EndDate", "Status")
+SELECT y."AcademicYearID", p."AcademicPeriodID", 'DEMO-OJT-2027-01',
+       'Học kỳ OJT demo đầu năm 2027', DATE '2026-11-01', DATE '2026-12-31',
+       DATE '2027-01-01', DATE '2027-04-30', 'ACTIVE'
+FROM public."AcademicYears" y
+JOIN public."AcademicPeriods" p ON p."PeriodCode" = 'DEMO-SEMESTER-2027'
+WHERE y."YearCode" = 'DEMO-2026-2027'
+ON CONFLICT ("SemesterCode") DO UPDATE
+SET "AcademicPeriodID" = EXCLUDED."AcademicPeriodID", "Status" = 'ACTIVE';
+COMMIT;
+
+-- OJT: seed sample enterprise recruitment without resetting or overwriting current data.
+-- IMPORTANT: These are fictional DEMO vacancies, NOT real job offers.
+-- Requires existing TECHVIET enterprise, its enterprise user, and an OJT semester.
+BEGIN;
+SET LOCAL search_path = public, pg_catalog;
+
+DO $seed$
+DECLARE
+  v_enterprise_id integer;
+  v_user_id integer;
+  v_coordinator_id integer;
+  v_semester_id integer;
+  v_semester_code text;
+  v_period_id integer;
+  v_window_id integer;
+  v_job_role_id integer;
+  v_position_id integer;
+  v_post_id integer;
+  v_row record;
+  v_pos1_id integer;
+  v_pos2_id integer;
+  v_post1_id integer;
+  v_post2_id integer;
+  v_student1_id integer;
+  v_student2_id integer;
+  v_reg1_id integer;
+  v_reg2_id integer;
+  v_app1_id integer;
+  v_app2_id integer;
+  v_coord1_id integer;
+  v_coord2_id integer;
+  v_assign_id integer;
+BEGIN
+  SELECT e."EnterpriseID" INTO v_enterprise_id
+  FROM public."Enterprises" e WHERE e."EnterpriseCode" = 'TECHVIET';
+  IF v_enterprise_id IS NULL THEN
+    RAISE EXCEPTION 'TECHVIET enterprise missing. Seed enterprise first; nothing changed.';
+  END IF;
+
+  SELECT eu."UserID" INTO v_user_id
+  FROM public."EnterpriseUsers" eu
+  JOIN public."Users" u ON u."UserID" = eu."UserID"
+  WHERE eu."EnterpriseID" = v_enterprise_id
+  ORDER BY CASE WHEN u."Email" = 'hr@techviet.example' THEN 0 ELSE 1 END, eu."UserID"
+  LIMIT 1;
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'TECHVIET enterprise user missing; cannot create RecruitmentPosts.CreatedBy.';
+  END IF;
+
+  -- Coordinator must be a staff user (OJT_COORD), not the enterprise user.
+  SELECT u."UserID" INTO v_coordinator_id
+  FROM public."Users" u
+  JOIN public."Roles" r ON r."RoleID" = u."RoleID"
+  WHERE r."RoleCode" = 'OJT_COORD' AND u."Status" = 'ACTIVE'
+  ORDER BY CASE WHEN u."Username" = 'ojt.coord01' THEN 0 ELSE 1 END, u."UserID"
+  LIMIT 1;
+  IF v_coordinator_id IS NULL THEN
+    RAISE EXCEPTION 'No ACTIVE OJT_COORD account found for StudentEnterpriseCoordination.CoordinatedBy.';
+  END IF;
+
+  -- Use the dedicated DEMO OJT semester inserted above.
+  SELECT s."OJTSemesterID", s."SemesterCode", s."AcademicPeriodID" INTO v_semester_id, v_semester_code, v_period_id
+  FROM public."OJTSemesters" s
+  WHERE s."SemesterCode" = 'DEMO-OJT-2027-01';
+  IF v_semester_id IS NULL THEN
+    RAISE EXCEPTION 'No OJT semester exists. Create an OJT semester first.';
+  END IF;
+
+  -- Ensure an open RecruitmentWindows exists
+  SELECT "WindowID" INTO v_window_id
+  FROM public."RecruitmentWindows"
+  WHERE "OJTSemesterID" = v_semester_id AND "Status" = 'OPEN' AND "EndsAt" > clock_timestamp()
+  ORDER BY "WindowID" DESC LIMIT 1;
+
+  IF v_window_id IS NULL AND v_period_id IS NOT NULL THEN
+    INSERT INTO public."RecruitmentWindows"
+      ("AcademicPeriodID", "OJTSemesterID", "Name", "StartsAt", "EndsAt", "Status", "CreatedBy")
+    VALUES
+      (v_period_id, v_semester_id, 'Đợt nhận nhu cầu tuyển dụng demo 2027', now() - interval '10 days', now() + interval '60 days', 'OPEN', v_user_id)
+    RETURNING "WindowID" INTO v_window_id;
+  END IF;
+
+  FOR v_row IN
+    SELECT * FROM (VALUES
+      ('DEMO-TV-WEB-01', 'WEB_DEV', 'Thực tập phát triển Web', 'Tham gia phát triển website nội bộ bằng React, Node.js và PostgreSQL.', 'Biết HTML, CSS, JavaScript; hiểu Git và REST API.', 5, 'Biên Hòa, Đồng Nai', 'HYBRID', 'SE'),
+      ('DEMO-TV-BA-02', 'BUSINESS_ANALYST', 'Thực tập Business Analyst', 'Hỗ trợ thu thập yêu cầu, viết user story và kiểm thử nghiệp vụ.', 'Có khả năng phân tích yêu cầu, giao tiếp và vẽ quy trình.', 3, 'TP. Hồ Chí Minh', 'ONSITE', 'IS'),
+      ('DEMO-TV-QA-03', 'QA_TESTER', 'Thực tập kiểm thử phần mềm', 'Thiết kế test case, báo cáo lỗi và hỗ trợ kiểm thử API.', 'Biết kiểm thử chức năng, SQL cơ bản và Postman.', 4, 'Biên Hòa, Đồng Nai', 'HYBRID', 'SE'),
+      ('DEMO-TV-DATA-04', 'DATA_ANALYST', 'Thực tập phân tích dữ liệu', 'Làm sạch dữ liệu, tạo báo cáo và dashboard hỗ trợ vận hành.', 'Biết Excel, SQL; có kiến thức Python hoặc Power BI là lợi thế.', 2, 'TP. Hồ Chí Minh', 'REMOTE', 'IS'),
+      ('DEMO-TV-SEC-05', 'SECURITY_INTERN', 'Thực tập An toàn thông tin', 'Hỗ trợ rà soát cấu hình và theo dõi cảnh báo bảo mật.', 'Hiểu mạng máy tính, Linux cơ bản và nguyên tắc an toàn thông tin.', 2, 'TP. Hồ Chí Minh', 'ONSITE', 'IA')
+    ) AS x(code, role_code, title, description, requirements, capacity, location, workmode, specialization_code)
+  LOOP
+    INSERT INTO public."JobRoles" ("RoleCode", "RoleName", "Description")
+    VALUES (v_row.role_code, v_row.title, v_row.description)
+    ON CONFLICT ("RoleCode") DO NOTHING;
+    SELECT j."JobRoleID" INTO v_job_role_id
+    FROM public."JobRoles" j WHERE j."RoleCode" = v_row.role_code;
+
+    SELECT p."PositionID" INTO v_position_id
+    FROM public."InternshipPositions" p
+    WHERE p."EnterpriseID" = v_enterprise_id
+      AND p."OJTSemesterID" = v_semester_id
+      AND p."RecruitmentCode" = v_row.code;
+
+    IF v_position_id IS NULL THEN
+      INSERT INTO public."InternshipPositions"
+        ("EnterpriseID", "OJTSemesterID", "RecruitmentCode", "Title",
+         "Description", "Requirements", "Capacity", "RemainingSlots", "Status",
+         "JobRoleID", "Location", "WorkMode")
+      VALUES
+        (v_enterprise_id, v_semester_id, v_row.code, v_row.title,
+         v_row.description, v_row.requirements, v_row.capacity, v_row.capacity,
+         'OPEN', v_job_role_id, v_row.location, v_row.workmode)
+      RETURNING "PositionID" INTO v_position_id;
+    END IF;
+
+    -- Do not create duplicate demo posts on rerun. Do not change existing posts.
+    SELECT rp."PostID" INTO v_post_id
+    FROM public."RecruitmentPosts" rp
+    JOIN public."RecruitmentPostPositions" rpp ON rpp."PostID" = rp."PostID"
+    WHERE rp."EnterpriseID" = v_enterprise_id
+      AND rp."OJTSemesterID" = v_semester_id
+      AND rpp."PositionID" = v_position_id
+    ORDER BY rp."PostID" LIMIT 1;
+
+    IF v_post_id IS NULL THEN
+      INSERT INTO public."RecruitmentPosts"
+        ("EnterpriseID", "OJTSemesterID", "WindowID", "Title", "Content", "Benefits",
+         "ApplicationInstructions", "Status", "PublishedAt", "DeadlineAt", "CreatedBy")
+      VALUES
+        (v_enterprise_id, v_semester_id, v_window_id, '[DEMO OJT] ' || v_row.title,
+         v_row.description || E'\nYêu cầu: ' || v_row.requirements,
+         'Được hướng dẫn công việc và tham gia dự án thực tế (dữ liệu DEMO).',
+         'Đăng ký qua hệ thống OJT của trường (chỉ dùng để kiểm thử).',
+         'PUBLISHED', now(), now() + interval '60 days', v_user_id)
+      RETURNING "PostID" INTO v_post_id;
+    ELSE
+      UPDATE public."RecruitmentPosts"
+      SET "WindowID" = COALESCE("WindowID", v_window_id),
+          "Status" = 'PUBLISHED',
+          "DeadlineAt" = GREATEST("DeadlineAt", now() + interval '30 days')
+      WHERE "PostID" = v_post_id;
+    END IF;
+
+    INSERT INTO public."RecruitmentPostPositions"
+      ("PostID", "PositionID", "EnterpriseID", "OJTSemesterID")
+    VALUES (v_post_id, v_position_id, v_enterprise_id, v_semester_id)
+    ON CONFLICT ("PostID", "PositionID") DO NOTHING;
+
+    INSERT INTO public."PositionSpecializations" ("PositionID", "SpecializationID")
+    SELECT v_position_id, sp."SpecializationID"
+    FROM public."Specializations" sp
+    WHERE sp."SpecializationCode" = v_row.specialization_code
+    ON CONFLICT DO NOTHING;
+  END LOOP;
+
+  -- Seed demo candidate and intern records for TECHVIET
+  SELECT "PositionID" INTO v_pos1_id FROM public."InternshipPositions"
+  WHERE "EnterpriseID" = v_enterprise_id AND "OJTSemesterID" = v_semester_id AND "RecruitmentCode" = 'DEMO-TV-WEB-01';
+  SELECT "PositionID" INTO v_pos2_id FROM public."InternshipPositions"
+  WHERE "EnterpriseID" = v_enterprise_id AND "OJTSemesterID" = v_semester_id AND "RecruitmentCode" = 'DEMO-TV-BA-02';
+  SELECT rp."PostID" INTO v_post1_id
+  FROM public."RecruitmentPosts" rp
+  JOIN public."RecruitmentPostPositions" rpp ON rpp."PostID" = rp."PostID"
+  WHERE rp."EnterpriseID" = v_enterprise_id AND rp."OJTSemesterID" = v_semester_id
+    AND rpp."PositionID" = v_pos1_id AND rpp."OJTSemesterID" = v_semester_id
+    AND rp."Status" = 'PUBLISHED'
+  ORDER BY rp."PostID" LIMIT 1;
+  SELECT rp."PostID" INTO v_post2_id
+  FROM public."RecruitmentPosts" rp
+  JOIN public."RecruitmentPostPositions" rpp ON rpp."PostID" = rp."PostID"
+  WHERE rp."EnterpriseID" = v_enterprise_id AND rp."OJTSemesterID" = v_semester_id
+    AND rpp."PositionID" = v_pos2_id AND rpp."OJTSemesterID" = v_semester_id
+    AND rp."Status" = 'PUBLISHED'
+  ORDER BY rp."PostID" LIMIT 1;
+  IF v_pos1_id IS NULL OR v_pos2_id IS NULL OR v_post1_id IS NULL OR v_post2_id IS NULL THEN
+    RAISE EXCEPTION 'Missing demo position or published recruitment post mapping (WEB/BA); seed stopped.';
+  END IF;
+  SELECT "StudentID" INTO v_student1_id FROM public."Students" s JOIN public."Users" u ON u."UserID" = s."UserID" WHERE u."Email" LIKE 'student01%' OR s."StudentCode" LIKE '%0001%' LIMIT 1;
+  SELECT "StudentID" INTO v_student2_id FROM public."Students" s JOIN public."Users" u ON u."UserID" = s."UserID" WHERE (u."Email" LIKE 'student02%' OR s."StudentCode" LIKE '%0002%') AND s."StudentID" <> v_student1_id LIMIT 1;
+
+  IF v_student1_id IS NOT NULL AND v_pos1_id IS NOT NULL THEN
+    SELECT "RegistrationID" INTO v_reg1_id FROM public."OJTRegistrations" WHERE "StudentID" = v_student1_id AND "OJTSemesterID" = v_semester_id LIMIT 1;
+    IF v_reg1_id IS NULL THEN
+      INSERT INTO public."OJTRegistrations" ("StudentID", "OJTSemesterID", "Status", "Application", "SubmittedBy")
+      VALUES (v_student1_id, v_semester_id, 'HANDED_OFF', '{"phone":"0901234567","email":"student01@student.edu.vn"}'::jsonb, v_user_id)
+      RETURNING "RegistrationID" INTO v_reg1_id;
+    END IF;
+
+    SELECT "ApplicationID" INTO v_app1_id FROM public."JobApplications" WHERE "RegistrationID" = v_reg1_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
+    IF v_app1_id IS NULL THEN
+      INSERT INTO public."JobApplications" ("RegistrationID", "StudentID", "EnterpriseID", "PostID", "PositionID", "OJTSemesterID", "CoverLetter", "Status")
+      VALUES (v_reg1_id, v_student1_id, v_enterprise_id, v_post1_id, v_pos1_id, v_semester_id, 'Em mong muốn thực tập vị trí phát triển Web tại TECHVIET.', 'SUBMITTED')
+      RETURNING "ApplicationID" INTO v_app1_id;
+    END IF;
+
+    SELECT "CoordinationID" INTO v_coord1_id FROM public."StudentEnterpriseCoordination" WHERE "RegistrationID" = v_reg1_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
+    IF v_coord1_id IS NULL THEN
+      INSERT INTO public."StudentEnterpriseCoordination" ("RegistrationID", "EnterpriseID", "PositionID", "ApplicationID", "OJTSemesterID", "CoordinatedBy", "Decision", "CoordinatedAt")
+      VALUES (v_reg1_id, v_enterprise_id, v_pos1_id, v_app1_id, v_semester_id, v_coordinator_id, 'PENDING', now() - interval '2 days')
+      RETURNING "CoordinationID" INTO v_coord1_id;
+    END IF;
+  END IF;
+
+  IF v_student2_id IS NOT NULL AND v_pos2_id IS NOT NULL THEN
+    SELECT "RegistrationID" INTO v_reg2_id FROM public."OJTRegistrations" WHERE "StudentID" = v_student2_id AND "OJTSemesterID" = v_semester_id LIMIT 1;
+    IF v_reg2_id IS NULL THEN
+      INSERT INTO public."OJTRegistrations" ("StudentID", "OJTSemesterID", "Status", "Application", "SubmittedBy")
+      VALUES (v_student2_id, v_semester_id, 'HANDED_OFF', '{"phone":"0907654321","email":"student02@student.edu.vn"}'::jsonb, v_user_id)
+      RETURNING "RegistrationID" INTO v_reg2_id;
+    END IF;
+
+    SELECT "ApplicationID" INTO v_app2_id FROM public."JobApplications" WHERE "RegistrationID" = v_reg2_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
+    IF v_app2_id IS NULL THEN
+      INSERT INTO public."JobApplications" ("RegistrationID", "StudentID", "EnterpriseID", "PostID", "PositionID", "OJTSemesterID", "CoverLetter", "Status")
+      VALUES (v_reg2_id, v_student2_id, v_enterprise_id, v_post2_id, v_pos2_id, v_semester_id, 'Em xin ứng tuyển vị trí BA tại TECHVIET.', 'ACCEPTED')
+      RETURNING "ApplicationID" INTO v_app2_id;
+    END IF;
+
+    SELECT "CoordinationID" INTO v_coord2_id FROM public."StudentEnterpriseCoordination" WHERE "RegistrationID" = v_reg2_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
+    IF v_coord2_id IS NULL THEN
+      INSERT INTO public."StudentEnterpriseCoordination" ("RegistrationID", "EnterpriseID", "PositionID", "ApplicationID", "OJTSemesterID", "CoordinatedBy", "Decision", "CoordinatedAt", "DecisionAt")
+      VALUES (v_reg2_id, v_enterprise_id, v_pos2_id, v_app2_id, v_semester_id, v_coordinator_id, 'ACCEPTED', now() - interval '5 days', now() - interval '3 days')
+      RETURNING "CoordinationID" INTO v_coord2_id;
+    END IF;
+
+    SELECT "AssignmentID" INTO v_assign_id FROM public."InternshipAssignments" WHERE "StudentID" = v_student2_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
+    IF v_assign_id IS NULL AND v_coord2_id IS NOT NULL THEN
+      INSERT INTO public."InternshipAssignments" ("CoordinationID", "StudentID", "EnterpriseID", "PositionID", "EnterpriseSupervisorName", "StartDate", "EndDate", "Status")
+      VALUES (v_coord2_id, v_student2_id, v_enterprise_id, v_pos2_id, 'Nguyễn Văn Quản Lý', current_date - 10, current_date + 80, 'ACTIVE')
+      RETURNING "AssignmentID" INTO v_assign_id;
+    END IF;
+  END IF;
+
+  RAISE NOTICE 'Seed completed for enterprise TECHVIET, OJT semester % (ID %).', v_semester_code, v_semester_id;
+END $seed$;
+COMMIT;
+
+-- Verification: newly seeded positions and their linked post status.
+SELECT e."EnterpriseCode", s."SemesterCode", p."RecruitmentCode",
+       p."Title", p."Capacity", p."RemainingSlots", p."Status" AS "PositionStatus",
+       rp."Status" AS "PostStatus", rp."PublishedAt"
+FROM public."InternshipPositions" p
+JOIN public."Enterprises" e ON e."EnterpriseID" = p."EnterpriseID"
+JOIN public."OJTSemesters" s ON s."OJTSemesterID" = p."OJTSemesterID"
+LEFT JOIN public."RecruitmentPostPositions" rpp ON rpp."PositionID" = p."PositionID"
+LEFT JOIN public."RecruitmentPosts" rp ON rp."PostID" = rpp."PostID"
+WHERE e."EnterpriseCode" = 'TECHVIET' AND p."RecruitmentCode" LIKE 'DEMO-TV-%'
+ORDER BY s."SemesterCode", p."RecruitmentCode";
