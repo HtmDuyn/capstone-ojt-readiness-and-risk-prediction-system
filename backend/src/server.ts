@@ -1,6 +1,7 @@
 import "./config/env";
+import { startAdvisoryWorker } from './modules/student-portal/advisory.service';
+import { startRecruitmentWorker } from './jobs/recruitment';
 import { startEligibilityWorker } from './jobs/eligibility';
-import { startPredictionWorker } from './jobs/predictions';
 import { startProvisioningJobs } from './jobs/provisioning';
 
 import app from "./app";
@@ -27,9 +28,10 @@ const startServer =
   async (): Promise<void> => {
     try {
       await testDatabaseConnection();
+      const stopRecruitment = startRecruitmentWorker();
+      const stopAdvisories = process.env.ADVISORY_WORKER_ENABLED !== 'false' ? startAdvisoryWorker() : () => {};
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
-      const stopPredictions = process.env.PREDICTION_WORKER_ENABLED === 'true' ? startPredictionWorker() : () => {};
-      const stopJobs = process.env.PROVISIONING_JOBS_ENABLED === 'true' ? startProvisioningJobs() : () => {};
+      const stopJobs = process.env.PROVISIONING_JOBS_ENABLED !== 'false' ? startProvisioningJobs() : () => {};
 
       const server =
         app.listen(
@@ -45,10 +47,6 @@ const startServer =
             );
 
             logger.info(
-              `Health check: ${baseUrl}/api/health`,
-            );
-
-            logger.info(
               `Login API: ${baseUrl}/api/auth/login`,
             );
 
@@ -61,8 +59,9 @@ const startServer =
       const shutdown =
         async () => {
           stopJobs();
+          stopRecruitment();
+          stopAdvisories();
           stopEligibility();
-          stopPredictions();
           logger.info(
             "Shutting down server...",
           );

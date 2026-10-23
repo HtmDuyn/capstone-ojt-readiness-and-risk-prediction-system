@@ -3,6 +3,9 @@ import type {
 } from "../auth/auth.types";
 
 export interface AccountRecord {
+  mustChangePassword: boolean;
+  studentId: number | null;
+  enterpriseId: number | null;
   id: number;
   username: string;
   email: string;
@@ -27,6 +30,8 @@ export interface CreateAccountInput {
 }
 
 export interface UpdateAccountInput {
+  status?: unknown;
+  roleId?: unknown;
   fullName?: unknown;
   phone?: unknown;
   email?: unknown;
@@ -37,25 +42,13 @@ export interface UpdateOwnProfileInput {
   phone?: unknown;
 }
 
-export interface UpdateAccountStatusInput {
-  status?: unknown;
-}
-
-export interface UpdateAccountRoleInput {
-  roleId?: unknown;
-}
-
 export interface AccountListQuery {
-  page?: unknown;
-  limit?: unknown;
+  userId?: unknown;
   search?: unknown;
   roleCode?: unknown;
-  status?: unknown;
 }
 
 export interface AccountListResult {
   data: AccountRecord[];
   total: number;
-  page: number;
-  limit: number;
 }

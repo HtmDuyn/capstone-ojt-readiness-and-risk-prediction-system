@@ -1,5 +1,8 @@
+import { enrichListRows } from '../../shared/list-context';
+import type { PoolClient } from "pg";
 import {
   query,
+  pool,
 } from "../../config/database";
 
 import type {
@@ -10,6 +13,7 @@ import type {
 const selectAccount = `
   SELECT
     u."UserID" AS id,
+    u."MustChangePassword" AS "mustChangePassword",
     u."Username" AS username,
     u."Email" AS email,
     u."Phone" AS phone,
@@ -20,7 +24,9 @@ const selectAccount = `
     r."RoleName" AS role_name,
     u."CreatedAt" AS created_at,
     u."UpdatedAt" AS updated_at,
-    u."LastLoginAt" AS last_login_at
+    u."LastLoginAt" AS last_login_at,
+    (SELECT s."StudentID" FROM "Students" s WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL) AS "studentId",
+    (SELECT eu."EnterpriseID" FROM "EnterpriseUsers" eu WHERE eu."UserID"=u."UserID" ORDER BY eu."EnterpriseID" LIMIT 1) AS "enterpriseId"
 
   FROM "Users" u
 
@@ -28,107 +34,23 @@ const selectAccount = `
     ON r."RoleID" = u."RoleID"
 `;
 
-export const findAccounts = async (
-  page: number,
-  limit: number,
-  search?: string,
-  roleCode?: string,
-  status?: string,
-): Promise<AccountListResult> => {
-  const offset =
-    (page - 1) * limit;
-
-  const searchValue =
-    search
-      ? `%${search}%`
-      : null;
-
-  const result =
-    await query<AccountRecord & {
-      total_count: string;
-    }>(
-      `
-        SELECT
-          u."UserID" AS id,
-          u."Username" AS username,
-          u."Email" AS email,
-          u."Phone" AS phone,
-          u."FullName" AS full_name,
-          u."Status" AS status,
-          u."RoleID" AS role_id,
-          r."RoleCode" AS role_code,
-          r."RoleName" AS role_name,
-          u."CreatedAt" AS created_at,
-          u."UpdatedAt" AS updated_at,
-          u."LastLoginAt" AS last_login_at,
-          COUNT(*) OVER() AS total_count
-
-        FROM "Users" u
-
-        INNER JOIN "Roles" r
-          ON r."RoleID" = u."RoleID"
-
-        WHERE
-          (
-            $1::text IS NULL
-            OR u."Username" ILIKE $1
-            OR u."Email" ILIKE $1
-            OR u."FullName" ILIKE $1
-          )
-
-          AND (
-            $2::text IS NULL
-            OR r."RoleCode" = $2
-          )
-
-          AND (
-            $3::text IS NULL
-            OR u."Status" = $3
-          )
-
-        ORDER BY
-          u."UserID"
-
-        LIMIT $4
-        OFFSET $5;
-      `,
-      [
-        searchValue,
-        roleCode ?? null,
-        status ?? null,
-        limit,
-        offset,
-      ],
-    );
-
-  const total =
-    result.rows[0]
-      ? Number(
-          result.rows[0]
-            .total_count,
-        )
-      : 0;
-
-  return {
-    data:
-      result.rows.map(
-        ({
-          total_count: _,
-          ...account
-        }) => account,
-      ),
-
-    total,
-    page,
-    limit,
-  };
+export const findAccounts = async (search?:string,roleCode?:string,userId?:number): Promise<AccountListResult> => {
+ const result=await query<{data:AccountRecord[];total:number}>(`WITH filtered AS (
+  ${selectAccount}
+  WHERE ($1::text IS NULL OR u."Username" ILIKE $1 OR u."Email" ILIKE $1 OR u."FullName" ILIKE $1)
+    AND ($2::text IS NULL OR r."RoleCode"=$2)
+    AND ($3::int IS NULL OR u."UserID"=$3)
+ )
+ SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(filtered) ORDER BY id) FILTER(WHERE id IS NOT NULL),'[]'::jsonb) AS data FROM filtered`,[search?'%'+search+'%':null,roleCode??null,userId??null]);
+ return {...result.rows[0],data:await enrichListRows({query},result.rows[0].data)};
 };
 
 export const findAccountById = async (
   userId: number,
+  client?: PoolClient,
 ): Promise<AccountRecord | null> => {
   const result =
-    await query<AccountRecord>(
+    await (client ? client.query.bind(client) : query)<AccountRecord>(
       `
         ${selectAccount}
 
@@ -264,33 +186,12 @@ export const createAccount = async (
   return account;
 };
 
-export const updateAccountByAdmin = async (
-  userId: number,
-  fullName: string,
-  phone: string | null,
-  email: string,
-): Promise<void> => {
-  await query(
-    `
-      UPDATE "Users"
-
-      SET
-        "FullName" = $2,
-        "Phone" = $3,
-        "Email" = $4,
-        "UpdatedAt" =
-          CURRENT_TIMESTAMP
-
-      WHERE
-        "UserID" = $1;
-    `,
-    [
-      userId,
-      fullName,
-      phone,
-      email,
-    ],
-  );
+export const accountTransaction = async <T>(work: (client: PoolClient) => Promise<T>): Promise<T> => {
+  if (!pool) throw new Error('Database is not configured.');
+  const client = await pool.connect();
+  try { await client.query('BEGIN'); const result = await work(client); await client.query('COMMIT'); return result; }
+  catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 };
 
 export const updateOwnProfile = async (
@@ -315,52 +216,6 @@ export const updateOwnProfile = async (
       userId,
       fullName,
       phone,
-    ],
-  );
-};
-
-export const updateAccountStatus = async (
-  userId: number,
-  status: string,
-): Promise<void> => {
-  await query(
-    `
-      UPDATE "Users"
-
-      SET
-        "Status" = $2,
-        "UpdatedAt" =
-          CURRENT_TIMESTAMP
-
-      WHERE
-        "UserID" = $1;
-    `,
-    [
-      userId,
-      status,
-    ],
-  );
-};
-
-export const updateAccountRole = async (
-  userId: number,
-  roleId: number,
-): Promise<void> => {
-  await query(
-    `
-      UPDATE "Users"
-
-      SET
-        "RoleID" = $2,
-        "UpdatedAt" =
-          CURRENT_TIMESTAMP
-
-      WHERE
-        "UserID" = $1;
-    `,
-    [
-      userId,
-      roleId,
     ],
   );
 };

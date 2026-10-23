@@ -2,8 +2,6 @@ import type {
   AccountListQuery,
   CreateAccountInput,
   UpdateAccountInput,
-  UpdateAccountRoleInput,
-  UpdateAccountStatusInput,
   UpdateOwnProfileInput,
 } from "./account.types";
 
@@ -45,58 +43,22 @@ export const parseCreateAccountInput = (
   };
 };
 
-export const parseUpdateAccountInput = (
-  input: unknown,
-): UpdateAccountInput => {
-  const body =
-    asObject(input);
-
-  return {
-    fullName:
-      body.fullName,
-    phone:
-      body.phone,
-    email:
-      body.email,
-  };
+export const parseUpdateAccountInput = (input: unknown): UpdateAccountInput => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw Object.assign(new Error('Invalid account update.'), {statusCode:400,errorCode:'INVALID_ACCOUNT_INPUT'});
+  const body = input as Record<string, unknown>;
+  const allowed = ['fullName','phone','email','status','roleId'];
+  if (Object.keys(body).some(key => !allowed.includes(key)) || !allowed.some(key => body[key] !== undefined)) throw Object.assign(new Error('Provide only account fields to update.'), {statusCode:400,errorCode:'INVALID_ACCOUNT_INPUT'});
+  return Object.fromEntries(allowed.filter(key => body[key] !== undefined).map(key => [key,body[key]]));
 };
 
 export const parseUpdateOwnProfileInput = (
   input: unknown,
 ): UpdateOwnProfileInput => {
-  const body =
-    asObject(input);
+  if(!input||typeof input!=='object'||Array.isArray(input))throw Object.assign(new Error('Provide a JSON object.'),{statusCode:400,errorCode:'INVALID_PROFILE_INPUT'});
+  const body=input as Record<string,unknown>,allowed=['fullName','phone'];
+  if(Object.keys(body).some(key=>!allowed.includes(key))||!Object.keys(body).some(key=>key!=='companyId'&&body[key]!==undefined))throw Object.assign(new Error('Provide supported profile fields to update.'),{statusCode:400,errorCode:'INVALID_PROFILE_INPUT'});
+  return body;
 
-  return {
-    fullName:
-      body.fullName,
-    phone:
-      body.phone,
-  };
-};
-
-export const parseUpdateStatusInput = (
-  input: unknown,
-): UpdateAccountStatusInput => {
-  const body =
-    asObject(input);
-
-  return {
-    status:
-      body.status,
-  };
-};
-
-export const parseUpdateRoleInput = (
-  input: unknown,
-): UpdateAccountRoleInput => {
-  const body =
-    asObject(input);
-
-  return {
-    roleId:
-      body.roleId,
-  };
 };
 
 export const parseAccountListQuery = (
@@ -106,15 +68,10 @@ export const parseAccountListQuery = (
     asObject(input);
 
   return {
-    page:
-      query.page,
-    limit:
-      query.limit,
+    userId: query.userId,
     search:
       query.search,
     roleCode:
       query.roleCode,
-    status:
-      query.status,
   };
 };

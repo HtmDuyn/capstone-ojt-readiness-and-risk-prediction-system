@@ -1,9 +1,12 @@
+import { enrichListRows } from '../../shared/list-context';
+import { currentCVSql } from './cv.service';
+import { assignPlacementWithClient } from '../academic/academic.service';
 import { query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, pagination, positiveId, inputObject, requiredText, optionalText, enumValue, resultValues } from './student.validation';
 
-const studentSelect = `SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",s."UserID" AS "userId",u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,u."Status" AS "accountStatus",s."ProgramID" AS "programId",s."EnrollmentYear" AS "enrollmentYear",s."CurrentSemester" AS "currentSemester",s."ClassName" AS "className",s."Status" AS status,p."CohortID" AS "cohortId",p."GroupCode" AS "groupCode",p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"`;
+export const studentSelect = `SELECT s."StudentID" AS id,${currentCVSql('s."StudentID"')} AS cv,s."StudentCode" AS "studentCode",s."UserID" AS "userId",u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,u."Status" AS "accountStatus",s."ProgramID" AS "programId",s."EnrollmentYear" AS "enrollmentYear",s."CurrentSemester" AS "currentSemester",s."ClassName" AS "className",s."Status" AS status,p."CohortID" AS "cohortId",p."GroupCode" AS "groupCode",p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId",CASE WHEN tp."ProgramID" IS NULL THEN NULL ELSE jsonb_build_object('id',tp."ProgramID",'code',tp."ProgramCode",'name',tp."ProgramName",'version',to_jsonb(tp)->'Version','status',to_jsonb(tp)->>'Status','totalCredits',tp."TotalCredits",'majorId',tp."SpecializationID",'majorName',major."SpecializationName",'majorCode',major."SpecializationCode") END AS program,CASE WHEN cohort."CohortID" IS NULL THEN NULL ELSE jsonb_build_object('id',cohort."CohortID",'code',cohort."CohortCode",'name',cohort."Name") END AS cohort,CASE WHEN entry."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',entry."AcademicPeriodID",'code',entry."PeriodCode",'name',entry."Name",'kind',entry."Kind",'startDate',entry."StartDate",'endDate',entry."EndDate") END AS "entryAcademicPeriod",CASE WHEN current_period."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',current_period."AcademicPeriodID",'code',current_period."PeriodCode",'name',current_period."Name",'kind',current_period."Kind",'startDate',current_period."StartDate",'endDate',current_period."EndDate") END AS "currentAcademicPeriod" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" LEFT JOIN "Specializations" major ON major."SpecializationID"=tp."SpecializationID" LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=p."CohortID" LEFT JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=p."EntryAcademicPeriodID" LEFT JOIN "AcademicPeriods" current_period ON current_period."AcademicPeriodID"=p."CurrentAcademicPeriodID"`;
 export async function student(id: number) {
   const row = (await query(`${studentSelect} WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL`,[id])).rows[0];
   if (!row) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
@@ -25,10 +28,10 @@ export async function listStudents(params: Record<string,unknown>, exporting=fal
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
   const row = (await query(`WITH filtered AS (${studentSelect}${where}), paged AS (SELECT * FROM filtered ORDER BY id LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,exporting?10001:p.limit,exporting?0:p.offset])).rows[0];
   if(exporting&&row.total>10000)throw invalid('Narrow export to at most 10000 students.',422,'EXPORT_TOO_LARGE');
-  return {total:row.total,items:row.items,page:p.page,limit:p.limit};
+  return {total:row.total,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
 export async function patchStudent(id: number, body: unknown, actorId: number) {
-  const input=inputObject(body,['fullName','phone','className','status','programId','reason']);
+  const input=inputObject(body,['fullName','phone','className','status','programId','placement','reason']);
   const reason=requiredText(input.reason,'reason',2000);
   const fields: Record<string,unknown>={};
   if ('className' in input) fields.ClassName=optionalText(input.className,'className',20);
@@ -37,7 +40,7 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
   const userFields: Record<string,unknown>={};
   if ('fullName' in input) userFields.FullName=requiredText(input.fullName,'fullName',100);
   if ('phone' in input) userFields.Phone=optionalText(input.phone,'phone',20);
-  if (!Object.keys(fields).length && !Object.keys(userFields).length) throw invalid('Provide at least one profile field.');
+  if (!Object.keys(fields).length && !Object.keys(userFields).length && input.placement===undefined) throw invalid('Provide at least one profile field.');
   return academicTransaction(async client => {
     const before=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL FOR UPDATE',[id])).rows[0];
     if (!before) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
@@ -45,6 +48,11 @@ export async function patchStudent(id: number, body: unknown, actorId: number) {
     for (const [table,key,keyId,values] of [['Students','StudentID',id,fields],['Users','UserID',before.UserID,userFields]] as const) {
       const entries=Object.entries(values);
       if (entries.length) await client.query(`UPDATE "${table}" SET ${entries.map(([col],i)=>`"${col}"=$${i+2}`).join(',')}${table==='Users'?',"UpdatedAt"=now()':''} WHERE "${key}"=$1`,[keyId,...entries.map(([,v])=>v)]);
+    }
+    if(input.placement!==undefined) {
+      const placement=inputObject(input.placement,['cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId']);
+      if(!Object.keys(placement).length)throw invalid('Provide at least one placement field.');
+      await assignPlacementWithClient(client,id,{...placement,reason},actorId);
     }
     await audit(client,actorId,'Students',id,'UPDATE_PROFILE',{...before,...beforeUser},{...before,...beforeUser,...fields,...userFields},reason);
     return (await client.query(`${studentSelect} WHERE s."StudentID"=$1`,[id])).rows[0];
@@ -55,7 +63,8 @@ export async function results(id: number, params: Record<string,unknown>) {
   await student(id);
   const p=pagination(params,['courseId','academicPeriodId','status']), args:unknown[]=[id], filters=['r."StudentID"=$1'];
   for (const key of ['courseId','academicPeriodId','status']) if (params[key]!==undefined) { args.push(key==='status' ? enumValue(params[key],['PASSED','FAILED','IN_PROGRESS','WITHDRAWN','RECOGNIZED'],'status') : positiveId(params[key],key)); filters.push(`r."${key==='courseId'?'CourseID':key==='status'?'Status':'AcademicPeriodID'}"=$${args.length}`); }
-  return (await query(`WITH filtered AS (${resultSelect} WHERE ${filters.join(' AND ')}), paged AS (SELECT * FROM filtered ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows.map(row=>({...row,page:p.page,limit:p.limit}))[0];
+  const row=(await query(`WITH filtered AS (${resultSelect} WHERE ${filters.join(' AND ')}), paged AS (SELECT * FROM filtered ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "periodStartDate" DESC NULLS LAST,"attemptNumber" DESC,id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
+  return {...row,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
 export async function resultPeriod(client: PoolClient, studentId: number, periodId: number) {
   const period=(await client.query(`SELECT p.*,COALESCE(parent."StartDate",p."StartDate") AS "SemesterStart" FROM "AcademicPeriods" p LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=p."ParentPeriodID" WHERE p."AcademicPeriodID"=$1`,[periodId])).rows[0];

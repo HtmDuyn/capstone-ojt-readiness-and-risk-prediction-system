@@ -2,7 +2,7 @@ import { Router } from "express";
 import { changePassword } from './auth.service';
 import { requestPasswordReset } from './password-reset.service';
 import { authorizeRoles } from '../../middleware/authorize';
-import { positiveId } from '../students/student.validation';
+import { positiveId, inputObject, invalid } from '../students/student.validation';
 
 import {
   authenticate,
@@ -15,8 +15,12 @@ import {
 } from "./auth.controller";
 
 const router = Router();
-router.post('/users/:userId/password-reset', authenticate, authorizeRoles('ADMIN'), async (req,res,next) => {
-  try { res.status(202).json({success:true,data:await requestPasswordReset(positiveId(req.params.userId,'userId'),req.user!.userId)}); }
+router.post('/users/password-reset', authenticate, authorizeRoles('ADMIN'), async (req,res,next) => {
+  try {
+    if(Object.keys(req.query).length)throw invalid('Provide userId in the JSON body, not query parameters.');
+    const body=inputObject(req.body,['userId']);
+    res.status(202).json({success:true,data:await requestPasswordReset(positiveId(body.userId,'userId'),req.user!.userId)});
+  }
   catch(error) { next(error); }
 });
 router.post('/change-password', authenticate, async (req, res, next) => {
@@ -42,6 +46,9 @@ router.post('/change-password', authenticate, async (req, res, next) => {
  *       Authenticate a user using email and password.
  *       If login succeeds, the API returns a JWT token.
  *       Use this token in Swagger Authorize as Bearer Token.
+ *       Chọn Examples để điền sẵn email và mật khẩu mẫu; tên tài khoản chỉ là nhãn,
+ *       request vẫn dùng email và password. Có mẫu cho 5 vai trò:
+ *       ADMIN, ACADEMIC, OJT_COORD, STUDENT và ENTERPRISE.
  *     tags:
  *       - Auth
  *     security: []
@@ -51,9 +58,32 @@ router.post('/change-password', authenticate, async (req, res, next) => {
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/LoginRequest'
- *           example:
- *             email: admin@ojtrpa.edu.vn
- *             password: Admin@123
+ *           examples:
+ *             admin01:
+ *               summary: Admin
+ *               value:
+ *                 email: admin@ojtrpa.edu.vn
+ *                 password: Admin@123
+ *             academic01:
+ *               summary: Academic
+ *               value:
+ *                 email: academic@ojtrpa.edu.vn
+ *                 password: Academic@123
+ *             ojt.coord01:
+ *               summary: OJT Coordinator
+ *               value:
+ *                 email: ojt.coord@ojtrpa.edu.vn
+ *                 password: Ojt@123
+ *             student01:
+ *               summary: Student01 — Sinh viên
+ *               value:
+ *                 email: student01@student.edu.vn
+ *                 password: Student@123
+ *             enterprise01:
+ *               summary: Enterprise
+ *               value:
+ *                 email: hr@techviet.example
+ *                 password: Enterprise@123
  *     responses:
  *       200:
  *         description: Login successful
@@ -65,6 +95,7 @@ router.post('/change-password', authenticate, async (req, res, next) => {
  *               success: true
  *               message: Login successful
  *               token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *               mustChangePassword: false
  *
  *       400:
  *         description: Missing or invalid request data

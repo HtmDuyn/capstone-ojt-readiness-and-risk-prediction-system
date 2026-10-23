@@ -16,11 +16,11 @@ import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
 import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
-import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
-import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
-import QhdnEnterpriseImport from "@/pages/qhdn/QhdnEnterpriseImport";
-import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
-import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
+import AdminAiConfig from "@/pages/admin/AdminAiConfig";
+import AdminSettings from "@/pages/admin/AdminSettings";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -156,7 +156,41 @@ export const router = createBrowserRouter([
   // Các role còn lại dùng layout chung và trang tạm trong khi chờ nghiệp vụ.
   {
     element: <PrivateRoute allowedRoles={["admin"]} />,
-    children: [createRoleRoutes("admin")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("admin")}
+            homePath="/admin/dashboard"
+            brandSubtitle="Quản trị viên"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          {
+            path: "/admin/dashboard",
+            element: <AdminDashboard />,
+          },
+          ...getMenuByRole("admin")
+            .filter((item) => item.path !== "/admin/dashboard")
+            .map((item) => ({
+              path: item.path,
+              element:
+                item.path === "/admin/users" ? (
+                  <AdminUsers />
+                ) : item.path === "/admin/metrics" ? (
+                  <AdminSystemMetrics />
+                ) : item.path === "/admin/ai-config" ? (
+                  <AdminAiConfig />
+                ) : item.path === "/admin/settings" ? (
+                  <AdminSettings />
+                ) : (
+                  <RolePlaceholderPage role="admin" />
+                ),
+            })),
+        ],
+      },
+    ],
   },
   {
     element: <PrivateRoute allowedRoles={["education"]} />,
@@ -198,31 +232,7 @@ export const router = createBrowserRouter([
   },
   {
     element: <PrivateRoute allowedRoles={["qhdn"]} />,
-    children: [
-      {
-        element: (
-          <BaseLayout
-            navItems={getMenuByRole("qhdn")}
-            homePath="/qhdn/dashboard"
-            brandSubtitle="Phòng Quan hệ Doanh nghiệp"
-            showAIConsult={false}
-          />
-        ),
-        children: [
-          { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
-          { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
-          { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
-          { path: "/qhdn/enterprises/import", element: <QhdnEnterpriseImport /> },
-          { path: "/qhdn/enterprises/list", element: <Navigate to="/qhdn/enterprises" replace /> },
-          { path: "/qhdn/partners", element: <Navigate to="/qhdn/enterprises" replace /> },
-          { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
-          { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
-          { path: "/qhdn/evaluations", element: <QhdnEnterpriseEvaluations /> },
-          { path: "/qhdn/analytics", element: <Navigate to="/qhdn/dashboard" replace /> },
-          { path: "/qhdn/interviews", element: <Navigate to="/qhdn/coordination" replace /> },
-        ],
-      },
-    ],
+    children: [createRoleRoutes("qhdn")],
   },
   {
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
