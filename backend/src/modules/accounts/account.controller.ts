@@ -25,6 +25,11 @@ export const listAccounts = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    const allowed: string[] = [];
+    if (Object.keys(req.query).some(key => !allowed.includes(key))) {
+      res.status(400).json({success:false,errorCode:'INVALID_ACCOUNT_SEARCH',message:'Unknown account query parameter.'});
+      return;
+    }
     const result =
       await getAccounts(
         parseAccountListQuery(
@@ -71,11 +76,16 @@ export const updateAccountById = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.query).length) {
+      res.status(400).json({success:false,errorCode:'INVALID_ACCOUNT_INPUT',message:'Provide userId and account fields in a JSON object body.'});
+      return;
+    }
+    const {userId, ...fields} = req.body;
     const account =
       await updateAccount(
-        req.params.userId,
+        userId,
         parseUpdateAccountInput(
-          req.body,
+          fields,
         ),
         req.user!.userId,
         req.user!.roleCode,

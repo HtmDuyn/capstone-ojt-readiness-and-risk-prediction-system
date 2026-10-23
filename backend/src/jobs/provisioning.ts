@@ -91,7 +91,14 @@ export function startProvisioningJobs() {
       // An archive failure must not prevent account/result emails from being delivered.
       for(const [name,job] of [['archive',archiveRecruitment],['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
         try { await job(); }
-        catch { console.error(`Provisioning ${name} job failed; check database migration and SMTP configuration.`); }
+        catch (error: any) {
+          // Log codes only: SMTP messages may contain recipient data or credentials.
+          const code = String(error?.code ?? error?.errorCode ?? 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0, 80);
+          console.error(`Provisioning ${name} job failed. Code: ${code}.`,
+            code === '57014' ? 'Database statement timed out.' :
+            code === 'XX000' ? 'Database/pooler error; check connection capacity.' :
+            name === 'email' ? 'Check database and mail configuration.' : 'Check database connection, locks and schema.');
+        }
       }
     }
     finally { busy = false; }

@@ -47,11 +47,10 @@ export function describeFeResponses(spec:Schema):void {
   personalUpdate.description='Chỉ cập nhật fullName và phone của tài khoản đăng nhập. Hồ sơ doanh nghiệp dùng PATCH /api/enterprise/profile riêng.';
   personalUpdate.requestBody={required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,minProperties:1,properties:{fullName:{type:'string',minLength:1,maxLength:150},phone:{type:'string',nullable:true,maxLength:20}}}}}};
 
-  set('/api/accounts/{userId}',account,'account','patch');
-  spec.paths['/api/accounts'].get.responses['200']={description:'Danh sách hoặc tài khoản theo userId; giữ envelope hiện có.',content:{'application/json':{schema:obj({success:{type:'boolean'},data:arr(account),total:{type:'integer'},page:id,limit:id})}}};
+  set('/api/accounts/update',account,'account','patch');
+  spec.paths['/api/accounts'].get.responses['200']={description:'Danh sách hoặc tài khoản theo userId; giữ envelope hiện có.',content:{'application/json':{schema:obj({success:{type:'boolean'},data:arr(account),total:{type:'integer'}})}}};
   const count={type:'integer',minimum:0},scope={type:'object',additionalProperties:true};
-  const distribution=obj({scope,basis:text,total:count,groups:arr(obj({level:text,count,averageScore:num}))});
-  set('/api/admin/dashboard',obj({summary:obj({scope:{type:'string',enum:['ALL_SYSTEM']},accounts:count,activeAccounts:count,students:count,companies:count,ojtSemesters:count,openAlerts:count}),readiness:distribution,risks:distribution,trends:obj({scope,basis:text,items:arr(obj({month:time,predictionCount:count,averageReadiness:num,averageRisk:num,highRiskCount:count}))})}));
+  set('/api/admin/dashboard',obj({summary:obj({scope:{type:'string',enum:['ALL_SYSTEM']},accounts:count,activeAccounts:count,students:count,companies:count,ojtSemesters:count})}),'data','post');
   const academicCounts={total:count,eligible:count,notEligible:count,insufficientData:count,awaitingConfirmation:count};
   set('/api/academic/dashboard',obj({scope,computedAt:time,summary:obj({...academicCounts,currentEvaluation:obj({eligible:count,notEligible:count,reviewRequired:count}),staleConfirmations:count}),statistics:obj({groupBy:text,overall:obj(academicCounts),groups:arr(obj({id:{oneOf:[{type:'integer'},{type:'string'}],nullable:true},name:nil(text),...academicCounts})),membershipCountsMayOverlap:{type:'boolean'}})}));
 

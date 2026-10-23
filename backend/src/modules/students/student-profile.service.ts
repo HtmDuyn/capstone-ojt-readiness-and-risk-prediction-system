@@ -1,5 +1,4 @@
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
-import { predictionSelect } from '../admin/admin.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { studentSelect, resultSelect } from './student.service';
 import { academicProgressWithClient } from './academic-progress';
@@ -51,10 +50,9 @@ export async function studentProfile(id:number,params:Row,actor:Actor) {
     // The selected semester is independent of pagination of historical registrations.
     const semesterId=selected??(await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID??
       (await c.query('SELECT o."OJTSemesterID" FROM "AcademicPeriods" p JOIN "OJTSemesters" o ON o."AcademicPeriodID"=COALESCE(p."ParentPeriodID",p."AcademicPeriodID") WHERE p."AcademicPeriodID"=$1',[profile.currentAcademicPeriodId])).rows[0]?.OJTSemesterID??null;
-    const forecast=(await c.query(predictionSelect+' WHERE p."StudentID"=$1 AND ($2::int IS NULL OR j."OJTSemesterID"=$2) ORDER BY p."PredictionID" DESC LIMIT 1',[id,semesterId])).rows[0]??null;
     const official=semesterId?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null;
     const officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;
-    return {...profile,academicProgress,comboSelections,forecast:{advisoryOnly:true,grantsOjtPermission:false,prediction:forecast},officialDecision,
+    return {...profile,academicProgress,comboSelections,officialDecision,
       courseResults:{items:resultItems,total:totalResults,page:resultsPage.page,limit:resultsPage.limit},
       ojtRegistrations:{items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit},
       ojtSemesterId:semesterId,officialEligibility:official};

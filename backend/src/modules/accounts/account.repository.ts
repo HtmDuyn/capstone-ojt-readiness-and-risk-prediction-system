@@ -34,15 +34,15 @@ const selectAccount = `
     ON r."RoleID" = u."RoleID"
 `;
 
-export const findAccounts = async (page:number,limit:number,search?:string,roleCode?:string,status?:string,userId?:number): Promise<AccountListResult> => {
+export const findAccounts = async (search?:string,roleCode?:string,userId?:number): Promise<AccountListResult> => {
  const result=await query<{data:AccountRecord[];total:number}>(`WITH filtered AS (
   ${selectAccount}
   WHERE ($1::text IS NULL OR u."Username" ILIKE $1 OR u."Email" ILIKE $1 OR u."FullName" ILIKE $1)
-    AND ($2::text IS NULL OR r."RoleCode"=$2) AND ($3::text IS NULL OR u."Status"=$3)
-    AND ($4::int IS NULL OR u."UserID"=$4)
- ), paged AS (SELECT * FROM filtered ORDER BY id LIMIT $5 OFFSET $6)
- SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id) FILTER(WHERE id IS NOT NULL),'[]'::jsonb) AS data FROM paged`,[search?'%'+search+'%':null,roleCode??null,status??null,userId??null,limit,(page-1)*limit]);
- return {...result.rows[0],data:await enrichListRows({query},result.rows[0].data),page,limit};
+    AND ($2::text IS NULL OR r."RoleCode"=$2)
+    AND ($3::int IS NULL OR u."UserID"=$3)
+ )
+ SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(filtered) ORDER BY id) FILTER(WHERE id IS NOT NULL),'[]'::jsonb) AS data FROM filtered`,[search?'%'+search+'%':null,roleCode??null,userId??null]);
+ return {...result.rows[0],data:await enrichListRows({query},result.rows[0].data)};
 };
 
 export const findAccountById = async (

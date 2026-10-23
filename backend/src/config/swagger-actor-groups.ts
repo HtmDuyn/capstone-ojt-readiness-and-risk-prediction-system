@@ -3,7 +3,6 @@
  * This file changes OpenAPI tags, NOT Express routes or authorization.
  * Inventory baseline: 223 unique operations (method + path).
  * Source mapping: actor docs reviewed against critical route middleware.
- * IMPORTANT: /api/health is public; it is shown under Admin for navigation only.
  * Do not treat membership in a Swagger tag as access control.
  */
 
@@ -75,12 +74,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   "GET /api/admin/dashboard/summary": [
     "Admin"
   ],
-  "POST /api/admin/prediction-jobs": [
-    "Admin"
-  ],
-  "POST /api/assessment-templates": [
-    "Admin"
-  ],
   "POST /api/assignments": [
     "Admin",
     "Phòng QHDN"
@@ -137,9 +130,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Admin",
     "Phòng Đào tạo"
   ],
-  "GET /api/health": [
-    "Admin"
-  ],
   "POST /api/imports/archive": [
     "Admin",
     "Phòng QHDN"
@@ -148,9 +138,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Admin",
     "Phòng Đào tạo",
     "Phòng QHDN"
-  ],
-  "GET /api/imports/emails": [
-    "Admin"
   ],
   "POST /api/imports/preview": [
     "Admin",
@@ -248,7 +235,7 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   "PATCH /api/json/accounts/status": [
     "Admin"
   ],
-  "POST /api/json/admin/audit-logs/search": [
+  "POST /api/admin/audit-logs/list": [
     "Admin"
   ],
   "POST /api/json/admin/dashboard/readiness/search": [
@@ -260,46 +247,7 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   "POST /api/json/admin/dashboard/trends/search": [
     "Admin"
   ],
-  "POST /api/json/admin/models/detail": [
-    "Admin"
-  ],
-  "POST /api/json/admin/models/search": [
-    "Admin"
-  ],
-  "POST /api/json/admin/prediction-jobs/detail": [
-    "Admin"
-  ],
-  "POST /api/json/admin/reports/export": [
-    "Admin"
-  ],
-  "POST /api/json/admin/reports/readiness/search": [
-    "Admin"
-  ],
   "POST /api/json/admin/reports/risks/search": [
-    "Admin"
-  ],
-  "POST /api/json/alerts/detail": [
-    "Admin"
-  ],
-  "POST /api/json/alerts/interventions": [
-    "Admin"
-  ],
-  "POST /api/json/alerts/search": [
-    "Admin"
-  ],
-  "PATCH /api/json/alerts/status": [
-    "Admin"
-  ],
-  "PATCH /api/json/assessment-templates": [
-    "Admin"
-  ],
-  "POST /api/json/assessment-templates/detail": [
-    "Admin"
-  ],
-  "POST /api/json/assessment-templates/publish": [
-    "Admin"
-  ],
-  "POST /api/json/assessment-templates/search": [
     "Admin"
   ],
   "POST /api/json/assessments/detail": [
@@ -469,15 +417,7 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Admin",
     "Phòng Đào tạo"
   ],
-  "POST /api/json/eligibility-check-runs/detail": [
-    "Admin",
-    "Phòng Đào tạo"
-  ],
-  "POST /api/json/eligibility-checks/confirm": [
-    "Admin",
-    "Phòng Đào tạo"
-  ],
-  "POST /api/json/imports/emails/retry": [
+  "POST /api/json/imports/emails/resend": [
     "Admin"
   ],
   "POST /api/json/internship-evaluations/detail": [
@@ -489,9 +429,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Admin",
     "Phòng QHDN",
     "Doanh nghiệp"
-  ],
-  "PATCH /api/json/interventions": [
-    "Admin"
   ],
   "POST /api/json/job-applications/cv/search": [
     "Admin",
@@ -676,12 +613,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Phòng QHDN",
     "Doanh nghiệp"
   ],
-  "POST /api/json/predictions/detail": [
-    "Admin"
-  ],
-  "POST /api/json/predictions/search": [
-    "Admin"
-  ],
   "POST /api/json/qhdn/dashboard/search": [
     "Admin",
     "Phòng QHDN"
@@ -779,9 +710,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   "POST /api/json/student/positions/search": [
     "Student"
   ],
-  "POST /api/json/student/risk-prediction/search": [
-    "Student"
-  ],
   "POST /api/json/student/roadmap-recommendations/search": [
     "Student"
   ],
@@ -819,10 +747,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Phòng Đào tạo",
     "Student"
   ],
-  "POST /api/json/students/eligibility-checks": [
-    "Admin",
-    "Phòng Đào tạo"
-  ],
   "POST /api/json/students/eligibility-checks/search": [
     "Admin",
     "Phòng Đào tạo",
@@ -834,9 +758,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Student"
   ],
   "POST /api/json/students/export": [
-    "Admin"
-  ],
-  "POST /api/json/students/interventions/search": [
     "Admin"
   ],
   "POST /api/json/students/predictions/search": [
@@ -878,9 +799,6 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
   "POST /api/positions": [
     "Admin",
     "Phòng QHDN"
-  ],
-  "GET /api/roles": [
-    "Admin"
   ],
   "POST /api/student/applications": [
     "Student"

@@ -3,7 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId,pagination } from '../students/student.validation';
 import { summary,supplementary,curriculum,registrationWindows,comboWindows,notifications,readNotification,currentAssignment,publishedResults } from './academic.service';
-import { risk,roadmap } from './cv.service';
+import { roadmap } from './cv.service';
 import { createAdvisoryRun,advisoryRuns,schedule } from './advisory.service';
 const router=Router(),student=[authenticate,authorizeRoles('STUDENT')],staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(e){next(e);}};
@@ -12,7 +12,6 @@ router.get('/student/supplementary-course-options',...student,handle(r=>suppleme
 router.get('/student/ojt-registration-windows',...student,handle(r=>registrationWindows(r.query,r.user)));
 router.get('/student/combo-registration-windows',...student,handle(r=>comboWindows(r.query,r.user)));
 router.get('/student/curriculum',...student,handle(r=>{pagination(r.query,[]);return curriculum(r.user);}));
-router.get('/student/risk-prediction',...student,handle(r=>{pagination(r.query,['ojtSemesterId']);return risk(positiveId(r.query.ojtSemesterId,'ojtSemesterId'),r.user);}));
 router.get('/student/roadmap-recommendations',...student,handle(r=>{pagination(r.query,['ojtSemesterId']);return roadmap(positiveId(r.query.ojtSemesterId,'ojtSemesterId'),r.user);}));
 router.get('/student/notifications',...student,handle(r=>notifications(r.query,r.user)));
 router.patch('/student/notifications/:id/read',...student,handle(r=>readNotification(positiveId(r.params.id),r.user)));

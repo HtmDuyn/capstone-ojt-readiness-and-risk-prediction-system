@@ -63,5 +63,5 @@ export async function queueDueAdvisories() {
   for(const s of schedules.rows)try{await createAdvisoryRun({ojtSemesterId:s.OJTSemesterID,academicPeriodId:s.AcademicPeriodID,scope:s.Scope,idempotencyKey:`advisory-${s.AcademicPeriodID}-v${s.Version}`,reason:'Thông báo giữa kỳ theo lịch đã cấu hình'},{userId:s.UpdatedBy,roleCode:'ACADEMIC'},'SUMMARY');}catch(e:any){console.error('Invalid advisory schedule',s.AcademicPeriodID,e.errorCode??'SCHEDULE_FAILED');}
 }
 export function startAdvisoryWorker() {
-  let busy=false,stopped=false;const tick=async()=>{if(busy||stopped)return;busy=true;try{await queueDueAdvisories();for(let i=0;i<10&&!stopped;i++)if(!await processAdvisoryItem())break;}catch(e:any){console.error('OJT advisory worker:',e.errorCode??'ADVISORY_WORKER_FAILED');}finally{busy=false;}};const timer=setInterval(()=>void tick(),5000);timer.unref();void tick();return ()=>{stopped=true;clearInterval(timer);};
+  let busy=false,stopped=false;const tick=async()=>{if(busy||stopped)return;busy=true;try{await queueDueAdvisories();for(let i=0;i<10&&!stopped;i++)if(!await processAdvisoryItem())break;}catch(e:any){console.error('OJT advisory worker:',e.code??e.errorCode??'ADVISORY_WORKER_FAILED');}finally{busy=false;}};const timer=setInterval(()=>void tick(),5000);timer.unref();void tick();return ()=>{stopped=true;clearInterval(timer);};
 }

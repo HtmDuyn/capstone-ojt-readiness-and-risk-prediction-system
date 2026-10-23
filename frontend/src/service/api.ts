@@ -1,11 +1,9 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-const baseURL =
-  import.meta.env.VITE_API_URL ||
-  'https://capstone-ojt-readiness-and-risk.onrender.com/api';
+import { API_BASE_URL } from '../config/api';
 
 const API = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

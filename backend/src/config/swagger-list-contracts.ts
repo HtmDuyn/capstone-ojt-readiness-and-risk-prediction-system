@@ -39,7 +39,6 @@ const listContexts:Record<string,string[]>={
  '/api/students/{id}/combo-selections':['createdByUser'], '/api/curricula':['createdByUser','publishedByUser'],
  '/api/ojt-rule-sets':['program','semester','createdByUser','publishedByUser'],
  '/api/students/{id}/eligibility-checks':['student','semester','ruleSet','checkedByUser'],
- '/api/eligibility-check-runs/{id}':['student','program','ruleSet'],
  '/api/ojt-registration-windows':['semester','academicPeriod','createdByUser'],
  '/api/ojt-registrations':['student','program','currentProgram','cohort','semester','submittedByUser'],
  '/api/ojt-semesters/{id}/eligible-student-handoffs':['semester','createdByUser'],
@@ -48,9 +47,7 @@ const listContexts:Record<string,string[]>={
  '/api/positions':['company','semester'], '/api/ojt-coordinations':['student','company','position','semester','coordinatedByUser'],
  '/api/assignments':['student','company','position','semester'], '/api/internship-evaluations':['student','company','position','semester','evaluatedByUser'],
  '/api/qhdn/registered-students':['student','program','cohort'], '/api/academic-imports':['importedByUser'],
- '/api/admin/prediction-jobs/{id}':['student'], '/api/predictions':['student','semester','model'],
- '/api/alerts':['student','semester','updatedByUser'], '/api/students/{id}/interventions':['student','assignedToUser','createdByUser'],
- '/api/admin/reports/readiness':['student','semester','model'], '/api/admin/audit-logs':['user'],
+
  '/api/enterprise/candidates':['student','company','position','semester'], '/api/enterprise/internships':['student','company','position','semester'],
  '/api/recruitment/posts':['company','semester','academicPeriod'],
  '/api/job-applications':['student','company','position','semester'],
@@ -99,8 +96,6 @@ export function describeListResponses(spec:Schema):void {
  }
  const candidateFields=spec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
  Object.assign(candidateFields,{companyId:id,company:contexts.company,coordinatedBy:{...id,nullable:true},coordinatedByUser:user,registration:contexts.registration,application:{type:'object',additionalProperties:true},decision:text,introducedAt:time,decisionAt:{...time,nullable:true},rejectReason:{...text,nullable:true},isLatestCoordination:{type:'boolean'},recruitmentPost:{type:'object',nullable:true,properties:{...spec.paths['/api/recruitment/posts'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties}}});
- const emails=spec.paths['/api/imports/emails'].get;
- emails.responses['200']={description:'Tối đa 100 email mới nhất; kèm tổng số và quyền gửi lại, không có nội dung mã hóa.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},emails:{type:'array',items:{type:'object',properties:{EmailID:id,UserID:id,Recipient:text,Status:text,Attempts:{type:'integer'},SentAt:time,ExpiresAt:time,LastError:{...text,nullable:true},user:obj({id,fullName:text,email:text}),canRetry:{type:'boolean'}}}},total:{type:'integer'},limit:{type:'integer',enum:[100]},hasMore:{type:'boolean'}}}}}};
  const schedules=spec.paths['/api/academic-periods/{id}/combo-phase-schedules'].get;
  schedules.responses['200']={description:'Lịch chọn combo theo học kỳ, kèm tên kỳ và người xác nhận.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:{type:'array',items:{type:'object',additionalProperties:true,properties:{academicPeriodId:id,academicPeriod:period,confirmedBy:id,confirmedByUser:user}}}}}}}};
 }
