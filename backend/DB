@@ -5607,7 +5607,7 @@ INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_student_academic_re
 -- SECTION: 20261008 curriculum management and publication
 ALTER TABLE "Courses" ALTER COLUMN "Credits" TYPE numeric(6,2);
 -- Curriculum simplification: keep ProgramID, ProgramCode, ProgramName,
--- TotalCredits and SpecializationID. No publication workflow for TrainingPrograms.
+S-- TotalCredits and SpecializationID. No publication workflow for TrainingPrograms.
 ALTER TABLE "TrainingPrograms" ALTER COLUMN "TotalCredits" TYPE numeric(6,2);
 CREATE UNIQUE INDEX "UQ_Curriculum_ProgramCode_CI" ON "TrainingPrograms"(upper("ProgramCode"));
 ALTER TABLE "ProgramCombos" ALTER COLUMN "SourceComboID" DROP NOT NULL, ADD COLUMN "CoursesReviewed" boolean NOT NULL DEFAULT false;
