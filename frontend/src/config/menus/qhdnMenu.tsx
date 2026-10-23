@@ -23,20 +23,6 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     label: 'Doanh nghiệp liên kết',
     path: '/qhdn/enterprises',
     icon: <Building2 size={20} />,
-    children: [
-      {
-        id: 'enterprises-import',
-        label: 'Import doanh nghiệp',
-        path: '/qhdn/enterprises/import',
-        icon: <Building2 size={16} />,
-      },
-      {
-        id: 'enterprises-list',
-        label: 'Danh sách doanh nghiệp',
-        path: '/qhdn/enterprises',
-        icon: <Building2 size={16} />,
-      },
-    ],
     banner: {
       title: 'Quản lý Doanh nghiệp & Vị trí Thực tập',
       description: 'Quản lý danh sách doanh nghiệp liên kết, vị trí thực tập tuyển dụng và chỉ tiêu số lượng tiếp nhận (quota).',

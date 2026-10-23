@@ -1,32 +1,29 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  X,
-  FileSpreadsheet,
-  Upload,
-  ArrowRight,
-  RotateCcw,
   Calendar,
-  ChevronDown,
-  Check,
-  Info,
+  CheckCircle2,
   Download,
+  Eye,
+  FileSpreadsheet,
+  Info,
+  RotateCcw,
+  Upload,
+  X,
 } from 'lucide-react';
-import type { SelectedFileItem, OjtSemesterItem } from '@/types/qhdn/qhdnTypes';
-
-export const IMPORT_SEMESTER_OPTIONS = [
-  { value: 'Fall 2026', label: 'Fall 2026 (01/09/2026 - 25/12/2026)', isCurrent: true },
-  { value: 'Summer 2026', label: 'Summer 2026 (01/05/2026 - 25/08/2026)', isCurrent: false },
-  { value: 'Spring 2026', label: 'Spring 2026 (05/01/2026 - 25/04/2026)', isCurrent: false },
-  { value: 'Fall 2025', label: 'Fall 2025 (01/09/2025 - 25/12/2025)', isCurrent: false },
-  { value: 'Summer 2025', label: 'Summer 2025 (01/05/2025 - 25/08/2025)', isCurrent: false },
-];
+import type { ReactNode } from 'react';
+import type { AcademicPeriodItem, OjtSemesterItem, SelectedFileItem } from '@/types/qhdn/qhdnTypes';
 
 interface FileImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedSemester?: string;
-  onSemesterChange?: (semester: string) => void;
-  semesters?: OjtSemesterItem[];
+  selectedSemesterId: number | null;
+  onSemesterChange: (semesterId: number) => void;
+  academicYearId: number | null;
+  onAcademicYearChange: (yearId: number) => void;
+  academicYears: Array<{ id: number; code: string }>;
+  academicPeriods: AcademicPeriodItem[];
+  semesters: OjtSemesterItem[];
+  isLoadingPeriods: boolean;
   selectedFiles: SelectedFileItem[];
   onRemoveFile: (fileName: string) => void;
   onClearAllFiles: () => void;
@@ -35,14 +32,27 @@ interface FileImportModalProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
+  previewContent?: ReactNode;
+  previewSummary?: ReactNode;
+  apiError?: string | null;
+  isCommitting?: boolean;
+  selectedCount?: number;
+  canConfirm?: boolean;
+  onConfirmImport?: () => void;
+  onChooseDifferentFile?: () => void;
 }
 
 export const FileImportModal: React.FC<FileImportModalProps> = ({
   isOpen,
   onClose,
-  selectedSemester,
+  selectedSemesterId,
   onSemesterChange,
+  academicYearId,
+  onAcademicYearChange,
+  academicYears,
+  academicPeriods,
   semesters,
+  isLoadingPeriods,
   selectedFiles,
   onRemoveFile,
   onClearAllFiles,
@@ -51,259 +61,285 @@ export const FileImportModal: React.FC<FileImportModalProps> = ({
   fileInputRef,
   onDragOver,
   onDrop,
+  previewContent,
+  previewSummary,
+  apiError,
+  isCommitting = false,
+  selectedCount = 0,
+  canConfirm = false,
+  onConfirmImport,
+  onChooseDifferentFile,
 }) => {
-  const [internalSemester, setInternalSemester] = useState<string>('Fall 2026');
-  const activeSemester = selectedSemester ?? internalSemester;
+  const semesterOptions = semesters
+    .filter((semester) => !academicYearId || semester.academicYearId === academicYearId)
+    .map((semester) => {
+    const academicPeriod = academicPeriods.find(
+      (period) => (period.ojtSemesterId || period.ojt?.id) === semester.id
+    );
+    const name = semester.name || semester.semesterCode || semester.code || `Kỳ #${semester.id}`;
+    const startDate = semester.startDate || academicPeriod?.ojt?.startDate || '';
+    const endDate = semester.endDate || academicPeriod?.ojt?.endDate || '';
+    return {
+      id: semester.id,
+      name,
+      label: `${name}${startDate ? ` (${startDate}${endDate ? ` - ${endDate}` : ''})` : ''}`,
+      status: semester.status || academicPeriod?.ojt?.status || academicPeriod?.status || '',
+    };
+    });
 
-  const semesterOptions =
-    semesters && semesters.length > 0
-      ? semesters.map((s) => ({
-          value: s.name || s.semesterCode || `Kỳ #${s.id}`,
-          label: `${s.name || s.semesterCode} (${s.semesterCode || ''}${s.startDate ? ` | ${s.startDate} - ${s.endDate || ''}` : ''})`,
-          isCurrent: s.status === 'PLANNED' || s.status === 'ONGOING',
-        }))
-      : IMPORT_SEMESTER_OPTIONS;
-
-  const handleSemesterSelect = (sem: string) => {
-    setInternalSemester(sem);
-    onSemesterChange?.(sem);
-  };
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200">
-        {/* Close button */}
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-2 backdrop-blur-xs sm:items-center sm:p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="enterprise-import-title"
+        className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[92dvh] sm:rounded-3xl"
+      >
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+          className="absolute right-3 top-3 z-10 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 sm:right-5 sm:top-5"
           aria-label="Đóng popup import"
         >
           <X size={20} />
         </button>
 
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-xs border border-emerald-200">
-            <FileSpreadsheet size={24} />
+        <header className="flex shrink-0 items-start gap-3 border-b border-slate-100 px-4 py-4 pr-12 sm:px-7 sm:py-5 sm:pr-14">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-700 sm:h-12 sm:w-12 sm:rounded-2xl">
+            <FileSpreadsheet size={22} />
           </div>
-          <div>
-            <h2 className="text-2xl font-extrabold text-slate-900">
+          <div className="min-w-0">
+            <h2 id="enterprise-import-title" className="text-lg font-extrabold text-slate-900 sm:text-2xl">
               Import doanh nghiệp từ file Excel
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Tải lên file bảng tính Excel (.xlsx, .xls) chứa danh sách doanh nghiệp đối tác, chỉ tiêu tiếp nhận OJT và thông tin liên hệ HR.
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+              Tải file danh sách doanh nghiệp, xem trước và xác nhận import.
             </p>
           </div>
-        </div>
+        </header>
 
-        {/* ─── CHỌN HỌC KỲ TIẾP NHẬN OJT ĐỂ IMPORT ─────────────────────── */}
-        <div className="bg-gradient-to-r from-purple-50/90 via-purple-50/40 to-slate-50 border border-purple-200/90 rounded-2xl p-4 sm:p-5 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/30">
-                <Calendar size={20} />
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3 sm:space-y-5 sm:p-6">
+          <section className="grid grid-cols-1 gap-3 rounded-2xl border border-purple-200 bg-purple-50/60 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(280px,1fr)] sm:items-center sm:p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white">
+                <Calendar size={18} />
               </div>
               <div>
-                <label className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  Chọn học kỳ tiếp nhận OJT
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
-                    Kỳ áp dụng
-                  </span>
-                </label>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Tất cả doanh nghiệp trong đợt import này sẽ được gắn trực tiếp vào học kỳ đã chọn
-                </p>
+                <h3 className="text-sm font-bold text-slate-900">Năm học và kỳ tiếp nhận OJT</h3>
+                <p className="mt-1 text-xs text-slate-500">Danh sách lấy trực tiếp từ dữ liệu đào tạo.</p>
               </div>
             </div>
-
-            {/* Dropdown chọn học kỳ */}
-            <div className="relative min-w-[250px]">
+            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
               <select
-                value={activeSemester}
-                onChange={(e) => handleSemesterSelect(e.target.value)}
-                className="w-full appearance-none pl-3.5 pr-10 py-2.5 bg-white border border-purple-300 rounded-xl text-xs sm:text-sm font-bold text-purple-950 shadow-xs hover:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 cursor-pointer transition-all"
+                value={academicYearId ?? ''}
+                onChange={(event) => onAcademicYearChange(Number(event.target.value))}
+                disabled={isLoadingPeriods || academicYears.length === 0}
+                aria-label="Chọn năm học"
+                className="min-w-0 w-full rounded-xl border border-purple-300 bg-white px-3 py-2.5 text-xs font-bold text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-500/20 disabled:opacity-60"
               >
-                {semesterOptions.map((sem) => (
-                  <option key={sem.value} value={sem.value}>
-                    {sem.label} {sem.isCurrent ? '⭐ (Hiện tại)' : ''}
-                  </option>
-                ))}
+                {academicYears.length === 0 ? (
+                  <option value="">{isLoadingPeriods ? 'Đang tải năm học...' : 'Chưa có năm học'}</option>
+                ) : (
+                  academicYears.map((year) => (
+                    <option key={year.id} value={year.id}>{year.code}</option>
+                  ))
+                )}
               </select>
-              <ChevronDown
-                size={16}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-purple-600 pointer-events-none"
-              />
-            </div>
-          </div>
-
-          {/* Quick chips selector */}
-          <div className="flex items-center gap-2 pt-1 flex-wrap text-xs">
-            <span className="text-slate-500 font-medium">Chọn nhanh kỳ:</span>
-            {semesterOptions.map((sem) => {
-              const isSelected = activeSemester === sem.value;
-              return (
-                <button
-                  key={sem.value}
-                  type="button"
-                  onClick={() => handleSemesterSelect(sem.value)}
-                  className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-purple-600 text-white shadow-xs font-bold scale-[1.02]'
-                      : 'bg-white hover:bg-purple-100/70 text-slate-700 border border-slate-200/90 hover:border-purple-300'
-                  }`}
-                >
-                  {isSelected && <Check size={12} className="stroke-[3]" />}
-                  {sem.value}
-                  {sem.isCurrent && !isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ─── TẢI FILE MẪU EXCEL CHUẨN ──────────────────────────────── */}
-        <div className="p-3.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-              <Info size={18} />
-            </div>
-            <div>
-              <span className="font-bold text-slate-800 block">Chưa có file danh sách chuẩn?</span>
-              <span className="text-slate-500">Tải file mẫu Excel (.xlsx) gồm đầy đủ cột thông tin: Tên DN, Mã DN, Ngành, HR Email, Quota.</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => alert('Đang tải file mẫu: Mau_Danh_Sach_Doanh_Nghiep_Tiep_Nhan_OJT.xlsx')}
-            className="px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-100/70 text-emerald-700 border border-emerald-300 font-bold cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs transition-all shrink-0 active:scale-95"
-          >
-            <Download size={14} />
-            Tải mẫu Excel (.xlsx)
-          </button>
-        </div>
-
-        {/* Drag & Drop Zone */}
-        <div
-          onDragOver={onDragOver}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 hover:bg-emerald-50/40 rounded-2xl p-8 sm:p-10 text-center transition-all cursor-pointer group space-y-3"
-        >
-          <div className="w-14 h-14 rounded-2xl bg-white text-emerald-600 shadow-xs border border-emerald-200 mx-auto flex items-center justify-center transition-transform group-hover:scale-105">
-            <Upload size={28} />
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-base font-bold text-slate-800">
-              Kéo thả file Excel (.xlsx, .xls) vào đây
-            </p>
-            <p className="text-xs text-slate-400 font-medium">hoặc</p>
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs cursor-pointer transition-all active:scale-95"
-            >
-              Chọn file Excel từ máy tính
-            </button>
-          </div>
-
-          <p className="text-xs text-slate-400 pt-1">
-            Hỗ trợ định dạng .xlsx, .xls. Có thể chọn nhiều file cùng lúc. Dung lượng tối đa mỗi file: 20MB.
-          </p>
-        </div>
-
-        {/* Selected Files List */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <FileSpreadsheet size={16} className="text-emerald-600" />
-              {selectedFiles.length} file Excel đã được chọn
-            </h3>
-            <button
-              type="button"
-              onClick={onClearAllFiles}
-              className="text-xs text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
-            >
-              Xóa tất cả
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto p-1">
-            {selectedFiles.map((f) => (
-              <div
-                key={f.name}
-                className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-emerald-300 transition-all"
+              <select
+                value={selectedSemesterId ?? ''}
+                onChange={(event) => onSemesterChange(Number(event.target.value))}
+                disabled={isLoadingPeriods || semesterOptions.length === 0}
+                aria-label="Chọn kỳ OJT"
+                className="min-w-0 w-full rounded-xl border border-purple-300 bg-white px-3 py-2.5 text-xs font-bold text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-500/20 disabled:opacity-60"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                    <FileSpreadsheet size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-900 truncate" title={f.name}>
-                      {f.name}
-                    </p>
-                    <p className="text-[11px] text-slate-400">{f.size}</p>
+                {semesterOptions.length === 0 ? (
+                  <option value="">{isLoadingPeriods ? 'Đang tải kỳ OJT...' : 'Không có kỳ OJT trong năm học này'}</option>
+                ) : (
+                  semesterOptions.map((semester) => (
+                    <option key={semester.id} value={semester.id}>
+                      {semester.label}{semester.status ? ` (${semester.status})` : ''}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          </section>
+
+          {previewSummary ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4">
+                <div>
+                  <p className="text-sm font-bold text-emerald-900">Xem trước danh sách doanh nghiệp</p>
+                  <p className="mt-1 text-xs text-emerald-800">Kiểm tra dữ liệu trước khi xác nhận import.</p>
+                </div>
+                {previewSummary}
+              </div>
+              {previewContent}
+            </>
+          ) : (
+            <>
+              <section className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                <div className="flex items-center gap-2.5">
+                  <Info size={18} className="shrink-0 text-emerald-700" />
+                  <div>
+                    <p className="font-bold text-slate-800">Tải file mẫu danh sách doanh nghiệp</p>
+                    <p className="mt-1 text-slate-500">File mẫu gồm tên, mã doanh nghiệp, ngành, email HR và quota.</p>
                   </div>
                 </div>
-
                 <button
                   type="button"
-                  onClick={() => onRemoveFile(f.name)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                  title="Xóa file này"
+                  onClick={() => alert('Đang tải file mẫu Excel doanh nghiệp.')}
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 py-2 font-bold text-emerald-700 hover:bg-emerald-100"
                 >
-                  <X size={14} />
+                  <Download size={14} />
+                  Tải file mẫu
                 </button>
-              </div>
-            ))}
-          </div>
+              </section>
 
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 font-semibold text-xs border border-slate-200">
-              + 49 file khác
-            </span>
+              <section
+                onDragOver={onDragOver}
+                onDrop={onDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer space-y-3 rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/20 p-5 text-center hover:border-emerald-500 sm:p-9"
+              >
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white text-emerald-600">
+                  <Upload size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Kéo thả file Excel (.xlsx, .xls) vào đây</p>
+                  <p className="my-1 text-xs text-slate-400">hoặc</p>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-800"
+                  >
+                    Chọn file từ máy tính
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">Hỗ trợ .xlsx, .xls; có thể chọn nhiều file.</p>
+              </section>
 
-            <div className="flex items-center gap-2">
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                    <FileSpreadsheet size={16} className="text-emerald-600" />
+                    {selectedFiles.length} file Excel đã chọn
+                  </h3>
+                  {selectedFiles.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={onClearAllFiles}
+                      className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                    >
+                      Xóa tất cả
+                    </button>
+                  )}
+                </div>
+                {selectedFiles.length > 0 && (
+                  <div className="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+                    {selectedFiles.map((file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-slate-800">{file.name}</p>
+                          <p className="text-[11px] text-slate-400">{file.size}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveFile(file.name)}
+                          aria-label={`Xóa file ${file.name}`}
+                          className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+
+          {apiError && (
+            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+              {apiError}
+            </div>
+          )}
+        </div>
+
+        {previewSummary ? (
+          <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+            <button
+              type="button"
+              onClick={onChooseDifferentFile}
+              disabled={isCommitting}
+              className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Chọn file khác
+            </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs cursor-pointer"
+                disabled={isCommitting}
+                className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
-
               <button
                 type="button"
-                disabled={isExtracting || selectedFiles.length === 0}
-                onClick={onStartExtraction}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                onClick={onConfirmImport}
+                disabled={!canConfirm || selectedCount === 0 || isCommitting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isExtracting ? (
+                {isCommitting ? (
                   <>
-                    <RotateCcw size={16} className="animate-spin" />
-                    Đang trích xuất dữ liệu Excel...
+                    <RotateCcw size={15} className="animate-spin" />
+                    Đang import...
                   </>
                 ) : (
-                  <>
-                    Bắt đầu trích xuất
-                    <ArrowRight size={16} />
-                  </>
+                  `Xác nhận import ${selectedCount} doanh nghiệp`
                 )}
               </button>
             </div>
-          </div>
-        </div>
-      </div>
+          </footer>
+        ) : (
+          <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white p-3 sm:flex-row sm:justify-end sm:px-6 sm:py-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              disabled={isExtracting || selectedFiles.length === 0 || !selectedSemesterId}
+              onClick={onStartExtraction}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isExtracting ? (
+                <>
+                  <RotateCcw size={15} className="animate-spin" />
+                  Đang tạo preview...
+                </>
+              ) : (
+                <>
+                  Xem trước dữ liệu
+                  <Eye size={15} />
+                </>
+              )}
+            </button>
+          </footer>
+        )}
+      </section>
     </div>
   );
 };

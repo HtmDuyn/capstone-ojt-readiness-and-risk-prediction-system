@@ -1,5 +1,6 @@
+import { loadAllPages } from '@/services/loadAllPages';
 import React, { useMemo, useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Building2,
   Layers,
@@ -24,14 +25,14 @@ import {
 } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { EnterprisePartnerDetailModal } from '@/components/qhdn/enterprise/PartnerDetailModal';
-import { EnterpriseImportExcelModal } from '@/components/qhdn/enterprise/ImportExcelModal';
+import { QhdnEnterpriseImportModal } from '@/components/qhdn/import/QhdnEnterpriseImportModal';
 import { EnterpriseCreateModal } from '@/components/qhdn/enterprise/CreateModal';
 import {
   archiveImport,
   createCompany,
   listCompanies,
   listPositions,
-  searchOjtSemesters,
+  listQhdnOjtSemesters,
 } from '@/services/qhdnService';
 import type {
   EnterprisePartner,
@@ -58,7 +59,6 @@ const MOU_FILTER_OPTIONS = [
 ];
 
 export const QhdnEnterpriseManagement: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   // Active Tab: 2 clean views
   const [activeTab, setActiveTab] = useState<'partners' | 'quotas'>('partners');
@@ -73,8 +73,7 @@ export const QhdnEnterpriseManagement: React.FC = () => {
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
-  const [excelImportSemester, setExcelImportSemester] = useState<string>('Fall 2026');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedEnterpriseDetail, setSelectedEnterpriseDetail] = useState<EnterprisePartner | null>(null);
 
   // Manual Add Form State
@@ -95,10 +94,6 @@ export const QhdnEnterpriseManagement: React.FC = () => {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-
-  // Excel File State
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
 
   // Archive State
   const [isArchiving, setIsArchiving] = useState(false);
@@ -140,36 +135,20 @@ export const QhdnEnterpriseManagement: React.FC = () => {
             return [];
           }
         })();
-        const firstPage = await listCompanies({ page: 1, limit: 100 });
-        const companies = [...firstPage.data.items];
-        const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
-
-        for (let page = 2; page <= totalPages; page += 1) {
-          const nextPage = await listCompanies({ page, limit: 100 });
-          companies.push(...nextPage.data.items);
-        }
-
-        let positions: PositionListItem[] = [];
-        try {
-          const firstPositionPage = await listPositions({ page: 1, limit: 20 });
-          positions = [...firstPositionPage.data.items];
-          const totalPositionPages = Math.ceil(
-            firstPositionPage.data.total / firstPositionPage.data.limit
-          );
-
-          for (let page = 2; page <= totalPositionPages; page += 1) {
-            const nextPage = await listPositions({ page, limit: firstPositionPage.data.limit });
-            positions.push(...nextPage.data.items);
-          }
-        } catch (error) {
-          console.error('Không thể tải học kỳ và chỉ tiêu từ danh sách vị trí:', error);
-          if (isActive) {
-            setCompanyToast({
-              type: 'error',
-              message: 'Không tải được học kỳ tiếp nhận và quota từ danh sách vị trí.',
-            });
-          }
-        }
+        const companiesPromise = loadAllPages(async page =>
+          (await listCompanies({ page, limit: 100 })).data
+        );
+        const positionsPromise = loadAllPages(async page =>
+          (await listPositions({ page, limit: 100 })).data
+        ).catch(error => {
+          console.error('Cannot load positions:', error);
+          if (isActive) setCompanyToast({ type: 'error', message: 'Kh?ng t?i ???c h?c k? ti?p nh?n v? quota t? danh s?ch v? tr?.' });
+          return [] as PositionListItem[];
+        });
+        const [companies, positions] = await Promise.all([companiesPromise, positionsPromise]);
+        if (!isActive) return;
+        const cachedByCode = new Map(cachedPartners.map(partner => [partner.code?.toUpperCase(), partner]));
+        const cachedByEmail = new Map(cachedPartners.filter(partner => partner.contactEmail).map(partner => [partner.contactEmail.toLowerCase(), partner]));
 
         const positionsByCompany = new Map<number, PositionListItem[]>();
         positions.forEach((position) => {
@@ -179,13 +158,8 @@ export const QhdnEnterpriseManagement: React.FC = () => {
         });
 
         const loadedPartners: EnterprisePartner[] = companies.map((company) => {
-          const cached = cachedPartners.find(
-            (partner) =>
-              partner.code?.toUpperCase() === company.code.toUpperCase() ||
-              (partner.contactEmail &&
-                company.contactEmail &&
-                partner.contactEmail.toLowerCase() === company.contactEmail.toLowerCase())
-          );
+          const cached = cachedByCode.get(company.code.toUpperCase()) ||
+            (company.contactEmail ? cachedByEmail.get(company.contactEmail.toLowerCase()) : undefined);
           const companyPositions = positionsByCompany.get(company.id) || [];
           const totalQuota = companyPositions.length
             ? companyPositions.reduce((total, position) => total + position.capacity, 0)
@@ -266,13 +240,13 @@ export const QhdnEnterpriseManagement: React.FC = () => {
     }
   }, [location.state]);
 
-  // Load danh sách kỳ OJT do phòng đào tạo khởi tạo từ API POST /api/json/ojt-semesters/search
+  // Load OJT semester options linked to academic periods.
   const [ojtSemesters, setOjtSemesters] = useState<OjtSemesterItem[]>([]);
 
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
-        const res = await searchOjtSemesters({ page: 1, limit: 100 });
+        const res = await listQhdnOjtSemesters();
         if (res && res.items) {
           setOjtSemesters(res.items);
         }
@@ -296,13 +270,6 @@ export const QhdnEnterpriseManagement: React.FC = () => {
     }
     return SEMESTER_FILTER_OPTIONS;
   }, [ojtSemesters]);
-
-  // Sample Excel preview data
-  const excelSamplePreview = [
-    { name: 'CMC Global', code: 'CMC', industry: 'CNTT & Xuất khẩu Phần mềm', quota: 60, contact: 'Ông Nguyễn Văn Tiến', email: 'tiennv@cmc.com.vn', semesters: 'Summer 2026, Fall 2026' },
-    { name: 'Sun* Inc. Vietnam', code: 'SUNASTERISK', industry: 'Phát triển Phần mềm AI & Web', quota: 40, contact: 'Bà Lê Thảo Nhi', email: 'nhi.le@sun-asterisk.com', semesters: 'Summer 2026, Fall 2026' },
-    { name: 'SmartOSC', code: 'SMARTOSC', industry: 'Thương mại Điện tử & Tech', quota: 35, contact: 'Ông Phạm Đức Anh', email: 'anhpd@smartosc.com', semesters: 'Summer 2026' },
-  ];
 
   // Filter partners
   const filteredPartners = useMemo(() => {
@@ -461,34 +428,19 @@ export const QhdnEnterpriseManagement: React.FC = () => {
     }
   };
 
-  const handleConfirmExcelImport = () => {
-    setIsImporting(true);
-    setTimeout(() => {
-      const importedPartners: EnterprisePartner[] = excelSamplePreview.map((item, idx) => ({
-        id: `ent-excel-${Date.now()}-${idx}`,
-        name: item.name,
-        code: item.code,
-        industry: item.industry,
-        tier: 'Tier-3 Standard',
-        contactPerson: item.contact,
-        contactEmail: item.email,
-        contactPhone: '0912 888 999',
-        address: 'Hà Nội / TP. Hồ Chí Minh',
-        mouStatus: 'Active',
-        mouSignedDate: '2026-01-01',
-        mouExpiryDate: '2029-01-01',
-        totalQuota: item.quota,
-        acceptedCount: 0,
-        availableQuota: item.quota,
-        semesters: Array.from(new Set([excelImportSemester, ...item.semesters.split(',').map((s) => s.trim())])),
-      }));
-
-      setPartners([...importedPartners, ...partners]);
-      setCurrentPage(1);
-      setIsImporting(false);
-      setIsExcelModalOpen(false);
-      setUploadedFileName(null);
-    }, 800);
+  const handleImportedEnterprises = (imported: EnterprisePartner[], count: number) => {
+    setPartners((current) => {
+      const byCode = new Map(current.map((partner) => [partner.code.toUpperCase(), partner]));
+      imported.forEach((partner) => byCode.set(partner.code.toUpperCase(), partner));
+      return Array.from(byCode.values());
+    });
+    setCurrentPage(1);
+    setIsImportModalOpen(false);
+    setCompanyToast({
+      type: 'success',
+      message: `Đã import thành công ${count} doanh nghiệp vào danh sách liên kết.`,
+    });
+    setTimeout(() => setCompanyToast(null), 5000);
   };
 
   const handleDeleteEnterprise = (partner: EnterprisePartner) => {
@@ -648,7 +600,7 @@ export const QhdnEnterpriseManagement: React.FC = () => {
           <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
             <button
               type="button"
-              onClick={() => navigate('/qhdn/enterprises/import?openModal=true')}
+              onClick={() => setIsImportModalOpen(true)}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-98"
               title="Import hàng loạt doanh nghiệp từ file Excel"
             >
@@ -831,7 +783,7 @@ export const QhdnEnterpriseManagement: React.FC = () => {
                             <div className="pt-2 flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => navigate('/qhdn/enterprises/import?openModal=true')}
+                                onClick={() => setIsImportModalOpen(true)}
                                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
                               >
                                 <FileSpreadsheet size={15} />
@@ -1271,18 +1223,13 @@ export const QhdnEnterpriseManagement: React.FC = () => {
         onClose={() => setSelectedEnterpriseDetail(null)}
       />
 
-      {/* ─── MODAL 2: IMPORT DOANH NGHIỆP TỪ EXCEL ────────── */}
-      <EnterpriseImportExcelModal
-        isOpen={isExcelModalOpen}
-        onClose={() => setIsExcelModalOpen(false)}
-        uploadedFileName={uploadedFileName}
-        onFileSelected={(fileName) => setUploadedFileName(fileName)}
-        excelSamplePreview={excelSamplePreview}
-        isImporting={isImporting}
-        onConfirmImport={handleConfirmExcelImport}
-        selectedSemester={excelImportSemester}
-        onSemesterChange={setExcelImportSemester}
-      />
+      {isImportModalOpen && (
+        <QhdnEnterpriseImportModal
+          isOpen
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={handleImportedEnterprises}
+        />
+      )}
 
       {/* ─── MODAL 3: THÊM DOANH NGHIỆP BẰNG TAY ─────────── */}
       <EnterpriseCreateModal

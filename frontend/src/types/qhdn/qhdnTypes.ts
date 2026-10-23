@@ -343,20 +343,7 @@ export interface CreatePositionResponse {
   message?: string;
 }
 
-/**
- * Payload cho POST /api/json/ojt-semesters/search
- */
-export interface SearchOjtSemestersRequest {
-  page?: number;
-  limit?: number;
-  search?: string;
-  status?: string;
-  academicYearId?: number;
-}
-
-/**
- * Thông tin một kỳ OJT trong danh sách items trả về từ POST /api/json/ojt-semesters/search
- */
+/** OJT semester options for QHDN screens. */
 export interface OjtSemesterItem {
   id: number;
   academicYearId?: number;
@@ -373,16 +360,7 @@ export interface OjtSemesterItem {
   [key: string]: any;
 }
 
-/**
- * Response trả về từ POST /api/json/ojt-semesters/search
- */
-export interface SearchOjtSemestersResponse {
-  success: boolean;
-  items: OjtSemesterItem[];
-  page: number;
-  limit: number;
-  total: number;
-}
+
 
 /**
  * Thông tin hồ sơ tài khoản từ GET /api/accounts/me/profile

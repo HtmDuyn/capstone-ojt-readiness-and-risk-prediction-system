@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { loadAllPages } from '@/services/loadAllPages';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Handshake,
@@ -25,9 +26,8 @@ import { StudentMatchModal } from '@/components/qhdn/coordination/StudentMatchMo
 import {
   listPositions,
   listCompanies,
-  searchOjtSemesters,
+  listQhdnOjtSemesters,
   listStudentsInSemester,
-  listCoordinations,
   coordinateStudent,
   reassignStudent,
   recordEnterpriseDecision,
@@ -41,7 +41,6 @@ import type {
   InternshipPosition,
   OjtSemesterItem,
   HandoffStudentItem,
-  CoordinationItem,
 } from '@/types/qhdn/qhdnTypes';
 
 const PAGE_SIZE = 10;
@@ -50,8 +49,11 @@ export const QhdnOjtCoordination: React.FC = () => {
   const navigate = useNavigate();
   // Semester states
   const [ojtSemesters, setOjtSemesters] = useState<OjtSemesterItem[]>([]);
-  const [selectedSemesterId, setSelectedSemesterId] = useState<number>(1);
+  const [selectedSemesterId, setSelectedSemesterId] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const studentRequest = useRef(0);
+  const catalogRequest = useRef(0);
 
   // Position & Partner states
   const [positions, setPositions] = useState<InternshipPosition[]>([]);
@@ -92,13 +94,16 @@ export const QhdnOjtCoordination: React.FC = () => {
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
-        const res = await searchOjtSemesters({ page: 1, limit: 50 });
+        const res = await listQhdnOjtSemesters();
         if (res?.items && res.items.length > 0) {
           setOjtSemesters(res.items);
           const active = res.items.find((s) => s.status === 'ACTIVE') || res.items[0];
           setSelectedSemesterId(active.id);
+        } else {
+          setIsLoading(false);
         }
       } catch (err) {
+        setIsLoading(false);
         console.warn('Không thể tải danh sách kỳ OJT:', err);
       }
     };
@@ -107,14 +112,16 @@ export const QhdnOjtCoordination: React.FC = () => {
 
   // 2. Fetch Companies & Positions
   const fetchEnterpriseCatalog = async (semesterId: number) => {
+    const request = ++catalogRequest.current;
     try {
       const [compRes, posRes] = await Promise.allSettled([
-        listCompanies({ page: 1, limit: 100 }),
-        listPositions({ page: 1, limit: 100, ojtSemesterId: semesterId }),
+        loadAllPages(async page => (await listCompanies({ page, limit: 100 })).data),
+        loadAllPages(async page => (await listPositions({ page, limit: 100, ojtSemesterId: semesterId })).data),
       ]);
 
-      const compItems = compRes.status === 'fulfilled' ? compRes.value.data.items : [];
-      const posItems = posRes.status === 'fulfilled' ? posRes.value.data.items : [];
+      if (request !== catalogRequest.current) return;
+      const compItems = compRes.status === 'fulfilled' ? compRes.value : [];
+      const posItems = posRes.status === 'fulfilled' ? posRes.value : [];
 
       const mappedPositions: InternshipPosition[] = posItems.map((item) => ({
         id: String(item.id),
@@ -172,31 +179,26 @@ export const QhdnOjtCoordination: React.FC = () => {
 
   // 3. Fetch Students & Coordinations in Selected Semester
   const fetchStudentsAndCoordinations = async (semesterId: number) => {
+    const request = ++studentRequest.current;
     setIsLoading(true);
     try {
-      const [studentsRes, coordinationsRes] = await Promise.allSettled([
-        listStudentsInSemester(semesterId, { page: 1, limit: 100 }),
-        listCoordinations({ page: 1, limit: 100, ojtSemesterId: semesterId }),
-      ]);
-
-      const handoffStudents: HandoffStudentItem[] =
-        studentsRes.status === 'fulfilled' ? studentsRes.value.data.items || [] : [];
-      const coordinations: CoordinationItem[] =
-        coordinationsRes.status === 'fulfilled' ? coordinationsRes.value.data.items || [] : [];
-
-      const coordinationMap = new Map<number, CoordinationItem>();
-      coordinations.forEach((coor) => {
-        if (coor.registrationId) {
-          coordinationMap.set(coor.registrationId, coor);
-        }
-      });
+      const handoffStudents: HandoffStudentItem[] = await loadAllPages(async page =>
+        (await listStudentsInSemester(semesterId, { page, limit: 100 })).data
+      );
+      if (request !== studentRequest.current) return;
 
       const currentSemObj = ojtSemesters.find((s) => s.id === semesterId);
       const semLabel = currentSemObj?.name || currentSemObj?.code || `Kỳ #${semesterId}`;
 
       const mapped = handoffStudents.map((std) => {
         const regId = std.registration?.id;
-        const coor = regId ? coordinationMap.get(regId) : undefined;
+        const coor = std.coordination ? {
+          ...std.coordination,
+          companyId: std.enterpriseId,
+          positionId: std.positionId,
+          company: { name: std.company?.name || std.enterpriseName },
+          position: { title: std.position?.title || std.positionTitle },
+        } : undefined;
 
         let coordinationStatus: 'Unassigned' | 'Pending Response' | 'Accepted' | 'Rejected' =
           'Unassigned';
@@ -246,9 +248,11 @@ export const QhdnOjtCoordination: React.FC = () => {
 
       setStudents(mapped);
     } catch (err) {
+      if (request !== studentRequest.current) return;
       console.error('Lỗi khi tải danh sách sinh viên bàn giao:', err);
+      setToast({ type: 'error', message: 'Không thể tải danh sách sinh viên bàn giao.' });
     } finally {
-      setIsLoading(false);
+      if (request === studentRequest.current) setIsLoading(false);
     }
   };
 
@@ -257,7 +261,8 @@ export const QhdnOjtCoordination: React.FC = () => {
       fetchEnterpriseCatalog(selectedSemesterId);
       fetchStudentsAndCoordinations(selectedSemesterId);
     }
-  }, [selectedSemesterId, ojtSemesters]);
+    return () => { studentRequest.current++; catalogRequest.current++; };
+  }, [selectedSemesterId]);
 
   // Counts for tabs
   const rejectedCount = students.filter((s) => s.coordinationStatus === 'Rejected').length;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { loadAllPages } from '@/services/loadAllPages';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Calendar,
   CheckCircle2,
@@ -42,6 +43,7 @@ import type {
 } from '@/types/qhdn/qhdnTypes';
 
 export const QhdnRegistrationWindows: React.FC = () => {
+  const semesterRequest = useRef(0);
   // -------------------------------------------------------------
   // STATE: Periods, Years, Semesters
   // -------------------------------------------------------------
@@ -218,15 +220,18 @@ export const QhdnRegistrationWindows: React.FC = () => {
   // 3. FETCH STUDENTS & WINDOWS FOR SELECTED SEMESTER
   // -------------------------------------------------------------
   const loadSemesterData = async (semesterId: number) => {
+    const request = ++semesterRequest.current;
     setLoadingData(true);
     try {
       const [stuRes, winRes] = await Promise.all([
-        listStudentsInSemester(semesterId, { limit: 200 }),
+        loadAllPages(async page => (await listStudentsInSemester(semesterId, { page, limit: 100 })).data),
         listRegistrationWindows({ ojtSemesterId: semesterId, limit: 100 }),
       ]);
 
-      if (stuRes && stuRes.data) {
-        setStudents(stuRes.data.items || []);
+      if (request !== semesterRequest.current) return;
+
+      if (stuRes) {
+        setStudents(stuRes);
       } else {
         setStudents([]);
       }
@@ -240,10 +245,11 @@ export const QhdnRegistrationWindows: React.FC = () => {
       // Reset selection
       setSelectedStudentIds([]);
     } catch (err: any) {
+      if (request !== semesterRequest.current) return;
       console.error('Lỗi tải dữ liệu sinh viên/đợt đăng ký:', err);
       showToast('error', 'Không thể tải danh sách sinh viên hoặc đợt đăng ký.');
     } finally {
-      setLoadingData(false);
+      if (request === semesterRequest.current) setLoadingData(false);
     }
   };
 
@@ -254,7 +260,9 @@ export const QhdnRegistrationWindows: React.FC = () => {
       setStudents([]);
       setWindows([]);
       setSelectedStudentIds([]);
+      setLoadingData(false);
     }
+    return () => { semesterRequest.current++; };
   }, [selectedOjtSemesterId]);
 
   // -------------------------------------------------------------

@@ -25,7 +25,7 @@ import {
   listOjtResults,
   transferOjtResult,
   exportOjtResultsUrl,
-  searchOjtSemesters,
+  listQhdnOjtSemesters,
   generateIdempotencyKey,
 } from '@/services/qhdnService';
 
@@ -79,7 +79,7 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
-        const res = await searchOjtSemesters({ page: 1, limit: 50 });
+        const res = await listQhdnOjtSemesters();
         if (res?.items && res.items.length > 0) {
           setSemesters(res.items);
           const active = res.items.find((s) => s.status === 'ACTIVE') || res.items[0];
@@ -240,11 +240,10 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
       {toast && (
         <div
           role="alert"
-          className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
-            toast.type === 'success'
+          className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
               : 'bg-rose-50 text-rose-800 border-rose-200'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-2">
             {toast.type === 'success' ? (
@@ -562,9 +561,9 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
             {filteredEvaluations.length === 0
               ? 'Không có dữ liệu hiển thị'
               : `Hiển thị ${(safeCurrentPage - 1) * PAGE_SIZE + 1}–${Math.min(
-                  safeCurrentPage * PAGE_SIZE,
-                  filteredEvaluations.length
-                )} trong ${filteredEvaluations.length} phiếu đánh giá`}
+                safeCurrentPage * PAGE_SIZE,
+                filteredEvaluations.length
+              )} trong ${filteredEvaluations.length} phiếu đánh giá`}
           </p>
 
           <nav className="flex items-center gap-1" aria-label="Phân trang phiếu đánh giá">
@@ -584,11 +583,10 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
                 type="button"
                 onClick={() => setCurrentPage(item)}
                 aria-current={safeCurrentPage === item ? 'page' : undefined}
-                className={`min-w-8 h-8 px-2 rounded-lg text-xs font-bold transition-all ${
-                  safeCurrentPage === item
+                className={`min-w-8 h-8 px-2 rounded-lg text-xs font-bold transition-all ${safeCurrentPage === item
                     ? 'bg-orange-500 text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {item}
               </button>

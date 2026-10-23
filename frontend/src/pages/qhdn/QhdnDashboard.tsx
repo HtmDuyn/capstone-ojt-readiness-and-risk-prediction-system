@@ -487,79 +487,6 @@ export const QhdnDashboard: React.FC = () => {
         badge="Phòng QHDN"
       />
 
-      {/* Filter Toolbar: Năm học & Kỳ OJT Selector */}
-      <div className="card-glass border border-slate-200/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
-            <Calendar size={18} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Chọn học kỳ theo dõi
-            </h3>
-            <p className="text-xs text-slate-500">
-              Dữ liệu bàn giao từ Đào tạo, điều phối DN và kết quả OJT theo kỳ
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {isLoading && (
-            <span className="text-xs text-orange-600 flex items-center gap-1.5 animate-pulse mr-1">
-              <RefreshCw size={13} className="animate-spin" />
-              Đang đồng bộ API...
-            </span>
-          )}
-
-          {/* Mục chọn Năm học */}
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="dashboard-year-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-              Năm học:
-            </label>
-            <select
-              id="dashboard-year-select"
-              value={selectedYearId}
-              onChange={(e) => {
-                const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
-                setSelectedYearId(val);
-              }}
-              disabled={isLoadingPeriods}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
-            >
-              <option value="ALL">Tất cả năm học</option>
-              {academicYears.map((y) => (
-                <option key={y.id} value={y.id}>
-                  {y.code}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Mục chọn Học kỳ OJT */}
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="dashboard-semester-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-              Học kỳ OJT:
-            </label>
-            <select
-              id="dashboard-semester-select"
-              value={selectedSemesterId || ''}
-              onChange={(event) => handleSemesterChange(Number(event.target.value))}
-              disabled={isLoadingPeriods || availableOjtSemesters.length === 0}
-              className="min-w-44 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
-            >
-              {availableOjtSemesters.map((sem) => (
-                <option key={sem.ojtSemesterId} value={sem.ojtSemesterId}>
-                  {sem.name} ({sem.code}) - {sem.status === 'ACTIVE' ? 'Đang mở' : 'Đã đóng'}
-                </option>
-              ))}
-              {availableOjtSemesters.length === 0 && (
-                <option value="">Không có kỳ OJT</option>
-              )}
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* KPI Cards Grid (5 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* KPI 1: Nhận từ Đào tạo */}
@@ -669,6 +596,79 @@ export const QhdnDashboard: React.FC = () => {
           <p className="mt-2 text-xs text-slate-500">
             Chờ DN duyệt: <strong className="text-amber-600 font-bold">{kpiStats.waiting} SV</strong>
           </p>
+        </div>
+      </div>
+
+      {/* Filter Toolbar: Năm học & Kỳ OJT Selector */}
+      <div className="card-glass border border-slate-200/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
+            <Calendar size={18} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              Chọn học kỳ theo dõi
+            </h3>
+            <p className="text-xs text-slate-500">
+              Dữ liệu bàn giao từ Đào tạo, điều phối DN và kết quả OJT theo kỳ
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {isLoading && (
+            <span className="text-xs text-orange-600 flex items-center gap-1.5 animate-pulse mr-1">
+              <RefreshCw size={13} className="animate-spin" />
+              Đang đồng bộ API...
+            </span>
+          )}
+
+          {/* Mục chọn Năm học */}
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="dashboard-year-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              Năm học:
+            </label>
+            <select
+              id="dashboard-year-select"
+              value={selectedYearId}
+              onChange={(e) => {
+                const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                setSelectedYearId(val);
+              }}
+              disabled={isLoadingPeriods}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
+            >
+              <option value="ALL">Tất cả năm học</option>
+              {academicYears.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.code}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Mục chọn Học kỳ OJT */}
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="dashboard-semester-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+              Học kỳ OJT:
+            </label>
+            <select
+              id="dashboard-semester-select"
+              value={selectedSemesterId || ''}
+              onChange={(event) => handleSemesterChange(Number(event.target.value))}
+              disabled={isLoadingPeriods || availableOjtSemesters.length === 0}
+              className="min-w-44 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
+            >
+              {availableOjtSemesters.map((sem) => (
+                <option key={sem.ojtSemesterId} value={sem.ojtSemesterId}>
+                  {sem.name} ({sem.code}) - {sem.status === 'ACTIVE' ? 'Đang mở' : 'Đã đóng'}
+                </option>
+              ))}
+              {availableOjtSemesters.length === 0 && (
+                <option value="">Không có kỳ OJT</option>
+              )}
+            </select>
+          </div>
         </div>
       </div>
 

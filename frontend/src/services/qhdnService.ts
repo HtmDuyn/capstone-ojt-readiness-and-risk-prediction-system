@@ -1,4 +1,6 @@
+import { loadAllPages } from './loadAllPages';
 import API, { API_BASE_URL } from './api';
+import type { AxiosError } from 'axios';
 import type {
   ImportPreviewRequest,
   ImportPreviewResponse,
@@ -8,8 +10,7 @@ import type {
   CreateCompanyResponse,
   CreatePositionRequest,
   CreatePositionResponse,
-  SearchOjtSemestersRequest,
-  SearchOjtSemestersResponse,
+  OjtSemesterItem,
   AccountProfileResponse,
   SearchOjtRegistrationsRequest,
   SearchOjtRegistrationsResponse,
@@ -90,6 +91,8 @@ export const listCompanies = async (
 ): Promise<CompanyListResponse> => {
   const response = await API.get<CompanyListResponse>('/companies', { params });
   return response.data;
+
+
 };
 
 /**
@@ -102,7 +105,8 @@ export const listPositions = async (
   try {
     const response = await API.get<PositionListResponse>('/positions', { params });
     return response.data;
-  } catch {
+  } catch (error) {
+    if (![404, 405].includes((error as AxiosError)?.response?.status ?? 0)) throw error;
     const response = await API.post<PositionListResponse>('/json/positions/list', {
       page: params.page ?? 1,
       limit: params.limit ?? 100,
@@ -135,25 +139,32 @@ export const createPosition = async (
   return response.data;
 };
 
-/**
- * POST /api/json/ojt-semesters/search
- * Danh sách kỳ OJT (Tìm kiếm / Phân trang kỳ OJT do phòng đào tạo khởi tạo).
- */
-export const searchOjtSemesters = async (
-  payload: SearchOjtSemestersRequest = { page: 1, limit: 100 }
-): Promise<SearchOjtSemestersResponse> => {
-  const requestBody: SearchOjtSemestersRequest = {
-    page: payload.page ?? 1,
-    limit: payload.limit ?? 100,
-    ...(payload.status ? { status: payload.status } : {}),
-    ...(payload.search ? { search: payload.search } : {}),
-    ...(payload.academicYearId ? { academicYearId: payload.academicYearId } : {}),
-  };
-  const response = await API.post<SearchOjtSemestersResponse>(
-    '/json/ojt-semesters/search',
-    requestBody
+/** Read QHDN semester options from the academic-period catalog. */
+export const listQhdnOjtSemesters = async (academicPeriods?: AcademicPeriodItem[]): Promise<{ items: OjtSemesterItem[] }> => {
+  const periods = academicPeriods ?? await loadAllPages(async page =>
+    getAcademicPeriods({ page, limit: 100 })
   );
-  return response.data;
+  const semesters = new Map<number, OjtSemesterItem>();
+  for (const period of periods) {
+    const ojt = period.ojt;
+    const id = period.ojtSemesterId || ojt?.id;
+    // Academic periods without an OJT link are not OJT semesters.
+    if (!id || semesters.has(id)) continue;
+    semesters.set(id, {
+      id,
+      name: ojt?.name || period.name,
+      code: ojt?.semesterCode || period.periodCode,
+      semesterCode: ojt?.semesterCode || period.periodCode,
+      academicPeriodId: ojt?.academicPeriodId ?? period.id,
+      academicYearId: ojt?.academicYearId ?? period.academicYearId,
+      status: ojt?.status || period.status,
+      startDate: ojt?.startDate || period.startDate,
+      endDate: ojt?.endDate || period.endDate,
+      regStartDate: ojt?.regStartDate ?? undefined,
+      regEndDate: ojt?.regEndDate ?? undefined,
+    });
+  }
+  return { items: Array.from(semesters.values()) };
 };
 
 /**

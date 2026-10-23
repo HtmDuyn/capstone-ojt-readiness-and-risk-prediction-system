@@ -24,7 +24,6 @@ import AdminSettings from "@/pages/admin/AdminSettings";
 
 import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
 import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
-import QhdnEnterpriseImport from "@/pages/qhdn/QhdnEnterpriseImport";
 import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
 import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
 import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
@@ -256,7 +255,7 @@ export const router = createBrowserRouter([
           { path: "/qhdn/eligible-students", element: <Navigate to="/qhdn/registration-windows" replace /> },
           { path: "/qhdn/handoff", element: <Navigate to="/qhdn/registration-windows" replace /> },
           { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
-          { path: "/qhdn/enterprises/import", element: <QhdnEnterpriseImport /> },
+          { path: "/qhdn/enterprises/import", element: <Navigate to="/qhdn/enterprises" replace /> },
           { path: "/qhdn/enterprises/list", element: <Navigate to="/qhdn/enterprises" replace /> },
           { path: "/qhdn/partners", element: <Navigate to="/qhdn/enterprises" replace /> },
           { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
