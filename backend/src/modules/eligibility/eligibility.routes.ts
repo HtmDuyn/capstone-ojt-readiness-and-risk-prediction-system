@@ -1,0 +1,17 @@
+import { Router, type RequestHandler } from 'express';
+import { authenticate } from '../../middleware/authenticate';
+import { authorizeRoles } from '../../middleware/authorize';
+import { positiveId, invalid } from '../students/student.validation';
+import { assertStudentAccess } from '../students/student.service';
+import { listRules,saveRule,publishRule,history,eligibility } from './eligibility.service';
+import { checkBatch } from './eligibility-run.service';
+const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT')];
+const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(req,res,next)=>{try{res.status(code).json({success:true,data:await work(req)});}catch(error){next(error);}};
+router.get('/ojt-rule-sets',...staff,handle(req=>listRules(req.query)));
+router.post('/ojt-rule-sets',...staff,handle(req=>saveRule(req.body,req.user.userId),201));
+router.patch('/ojt-rule-sets/:id',...staff,handle(req=>saveRule(req.body,req.user.userId,positiveId(req.params.id))));
+router.post('/ojt-rule-sets/:id/publish',...staff,handle(req=>publishRule(positiveId(req.params.id),req.user.userId)));
+router.post('/eligibility-check-runs',...staff,handle(req=>{if(Object.keys(req.query).length)throw invalid('Use JSON body, not query parameters.');return checkBatch(req.body,req.user.userId);}));
+router.get('/students/:id/eligibility',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return eligibility(id,req.query);}));
+router.get('/students/:id/eligibility-checks',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return history(id,req.query);}));
+export default router;

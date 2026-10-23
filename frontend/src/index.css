@@ -265,17 +265,6 @@ body {
     transform: translateY(-1px);
   }
 
-  /* ─── Role Card (Login) ──────────────────────────────────── */
-
-  .role-card {
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    cursor: pointer;
-  }
-
-  .role-card:hover {
-    transform: translateY(-4px);
-  }
-
   /* ─── Social Login Button ────────────────────────────────── */
 
   .social-btn {

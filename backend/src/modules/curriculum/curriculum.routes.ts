@@ -1,0 +1,16 @@
+import { Router, type RequestHandler } from 'express';
+import { authenticate } from '../../middleware/authenticate';
+import { authorizeRoles } from '../../middleware/authorize';
+import { positiveId } from './curriculum.validation';
+import { listCatalog, readDetail } from './curriculum.repository';
+import { saveMajor, saveCourse } from './curriculum.service';
+import { importCurriculum } from './curriculum-import.service';
+const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
+const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(req,res,next)=>{try{res.status(code).json({success:true,data:await work(req)});}catch(error){next(error);}};
+for(const kind of ['majors','courses','curricula'] as const)router.get(`/${kind}`,...staff,handle(req=>listCatalog(kind,req.query)));
+router.post('/majors',...staff,handle(req=>saveMajor(req.body,req.user.userId),201));
+router.post('/courses',...staff,handle(req=>saveCourse(req.body,req.user.userId),201));
+router.patch('/courses/:id',...staff,handle(req=>saveCourse(req.body,req.user.userId,positiveId(req.params.id))));
+router.get('/curricula/:id',...staff,handle(req=>readDetail(positiveId(req.params.id))));
+for(const mode of ['preview','commit'])router.post(`/curriculum-imports/${mode}`,...staff,handle(req=>importCurriculum(req.body,req.user.userId,mode==='preview')));
+export default router;
