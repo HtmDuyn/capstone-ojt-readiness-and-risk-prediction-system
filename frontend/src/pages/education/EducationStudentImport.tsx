@@ -1,1043 +1,1482 @@
 import React from "react";
+import * as XLSX from "xlsx";
 import {
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   Download,
   FileSpreadsheet,
+  GraduationCap,
+  Info,
+  Loader2,
   Plus,
-  RefreshCw,
-  Save,
+  Search,
+  ShieldCheck,
+  Trash2,
   Upload,
+  Users,
   X,
 } from "lucide-react";
 
-import * as XLSX from "xlsx";
-
 import { PageBanner } from "@/components/common/PageBanner";
-
 import {
   importService,
   type ImportCommitResponse,
   type ImportPreviewResponse,
   type StudentImportRow,
 } from "@/service/import.service";
+import { parseStudentImportWorkbook } from "@/service/studentImportWorkbook";
 
-/* =========================================================
-   TYPES
-   ========================================================= */
+/* ===================== TYPES ===================== */
 
-type ToastType = "success" | "error";
+type Tab = "students" | "grades";
 
-interface ToastState {
-  type: ToastType;
-  message: string;
-}
-
-/* =========================================================
-   CONSTANTS
-   ========================================================= */
-
-const EMPTY_STUDENT_FORM: StudentImportRow = {
-  code: "",
-  email: "",
-  fullName: "",
+type GradeRow = {
+  code: string;
+  courseCode: string;
+  period: string;
+  status: string;
+  score: string;
+  gradePoints: string;
+  grade: string;
 };
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
+type Issue = {
+  row: number;
+  message: string;
+};
 
-/**
- * Chuẩn hóa tên cột trong Excel/CSV.
- *
- * Ví dụ:
- * "Mã sinh viên" -> "masinhvien"
- * "Student Code" -> "studentcode"
- * "full_name"    -> "fullname"
- */
-const normalizeHeader = (value: string) => {
-  return value
+type Notice = {
+  type: "success" | "error";
+  message: string;
+};
+
+/* ===================== HELPERS ===================== */
+
+const normalize = (value: string) =>
+  value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
+
+const getCell = (row: Record<string, unknown>, aliases: string[]) => {
+  const names = aliases.map(normalize);
+
+  const found = Object.entries(row).find(([key]) =>
+    names.includes(normalize(key)),
+  );
+
+  return String(found?.[1] ?? "").trim();
 };
 
-const getValueByAliases = (row: Record<string, unknown>, aliases: string[]) => {
-  const normalizedAliases = aliases.map(normalizeHeader);
+const parseStatus = (value: string) => {
+  const key = normalize(value);
 
-  for (const [key, value] of Object.entries(row)) {
-    const normalizedKey = normalizeHeader(key);
+  if (key === "dat" || key === "passed") {
+    return "PASSED";
+  }
 
-    if (normalizedAliases.includes(normalizedKey)) {
-      return String(value ?? "").trim();
+  if (key === "khongdat" || key === "failed") {
+    return "FAILED";
+  }
+
+  return value.trim();
+};
+
+const createKey = (prefix: string) =>
+  `${prefix}-${Date.now()}-${
+    window.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
+  }`;
+
+/* ===================== VALIDATION ===================== */
+
+const validateStudents = (rows: StudentImportRow[]): Issue[] => {
+  const issues: Issue[] = [];
+  const seen = new Set<string>();
+
+  rows.forEach((row, index) => {
+    const number = index + 2;
+
+    if (!row.code.trim() || !row.fullName.trim() || !row.email.trim()) {
+      issues.push({
+        row: number,
+        message: "Thiếu MSSV, họ tên hoặc email.",
+      });
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) {
+      issues.push({
+        row: number,
+        message: "Email không hợp lệ.",
+      });
+    }
+
+    const key = normalize(row.code);
+
+    if (key && seen.has(key)) {
+      issues.push({
+        row: number,
+        message: "Trùng MSSV trong file.",
+      });
+    }
+
+    if (key) seen.add(key);
+  });
+
+  return issues;
+};
+
+const validateGrades = (rows: GradeRow[]): Issue[] => {
+  const issues: Issue[] = [];
+  const seen = new Set<string>();
+
+  rows.forEach((row, index) => {
+    const number = index + 2;
+
+    if (!row.code || !row.courseCode || !row.period) {
+      issues.push({
+        row: number,
+        message: "Thiếu MSSV, mã môn hoặc kỳ học.",
+      });
+    }
+
+    if (!["PASSED", "FAILED"].includes(row.status)) {
+      issues.push({
+        row: number,
+        message: "Trạng thái phải là Đạt hoặc Không đạt.",
+      });
+    }
+
+    for (const [label, value, max] of [
+      ["Điểm số", row.score, 10],
+      ["Điểm hệ 4", row.gradePoints, 4],
+    ] as const) {
+      if (value.trim()) {
+        const score = Number(value.replace(",", "."));
+
+        if (!Number.isFinite(score) || score < 0 || score > max) {
+          issues.push({
+            row: number,
+            message: `${label} phải từ 0 đến ${max}.`,
+          });
+        }
+      }
+    }
+
+    const key = [row.code, row.courseCode, row.period].map(normalize).join("|");
+
+    if (seen.has(key)) {
+      issues.push({
+        row: number,
+        message: "Trùng môn trong cùng kỳ học.",
+      });
+    }
+
+    seen.add(key);
+  });
+
+  return issues;
+};
+
+/* ===================== EXCEL TEMPLATE ===================== */
+
+const downloadTemplate = (tab: Tab) => {
+  const isStudent = tab === "students";
+
+  const headers = isStudent
+    ? [
+        "Mã sinh viên",
+        "Họ và tên",
+        "Email",
+        "Chương trình đào tạo",
+        "Khóa",
+        "Nhóm",
+        "Kỳ hiện tại",
+      ]
+    : [
+        "Mã sinh viên",
+        "Mã môn",
+        "Kỳ học",
+        "Trạng thái",
+        "Điểm số",
+        "Điểm hệ 4",
+        "Điểm chữ",
+      ];
+
+  const example = isStudent
+    ? ["DEMO001", "Nguyễn Văn An", "demo001@example.com", "", "", "", ""]
+    : ["DEMO001", "PRF192", "Fall 2027", "Đạt", 8, 3.5, "B"];
+
+  const book = XLSX.utils.book_new();
+
+  const data = XLSX.utils.aoa_to_sheet([headers]);
+
+  data["!cols"] = headers.map((_, index) => ({
+    wch: index === 2 ? 34 : 24,
+  }));
+
+  XLSX.utils.book_append_sheet(
+    book,
+    data,
+    isStudent ? "Danh sách sinh viên" : "Kết quả học tập",
+  );
+
+  const guide = XLSX.utils.aoa_to_sheet([
+    ["HƯỚNG DẪN"],
+    ["Nhập dữ liệu ở sheet đầu tiên. Không thay đổi tên cột."],
+    ["Dữ liệu dưới đây chỉ là ví dụ, KHÔNG tự động được Import."],
+    [],
+    headers,
+    example,
+    [],
+    [
+      isStudent
+        ? "Sinh viên mới không cần có bảng điểm. Không nhập lớp."
+        : "Một dòng là một kết quả môn học của một sinh viên trong một kỳ.",
+    ],
+  ]);
+
+  guide["!cols"] = headers.map(() => ({
+    wch: 30,
+  }));
+
+  XLSX.utils.book_append_sheet(book, guide, "Hướng dẫn");
+
+  XLSX.writeFile(
+    book,
+    isStudent ? "mau-import-sinh-vien.xlsx" : "mau-cap-nhat-bang-diem.xlsx",
+  );
+};
+
+/* ===================== BACKEND PREVIEW ===================== */
+
+const getPreviewProblems = (
+  preview: ImportPreviewResponse,
+  expected: number,
+): string[] => {
+  const problems: string[] = [];
+
+  if (preview.total !== expected) {
+    problems.push("Số dòng Backend xử lý khác số dòng đã gửi.");
+  }
+
+  if (preview.created + preview.updated !== preview.total) {
+    problems.push(
+      "Số bản ghi tạo mới/cập nhật không khớp tổng số. Cần xem lại trước khi lưu.",
+    );
+  }
+
+  for (const item of preview.rows ?? []) {
+    const row = item as unknown as Record<string, unknown>;
+
+    const action = String(row.action ?? "").toUpperCase();
+
+    if (action && action !== "CREATED" && action !== "UPDATED") {
+      problems.push(
+        `Dòng ${row.rowNumber ?? "?"}: ${String(row.message ?? action)}`,
+      );
+    }
+
+    if (Array.isArray(row.errors) && row.errors.length) {
+      problems.push(
+        `Dòng ${row.rowNumber ?? "?"}: ${row.errors.map(String).join("; ")}`,
+      );
     }
   }
 
-  return "";
+  return problems;
 };
 
-/**
- * Backend hiện tại đã xác nhận các field:
- *
- * code
- * email
- * fullName
- *
- * FE hỗ trợ thêm một số tên cột tương đương
- * để file Excel dễ sử dụng hơn.
- */
-const convertExcelRowToStudent = (
-  row: Record<string, unknown>,
-): StudentImportRow => {
-  const code = getValueByAliases(row, [
-    "code",
-    "studentCode",
-    "student_code",
-    "MSSV",
-    "Mã sinh viên",
-    "Ma sinh vien",
-  ]);
-
-  const email = getValueByAliases(row, [
-    "email",
-    "studentEmail",
-    "student_email",
-    "Email sinh viên",
-  ]);
-
-  const fullName = getValueByAliases(row, [
-    "fullName",
-    "full_name",
-    "name",
-    "studentName",
-    "student_name",
-    "Họ tên",
-    "Ho ten",
-    "Tên sinh viên",
-  ]);
-
-  return {
-    code,
-    email,
-    fullName,
-  };
-};
-
-const createIdempotencyKey = (prefix: string) => {
-  const randomPart =
-    window.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
-
-  return `${prefix}-${Date.now()}-${randomPart}`;
-};
-
-const formatFileSize = (bytes: number) => {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-};
-
-const getActionLabel = (action: string) => {
-  if (action === "CREATED") {
-    return "Tạo mới";
-  }
-
-  if (action === "UPDATED") {
-    return "Cập nhật";
-  }
-
-  return action;
-};
-
-/* =========================================================
-   COMPONENT
-   ========================================================= */
+/* ===================== COMPONENT ===================== */
 
 export const EducationStudentImport: React.FC = () => {
-  /* ===================== FILE ===================== */
+  const [tab, setTab] = React.useState<Tab>("students");
 
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-
-  /*
-   * Đây là dữ liệu sẽ gửi lên API.
-   *
-   * Dù lấy từ Excel, CSV hay nhập thủ công,
-   * cuối cùng đều chuyển về:
-   *
-   * {
-   *   code,
-   *   email,
-   *   fullName
-   * }
-   */
   const [students, setStudents] = React.useState<StudentImportRow[]>([]);
+
+  const [grades, setGrades] = React.useState<GradeRow[]>([]);
+
+  const [studentFile, setStudentFile] = React.useState("");
+
+  const [gradeFile, setGradeFile] = React.useState("");
+
+  const [fileError, setFileError] = React.useState("");
+
+  const [preview, setPreview] = React.useState<ImportPreviewResponse | null>(
+    null,
+  );
+
+  const [previewProblems, setPreviewProblems] = React.useState<string[]>([]);
+
+  const [commit, setCommit] = React.useState<ImportCommitResponse | null>(null);
+
+  const [gradesChecked, setGradesChecked] = React.useState(false);
+
+  const [busy, setBusy] = React.useState<"read" | "preview" | "commit" | null>(
+    null,
+  );
+
+  const [notice, setNotice] = React.useState<Notice | null>(null);
+
+  const [search, setSearch] = React.useState("");
+
+  const [showModal, setShowModal] = React.useState(false);
+
+  const [showConfirm, setShowConfirm] = React.useState(false);
+
+  const [form, setForm] = React.useState({
+    code: "",
+    fullName: "",
+    email: "",
+  });
+
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const isStudent = tab === "students";
+
+  const issues = isStudent
+    ? validateStudents(students)
+    : validateGrades(grades);
+
+  const badRows = new Set(issues.map((issue) => issue.row));
+
+  const total = isStudent ? students.length : grades.length;
+
+  const fileName = isStudent ? studentFile : gradeFile;
+
+  /* ===================== RESET ===================== */
+
+  const resetStudentPreview = () => {
+    setPreview(null);
+    setPreviewProblems([]);
+    setCommit(null);
+  };
+
+  /* ===================== READ EXCEL ===================== */
+
+  const onFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+    setFileError("");
+    try {
+      if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+        throw new Error("Chỉ hỗ trợ Excel hoặc CSV.");
+      }
+
+      setBusy("read");
+
+      if (isStudent) {
+        const book = XLSX.read(await file.arrayBuffer(), { type: "array" });
+
+        // Tìm sheet Danh sách sinh viên.
+        // Nếu file chỉ có một sheet thì dùng sheet đó.
+        const studentSheetName =
+          book.SheetNames.find(
+            (name) => normalize(name) === normalize("Danh sách sinh viên"),
+          ) ?? (book.SheetNames.length === 1 ? book.SheetNames[0] : undefined);
+
+        if (!studentSheetName) {
+          throw new Error(
+            'Không tìm thấy sheet "Danh sách sinh viên" trong file Excel.',
+          );
+        }
+
+        // Tạo workbook tạm chỉ chứa sheet sinh viên.
+        // Nhờ vậy parser không xử lý nhầm bảng điểm.
+        const studentOnlyBook = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(
+          studentOnlyBook,
+          book.Sheets[studentSheetName],
+          "Danh sách sinh viên",
+        );
+
+        const studentOnlyData = XLSX.write(studentOnlyBook, {
+          bookType: "xlsx",
+          type: "array",
+        });
+
+        const studentOnlyFile = new File(
+          [studentOnlyData],
+          "danh-sach-sinh-vien.xlsx",
+          {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          },
+        );
+
+        // Chỉ phân tích dữ liệu sinh viên
+        const parsed = await parseStudentImportWorkbook(studentOnlyFile);
+
+        if (!parsed.length) {
+          throw new Error("Không có sinh viên nào trong file.");
+        }
+
+        // Chỉ giữ dữ liệu sinh viên.
+        // Không gửi className hoặc courseResults.
+        const cleaned: StudentImportRow[] = parsed.map((row) => {
+          const academic = row.academic;
+
+          const safeAcademic = academic
+            ? {
+                ...(academic.programId != null
+                  ? {
+                      programId: academic.programId,
+                    }
+                  : {}),
+                ...(academic.placement
+                  ? {
+                      placement: academic.placement,
+                    }
+                  : {}),
+              }
+            : undefined;
+
+          return {
+            code: row.code,
+            email: row.email,
+            fullName: row.fullName,
+            ...(safeAcademic && Object.keys(safeAcademic).length
+              ? {
+                  academic: safeAcademic,
+                }
+              : {}),
+          };
+        });
+
+        setStudents(cleaned);
+        setStudentFile(file.name);
+
+        resetStudentPreview();
+
+        setNotice({
+          type: "success",
+          message: `Đã đọc ${cleaned.length} sinh viên. Chưa ghi database.`,
+        });
+      } else {
+        // Đọc file Excel
+        const book = XLSX.read(await file.arrayBuffer(), { type: "array" });
+
+        // Ưu tiên sheet "Kết quả học tập"
+        const gradeSheetName = book.SheetNames.find(
+          (name) => normalize(name) === normalize("Kết quả học tập"),
+        );
+
+        // Cho phép file bảng điểm chỉ có 1 sheet
+        const sheetName =
+          gradeSheetName ??
+          (book.SheetNames.length === 1 ? book.SheetNames[0] : undefined);
+
+        if (!sheetName) {
+          throw new Error(
+            'Không tìm thấy sheet "Kết quả học tập". ' +
+              "Hãy chọn đúng file bảng điểm.",
+          );
+        }
+
+        const sheet = book.Sheets[sheetName];
+
+        if (!sheet) {
+          throw new Error("Không thể đọc sheet kết quả học tập.");
+        }
+
+        // Đọc dạng mảng để nhận diện đúng hàng tiêu đề
+        const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+          header: 1,
+          defval: "",
+          blankrows: false,
+        });
+
+        const headerIndex = grid.findIndex((row) => {
+          const columns = row.map((value) => normalize(String(value ?? "")));
+
+          return (
+            columns.includes("masinhvien") &&
+            (columns.includes("mamon") || columns.includes("coursecode"))
+          );
+        });
+
+        if (headerIndex === -1) {
+          throw new Error(
+            'Sheet bảng điểm thiếu cột "Mã sinh viên" ' +
+              'hoặc "Mã môn". Hãy kiểm tra lại file.',
+          );
+        }
+
+        const headers = grid[headerIndex].map((value) =>
+          String(value ?? "").trim(),
+        );
+
+        const rawRows = grid
+          .slice(headerIndex + 1)
+          .filter((values) =>
+            values.some((value) => String(value ?? "").trim()),
+          )
+          .map((values) => {
+            const record: Record<string, unknown> = {};
+
+            headers.forEach((header, index) => {
+              record[header] = values[index] ?? "";
+            });
+
+            return record;
+          });
+
+        if (rawRows.length === 0) {
+          throw new Error(
+            'Sheet "Kết quả học tập" đang trống. ' +
+              "File này chưa có điểm để Import. " +
+              "Hãy dùng file bảng điểm có dữ liệu.",
+          );
+        }
+
+        const rows: GradeRow[] = rawRows.map((row) => ({
+          code: getCell(row, ["Mã sinh viên", "MSSV", "code"]),
+          courseCode: getCell(row, ["Mã môn", "courseCode"]),
+          period: getCell(row, ["Kỳ học", "period", "academicPeriodId"]),
+          status: parseStatus(getCell(row, ["Trạng thái", "status"])),
+          score: getCell(row, ["Điểm số", "score"]),
+          gradePoints: getCell(row, ["Điểm hệ 4", "gradePoints"]),
+          grade: getCell(row, ["Điểm chữ", "grade"]),
+        }));
+
+        // Cập nhật bảng kết quả học tập
+        setGrades(rows);
+        setGradeFile(file.name);
+        setGradesChecked(false);
+        setFileError("");
+
+        setNotice({
+          type: "success",
+          message:
+            `Đã đọc thành công ${rows.length} ` +
+            "kết quả học tập. Chưa ghi database.",
+        });
+      }
+
+      setSearch("");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Không đọc được file Excel.";
+
+      setFileError(message);
+
+      if (!isStudent) {
+        setGrades([]);
+        setGradeFile("");
+        setGradesChecked(false);
+      }
+
+      setNotice({
+        type: "error",
+        message,
+      });
+    } finally {
+      setBusy(null);
+      event.target.value = "";
+    }
+  };
 
   /* ===================== PREVIEW ===================== */
 
-  const [previewResult, setPreviewResult] =
-    React.useState<ImportPreviewResponse | null>(null);
+  const onPreview = async () => {
+    if (!total || issues.length || busy) return;
 
-  const [commitResult, setCommitResult] =
-    React.useState<ImportCommitResponse | null>(null);
+    if (!isStudent) {
+      setGradesChecked(true);
 
-  const [isReadingFile, setIsReadingFile] = React.useState(false);
-
-  const [isPreviewing, setIsPreviewing] = React.useState(false);
-
-  const [isCommitting, setIsCommitting] = React.useState(false);
-
-  /* ===================== ADD STUDENT ===================== */
-
-  const [showAddStudentModal, setShowAddStudentModal] = React.useState(false);
-
-  const [studentForm, setStudentForm] =
-    React.useState<StudentImportRow>(EMPTY_STUDENT_FORM);
-
-  /* ===================== TOAST ===================== */
-
-  const [toast, setToast] = React.useState<ToastState | null>(null);
-
-  const toastTimeoutRef = React.useRef<number | null>(null);
-
-  const showToast = React.useCallback((type: ToastType, message: string) => {
-    setToast({
-      type,
-      message,
-    });
-
-    if (toastTimeoutRef.current !== null) {
-      window.clearTimeout(toastTimeoutRef.current);
-    }
-
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setToast(null);
-
-      toastTimeoutRef.current = null;
-    }, 3500);
-  }, []);
-
-  React.useEffect(() => {
-    return () => {
-      if (toastTimeoutRef.current !== null) {
-        window.clearTimeout(toastTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  /* =====================================================
-       RESET PREVIEW
-       ===================================================== */
-
-  const resetPreview = () => {
-    setPreviewResult(null);
-    setCommitResult(null);
-  };
-
-  /* =====================================================
-       FILE ACTIONS
-       ===================================================== */
-
-  const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    const fileName = file.name.toLowerCase();
-
-    const supported =
-      fileName.endsWith(".xlsx") ||
-      fileName.endsWith(".xls") ||
-      fileName.endsWith(".csv");
-
-    if (!supported) {
-      showToast("error", "Chỉ hỗ trợ file Excel (.xlsx, .xls) hoặc CSV.");
-
-      event.target.value = "";
-
-      return;
-    }
-
-    try {
-      setIsReadingFile(true);
-
-      /*
-       * Đọc file thành ArrayBuffer.
-       */
-      const arrayBuffer = await file.arrayBuffer();
-
-      /*
-       * XLSX có thể đọc cả:
-       * .xlsx
-       * .xls
-       * .csv
-       */
-      const workbook = XLSX.read(arrayBuffer, {
-        type: "array",
+      setNotice({
+        type: "success",
+        message:
+          "Đã kiểm tra định dạng bảng điểm trên giao diện. Chưa gửi API hoặc lưu dữ liệu.",
       });
 
-      const firstSheetName = workbook.SheetNames[0];
-
-      if (!firstSheetName) {
-        throw new Error("File không có worksheet dữ liệu.");
-      }
-
-      const worksheet = workbook.Sheets[firstSheetName];
-
-      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-        worksheet,
-        {
-          defval: "",
-        },
-      );
-
-      const parsedRows = rawRows
-        .map(convertExcelRowToStudent)
-        .filter((row) => row.code || row.email || row.fullName);
-
-      if (parsedRows.length === 0) {
-        throw new Error("Không tìm thấy dữ liệu sinh viên trong file.");
-      }
-
-      /*
-       * Chọn file mới sẽ thay danh sách
-       * đang chuẩn bị import.
-       */
-      setSelectedFile(file);
-
-      setStudents(parsedRows);
-
-      resetPreview();
-
-      showToast("success", `Đã đọc ${parsedRows.length} dòng dữ liệu từ file.`);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Không thể đọc file dữ liệu.";
-
-      setSelectedFile(null);
-
-      setStudents([]);
-
-      resetPreview();
-
-      showToast("error", message);
-    } finally {
-      setIsReadingFile(false);
-
-      /*
-       * Cho phép chọn lại cùng một file.
-       */
-      event.target.value = "";
-    }
-  };
-
-  /* =====================================================
-       DOWNLOAD TEMPLATE
-       ===================================================== */
-
-  const handleDownloadTemplate = () => {
-    /*
-     * Chưa có API tải template trong Swagger,
-     * nên tạo file mẫu trực tiếp ở FE.
-     */
-    const templateRows = [
-      {
-        code: "SE161234",
-        email: "student@example.com",
-        fullName: "Nguyễn Văn A",
-      },
-    ];
-
-    const worksheet = XLSX.utils.json_to_sheet(templateRows);
-
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
-
-    XLSX.writeFile(workbook, "student-import-template.xlsx");
-  };
-
-  /* =====================================================
-       PREVIEW API
-       ===================================================== */
-
-  const handlePreview = async () => {
-    if (students.length === 0) {
-      showToast("error", "Vui lòng chọn file hoặc thêm ít nhất một sinh viên.");
-
-      return;
-    }
-
-    /*
-     * Kiểm tra tối thiểu ở FE.
-     * Validation nghiệp vụ thật vẫn do backend /preview xử lý.
-     */
-    const invalidIndex = students.findIndex(
-      (student) =>
-        !student.code.trim() ||
-        !student.email.trim() ||
-        !student.fullName.trim(),
-    );
-
-    if (invalidIndex !== -1) {
-      showToast(
-        "error",
-        `Dòng ${invalidIndex + 1} đang thiếu MSSV, email hoặc họ tên.`,
-      );
-
       return;
     }
 
     try {
-      setIsPreviewing(true);
-
-      setCommitResult(null);
+      setBusy("preview");
+      resetStudentPreview();
 
       const result = await importService.previewStudentImport({
         kind: "STUDENT",
-
-        idempotencyKey: createIdempotencyKey("student-preview"),
-
+        idempotencyKey: createKey("student-preview"),
         rows: students,
       });
 
-      setPreviewResult(result);
+      setPreview(result);
 
-      showToast("success", `Kiểm tra hoàn tất ${result.total} sinh viên.`);
+      const problems = getPreviewProblems(result, students.length);
+
+      setPreviewProblems(problems);
+
+      setNotice({
+        type: problems.length ? "error" : "success",
+        message: problems.length
+          ? "Backend trả về dữ liệu cần xem lại."
+          : "API Preview thành công. Chưa ghi database.",
+      });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Không thể kiểm tra dữ liệu.";
-
-      setPreviewResult(null);
-
-      showToast("error", message);
+      setNotice({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Không thể gọi API Preview.",
+      });
     } finally {
-      setIsPreviewing(false);
+      setBusy(null);
     }
   };
 
-  /* =====================================================
-       COMMIT API
-       ===================================================== */
+  /* ===================== COMMIT ===================== */
 
-  const handleConfirmImport = async () => {
-    if (!previewResult) {
-      showToast("error", "Vui lòng kiểm tra dữ liệu trước khi xác nhận nhập.");
-
+  const onCommit = async () => {
+    if (!preview || previewProblems.length || commit || busy) {
       return;
     }
 
-    if (students.length === 0) {
-      showToast("error", "Không có dữ liệu để nhập.");
-
-      return;
-    }
+    setShowConfirm(false);
 
     try {
-      setIsCommitting(true);
+      setBusy("commit");
 
       const result = await importService.commitStudentImport({
         kind: "STUDENT",
-
-        /*
-         * Commit dùng key mới để tránh
-         * xung đột với preview.
-         */
-        idempotencyKey: createIdempotencyKey("student-commit"),
-
+        idempotencyKey: createKey("student-commit"),
         rows: students,
       });
 
-      setCommitResult(result);
+      setCommit(result);
 
-      showToast(
-        "success",
-        `Nhập thành công ${result.total} sinh viên: ${result.created} tạo mới, ${result.updated} cập nhật.`,
-      );
+      setNotice({
+        type: "success",
+        message: `Đã Import thành công: ${result.created} tạo mới, ${result.updated} cập nhật.`,
+      });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Không thể nhập dữ liệu sinh viên.";
-
-      showToast("error", message);
+      setNotice({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Không thể Commit dữ liệu.",
+      });
     } finally {
-      setIsCommitting(false);
+      setBusy(null);
     }
   };
 
-  /* =====================================================
-       MANUAL STUDENT
-       ===================================================== */
+  /* ===================== MANUAL ===================== */
 
-  const handleOpenAddStudent = () => {
-    setStudentForm(EMPTY_STUDENT_FORM);
+  const onAddStudent = () => {
+    const next = [...students, { ...form }];
 
-    setShowAddStudentModal(true);
-  };
+    const errors = validateStudents(next);
 
-  const handleCloseAddStudent = () => {
-    setShowAddStudentModal(false);
-
-    setStudentForm(EMPTY_STUDENT_FORM);
-  };
-
-  const handleSaveStudent = () => {
-    const code = studentForm.code.trim();
-
-    const email = studentForm.email.trim();
-
-    const fullName = studentForm.fullName.trim();
-
-    if (!code || !email || !fullName) {
-      showToast("error", "Vui lòng nhập đầy đủ MSSV, email và họ tên.");
-
+    if (errors.length) {
+      setNotice({
+        type: "error",
+        message: `Dòng ${errors[0].row}: ${errors[0].message}`,
+      });
       return;
     }
 
-    /*
-     * Chỉ chặn duplicate trong batch hiện tại.
-     *
-     * Nếu MSSV đã tồn tại trong DB,
-     * backend preview sẽ trả action UPDATED.
-     */
-    const duplicated = students.some(
-      (student) => student.code.toLowerCase() === code.toLowerCase(),
-    );
+    setStudents(next);
+    resetStudentPreview();
+    setShowModal(false);
 
-    if (duplicated) {
-      showToast("error", "MSSV này đã có trong danh sách đang chuẩn bị nhập.");
+    setForm({
+      code: "",
+      fullName: "",
+      email: "",
+    });
 
-      return;
-    }
-
-    const newStudent: StudentImportRow = {
-      code,
-      email,
-      fullName,
-    };
-
-    setStudents((current) => [...current, newStudent]);
-
-    resetPreview();
-
-    handleCloseAddStudent();
-
-    showToast("success", `Đã thêm ${code} vào danh sách chờ kiểm tra.`);
+    setNotice({
+      type: "success",
+      message: "Đã thêm sinh viên vào danh sách chờ Import.",
+    });
   };
 
-  /* =====================================================
-       DERIVED DATA
-       ===================================================== */
+  const removeRow = (index: number) => {
+    if (isStudent) {
+      setStudents((old) => old.filter((_, i) => i !== index));
 
-  const getPreviewAction = (index: number) => {
-    if (!previewResult) {
-      return null;
+      resetStudentPreview();
+    } else {
+      setGrades((old) => old.filter((_, i) => i !== index));
+
+      setGradesChecked(false);
     }
-
-    /*
-     * Backend trả rowNumber bắt đầu từ 1.
-     */
-    return (
-      previewResult.rows.find((row) => row.rowNumber === index + 1) ?? null
-    );
   };
 
-  /* =====================================================
-       RENDER
-       ===================================================== */
+  /* ===================== FILTER ===================== */
+
+  const filteredStudents = students
+    .map((row, index) => ({
+      row,
+      index,
+    }))
+    .filter(({ row }) =>
+      [row.code, row.fullName, row.email].some((value) =>
+        normalize(value).includes(normalize(search)),
+      ),
+    );
+
+  const filteredGrades = grades
+    .map((row, index) => ({
+      row,
+      index,
+    }))
+    .filter(({ row }) =>
+      [row.code, row.courseCode, row.period].some((value) =>
+        normalize(value).includes(normalize(search)),
+      ),
+    );
+
+  /* ===================== RENDER ===================== */
 
   return (
-    <div className="space-y-6">
-      {/* ===================== TOAST ===================== */}
+    <div className="space-y-6 pb-10">
+      <PageBanner
+        title="Import dữ liệu học vụ"
+        description="Nhập sinh viên mới và cập nhật kết quả học tập theo từng kỳ."
+        badge="Phòng Đào tạo"
+      />
 
-      {toast && (
-        <div className="fixed right-6 top-6 z-[9999] w-[380px] max-w-[calc(100vw-3rem)]">
-          <div
-            className={`overflow-hidden rounded-2xl border bg-white shadow-2xl ${
-              toast.type === "success" ? "border-emerald-200" : "border-red-200"
-            }`}
-          >
-            <div
-              className={`h-1 ${
-                toast.type === "success" ? "bg-emerald-500" : "bg-red-500"
-              }`}
-            />
+      {/* NOTIFICATION */}
 
-            <div className="flex items-start gap-3 p-4">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                  toast.type === "success"
-                    ? "bg-emerald-50 text-emerald-600"
-                    : "bg-red-50 text-red-600"
-                }`}
-              >
-                {toast.type === "success" ? (
-                  <CheckCircle2 size={20} />
-                ) : (
-                  <AlertTriangle size={20} />
-                )}
-              </div>
+      {notice && (
+        <div
+          className={`flex items-start justify-between gap-3 rounded-2xl border p-4 text-sm ${
+            notice.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-red-200 bg-red-50 text-red-800"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            {notice.type === "success" ? (
+              <CheckCircle2 size={19} />
+            ) : (
+              <AlertTriangle size={19} />
+            )}
 
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-sm font-bold ${
-                    toast.type === "success"
-                      ? "text-emerald-800"
-                      : "text-red-800"
-                  }`}
-                >
-                  {toast.type === "success"
-                    ? "Thành công"
-                    : "Không thể thực hiện"}
-                </p>
-
-                <p className="mt-1 text-sm leading-5 text-slate-600">
-                  {toast.message}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setToast(null)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X size={17} />
-              </button>
-            </div>
+            <span>{notice.message}</span>
           </div>
+
+          <button
+            type="button"
+            aria-label="Đóng thông báo"
+            onClick={() => setNotice(null)}
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
 
-      {/* ===================== BANNER ===================== */}
+      {/* TWO FUNCTION CARDS */}
 
-      <PageBanner
-        title="Import dữ liệu sinh viên"
-        description="Nhập dữ liệu sinh viên từ file Excel/CSV hoặc thêm thủ công, kiểm tra trước khi lưu vào hệ thống."
-        badge="Quản lý dữ liệu"
-      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => {
+            setTab("students");
+            setSearch("");
+            setNotice(null);
+          }}
+          className={`flex items-start gap-4 rounded-2xl border p-5 text-left shadow-sm transition ${
+            isStudent
+              ? "border-orange-400 bg-orange-50 ring-2 ring-orange-100"
+              : "border-slate-200 bg-white hover:border-orange-200"
+          }`}
+        >
+          <span
+            className={`rounded-xl p-3 ${
+              isStudent
+                ? "bg-orange-500 text-white"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <Users size={24} />
+          </span>
 
-      {/* ===================== CHỌN FILE ===================== */}
+          <span>
+            <span className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Chức năng 01
+            </span>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-5">
-          <h2 className="text-lg font-semibold text-slate-800">
-            Nhập dữ liệu sinh viên
-          </h2>
+            <span className="mt-1 block text-lg font-bold text-slate-900">
+              Import sinh viên
+            </span>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Chọn file Excel/CSV hoặc thêm từng sinh viên thủ công. Dữ liệu sẽ
-            được kiểm tra trước khi nhập vào hệ thống.
-          </p>
-        </div>
+            <span className="mt-1 block text-sm text-slate-500">
+              Khi có sinh viên mới nhập học. Không yêu cầu bảng điểm.
+            </span>
 
-        <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
-          <FileSpreadsheet
-            size={40}
-            className="mx-auto mb-3 text-emerald-500"
-          />
+            <span className="mt-3 block text-xs font-semibold text-orange-600">
+              {students.length} sinh viên đang chuẩn bị
+            </span>
+          </span>
+        </button>
 
-          <p className="text-sm font-semibold text-slate-700">
-            Chọn file dữ liệu sinh viên
-          </p>
+        <button
+          type="button"
+          onClick={() => {
+            setTab("grades");
+            setSearch("");
+            setNotice(null);
+          }}
+          className={`flex items-start gap-4 rounded-2xl border p-5 text-left shadow-sm transition ${
+            !isStudent
+              ? "border-orange-400 bg-orange-50 ring-2 ring-orange-100"
+              : "border-slate-200 bg-white hover:border-orange-200"
+          }`}
+        >
+          <span
+            className={`rounded-xl p-3 ${
+              !isStudent
+                ? "bg-orange-500 text-white"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <GraduationCap size={24} />
+          </span>
 
-          <p className="mt-1 text-xs text-slate-500">
-            Hỗ trợ Excel (.xlsx, .xls) hoặc CSV
-          </p>
+          <span>
+            <span className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+              Chức năng 02
+            </span>
 
-          <p className="mt-1 text-xs text-slate-400">
-            Các cột cần có: code, email, fullName
-          </p>
+            <span className="mt-1 block text-lg font-bold text-slate-900">
+              Cập nhật kết quả học tập
+            </span>
 
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            <label
-              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 ${
-                isReadingFile ? "pointer-events-none opacity-60" : ""
-              }`}
+            <span className="mt-1 block text-sm text-slate-500">
+              Khi có bảng điểm mới sau mỗi kỳ học.
+            </span>
+
+            <span className="mt-3 block text-xs font-semibold text-orange-600">
+              {grades.length} kết quả môn học đang chuẩn bị
+            </span>
+          </span>
+        </button>
+      </div>
+
+      {/* UPLOAD AND GUIDE */}
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.8fr)]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                Bước 1 · Chuẩn bị dữ liệu
+              </p>
+
+              <h2 className="mt-1 text-xl font-bold text-slate-900">
+                {isStudent ? "Danh sách sinh viên" : "Bảng điểm theo kỳ"}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Tải Excel từ nhà trường hoặc dùng file mẫu.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => downloadTemplate(tab)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              <Upload size={17} />
+              <Download size={17} />
+              Tải file mẫu
+            </button>
+          </div>
 
-              {isReadingFile ? "Đang đọc file..." : "Chọn file"}
+          <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-sm">
+              <FileSpreadsheet size={29} />
+            </div>
+
+            <p className="mt-3 text-sm font-bold text-slate-800">
+              {isStudent
+                ? "Chọn danh sách sinh viên"
+                : "Chọn bảng điểm của kỳ học"}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Hỗ trợ .xlsx, .xls, .csv · Không cần nhập JSON hay ID database
+            </p>
+
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={onFileChange}
+            />
+
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => inputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {busy === "read" ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : (
+                  <Upload size={17} />
+                )}
+
+                {busy === "read" ? "Đang đọc file..." : "Chọn file Excel"}
+              </button>
+
+              {isStudent && (
+                <button
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => setShowModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  <Plus size={17} />
+                  Thêm sinh viên
+                </button>
+              )}
+            </div>
+
+            {fileName && (
+              <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 size={16} />
+                {fileName}
+              </p>
+            )}
+
+            {fileError && (
+              <div
+                role="alert"
+                className="mx-auto mt-4 flex max-w-xl items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700"
+              >
+                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+
+                <span>{fileError}</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-center gap-2">
+            <BookOpen size={19} className="text-orange-500" />
+
+            <h3 className="font-bold text-slate-900">Quy trình sử dụng</h3>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {[
+              ["01", "Chuẩn bị file", "Dùng dữ liệu có sẵn hoặc tải mẫu."],
+              ["02", "Xem trước", "Kiểm tra dòng lỗi và trùng dữ liệu."],
+              [
+                "03",
+                "Kiểm tra",
+                isStudent
+                  ? "Gọi API Preview thật."
+                  : "Kiểm tra định dạng trên giao diện.",
+              ],
+              [
+                "04",
+                "Lưu dữ liệu",
+                isStudent
+                  ? "Xác nhận mới gọi API Commit."
+                  : "Chờ BE xác nhận cập nhật điểm an toàn.",
+              ],
+            ].map(([number, title, detail]) => (
+              <div key={number} className="flex gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-xs font-bold text-orange-600">
+                  {number}
+                </span>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {title}
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {detail}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 flex gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+            <ShieldCheck size={18} className="shrink-0" />
+
+            <span>
+              {isStudent
+                ? "Preview không ghi database. Chỉ Commit sau khi bạn xác nhận."
+                : "Chưa cho ghi bảng điểm để tránh ghi đè kết quả cũ khi chưa rõ logic Backend."}
+            </span>
+          </div>
+        </aside>
+      </div>
+
+      {/* DATA TABLE */}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
+              Bước 2 · Xem trước dữ liệu
+            </p>
+
+            <h2 className="mt-1 text-lg font-bold text-slate-900">
+              {isStudent
+                ? "Sinh viên chờ Import"
+                : "Kết quả học tập chờ cập nhật"}
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              {total} dòng · {badRows.size} dòng cần sửa
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-2.5 text-slate-400"
+              />
 
               <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileChange}
-                disabled={isReadingFile}
-                className="hidden"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Tìm MSSV, mã môn..."
+                className="w-52 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-orange-400"
               />
             </label>
 
             <button
               type="button"
-              onClick={handleOpenAddStudent}
-              className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-5 py-2.5 text-sm font-semibold text-orange-600 transition hover:bg-orange-50"
+              disabled={!total || Boolean(busy)}
+              onClick={() => {
+                if (isStudent) {
+                  setStudents([]);
+                  setStudentFile("");
+                  resetStudentPreview();
+                } else {
+                  setGrades([]);
+                  setGradeFile("");
+                  setGradesChecked(false);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
-              <Plus size={17} />
-              Thêm sinh viên
+              <Trash2 size={16} />
+              Xóa tất cả
             </button>
           </div>
-
-          {selectedFile && (
-            <div className="mx-auto mt-5 flex max-w-xl items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left">
-              <div className="flex min-w-0 items-center gap-3">
-                <FileSpreadsheet
-                  size={22}
-                  className="shrink-0 text-emerald-500"
-                />
-
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-700">
-                    {selectedFile.name}
-                  </p>
-
-                  <p className="text-xs text-slate-400">
-                    {formatFileSize(selectedFile.size)} • {students.length} dòng
-                    dữ liệu
-                  </p>
-                </div>
-              </div>
-
-              <CheckCircle2 size={20} className="shrink-0 text-emerald-500" />
-            </div>
-          )}
-
-          {!selectedFile && students.length > 0 && (
-            <div className="mx-auto mt-5 max-w-xl rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              Đang có <strong>{students.length}</strong> sinh viên được thêm thủ
-              công.
-            </div>
-          )}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={handleDownloadTemplate}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-          >
-            <Download size={17} />
-            Tải file mẫu
-          </button>
+        {!total ? (
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-200 py-14 text-center text-slate-400">
+            <FileSpreadsheet size={36} className="mx-auto" />
 
+            <p className="mt-3 text-sm">
+              Chưa có dữ liệu. Hãy chọn file Excel để bắt đầu.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full min-w-[840px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {isStudent ? (
+                  <tr>
+                    <th className="px-4 py-3">Dòng</th>
+                    <th className="px-4 py-3">MSSV</th>
+                    <th className="px-4 py-3">Họ và tên</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Kiểm tra</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                ) : (
+                  <tr>
+                    <th className="px-4 py-3">Dòng</th>
+                    <th className="px-4 py-3">MSSV</th>
+                    <th className="px-4 py-3">Mã môn</th>
+                    <th className="px-4 py-3">Kỳ học</th>
+                    <th className="px-4 py-3">Trạng thái</th>
+                    <th className="px-4 py-3">Điểm</th>
+                    <th className="px-4 py-3">Kiểm tra</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                )}
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {isStudent
+                  ? filteredStudents.slice(0, 50).map(({ row, index }) => (
+                      <tr
+                        key={`${row.code}-${index}`}
+                        className={
+                          badRows.has(index + 2)
+                            ? "bg-red-50"
+                            : "hover:bg-slate-50"
+                        }
+                      >
+                        <td className="px-4 py-3 text-slate-400">
+                          {index + 2}
+                        </td>
+
+                        <td className="px-4 py-3 font-semibold text-slate-800">
+                          {row.code || "—"}
+                        </td>
+
+                        <td className="px-4 py-3">{row.fullName || "—"}</td>
+
+                        <td className="px-4 py-3">{row.email || "—"}</td>
+
+                        <td className="px-4 py-3">
+                          {badRows.has(index + 2) ? (
+                            <span className="font-semibold text-red-600">
+                              Cần sửa
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-emerald-600">
+                              Hợp lệ
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            aria-label="Xóa dòng"
+                            onClick={() => removeRow(index)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  : filteredGrades.slice(0, 50).map(({ row, index }) => (
+                      <tr
+                        key={`${row.code}-${row.courseCode}-${index}`}
+                        className={
+                          badRows.has(index + 2)
+                            ? "bg-red-50"
+                            : "hover:bg-slate-50"
+                        }
+                      >
+                        <td className="px-4 py-3 text-slate-400">
+                          {index + 2}
+                        </td>
+
+                        <td className="px-4 py-3 font-semibold text-slate-800">
+                          {row.code || "—"}
+                        </td>
+
+                        <td className="px-4 py-3">{row.courseCode || "—"}</td>
+
+                        <td className="px-4 py-3">{row.period || "—"}</td>
+
+                        <td className="px-4 py-3">
+                          {row.status === "PASSED"
+                            ? "Đạt"
+                            : row.status === "FAILED"
+                              ? "Không đạt"
+                              : row.status || "—"}
+                        </td>
+
+                        <td className="px-4 py-3">{row.score || "—"}</td>
+
+                        <td className="px-4 py-3">
+                          {badRows.has(index + 2) ? (
+                            <span className="font-semibold text-red-600">
+                              Cần sửa
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-emerald-600">
+                              Hợp lệ
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            aria-label="Xóa dòng"
+                            onClick={() => removeRow(index)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+
+            {(isStudent ? filteredStudents.length : filteredGrades.length) >
+              50 && (
+              <p className="border-t border-slate-100 p-3 text-xs text-slate-500">
+                Chỉ hiển thị 50 dòng đầu. Các dòng khác vẫn được giữ trong danh
+                sách.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* VALIDATION ISSUES */}
+
+        {issues.length > 0 && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p className="font-bold">Dữ liệu cần sửa</p>
+
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {issues.slice(0, 8).map((issue, index) => (
+                <li key={index}>
+                  Dòng {issue.row}: {issue.message}
+                </li>
+              ))}
+            </ul>
+
+            {issues.length > 8 && (
+              <p className="mt-2 text-xs">Còn {issues.length - 8} lỗi khác.</p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end">
           <button
             type="button"
-            onClick={handlePreview}
-            disabled={isPreviewing || isReadingFile || students.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onPreview}
+            disabled={!total || issues.length > 0 || Boolean(busy)}
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
           >
-            {isPreviewing ? (
-              <RefreshCw size={17} className="animate-spin" />
+            {busy === "preview" ? (
+              <Loader2 size={17} className="animate-spin" />
             ) : (
-              <Upload size={17} />
+              <ShieldCheck size={17} />
             )}
 
-            {isPreviewing ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
+            {isStudent ? "Kiểm tra qua API Preview" : "Kiểm tra bảng điểm"}
           </button>
         </div>
       </section>
 
-      {/* ===================== PREVIEW RESULT ===================== */}
+      {/* STUDENT API PREVIEW */}
 
-      {previewResult && (
-        <>
-          {/* TABLE */}
+      {isStudent && preview && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-bold text-slate-900">
+            Bước 3 · Kết quả từ Backend
+          </h2>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-800">
-                  Kết quả kiểm tra
-                </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {[
+              ["Tổng sinh viên", preview.total],
+              ["Tạo mới", preview.created],
+              ["Cập nhật", preview.updated],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">{label}</p>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Kiểm tra lại danh sách trước khi xác nhận nhập dữ liệu.
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {value}
                 </p>
               </div>
+            ))}
+          </div>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                <CheckCircle2 size={14} />
-                Đã kiểm tra
-              </span>
+          {previewProblems.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <p className="font-bold">Chưa thể lưu</p>
+
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {previewProblems.map((problem, index) => (
+                  <li key={index}>{problem}</li>
+                ))}
+              </ul>
             </div>
+          ) : (
+            <p className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">
+              <CheckCircle2 size={18} />
+              Preview thành công. Chưa ghi dữ liệu vào database.
+            </p>
+          )}
 
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[850px] text-left text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Dòng
-                    </th>
+          {commit && (
+            <p className="mt-4 rounded-xl bg-blue-50 p-4 text-sm font-semibold text-blue-800">
+              Đã Import thành công: {commit.created} tạo mới, {commit.updated}{" "}
+              cập nhật.
+            </p>
+          )}
 
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      MSSV
-                    </th>
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              disabled={
+                Boolean(busy) || Boolean(commit) || previewProblems.length > 0
+              }
+              onClick={() => setShowConfirm(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <Upload size={17} />
 
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Họ tên
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Email
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold text-slate-600">
-                      Xử lý
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {students.map((student, index) => {
-                    const previewRow = getPreviewAction(index);
-
-                    return (
-                      <tr key={`${student.code}-${index}`}>
-                        <td className="px-4 py-3 text-slate-500">
-                          {index + 1}
-                        </td>
-
-                        <td className="px-4 py-3 font-medium text-slate-700">
-                          {student.code}
-                        </td>
-
-                        <td className="px-4 py-3 text-slate-700">
-                          {student.fullName}
-                        </td>
-
-                        <td className="px-4 py-3 text-slate-600">
-                          {student.email}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          {previewRow ? (
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                previewRow.action === "CREATED"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : previewRow.action === "UPDATED"
-                                    ? "bg-orange-50 text-orange-700"
-                                    : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {getActionLabel(previewRow.action)}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* READY MESSAGE */}
-
-            <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <div className="flex gap-3">
-                <CheckCircle2
-                  size={20}
-                  className="mt-0.5 shrink-0 text-emerald-500"
-                />
-
-                <div>
-                  <p className="text-sm font-semibold text-emerald-700">
-                    Dữ liệu đã được kiểm tra
-                  </p>
-
-                  <p className="mt-1 text-xs text-emerald-700">
-                    {previewResult.created} sinh viên sẽ được tạo mới và{" "}
-                    {previewResult.updated} sinh viên sẽ được cập nhật.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* COMMIT SUCCESS */}
-
-            {commitResult && (
-              <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
-                <div className="flex gap-3">
-                  <CheckCircle2
-                    size={20}
-                    className="mt-0.5 shrink-0 text-blue-600"
-                  />
-
-                  <div>
-                    <p className="text-sm font-semibold text-blue-700">
-                      Nhập dữ liệu thành công
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-blue-700">
-                      Đã xử lý thành công{" "}
-                      <strong>{commitResult.total} sinh viên</strong>. Trong đó
-                      có{" "}
-                      <strong>
-                        {commitResult.created} sinh viên được thêm mới
-                      </strong>{" "}
-                      và{" "}
-                      <strong>
-                        {commitResult.updated} sinh viên được cập nhật
-                      </strong>
-                      .
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* CONFIRM */}
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={handleConfirmImport}
-                disabled={isCommitting || Boolean(commitResult)}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isCommitting ? (
-                  <RefreshCw size={17} className="animate-spin" />
-                ) : (
-                  <Save size={17} />
-                )}
-
-                {isCommitting
-                  ? "Đang nhập dữ liệu..."
-                  : commitResult
-                    ? "Đã nhập dữ liệu"
-                    : "Xác nhận nhập dữ liệu"}
-              </button>
-            </div>
-          </section>
-        </>
+              {commit ? "Đã lưu" : "Xác nhận Import sinh viên"}
+            </button>
+          </div>
+        </section>
       )}
 
-      {/* ===================== ADD STUDENT MODAL ===================== */}
+      {/* GRADE PREVIEW - NO DATABASE WRITE */}
 
-      {showAddStudentModal && (
+      {!isStudent && gradesChecked && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-800">
+          <Info size={20} className="shrink-0" />
+
+          <div>
+            <p className="font-bold">
+              Đã kiểm tra định dạng {grades.length} kết quả học tập
+            </p>
+
+            <p className="mt-1 leading-6">
+              Đây là kiểm tra tại Frontend, chưa gọi API và chưa lưu bảng điểm.
+              Chức năng Commit sẽ được kết nối khi BE xác nhận cách cập nhật
+              cộng dồn, xử lý môn học lại và chống trùng.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ADD STUDENT MODAL */}
+
+      {showModal && (
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
-          onClick={handleCloseAddStudent}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowModal(false);
+            }
+          }}
         >
           <div
-            className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
           >
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <h2 className="text-xl font-black text-slate-900">
-                  Thêm sinh viên
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Thêm sinh viên vào danh sách chờ kiểm tra.
-                </p>
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-900">
+                Thêm sinh viên
+              </h3>
 
               <button
                 type="button"
-                onClick={handleCloseAddStudent}
-                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Đóng"
+                onClick={() => setShowModal(false)}
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
-              {/* MSSV */}
+            <p className="mt-1 text-sm text-slate-500">
+              Thêm thông tin cơ bản. Chưa ghi database.
+            </p>
 
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  MSSV <span className="text-red-500">*</span>
+            <div className="mt-5 space-y-4">
+              {(
+                [
+                  ["Mã sinh viên", "code"],
+                  ["Họ và tên", "fullName"],
+                  ["Email", "email"],
+                ] as const
+              ).map(([label, key]) => (
+                <label key={key} className="block">
+                  <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+                    {label} <span className="text-red-500">*</span>
+                  </span>
+
+                  <input
+                    value={form[key]}
+                    onChange={(event) =>
+                      setForm((old) => ({
+                        ...old,
+                        [key]: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400"
+                  />
                 </label>
-
-                <input
-                  type="text"
-                  value={studentForm.code}
-                  onChange={(event) =>
-                    setStudentForm((current) => ({
-                      ...current,
-
-                      code: event.target.value,
-                    }))
-                  }
-                  placeholder="VD: SE161234"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                />
-              </div>
-
-              {/* FULL NAME */}
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Họ tên <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  type="text"
-                  value={studentForm.fullName}
-                  onChange={(event) =>
-                    setStudentForm((current) => ({
-                      ...current,
-
-                      fullName: event.target.value,
-                    }))
-                  }
-                  placeholder="Nhập họ tên sinh viên"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                />
-              </div>
-
-              {/* EMAIL */}
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Email <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  type="email"
-                  value={studentForm.email}
-                  onChange={(event) =>
-                    setStudentForm((current) => ({
-                      ...current,
-
-                      email: event.target.value,
-                    }))
-                  }
-                  placeholder="VD: student@example.com"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                />
-              </div>
+              ))}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={handleCloseAddStudent}
-                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setShowModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold"
               >
                 Hủy
               </button>
 
               <button
                 type="button"
-                onClick={handleSaveStudent}
-                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+                onClick={onAddStudent}
+                className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white"
               >
-                <Plus size={17} />
-                Thêm sinh viên
+                Thêm vào danh sách
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM COMMIT MODAL */}
+
+      {showConfirm && preview && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowConfirm(false);
+            }
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <AlertTriangle size={24} />
+            </div>
+
+            <h3 className="mt-4 text-xl font-bold text-slate-900">
+              Xác nhận ghi dữ liệu thật?
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Thao tác này gọi <strong>POST /api/imports/commit</strong> và có
+              thể tạo mới hoặc cập nhật sinh viên trong database.
+            </p>
+
+            <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+              {preview.created} tạo mới · {preview.updated} cập nhật
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={onCommit}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Xác nhận lưu
               </button>
             </div>
           </div>

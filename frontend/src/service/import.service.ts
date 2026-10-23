@@ -1,15 +1,39 @@
-const API_BASE_URL =
+
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
-  "https://capstone-ojt-readiness-and-risk.onrender.com";
+  "https://capstone-ojt-readiness-and-risk.onrender.com"
+).replace(/\/+$/, "");
 
 /* =========================================================
-   TYPES
+   STUDENT IMPORT TYPES
    ========================================================= */
+
+export interface StudentCourseResult {
+  courseCode: string;
+  academicPeriodId: number;
+  status: string;
+  score?: number;
+  gradePoints?: number;
+  grade?: string;
+}
+
+export interface StudentPlacement {
+  cohortId?: number;
+  groupCode?: string;
+  currentAcademicPeriodId?: number;
+}
+
+export interface StudentAcademicData {
+  programId?: number;
+  placement?: StudentPlacement;
+  courseResults?: StudentCourseResult[];
+}
 
 export interface StudentImportRow {
   code: string;
   email: string;
   fullName: string;
+  academic?: StudentAcademicData;
 }
 
 export interface StudentImportPayload {
@@ -18,7 +42,9 @@ export interface StudentImportPayload {
   rows: StudentImportRow[];
 }
 
-/* ===================== PREVIEW ===================== */
+/* =========================================================
+   PREVIEW RESPONSE
+   ========================================================= */
 
 export interface ImportPreviewRow {
   rowNumber: number;
@@ -35,7 +61,9 @@ export interface ImportPreviewResponse {
   rows: ImportPreviewRow[];
 }
 
-/* ===================== COMMIT ===================== */
+/* =========================================================
+   COMMIT RESPONSE
+   ========================================================= */
 
 export interface ImportCommitResponse {
   success: boolean;
@@ -47,7 +75,9 @@ export interface ImportCommitResponse {
   replayed: boolean;
 }
 
-/* ===================== ERROR ===================== */
+/* =========================================================
+   API ERROR
+   ========================================================= */
 
 interface ApiErrorResponse {
   success?: boolean;
@@ -59,17 +89,19 @@ interface ApiErrorResponse {
    AUTH
    ========================================================= */
 
-const getAuthToken = () => {
+const getAuthToken = (): string | null => {
   return localStorage.getItem("ojt_auth_token");
 };
 
 /* =========================================================
-   PREVIEW STUDENT IMPORT
+   SHARED REQUEST
    ========================================================= */
 
-const previewStudentImport = async (
+const sendImportRequest = async <T>(
+  endpoint: string,
   payload: StudentImportPayload,
-): Promise<ImportPreviewResponse> => {
+  fallbackError: string,
+): Promise<T> => {
   const token = getAuthToken();
 
   if (!token) {
@@ -79,106 +111,99 @@ const previewStudentImport = async (
   }
 
   const response = await fetch(
-    `${API_BASE_URL}/api/imports/preview`,
+    `${API_BASE_URL}${endpoint}`,
     {
       method: "POST",
-
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-
       body: JSON.stringify(payload),
     },
   );
 
-  const result = (await response.json()) as
-    | ImportPreviewResponse
-    | ApiErrorResponse;
+  let result: unknown;
 
-  if (!response.ok) {
-    const error =
-      result as ApiErrorResponse;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(
+      `Backend trả về dữ liệu không hợp lệ (HTTP ${response.status}).`,
+    );
+  }
 
-    if (response.status === 401) {
-      throw new Error(
-        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
-      );
-    }
+  const apiResult =
+    result !== null &&
+    typeof result === "object" &&
+    !Array.isArray(result)
+      ? (result as ApiErrorResponse)
+      : null;
 
+  if (response.status === 401) {
+    throw new Error(
+      "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
+    );
+  }
+
+  if (response.status === 403) {
+    throw new Error(
+      "Tài khoản không có quyền thực hiện chức năng này.",
+    );
+  }
+
+  if (!response.ok || apiResult?.success === false) {
     if (response.status === 409) {
       throw new Error(
-        error.message ||
-          "Mã idempotency đã được sử dụng.",
+        apiResult?.message ||
+          "Dữ liệu bị xung đột hoặc mã idempotency đã được sử dụng.",
       );
     }
 
     throw new Error(
-      error.message ||
-        "Không thể kiểm tra dữ liệu sinh viên.",
+      apiResult?.message ||
+        `${fallbackError} (HTTP ${response.status}).`,
     );
   }
 
-  return result as ImportPreviewResponse;
+  if (
+    result === null ||
+    typeof result !== "object" ||
+    Array.isArray(result)
+  ) {
+    throw new Error(
+      "Backend trả về cấu trúc kết quả không hợp lệ.",
+    );
+  }
+
+  return result as T;
 };
 
 /* =========================================================
-   COMMIT STUDENT IMPORT
+   PREVIEW
    ========================================================= */
 
-const commitStudentImport = async (
+const previewStudentImport = (
+  payload: StudentImportPayload,
+): Promise<ImportPreviewResponse> => {
+  return sendImportRequest<ImportPreviewResponse>(
+    "/api/imports/preview",
+    payload,
+    "Không thể kiểm tra dữ liệu sinh viên",
+  );
+};
+
+/* =========================================================
+   COMMIT
+   ========================================================= */
+
+const commitStudentImport = (
   payload: StudentImportPayload,
 ): Promise<ImportCommitResponse> => {
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error(
-      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
-    );
-  }
-
-  const response = await fetch(
-    `${API_BASE_URL}/api/imports/commit`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: JSON.stringify(payload),
-    },
+  return sendImportRequest<ImportCommitResponse>(
+    "/api/imports/commit",
+    payload,
+    "Không thể nhập dữ liệu sinh viên",
   );
-
-  const result = (await response.json()) as
-    | ImportCommitResponse
-    | ApiErrorResponse;
-
-  if (!response.ok) {
-    const error =
-      result as ApiErrorResponse;
-
-    if (response.status === 401) {
-      throw new Error(
-        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
-      );
-    }
-
-    if (response.status === 409) {
-      throw new Error(
-        error.message ||
-          "Mã idempotency đã được sử dụng.",
-      );
-    }
-
-    throw new Error(
-      error.message ||
-        "Không thể nhập dữ liệu sinh viên.",
-    );
-  }
-
-  return result as ImportCommitResponse;
 };
 
 /* =========================================================
