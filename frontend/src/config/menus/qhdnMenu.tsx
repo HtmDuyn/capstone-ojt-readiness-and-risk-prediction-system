@@ -2,7 +2,7 @@ import React from 'react';
 import {
   DashboardGridIcon,
 } from '@/components/common/icons/AppIcons';
-import { Building2, Handshake, Award } from 'lucide-react';
+import { Building2, Handshake, Award, UserCheck } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const QHDN_NAV_ITEMS: NavItem[] = [
@@ -45,15 +45,29 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     },
   },
   {
-    id: 'coordination',
-    label: 'Điều phối OJT',
-    path: '/qhdn/coordination',
+    id: 'ojt-management',
+    label: 'Quản lý OJT',
+    path: '/qhdn/registration-windows',
     icon: <Handshake size={20} />,
+    children: [
+      {
+        id: 'registration-windows',
+        label: 'Tiếp nhận và mở ĐK OJT',
+        path: '/qhdn/registration-windows',
+        icon: <UserCheck size={16} />,
+      },
+      {
+        id: 'coordination',
+        label: 'Điều phối OJT',
+        path: '/qhdn/coordination',
+        icon: <Handshake size={16} />,
+      },
+    ],
     banner: {
-      title: 'Điều phối & Ghép cặp Sinh viên OJT',
-      description: 'Nhận danh sách sinh viên đủ điều kiện từ PĐT, phân bổ sinh viên vào doanh nghiệp và xử lý điều phối lại sinh viên bị từ chối.',
-      badge: 'Luồng Điều phối',
-      primaryActionLabel: 'Điều phối tự động',
+      title: 'Quản lý & Điều phối OJT',
+      description: 'Tiếp nhận bàn giao từ PĐT, mở đợt đăng ký và điều phối ghép cặp sinh viên vào doanh nghiệp tiếp nhận.',
+      badge: 'Quản lý OJT',
+      primaryActionLabel: 'Mở đợt đăng ký OJT',
     },
   },
   {

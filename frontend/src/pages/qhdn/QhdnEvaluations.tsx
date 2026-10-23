@@ -1,31 +1,41 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Award,
+  FileCheck2,
   Search,
   Download,
-  Filter,
   Eye,
-  X,
+  Send,
   Calendar,
   GraduationCap,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  FileCheck2,
+  User,
+  Star,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  X,
+  FileSpreadsheet,
+  Building2,
+  Award,
 } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
+import {
+  listInternshipEvaluations,
+  listOjtResults,
+  transferOjtResult,
+  exportOjtResultsUrl,
+  searchOjtSemesters,
+  generateIdempotencyKey,
+} from '@/services/qhdnService';
 
-import type { EnterpriseEvaluation } from '@/types/qhdn/qhdnTypes';
+import type {
+  InternshipEvaluationItem,
+  OjtResultItem,
+  OjtSemesterItem,
+} from '@/types/qhdn/qhdnTypes';
 
 const PAGE_SIZE = 10;
-
-const SEMESTER_OPTIONS = [
-  { value: 'ALL', label: 'Tất cả học kỳ' },
-  { value: 'Summer 2026', label: 'Summer 2026' },
-  { value: 'Spring 2026', label: 'Spring 2026' },
-  { value: 'Fall 2025', label: 'Fall 2025' },
-  { value: 'Summer 2025', label: 'Summer 2025' },
-];
 
 const COHORT_OPTIONS = [
   { value: 'ALL', label: 'Tất cả khóa' },
@@ -36,53 +46,149 @@ const COHORT_OPTIONS = [
 ];
 
 export const QhdnEnterpriseEvaluations: React.FC = () => {
-  const [evaluations, setEvaluations] = useState<
-    (EnterpriseEvaluation & { cohort: string; semester: string })[]
-  >([]);
+  // Semester list
+  const [semesters, setSemesters] = useState<OjtSemesterItem[]>([]);
+  const [selectedSemesterId, setSelectedSemesterId] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Raw data from API
+  const [evaluations, setEvaluations] = useState<InternshipEvaluationItem[]>([]);
+  const [ojtResults, setOjtResults] = useState<OjtResultItem[]>([]);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSemester, setSelectedSemester] = useState('ALL');
   const [selectedCohort, setSelectedCohort] = useState('ALL');
   const [scoreFilter, setScoreFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Selected Evaluation for Modal Detail
-  const [selectedEvaluationDetail, setSelectedEvaluationDetail] = useState<
-    (EnterpriseEvaluation & { cohort: string; semester: string }) | null
+  const [selectedEvalDetail, setSelectedEvalDetail] = useState<
+    (InternshipEvaluationItem & { transferStatus?: string; officialResult?: OjtResultItem }) | null
   >(null);
+
+  // Modal Transfer to Academic state
+  const [transferTarget, setTransferTarget] = useState<InternshipEvaluationItem | null>(null);
+  const [transferReason, setTransferReason] = useState<string>('Báo cáo hoàn thành thực tập và bàn giao điểm OJT');
+  const [isTransferring, setIsTransferring] = useState<boolean>(false);
+
+  // Toast notification
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // 1. Fetch semesters
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      try {
+        const res = await searchOjtSemesters({ page: 1, limit: 50 });
+        if (res?.items && res.items.length > 0) {
+          setSemesters(res.items);
+          const active = res.items.find((s) => s.status === 'ACTIVE') || res.items[0];
+          setSelectedSemesterId(active.id);
+        }
+      } catch (err) {
+        console.warn('Không thể tải danh sách kỳ OJT:', err);
+      }
+    };
+    fetchSemesters();
+  }, []);
+
+  // 2. Fetch Evaluations & OJT Results
+  const fetchData = async (semesterId: number) => {
+    setIsLoading(true);
+    try {
+      const [evalRes, resultRes] = await Promise.allSettled([
+        listInternshipEvaluations({ ojtSemesterId: semesterId, page: 1, limit: 100 }),
+        listOjtResults({ ojtSemesterId: semesterId, page: 1, limit: 100 }),
+      ]);
+
+      if (evalRes.status === 'fulfilled' && evalRes.value?.data?.items) {
+        setEvaluations(evalRes.value.data.items);
+      } else {
+        setEvaluations([]);
+      }
+
+      if (resultRes.status === 'fulfilled' && resultRes.value?.data?.items) {
+        setOjtResults(resultRes.value.data.items);
+      } else {
+        setOjtResults([]);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải kết quả đánh giá:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedSemesterId) {
+      fetchData(selectedSemesterId);
+    }
+  }, [selectedSemesterId]);
+
+  // Map each evaluation with corresponding OjtResult
+  const mappedEvaluations = useMemo(() => {
+    const resultMap = new Map<number, OjtResultItem>();
+    ojtResults.forEach((res) => {
+      if (res.assignmentId) {
+        resultMap.set(res.assignmentId, res);
+      }
+    });
+
+    return evaluations.map((item) => {
+      const official = resultMap.get(item.assignmentId);
+      let transferStatus: 'CONFIRMED' | 'PENDING_ACADEMIC_CONFIRMATION' | 'NOT_TRANSFERRED' =
+        'NOT_TRANSFERRED';
+
+      if (official) {
+        if (official.status === 'CONFIRMED') {
+          transferStatus = 'CONFIRMED';
+        } else {
+          transferStatus = 'PENDING_ACADEMIC_CONFIRMATION';
+        }
+      }
+
+      return {
+        ...item,
+        transferStatus,
+        officialResult: official,
+      };
+    });
+  }, [evaluations, ojtResults]);
 
   // Filter evaluations
   const filteredEvaluations = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
-    return evaluations.filter((evalItem) => {
+    return mappedEvaluations.filter((evalItem) => {
       // Search
       const matchesSearch =
         !query ||
-        evalItem.studentName.toLowerCase().includes(query) ||
-        evalItem.studentCode.toLowerCase().includes(query) ||
-        evalItem.enterpriseName.toLowerCase().includes(query) ||
-        evalItem.evaluatorName.toLowerCase().includes(query);
-
-      // Semester
-      const matchesSemester =
-        selectedSemester === 'ALL' || evalItem.semester === selectedSemester;
+        (evalItem.fullName && evalItem.fullName.toLowerCase().includes(query)) ||
+        (evalItem.studentCode && evalItem.studentCode.toLowerCase().includes(query)) ||
+        (evalItem.companyName && evalItem.companyName.toLowerCase().includes(query)) ||
+        (evalItem.evaluatedByUser?.fullName && evalItem.evaluatedByUser.fullName.toLowerCase().includes(query));
 
       // Cohort
       const matchesCohort =
-        selectedCohort === 'ALL' || evalItem.cohort === selectedCohort;
+        selectedCohort === 'ALL' ||
+        (evalItem.student?.cohortName && evalItem.student.cohortName.includes(selectedCohort));
 
       // Score
+      const score = Number(evalItem.overallScore) || 0;
       const matchesScore =
         scoreFilter === 'ALL' ||
-        (scoreFilter === 'HIGH' && evalItem.overallScore >= 9.0) ||
-        (scoreFilter === 'MED' && evalItem.overallScore >= 8.0 && evalItem.overallScore < 9.0) ||
-        (scoreFilter === 'PASS' && evalItem.overallScore < 8.0);
+        (scoreFilter === 'GE_9' && score >= 9.0) ||
+        (scoreFilter === 'GE_8' && score >= 8.0 && score < 9.0) ||
+        (scoreFilter === 'GE_7' && score >= 7.0 && score < 8.0) ||
+        (scoreFilter === 'LT_7' && score < 7.0);
 
-      return matchesSearch && matchesSemester && matchesCohort && matchesScore;
+      // Status
+      const matchesStatus =
+        statusFilter === 'ALL' || evalItem.transferStatus === statusFilter;
+
+      return matchesSearch && matchesCohort && matchesScore && matchesStatus;
     });
-  }, [evaluations, searchTerm, selectedSemester, selectedCohort, scoreFilter]);
+  }, [mappedEvaluations, searchTerm, selectedCohort, scoreFilter, statusFilter]);
 
   // Pagination calculation
   const totalPages = Math.max(1, Math.ceil(filteredEvaluations.length / PAGE_SIZE));
@@ -93,335 +199,375 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
   );
   const emptyRowsCount = PAGE_SIZE - paginatedEvaluations.length;
 
-  const avgOverallScore =
-    evaluations.length > 0
-      ? (
-          evaluations.reduce((acc, curr) => acc + curr.overallScore, 0) / evaluations.length
-        ).toFixed(1)
-      : '0.0';
+  // Handle Transfer Result to Academic Department
+  const handleConfirmTransfer = async () => {
+    if (!transferTarget) return;
 
-  const excellentCount = evaluations.filter((e) => e.overallScore >= 8.5).length;
-  const excellentRate =
-    evaluations.length > 0 ? Math.round((excellentCount / evaluations.length) * 100) : 0;
+    setIsTransferring(true);
+    try {
+      const idempotencyKey = generateIdempotencyKey('transfer');
+      await transferOjtResult({
+        assignmentId: transferTarget.assignmentId,
+        reason: transferReason.trim() || 'Chuyển giao kết quả đánh giá OJT cho Phòng Đào tạo',
+        idempotencyKey,
+      });
 
-  const hasActiveFilters =
-    searchTerm !== '' ||
-    selectedSemester !== 'ALL' ||
-    selectedCohort !== 'ALL' ||
-    scoreFilter !== 'ALL';
+      setToast({
+        type: 'success',
+        message: `Đã gửi kết quả OJT của sinh viên ${transferTarget.fullName || transferTarget.studentCode} sang Phòng Đào tạo!`,
+      });
 
-  const handleResetFilters = () => {
-    setSearchTerm('');
-    setSelectedSemester('ALL');
-    setSelectedCohort('ALL');
-    setScoreFilter('ALL');
-    setCurrentPage(1);
+      setTransferTarget(null);
+      await fetchData(selectedSemesterId);
+    } catch (err: any) {
+      console.error('Lỗi khi chuyển giao kết quả OJT:', err);
+      const msg = err.response?.data?.message || err.message || 'Chuyển giao kết quả thất bại!';
+      setToast({ type: 'error', message: msg });
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  // Export report handler
+  const handleExportReport = () => {
+    const url = exportOjtResultsUrl(selectedSemesterId, 'csv');
+    window.open(url, '_blank');
   };
 
   return (
     <div className="space-y-6 pb-12 font-sans">
-      {/* ─── Page Banner ─────────────────────────────────── */}
+      {/* Toast Alert */}
+      {toast && (
+        <div
+          role="alert"
+          className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
+            toast.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : 'bg-rose-50 text-rose-800 border-rose-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {toast.type === 'success' ? (
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle size={16} className="text-rose-600 shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="p-1 hover:bg-black/5 rounded cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Page Banner */}
       <PageBanner
-        title="Báo cáo & Đánh giá Thực tập OJT"
-        description="Tổng hợp kết quả đánh giá thực tập OJT, điểm kỹ năng chuyên môn và thái độ làm việc từ người hướng dẫn doanh nghiệp."
+        title="Đánh giá Thực tập & Chuyển giao Phòng Đào tạo"
+        description="Tiếp nhận phiếu điểm từ Doanh nghiệp đối tác, kiểm tra đối soát và chuyển giao kết quả OJT chính thức cho Phòng Đào tạo xác nhận."
         badge="Phòng QHDN"
       />
 
-      {/* ─── CARD 1: PHẦN BÁO CÁO TỔNG QUAN (CARD RIÊNG BIỆT) ─── */}
-      <div className="card-glass border border-slate-200/80 shadow-xs p-5">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 flex-1">
-            {/* KPI 1 */}
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-slate-500">Điểm OJT Trung bình</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-bold text-slate-900">{avgOverallScore}</span>
-                <span className="text-xs font-normal text-slate-400">/ 10.0</span>
-              </div>
-              <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                <TrendingUp size={12} /> Đạt chuẩn chất lượng đầu ra
-              </p>
-            </div>
-
-            {/* KPI 2 */}
-            <div className="space-y-1 sm:border-l sm:border-slate-200/80 sm:pl-6">
-              <span className="text-xs font-medium text-slate-500">Tổng số phiếu đánh giá</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-bold text-slate-900">{evaluations.length}</span>
-                <span className="text-xs font-normal text-slate-400">phiếu</span>
-              </div>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                <FileCheck2 size={12} className="text-blue-500" /> Đã nghiệm thu kết quả
-              </p>
-            </div>
-
-            {/* KPI 3 */}
-            <div className="space-y-1 sm:border-l sm:border-slate-200/80 sm:pl-6">
-              <span className="text-xs font-medium text-slate-500">Tỷ lệ Giỏi & Xuất sắc</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-bold text-slate-900">{excellentRate}%</span>
-                <span className="text-xs font-normal text-slate-400">({excellentCount}/{evaluations.length} SV)</span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Điểm tổng kết từ 8.5 trở lên
-              </p>
-            </div>
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="card-glass border border-slate-200/80 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Phiếu đánh giá từ DN</span>
+            <FileCheck2 size={17} className="text-blue-600" />
           </div>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{evaluations.length}</p>
+          <p className="mt-1 text-xs text-slate-400">Doanh nghiệp đã nộp</p>
+        </div>
 
-          {/* Action Export Excel */}
-          <div className="shrink-0 self-end lg:self-center">
-            <button
-              type="button"
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-2 active:scale-98"
-            >
-              <Download size={15} />
-              Xuất báo cáo Excel
-            </button>
+        <div className="card-glass border border-slate-200/80 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Đã chuyển giao PĐT</span>
+            <Send size={17} className="text-orange-600" />
           </div>
+          <p className="mt-2 text-2xl font-bold text-orange-600">{ojtResults.length}</p>
+          <p className="mt-1 text-xs text-slate-400">Đang chờ hoặc đã xác nhận</p>
+        </div>
+
+        <div className="card-glass border border-slate-200/80 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">PĐT đã chốt điểm</span>
+            <CheckCircle2 size={17} className="text-emerald-600" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-emerald-600">
+            {ojtResults.filter((r) => r.status === 'CONFIRMED').length}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">Điểm OJT chính thức</p>
+        </div>
+
+        <div className="card-glass border border-slate-200/80 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Chưa chuyển giao</span>
+            <Clock size={17} className="text-slate-500" />
+          </div>
+          <p className="mt-2 text-2xl font-bold text-slate-700">
+            {Math.max(0, evaluations.length - ojtResults.length)}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">Cần QHDN gửi sang Đào tạo</p>
         </div>
       </div>
 
-      {/* ─── CARD 2: BẢNG DANH SÁCH ĐÁNH GIÁ (CARD RIÊNG BIỆT) ─── */}
-      <div className="card-glass border border-slate-200/80 shadow-xs overflow-hidden flex flex-col justify-between">
-        {/* Card Header & Filter Toolbar: Kỳ, Khóa, Khung điểm, Tìm kiếm */}
-        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo tên SV, MSSV, doanh nghiệp, mentor..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+      {/* FILTER & TOOLBAR CARD */}
+      <div className="card-glass border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="p-3 sm:p-4 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Tìm tên SV, MSSV, DN, người hướng dẫn..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Học kỳ */}
+            <div className="relative min-w-[190px]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                <Calendar size={15} />
+              </div>
+              <select
+                value={selectedSemesterId}
+                onChange={(e) => {
+                  setSelectedSemesterId(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                aria-label="Chọn học kỳ"
+                className="w-full pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
               >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Lọc Học kỳ */}
-          <div className="relative min-w-[160px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-              <Calendar size={15} />
+                {semesters.map((sem) => (
+                  <option key={sem.id} value={sem.id}>
+                    {sem.name || sem.code || `Kỳ #${sem.id}`}
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              value={selectedSemester}
-              onChange={(e) => {
-                setSelectedSemester(e.target.value);
-                setCurrentPage(1);
-              }}
-              aria-label="Lọc theo học kỳ"
-              className="w-full pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
-            >
-              {SEMESTER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          {/* Lọc Khóa */}
-          <div className="relative min-w-[140px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-              <GraduationCap size={15} />
+            {/* Trạng thái gửi Đào tạo */}
+            <div className="relative min-w-[160px]">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                aria-label="Lọc trạng thái chuyển giao"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
+              >
+                <option value="ALL">Tất cả trạng thái PĐT</option>
+                <option value="NOT_TRANSFERRED">Chưa gửi Đào tạo</option>
+                <option value="PENDING_ACADEMIC_CONFIRMATION">Chờ Đào tạo xác nhận</option>
+                <option value="CONFIRMED">Đào tạo đã xác nhận</option>
+              </select>
             </div>
-            <select
-              value={selectedCohort}
-              onChange={(e) => {
-                setSelectedCohort(e.target.value);
-                setCurrentPage(1);
-              }}
-              aria-label="Lọc theo khóa sinh viên"
-              className="w-full pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
-            >
-              {COHORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          {/* Lọc Khung điểm */}
-          <div className="relative min-w-[170px]">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-              <Filter size={15} />
+            {/* Mức điểm */}
+            <div className="relative min-w-[130px]">
+              <select
+                value={scoreFilter}
+                onChange={(e) => {
+                  setScoreFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                aria-label="Lọc mức điểm"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
+              >
+                <option value="ALL">Tất cả điểm</option>
+                <option value="GE_9">Xuất sắc (≥ 9.0)</option>
+                <option value="GE_8">Giỏi (8.0 - 8.9)</option>
+                <option value="GE_7">Khá (7.0 - 7.9)</option>
+                <option value="LT_7">Cần cải thiện (&lt; 7.0)</option>
+              </select>
             </div>
-            <select
-              value={scoreFilter}
-              onChange={(e) => {
-                setScoreFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              aria-label="Lọc theo khung điểm"
-              className="w-full pl-8 pr-7 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-xs cursor-pointer"
-            >
-              <option value="ALL">Tất cả điểm số</option>
-              <option value="HIGH">Điểm từ 9.0 trở lên</option>
-              <option value="MED">Điểm từ 8.0 – 8.9</option>
-              <option value="PASS">Điểm dưới 8.0</option>
-            </select>
           </div>
 
-          {/* Reset Filters */}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="px-3 py-2 rounded-xl bg-slate-200/80 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
-            >
-              Đặt lại
-            </button>
-          )}
+          {/* Export Report Action */}
+          <button
+            type="button"
+            onClick={handleExportReport}
+            className="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 whitespace-nowrap"
+            title="Xuất bảng điểm OJT tổng hợp sang CSV"
+          >
+            <Download size={14} />
+            Xuất Báo cáo CSV
+          </button>
+        </div>
+      </div>
 
-          <div className="ml-auto text-xs text-slate-500 font-medium">
-            Tìm thấy <strong className="text-slate-800">{filteredEvaluations.length}</strong> kết quả
+      {/* EVALUATION LIST TABLE CARD */}
+      <div className="card-glass border border-slate-200/80 shadow-xs overflow-hidden flex flex-col justify-between">
+        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Award size={18} className="text-orange-500" />
+              Sổ Đánh giá Doanh nghiệp & Chuyển giao Điểm OJT
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Theo dõi điểm thực tập do Mentor DN đánh giá và chuyển giao cho Phòng Đào tạo (ACADEMIC)
+            </p>
           </div>
+          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200/70">
+            {filteredEvaluations.length} Phiếu đánh giá
+          </span>
         </div>
 
-        {/* ─── TABLE: Thêm STT, Xóa avatar, Xóa icon DN, Bỏ đề xuất, Bỏ xếp loại, Thêm màu nút Chi tiết ─── */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700 min-w-[880px]">
+          <table className="w-full text-left text-xs text-slate-700 min-w-[1040px]">
             <thead className="bg-slate-100/70 text-slate-500 uppercase font-semibold text-xs tracking-wider border-b border-slate-100">
               <tr className="h-11">
                 <th className="px-4 py-3 w-14 text-center">STT</th>
-                <th className="px-4 py-3">Sinh viên OJT</th>
-                <th className="px-4 py-3 w-36">Kỳ & Khóa</th>
-                <th className="px-4 py-3 w-60">Doanh nghiệp & Vị trí</th>
-                <th className="px-4 py-3 text-center w-36">Điểm đánh giá</th>
-                <th className="px-4 py-3 w-52">Người đánh giá (Mentor)</th>
-                <th className="px-4 py-3 text-right w-28">Thao tác</th>
+                <th className="px-4 py-3 min-w-[200px]">Sinh viên OJT</th>
+                <th className="px-4 py-3 min-w-[220px]">Doanh nghiệp thực tập</th>
+                <th className="px-4 py-3 text-center w-28">Điểm tổng kết</th>
+                <th className="px-4 py-3 w-44">Người đánh giá</th>
+                <th className="px-4 py-3 text-center w-48">Chuyển giao Đào tạo</th>
+                <th className="px-4 py-3 text-right w-44">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {paginatedEvaluations.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="h-[580px] text-center">
+                  <td colSpan={7} className="h-64 text-center">
                     <div className="max-w-xs mx-auto space-y-2">
                       <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                        <Award size={24} />
+                        <FileCheck2 size={24} />
                       </div>
-                      <p className="text-sm font-semibold text-slate-700">Không tìm thấy phiếu đánh giá phù hợp</p>
-                      <p className="text-xs text-slate-400">Hãy thử xóa hoặc điều chỉnh bộ lọc.</p>
-                      {hasActiveFilters && (
-                        <button
-                          type="button"
-                          onClick={handleResetFilters}
-                          className="mt-2 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 text-xs font-semibold hover:bg-orange-100 cursor-pointer"
-                        >
-                          Xóa bộ lọc
-                        </button>
-                      )}
+                      <p className="text-sm font-semibold text-slate-700">Chưa có phiếu đánh giá nào</p>
+                      <p className="text-xs text-slate-400">Không tìm thấy bản ghi phù hợp hoặc DN chưa nộp đánh giá kỳ này.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                <>
-                  {paginatedEvaluations.map((item, index) => {
-                    const rowNumber = (safeCurrentPage - 1) * PAGE_SIZE + index + 1;
+                paginatedEvaluations.map((item, index) => {
+                  const rowNumber = (safeCurrentPage - 1) * PAGE_SIZE + index + 1;
 
-                    return (
-                      <tr
-                        key={item.id}
-                        onClick={() => setSelectedEvaluationDetail(item)}
-                        className="h-[58px] hover:bg-slate-50 transition-colors cursor-pointer group"
-                      >
-                        {/* STT: Số thuần túy */}
-                        <td className="px-4 py-3 text-center text-sm font-semibold text-slate-500">
-                          {rowNumber}
-                        </td>
+                  return (
+                    <tr key={item.id} className="h-[58px] hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-center text-sm font-semibold text-slate-500">
+                        {rowNumber}
+                      </td>
 
-                        {/* Sinh viên: KHÔNG có Avatar hình tròn */}
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-slate-900 text-sm group-hover:text-orange-600 transition-colors">
-                            {item.studentName}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            MSSV: <strong className="text-slate-700 font-semibold">{item.studentCode}</strong> | {item.major}
-                          </p>
-                        </td>
+                      <td className="px-4 py-3 min-w-[200px]">
+                        <p className="font-bold text-slate-900 text-sm">
+                          {item.fullName || item.student?.fullName || `SV #${item.assignmentId}`}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          MSSV: <strong className="text-slate-700 font-semibold">{item.studentCode || item.student?.studentCode || ''}</strong>
+                        </p>
+                      </td>
 
-                        {/* Kỳ & Khóa */}
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-800 text-xs">{item.semester || 'Summer 2026'}</p>
-                          <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-bold text-[11px] border border-slate-200/60">
-                            {item.cohort || 'K18'}
+                      <td className="px-4 py-3 min-w-[220px]">
+                        <p className="font-bold text-slate-900 text-xs">
+                          {item.companyName || item.company?.name || 'Doanh nghiệp'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Vị trí: {item.positionTitle || item.position?.title || 'Thực tập sinh'}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-3 text-center w-28">
+                        <span className="font-extrabold text-slate-900 text-sm">
+                          {Number(item.overallScore).toFixed(1)} <span className="text-xs font-normal text-slate-400">/ 10</span>
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 w-44">
+                        <p className="font-semibold text-slate-900 text-xs">
+                          {item.evaluatedByUser?.fullName || 'Người hướng dẫn DN'}
+                        </p>
+                        <p className="text-xs text-slate-400">Mentor Doanh nghiệp</p>
+                      </td>
+
+                      {/* Trạng thái gửi về phòng Đào tạo */}
+                      <td className="px-4 py-3 text-center w-48">
+                        {item.transferStatus === 'CONFIRMED' && (
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-bold whitespace-nowrap">
+                            <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                            Đào tạo đã xác nhận
                           </span>
-                        </td>
-
-                        {/* Doanh nghiệp & Vị trí: XÓA ICON DOANH NGHIỆP */}
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-slate-900 text-xs">{item.enterpriseName}</p>
-                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{item.positionTitle}</p>
-                        </td>
-
-                        {/* Điểm OJT: CHỈ GIỮ LẠI ĐIỂM SỐ (Bỏ phần xếp loại) */}
-                        <td className="px-4 py-3 text-center">
-                          <span className="font-bold text-slate-900 text-sm">
-                            {item.overallScore} <span className="text-xs font-normal text-slate-400">/ 10</span>
+                        )}
+                        {item.transferStatus === 'PENDING_ACADEMIC_CONFIRMATION' && (
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200/80 text-xs font-semibold whitespace-nowrap">
+                            <Clock size={13} className="text-orange-600 shrink-0" />
+                            Chờ Đào tạo xác nhận
                           </span>
-                        </td>
+                        )}
+                        {item.transferStatus === 'NOT_TRANSFERRED' && (
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-xs font-medium whitespace-nowrap">
+                            Chưa gửi Đào tạo
+                          </span>
+                        )}
+                      </td>
 
-                        {/* Người đánh giá */}
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-900 text-xs">{item.evaluatorName}</p>
-                          <p className="text-xs text-slate-400">{item.evaluatorRole}</p>
-                        </td>
+                      {/* Thao tác */}
+                      <td className="px-4 py-3 text-right w-44">
+                        <div className="inline-flex items-center justify-end gap-1.5 w-full">
+                          {/* Nút gửi kết quả sang Đào tạo */}
+                          {item.transferStatus === 'NOT_TRANSFERRED' && (
+                            <button
+                              type="button"
+                              onClick={() => setTransferTarget(item)}
+                              className="h-8 px-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs shadow-xs inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                              title="Chuyển giao kết quả OJT sang Phòng Đào tạo"
+                            >
+                              <Send size={12} />
+                              Gửi PĐT
+                            </button>
+                          )}
 
-                        {/* Thao tác: NÚT CHI TIẾT CÓ MÀU CAM DỊU MẮT */}
-                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          {/* Nút xem chi tiết phiếu điểm */}
                           <button
                             type="button"
-                            onClick={() => setSelectedEvaluationDetail(item)}
-                            className="px-2.5 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 font-semibold text-xs border border-orange-200/80 transition-all cursor-pointer inline-flex items-center gap-1 active:scale-95"
+                            onClick={() => setSelectedEvalDetail(item)}
+                            className="w-8 h-8 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200/80 transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-2xs shrink-0"
                             title="Xem chi tiết phiếu đánh giá"
+                            aria-label="Xem chi tiết phiếu đánh giá"
                           >
-                            <Eye size={13} className="text-orange-500" />
-                            Chi tiết
+                            <Eye size={15} className="text-orange-500" />
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {/* Empty rows filler for strictly constant 10-row height */}
-                  {emptyRowsCount > 0 &&
-                    Array.from({ length: emptyRowsCount }).map((_, i) => (
-                      <tr key={`empty-eval-row-${i}`} className="h-[58px] pointer-events-none select-none border-b border-slate-50">
-                        <td colSpan={7} className="px-4 py-3 text-transparent">
-                          &nbsp;
-                        </td>
-                      </tr>
-                    ))}
-                </>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* ─── FIXED PAGINATION FOOTER ───────────────────────── */}
+        {/* FIXED PAGINATION FOOTER */}
         <div className="border-t border-slate-100 px-5 py-3 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-500 font-medium">
             {filteredEvaluations.length === 0
-              ? 'Không có dữ liệu'
+              ? 'Không có dữ liệu hiển thị'
               : `Hiển thị ${(safeCurrentPage - 1) * PAGE_SIZE + 1}–${Math.min(
                   safeCurrentPage * PAGE_SIZE,
                   filteredEvaluations.length
-                )} trong ${filteredEvaluations.length} đánh giá`}
+                )} trong ${filteredEvaluations.length} phiếu đánh giá`}
           </p>
 
-          <nav className="flex items-center gap-1" aria-label="Phân trang đánh giá">
+          <nav className="flex items-center gap-1" aria-label="Phân trang phiếu đánh giá">
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -461,89 +607,193 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── MODAL: CHI TIẾT PHIẾU ĐÁNH GIÁ ────────────────── */}
-      {selectedEvaluationDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Phiếu Đánh giá Kết quả Thực tập
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Doanh nghiệp: {selectedEvaluationDetail.enterpriseName}
-                </p>
-              </div>
+      {/* MODAL 1: CHI TIẾT PHIẾU ĐÁNH GIÁ THỰC TẬP */}
+      {selectedEvalDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <FileCheck2 size={18} className="text-orange-500" />
+                Chi tiết Phiếu đánh giá Thực tập OJT
+              </h3>
               <button
                 type="button"
-                onClick={() => setSelectedEvaluationDetail(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                onClick={() => setSelectedEvalDetail(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Student info */}
-              <div className="p-3.5 bg-slate-50 rounded-xl space-y-1.5 border border-slate-100">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Sinh viên:</span>
-                  <span className="font-bold text-slate-900 text-sm">{selectedEvaluationDetail.studentName}</span>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-slate-400">Sinh viên:</span>
+                  <p className="font-bold text-slate-800 text-sm mt-0.5">
+                    {selectedEvalDetail.fullName || selectedEvalDetail.studentCode}
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Mã sinh viên:</span>
-                  <span className="font-semibold text-slate-800">{selectedEvaluationDetail.studentCode} ({selectedEvaluationDetail.cohort})</span>
+                <div>
+                  <span className="text-slate-400">MSSV:</span>
+                  <p className="font-semibold text-slate-700 mt-0.5">
+                    {selectedEvalDetail.studentCode}
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Học kỳ:</span>
-                  <span className="text-slate-800 font-medium">{selectedEvaluationDetail.semester}</span>
+                <div>
+                  <span className="text-slate-400">Doanh nghiệp:</span>
+                  <p className="font-semibold text-slate-700 mt-0.5">
+                    {selectedEvalDetail.companyName || 'Doanh nghiệp đối tác'}
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Vị trí thực tập:</span>
-                  <span className="text-slate-800">{selectedEvaluationDetail.positionTitle}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Người đánh giá:</span>
-                  <span className="text-slate-800">{selectedEvaluationDetail.evaluatorName} ({selectedEvaluationDetail.evaluatorRole})</span>
-                </div>
-              </div>
-
-              {/* Score Breakdown */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2.5">
-                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                  <span className="font-bold text-slate-800 text-sm">Điểm tổng kết OJT:</span>
-                  <span className="text-lg font-extrabold text-slate-900">{selectedEvaluationDetail.overallScore} / 10</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Kỹ năng chuyên môn kỹ thuật:</span>
-                  <span className="font-bold text-slate-900">{selectedEvaluationDetail.technicalScore} / 10</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Kỹ năng mềm & Giao tiếp:</span>
-                  <span className="font-bold text-slate-900">{selectedEvaluationDetail.softSkillScore} / 10</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Thái độ làm việc & Kỷ luật:</span>
-                  <span className="font-bold text-slate-900">{selectedEvaluationDetail.attitudeScore} / 10</span>
+                <div>
+                  <span className="text-slate-400">Vị trí:</span>
+                  <p className="font-semibold text-slate-700 mt-0.5">
+                    {selectedEvalDetail.positionTitle || 'Thực tập sinh'}
+                  </p>
                 </div>
               </div>
 
-              {/* Comments */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                <span className="font-bold text-slate-700 block">Nhận xét từ Người hướng dẫn:</span>
-                <p className="text-slate-600 italic leading-relaxed">
-                  "{selectedEvaluationDetail.comments}"
+              {/* Bảng điểm chi tiết */}
+              <div className="p-3 rounded-xl bg-orange-50/50 border border-orange-100/70 space-y-2">
+                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                  Bảng điểm các tiêu chí (Thang điểm 10)
+                </h4>
+                <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                  <div className="p-2 rounded-lg bg-white border border-orange-100">
+                    <p className="text-[11px] text-slate-500">Mức độ hoàn thành</p>
+                    <p className="text-base font-bold text-slate-900 mt-0.5">
+                      {Number(selectedEvalDetail.completionScore).toFixed(1)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white border border-orange-100">
+                    <p className="text-[11px] text-slate-500">Thái độ & Kỷ luật</p>
+                    <p className="text-base font-bold text-slate-900 mt-0.5">
+                      {Number(selectedEvalDetail.attitudeScore).toFixed(1)}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white border border-orange-100">
+                    <p className="text-[11px] text-slate-500">Kỹ năng chuyên môn</p>
+                    <p className="text-base font-bold text-slate-900 mt-0.5">
+                      {Number(selectedEvalDetail.skillScore).toFixed(1)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white border border-orange-200 flex items-center justify-between">
+                  <span className="font-bold text-slate-800">ĐIỂM ĐÁNH GIÁ TỔNG KẾT:</span>
+                  <span className="text-lg font-black text-orange-600">
+                    {Number(selectedEvalDetail.overallScore).toFixed(1)} / 10
+                  </span>
+                </div>
+              </div>
+
+              {/* Nhận xét */}
+              <div>
+                <span className="text-slate-500 font-semibold">Nhận xét từ Mentor Doanh nghiệp:</span>
+                <p className="mt-1 p-3 rounded-xl bg-slate-50 border border-slate-100 text-slate-700 italic">
+                  "{selectedEvalDetail.comments || 'Sinh viên hoàn thành tốt nhiệm vụ được giao, có tinh thần học hỏi cao.'}"
                 </p>
               </div>
+
+              {/* Trạng thái xác nhận Đào tạo */}
+              {selectedEvalDetail.officialResult && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs">
+                  <p className="font-bold">
+                    Trạng thái tại Phòng Đào tạo: {selectedEvalDetail.officialResult.status === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN CHÍNH THỨC' : 'CHỜ XÁC NHẬN'}
+                  </p>
+                  {selectedEvalDetail.officialResult.confirmedAt && (
+                    <p className="text-[11px] mt-0.5 text-emerald-600">
+                      Thời gian xác nhận: {new Date(selectedEvalDetail.officialResult.confirmedAt).toLocaleString('vi-VN')}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
-                onClick={() => setSelectedEvaluationDetail(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                onClick={() => setSelectedEvalDetail(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: XÁC NHẬN CHUYỂN GIAO KẾT QUẢ SANG PHÒNG ĐÀO TẠO */}
+      {transferTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Send size={18} className="text-orange-500" />
+                Chuyển giao kết quả OJT cho Đào tạo
+              </h3>
+              <button
+                type="button"
+                onClick={() => setTransferTarget(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600 leading-relaxed">
+                Bạn đang chuẩn bị chuyển giao kết quả OJT của sinh viên{' '}
+                <strong className="text-slate-900 font-bold">
+                  {transferTarget.fullName || transferTarget.studentCode}
+                </strong>{' '}
+                với điểm tổng kết là{' '}
+                <strong className="text-orange-600 font-extrabold text-sm">
+                  {Number(transferTarget.overallScore).toFixed(1)} / 10
+                </strong>{' '}
+                sang cho Phòng Đào tạo (ACADEMIC) để đối soát và chốt điểm chính thức.
+              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Lý do / Ghi chú chuyển giao:
+                </label>
+                <textarea
+                  rows={3}
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                  placeholder="Nhập ghi chú hoặc lý do chuyển giao kết quả..."
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setTransferTarget(null)}
+                disabled={isTransferring}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTransfer}
+                disabled={isTransferring}
+                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isTransferring ? (
+                  <>
+                    <Clock size={13} className="animate-spin" />
+                    Đang gửi...
+                  </>
+                ) : (
+                  <>
+                    <Send size={13} />
+                    Xác nhận chuyển giao
+                  </>
+                )}
               </button>
             </div>
           </div>

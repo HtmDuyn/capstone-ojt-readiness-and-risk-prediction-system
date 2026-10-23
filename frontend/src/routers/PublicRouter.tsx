@@ -27,6 +27,7 @@ import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
 import QhdnEnterpriseImport from "@/pages/qhdn/QhdnEnterpriseImport";
 import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
 import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
+import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -251,6 +252,9 @@ export const router = createBrowserRouter([
         children: [
           { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
           { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
+          { path: "/qhdn/registration-windows", element: <QhdnRegistrationWindows /> },
+          { path: "/qhdn/eligible-students", element: <Navigate to="/qhdn/registration-windows" replace /> },
+          { path: "/qhdn/handoff", element: <Navigate to="/qhdn/registration-windows" replace /> },
           { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
           { path: "/qhdn/enterprises/import", element: <QhdnEnterpriseImport /> },
           { path: "/qhdn/enterprises/list", element: <Navigate to="/qhdn/enterprises" replace /> },
