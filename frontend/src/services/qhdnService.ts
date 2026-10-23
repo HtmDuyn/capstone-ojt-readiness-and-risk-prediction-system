@@ -1,85 +1,47 @@
-import { loadAllPages } from './loadAllPages';
-import API, { API_BASE_URL } from './api';
-import type { AxiosError } from 'axios';
+import type { ImportPreviewResponse } from "@/types/qhdn/qhdnTypes";
+import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type {
-  ImportPreviewRequest,
-  ImportPreviewResponse,
-  ImportCommitResponse,
-  ImportArchiveResponse,
-  CreateCompanyRequest,
-  CreateCompanyResponse,
-  CreatePositionRequest,
-  CreatePositionResponse,
+  Application,
+  AssignmentInput,
+  AssignmentUpdate,
+  Page,
+  PageQuery,
+  RecruitmentPost,
+  RecruitmentWindow,
+  Registration,
+  ReportPage,
+  ReportType,
+  Result,
+  WindowInput,
+} from "@/types/qhdn/workflowTypes";
+import { loadAllPages } from "../utils/loadAllPages";
+import API from "./api";
+import type {
   OjtSemesterItem,
-  AccountProfileResponse,
-  SearchOjtRegistrationsRequest,
-  SearchOjtRegistrationsResponse,
   CompanyListResponse,
   PositionListResponse,
   CreateCoordinationRequest,
   ReassignCoordinationRequest,
   EnterpriseDecisionRequest,
-  CreateAssignmentRequest,
-  UpdateAssignmentRequest,
   TransferOjtResultRequest,
   CoordinationListResponse,
   AssignmentListResponse,
   InternshipEvaluationListResponse,
   OjtResultListResponse,
   HandoffStudentListResponse,
-  EligibleStudentHandoffBatchResponse,
   QhdnDashboardData,
   AcademicPeriodItem,
   RegistrationWindowItem,
   CreateRegistrationWindowRequest,
   UpdateRegistrationWindowRequest,
   ListRegistrationWindowsResponse,
-} from '@/types/qhdn/qhdnTypes';
-
-/**
- * POST /api/imports/preview
- * Kiểm tra dữ liệu nhập sinh viên hoặc doanh nghiệp (preview mode, chưa commit).
- */
-export const previewImport = async (
-  payload: ImportPreviewRequest
-): Promise<ImportPreviewResponse> => {
-  const response = await API.post<ImportPreviewResponse>(
-    '/imports/preview',
-    payload
-  );
-  return response.data;
-};
+} from "@/types/qhdn/qhdnTypes";
 
 /**
  * Tạo idempotencyKey ngẫu nhiên cho mỗi lần import / điều phối / chuyển giao.
  */
-export const generateIdempotencyKey = (prefix = 'qhdn'): string => {
+export const generateIdempotencyKey = (prefix = "qhdn"): string => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-};
-
-/**
- * POST /api/imports/commit
- * Xác nhận nhập chính thức sinh viên hoặc doanh nghiệp vào hệ thống.
- * Request body giống /preview, response bổ sung batchId & replayed.
- */
-export const commitImport = async (
-  payload: ImportPreviewRequest
-): Promise<ImportCommitResponse> => {
-  const response = await API.post<ImportCommitResponse>(
-    '/imports/commit',
-    payload
-  );
-  return response.data;
-};
-
-/**
- * POST /api/imports/archive
- * Lưu trữ tuyển dụng sau hai học kỳ kể từ khi sinh viên đi OJT.
- * Không có request body.
- */
-export const archiveImport = async (): Promise<ImportArchiveResponse> => {
-  const response = await API.post<ImportArchiveResponse>('/imports/archive');
-  return response.data;
 };
 
 /**
@@ -87,63 +49,46 @@ export const archiveImport = async (): Promise<ImportArchiveResponse> => {
  * Danh sách doanh nghiệp đã được lưu trong hệ thống.
  */
 export const listCompanies = async (
-  params: { page?: number; limit?: number; search?: string; status?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<CompanyListResponse> => {
-  const response = await API.get<CompanyListResponse>('/companies', { params });
+  const response = await API.get<CompanyListResponse>("/companies", { params });
   return response.data;
-
-
 };
 
 /**
- * GET /api/positions hoặc POST /api/json/positions/list
+ * GET /api/positions
  * Danh sách vị trí thực tập kèm thông tin doanh nghiệp và học kỳ.
  */
 export const listPositions = async (
-  params: { page?: number; limit?: number; companyId?: number; ojtSemesterId?: number; status?: string; search?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    companyId?: number;
+    ojtSemesterId?: number;
+    status?: string;
+    search?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<PositionListResponse> => {
-  try {
-    const response = await API.get<PositionListResponse>('/positions', { params });
-    return response.data;
-  } catch (error) {
-    if (![404, 405].includes((error as AxiosError)?.response?.status ?? 0)) throw error;
-    const response = await API.post<PositionListResponse>('/json/positions/list', {
-      page: params.page ?? 1,
-      limit: params.limit ?? 100,
-      ...params,
-    });
-    return response.data;
-  }
-};
-
-/**
- * POST /api/companies
- * Tạo mới doanh nghiệp đối tác (HTTP 201 Created).
- * Quyền: ADMIN/OJT_COORD và ENTERPRISE scoped thông qua EnterpriseUser.
- */
-export const createCompany = async (
-  payload: CreateCompanyRequest
-): Promise<CreateCompanyResponse> => {
-  const response = await API.post<CreateCompanyResponse>('/companies', payload);
-  return response.data;
-};
-
-/**
- * POST /api/positions
- * Tạo mới vị trí tuyển dụng thực tập OJT cho doanh nghiệp (HTTP 201 Created).
- */
-export const createPosition = async (
-  payload: CreatePositionRequest
-): Promise<CreatePositionResponse> => {
-  const response = await API.post<CreatePositionResponse>('/positions', payload);
+  const response = await API.get<PositionListResponse>("/positions", {
+    params,
+  });
   return response.data;
 };
 
 /** Read QHDN semester options from the academic-period catalog. */
-export const listQhdnOjtSemesters = async (academicPeriods?: AcademicPeriodItem[]): Promise<{ items: OjtSemesterItem[] }> => {
-  const periods = academicPeriods ?? await loadAllPages(async page =>
-    getAcademicPeriods({ page, limit: 100 })
-  );
+export const listQhdnOjtSemesters = async (
+  academicPeriods?: AcademicPeriodItem[],
+): Promise<{ items: OjtSemesterItem[] }> => {
+  const periods =
+    academicPeriods ??
+    (await loadAllPages(async (page) =>
+      getAcademicPeriods({ page, limit: 100 }),
+    ));
   const semesters = new Map<number, OjtSemesterItem>();
   for (const period of periods) {
     const ojt = period.ojt;
@@ -167,29 +112,6 @@ export const listQhdnOjtSemesters = async (academicPeriods?: AcademicPeriodItem[
   return { items: Array.from(semesters.values()) };
 };
 
-/**
- * GET /api/accounts/me/profile
- * Xem hồ sơ cá nhân của tài khoản đang đăng nhập.
- */
-export const getAccountProfile = async (): Promise<AccountProfileResponse> => {
-  const response = await API.get<AccountProfileResponse>('/accounts/me/profile');
-  return response.data;
-};
-
-/**
- * POST /api/json/ojt-registrations/search
- * Tìm kiếm danh sách hồ sơ đăng ký OJT của sinh viên.
- */
-export const searchOjtRegistrations = async (
-  payload: SearchOjtRegistrationsRequest = {}
-): Promise<SearchOjtRegistrationsResponse> => {
-  const response = await API.post<SearchOjtRegistrationsResponse>(
-    '/json/ojt-registrations/search',
-    payload
-  );
-  return response.data;
-};
-
 // =========================================================================
 // 1. LUỒNG TIẾP NHẬN DANH SÁCH SINH VIÊN TỪ PHÒNG ĐÀO TẠO (ACADEMIC -> QHDN)
 // =========================================================================
@@ -200,40 +122,17 @@ export const searchOjtRegistrations = async (
  */
 export const listStudentsInSemester = async (
   ojtSemesterId: number,
-  params: { page?: number; limit?: number; search?: string; registrationStatus?: string; coordinationStatus?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    registrationStatus?: string;
+    coordinationStatus?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<HandoffStudentListResponse> => {
   const response = await API.get<HandoffStudentListResponse>(
     `/ojt-semesters/${ojtSemesterId}/students`,
-    { params }
-  );
-  return response.data;
-};
-
-/**
- * GET /api/ojt-semesters/:id/eligible-student-handoffs
- * Lịch sử các đợt bàn giao sinh viên đủ điều kiện từ phòng đào tạo sang QHDN.
- */
-export const listHandoffBatches = async (
-  ojtSemesterId: number,
-  params: { page?: number; limit?: number } = { page: 1, limit: 50 }
-): Promise<EligibleStudentHandoffBatchResponse> => {
-  const response = await API.get<EligibleStudentHandoffBatchResponse>(
-    `/ojt-semesters/${ojtSemesterId}/eligible-student-handoffs`,
-    { params }
-  );
-  return response.data;
-};
-
-/**
- * GET /api/qhdn/registered-students
- * Danh sách sinh viên đã đăng ký và có bản ghi bàn giao thật từ đào tạo cùng kỳ.
- */
-export const listRegisteredStudents = async (
-  params: { page?: number; limit?: number; search?: string; ojtSemesterId?: number; status?: string } = { page: 1, limit: 100 }
-): Promise<{ success: boolean; data: { items: any[]; total: number; page: number; limit: number } }> => {
-  const response = await API.get<{ success: boolean; data: { items: any[]; total: number; page: number; limit: number } }>(
-    '/qhdn/registered-students',
-    { params }
+    { params },
   );
   return response.data;
 };
@@ -243,12 +142,26 @@ export const listRegisteredStudents = async (
  * Danh sách kỳ học và năm học do phòng đào tạo khởi tạo.
  */
 export const getAcademicPeriods = async (
-  params: { page?: number; limit?: number; search?: string; status?: string } = { page: 1, limit: 100 }
-): Promise<{ success: boolean; items: AcademicPeriodItem[]; total: number; page: number; limit: number }> => {
-  const response = await API.get<{ success: boolean; items: AcademicPeriodItem[]; total: number; page: number; limit: number }>(
-    '/academic-periods',
-    { params }
-  );
+  params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  } = { page: 1, limit: 100 },
+): Promise<{
+  success: boolean;
+  items: AcademicPeriodItem[];
+  total: number;
+  page: number;
+  limit: number;
+}> => {
+  const response = await API.get<{
+    success: boolean;
+    items: AcademicPeriodItem[];
+    total: number;
+    page: number;
+    limit: number;
+  }>("/academic-periods", { params });
   return response.data;
 };
 
@@ -257,11 +170,16 @@ export const getAcademicPeriods = async (
  * Danh sách các đợt mở đăng ký OJT (theo kỳ hoặc theo trạng thái).
  */
 export const listRegistrationWindows = async (
-  params: { ojtSemesterId?: number; status?: string; page?: number; limit?: number } = { page: 1, limit: 50 }
+  params: {
+    ojtSemesterId?: number;
+    status?: string;
+    page?: number;
+    limit?: number;
+  } = { page: 1, limit: 50 },
 ): Promise<ListRegistrationWindowsResponse> => {
   const response = await API.get<ListRegistrationWindowsResponse>(
-    '/ojt-registration-windows',
-    { params }
+    "/ojt-registration-windows",
+    { params },
   );
   return response.data;
 };
@@ -271,12 +189,12 @@ export const listRegistrationWindows = async (
  * Tạo mới đợt đăng ký OJT (ở trạng thái DRAFT) với phạm vi danh sách sinh viên đủ điều kiện.
  */
 export const createRegistrationWindow = async (
-  payload: CreateRegistrationWindowRequest
+  payload: CreateRegistrationWindowRequest,
 ): Promise<{ success: boolean; data: RegistrationWindowItem }> => {
-  const response = await API.post<{ success: boolean; data: RegistrationWindowItem }>(
-    '/ojt-registration-windows',
-    payload
-  );
+  const response = await API.post<{
+    success: boolean;
+    data: RegistrationWindowItem;
+  }>("/ojt-registration-windows", payload);
   return response.data;
 };
 
@@ -286,12 +204,12 @@ export const createRegistrationWindow = async (
  */
 export const updateRegistrationWindow = async (
   windowId: number,
-  payload: UpdateRegistrationWindowRequest
+  payload: UpdateRegistrationWindowRequest,
 ): Promise<{ success: boolean; data: RegistrationWindowItem }> => {
-  const response: any = await (API.patch as any)(
-    `/ojt-registration-windows/${windowId}`,
-    payload
-  );
+  const response = await API.patch<{
+    success: boolean;
+    data: RegistrationWindowItem;
+  }>(`/ojt-registration-windows/${windowId}`, payload);
   return response.data;
 };
 
@@ -300,9 +218,9 @@ export const updateRegistrationWindow = async (
  */
 export const openRegistrationWindow = async (
   windowId: number,
-  reason = 'Mở cổng đăng ký OJT cho sinh viên đủ điều kiện'
+  reason = "Mở cổng đăng ký OJT cho sinh viên đủ điều kiện",
 ): Promise<{ success: boolean; data: RegistrationWindowItem }> => {
-  return updateRegistrationWindow(windowId, { status: 'OPEN', reason });
+  return updateRegistrationWindow(windowId, { status: "OPEN", reason });
 };
 
 /**
@@ -310,9 +228,9 @@ export const openRegistrationWindow = async (
  */
 export const closeRegistrationWindow = async (
   windowId: number,
-  reason = 'Hết hạn đăng ký OJT đợt này'
+  reason = "Hết hạn đăng ký OJT đợt này",
 ): Promise<{ success: boolean; data: RegistrationWindowItem }> => {
-  return updateRegistrationWindow(windowId, { status: 'CLOSED', reason });
+  return updateRegistrationWindow(windowId, { status: "CLOSED", reason });
 };
 
 // =========================================================================
@@ -324,9 +242,19 @@ export const closeRegistrationWindow = async (
  * Danh sách sinh viên đã được điều phối cho doanh nghiệp đối tác.
  */
 export const listCoordinations = async (
-  params: { page?: number; limit?: number; ojtSemesterId?: number; companyId?: number; status?: string; search?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    ojtSemesterId?: number;
+    companyId?: number;
+    status?: string;
+    search?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<CoordinationListResponse> => {
-  const response = await API.get<CoordinationListResponse>('/ojt-coordinations', { params });
+  const response = await API.get<CoordinationListResponse>(
+    "/ojt-coordinations",
+    { params },
+  );
   return response.data;
 };
 
@@ -335,11 +263,11 @@ export const listCoordinations = async (
  * Điều phối hồ sơ sinh viên đã bàn giao đến doanh nghiệp (lần đầu).
  */
 export const coordinateStudent = async (
-  payload: CreateCoordinationRequest
+  payload: CreateCoordinationRequest,
 ): Promise<{ success: boolean; data: any }> => {
   const response = await API.post<{ success: boolean; data: any }>(
-    '/ojt-coordinations',
-    payload
+    "/ojt-coordinations",
+    payload,
   );
   return response.data;
 };
@@ -350,11 +278,11 @@ export const coordinateStudent = async (
  */
 export const reassignStudent = async (
   coordinationId: number,
-  payload: ReassignCoordinationRequest
+  payload: ReassignCoordinationRequest,
 ): Promise<{ success: boolean; data: any }> => {
   const response = await API.post<{ success: boolean; data: any }>(
     `/ojt-coordinations/${coordinationId}/reassign`,
-    payload
+    payload,
   );
   return response.data;
 };
@@ -365,11 +293,11 @@ export const reassignStudent = async (
  */
 export const recordEnterpriseDecision = async (
   coordinationId: number,
-  payload: EnterpriseDecisionRequest
+  payload: EnterpriseDecisionRequest,
 ): Promise<{ success: boolean; data: any }> => {
   const response = await API.post<{ success: boolean; data: any }>(
     `/ojt-coordinations/${coordinationId}/decision`,
-    payload
+    payload,
   );
   return response.data;
 };
@@ -379,38 +307,18 @@ export const recordEnterpriseDecision = async (
  * Danh sách phân công thực tập chính thức (sau khi doanh nghiệp ACCEPTED).
  */
 export const listAssignments = async (
-  params: { page?: number; limit?: number; companyId?: number; ojtSemesterId?: number; status?: string; search?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    companyId?: number;
+    ojtSemesterId?: number;
+    status?: string;
+    search?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<AssignmentListResponse> => {
-  const response = await API.get<AssignmentListResponse>('/assignments', { params });
-  return response.data;
-};
-
-/**
- * POST /api/assignments
- * Tạo phân công thực tập sau khi điều phối được doanh nghiệp chấp thuận.
- */
-export const createAssignment = async (
-  payload: CreateAssignmentRequest
-): Promise<{ success: boolean; data: any }> => {
-  const response = await API.post<{ success: boolean; data: any }>(
-    '/assignments',
-    payload
-  );
-  return response.data;
-};
-
-/**
- * PATCH /api/assignments/:id
- * Cập nhật phân công (thời gian thực tập, người hướng dẫn, trạng thái ACTIVE/COMPLETED/CANCELLED).
- */
-export const updateAssignment = async (
-  assignmentId: number,
-  payload: UpdateAssignmentRequest
-): Promise<{ success: boolean; data: any }> => {
-  const response: any = await API.patch(
-    `/assignments/${assignmentId}`,
-    payload
-  );
+  const response = await API.get<AssignmentListResponse>("/assignments", {
+    params,
+  });
   return response.data;
 };
 
@@ -423,11 +331,18 @@ export const updateAssignment = async (
  * Tiếp nhận danh sách phiếu đánh giá thực tập từ người hướng dẫn doanh nghiệp.
  */
 export const listInternshipEvaluations = async (
-  params: { page?: number; limit?: number; ojtSemesterId?: number; companyId?: number; status?: string; search?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    ojtSemesterId?: number;
+    companyId?: number;
+    status?: string;
+    search?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<InternshipEvaluationListResponse> => {
   const response = await API.get<InternshipEvaluationListResponse>(
-    '/internship-evaluations',
-    { params }
+    "/internship-evaluations",
+    { params },
   );
   return response.data;
 };
@@ -438,11 +353,11 @@ export const listInternshipEvaluations = async (
  * Yêu cầu: Quyền OJT_COORD hoặc ADMIN, phân công đã COMPLETED và có đánh giá SUBMITTED từ DN.
  */
 export const transferOjtResult = async (
-  payload: TransferOjtResultRequest
+  payload: TransferOjtResultRequest,
 ): Promise<{ success: boolean; data: any }> => {
   const response = await API.post<{ success: boolean; data: any }>(
-    '/ojt-results',
-    payload
+    "/ojt-results",
+    payload,
   );
   return response.data;
 };
@@ -452,22 +367,18 @@ export const transferOjtResult = async (
  * Danh sách kết quả OJT đã chuyển giao cho phòng đào tạo (và theo dõi trạng thái xác nhận CONFIRMED).
  */
 export const listOjtResults = async (
-  params: { page?: number; limit?: number; ojtSemesterId?: number; status?: string; search?: string } = { page: 1, limit: 100 }
+  params: {
+    page?: number;
+    limit?: number;
+    ojtSemesterId?: number;
+    status?: string;
+    search?: string;
+  } = { page: 1, limit: 100 },
 ): Promise<OjtResultListResponse> => {
-  const response = await API.get<OjtResultListResponse>('/ojt-results', { params });
+  const response = await API.get<OjtResultListResponse>("/ojt-results", {
+    params,
+  });
   return response.data;
-};
-
-/**
- * GET /api/ojt-semesters/:id/results/export
- * Xuất danh sách kết quả OJT theo học kỳ dưới định dạng CSV hoặc PDF.
- */
-export const exportOjtResultsUrl = (
-  ojtSemesterId: number,
-  format: 'csv' | 'pdf' = 'csv'
-): string => {
-  const token = localStorage.getItem('ojt_auth_token') || '';
-  return `${API_BASE_URL}/ojt-semesters/${ojtSemesterId}/results/export?format=${format}&token=${token}`;
 };
 
 // =========================================================================
@@ -479,25 +390,139 @@ export const exportOjtResultsUrl = (
  * Dữ liệu tổng quan phòng QHDN (bàn giao, sức chứa, tiếp nhận, kết quả).
  */
 export const getQhdnDashboard = async (
-  params: { ojtSemesterId?: number; companyId?: number } = {}
+  params: { ojtSemesterId?: number; companyId?: number } = {},
 ): Promise<{ success: boolean; data: QhdnDashboardData }> => {
   const response = await API.get<{ success: boolean; data: QhdnDashboardData }>(
-    '/qhdn/dashboard',
-    { params }
+    "/qhdn/dashboard",
+    { params },
   );
   return response.data;
 };
 
-/**
- * GET /api/qhdn/reports
- * Báo cáo chi tiết QHDN theo loại: acceptance | internships | enterprise-feedback
- */
-export const getQhdnReports = async (
-  type: 'acceptance' | 'internships' | 'enterprise-feedback',
-  params: { ojtSemesterId?: number; companyId?: number; page?: number; limit?: number } = { page: 1, limit: 100 }
-): Promise<{ success: boolean; data: any }> => {
-  const response = await API.get<{ success: boolean; data: any }>('/qhdn/reports', {
-    params: { type, ...params },
-  });
-  return response.data;
-};
+export const archiveRecruitment = async () =>
+  (
+    await API.post<{ success: boolean; archivedCount: number }>(
+      "/imports/archive",
+    )
+  ).data;
+
+export const listRegistrations = async (params: PageQuery) =>
+  (await API.get<Result<Page<Registration>>>("/ojt-registrations", { params }))
+    .data.data;
+export const listApplications = async (params: PageQuery) =>
+  (await API.get<Result<Page<Application>>>("/job-applications", { params }))
+    .data.data;
+export const reviewRegistration = async (
+  id: number,
+  payload: {
+    decision: "APPROVE" | "REJECT";
+    reason: string;
+    idempotencyKey: string;
+  },
+) => (await API.post(`/ojt-registrations/${id}/review`, payload)).data;
+export const updateCompany = async (
+  id: number,
+  payload: Partial<
+    Pick<
+      CompanyListItem,
+      | "name"
+      | "address"
+      | "industry"
+      | "contactPersonName"
+      | "contactPhone"
+      | "contactEmail"
+      | "status"
+    >
+  > & { reason: string },
+) => (await API.patch(`/companies/${id}`, payload)).data;
+export const listRecruitmentPosts = async (
+  params: PageQuery & { companyId: number; windowId?: number },
+) =>
+  (
+    await API.get<Result<Page<RecruitmentPost>>>("/recruitment/posts", {
+      params,
+    })
+  ).data.data;
+export const createRecruitmentWindow = async (payload: WindowInput) =>
+  (await API.post<Result<RecruitmentWindow>>("/recruitment/windows", payload))
+    .data.data;
+export const updateRecruitmentWindow = async (
+  id: number,
+  payload: Partial<WindowInput> & {
+    reason: string;
+    status?: "OPEN" | "CLOSED";
+  },
+) =>
+  (
+    await API.patch<Result<RecruitmentWindow>>(
+      `/recruitment/windows/${id}`,
+      payload,
+    )
+  ).data.data;
+export const reviewRecruitmentPost = async (
+  id: number,
+  payload: {
+    decision: "PUBLISH" | "REJECT";
+    reason: string;
+    deadlineAt?: string;
+  },
+) => (await API.post(`/recruitment/posts/${id}/review`, payload)).data;
+export const closeRecruitmentPost = async (id: number, reason: string) =>
+  (await API.post(`/recruitment/posts/${id}/close`, { reason })).data;
+export const assignInternship = async (payload: AssignmentInput) =>
+  (await API.post("/assignments", payload)).data;
+export const editInternship = async (id: number, payload: AssignmentUpdate) =>
+  (await API.patch(`/assignments/${id}`, payload)).data;
+export const listReports = async (type: ReportType, params: PageQuery) =>
+  (
+    await API.get<Result<ReportPage>>("/qhdn/reports", {
+      params: { ...params, type },
+    })
+  ).data.data;
+
+// API trả Blob; utils/downloadFile phụ trách lưu file trên trình duyệt.
+export const getCvFile = async (
+  studentId: number,
+  cvFileId?: number | null,
+): Promise<Blob> =>
+  (
+    await API.get<Blob>(`/students/${studentId}/cv`, {
+      params: cvFileId ? { cvFileId } : {},
+      responseType: "blob",
+    })
+  ).data;
+export const exportOjtResults = async (
+  semesterId: number,
+  format: "csv" | "pdf",
+): Promise<Blob> =>
+  (
+    await API.get<Blob>(`/ojt-semesters/${semesterId}/results/export`, {
+      params: { format },
+      responseType: "blob",
+    })
+  ).data;
+export const exportQhdnReport = async (
+  type: ReportType,
+  params: { ojtSemesterId?: number; companyId?: number },
+): Promise<Blob> =>
+  (
+    await API.get<Blob>("/qhdn/reports/export", {
+      params: { ...params, type, format: "csv" },
+      responseType: "blob",
+    })
+  ).data;
+
+export const previewEnterpriseImport = async (
+  payload: FormData,
+): Promise<ImportPreviewResponse> =>
+  (
+    await API.post<ImportPreviewResponse>("/imports/preview", payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  ).data;
+export const commitEnterpriseImport = async (payload: FormData) =>
+  (
+    await API.post<{ success: boolean }>("/imports/commit", payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  ).data;

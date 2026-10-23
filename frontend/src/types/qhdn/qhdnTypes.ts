@@ -1,160 +1,7 @@
-
-
-export type SemesterOption = 'Summer 2026' | 'Spring 2026' | 'Fall 2025' | 'Summer 2025';
-
-export interface EnterprisePartner {
-  id: string;
-  name: string;
-  code: string;
-  logoUrl?: string;
-  industry: string;
-  tier: 'Tier-1 Gold' | 'Tier-2 Silver' | 'Tier-3 Standard';
-  contactPerson: string;
-  contactEmail: string;
-  contactPhone: string;
-  address: string;
-  mouStatus: 'Active' | 'Pending Renewal' | 'Draft';
-  mouSignedDate: string;
-  mouExpiryDate: string;
-  totalQuota: number;
-  acceptedCount: number;
-  availableQuota: number;
-  semester?: string;
-  semesters?: string[];
-  cohorts?: string[];
-}
-
-export interface InternshipPosition {
-  id: string;
-  enterpriseId: string;
-  enterpriseName: string;
-  title: string;
-  department: string;
-  location: string;
-  workType: 'Onsite' | 'Hybrid' | 'Remote';
-  stipend: string;
-  totalSlots: number;
-  filledSlots: number;
-  requiredSkills: string[];
-  description: string;
-  requirements: string;
-  status: 'Open' | 'Closed' | 'Draft';
-}
-
-export interface EligibleStudent {
-  id: string;
-  studentCode: string;
-  fullName: string;
-  avatarUrl?: string;
-  major: string;
-  gpa: number;
-  completedCredits: number;
-  englishLevel: string;
-  readinessScore: number; // 0 - 100
-  topSkills: string[];
-  ojtEligibilityStatus: 'Qualified' | 'Pending Review';
-  assignedEnterpriseId?: string;
-  assignedEnterpriseName?: string;
-  assignedPositionId?: string;
-  assignedPositionTitle?: string;
-  coordinationStatus: 'Unassigned' | 'Pending Response' | 'Accepted' | 'Rejected' | 'Interviewing';
-  rejectionReason?: string;
-  assignedDate?: string;
-}
-
-export interface EnterpriseEvaluation {
-  id: string;
-  studentCode: string;
-  studentName: string;
-  major: string;
-  enterpriseName: string;
-  positionTitle: string;
-  evaluatorName: string;
-  evaluatorRole: string;
-  evaluationDate: string;
-  technicalScore: number; // Max 10
-  softSkillScore: number; // Max 10
-  attitudeScore: number; // Max 10
-  overallScore: number; // Max 10
-  grade: 'Excellent' | 'Good' | 'Satisfactory' | 'Unsatisfactory';
-  recommendForHire: boolean;
-  comments: string;
-}
-
-export interface SemesterStats {
-  semester: SemesterOption;
-  totalEligibleStudents: number;
-  placedStudents: number;
-  pendingStudents: number;
-  rejectedStudents: number;
-  reassignedStudents: number;
-  acceptanceRate: number; // percentage
-  enterpriseResponseRate: number; // percentage
-  totalPartnerEnterprises: number;
-  totalQuotaAvailable: number;
-}
-
-export interface ExtractedEnterprise {
-  id: string;
-  fileName: string;
-  fileSize: string;
-  code: string;
-  name: string;
-  shortName: string;
-  email: string;
-  contactPerson: string;
-  contactRole: string;
-  phone: string;
-  industry: string;
-  website: string;
-  address: string;
-  description: string;
-  positionsCount: number;
-  quota: number;
-  status: 'valid' | 'missing_jd' | 'need_review' | 'error';
-  statusText: string;
-  createAccount: boolean;
-  logoBg: string;
-  logoText: string;
-  semester?: string;
-  semesters?: string[];
-}
-
-export interface SelectedFileItem {
-  name: string;
-  size: string;
-}
-
-// ─── IMPORT PREVIEW API TYPES ────────────────────────────────────────────────
-
-export interface ImportPositionRow {
-  code: string;
-  title: string;
-  description?: string;
-  requirements?: string;
-  capacity: number;
-}
-
-export interface ImportEnterpriseRow {
-  code: string;
-  email: string;
-  fullName: string;
-  name: string;
-  address?: string;
-  positions?: ImportPositionRow[];
-}
-
-export interface ImportPreviewRequest {
-  kind: 'ENTERPRISE';
-  idempotencyKey: string;
-  semesterId: number;
-  rows: ImportEnterpriseRow[];
-}
-
 export interface ImportPreviewRowResult {
   rowNumber: number;
   code: string;
-  action: 'CREATED' | 'UPDATED' | 'SKIPPED' | 'ERROR';
+  action: "CREATED" | "UPDATED" | "SKIPPED" | "ERROR";
   error?: string;
 }
 
@@ -167,25 +14,6 @@ export interface ImportPreviewResponse {
   canCommit: boolean;
   preview: boolean;
   rows: ImportPreviewRowResult[];
-}
-
-export interface ImportCommitResponse {
-  success: boolean;
-  total: number;
-  created: number;
-  updated: number;
-  errors: string[];
-  canCommit: boolean;
-  /** ID của batch import đã được lưu vào hệ thống */
-  batchId: number;
-  /** true nếu idempotencyKey đã được dùng trước đó (replay) */
-  replayed: boolean;
-}
-
-export interface ImportArchiveResponse {
-  success: boolean;
-  /** Số lượng bản ghi tuyển dụng đã được lưu trữ */
-  archivedCount: number;
 }
 
 export interface CompanyListItem {
@@ -255,94 +83,6 @@ export interface PositionListResponse {
   };
 }
 
-/**
- * Payload gửi lên POST /api/companies
- */
-export interface CreateCompanyRequest {
-  enterpriseCode: string;
-  name: string;
-  address?: string;
-  industry?: string;
-  contactPersonName?: string;
-  contactPhone?: string;
-  contactEmail?: string;
-  status?: string;
-  reason?: string;
-  code?: string;
-}
-
-/**
- * Thông tin chi tiết doanh nghiệp trả về sau khi tạo mới
- */
-export interface CompanyData {
-  id: number;
-  enterpriseCode: string;
-  name: string;
-  address?: string;
-  industry?: string;
-  contactPersonName?: string;
-  contactPhone?: string;
-  contactEmail?: string;
-  status: string;
-  createdAt: string;
-  code?: string;
-}
-
-/**
- * Response trả về từ POST /api/companies (201 Created)
- */
-export interface CreateCompanyResponse {
-  success: boolean;
-  data: CompanyData;
-  message?: string;
-}
-
-/**
- * Request payload cho POST /api/positions
- */
-export interface CreatePositionRequest {
-  enterpriseId?: number;
-  ojtSemesterId?: number;
-  title: string;
-  description?: string;
-  requirements?: string;
-  capacity: number;
-  status?: string;
-  reason?: string;
-  companyId?: number;
-  recruitmentCode?: string;
-  location?: string;
-  workMode?: 'ONSITE' | 'REMOTE' | 'HYBRID' | string;
-}
-
-/**
- * Chi tiết vị trí tuyển dụng OJT trả về sau khi tạo mới
- */
-export interface PositionData {
-  id: number;
-  enterpriseId?: number;
-  ojtSemesterId?: number;
-  recruitmentCode?: string;
-  title: string;
-  description?: string;
-  requirements?: string;
-  capacity: number;
-  status: string;
-  location?: string;
-  workMode?: string;
-  companyId?: number;
-  remainingSlots?: number;
-}
-
-/**
- * Response trả về từ POST /api/positions (201 Created)
- */
-export interface CreatePositionResponse {
-  success: boolean;
-  data: PositionData;
-  message?: string;
-}
-
 /** OJT semester options for QHDN screens. */
 export interface OjtSemesterItem {
   id: number;
@@ -360,91 +100,6 @@ export interface OjtSemesterItem {
   [key: string]: any;
 }
 
-
-
-/**
- * Thông tin hồ sơ tài khoản từ GET /api/accounts/me/profile
- */
-export interface AccountProfile {
-  id: number;
-  username: string;
-  email: string;
-  phone: string | null;
-  full_name: string;
-  status: string;
-  role_id: number;
-  role_code: string;
-  role_name: string;
-  created_at: string;
-  updated_at: string;
-  last_login_at: string | null;
-}
-
-/**
- * Response trả về từ GET /api/accounts/me/profile
- */
-export interface AccountProfileResponse {
-  success: boolean;
-  account: AccountProfile;
-  message?: string;
-}
-
-/**
- * Request payload cho POST /api/json/ojt-registrations/search
- * Danh sách hồ sơ đăng ký OJT
- */
-export interface SearchOjtRegistrationsRequest {
-  ojtSemesterId?: number;
-  windowId?: number;
-  studentId?: number;
-  programId?: number;
-  cohortId?: number;
-  groupCode?: string;
-  status?: string;
-  search?: string;
-  page?: number;
-  limit?: number;
-}
-
-/**
- * Thông tin một hồ sơ đăng ký OJT
- */
-export interface OjtRegistrationItem {
-  id?: number;
-  studentId?: number;
-  studentCode?: string;
-  studentName?: string;
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  major?: string;
-  gpa?: number;
-  credits?: number;
-  status?: string;
-  groupCode?: string;
-  ojtSemesterId?: number;
-  windowId?: number;
-  programId?: number;
-  cohortId?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: any;
-}
-
-/**
- * Response trả về từ POST /api/json/ojt-registrations/search
- */
-export interface SearchOjtRegistrationsResponse {
-  success: boolean;
-  data: {
-    items: OjtRegistrationItem[];
-    total: number;
-    page: number;
-    limit: number;
-  };
-  message?: string;
-}
-
 // =========================================================================
 // TYPES CHO LUỒNG ĐIỀU PHỐI, DOANH NGHIỆP DUYỆT, ĐÁNH GIÁ VÀ CHUYỂN GIAO PĐT
 // =========================================================================
@@ -454,58 +109,27 @@ export interface SearchOjtRegistrationsResponse {
  */
 export interface CreateCoordinationRequest {
   registrationId: number;
-  companyId: number;
   positionId: number;
-  notes?: string;
-  idempotencyKey?: string;
+  applicationId?: number;
+  reason: string;
+  idempotencyKey: string;
 }
 
 /**
  * Payload cho POST /api/ojt-coordinations/:id/reassign (Điều phối lại sau khi bị từ chối)
  */
 export interface ReassignCoordinationRequest {
-  registrationId?: number;
-  companyId: number;
   positionId: number;
-  notes?: string;
-  reason?: string;
-  idempotencyKey?: string;
+  reason: string;
+  idempotencyKey: string;
 }
 
 /**
  * Payload cho POST /api/ojt-coordinations/:id/decision (Ghi nhận quyết định Doanh nghiệp)
  */
 export interface EnterpriseDecisionRequest {
-  decision: 'ACCEPTED' | 'REJECTED';
-  reason?: string;
-}
-
-/**
- * Payload cho POST /api/assignments (Tạo phân công sau khi DN duyệt)
- */
-export interface CreateAssignmentRequest {
-  coordinationId: number;
-  registrationId?: number;
-  companyId?: number;
-  positionId?: number;
-  enterpriseSupervisorName?: string;
-  enterpriseSupervisorEmail?: string;
-  enterpriseSupervisorPhone?: string;
-  startDate?: string;
-  endDate?: string;
-  idempotencyKey?: string;
-}
-
-/**
- * Payload cho PATCH /api/assignments/:id
- */
-export interface UpdateAssignmentRequest {
-  enterpriseSupervisorName?: string;
-  enterpriseSupervisorEmail?: string;
-  enterpriseSupervisorPhone?: string;
-  status?: 'ASSIGNED' | 'ACTIVE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
-  startDate?: string;
-  endDate?: string;
+  decision: "ACCEPTED" | "REJECTED";
+  reason: string;
 }
 
 /**
@@ -526,7 +150,7 @@ export interface CoordinationItem {
   companyId: number;
   positionId: number;
   ojtSemesterId: number;
-  decision: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  decision: "PENDING" | "ACCEPTED" | "REJECTED";
   rejectReason?: string;
   decisionAt?: string;
   coordinatedAt?: string;
@@ -580,7 +204,13 @@ export interface AssignmentItem {
   companyId: number;
   positionId: number;
   ojtSemesterId: number;
-  status: 'ASSIGNED' | 'ACTIVE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  status:
+    | "ASSIGNED"
+    | "ACTIVE"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "FAILED"
+    | "CANCELLED";
   startDate?: string;
   endDate?: string;
   enterpriseSupervisorName?: string;
@@ -608,10 +238,10 @@ export interface AssignmentListResponse {
 export interface InternshipEvaluationItem {
   id: number;
   assignmentId: number;
-  completionScore: number;
-  attitudeScore: number;
-  skillScore: number;
-  overallScore: number;
+  completionScore: number | null;
+  attitudeScore: number | null;
+  skillScore: number | null;
+  overallScore: number | null;
   comments?: string;
   status: string;
   evaluatedBy?: number;
@@ -655,7 +285,7 @@ export interface OjtResultItem {
   enterpriseName: string;
   ojtSemesterId: number;
   semesterCode?: string;
-  status: 'PENDING_ACADEMIC_CONFIRMATION' | 'REVISION_REQUESTED' | 'CONFIRMED';
+  status: "PENDING_ACADEMIC_CONFIRMATION" | "REVISION_REQUESTED" | "CONFIRMED";
   officialScore: number | null;
   completionScore?: number | null;
   attitudeScore?: number | null;
@@ -701,7 +331,7 @@ export interface HandoffStudentItem {
   gpa?: number;
   englishLevel?: string;
   groupCode?: string;
-  handoffStatus?: 'HANDED_OFF' | 'NOT_HANDED_OFF';
+  handoffStatus?: "HANDED_OFF" | "NOT_HANDED_OFF";
   handoffId?: number;
   handoff?: {
     id: number;
@@ -763,11 +393,11 @@ export interface HandoffStudentItem {
     };
   };
   coordinationId?: number;
-  coordinationStatus?: 'NOT_COORDINATED' | 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  coordinationStatus?: "NOT_COORDINATED" | "PENDING" | "ACCEPTED" | "REJECTED";
   coordination?: {
     id: number;
     applicationId?: number;
-    decision: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+    decision: "PENDING" | "ACCEPTED" | "REJECTED";
     decisionAt?: string;
     rejectReason?: string;
     coordinatedAt?: string;
@@ -804,30 +434,6 @@ export interface HandoffStudentListResponse {
   data: {
     ojtSemesterId?: number;
     items: HandoffStudentItem[];
-    total: number;
-    page: number;
-    limit: number;
-  };
-  message?: string;
-}
-
-/**
- * Đợt bàn giao sinh viên từ Đào tạo (GET /api/ojt-semesters/:id/eligible-student-handoffs)
- */
-export interface EligibleStudentHandoffBatch {
-  id: number;
-  handoffId: number;
-  ojtSemesterId: number;
-  totalStudents: number;
-  handedOffBy: number;
-  handedOffAt: string;
-  reason?: string;
-}
-
-export interface EligibleStudentHandoffBatchResponse {
-  success: boolean;
-  data: {
-    items: EligibleStudentHandoffBatch[];
     total: number;
     page: number;
     limit: number;
@@ -880,7 +486,7 @@ export interface AcademicPeriodItem {
   id: number;
   periodCode: string;
   name: string;
-  kind: 'SEMESTER' | 'BLOCK3';
+  kind: "SEMESTER" | "BLOCK3";
   status: string;
   startDate: string;
   endDate: string;
@@ -927,7 +533,7 @@ export interface RegistrationWindowItem {
   ojtSemesterId: number;
   academicPeriodId?: number;
   requiredRelativeSemester?: number;
-  status: 'DRAFT' | 'OPEN' | 'CLOSED';
+  status: "DRAFT" | "OPEN" | "CLOSED";
   startsAt: string;
   endsAt: string;
   scope: {
@@ -995,7 +601,7 @@ export interface UpdateRegistrationWindowRequest {
   name?: string;
   endsAt?: string;
   reason?: string;
-  status?: 'OPEN' | 'CLOSED';
+  status?: "OPEN" | "CLOSED";
 }
 
 export interface ListRegistrationWindowsResponse {
@@ -1007,4 +613,3 @@ export interface ListRegistrationWindowsResponse {
     limit: number;
   };
 }
-

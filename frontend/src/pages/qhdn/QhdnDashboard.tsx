@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { loadAllPages } from "@/utils/loadAllPages";
+import { errorMessage, Notice } from "@/components/qhdn/QhdnUi";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   Building2,
@@ -20,7 +22,7 @@ import {
   Send,
   Award,
   UserCheck,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -32,22 +34,22 @@ import {
   Tooltip,
   Legend,
   type ChartConfiguration,
-} from 'chart.js';
-import { PageBanner } from '@/components/common/PageBanner';
+} from "chart.js";
+import { PageBanner } from "@/components/common/PageBanner";
 import {
   getAcademicPeriods,
   getQhdnDashboard,
   listCompanies,
   listPositions,
   listCoordinations,
-} from '@/services/qhdnService';
+} from "@/services/qhdnService";
 import type {
   AcademicPeriodItem,
   QhdnDashboardData,
   CoordinationItem,
   CompanyListItem,
   PositionListItem,
-} from '@/types/qhdn/qhdnTypes';
+} from "@/types/qhdn/qhdnTypes";
 
 ChartJS.register(
   CategoryScale,
@@ -57,34 +59,46 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 );
 
 export const QhdnDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [loadError, setLoadError] = useState("");
 
   // Academic Periods, Years & OJT Semesters states
-  const [academicPeriods, setAcademicPeriods] = useState<AcademicPeriodItem[]>([]);
-  const [selectedYearId, setSelectedYearId] = useState<number | 'ALL'>('ALL');
-  const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(null);
-  const [selectedSemesterName, setSelectedSemesterName] = useState<string>('Học kỳ hiện tại');
+  const [academicPeriods, setAcademicPeriods] = useState<AcademicPeriodItem[]>(
+    [],
+  );
+  const [selectedYearId, setSelectedYearId] = useState<number | "ALL">("ALL");
+  const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(
+    null,
+  );
+  const [selectedSemesterName, setSelectedSemesterName] =
+    useState<string>("Học kỳ hiện tại");
   const [isLoadingPeriods, setIsLoadingPeriods] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Dashboard API data
-  const [dashboardData, setDashboardData] = useState<QhdnDashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<QhdnDashboardData | null>(
+    null,
+  );
 
   // Enterprise Quota calculation data
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
   const [positions, setPositions] = useState<PositionListItem[]>([]);
 
   // Coordinations data for rejected & accepted widgets
-  const [rejectedCoordinations, setRejectedCoordinations] = useState<CoordinationItem[]>([]);
-  const [acceptedCoordinations, setAcceptedCoordinations] = useState<CoordinationItem[]>([]);
+  const [rejectedCoordinations, setRejectedCoordinations] = useState<
+    CoordinationItem[]
+  >([]);
+  const [acceptedCoordinations, setAcceptedCoordinations] = useState<
+    CoordinationItem[]
+  >([]);
 
   // Quota view mode: Chart (Top 8) vs Table (Toàn bộ DN)
-  const [quotaViewMode, setQuotaViewMode] = useState<'chart' | 'list'>('chart');
-  const [quotaSearch, setQuotaSearch] = useState('');
+  const [quotaViewMode, setQuotaViewMode] = useState<"chart" | "list">("chart");
+  const [quotaSearch, setQuotaSearch] = useState("");
 
   // Canvas references for ChartJS
   const pipelineChartRef = useRef<HTMLCanvasElement | null>(null);
@@ -98,20 +112,26 @@ export const QhdnDashboard: React.FC = () => {
     const fetchPeriods = async () => {
       setIsLoadingPeriods(true);
       try {
-        const res = await getAcademicPeriods({ limit: 100 });
+        const res = {
+          items: await loadAllPages((page) =>
+            getAcademicPeriods({ page, limit: 100 }),
+          ),
+        };
         if (res?.items && res.items.length > 0) {
           setAcademicPeriods(res.items);
           const withOjt = res.items.filter((p) => p.ojtSemesterId || p.ojt?.id);
           if (withOjt.length > 0) {
             const first = withOjt[0];
             const ojtId = first.ojtSemesterId || first.ojt?.id || null;
-            setSelectedYearId(first.academicYearId || 'ALL');
+            setSelectedYearId(first.academicYearId || "ALL");
             setSelectedSemesterId(ojtId);
-            setSelectedSemesterName(first.ojt?.name || first.name || `Kỳ #${ojtId}`);
+            setSelectedSemesterName(
+              first.ojt?.name || first.name || `Kỳ #${ojtId}`,
+            );
           }
         }
       } catch (err) {
-        console.warn('Lỗi khi tải danh sách kỳ học:', err);
+        setLoadError(errorMessage(err));
       } finally {
         setIsLoadingPeriods(false);
       }
@@ -121,7 +141,10 @@ export const QhdnDashboard: React.FC = () => {
 
   // Trích xuất danh sách năm học
   const academicYears = useMemo(() => {
-    const map = new Map<number, { id: number; code: string; status?: string }>();
+    const map = new Map<
+      number,
+      { id: number; code: string; status?: string }
+    >();
     academicPeriods.forEach((p) => {
       if (p.academicYearId && p.academicYear) {
         map.set(p.academicYearId, {
@@ -154,12 +177,12 @@ export const QhdnDashboard: React.FC = () => {
           name: p.ojt?.name || p.name || `Kỳ OJT #${ojtId}`,
           code: p.ojt?.semesterCode || p.periodCode || `OJT-${ojtId}`,
           academicYearId: p.academicYearId,
-          status: p.ojt?.status || p.status || 'ACTIVE',
+          status: p.ojt?.status || p.status || "ACTIVE",
         });
       }
     });
 
-    if (selectedYearId !== 'ALL') {
+    if (selectedYearId !== "ALL") {
       return list.filter((s) => s.academicYearId === selectedYearId);
     }
     return list;
@@ -168,7 +191,9 @@ export const QhdnDashboard: React.FC = () => {
   // Tự động đồng bộ kỳ được chọn khi danh sách kỳ thay đổi
   useEffect(() => {
     if (availableOjtSemesters.length > 0) {
-      const exists = availableOjtSemesters.find((s) => s.ojtSemesterId === selectedSemesterId);
+      const exists = availableOjtSemesters.find(
+        (s) => s.ojtSemesterId === selectedSemesterId,
+      );
       if (!exists) {
         setSelectedSemesterId(availableOjtSemesters[0].ojtSemesterId);
         setSelectedSemesterName(availableOjtSemesters[0].name);
@@ -177,7 +202,7 @@ export const QhdnDashboard: React.FC = () => {
       }
     } else {
       setSelectedSemesterId(null);
-      setSelectedSemesterName('Không có kỳ OJT');
+      setSelectedSemesterName("Không có kỳ OJT");
     }
   }, [selectedYearId, availableOjtSemesters]);
 
@@ -193,32 +218,62 @@ export const QhdnDashboard: React.FC = () => {
       try {
         const [dashRes, compRes, posRes, coorRes] = await Promise.allSettled([
           getQhdnDashboard({ ojtSemesterId: selectedSemesterId }),
-          listCompanies({ page: 1, limit: 100 }),
-          listPositions({ page: 1, limit: 200, ojtSemesterId: selectedSemesterId }),
-          listCoordinations({ page: 1, limit: 50, ojtSemesterId: selectedSemesterId }),
+          loadAllPages((page) =>
+            listCompanies({ page, limit: 100 }).then((r) => r.data),
+          ),
+          loadAllPages((page) =>
+            listPositions({
+              page,
+              limit: 100,
+              ojtSemesterId: selectedSemesterId,
+            }).then((r) => r.data),
+          ),
+          loadAllPages((page) =>
+            listCoordinations({
+              page,
+              limit: 100,
+              ojtSemesterId: selectedSemesterId,
+            }).then((r) => r.data),
+          ),
         ]);
 
         if (!isActive) return;
+        const failed = [dashRes, compRes, posRes, coorRes].find(
+          (r) => r.status === "rejected",
+        );
+        if (failed?.status === "rejected") throw failed.reason;
 
-        if (dashRes.status === 'fulfilled' && dashRes.value?.data) {
+        if (dashRes.status === "fulfilled" && dashRes.value?.data) {
           setDashboardData(dashRes.value.data);
         }
 
-        if (compRes.status === 'fulfilled' && compRes.value?.data?.items) {
-          setCompanies(compRes.value.data.items);
+        if (compRes.status === "fulfilled" && compRes.value) {
+          setCompanies(compRes.value);
         }
 
-        if (posRes.status === 'fulfilled' && posRes.value?.data?.items) {
-          setPositions(posRes.value.data.items);
+        if (posRes.status === "fulfilled" && posRes.value) {
+          setPositions(posRes.value);
         }
 
-        if (coorRes.status === 'fulfilled' && coorRes.value?.data?.items) {
-          const allCoors = coorRes.value.data.items;
-          setRejectedCoordinations(allCoors.filter((c) => c.decision === 'REJECTED'));
-          setAcceptedCoordinations(allCoors.filter((c) => c.decision === 'ACCEPTED'));
+        if (coorRes.status === "fulfilled" && coorRes.value) {
+          const latest = new Map<number, CoordinationItem>();
+          coorRes.value.forEach((c) => {
+            if (
+              !latest.has(c.registrationId) ||
+              latest.get(c.registrationId)!.id < c.id
+            )
+              latest.set(c.registrationId, c);
+          });
+          const allCoors = Array.from(latest.values());
+          setRejectedCoordinations(
+            allCoors.filter((c) => c.decision === "REJECTED"),
+          );
+          setAcceptedCoordinations(
+            allCoors.filter((c) => c.decision === "ACCEPTED"),
+          );
         }
       } catch (err) {
-        console.error('Lỗi khi tải thông tin Dashboard QHDN:', err);
+        if (isActive) setLoadError(errorMessage(err));
       } finally {
         if (isActive) setIsLoading(false);
       }
@@ -234,7 +289,9 @@ export const QhdnDashboard: React.FC = () => {
   // Cập nhật tên học kỳ khi người dùng chọn thủ công
   const handleSemesterChange = (semesterId: number) => {
     setSelectedSemesterId(semesterId);
-    const found = availableOjtSemesters.find((s) => s.ojtSemesterId === semesterId);
+    const found = availableOjtSemesters.find(
+      (s) => s.ojtSemesterId === semesterId,
+    );
     if (found) {
       setSelectedSemesterName(found.name);
     }
@@ -249,22 +306,30 @@ export const QhdnDashboard: React.FC = () => {
       positionMap.set(pos.companyId, list);
     });
 
-    return companies.map((company) => {
-      const compPositions = positionMap.get(company.id) || [];
-      const totalQuota = compPositions.reduce((sum, p) => sum + (p.capacity || 0), 0);
-      const remainingSlots = compPositions.reduce((sum, p) => sum + (p.remainingSlots || 0), 0);
-      const acceptedCount = Math.max(0, totalQuota - remainingSlots);
+    return companies
+      .map((company) => {
+        const compPositions = positionMap.get(company.id) || [];
+        const totalQuota = compPositions.reduce(
+          (sum, p) => sum + (p.capacity || 0),
+          0,
+        );
+        const remainingSlots = compPositions.reduce(
+          (sum, p) => sum + (p.remainingSlots || 0),
+          0,
+        );
+        const acceptedCount = Math.max(0, totalQuota - remainingSlots);
 
-      return {
-        id: company.id,
-        name: company.name,
-        code: company.code,
-        industry: company.industry || 'Công nghệ thông tin',
-        totalQuota,
-        acceptedCount,
-        availableQuota: remainingSlots,
-      };
-    }).sort((a, b) => b.totalQuota - a.totalQuota);
+        return {
+          id: company.id,
+          name: company.name,
+          code: company.code,
+          industry: company.industry || "Chưa cập nhật",
+          totalQuota,
+          acceptedCount,
+          availableQuota: remainingSlots,
+        };
+      })
+      .sort((a, b) => b.totalQuota - a.totalQuota);
   }, [companies, positions]);
 
   // Top 8 DN có chỉ tiêu lớn nhất
@@ -280,7 +345,7 @@ export const QhdnDashboard: React.FC = () => {
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.code.toLowerCase().includes(q) ||
-        p.industry.toLowerCase().includes(q)
+        p.industry.toLowerCase().includes(q),
     );
   }, [enterpriseQuotaList, quotaSearch]);
 
@@ -291,7 +356,8 @@ export const QhdnDashboard: React.FC = () => {
     const rejected = dashboardData?.students?.enterpriseRejected ?? 0;
     const waiting = dashboardData?.students?.waitingForEnterprise ?? 0;
     const partnerCount = dashboardData?.partners?.total ?? companies.length;
-    const acceptanceRate = handedOff > 0 ? Math.round((assigned / handedOff) * 100) : 0;
+    const acceptanceRate =
+      handedOff > 0 ? Math.round((assigned / handedOff) * 100) : 0;
 
     const inProgress = dashboardData?.assignments?.active ?? 0;
     const completed = dashboardData?.assignments?.completed ?? 0;
@@ -322,16 +388,16 @@ export const QhdnDashboard: React.FC = () => {
       pipelineChartInstance.current.destroy();
     }
 
-    const ctx = pipelineChartRef.current.getContext('2d');
+    const ctx = pipelineChartRef.current.getContext("2d");
     if (!ctx) return;
 
     const labels = [
-      'Bàn giao từ PĐT',
-      'Đã chốt DN',
-      'Chờ DN duyệt',
-      'Đang thực tập',
-      'Hoàn thành OJT',
-      'Đã chuyển PĐT',
+      "Bàn giao từ PĐT",
+      "Đã chốt DN",
+      "Chờ DN duyệt",
+      "Đang thực tập",
+      "Hoàn thành OJT",
+      "Đã chuyển PĐT",
     ];
 
     const dataValues = [
@@ -344,20 +410,20 @@ export const QhdnDashboard: React.FC = () => {
     ];
 
     const config: ChartConfiguration = {
-      type: 'bar',
+      type: "bar",
       data: {
         labels,
         datasets: [
           {
-            label: 'Số lượng sinh viên',
+            label: "Số lượng sinh viên",
             data: dataValues,
             backgroundColor: [
-              '#3b82f6', // Bàn giao PĐT (Blue)
-              '#059669', // Đã chốt DN (Emerald)
-              '#f59e0b', // Chờ DN (Amber)
-              '#6366f1', // Đang thực tập (Indigo)
-              '#0f766e', // Hoàn thành (Teal)
-              '#ea580c', // Đã chuyển PĐT (Orange)
+              "#3b82f6", // Bàn giao PĐT (Blue)
+              "#059669", // Đã chốt DN (Emerald)
+              "#f59e0b", // Chờ DN (Amber)
+              "#6366f1", // Đang thực tập (Indigo)
+              "#0f766e", // Hoàn thành (Teal)
+              "#ea580c", // Đã chuyển PĐT (Orange)
             ],
             borderRadius: 6,
             barThickness: 28,
@@ -372,7 +438,7 @@ export const QhdnDashboard: React.FC = () => {
             display: false,
           },
           tooltip: {
-            backgroundColor: '#0f172a',
+            backgroundColor: "#0f172a",
             padding: 10,
             cornerRadius: 6,
             callbacks: {
@@ -383,13 +449,13 @@ export const QhdnDashboard: React.FC = () => {
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { family: 'Inter, sans-serif', size: 11 } },
+            ticks: { font: { family: "Inter, sans-serif", size: 11 } },
           },
           y: {
             beginAtZero: true,
-            grid: { color: '#f1f5f9' },
+            grid: { color: "#f1f5f9" },
             ticks: {
-              font: { family: 'Inter, sans-serif', size: 11 },
+              font: { family: "Inter, sans-serif", size: 11 },
               callback: (val) => `${val} SV`,
             },
           },
@@ -408,13 +474,13 @@ export const QhdnDashboard: React.FC = () => {
 
   // Render Chart 2: Top 8 Quota Doanh nghiệp
   useEffect(() => {
-    if (quotaViewMode !== 'chart' || !categoryChartRef.current) return;
+    if (quotaViewMode !== "chart" || !categoryChartRef.current) return;
 
     if (categoryChartInstance.current) {
       categoryChartInstance.current.destroy();
     }
 
-    const ctx = categoryChartRef.current.getContext('2d');
+    const ctx = categoryChartRef.current.getContext("2d");
     if (!ctx) return;
 
     const entNames = top8Partners.map((e) => e.code || e.name);
@@ -422,48 +488,50 @@ export const QhdnDashboard: React.FC = () => {
     const availableSlots = top8Partners.map((e) => e.availableQuota);
 
     const config: ChartConfiguration = {
-      type: 'bar',
+      type: "bar",
       data: {
-        labels: entNames.length > 0 ? entNames : ['Chưa có dữ liệu DN'],
+        labels: entNames.length > 0 ? entNames : ["Chưa có dữ liệu DN"],
         datasets: [
           {
-            label: 'Đã tiếp nhận',
+            label: "Đã tiếp nhận",
             data: acceptedSlots.length > 0 ? acceptedSlots : [0],
-            backgroundColor: '#0284c7',
+            backgroundColor: "#0284c7",
             borderRadius: 4,
           },
           {
-            label: 'Slot còn lại',
+            label: "Slot còn lại",
             data: availableSlots.length > 0 ? availableSlots : [0],
-            backgroundColor: '#e2e8f0',
+            backgroundColor: "#e2e8f0",
             borderRadius: 4,
           },
         ],
       },
       options: {
-        indexAxis: 'y',
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'top',
-            labels: { font: { family: 'Inter, sans-serif', size: 12 } },
+            position: "top",
+            labels: { font: { family: "Inter, sans-serif", size: 12 } },
           },
           tooltip: {
-            backgroundColor: '#0f172a',
+            backgroundColor: "#0f172a",
             padding: 10,
           },
         },
         scales: {
           x: {
             stacked: true,
-            grid: { color: '#f1f5f9' },
-            ticks: { font: { family: 'Inter, sans-serif', size: 11 } },
+            grid: { color: "#f1f5f9" },
+            ticks: { font: { family: "Inter, sans-serif", size: 11 } },
           },
           y: {
             stacked: true,
             grid: { display: false },
-            ticks: { font: { family: 'Inter, sans-serif', size: 11, weight: 'bold' } },
+            ticks: {
+              font: { family: "Inter, sans-serif", size: 11, weight: "bold" },
+            },
           },
         },
       } as any,
@@ -491,7 +559,7 @@ export const QhdnDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* KPI 1: Nhận từ Đào tạo */}
         <div
-          onClick={() => navigate('/qhdn/registration-windows')}
+          onClick={() => navigate("/qhdn/registration-windows")}
           className="card-glass border border-slate-200/80 p-5 cursor-pointer hover:border-orange-300 hover:shadow-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -530,13 +598,17 @@ export const QhdnDashboard: React.FC = () => {
             {kpiStats.acceptanceRate}%
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            Đã chốt: <strong className="text-slate-800 font-bold">{kpiStats.assigned}</strong> / {kpiStats.handedOff} SV
+            Đã chốt:{" "}
+            <strong className="text-slate-800 font-bold">
+              {kpiStats.assigned}
+            </strong>{" "}
+            / {kpiStats.handedOff} SV
           </p>
         </div>
 
         {/* KPI 3: Đã hoàn thành thực tập (chèn thêm từ card dài vào 4 card trên) */}
         <div
-          onClick={() => navigate('/qhdn/evaluations')}
+          onClick={() => navigate("/qhdn/evaluations")}
           className="card-glass border border-slate-200/80 p-5 cursor-pointer hover:border-teal-300 hover:shadow-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -548,17 +620,25 @@ export const QhdnDashboard: React.FC = () => {
             </div>
           </div>
           <p className="mt-3 text-2xl font-bold text-teal-700">
-            {kpiStats.completed} <span className="text-sm font-semibold text-slate-400">SV</span>
+            {kpiStats.completed}{" "}
+            <span className="text-sm font-semibold text-slate-400">SV</span>
           </p>
           <p className="mt-2 text-xs text-slate-500 flex items-center justify-between">
-            <span>Đang thực tập: <strong className="text-slate-800 font-bold">{kpiStats.inProgress}</strong></span>
-            <span className="text-teal-600 font-semibold group-hover:translate-x-0.5 transition-transform">Sổ ĐG &rarr;</span>
+            <span>
+              Đang thực tập:{" "}
+              <strong className="text-slate-800 font-bold">
+                {kpiStats.inProgress}
+              </strong>
+            </span>
+            <span className="text-teal-600 font-semibold group-hover:translate-x-0.5 transition-transform">
+              Sổ ĐG &rarr;
+            </span>
           </p>
         </div>
 
         {/* KPI 4: Doanh nghiệp đối tác */}
         <div
-          onClick={() => navigate('/qhdn/enterprises')}
+          onClick={() => navigate("/qhdn/enterprises")}
           className="card-glass border border-slate-200/80 p-5 cursor-pointer hover:border-purple-300 hover:shadow-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -573,13 +653,17 @@ export const QhdnDashboard: React.FC = () => {
             {kpiStats.partnerCount}
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            Tổng sức chứa: <strong className="text-slate-800 font-bold">{dashboardData?.positions?.totalCapacity || 0}</strong> slot
+            Tổng sức chứa:{" "}
+            <strong className="text-slate-800 font-bold">
+              {dashboardData?.positions?.totalCapacity || 0}
+            </strong>{" "}
+            slot
           </p>
         </div>
 
         {/* KPI 5: Bị từ chối cần điều phối lại */}
         <div
-          onClick={() => navigate('/qhdn/coordination')}
+          onClick={() => navigate("/qhdn/coordination")}
           className="card-glass border border-slate-200/80 p-5 cursor-pointer hover:border-rose-300 hover:shadow-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -594,7 +678,10 @@ export const QhdnDashboard: React.FC = () => {
             {kpiStats.rejected}
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            Chờ DN duyệt: <strong className="text-amber-600 font-bold">{kpiStats.waiting} SV</strong>
+            Chờ DN duyệt:{" "}
+            <strong className="text-amber-600 font-bold">
+              {kpiStats.waiting} SV
+            </strong>
           </p>
         </div>
       </div>
@@ -625,14 +712,18 @@ export const QhdnDashboard: React.FC = () => {
 
           {/* Mục chọn Năm học */}
           <div className="flex items-center gap-1.5">
-            <label htmlFor="dashboard-year-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            <label
+              htmlFor="dashboard-year-select"
+              className="text-xs font-semibold text-slate-500 whitespace-nowrap"
+            >
               Năm học:
             </label>
             <select
               id="dashboard-year-select"
               value={selectedYearId}
               onChange={(e) => {
-                const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                const val =
+                  e.target.value === "ALL" ? "ALL" : Number(e.target.value);
                 setSelectedYearId(val);
               }}
               disabled={isLoadingPeriods}
@@ -649,19 +740,25 @@ export const QhdnDashboard: React.FC = () => {
 
           {/* Mục chọn Học kỳ OJT */}
           <div className="flex items-center gap-1.5">
-            <label htmlFor="dashboard-semester-select" className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+            <label
+              htmlFor="dashboard-semester-select"
+              className="text-xs font-semibold text-slate-500 whitespace-nowrap"
+            >
               Học kỳ OJT:
             </label>
             <select
               id="dashboard-semester-select"
-              value={selectedSemesterId || ''}
-              onChange={(event) => handleSemesterChange(Number(event.target.value))}
+              value={selectedSemesterId || ""}
+              onChange={(event) =>
+                handleSemesterChange(Number(event.target.value))
+              }
               disabled={isLoadingPeriods || availableOjtSemesters.length === 0}
               className="min-w-44 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
             >
               {availableOjtSemesters.map((sem) => (
                 <option key={sem.ojtSemesterId} value={sem.ojtSemesterId}>
-                  {sem.name} ({sem.code}) - {sem.status === 'ACTIVE' ? 'Đang mở' : 'Đã đóng'}
+                  {sem.name} ({sem.code}) -{" "}
+                  {sem.status === "ACTIVE" ? "Đang mở" : "Đã đóng"}
                 </option>
               ))}
               {availableOjtSemesters.length === 0 && (
@@ -682,7 +779,8 @@ export const QhdnDashboard: React.FC = () => {
                 Tiến độ Toàn trình OJT ({selectedSemesterName})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Quy trình từ Bàn giao PĐT ⟶ Điều phối ⟶ Đang thực tập ⟶ Chuyển giao kết quả
+                Quy trình từ Bàn giao PĐT ⟶ Điều phối ⟶ Đang thực tập ⟶ Chuyển
+                giao kết quả
               </p>
             </div>
             <TrendingUp className="text-slate-400" size={18} />
@@ -697,12 +795,13 @@ export const QhdnDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Phân bổ chỉ tiêu Quota Doanh nghiệp ({enterpriseQuotaList.length} DN)
+                Phân bổ chỉ tiêu Quota Doanh nghiệp (
+                {enterpriseQuotaList.length} DN)
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                {quotaViewMode === 'chart'
-                  ? 'Biểu đồ Top 8 đối tác có quy mô tiếp nhận lớn nhất'
-                  : 'Bảng xếp hạng đầy đủ chỉ tiêu tất cả đối tác'}
+                {quotaViewMode === "chart"
+                  ? "Biểu đồ Top 8 đối tác có quy mô tiếp nhận lớn nhất"
+                  : "Bảng xếp hạng đầy đủ chỉ tiêu tất cả đối tác"}
               </p>
             </div>
 
@@ -710,9 +809,11 @@ export const QhdnDashboard: React.FC = () => {
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
               <button
                 type="button"
-                onClick={() => setQuotaViewMode('chart')}
+                onClick={() => setQuotaViewMode("chart")}
                 className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors ${
-                  quotaViewMode === 'chart' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                  quotaViewMode === "chart"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600"
                 }`}
                 title="Xem dạng biểu đồ Top 8"
               >
@@ -721,9 +822,11 @@ export const QhdnDashboard: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setQuotaViewMode('list')}
+                onClick={() => setQuotaViewMode("list")}
                 className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors ${
-                  quotaViewMode === 'list' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                  quotaViewMode === "list"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600"
                 }`}
                 title="Xem toàn bộ danh sách đối tác"
               >
@@ -734,17 +837,20 @@ export const QhdnDashboard: React.FC = () => {
           </div>
 
           {/* View Mode 1: Top 8 Chart */}
-          {quotaViewMode === 'chart' && (
+          {quotaViewMode === "chart" && (
             <div className="relative w-full h-72">
               <canvas ref={categoryChartRef} />
             </div>
           )}
 
           {/* View Mode 2: Full Scrollable Ranking List */}
-          {quotaViewMode === 'list' && (
+          {quotaViewMode === "list" && (
             <div className="space-y-2 h-72 flex flex-col">
               <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search
+                  size={14}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
                 <input
                   type="text"
                   placeholder="Tìm doanh nghiệp trong danh sách..."
@@ -761,23 +867,46 @@ export const QhdnDashboard: React.FC = () => {
                   </div>
                 ) : (
                   fullRankingPartners.map((ent, idx) => {
-                    const fill = ent.totalQuota > 0 ? Math.round((ent.acceptedCount / ent.totalQuota) * 100) : 0;
+                    const fill =
+                      ent.totalQuota > 0
+                        ? Math.round((ent.acceptedCount / ent.totalQuota) * 100)
+                        : 0;
+                    if (loadError)
+                      return (
+                        <div className="space-y-4">
+                          <Notice>{loadError}</Notice>
+                          <button
+                            className="rounded-xl border p-3"
+                            onClick={() => window.location.reload()}
+                          >
+                            Thử lại
+                          </button>
+                        </div>
+                      );
                     return (
                       <div
                         key={ent.id}
                         className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-between gap-3 border border-slate-100"
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-5 text-center text-slate-400 font-bold">{idx + 1}</span>
+                          <span className="w-5 text-center text-slate-400 font-bold">
+                            {idx + 1}
+                          </span>
                           <div className="truncate">
-                            <p className="font-bold text-slate-900 truncate">{ent.name}</p>
-                            <p className="text-[11px] text-slate-400">Mã: {ent.code} • {ent.industry}</p>
+                            <p className="font-bold text-slate-900 truncate">
+                              {ent.name}
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              Mã: {ent.code} • {ent.industry}
+                            </p>
                           </div>
                         </div>
 
                         <div className="w-36 shrink-0">
                           <div className="flex justify-between text-[11px] font-semibold text-slate-700 mb-0.5">
-                            <span>{ent.acceptedCount} / {ent.totalQuota}</span>
+                            <span>
+                              {ent.acceptedCount} / {ent.totalQuota}
+                            </span>
                             <span>{fill}%</span>
                           </div>
                           <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
@@ -817,7 +946,7 @@ export const QhdnDashboard: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/qhdn/coordination')}
+              onClick={() => navigate("/qhdn/coordination")}
               className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
             >
               Mở trang điều phối
@@ -838,7 +967,7 @@ export const QhdnDashboard: React.FC = () => {
                 >
                   <div>
                     <p className="font-bold text-slate-900 text-sm">
-                      {coor.student?.fullName || 'Sinh viên'}{' '}
+                      {coor.student?.fullName || "Sinh viên"}{" "}
                       {coor.student?.studentCode && (
                         <span className="font-normal text-xs text-slate-500">
                           ({coor.student.studentCode})
@@ -846,16 +975,19 @@ export const QhdnDashboard: React.FC = () => {
                       )}
                     </p>
                     <p className="text-slate-600 mt-0.5">
-                      Doanh nghiệp: <span className="font-medium text-slate-800">{coor.company?.name || 'Doanh nghiệp'}</span>
+                      Doanh nghiệp:{" "}
+                      <span className="font-medium text-slate-800">
+                        {coor.company?.name || "Doanh nghiệp"}
+                      </span>
                     </p>
                     <p className="text-rose-700 mt-1 italic">
-                      Lý do: {coor.rejectReason || 'Chưa đạt yêu cầu phỏng vấn'}
+                      Lý do: {coor.rejectReason || "Chưa đạt yêu cầu phỏng vấn"}
                     </p>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => navigate('/qhdn/coordination')}
+                    onClick={() => navigate("/qhdn/coordination")}
                     className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors"
                   >
                     Điều phối lại
@@ -884,7 +1016,7 @@ export const QhdnDashboard: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/qhdn/enterprises')}
+              onClick={() => navigate("/qhdn/enterprises")}
               className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
             >
               Xem DN đối tác
@@ -905,13 +1037,16 @@ export const QhdnDashboard: React.FC = () => {
                 >
                   <div>
                     <p className="font-bold text-slate-900 text-sm">
-                      {coor.student?.fullName || 'Sinh viên'}{' '}
+                      {coor.student?.fullName || "Sinh viên"}{" "}
                       <span className="font-normal text-xs text-slate-500">
-                        ⟶ {coor.company?.name || 'Doanh nghiệp'}
+                        ⟶ {coor.company?.name || "Doanh nghiệp"}
                       </span>
                     </p>
                     <p className="text-slate-500 mt-0.5">
-                      Vị trí: <span className="font-medium text-slate-700">{coor.position?.title || 'Thực tập sinh'}</span>
+                      Vị trí:{" "}
+                      <span className="font-medium text-slate-700">
+                        {coor.position?.title || "Thực tập sinh"}
+                      </span>
                     </p>
                   </div>
 
