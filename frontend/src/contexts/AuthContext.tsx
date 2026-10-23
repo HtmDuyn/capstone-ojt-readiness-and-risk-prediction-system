@@ -41,10 +41,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const storedToken = localStorage.getItem(TOKEN_KEY);
       const storedUser = localStorage.getItem(USER_KEY);
 
-      if (storedToken?.startsWith("mock_token_")) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-      } else if (storedToken && storedUser) {
+      if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser) as AuthUser);
       }

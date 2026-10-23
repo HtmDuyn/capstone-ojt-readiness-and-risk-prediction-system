@@ -56,8 +56,7 @@ interface UserForm {
    ========================================================= */
 
 const ROLE_LABELS: Record<string, UserRole> = { STUDENT: 'Sinh viên', ACADEMIC: 'Phòng Đào tạo', OJT_COORD: 'Phòng Quan hệ Doanh nghiệp', ENTERPRISE: 'Doanh nghiệp', ADMIN: 'Quản trị viên' };
-type AccountRecord = Account;
-const mapAccount = (a: AccountRecord): UserAccount => ({ raw: a, phone: a.phone ?? '', id: a.id, code: a.username, name: a.full_name, email: a.email, roleId: a.role_id, role: ROLE_LABELS[a.role_code], status: a.status === 'ACTIVE' ? 'Hoạt động' : a.status === 'LOCKED' ? 'Khóa' : 'Ngừng hoạt động' });
+const mapAccount = (a: Account): UserAccount => ({ raw: a, phone: a.phone ?? '', id: a.id, code: a.username, name: a.full_name, email: a.email, roleId: a.role_id, role: ROLE_LABELS[a.role_code], status: a.status === 'ACTIVE' ? 'Hoạt động' : a.status === 'LOCKED' ? 'Khóa' : 'Ngừng hoạt động' });
 const statusCode = (s: UserStatus) => s === 'Hoạt động' ? 'ACTIVE' : s === 'Khóa' ? 'LOCKED' : 'INACTIVE';
 
 const EMPTY_FORM: UserForm = {
@@ -620,7 +619,7 @@ const AdminUsers: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-3 border-t border-slate-100 px-6 py-4 text-sm"><p><strong>ID tài khoản:</strong> {viewUser.id}</p><p><strong>Điện thoại:</strong> {viewUser.phone || '—'}</p><p><strong>Ngày tạo:</strong> {formatDate(viewUser.raw.created_at)}</p><p><strong>Đăng nhập gần nhất:</strong> {formatDate(viewUser.raw.last_login_at)}</p><div className="flex flex-wrap gap-2"><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'reset')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><KeyRound size={16} />Đặt lại mật khẩu</button><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'resend')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><Mail size={16} />Gửi lại email lỗi</button></div><p className="text-xs text-slate-500">Chỉ gửi lại email đăng nhập bị lỗi, chưa hết hạn và đủ điều kiện theo backend.</p></div>
+              <div className="space-y-3 border-t border-slate-100 px-6 py-4 text-sm"><p><strong>ID tài khoản:</strong> {viewUser.id}</p><p><strong>Điện thoại:</strong> {viewUser.phone || '—'}</p><p><strong>Ngày tạo:</strong> {formatDate(viewUser.raw.created_at)}</p><p><strong>Đăng nhập gần nhất:</strong> {formatDate(viewUser.raw.last_login_at)}</p><div className="flex flex-wrap gap-2"><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'reset')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><KeyRound size={16} />Đặt lại mật khẩu</button><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'resend')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><Mail size={16} />Gửi lại email lỗi</button></div></div>
               {/* FOOTER */}
 
               <div className="flex justify-end border-t border-slate-200 px-6 py-4">

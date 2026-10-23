@@ -72,10 +72,10 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     path: '/admin/settings',
     icon: <Settings size={20} />,
     banner: {
-      title: 'Cài đặt Chung',
+      title: 'Cài đặt hệ thống',
       description:
-        'Cấu hình các tham số toàn cục của hệ thống OJT Readiness.',
-      badge: 'System Settings',
+        'Quản lý hồ sơ cá nhân và mật khẩu đăng nhập của bạn.',
+      badge: 'Tài khoản cá nhân',
     },
   },
 ];
