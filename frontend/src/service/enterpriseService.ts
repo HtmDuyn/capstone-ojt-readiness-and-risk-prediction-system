@@ -2,7 +2,7 @@ import API from './api';
 import { EnterpriseProfileResponse } from '@/types/enterprise/enterpriseTypes';
 import { UpdateProfileRequest, UpdateProfileResponse } from './authService';
 
-// ─── Shared Types ────────────────────────────────────────────
+// ─── Shared Types ────────────────────────────────────────────────────────────
 export interface PaginatedRequest {
   page?: number;
   limit?: number;
@@ -19,7 +19,7 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// ─── Recruitment Window Types ────────────────────────────────
+// ─── Recruitment Window Types ────────────────────────────────────────────────
 export interface RecruitmentWindow {
   id: number;
   academicPeriodId: number;
@@ -35,7 +35,7 @@ export interface RecruitmentWindow {
   updatedAt?: string;
 }
 
-// ─── Recruitment Post Types ──────────────────────────────────
+// ─── Recruitment Post Types ──────────────────────────────────────────────────
 export interface RecruitmentPostPosition {
   id: number;
   code: string;
@@ -68,7 +68,7 @@ export interface RecruitmentPost {
   updatedAt?: string;
 }
 
-// ─── Enterprise Candidate Types ──────────────────────────────
+// ─── Enterprise Candidate Types ──────────────────────────────────────────────
 export interface EnterpriseCandidateStudent {
   id: number;
   studentCode: string;
@@ -111,7 +111,7 @@ export interface EnterpriseCandidateItem {
   jobApplication?: Record<string, unknown> | null;
 }
 
-// ─── Enterprise Internship Types ─────────────────────────────
+// ─── Enterprise Internship Types ─────────────────────────────────────────────
 export interface EnterpriseInternshipItem {
   id: number; // AssignmentID
   studentId: number;
@@ -228,11 +228,14 @@ export interface InternshipTaskListRequest {
   assignmentId?: number;
   page?: number;
   limit?: number;
+  // companyId bắt buộc với vai trò ENTERPRISE — được inject tự động từ EnterpriseContext
+  companyId?: number;
 }
 
-// ─── Service ─────────────────────────────────────────────────
+// ─── Service ─────────────────────────────────────────────────────────────────
 export const enterpriseService = {
-  // ── Profile ──────────────────────────────────────────────
+  // ── Profile ──────────────────────────────────────────────────────────────
+  // Gọi GET /api/enterprise/profile — không cần companyId vì backend lấy từ JWT
   getProfile: async (): Promise<EnterpriseProfileResponse> => {
     const response = await API.get<EnterpriseProfileResponse>('/enterprise/profile');
     return response.data;
@@ -243,7 +246,8 @@ export const enterpriseService = {
     return response.data as UpdateProfileResponse;
   },
 
-  // ── Recruitment Windows (JSON Input) ─────────────────────
+  // ── Recruitment Windows (JSON Input) ──────────────────────────────────────
+  // Gọi POST /api/json/recruitment/windows/list — không cần companyId
   listRecruitmentWindows: async (params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<RecruitmentWindow>> => {
     const response = await API.post<PaginatedResponse<RecruitmentWindow>>(
       '/json/recruitment/windows/list',
@@ -252,61 +256,75 @@ export const enterpriseService = {
     return response.data;
   },
 
-  // ── Recruitment Posts (JSON Input) ───────────────────────
-  listRecruitmentPosts: async (params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<RecruitmentPost>> => {
+  // ── Recruitment Posts (JSON Input) ────────────────────────────────────────
+  // Gọi POST /api/json/recruitment/posts/list
+  // companyId bắt buộc: backend scope ENTERPRISE chỉ trả về bài đăng của doanh nghiệp mình
+  listRecruitmentPosts: async (companyId: number, params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<RecruitmentPost>> => {
     const response = await API.post<PaginatedResponse<RecruitmentPost>>(
       '/json/recruitment/posts/list',
-      { page: params.page ?? 1, limit: params.limit ?? 20, ...params }
+      { page: params.page ?? 1, limit: params.limit ?? 20, companyId, ...params }
     );
     return response.data;
   },
 
-  // ── Enterprise Candidates (JSON Input) ──────────────────
-  listCandidates: async (params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
+  // ── Enterprise Candidates (JSON Input) ───────────────────────────────────
+  // Gọi POST /api/json/enterprise/candidates/list
+  // companyId BẮT BUỘC — backend trả 400 nếu thiếu với vai trò ENTERPRISE
+  listCandidates: async (companyId: number, params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
     const response = await API.post<PaginatedResponse<EnterpriseCandidateItem>>(
       '/json/enterprise/candidates/list',
-      { page: params.page ?? 1, limit: params.limit ?? 20, ...params }
+      { page: params.page ?? 1, limit: params.limit ?? 20, companyId, ...params }
     );
     return response.data;
   },
 
-  // ── Enterprise Internships (JSON Input) ─────────────────
-  listInternships: async (params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
+  // ── Enterprise Internships (JSON Input) ───────────────────────────────────
+  // Gọi POST /api/json/enterprise/internships/list
+  // companyId BẮT BUỘC — backend trả 400 nếu thiếu với vai trò ENTERPRISE
+  listInternships: async (companyId: number, params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
     const response = await API.post<PaginatedResponse<EnterpriseInternshipItem>>(
       '/json/enterprise/internships/list',
-      { page: params.page ?? 1, limit: params.limit ?? 20, ...params }
+      { page: params.page ?? 1, limit: params.limit ?? 20, companyId, ...params }
     );
     return response.data;
   },
 
-  listInternshipTasks: async (params: InternshipTaskListRequest = {}): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
+  // ── Internship Tasks (JSON Input) ─────────────────────────────────────────
+  // Gọi POST /api/json/internship-tasks/list
+  // companyId BẮT BUỘC với vai trò ENTERPRISE — backend dùng để kiểm tra scope
+  listInternshipTasks: async (companyId: number, params: InternshipTaskListRequest = {}): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
     const response = await API.post<PaginatedResponse<EnterpriseInternshipTask>>(
       '/json/internship-tasks/list',
       {
         page: params.page ?? 1,
         limit: params.limit ?? 100,
+        companyId,
         ...(params.assignmentId !== undefined ? { assignmentId: params.assignmentId } : {}),
       }
     );
     return response.data;
   },
 
-  // ── Candidate Decision (JSON Input) ─────────────────────
+  // ── Candidate Decision ────────────────────────────────────────────────────
+  // Gọi PATCH /api/enterprise/candidates/:id/decision (direct route, không phải JSON adapter)
+  // candidateId = CoordinationID; decision = ACCEPTED | REJECTED; reason là lý do từ chối
+  // LƯU Ý: API /api/json/enterprise/candidates/decision (404) đang bị lỗi — KHÔNG GỌI
   decideCandidate: async (candidateId: number, decision: 'ACCEPTED' | 'REJECTED', reason: string): Promise<unknown> => {
-    const response = await API.post('/json/enterprise/candidates/decision', {
-      candidateId,
+    // Gọi trực tiếp endpoint REST (không qua JSON adapter vì đang 404)
+    const response = await API.patch(`/enterprise/candidates/${candidateId}/decision`, {
       decision,
       reason,
     });
     return response.data;
   },
 
-  // ── Internship Evaluation (JSON Input) ──────────────────
+  // ── Internship Evaluation ─────────────────────────────────────────────────
+  // Gọi PUT /api/enterprise/internships/:id/evaluation (direct route)
+  // internshipId = AssignmentID
+  // LƯU Ý: API /api/json/enterprise/internships/evaluation (404) đang bị lỗi — KHÔNG GỌI
   evaluateInternship: async (internshipId: number, evaluationData: Record<string, unknown>): Promise<unknown> => {
-    const response = await API.put(`/json/enterprise/internships/evaluation`, {
-      internshipId,
-      ...evaluationData,
-    });
+    // Gọi trực tiếp endpoint REST (không qua JSON adapter vì đang 404)
+    const response = await API.put(`/enterprise/internships/${internshipId}/evaluation`, evaluationData);
     return response.data;
   },
 };

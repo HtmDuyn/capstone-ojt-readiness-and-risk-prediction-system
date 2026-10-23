@@ -37,10 +37,14 @@ API.interceptors.response.use(
   },
   (error: AxiosError) => {
     if (error.response && error.response.status === 401) {
-      console.error('Unauthorized, please login again.');
-      // Xóa token hoặc chuyển hướng về trang login nếu cần
-      // localStorage.removeItem('token');
-      // window.location.href = '/login';
+      const data = error.response.data as { message?: string; errorCode?: string } | undefined;
+      console.warn('[API 401 Unauthorized]', data?.errorCode, data?.message || error.message);
+      
+      // Nếu token không hợp lệ hoặc đã hết hạn, xóa token lỗi khỏi storage
+      if (data?.errorCode === 'INVALID_TOKEN' || data?.errorCode === 'TOKEN_EXPIRED') {
+        localStorage.removeItem('ojt_auth_token');
+        localStorage.removeItem('ojt_auth_user');
+      }
     }
     return Promise.reject(error);
   }

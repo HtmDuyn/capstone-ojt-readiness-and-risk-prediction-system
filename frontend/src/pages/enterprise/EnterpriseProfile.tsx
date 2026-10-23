@@ -24,9 +24,12 @@ import { enterpriseService } from '@/service/enterpriseService';
 import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
+import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseProfile: React.FC = () => {
   const { user: authUser, updateUser } = useAuth();
+  // Dùng EnterpriseContext để lấy profile ban đầu — tránh gọi API lại khi vào trang
+  const { profile: contextProfile, loading: contextLoading, reload: reloadContext } = useEnterprise();
   const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +44,19 @@ export const EnterpriseProfile: React.FC = () => {
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Lấy profile từ context (khi context load xong) — tránh double-fetch
+  useEffect(() => {
+    if (!contextLoading) {
+      setProfile(contextProfile);
+      setLoading(false);
+      if (contextProfile) {
+        setEditFullName(authUser?.name || contextProfile.contactPersonName || 'Nguyen Van A');
+        setEditPhone(contextProfile.contactPhone || '0909123456');
+      }
+    }
+  }, [contextProfile, contextLoading, authUser]);
+
+  // Refresh lại profile sau khi cập nhật — gọi cả context reload và cập nhật state cục bộ
   const fetchProfile = async () => {
     setLoading(true);
     setError(null);
@@ -48,9 +64,10 @@ export const EnterpriseProfile: React.FC = () => {
       const response = await enterpriseService.getProfile();
       if (response && response.success && response.data) {
         setProfile(response.data);
-        // Prepopulate edit fields
         setEditFullName(authUser?.name || response.data.contactPersonName || 'Nguyen Van A');
         setEditPhone(response.data.contactPhone || '0909123456');
+        // Cập nhật context để các component khác cũng dùng profile mới
+        void reloadContext();
       } else {
         setError(response.message || 'Không thể tải thông tin hồ sơ doanh nghiệp.');
       }
@@ -64,10 +81,6 @@ export const EnterpriseProfile: React.FC = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
 
   // Handle Patch: /api/accounts/me/profile
   const handleUpdateProfile = async (e: React.FormEvent) => {

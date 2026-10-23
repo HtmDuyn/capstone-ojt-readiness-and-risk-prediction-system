@@ -2,8 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { Users, Search, CheckCircle2, XCircle, FileText, Calendar, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem } from '@/service/enterpriseService';
+import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseCandidates: React.FC = () => {
+  // Lấy companyId từ EnterpriseContext (đã được load sẵn khi đăng nhập)
+  const { companyId, loading: profileLoading, error: profileError } = useEnterprise();
   const [candidates, setCandidates] = useState<EnterpriseCandidateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,13 +20,16 @@ export const EnterpriseCandidates: React.FC = () => {
   const limit = 20;
 
   const fetchCandidates = useCallback(async () => {
+    // Chờ companyId được load từ profile trước khi gọi API
+    if (!companyId) return;
     setLoading(true);
     setError(null);
     try {
       const params: Record<string, unknown> = { page, limit };
       if (filterStatus !== 'ALL') params.decision = filterStatus;
       if (searchTerm.trim()) params.search = searchTerm.trim();
-      const res = await enterpriseService.listCandidates(params);
+      // Truyền companyId vào API — bắt buộc để backend xác định phạm vi doanh nghiệp
+      const res = await enterpriseService.listCandidates(companyId, params);
       if (res?.success && res.data) {
         setCandidates(res.data.items || []);
         setTotal(res.data.total || 0);
@@ -35,7 +41,7 @@ export const EnterpriseCandidates: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, filterStatus, searchTerm]);
+  }, [page, filterStatus, searchTerm, companyId]);
 
   useEffect(() => {
     fetchCandidates();
@@ -57,10 +63,15 @@ export const EnterpriseCandidates: React.FC = () => {
       if (selectedCandidate?.id === candidateId) {
         setSelectedCandidate(null);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể cập nhật quyết định';
-      setToastMessage(`Lỗi: ${message}`);
-      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      const serverMessage = err?.response?.data?.message;
+      const errorCode = err?.response?.data?.errorCode;
+      let displayMessage = serverMessage || err?.message || 'Không thể cập nhật quyết định';
+      if (errorCode === 'INVALID_TOKEN' || errorCode === 'TOKEN_EXPIRED') {
+        displayMessage = 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại!';
+      }
+      setToastMessage(`Lỗi: ${displayMessage}`);
+      setTimeout(() => setToastMessage(null), 5000);
       console.error('Failed to update candidate decision:', err);
     } finally {
       setActionLoading(null);
@@ -90,6 +101,13 @@ export const EnterpriseCandidates: React.FC = () => {
         description="Xem hồ sơ sinh viên được giới thiệu bởi phòng QHDN, xác nhận hoặc từ chối tiếp nhận thực tập."
         badge="Duyệt Hồ sơ OJT"
       />
+
+      {/* Hiển thị lỗi load profile nếu có */}
+      {profileError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm">
+          Lỗi tải hồ sơ doanh nghiệp: {profileError}
+        </div>
+      )}
 
       {toastMessage && (
         <div className={`p-4 ${toastMessage.startsWith('Lỗi') ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'} border rounded-xl text-sm font-medium flex items-center justify-between animate-fadeIn shadow-sm`}>
@@ -138,12 +156,14 @@ export const EnterpriseCandidates: React.FC = () => {
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading && (
+      {/* Loading State — hiển thị khi đang tải profile hoặc dữ liệu ứng viên */}
+      {(loading || profileLoading) && (
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-            <p className="text-xs text-slate-500 font-medium">Đang tải danh sách ứng viên...</p>
+            <p className="text-xs text-slate-500 font-medium">
+              {profileLoading ? 'Đang xác thực doanh nghiệp...' : 'Đang tải danh sách ứng viên...'}
+            </p>
           </div>
         </div>
       )}

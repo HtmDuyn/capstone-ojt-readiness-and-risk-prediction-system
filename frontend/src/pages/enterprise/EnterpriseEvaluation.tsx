@@ -5,6 +5,7 @@ import {
   enterpriseService,
   type EnterpriseInternshipItem,
 } from '@/service/enterpriseService';
+import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 interface EvaluationRow {
   id: number;
@@ -68,6 +69,8 @@ const toEvaluationRow = (item: EnterpriseInternshipItem): EvaluationRow => {
 };
 
 export const EnterpriseEvaluation: React.FC = () => {
+  // Lấy companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
+  const { companyId, loading: profileLoading } = useEnterprise();
   const [evaluations, setEvaluations] = useState<EvaluationRow[]>([]);
   const [selectedEval, setSelectedEval] = useState<EvaluationRow | null>(null);
   const [scores, setScores] = useState<EvaluationForm>(emptyForm);
@@ -78,10 +81,13 @@ export const EnterpriseEvaluation: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchEvaluations = useCallback(async () => {
+    // Chờ companyId được load từ profile trước khi gọi API
+    if (!companyId) return;
     setLoading(true);
     setError(null);
     try {
-      const firstPage = await enterpriseService.listInternships({ page: 1, limit: 100 });
+      // Truyền companyId vào API — bắt buộc để backend scope đúng doanh nghiệp
+      const firstPage = await enterpriseService.listInternships(companyId, { page: 1, limit: 100 });
       if (!firstPage?.success || !firstPage.data) {
         throw new Error('Không thể tải danh sách sinh viên thực tập');
       }
@@ -90,7 +96,7 @@ export const EnterpriseEvaluation: React.FC = () => {
       const total = firstPage.data.total;
       const totalPages = Math.ceil(total / firstPage.data.limit);
       for (let page = 2; page <= totalPages; page += 1) {
-        const response = await enterpriseService.listInternships({ page, limit: 100 });
+        const response = await enterpriseService.listInternships(companyId, { page, limit: 100 });
         if (!response?.success || !response.data) {
           throw new Error(`Không thể tải danh sách thực tập ở trang ${page}`);
         }
@@ -111,7 +117,7 @@ export const EnterpriseEvaluation: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [companyId]);
 
   useEffect(() => {
     void fetchEvaluations();
@@ -176,9 +182,14 @@ export const EnterpriseEvaluation: React.FC = () => {
       setToastMessage(`Đã gửi đánh giá OJT cho sinh viên ${selectedEval.fullName} thành công.`);
       setSelectedEval(null);
       setTimeout(() => setToastMessage(null), 4000);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể gửi đánh giá OJT';
-      setActionError(message);
+    } catch (err: any) {
+      const serverMessage = err?.response?.data?.message;
+      const errorCode = err?.response?.data?.errorCode;
+      let displayMessage = serverMessage || err?.message || 'Không thể gửi đánh giá OJT';
+      if (errorCode === 'INVALID_TOKEN' || errorCode === 'TOKEN_EXPIRED') {
+        displayMessage = 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại!';
+      }
+      setActionError(displayMessage);
       console.error('Failed to submit internship evaluation:', err);
     } finally {
       setSubmitting(false);

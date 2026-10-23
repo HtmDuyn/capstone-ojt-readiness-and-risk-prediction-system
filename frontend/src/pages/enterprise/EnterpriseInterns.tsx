@@ -24,6 +24,7 @@ import {
 import { enterpriseService, type EnterpriseInternshipItem } from '@/service/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 // Adapter: map API data to existing UI's expected format
 const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): EnterpriseIntern => ({
@@ -43,6 +44,8 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): Enterpri
 });
 
 export const EnterpriseInterns: React.FC = () => {
+  // Lấy companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
+  const { companyId, loading: profileLoading } = useEnterprise();
   const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
   const [tasks, setTasks] = useState<InternTask[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
@@ -52,10 +55,13 @@ export const EnterpriseInterns: React.FC = () => {
   const apiLimit = 20;
 
   const fetchInternships = useCallback(async () => {
+    // Chờ companyId được load từ profile trước khi gọi API
+    if (!companyId) return;
     setApiLoading(true);
     setApiError(null);
     try {
-      const res = await enterpriseService.listInternships({ page: apiPage, limit: apiLimit });
+      // Truyền companyId vào API — bắt buộc để backend xác định phạm vi doanh nghiệp
+      const res = await enterpriseService.listInternships(companyId, { page: apiPage, limit: apiLimit });
       if (res?.success && res.data) {
         const mapped = (res.data.items || []).map(mapApiToIntern);
         setInterns(mapped);
@@ -68,7 +74,7 @@ export const EnterpriseInterns: React.FC = () => {
     } finally {
       setApiLoading(false);
     }
-  }, [apiPage]);
+  }, [apiPage, companyId]);
 
   useEffect(() => {
     fetchInternships();

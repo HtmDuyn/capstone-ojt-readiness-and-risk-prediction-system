@@ -7,6 +7,7 @@ import {
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import { getMenuByRole } from "@/config";
+import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
@@ -202,16 +203,19 @@ export const router = createBrowserRouter([
     children: [createRoleRoutes("qhdn")],
   },
   {
+    // EnterpriseProvider load profile một lần, cung cấp companyId cho toàn bộ luồng doanh nghiệp
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
     children: [
       {
         element: (
-          <BaseLayout
-            navItems={getMenuByRole("enterprise")}
-            homePath="/enterprise/dashboard"
-            brandSubtitle="Đối tác Doanh nghiệp"
-            showAIConsult={false}
-          />
+          <EnterpriseProvider>
+            <BaseLayout
+              navItems={getMenuByRole("enterprise")}
+              homePath="/enterprise/dashboard"
+              brandSubtitle="Đối tác Doanh nghiệp"
+              showAIConsult={false}
+            />
+          </EnterpriseProvider>
         ),
         children: [
           {

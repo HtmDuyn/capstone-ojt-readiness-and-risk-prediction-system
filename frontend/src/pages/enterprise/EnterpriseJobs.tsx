@@ -14,6 +14,7 @@ import {
   type RecruitmentPost,
   type RecruitmentPostPosition,
 } from '@/service/enterpriseService';
+import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 interface RecruitmentPositionInfo extends RecruitmentPostPosition {
   postTitle: string;
@@ -44,6 +45,8 @@ const POST_STATUS_STYLES: Record<RecruitmentPost['status'], string> = {
 };
 
 export const EnterpriseJobs: React.FC = () => {
+  // Lấy companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
+  const { companyId } = useEnterprise();
   const [positions, setPositions] = useState<RecruitmentPositionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +55,8 @@ export const EnterpriseJobs: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // Chờ companyId sẵn có mới tải dữ liệu
+    if (!companyId) return;
     let cancelled = false;
 
     const loadPositions = async () => {
@@ -59,7 +64,8 @@ export const EnterpriseJobs: React.FC = () => {
       setError(null);
 
       try {
-        const firstPage = await enterpriseService.listRecruitmentPosts({
+        // Truyền companyId vào API — bắt buộc để backend scope đúng doanh nghiệp
+        const firstPage = await enterpriseService.listRecruitmentPosts(companyId, {
           page: 1,
           limit: API_PAGE_SIZE,
         });
@@ -70,7 +76,8 @@ export const EnterpriseJobs: React.FC = () => {
         const posts = [...firstPage.data.items];
         const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
         for (let currentPage = 2; currentPage <= totalPages; currentPage += 1) {
-          const response = await enterpriseService.listRecruitmentPosts({
+          // Truyền companyId cho mọi trang phân trang
+          const response = await enterpriseService.listRecruitmentPosts(companyId!, {
             page: currentPage,
             limit: API_PAGE_SIZE,
           });
@@ -111,7 +118,8 @@ export const EnterpriseJobs: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, companyId]);
+
 
   const filteredPositions = useMemo(() => {
     const query = searchTerm.trim().toLocaleLowerCase();

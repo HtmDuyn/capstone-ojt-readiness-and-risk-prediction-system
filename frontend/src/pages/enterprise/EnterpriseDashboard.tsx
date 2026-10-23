@@ -17,6 +17,7 @@ import {
 import { enterpriseService, type EnterpriseInternshipTask } from '@/service/enterpriseService';
 import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
+import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 interface StudentTaskProgress {
   studentId: number;
@@ -59,8 +60,8 @@ const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgre
 };
 
 export const EnterpriseDashboard: React.FC = () => {
-  const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Lấy profile và companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
+  const { profile, companyId, loading, error: profileError } = useEnterprise();
   const [taskProgress, setTaskProgress] = useState<StudentTaskProgress[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
@@ -74,28 +75,14 @@ export const EnterpriseDashboard: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      try {
-        const res = await enterpriseService.getProfile();
-        if (res && res.success && res.data) {
-          setProfile(res.data);
-        }
-      } catch (err) {
-        console.error('Failed to load enterprise profile in dashboard:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProfile();
-  }, []);
-
-  useEffect(() => {
+    // Chờ companyId sẵn có mới gọi API tasks
+    if (!companyId) return;
     const loadTaskProgress = async () => {
       setTasksLoading(true);
       setTasksError(null);
       try {
-        const firstPage = await enterpriseService.listInternshipTasks({ page: 1, limit: 100 });
+        // Truyền companyId — bắt buộc để backend scope đúng doanh nghiệp
+        const firstPage = await enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 });
         if (!firstPage?.success || !firstPage.data) {
           throw new Error('Không thể tải dữ liệu tiến độ task');
         }
@@ -103,7 +90,7 @@ export const EnterpriseDashboard: React.FC = () => {
         const tasks = [...firstPage.data.items];
         const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
         for (let page = 2; page <= totalPages; page += 1) {
-          const response = await enterpriseService.listInternshipTasks({ page, limit: 100 });
+          const response = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 });
           if (!response?.success || !response.data) {
             throw new Error(`Không thể tải dữ liệu task ở trang ${page}`);
           }
@@ -121,7 +108,7 @@ export const EnterpriseDashboard: React.FC = () => {
     };
 
     void loadTaskProgress();
-  }, []);
+  }, [companyId]);
 
   const handleSendIncident = (e: React.FormEvent) => {
     e.preventDefault();
