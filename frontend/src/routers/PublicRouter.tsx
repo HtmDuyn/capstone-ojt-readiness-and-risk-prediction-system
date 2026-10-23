@@ -21,6 +21,12 @@ import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
 import AdminAiConfig from "@/pages/admin/AdminAiConfig";
 import AdminSettings from "@/pages/admin/AdminSettings";
+
+import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
+import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
+import QhdnEnterpriseImport from "@/pages/qhdn/QhdnEnterpriseImport";
+import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
+import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -230,9 +236,33 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  {
+    {
     element: <PrivateRoute allowedRoles={["qhdn"]} />,
-    children: [createRoleRoutes("qhdn")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("qhdn")}
+            homePath="/qhdn/dashboard"
+            brandSubtitle="Phòng Quan hệ Doanh nghiệp"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
+          { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
+          { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
+          { path: "/qhdn/enterprises/import", element: <QhdnEnterpriseImport /> },
+          { path: "/qhdn/enterprises/list", element: <Navigate to="/qhdn/enterprises" replace /> },
+          { path: "/qhdn/partners", element: <Navigate to="/qhdn/enterprises" replace /> },
+          { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
+          { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
+          { path: "/qhdn/evaluations", element: <QhdnEnterpriseEvaluations /> },
+          { path: "/qhdn/analytics", element: <Navigate to="/qhdn/dashboard" replace /> },
+          { path: "/qhdn/interviews", element: <Navigate to="/qhdn/coordination" replace /> },
+        ],
+      },
+    ],
   },
   {
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
