@@ -481,36 +481,42 @@ export const QhdnDashboard: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 text-xs">
-                {fullRankingPartners.map((ent, idx) => {
-                  const fill = Math.round((ent.acceptedCount / ent.totalQuota) * 100);
-                  return (
-                    <div
-                      key={ent.id}
-                      className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-between gap-3 border border-slate-100"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-5 text-center text-slate-400 font-bold">{idx + 1}</span>
-                        <div className="truncate">
-                          <p className="font-bold text-slate-900 truncate">{ent.name}</p>
-                          <p className="text-[11px] text-slate-400">Mã: {ent.code}</p>
+                {fullRankingPartners.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-slate-400 text-xs">
+                    Chưa có dữ liệu chỉ tiêu doanh nghiệp
+                  </div>
+                ) : (
+                  fullRankingPartners.map((ent, idx) => {
+                    const fill = ent.totalQuota > 0 ? Math.round((ent.acceptedCount / ent.totalQuota) * 100) : 0;
+                    return (
+                      <div
+                        key={ent.id}
+                        className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-between gap-3 border border-slate-100"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-5 text-center text-slate-400 font-bold">{idx + 1}</span>
+                          <div className="truncate">
+                            <p className="font-bold text-slate-900 truncate">{ent.name}</p>
+                            <p className="text-[11px] text-slate-400">Mã: {ent.code}</p>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="w-36 shrink-0">
-                        <div className="flex justify-between text-[11px] font-semibold text-slate-700 mb-0.5">
-                          <span>{ent.acceptedCount} / {ent.totalQuota}</span>
-                          <span>{fill}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-orange-500"
-                            style={{ width: `${fill}%` }}
-                          />
+                        <div className="w-36 shrink-0">
+                          <div className="flex justify-between text-[11px] font-semibold text-slate-700 mb-0.5">
+                            <span>{ent.acceptedCount} / {ent.totalQuota}</span>
+                            <span>{fill}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-orange-500"
+                              style={{ width: `${fill}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -546,32 +552,38 @@ export const QhdnDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-2.5">
-            {rejectedStudents.map((std) => (
-              <div
-                key={std.id}
-                className="p-3 rounded-xl border border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3 text-xs"
-              >
-                <div>
-                  <p className="font-bold text-slate-900 text-sm">
-                    {std.fullName} <span className="font-normal text-xs text-slate-500">({std.studentCode})</span>
-                  </p>
-                  <p className="text-slate-600 mt-0.5">
-                    Ngành: <span className="font-medium text-slate-800">{std.major}</span>
-                  </p>
-                  <p className="text-rose-700 mt-1 italic">
-                    Lý do: {std.rejectionReason}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/qhdn/coordination')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors"
+            {rejectedStudents.length === 0 ? (
+              <p className="text-center text-slate-400 py-6 text-xs">
+                Hiện không có sinh viên nào cần điều phối lại.
+              </p>
+            ) : (
+              rejectedStudents.map((std) => (
+                <div
+                  key={std.id}
+                  className="p-3 rounded-xl border border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3 text-xs"
                 >
-                  Điều phối lại
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">
+                      {std.fullName} <span className="font-normal text-xs text-slate-500">({std.studentCode})</span>
+                    </p>
+                    <p className="text-slate-600 mt-0.5">
+                      Ngành: <span className="font-medium text-slate-800">{std.major}</span>
+                    </p>
+                    <p className="text-rose-700 mt-1 italic">
+                      Lý do: {std.rejectionReason}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/qhdn/coordination')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors"
+                  >
+                    Điều phối lại
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -602,25 +614,31 @@ export const QhdnDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-2.5">
-            {MOCK_ELIGIBLE_STUDENTS.filter((s) => s.assignedEnterpriseName).slice(0, 3).map((std) => (
-              <div
-                key={std.id}
-                className="p-3 rounded-xl border border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3 text-xs"
-              >
-                <div>
-                  <p className="font-bold text-slate-900 text-sm">
-                    {std.fullName} <span className="font-normal text-xs text-slate-500">⟶ {std.assignedEnterpriseName}</span>
-                  </p>
-                  <p className="text-slate-500 mt-0.5">
-                    Vị trí: <span className="font-medium text-slate-700">{std.assignedPositionTitle || 'Thực tập sinh'}</span>
-                  </p>
-                </div>
+            {MOCK_ELIGIBLE_STUDENTS.filter((s) => s.assignedEnterpriseName).length === 0 ? (
+              <p className="text-center text-slate-400 py-6 text-xs">
+                Chưa có phản hồi tiếp nhận mới từ doanh nghiệp.
+              </p>
+            ) : (
+              MOCK_ELIGIBLE_STUDENTS.filter((s) => s.assignedEnterpriseName).slice(0, 3).map((std) => (
+                <div
+                  key={std.id}
+                  className="p-3 rounded-xl border border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">
+                      {std.fullName} <span className="font-normal text-xs text-slate-500">⟶ {std.assignedEnterpriseName}</span>
+                    </p>
+                    <p className="text-slate-500 mt-0.5">
+                      Vị trí: <span className="font-medium text-slate-700">{std.assignedPositionTitle || 'Thực tập sinh'}</span>
+                    </p>
+                  </div>
 
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
-                  Đã tiếp nhận
-                </span>
-              </div>
-            ))}
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
+                    Đã tiếp nhận
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -20,7 +20,7 @@ import { ExtractionKpiCards } from '@/components/qhdn/import/ExtractionKpiCards'
 import { FileImportModal } from '@/components/qhdn/import/FileImportModal';
 import { EnterpriseDetailModal } from '@/components/qhdn/import/EnterpriseDetailModal';
 import { ImportSuccessModal } from '@/components/qhdn/import/ImportSuccessModal';
-import { previewImport, commitImport, generateIdempotencyKey, searchOjtSemesters } from '@/service/qhdnService';
+import { previewImport, commitImport, generateIdempotencyKey, searchOjtSemesters } from '@/services/qhdnService';
 import * as XLSX from 'xlsx';
 import type {
   ExtractedEnterprise,

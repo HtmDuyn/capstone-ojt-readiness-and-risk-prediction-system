@@ -18,10 +18,8 @@ import {
 import { PageBanner } from '@/components/common/PageBanner';
 import { StudentDetailModal } from '@/components/qhdn/coordination/StudentDetailModal';
 import { StudentMatchModal } from '@/components/qhdn/coordination/StudentMatchModal';
-import { listPositions } from '@/service/qhdnService';
-import {
-  MOCK_ELIGIBLE_STUDENTS,
-} from '@/data/qhdn/qhdnMockData';
+import { listPositions } from '@/services/qhdnService';
+
 import type {
   EligibleStudent,
   EnterprisePartner,
@@ -104,22 +102,9 @@ export const QhdnOjtCoordination: React.FC = () => {
     };
   }, []);
 
-  const [students, setStudents] = useState<EligibleStudent[]>(() => {
-    return MOCK_ELIGIBLE_STUDENTS.map((s, idx) => {
-      let cohort = 'K18';
-      if (s.studentCode.includes('17')) cohort = 'K17';
-      else if (s.studentCode.includes('18')) cohort = 'K18';
-      else if (s.studentCode.includes('19')) cohort = 'K19';
-      else if (s.studentCode.includes('20')) cohort = 'K20';
-
-      const sems = ['Summer 2026', 'Summer 2026', 'Spring 2026'];
-      return {
-        ...s,
-        cohort,
-        semester: sems[idx % sems.length],
-      } as EligibleStudent & { cohort: string; semester: string };
-    });
-  });
+  const [students, setStudents] = useState<
+    (EligibleStudent & { cohort: string; semester: string })[]
+  >([]);
 
   // Filter States
   const [activeStatusTab, setActiveStatusTab] = useState<

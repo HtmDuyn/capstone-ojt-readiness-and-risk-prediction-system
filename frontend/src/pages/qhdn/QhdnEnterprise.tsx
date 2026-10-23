@@ -32,7 +32,7 @@ import {
   listCompanies,
   listPositions,
   searchOjtSemesters,
-} from '@/service/qhdnService';
+} from '@/services/qhdnService';
 import type {
   EnterprisePartner,
   CreateCompanyRequest,

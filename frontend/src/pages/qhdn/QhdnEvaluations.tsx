@@ -14,7 +14,7 @@ import {
   FileCheck2,
 } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { MOCK_ENTERPRISE_EVALUATIONS } from '@/data/qhdn/qhdnMockData';
+
 import type { EnterpriseEvaluation } from '@/types/qhdn/qhdnTypes';
 
 const PAGE_SIZE = 10;
@@ -36,24 +36,9 @@ const COHORT_OPTIONS = [
 ];
 
 export const QhdnEnterpriseEvaluations: React.FC = () => {
-  const [evaluations] = useState<
+  const [evaluations, setEvaluations] = useState<
     (EnterpriseEvaluation & { cohort: string; semester: string })[]
-  >(() => {
-    return MOCK_ENTERPRISE_EVALUATIONS.map((item, idx) => {
-      let cohort = 'K18';
-      if (item.studentCode.includes('17')) cohort = 'K17';
-      else if (item.studentCode.includes('18')) cohort = 'K18';
-      else if (item.studentCode.includes('19')) cohort = 'K19';
-      else if (item.studentCode.includes('20')) cohort = 'K20';
-
-      const sems = ['Summer 2026', 'Summer 2026', 'Spring 2026'];
-      return {
-        ...item,
-        cohort,
-        semester: sems[idx % sems.length],
-      };
-    });
-  });
+  >([]);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,12 +93,16 @@ export const QhdnEnterpriseEvaluations: React.FC = () => {
   );
   const emptyRowsCount = PAGE_SIZE - paginatedEvaluations.length;
 
-  const avgOverallScore = (
-    evaluations.reduce((acc, curr) => acc + curr.overallScore, 0) / evaluations.length
-  ).toFixed(1);
+  const avgOverallScore =
+    evaluations.length > 0
+      ? (
+          evaluations.reduce((acc, curr) => acc + curr.overallScore, 0) / evaluations.length
+        ).toFixed(1)
+      : '0.0';
 
   const excellentCount = evaluations.filter((e) => e.overallScore >= 8.5).length;
-  const excellentRate = Math.round((excellentCount / evaluations.length) * 100);
+  const excellentRate =
+    evaluations.length > 0 ? Math.round((excellentCount / evaluations.length) * 100) : 0;
 
   const hasActiveFilters =
     searchTerm !== '' ||
