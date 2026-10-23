@@ -23,7 +23,7 @@ export const authService = {
     const response = await API.post<LoginResponse>('/auth/login', credentials);
     return response.data;
   },
-   getCurrentUser: async (token: string) => {
+  getCurrentUser: async (token: string) => {
     const response = await API.get<CurrentUserResponse>('/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
