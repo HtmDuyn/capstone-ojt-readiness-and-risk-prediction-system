@@ -10,7 +10,10 @@ const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(r
 router.get('/ojt-rule-sets',...staff,handle(req=>listRules(req.query)));
 router.post('/ojt-rule-sets',...staff,handle(req=>saveRule(req.body,req.user.userId),201));
 router.patch('/ojt-rule-sets/:id',...staff,handle(req=>saveRule(req.body,req.user.userId,positiveId(req.params.id))));
-router.post('/ojt-rule-sets/:id/publish',...staff,handle(req=>publishRule(positiveId(req.params.id),req.user.userId)));
+router.post('/ojt-rule-sets/:id/publish',...staff,handle(req=>{
+ if(req.body!==undefined&&(!req.body||typeof req.body!=='object'||Array.isArray(req.body)||Object.keys(req.body).length))throw invalid('Publish accepts an empty JSON object or no body.');
+ return publishRule(positiveId(req.params.id),req.user.userId);
+}));
 router.post('/eligibility-check-runs',...staff,handle(req=>{if(Object.keys(req.query).length)throw invalid('Use JSON body, not query parameters.');return checkBatch(req.body,req.user.userId);}));
 router.get('/students/:id/eligibility',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return eligibility(id,req.query);}));
 router.get('/students/:id/eligibility-checks',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return history(id,req.query);}));

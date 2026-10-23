@@ -6479,14 +6479,11 @@ END $$;
 
 
 -- ============================================================
--- DEMO OJT SEMESTER: only if absent. Does not change existing rows.
--- Required for a fresh database to attach recruitment data.
+-- Optional demo OJT semester: only when a demo year was explicitly provisioned.
+-- Do not seed DEMO-2026-2027 alongside the official 2026-2027 year.
 -- ============================================================
 BEGIN;
 SET LOCAL search_path = public, pg_catalog;
-INSERT INTO public."AcademicYears" ("YearCode", "StartDate", "EndDate", "Status")
-VALUES ('DEMO-2026-2027', DATE '2026-09-01', DATE '2027-08-31', 'PLANNED')
-ON CONFLICT ("YearCode") DO NOTHING;
 
 INSERT INTO public."AcademicPeriods" ("AcademicYearID", "PeriodCode", "Name", "Kind", "StartDate", "EndDate", "Status")
 SELECT y."AcademicYearID", 'DEMO-SEMESTER-2027', 'Học kỳ OJT demo đầu năm 2027', 'SEMESTER', DATE '2026-11-01', DATE '2027-04-30', 'ACTIVE'
@@ -6571,7 +6568,8 @@ BEGIN
   FROM public."OJTSemesters" s
   WHERE s."SemesterCode" = 'DEMO-OJT-2027-01';
   IF v_semester_id IS NULL THEN
-    RAISE EXCEPTION 'No OJT semester exists. Create an OJT semester first.';
+    RAISE NOTICE 'Skipping optional demo recruitment: demo OJT semester is not configured.';
+    RETURN;
   END IF;
 
   -- Ensure an open RecruitmentWindows exists
@@ -6820,6 +6818,7 @@ DECLARE actor_id int; program_id int; user_id int; student_id int; cohort_id int
 BEGIN
  PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
  IF EXISTS (SELECT 1 FROM "SchemaMigrations" WHERE "Version"='20261022_demo_ojt_ready_student') THEN RETURN; END IF;
+ IF NOT EXISTS (SELECT 1 FROM "OJTSemesters" WHERE "SemesterCode"='DEMO-OJT-2027-01') THEN RETURN; END IF;
  SELECT u."UserID" INTO STRICT actor_id FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID"
  WHERE u."Email"='academic@ojtrpa.edu.vn' AND r."RoleCode"='ACADEMIC';
  SELECT "AcademicPeriodID" INTO STRICT prep_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-PREP-2026';
@@ -6877,3 +6876,38 @@ BEGIN
 END $demo$;
 COMMIT;
 -- END DEMO OJT READY STUDENT: 20261022
+
+-- BEGIN INCREMENTAL UPDATE: 20261023_academic_rest_resources
+-- Existing databases: run only this block; no existing application rows are changed.
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+CREATE TABLE IF NOT EXISTS "AcademicImportRequests" (
+ "ImportID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "Kind" varchar(20) NOT NULL CHECK("Kind" IN ('STUDENT','CURRICULUM')),
+ "IdempotencyKey" varchar(100) NOT NULL,"RequestHash" char(64) NOT NULL,
+ "Payload" jsonb NOT NULL CHECK(jsonb_typeof("Payload")='object'),
+ "Preview" jsonb NOT NULL CHECK(jsonb_typeof("Preview")='object'),
+ "Status" varchar(20) NOT NULL DEFAULT 'VALIDATED' CHECK("Status" IN ('VALIDATED','COMMITTED')),
+ "Result" jsonb,"CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),
+ "CreatedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),"CommittedAt" timestamptz,
+ "AccountBatchID" bigint REFERENCES "AccountImportBatches"("BatchID"),
+ "AcademicBatchID" bigint REFERENCES "AcademicImportBatches"("BatchID"),
+ UNIQUE("Kind","CreatedBy","IdempotencyKey"),
+ CHECK(("Status"='COMMITTED')=("CommittedAt" IS NOT NULL)),
+ CHECK("Status"<>'COMMITTED' OR ("Result" IS NOT NULL AND "AcademicBatchID" IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS "IX_AcademicImportRequests_KindID" ON "AcademicImportRequests"("Kind","ImportID" DESC);
+ALTER TABLE "AcademicImportRequests" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "AcademicImportRequests" FROM PUBLIC;
+DO $$ DECLARE role_name text; BEGIN
+ FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON TABLE "AcademicImportRequests" FROM %I',role_name); END IF;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE "AcademicImportRequests" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE "AcademicImportRequests_ImportID_seq" TO service_role;
+ END IF;
+END $$;
+INSERT INTO "SchemaMigrations"("Version") VALUES('20261023_academic_rest_resources') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: 20261023_academic_rest_resources

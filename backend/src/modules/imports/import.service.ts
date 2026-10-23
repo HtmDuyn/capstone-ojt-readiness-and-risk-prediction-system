@@ -6,9 +6,11 @@ import { fail, validateImport } from './import.validation';
 import { saveHistory, recordRejected, safeRow } from '../students/academic-import.service';
 import { windowRecord, assertOpen } from '../recruitment/recruitment.repository';
 import { importAcademicProfile } from '../students/complete-import.service';
+import type { PoolClient } from 'pg';
+export type ImportCommitHook=(client:PoolClient,result:Record<string,any>)=>Promise<void>;
 
-export async function importAccounts(body: unknown, actorId: number, preview = false) {
-  try { return await performAccountImport(body,actorId,preview); }
+export async function importAccounts(body: unknown, actorId: number, preview = false,onCommit?:ImportCommitHook) {
+  try { return await performAccountImport(body,actorId,preview,onCommit); }
   catch(error:any) {
     if (!preview && (body as any)?.kind==='STUDENT') {
       try { error.importBatchId=await recordRejected(body,actorId,'STUDENT',error); }
@@ -17,7 +19,7 @@ export async function importAccounts(body: unknown, actorId: number, preview = f
     throw error;
   }
 }
-async function performAccountImport(body: unknown, actorId: number, preview = false) {
+async function performAccountImport(body: unknown, actorId: number, preview = false,onCommit?:ImportCommitHook) {
   const input = validateImport(body);
   const payloadHash = createHash('sha256').update(JSON.stringify({ kind: input.kind, windowId: input.windowId, rows: input.rows })).digest('hex');
   if (!pool) throw fail('Database is not configured.', 503);
@@ -33,8 +35,9 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     if (old.rows.length) {
       if (old.rows[0].PayloadHash !== payloadHash || old.rows[0].ImportedBy !== actorId) throw fail('Idempotency key already used for a different import.', 409);
       const academicImportId=input.kind==='STUDENT' ? (await client.query('SELECT "BatchID" FROM "AcademicImportBatches" WHERE "SourceAccountBatchID"=$1',[old.rows[0].BatchID])).rows[0]?.BatchID : undefined;
-      await client.query('ROLLBACK');
-      return { ...old.rows[0].Summary, batchId: old.rows[0].BatchID, academicImportId, replayed: true };
+      const result={ ...old.rows[0].Summary, batchId: old.rows[0].BatchID, academicImportId, replayed: true };
+      if(onCommit&&!preview){await onCommit(client,result);await client.query('COMMIT');}else await client.query('ROLLBACK');
+      return result;
     }
     let recruitmentDeadline: Date | undefined;
     if (input.kind === 'ENTERPRISE') {
@@ -117,8 +120,10 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       return {...summary,preview:true,rows:plans.map((p,i)=>({rowNumber:i+1,code:p.row.code,action:p.action}))};
     }
     if (input.kind==='STUDENT') academicImportId=await saveHistory(client,{kind:'STUDENT',key:input.idempotencyKey,hash:payloadHash,status:'COMPLETED',summary,sourceAccountBatchId:batchId},actorId,plans.map(p=>({raw:safeRow(p.row,'STUDENT'),normalized:{userId:p.userId,action:p.action},status:'IMPORTED'})));
+    const result={ ...summary, batchId, academicImportId, replayed: false };
+    if(onCommit)await onCommit(client,result);
     await client.query('COMMIT');
-    return { ...summary, batchId, academicImportId, replayed: false };
+    return result;
   } catch (error) {
     await client.query('ROLLBACK');
     if ((error as { code?: string }).code === '23505') throw fail('Duplicate account, import or recruitment code.', 409, 'IMPORT_CONFLICT');

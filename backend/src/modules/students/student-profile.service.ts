@@ -2,7 +2,8 @@ import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { readTransaction } from '../qhdn/read.repository';
 import { studentSelect, resultSelect } from './student.service';
 import { academicProgressWithClient } from './academic-progress';
-import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
+import { officialEligibilityWithClient,eligibility,history } from '../eligibility/eligibility.service';
+import { enrichListRows } from '../../shared/list-context';
 import { invalid, pagination, positiveId, enumValue } from './student.validation';
 import type { Actor } from '../ojt-registration/window.service';
 
@@ -52,7 +53,14 @@ export async function studentProfile(id:number,params:Row,actor:Actor) {
       (await c.query('SELECT o."OJTSemesterID" FROM "AcademicPeriods" p JOIN "OJTSemesters" o ON o."AcademicPeriodID"=COALESCE(p."ParentPeriodID",p."AcademicPeriodID") WHERE p."AcademicPeriodID"=$1',[profile.currentAcademicPeriodId])).rows[0]?.OJTSemesterID??null;
     const official=semesterId?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null;
     const officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;
+    const eligibilityResults=await eligibility(id,selected?{ojtSemesterId:selected}:{},c,academicProgress);
+    const eligibilityChecks=await history(id,selected?{ojtSemesterId:selected}:{},c);
+    const comboHistory=(await c.query(`SELECT "EventID" AS id,"WindowID" AS "windowId","ProgramComboID" AS "comboId","CourseIDs" AS "courseIds",
+      "EventType" AS type,"ChoiceSnapshot" AS choice,"PreviousSnapshot" AS previous,"Reason" AS reason,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt"
+      FROM "StudentComboSelectionEvents" WHERE "StudentID"=$1 ORDER BY "EventID" DESC LIMIT 20`,[id])).rows;
+    const comboHistoryTotal=(await c.query('SELECT count(*)::int n FROM "StudentComboSelectionEvents" WHERE "StudentID"=$1',[id])).rows[0].n;
     return {...profile,academicProgress,comboSelections,officialDecision,
+      eligibility:eligibilityResults,eligibilityChecks,comboHistory:{items:await enrichListRows(c,comboHistory),total:comboHistoryTotal,page:1,limit:20},
       courseResults:{items:resultItems,total:totalResults,page:resultsPage.page,limit:resultsPage.limit},
       ojtRegistrations:{items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit},
       ojtSemesterId:semesterId,officialEligibility:official};
