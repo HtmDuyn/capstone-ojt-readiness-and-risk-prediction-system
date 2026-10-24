@@ -1,3 +1,4 @@
+import { assertOjtSemesterSix } from '../academic/workflow-policy';
 import { enrichListRows } from '../../shared/list-context';
 import { currentCVSql } from '../students/cv.service';
 import { academicTransaction,audit } from '../academic/academic.repository';
@@ -20,6 +21,7 @@ export async function handoff(semesterId:number,body:unknown,actor:number) {
   const checks:Row[]=[];
   for(const studentId of selected){
    if((await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2',[studentId,semesterId])).rowCount)throw invalid('Student already handed off for this semester.',409,'STUDENT_ALREADY_HANDED_OFF');
+   await assertOjtSemesterSix(c,studentId,semesterId);
    const check=await officialEligibilityWithClient(c,studentId,semesterId);
    if(!check||check.status!=='ELIGIBLE'||check.isStale)throw invalid('Current confirmed eligible result required for student '+studentId,409,'CONFIRMED_ELIGIBILITY_REQUIRED');
    checks.push(check);

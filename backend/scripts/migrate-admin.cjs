@@ -14,7 +14,9 @@ const {pool}=require('../dist/config/database');
   const offset=schema.indexOf(marker);
   if(offset<0||schema.indexOf(marker,offset+marker.length)>=0)throw new Error('Expected one Admin management APIs section in backend/DB.');
   const end=schema.indexOf('-- SECTION:',offset+marker.length);
+  await c.query('BEGIN');
   await c.query(schema.slice(offset,end<0?undefined:end));
+  await c.query('COMMIT');
   console.log('Admin API migration installed.');
  }catch(error){await c.query('ROLLBACK');throw error;}
  finally{await c.query("SELECT pg_advisory_unlock(hashtext('admin-api-migration'))");c.release();}

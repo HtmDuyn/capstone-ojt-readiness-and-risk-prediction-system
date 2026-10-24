@@ -155,6 +155,17 @@ export const authenticate = async (
       return;
     }
 
+    // A full database reset can reuse a UserID for another seed account.
+    // Never let a token issued for that previous account inherit the new identity.
+    if (payload.username !== currentUser.username) {
+      res.status(401).json({
+        success: false,
+        errorCode: 'TOKEN_REVOKED',
+        message: 'Your account identity has changed. Please login again.',
+      });
+      return;
+    }
+
     /*
      * ==============================
      * 3. CHECK USER STATUS

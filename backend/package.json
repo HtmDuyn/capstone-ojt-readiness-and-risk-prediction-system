@@ -6,6 +6,7 @@
   "scripts": {
     "db:migrate:training-program-metadata": "npm run build && node scripts/migrate-training-program-metadata.cjs",
     "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
+    "prebuild": "node scripts/clean-build.cjs",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
     "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",

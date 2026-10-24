@@ -47,9 +47,16 @@ export async function studentProfile(id:number,params:Row,actor:Actor) {
       const {cvUrl,...application}=registration.application??{};
       registration.application={...application,cv:profile.cv};
     }
-    // The selected semester is independent of pagination of historical registrations.
+    // The selected semester is independent of historical-registration pagination.
+    // Before registration exists, resolve curriculum stage 6 through the cohort calendar mapping;
+    // the current period can still be semester 5 while preparing for the upcoming OJT.
     const semesterId=selected??(await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID??
-      (await c.query('SELECT o."OJTSemesterID" FROM "AcademicPeriods" p JOIN "OJTSemesters" o ON o."AcademicPeriodID"=COALESCE(p."ParentPeriodID",p."AcademicPeriodID") WHERE p."AcademicPeriodID"=$1',[profile.currentAcademicPeriodId])).rows[0]?.OJTSemesterID??null;
+      (await c.query(`SELECT o."OJTSemesterID" FROM "StudentAcademicPlacements" placement
+       JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID" AND entry."Kind"='SEMESTER'
+       JOIN "AcademicPeriods" target ON target."Kind"='SEMESTER' AND target."StartDate">=entry."StartDate"
+       JOIN "OJTSemesters" o ON o."AcademicPeriodID"=target."AcademicPeriodID"
+       WHERE placement."StudentID"=$1 AND "StudentCurriculumSemester"(placement."StudentID",target."AcademicPeriodID")=6
+       ORDER BY target."StartDate",o."OJTSemesterID" LIMIT 1`,[id])).rows[0]?.OJTSemesterID??null;
     const official=semesterId?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null;
     const officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;
     return {...profile,academicProgress,comboSelections,officialDecision,

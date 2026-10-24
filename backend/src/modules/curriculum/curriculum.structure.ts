@@ -6,6 +6,7 @@ export async function normalizeCourses(client:PoolClient,raw:unknown):Promise<Ro
   for(const value of array(raw,'courses')) {
     const b=inputObject(value,['courseId','courseCode','credits','semester','isRequired','entryKind','prerequisiteText']);
     const c=await courseId(client,b);
+    if(c.CourseCode.toUpperCase()==='OJT202' && (integer(b.semester,'semester')!==6 || (b.entryKind??'COURSE')!=='COURSE'))throw invalid('OJT202 must be a concrete curriculum course in semester 6.');
     rows.push({courseId:c.CourseID,name:c.CourseName,credits:credits(b.credits),semester:integer(b.semester,'semester'),isRequired:boolean(b.isRequired,'isRequired'),entryKind:enumValue(b.entryKind??'COURSE',['COURSE','COMBO_SLOT','ELECTIVE_SLOT'],'entryKind'),prerequisiteText:optionalText(b.prerequisiteText,'prerequisiteText',10000)});
   }
   unique(rows.map(c=>c.courseId),'curriculum course');return rows;

@@ -316,6 +316,20 @@
  *                   "type": "integer",
  *                   "minimum": 1,
  *                   "maximum": 2147483647
+ *                 },
+ *                 "curriculumPeriods": {
+ *                   "type": "array",
+ *                   "minItems": 10,
+ *                   "maxItems": 10,
+ *                   "description": "Explicit mapping of curriculum stages 0–9 to Spring/Summer/Fall calendar periods. Stage 0 must match entryAcademicPeriodId.",
+ *                   "items": {
+ *                     "type": "object",
+ *                     "required": ["semester", "academicPeriodId"],
+ *                     "properties": {
+ *                       "semester": {"type": "integer", "minimum": 0, "maximum": 9},
+ *                       "academicPeriodId": {"type": "integer", "minimum": 1}
+ *                     }
+ *                   }
  *                 }
  *               }
  *             }
@@ -404,6 +418,20 @@
  *                   "type": "integer",
  *                   "minimum": 1,
  *                   "maximum": 2147483647
+ *                 },
+ *                 "curriculumPeriods": {
+ *                   "type": "array",
+ *                   "minItems": 10,
+ *                   "maxItems": 10,
+ *                   "description": "Explicit mapping of curriculum stages 0–9 to Spring/Summer/Fall calendar periods. Stage 0 must match entryAcademicPeriodId.",
+ *                   "items": {
+ *                     "type": "object",
+ *                     "required": ["semester", "academicPeriodId"],
+ *                     "properties": {
+ *                       "semester": {"type": "integer", "minimum": 0, "maximum": 9},
+ *                       "academicPeriodId": {"type": "integer", "minimum": 1}
+ *                     }
+ *                   }
  *                 }
  *               }
  *             }

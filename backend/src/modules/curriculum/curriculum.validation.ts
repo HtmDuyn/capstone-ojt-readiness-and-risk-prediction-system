@@ -13,9 +13,9 @@ export async function courseId(client:PoolClient,row:Record<string,unknown>) {
   if (('courseId' in row)===('courseCode' in row)) throw invalid('Provide exactly one of courseId or courseCode.');
   const byId='courseId' in row;
   const value=byId?positiveId(row.courseId,'courseId'):requiredText(row.courseCode,'courseCode',20).toUpperCase();
-  const found=(await client.query(`SELECT "CourseID","CourseName" FROM "Courses" WHERE ${byId?'"CourseID"':'upper("CourseCode")'}=$1`,[value])).rows[0];
+  const found=(await client.query(`SELECT "CourseID","CourseCode","CourseName" FROM "Courses" WHERE ${byId?'"CourseID"':'upper("CourseCode")'}=$1`,[value])).rows[0];
   if(!found)throw invalid(`Unknown course: ${value}.`,400,'COURSE_NOT_FOUND');
-  return found as {CourseID:number;CourseName:string};
+  return found as {CourseID:number;CourseCode:string;CourseName:string};
 }
 export function metadata(body:unknown,patch=false) {
   const b=inputObject(body,['code','name','version','majorId','totalCredits','effectiveYear','gpaScale']);

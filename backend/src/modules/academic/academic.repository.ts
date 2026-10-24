@@ -30,7 +30,7 @@ export async function findRecord(client: PoolClient, resource: Resource, id: num
   const result = await client.query(`SELECT t.* ${resource === 'academic-periods' ? periodOjt : ''} FROM "${c.table}" t WHERE t."${c.id}"=$1 FOR UPDATE OF t`, [id]);
   if (!result.rows[0]) throw academicError(`${resource} record not found.`, 404, 'ACADEMIC_RECORD_NOT_FOUND');
   const row = asApi(resource, result.rows[0]);
-  if (resource === 'cohorts') row.groups = (await client.query('SELECT "GroupCode" AS "groupCode","EntryAcademicPeriodID" AS "entryAcademicPeriodId" FROM "CohortGroups" WHERE "CohortID"=$1 ORDER BY "GroupCode"', [id])).rows;
+  if (resource === 'cohorts') row.groups = (await client.query('SELECT g."GroupCode" AS "groupCode",g."EntryAcademicPeriodID" AS "entryAcademicPeriodId",COALESCE((SELECT jsonb_agg(jsonb_build_object(\'semester\',m."CurriculumSemester",\'academicPeriodId\',m."AcademicPeriodID") ORDER BY m."CurriculumSemester") FROM "CohortCurriculumPeriods" m WHERE m."CohortID"=g."CohortID" AND m."GroupCode"=g."GroupCode"),\'[]\'::jsonb) AS "curriculumPeriods" FROM "CohortGroups" g WHERE g."CohortID"=$1 ORDER BY g."GroupCode"', [id])).rows;
   return row;
 }
 
@@ -50,7 +50,7 @@ export async function listRecords(resource: Resource, params: Record<string, unk
   if (params.academicPeriodId !== undefined) { args.push(positiveId(params.academicPeriodId,"academicPeriodId")); conditions.push(`t."AcademicPeriodID"=$${args.length}`); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   // Use one statement so total and page share the same database snapshot, including an empty page.
-  const grouped = resource === 'cohorts' ? `, COALESCE((SELECT jsonb_agg(jsonb_build_object('groupCode',g."GroupCode",'entryAcademicPeriodId',g."EntryAcademicPeriodID") ORDER BY g."GroupCode") FROM "CohortGroups" g WHERE g."CohortID"=t."CohortID"),'[]'::jsonb) AS groups` : resource === 'academic-periods' ? periodOjt : '';
+  const grouped = resource === 'cohorts' ? `, COALESCE((SELECT jsonb_agg(jsonb_build_object('groupCode',g."GroupCode",'entryAcademicPeriodId',g."EntryAcademicPeriodID",'curriculumPeriods',COALESCE((SELECT jsonb_agg(jsonb_build_object('semester',m."CurriculumSemester",'academicPeriodId',m."AcademicPeriodID") ORDER BY m."CurriculumSemester") FROM "CohortCurriculumPeriods" m WHERE m."CohortID"=g."CohortID" AND m."GroupCode"=g."GroupCode"),'[]'::jsonb)) ORDER BY g."GroupCode") FROM "CohortGroups" g WHERE g."CohortID"=t."CohortID"),'[]'::jsonb) AS groups` : resource === 'academic-periods' ? periodOjt : '';
   const result = await query(`WITH filtered AS (SELECT t.* ${grouped} FROM "${c.table}" t ${where}), page AS (
     SELECT * FROM filtered ORDER BY "${c.id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}
   ) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(page) ORDER BY page."${c.id}" DESC) FILTER (WHERE page."${c.id}" IS NOT NULL),'[]'::jsonb) AS items FROM page`, [...args, p.limit, p.offset]);

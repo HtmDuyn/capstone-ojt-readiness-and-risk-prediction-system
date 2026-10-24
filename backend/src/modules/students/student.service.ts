@@ -79,11 +79,9 @@ export async function results(id: number, params: Record<string,unknown>) {
 export async function resultPeriod(client: PoolClient, studentId: number, periodId: number) {
   const period=(await client.query(`SELECT p.*,COALESCE(parent."StartDate",p."StartDate") AS "SemesterStart" FROM "AcademicPeriods" p LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=p."ParentPeriodID" WHERE p."AcademicPeriodID"=$1`,[periodId])).rows[0];
   if (!period) throw invalid('Academic period not found.');
-  const placement=(await client.query(`SELECT entry."StartDate" FROM "StudentAcademicPlacements" sp JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=sp."EntryAcademicPeriodID" WHERE sp."StudentID"=$1`,[studentId])).rows[0];
-  if (!placement) throw invalid('Assign the actual specialized entry period before importing results.');
-  if (new Date(period.SemesterStart)<new Date(placement.StartDate)) throw invalid('Result period precedes specialized entry.');
-  const count=(await client.query('SELECT count(*)::int AS n FROM "AcademicPeriods" WHERE "Kind"=\'SEMESTER\' AND "StartDate">=$1 AND "StartDate"<=$2',[placement.StartDate,period.SemesterStart])).rows[0].n;
-  return { academicYearId:period.AcademicYearID,semesterTaken:count };
+  const stage=(await client.query('SELECT "StudentCurriculumSemester"($1,$2) AS stage',[studentId,periodId])).rows[0]?.stage;
+  if(stage===null||stage===undefined)throw invalid('Map the cohort curriculum stage to this calendar semester before importing results.');
+  return {academicYearId:period.AcademicYearID,semesterTaken:stage};
 }
 export async function patchResult(id: number, body: unknown, actorId: number) {
   const input=inputObject(body,['courseId','academicPeriodId','attemptNumber','score','grade','gradePoints','status','sourceReference','reason']);
