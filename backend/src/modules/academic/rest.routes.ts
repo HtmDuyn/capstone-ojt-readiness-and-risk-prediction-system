@@ -6,7 +6,7 @@ import { assessmentWindows,createAssessment,updateAssessment,updateRule,semester
 import { createImportRequest,commitImportRequest,importRequests,retryStudentImportEmail } from '../imports/import-request.service';
 import { saveGradeMapping } from './workflow-policy';
 import { handoff,handoffHistory } from '../ojt-registration/handoff.service';
-import { listWindows,asWindow,windowRecord } from '../combo-registration/combo.repository';
+import { asWindow,windowRecord } from '../combo-registration/combo.repository';
 import { selectionReport } from '../combo-registration/window.service';
 import { academicTransaction } from './academic.repository';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';

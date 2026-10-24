@@ -11,7 +11,7 @@ for(const resource of Object.keys(resources) as Resource[])router.patch(`/${reso
   try {
     const input=inputObject(req.body,['id',...Object.keys(resources[resource].fields),...(resource==='academic-periods'?['ojt','comboPhaseSchedules','advisorySchedule']:resource==='cohorts'?['groups']:[])]);
     const {id:rawId,...changes}=input,id=positiveId(rawId);
-    res.json({success:true,data:resource==='academic-periods'?await savePeriodResource(changes,req.user!,id):await saveResource(resource,changes,req.user!.userId,id)});
+    res.json({success:true,data:resource==='academic-periods'?await savePeriodResource(changes,{userId:req.user!.userId,roleCode:req.user!.roleCode!},id):await saveResource(resource,changes,req.user!.userId,id)});
   }catch(error){next(error);}
 });
 // Scope authentication to these paths so sibling APIs retain their own role rules.
@@ -21,7 +21,7 @@ for (const resource of Object.keys(resources) as Resource[]) {
     catch (error) { next(error); }
   });
   router.post(`/${resource}`, authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
-    try { res.status(201).json({ success: true, data: resource==='academic-periods'?await savePeriodResource(req.body,req.user!):await saveResource(resource, req.body, req.user!.userId) }); }
+    try { res.status(201).json({ success: true, data: resource==='academic-periods'?await savePeriodResource(req.body,{userId:req.user!.userId,roleCode:req.user!.roleCode!}):await saveResource(resource, req.body, req.user!.userId) }); }
     catch (error) { next(error); }
   });
   router.patch(`/${resource}/:id`, authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
