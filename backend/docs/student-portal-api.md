@@ -1,6 +1,31 @@
 # Triển khai API kỳ 5 → OJT
 
-Đã triển khai 48 operation mới trong checklist và sửa/đối chiếu 24 operation hiện có được đánh dấu cần sửa. Các API `/student/...` chỉ nhận STUDENT; API Đào tạo nhận ADMIN/ACADEMIC; import/công bố nhận ADMIN/OJT_COORD; doanh nghiệp chỉ đọc đơn/CV đã được gửi đến doanh nghiệp mình và ghi decision/evaluation trong phạm vi.
+## Nhập JSON cho Sinh viên (2026-10-24)
+
+Các API academic-summary, supplementary-course-options, curriculum, roadmap-recommendations, assignments/current, dashboard, opportunities và hai danh sách đợt đăng ký bắt buộc `studentId` trong JSON. Lấy StudentID từ response đăng nhập/thông tin tài khoản; ID phải khớp hồ sơ của tài khoản được xác thực. Thông báo và cập nhật hồ sơ tài khoản vẫn dùng định danh tài khoản, không cần thêm studentId.
+
+Backend vẫn xác thực Bearer token và trạng thái tài khoản. Trong cùng request, adapter và handler gốc dùng lại kết quả xác thực; StudentID lấy từ DB hiện hành, không tin claim StudentID cũ trong token. Truy vấn hồ sơ dùng StudentID kèm UserID; các phần dashboard dùng lại hồ sơ theo request. Không cache xác thực/hồ sơ giữa các request. Chưa đo độ trễ trên dữ liệu thực tế.
+
+
+Nhóm **Sinh viên** trong Swagger có 30 operation dùng một JSON body tại `/api/student/*`. ID và bộ lọc nằm trong body; không còn ô path/query. Upload CV là ngoại lệ: `POST /api/students/me/cv` dùng multipart/form-data, trường file `cv`.
+
+| Chức năng | API | JSON minh họa |
+| --- | --- | --- |
+| Dashboard | POST /api/student/dashboard/search | {"studentId":1,"ojtSemesterId":1} |
+| Hồ sơ | POST /api/student/profile/detail | {"studentId":1} |
+| Điểm học phần | POST /api/student/course-results/search | {"studentId":1,"page":1,"limit":20} |
+| Điều kiện OJT | POST /api/student/eligibility/search | {"studentId":1,"ojtSemesterId":1} |
+| Xem trước chọn combo | POST /api/student/combo-registration-windows/preview | {"windowId":1,"comboId":1,"courseIds":[1,2]} |
+| Đánh dấu thông báo | PATCH /api/student/notifications/update | {"notificationId":1,"isRead":true} |
+| Chi tiết kết quả OJT | POST /api/student/ojt-results/detail | {"resultId":1} |
+| Tải CV | POST /api/student/cv/download | {"studentId":1,"cvFileId":1} |
+| Chương trình học | POST /api/student/curriculum/search | {"studentId":1} |
+
+Gửi `Content-Type: application/json` và Bearer token STUDENT. Thiếu ID bắt buộc, sai kiểu, trường dư hoặc query URL trả 400; sai Content-Type trả 415. Adapter chuyển ID/bộ lọc vào handler nghiệp vụ hiện có, giữ nguyên kiểm tra quyền sở hữu và trạng thái nghiệp vụ. Sinh viên không thể xem hồ sơ của người khác bằng cách thay studentId.
+
+Các route REST gốc tiếp tục hoạt động để giữ tương thích; trên Swagger, phiên bản dùng chung chỉ còn ở nhóm nhân sự, Sinh viên thấy phiên bản JSON. Không thêm lại các API đợt đăng ký portal bị trùng hay logic nghiệp vụ đã xóa. Các mô tả REST/service bên dưới là thông tin triển khai; hợp đồng gọi API Student hiện tại lấy từ `/api-docs/openapi.json` và `docs/api-input-reference.md`.
+
+Đã triển khai 48 operation mới trong checklist và sửa/đối chiếu 24 operation hiện có được đánh dấu cần sửa. Các API `/students/me/...` chỉ nhận STUDENT; API Đào tạo nhận ADMIN/ACADEMIC; import/công bố nhận ADMIN/OJT_COORD; doanh nghiệp chỉ đọc đơn/CV đã được gửi đến doanh nghiệp mình và ghi decision/evaluation trong phạm vi.
 
 ## Khởi tạo schema và chạy
 
@@ -41,7 +66,7 @@ Base URL `/api`, Bearer JWT. Các API mới trả `{success:true,data:...}`. Ri�
 
 Danh sách dùng page/limit (1/20 mặc định, limit tối đa 100). Các endpoint học vụ theo kỳ (`academic-summary`, `supplementary-course-options`, `dashboard`, `risk-prediction`, `roadmap-recommendations`, `company-recommendations`, báo cáo QHDN) yêu cầu `ojtSemesterId`.
 
-Swagger `/api-docs` duy trì cơ chế JSON wrapper hiện có: GET có query/path được tài liệu hóa thành POST `/api/json/.../search|detail`. Route REST gốc vẫn hoạt động. Upload CV/import file là multipart/form-data, không đưa tệp vào JSON wrapper.
+Swagger `/api-docs` mô tả route REST trực tiếp. GET dùng path/query; upload CV/import file dùng multipart/form-data.
 
 ## Import sheet đối tác — QHDN
 

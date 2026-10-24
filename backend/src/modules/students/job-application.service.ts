@@ -12,7 +12,7 @@ import type { Actor, Row } from '../ojt-registration/window.service';
 
 export async function ownStudent(c:PoolClient,actor:Actor) {
   if(actor.roleCode!=='STUDENT')throw invalid('Chức năng dành cho sinh viên.',403,'FORBIDDEN');
-  const s=(await c.query(`SELECT s.* FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."UserID"=$1 AND s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'`,[actor.userId])).rows[0];
+  const s=(await c.query(`SELECT s.* FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE ${actor.studentId!=null?'s."StudentID"=$1 AND s."UserID"=$2':'s."UserID"=$1'} AND s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'`,actor.studentId!=null?[actor.studentId,actor.userId]:[actor.userId])).rows[0];
   if(!s)throw invalid('Không có hồ sơ sinh viên đang hoạt động.',403,'STUDENT_INACTIVE');return s;
 }
 

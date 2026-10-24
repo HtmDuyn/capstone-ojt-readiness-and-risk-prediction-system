@@ -4,7 +4,7 @@ import { academicTransaction,audit } from '../academic/academic.repository';
 import { inputObject,invalid,positiveId,requiredText,pagination,enumValue,optionalText } from '../students/student.validation';
 import { timestamp,ids } from '../combo-registration/combo.validation';
 export type Row=Record<string,any>;
-export type Actor={userId:number;roleCode:string};
+export type Actor={userId:number;roleCode:string;studentId?:number|null};
 export function registrationScope(value:unknown) {
  const b=inputObject(value,['programIds','cohortIds','majorIds','studentIds','groupCodes']);const scope:Row={};
  for(const key of ['programIds','cohortIds','majorIds','studentIds'])if(b[key]!==undefined){scope[key]=ids(b[key],key,1000);if(!scope[key].length)throw invalid(`${key} must be nonempty.`);}

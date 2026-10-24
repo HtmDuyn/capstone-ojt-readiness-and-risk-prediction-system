@@ -5604,10 +5604,28 @@ BEGIN
  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO service_role',seq); END IF;
 END $$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_student_academic_records');
+-- SECTION: 20261024 training program metadata compatibility
+-- Additive repair for the curriculum API contract; safe to run on an existing DB.
+-- Legacy programs remain DRAFT/unreviewed. Version/year/actor metadata is unknown,
+-- so it stays NULL until academic staff supplies verified values.
+SELECT pg_advisory_xact_lock(hashtext('training-program-metadata-migration'));
+ALTER TABLE "TrainingPrograms"
+ ADD COLUMN IF NOT EXISTS "Version" varchar(10),
+ ADD COLUMN IF NOT EXISTS "EffectiveYear" int CHECK ("EffectiveYear" BETWEEN 1900 AND 2200),
+ ADD COLUMN IF NOT EXISTS "Status" varchar(20) NOT NULL DEFAULT 'DRAFT' CHECK ("Status" IN ('DRAFT','PUBLISHED')),
+ ADD COLUMN IF NOT EXISTS "PrerequisitesReviewed" boolean NOT NULL DEFAULT false,
+ ADD COLUMN IF NOT EXISTS "EquivalencesReviewed" boolean NOT NULL DEFAULT false,
+ ADD COLUMN IF NOT EXISTS "CreatedBy" int REFERENCES "Users"("UserID") ON DELETE SET NULL,
+ ADD COLUMN IF NOT EXISTS "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+ ADD COLUMN IF NOT EXISTS "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
+ ADD COLUMN IF NOT EXISTS "PublishedBy" int REFERENCES "Users"("UserID") ON DELETE SET NULL,
+ ADD COLUMN IF NOT EXISTS "PublishedAt" timestamptz;
+COMMENT ON COLUMN "TrainingPrograms"."CreatedAt" IS 'Creation timestamp; pre-migration records receive migration time, not a reconstructed historical timestamp.';
+INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261024_training_program_metadata') ON CONFLICT ("Version") DO NOTHING;
+
 -- SECTION: 20261008 curriculum management and publication
 ALTER TABLE "Courses" ALTER COLUMN "Credits" TYPE numeric(6,2);
--- Curriculum simplification: keep ProgramID, ProgramCode, ProgramName,
--- TotalCredits and SpecializationID. No publication workflow for TrainingPrograms.
+-- Program metadata is defined by the additive compatibility section above.
 ALTER TABLE "TrainingPrograms" ALTER COLUMN "TotalCredits" TYPE numeric(6,2);
 CREATE UNIQUE INDEX "UQ_Curriculum_ProgramCode_CI" ON "TrainingPrograms"(upper("ProgramCode"));
 ALTER TABLE "ProgramCombos" ALTER COLUMN "SourceComboID" DROP NOT NULL, ADD COLUMN "CoursesReviewed" boolean NOT NULL DEFAULT false;
@@ -5618,7 +5636,7 @@ CREATE UNIQUE INDEX "UQ_Course_Code" ON "Courses"(upper("CourseCode"));
 CREATE UNIQUE INDEX "UQ_Specialization_Code" ON "Specializations"(upper("SpecializationCode"));
 ALTER TABLE "AcademicImportBatches" DROP CONSTRAINT "AcademicImportBatches_Kind_check", ADD CONSTRAINT "AcademicImportBatches_Kind_check" CHECK ("Kind" IN ('STUDENT','COURSE_RESULT','CURRICULUM')),
  ADD COLUMN "CurriculumID" int REFERENCES "TrainingPrograms"("ProgramID");
--- Publication-specific columns, constraints and immutable triggers are intentionally omitted.
+-- Publication validation remains in the curriculum service; no immutable triggers.
 -- All other academic, combo and import tables remain unchanged.
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_curriculum_management');
 -- SECTION: 20261008 combo registration windows and confirmed choices
@@ -6877,3 +6895,80 @@ BEGIN
 END $demo$;
 COMMIT;
 -- END DEMO OJT READY STUDENT: 20261022
+
+
+-- SECTION: 20261024 publish seeded training programs
+-- Fresh-install seed acceptance, scoped only to program codes inserted by this file.
+-- SEED-2026 / 2026 identify this seed release, not a guessed cohort entry year.
+BEGIN;
+DO $publish_seed$
+DECLARE actor_id int;
+BEGIN
+ SELECT u."UserID" INTO STRICT actor_id FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID"
+ WHERE u."Email"='academic@ojtrpa.edu.vn' AND r."RoleCode"='ACADEMIC';
+ CREATE TEMP TABLE seed_published_programs ("ProgramID" int PRIMARY KEY) ON COMMIT DROP;
+ INSERT INTO seed_published_programs
+ SELECT p."ProgramID" FROM "TrainingPrograms" p JOIN (VALUES
+ ('BIT_AI_K18D-19A'),
+ ('BIT_AI_K18D-19A_FNO'),
+ ('BIT_AI_K19B_FNO'),
+ ('BIT_AI_K19D-20A'),
+ ('BIT_AI_K20B'),
+ ('BIT_AI_K20B_FNO'),
+ ('BIT_AI_K20C'),
+ ('BIT_AI_K20D-21A'),
+ ('BIT_AI_K21B'),
+ ('BIT_AI_K21C'),
+ ('BIT_AI_K21D-22A'),
+ ('BIT_IA_K18D-19A'),
+ ('BIT_IA_K18D-19A_FNO'),
+ ('BIT_IA_K19B_FNO'),
+ ('BIT_IA_K19D-20A'),
+ ('BIT_IA_K20B'),
+ ('BIT_IA_K20B_FNO'),
+ ('BIT_IA_K20C'),
+ ('BIT_IA_K20D-21A'),
+ ('BIT_IA_K21B'),
+ ('BIT_IA_K21C'),
+ ('BIT_IA_K21D-22A'),
+ ('BIT_IS_K18D_19A'),
+ ('BIT_IS_K19B'),
+ ('BIT_IS_K19C'),
+ ('BIT_IS_K19D_K20A'),
+ ('BIT_IS_K20B'),
+ ('BIT_IS_K20C'),
+ ('BIT_IS_K20D'),
+ ('BIT_IS_K20D-21A'),
+ ('BIT_SE_K18D_19A'),
+ ('BIT_SE_K19B'),
+ ('BIT_SE_K19C'),
+ ('BIT_SE_K19D_K20A'),
+ ('BIT_SE_K20B'),
+ ('BIT_SE_K20C'),
+ ('BIT_SE_K20D_K21A'),
+ ('BIT_SE_K21B'),
+ ('BIT_SE_K21C'),
+ ('BIT_SE-2026_K21D_K22A'),
+ ('DEMO-OJT-READY')
+ ) AS seed(code) ON seed.code=p."ProgramCode";
+
+ UPDATE "TrainingPrograms" p SET
+  "Version"=COALESCE(p."Version",'SEED-2026'),
+  "EffectiveYear"=COALESCE(p."EffectiveYear",2026),
+  "Status"='PUBLISHED',"PrerequisitesReviewed"=true,"EquivalencesReviewed"=true,
+  "CreatedBy"=COALESCE(p."CreatedBy",actor_id),
+  "PublishedBy"=COALESCE(p."PublishedBy",actor_id),
+  "PublishedAt"=COALESCE(p."PublishedAt",now()),"UpdatedAt"=now()
+ FROM seed_published_programs seed WHERE seed."ProgramID"=p."ProgramID";
+ UPDATE "ProgramCombos" b SET "CoursesReviewed"=true
+ FROM seed_published_programs seed WHERE seed."ProgramID"=b."ProgramID";
+ -- Accept curriculum requirements from this seed; slot rows remain choice slots.
+ UPDATE "ProgramCourses" pc SET "IsRequired"=true
+ FROM seed_published_programs seed WHERE seed."ProgramID"=pc."ProgramID" AND pc."IsRequired" IS NULL;
+ -- Seed/demo grades use the 0..10 scale; preserve any policy already configured.
+ INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","RetakePolicy","ConfirmedBy")
+ SELECT "ProgramID",10,'LATEST',actor_id FROM seed_published_programs
+ ON CONFLICT ("ProgramID") DO NOTHING;
+ INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261024_publish_seeded_programs') ON CONFLICT DO NOTHING;
+END $publish_seed$;
+COMMIT;

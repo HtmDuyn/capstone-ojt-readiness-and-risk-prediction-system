@@ -2,12 +2,15 @@ import type { PoolClient } from 'pg';
 import { enrichListRows } from '../../shared/list-context';
 import { invalid, pagination, positiveId } from '../students/student.validation';
 export type Row = Record<string, any>;
-export type Actor = { userId:number; roleCode:string };
+export type Actor = { userId:number; roleCode:string; studentId?:number|null };
+const requestProfiles = new WeakMap<Actor, Row>();
 export async function ownStudent(c:PoolClient, actor:Actor) {
   if(actor.roleCode!=='STUDENT')throw invalid('Student access required.',403,'FORBIDDEN');
-  const s=(await c.query('SELECT s.*,u."Status" AS "AccountStatus",p."CohortID",p."GroupCode",t."SpecializationID" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" WHERE s."UserID"=$1 AND s."DeletedAt" IS NULL',[actor.userId])).rows[0];
+  const cached = requestProfiles.get(actor);
+  if(cached) return cached;
+  const s=(await c.query('SELECT s.*,u."Status" AS "AccountStatus",p."CohortID",p."GroupCode",t."SpecializationID" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" WHERE '+(actor.studentId!=null?'s."StudentID"=$1 AND s."UserID"=$2':'s."UserID"=$1')+' AND s."DeletedAt" IS NULL',actor.studentId!=null?[actor.studentId,actor.userId]:[actor.userId])).rows[0];
   if(!s)throw invalid('Student profile not found.',404,'STUDENT_NOT_FOUND');
-  if(s.Status!=='ACTIVE'||s.AccountStatus!=='ACTIVE')throw invalid('Student profile is inactive.',403,'STUDENT_INACTIVE');return s;
+  if(s.Status!=='ACTIVE'||s.AccountStatus!=='ACTIVE')throw invalid('Student profile is inactive.',403,'STUDENT_INACTIVE');requestProfiles.set(actor,s);return s;
 }
 export function inScope(scope:Row,s:Row) {
   return Object.entries({programIds:s.ProgramID,cohortIds:s.CohortID,groupCodes:s.GroupCode,majorIds:s.SpecializationID,studentIds:s.StudentID}).every(([key,v])=>!scope[key]||scope[key].includes(v));
