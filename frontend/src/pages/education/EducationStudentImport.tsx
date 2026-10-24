@@ -577,10 +577,38 @@ export const EducationStudentImport: React.FC = () => {
     }
   };
 
+  const translateImportMessage = (message: string): string => {
+    const rawMessage = String(message ?? "").trim();
+
+    const rowMatch = rawMessage.match(/Row\s+(\d+)/i);
+    const rowPrefix = rowMatch ? `Sinh viên thứ ${rowMatch[1]}: ` : "";
+    if (
+      /academic profile/i.test(rawMessage) &&
+      /placement/i.test(rawMessage) &&
+      /courseResults/i.test(rawMessage)
+    ) {
+      return (
+        rowPrefix +
+        "Hệ thống yêu cầu bổ sung thông tin học vụ, " +
+        "khóa/kỳ học và kết quả học tập của sinh viên. " +
+        "Vui lòng kiểm tra lại dữ liệu."
+      );
+    }
+
+    return rawMessage
+      .replace(/Row\s+(\d+)\s*:/gi, "Dòng $1:")
+      .replace(/academic profile/gi, "thông tin học vụ")
+      .replace(/placement/gi, "thông tin khóa và kỳ học")
+      .replace(/courseResults/gi, "kết quả học tập")
+      .replace(/are required/gi, "là bắt buộc")
+      .replace(/is required/gi, "là bắt buộc");
+  };
+
   /* ===================== PREVIEW ===================== */
 
   const onPreview = async () => {
     if (!total || issues.length || busy) return;
+    setNotice(null);
 
     if (!isStudent) {
       setGradesChecked(true);
@@ -613,14 +641,18 @@ export const EducationStudentImport: React.FC = () => {
       setNotice({
         type: problems.length ? "error" : "success",
         message: problems.length
-          ? "Backend trả về dữ liệu cần xem lại."
-          : "API Preview thành công. Chưa ghi database.",
+          ? "Hệ thống phát hiện dữ liệu cần kiểm tra lại."
+          : "Kiểm tra thành công. Dữ liệu chưa được lưu vào hệ thống.",
       });
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Không thể kiểm tra dữ liệu sinh viên.";
+
       setNotice({
         type: "error",
-        message:
-          error instanceof Error ? error.message : "Không thể gọi API Preview.",
+        message: translateImportMessage(message),
       });
     } finally {
       setBusy(null);
@@ -756,7 +788,7 @@ export const EducationStudentImport: React.FC = () => {
               <AlertTriangle size={19} />
             )}
 
-            <span>{notice.message}</span>
+            <span>{translateImportMessage(notice.message)}</span>
           </div>
 
           <button
@@ -864,15 +896,17 @@ export const EducationStudentImport: React.FC = () => {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
-                Bước 1 · Chuẩn bị dữ liệu
+                Bước 1 · Chọn tệp dữ liệu
               </p>
 
               <h2 className="mt-1 text-xl font-bold text-slate-900">
-                {isStudent ? "Danh sách sinh viên" : "Bảng điểm theo kỳ"}
+                {isStudent
+                  ? "Nhập danh sách sinh viên"
+                  : "Cập nhật bảng điểm theo kỳ"}
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Tải Excel từ nhà trường hoặc dùng file mẫu.
+                Chọn tệp Excel có sẵn hoặc sử dụng tệp mẫu của hệ thống.
               </p>
             </div>
 
@@ -893,12 +927,12 @@ export const EducationStudentImport: React.FC = () => {
 
             <p className="mt-3 text-sm font-bold text-slate-800">
               {isStudent
-                ? "Chọn danh sách sinh viên"
-                : "Chọn bảng điểm của kỳ học"}
+                ? "Chọn tệp danh sách sinh viên"
+                : "Chọn tệp bảng điểm"}
             </p>
 
             <p className="mt-1 text-xs text-slate-500">
-              Hỗ trợ .xlsx, .xls, .csv · Không cần nhập JSON hay ID database
+              Định dạng hỗ trợ file: .xlsx, .xls, .csv
             </p>
 
             <input
@@ -967,21 +1001,29 @@ export const EducationStudentImport: React.FC = () => {
 
           <div className="mt-5 space-y-4">
             {[
-              ["01", "Chuẩn bị file", "Dùng dữ liệu có sẵn hoặc tải mẫu."],
-              ["02", "Xem trước", "Kiểm tra dòng lỗi và trùng dữ liệu."],
+              [
+                "01",
+                "Chuẩn bị tệp Excel",
+                "Sử dụng tệp có sẵn hoặc tải tệp mẫu của hệ thống.",
+              ],
+              [
+                "02",
+                "Chọn tệp và xem trước",
+                "Hiển thị danh sách và kiểm tra thông tin còn thiếu.",
+              ],
               [
                 "03",
-                "Kiểm tra",
+                "Kiểm tra dữ liệu",
                 isStudent
-                  ? "Gọi API Preview thật."
-                  : "Kiểm tra định dạng trên giao diện.",
+                  ? "Đối chiếu thông tin sinh viên với hệ thống."
+                  : "Kiểm tra định dạng và thông tin bảng điểm.",
               ],
               [
                 "04",
-                "Lưu dữ liệu",
+                isStudent ? "Xác nhận lưu" : "Lưu bảng điểm",
                 isStudent
-                  ? "Xác nhận mới gọi API Commit."
-                  : "Chờ BE xác nhận cập nhật điểm an toàn.",
+                  ? "Lưu dữ liệu sau khi kiểm tra và xác nhận."
+                  : "Chức năng lưu bảng điểm đang được hoàn thiện.",
               ],
             ].map(([number, title, detail]) => (
               <div key={number} className="flex gap-3">
@@ -1007,8 +1049,8 @@ export const EducationStudentImport: React.FC = () => {
 
             <span>
               {isStudent
-                ? "Preview không ghi database. Chỉ Commit sau khi bạn xác nhận."
-                : "Chưa cho ghi bảng điểm để tránh ghi đè kết quả cũ khi chưa rõ logic Backend."}
+                ? "Dữ liệu chỉ được lưu vào hệ thống sau khi bạn kiểm tra và xác nhận."
+                : "Hiện tại chỉ hỗ trợ xem trước và kiểm tra bảng điểm, chưa hỗ trợ lưu dữ liệu."}
             </span>
           </div>
         </aside>
@@ -1020,13 +1062,13 @@ export const EducationStudentImport: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-orange-500">
-              Bước 2 · Xem trước dữ liệu
+              Bước 2 · Xem trước và kiểm tra
             </p>
 
             <h2 className="mt-1 text-lg font-bold text-slate-900">
               {isStudent
-                ? "Sinh viên chờ Import"
-                : "Kết quả học tập chờ cập nhật"}
+                ? "Danh sách sinh viên đã tải lên"
+                : "Bảng điểm đã tải lên"}
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
@@ -1256,9 +1298,39 @@ export const EducationStudentImport: React.FC = () => {
               <ShieldCheck size={17} />
             )}
 
-            {isStudent ? "Kiểm tra qua API Preview" : "Kiểm tra bảng điểm"}
+            {isStudent ? "Kiểm tra dữ liệu sinh viên" : "Kiểm tra bảng điểm"}
           </button>
         </div>
+
+        {/* Trạng thái kiểm tra dữ liệu */}
+        {busy === "preview" && (
+          <div
+            role="status"
+            className="mt-4 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700"
+          >
+            <Loader2 size={18} className="animate-spin" />
+            Đang gửi dữ liệu đến hệ thống để kiểm tra...
+          </div>
+        )}
+
+        {notice && busy !== "preview" && (
+          <div
+            role="status"
+            className={`mt-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
+              notice.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {notice.type === "success" ? (
+              <CheckCircle2 size={18} className="shrink-0" />
+            ) : (
+              <AlertTriangle size={18} className="shrink-0" />
+            )}
+
+            <span>{notice.message}</span>
+          </div>
+        )}
       </section>
 
       {/* STUDENT API PREVIEW */}

@@ -1,760 +1,1522 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Users,
-  CheckCircle2,
   AlertTriangle,
-  TrendingUp,
-  UserCheck,
+  BarChart3,
+  BellRing,
   BookOpen,
-  ArrowRight,
-  School,
-  Bot,
-  ShieldAlert,
+  CalendarDays,
+  CheckCircle2,
+  Database,
+  FileDown,
+  GraduationCap,
+  Info,
+  Loader2,
+  PieChart,
+  RefreshCcw,
+  Users,
 } from "lucide-react";
 
+import API from "@/service/api";
+
+/* =========================================================
+   API PATHS
+   ========================================================= */
+
+const API_PATHS = {
+  years: "/academic-years",
+  periods: "/academic-periods",
+  dashboard: "/json/academic/dashboard/search",
+  courseDemand: "/json/academic/course-demand/list",
+  alerts: "/json/academic/alerts/list",
+} as const;
+
+type JsonObject = Record<string, unknown>;
+type QueryParams = Record<string, string | number>;
+
+interface AcademicYear {
+  id: string;
+  code: string;
+}
+
+interface AcademicPeriod {
+  id: string;
+  academicYearId: string | null;
+  code: string;
+  name: string;
+  ojtSemesterId: string | null;
+  assessmentDeadline: string | null;
+}
+
+interface PeriodStatistic {
+  label: string;
+  eligible: number;
+  ineligible: number;
+}
+
+interface CohortProgress {
+  label: string;
+  percent: number;
+}
+
+interface CourseDemand {
+  id: string;
+  code: string;
+  name: string;
+  count: number | null;
+}
+
+interface AcademicAlert {
+  id: string;
+  title: string;
+  description: string;
+  date: string | null;
+}
+
+/* =========================================================
+   DATA HELPERS
+   ========================================================= */
+
+const isObject = (value: unknown): value is JsonObject =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getPath = (value: unknown, path: string): unknown => {
+  return path.split(".").reduce<unknown>((current, key) => {
+    if (!isObject(current)) return undefined;
+    return current[key];
+  }, value);
+};
+
+const readValue = (value: unknown, paths: string[]): unknown => {
+  const sources = [
+    value,
+    getPath(value, "data"),
+    getPath(value, "result"),
+    getPath(value, "data.data"),
+    getPath(value, "data.result"),
+  ];
+
+  for (const source of sources) {
+    for (const path of paths) {
+      const result = getPath(source, path);
+
+      if (result !== undefined && result !== null) {
+        return result;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const readString = (value: unknown, paths: string[]): string | null => {
+  const result = readValue(value, paths);
+
+  if (typeof result === "string" && result.trim()) {
+    return result.trim();
+  }
+
+  if (typeof result === "number" && Number.isFinite(result)) {
+    return String(result);
+  }
+
+  return null;
+};
+
+const readNumber = (value: unknown, paths: string[]): number | null => {
+  const result = readValue(value, paths);
+
+  if (typeof result === "number" && Number.isFinite(result)) {
+    return result;
+  }
+
+  if (
+    typeof result === "string" &&
+    result.trim() !== "" &&
+    Number.isFinite(Number(result))
+  ) {
+    return Number(result);
+  }
+
+  return null;
+};
+
+const readList = (value: unknown, paths: string[] = []): JsonObject[] => {
+  if (Array.isArray(value)) {
+    return value.filter(isObject);
+  }
+
+  const candidates = [
+    ...paths,
+    "items",
+    "rows",
+    "results",
+    "content",
+    "records",
+    "list",
+    "data.items",
+    "data.rows",
+    "data.results",
+    "data",
+    "result.items",
+    "result",
+  ];
+
+  for (const path of candidates) {
+    const result = readValue(value, [path]);
+
+    if (Array.isArray(result)) {
+      return result.filter(isObject);
+    }
+  }
+
+  return [];
+};
+
+const formatNumber = (value: number | null): string => {
+  if (value === null) return "—";
+
+  return new Intl.NumberFormat("vi-VN").format(value);
+};
+
+const formatPercent = (value: number): string => {
+  return `${value.toLocaleString("vi-VN", {
+    maximumFractionDigits: 1,
+  })}%`;
+};
+
+const formatDate = (value: string | null): string => {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("vi-VN");
+};
+
+const clampPercent = (value: number): number =>
+  Math.max(0, Math.min(100, value));
+
+const toApiId = (value: string): string | number =>
+  /^\d+$/.test(value) ? Number(value) : value;
+
+const getErrorMessage = (error: unknown): string => {
+  const apiError = error as {
+    response?: {
+      status?: number;
+      data?: unknown;
+    };
+    message?: string;
+  };
+
+  const status = apiError?.response?.status;
+
+  const message = readString(apiError?.response?.data, [
+    "message",
+    "error.message",
+    "error",
+    "detail",
+  ]);
+
+  if (status === 404) {
+    return "API không tồn tại trên Backend hiện tại (HTTP 404).";
+  }
+
+  if (status === 401) {
+    return "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.";
+  }
+
+  if (status === 403) {
+    return "Tài khoản không có quyền truy cập API này.";
+  }
+
+  if (status === 400) {
+    return message || "Tham số API không hợp lệ.";
+  }
+
+  if (status) {
+    return message || `Backend trả về HTTP ${status}.`;
+  }
+
+  return apiError?.message || "Không thể kết nối Backend.";
+};
+
+const getJson = async (
+  path: string,
+  params: QueryParams,
+  signal: AbortSignal,
+): Promise<unknown> => {
+  const response = await API.get<unknown>(path, {
+    params,
+    signal,
+  });
+
+  return response.data;
+};
+
+const postJson = async (
+  path: string,
+  body: QueryParams,
+  signal: AbortSignal,
+): Promise<unknown> => {
+  const response = await API.post<unknown>(path, body, {
+    signal,
+  });
+
+  return response.data;
+};
+
+/* =========================================================
+   NORMALIZE ACADEMIC YEARS / PERIODS
+   ========================================================= */
+
+const parseAcademicYears = (value: unknown): AcademicYear[] => {
+  return readList(value)
+    .map((item) => {
+      const id = readString(item, ["id"]);
+      const code = readString(item, ["yearCode", "code", "name"]);
+
+      if (!id || !code) return null;
+
+      return { id, code };
+    })
+    .filter((item): item is AcademicYear => item !== null);
+};
+
+const parseAcademicPeriods = (value: unknown): AcademicPeriod[] => {
+  return readList(value)
+    .filter((item) => {
+      const kind = readString(item, ["kind"]);
+
+      return !kind || kind === "SEMESTER";
+    })
+    .map((item) => {
+      const id = readString(item, ["id"]);
+
+      if (!id) return null;
+
+      return {
+        id,
+        academicYearId: readString(item, ["academicYearId", "academicYear.id"]),
+        code: readString(item, ["periodCode", "code"]) || "",
+        name:
+          readString(item, ["name", "periodName", "periodCode"]) || "Kỳ học",
+        ojtSemesterId: readString(item, [
+          "ojtSemesterId",
+          "ojtSemester.id",
+          "ojt.id",
+        ]),
+        assessmentDeadline: readString(item, [
+          "assessmentDeadline",
+          "ojt.assessmentDeadline",
+          "ojtSemester.assessmentDeadline",
+          "assessmentWindow.deadline",
+        ]),
+      };
+    })
+    .filter((item): item is AcademicPeriod => item !== null);
+};
+
+/* =========================================================
+   NORMALIZE DASHBOARD
+   ========================================================= */
+
+const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
+  const items = readList(value, [
+    "eligibilityByPeriod",
+    "eligibilityTrend",
+    "periodStatistics",
+    "statisticsByPeriod",
+    "byPeriod",
+    "charts.eligibilityByPeriod",
+  ]);
+
+  return items
+    .map((item) => {
+      const label = readString(item, [
+        "periodName",
+        "academicPeriodName",
+        "periodCode",
+        "name",
+        "label",
+      ]);
+
+      const eligible = readNumber(item, [
+        "eligibleStudents",
+        "eligibleCount",
+        "eligible",
+      ]);
+
+      const ineligible = readNumber(item, [
+        "ineligibleStudents",
+        "ineligibleCount",
+        "notEligibleCount",
+        "ineligible",
+      ]);
+
+      if (!label || (eligible === null && ineligible === null)) {
+        return null;
+      }
+
+      return {
+        label,
+        eligible: eligible ?? 0,
+        ineligible: ineligible ?? 0,
+      };
+    })
+    .filter((item): item is PeriodStatistic => item !== null);
+};
+
+const parseCohortProgress = (value: unknown): CohortProgress[] => {
+  const items = readList(value, [
+    "cohortProgress",
+    "progressByCohort",
+    "cohortStatistics",
+    "academicProgressByCohort",
+    "charts.cohortProgress",
+  ]);
+
+  return items
+    .map((item) => {
+      const label = readString(item, [
+        "cohortCode",
+        "cohortName",
+        "name",
+        "label",
+      ]);
+
+      const percent = readNumber(item, [
+        "completionPercentage",
+        "completionPercent",
+        "completionRate",
+        "progressPercentage",
+        "progressPercent",
+      ]);
+
+      if (!label || percent === null) return null;
+
+      return {
+        label,
+        percent: clampPercent(percent),
+      };
+    })
+    .filter((item): item is CohortProgress => item !== null);
+};
+
+const parseCourseDemand = (value: unknown): CourseDemand[] => {
+  return readList(value)
+    .map((item, index) => {
+      const code = readString(item, ["courseCode", "code", "course.code"]);
+
+      const name = readString(item, ["courseName", "name", "course.name"]);
+
+      if (!code && !name) return null;
+
+      return {
+        id: readString(item, ["id", "courseId"]) || `course-${index}`,
+        code: code || "—",
+        name: name || "Chưa có tên học phần",
+        count: readNumber(item, [
+          "studentCount",
+          "demandCount",
+          "affectedStudents",
+          "totalStudents",
+          "count",
+        ]),
+      };
+    })
+    .filter((item): item is CourseDemand => item !== null);
+};
+
+const parseAlerts = (value: unknown): AcademicAlert[] => {
+  return readList(value)
+    .map((item, index) => {
+      const title = readString(item, ["title", "alertTitle", "name", "type"]);
+
+      const description = readString(item, [
+        "message",
+        "description",
+        "content",
+        "reason",
+      ]);
+
+      if (!title && !description) return null;
+
+      return {
+        id: readString(item, ["id"]) || `alert-${index}`,
+        title: title || "Cảnh báo học vụ",
+        description: description || "",
+        date: readString(item, ["createdAt", "issuedAt", "date"]),
+      };
+    })
+    .filter((item): item is AcademicAlert => item !== null);
+};
+
+/* =========================================================
+   UI COMPONENTS
+   ========================================================= */
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  loading?: boolean;
+}
+
+const EmptyState: React.FC<EmptyStateProps> = ({
+  title,
+  description,
+  loading = false,
+}) => (
+  <div className="flex min-h-[170px] flex-col items-center justify-center px-5 py-8 text-center">
+    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+      {loading ? (
+        <Loader2 size={20} className="animate-spin" />
+      ) : (
+        <Database size={20} />
+      )}
+    </div>
+
+    <p className="mt-3 text-sm font-semibold text-slate-700">
+      {loading ? "Đang tải dữ liệu..." : title}
+    </p>
+
+    {!loading && description && (
+      <p className="mt-1 max-w-md text-xs leading-5 text-slate-400">
+        {description}
+      </p>
+    )}
+  </div>
+);
+
+const ErrorNotice: React.FC<{ message: string }> = ({ message }) => (
+  <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-600">
+    <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+    <span>{message}</span>
+  </div>
+);
+
+interface MetricCardProps {
+  label: string;
+  value: number | null;
+  description: string;
+  icon: React.ReactNode;
+  iconClass: string;
+  loading: boolean;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({
+  label,
+  value,
+  description,
+  icon,
+  iconClass,
+  loading,
+}) => (
+  <div className="min-w-0 p-4">
+    <div className="flex items-start justify-between gap-3">
+      <p className="text-xs font-semibold text-slate-600">{label}</p>
+
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+      >
+        {icon}
+      </div>
+    </div>
+
+    <p className="mt-4 text-2xl font-extrabold text-slate-900">
+      {loading ? (
+        <span className="inline-block h-7 w-16 animate-pulse rounded bg-slate-100" />
+      ) : (
+        formatNumber(value)
+      )}
+    </p>
+
+    <p className="mt-2 text-[11px] leading-5 text-slate-400">
+      {!loading && value === null ? "Chưa có số liệu từ API" : description}
+    </p>
+  </div>
+);
+
+interface SectionTitleProps {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  iconClass: string;
+}
+
+const SectionTitle: React.FC<SectionTitleProps> = ({
+  icon,
+  title,
+  description,
+  iconClass,
+}) => (
+  <div className="flex items-start gap-3">
+    <div
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+    >
+      {icon}
+    </div>
+
+    <div>
+      <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+
+      {description && (
+        <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
+      )}
+    </div>
+  </div>
+);
+
+/* =========================================================
+   EDUCATION DASHBOARD
+   ========================================================= */
+
 export const EducationDashboard: React.FC = () => {
-  const navigate = useNavigate();
+  /* ---------------- FILTER DATA ---------------- */
 
-  const totalStudents = 5240;
-  const eligibleStudents = 3850;
-  const ineligibleStudents = 1390;
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
 
-  const lowRiskStudents = 4670;
-  const mediumRiskStudents = 420;
-  const highRiskStudents = 150;
+  const [academicPeriods, setAcademicPeriods] = useState<AcademicPeriod[]>([]);
 
-  const lowRiskPercent = 89.1;
-  const mediumRiskPercent = 8.0;
-  const highRiskPercent = 2.9;
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedPeriod, setSelectedPeriod] = useState("");
+
+  /* ---------------- BACKEND DATA ---------------- */
+
+  const [dashboardData, setDashboardData] = useState<unknown>(null);
+  const [courseDemandData, setCourseDemandData] = useState<unknown>(null);
+  const [alertsData, setAlertsData] = useState<unknown>(null);
+
+  /* ---------------- LOADING ---------------- */
+
+  const [filtersLoading, setFiltersLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+
+  /* ---------------- ERRORS ---------------- */
+
+  const [filtersError, setFiltersError] = useState("");
+  const [dashboardError, setDashboardError] = useState("");
+  const [courseDemandError, setCourseDemandError] = useState("");
+  const [alertsError, setAlertsError] = useState("");
+
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  /* =====================================================
+     LOAD FILTERS
+
+     GET /api/academic-years
+     GET /api/academic-periods
+
+     Hai endpoint này đã hoạt động trên Network.
+     ===================================================== */
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadFilters = async () => {
+      setFiltersLoading(true);
+      setFiltersError("");
+
+      const results = await Promise.allSettled([
+        postJson(
+          API_PATHS.dashboard,
+          {
+            ...dashboardParams,
+          },
+          controller.signal,
+        ),
+        postJson(
+          API_PATHS.courseDemand,
+          {
+            page: 1,
+            limit: 20,
+            ...dashboardParams,
+          },
+          controller.signal,
+        ),
+      ]);
+
+      if (controller.signal.aborted) return;
+
+      const errors: string[] = [];
+
+      if (results[0].status === "fulfilled") {
+        setAcademicYears(parseAcademicYears(results[0].value));
+      } else {
+        setAcademicYears([]);
+        errors.push(`Năm học: ${getErrorMessage(results[0].reason)}`);
+      }
+
+      if (results[1].status === "fulfilled") {
+        setAcademicPeriods(parseAcademicPeriods(results[1].value));
+      } else {
+        setAcademicPeriods([]);
+        errors.push(`Kỳ học: ${getErrorMessage(results[1].reason)}`);
+      }
+
+      setFiltersError(errors.join(" | "));
+      setFiltersLoading(false);
+    };
+
+    void loadFilters();
+
+    return () => controller.abort();
+  }, [refreshKey]);
+
+  /* =====================================================
+     SELECTED FILTERS
+     ===================================================== */
+
+  const filteredPeriods = useMemo(() => {
+    if (!selectedYear) return academicPeriods;
+
+    return academicPeriods.filter(
+      (period) => period.academicYearId === selectedYear,
+    );
+  }, [academicPeriods, selectedYear]);
+
+  const selectedPeriodInfo = useMemo(() => {
+    return (
+      academicPeriods.find((period) => period.id === selectedPeriod) || null
+    );
+  }, [academicPeriods, selectedPeriod]);
+
+  const selectedOjtSemesterId = selectedPeriodInfo?.ojtSemesterId || null;
+
+  /*
+   * Backend hiện không chấp nhận academicYearId
+   * trong GET /academic/dashboard.
+   *
+   * Chỉ truyền ojtSemesterId khi kỳ học đã có
+   * liên kết với kỳ OJT.
+   */
+
+  const unsupportedPeriod = Boolean(selectedPeriod) && !selectedOjtSemesterId;
+
+  const dashboardParams = useMemo<QueryParams>(() => {
+    const params: QueryParams = {};
+
+    if (selectedOjtSemesterId) {
+      params.ojtSemesterId = toApiId(selectedOjtSemesterId);
+    }
+
+    return params;
+  }, [selectedOjtSemesterId]);
+
+  /* =====================================================
+     LOAD DASHBOARD AND COURSE DEMAND
+
+     GET /api/academic/dashboard
+     GET /api/academic/course-demand
+
+     Không truyền academicYearId hoặc academicPeriodId
+     vì chưa được xác nhận là query parameter hợp lệ.
+     ===================================================== */
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadDashboard = async () => {
+      setDashboardLoading(true);
+      setDashboardError("");
+      setCourseDemandError("");
+
+      setDashboardData(null);
+      setCourseDemandData(null);
+
+      if (unsupportedPeriod) {
+        setDashboardLoading(false);
+        return;
+      }
+
+      const results = await Promise.allSettled([
+        postJson(
+          API_PATHS.dashboard,
+          {
+            ...dashboardParams,
+          },
+          controller.signal,
+        ),
+        postJson(
+          API_PATHS.courseDemand,
+          {
+            page: 1,
+            limit: 20,
+            ...dashboardParams,
+          },
+          controller.signal,
+        ),
+      ]);
+
+      if (controller.signal.aborted) return;
+
+      if (results[0].status === "fulfilled") {
+        setDashboardData(results[0].value);
+      } else {
+        setDashboardError(getErrorMessage(results[0].reason));
+      }
+
+      if (results[1].status === "fulfilled") {
+        setCourseDemandData(results[1].value);
+      } else {
+        setCourseDemandError(getErrorMessage(results[1].reason));
+      }
+
+      setDashboardLoading(false);
+    };
+
+    void loadDashboard();
+
+    return () => controller.abort();
+  }, [dashboardParams, unsupportedPeriod, refreshKey]);
+
+  /* =====================================================
+     LOAD ACADEMIC ALERTS
+
+     Chỉ gọi khi có đủ:
+     - academicPeriodId
+     - ojtSemesterId
+     - assessmentDeadline
+
+     Dùng POST /api/json/academic/alerts/list
+     trong danh sách Swagger mới.
+     ===================================================== */
+
+  const assessmentDeadline = selectedPeriodInfo?.assessmentDeadline || null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    if (!selectedPeriod || !selectedOjtSemesterId || !assessmentDeadline) {
+      setAlertsData(null);
+      setAlertsError("");
+      setAlertsLoading(false);
+
+      return () => controller.abort();
+    }
+
+    const loadAlerts = async () => {
+      setAlertsLoading(true);
+      setAlertsError("");
+      setAlertsData(null);
+
+      try {
+        const response = await postJson(
+          API_PATHS.alerts,
+          {
+            page: 1,
+            limit: 10,
+            academicPeriodId: toApiId(selectedPeriod),
+            ojtSemesterId: toApiId(selectedOjtSemesterId),
+            assessmentDeadline,
+          },
+          controller.signal,
+        );
+
+        if (controller.signal.aborted) return;
+
+        setAlertsData(response);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+
+        setAlertsError(getErrorMessage(error));
+      } finally {
+        if (!controller.signal.aborted) {
+          setAlertsLoading(false);
+        }
+      }
+    };
+
+    void loadAlerts();
+
+    return () => controller.abort();
+  }, [selectedPeriod, selectedOjtSemesterId, assessmentDeadline, refreshKey]);
+
+  /* =====================================================
+     STATISTICS FROM BACKEND
+
+     Không tự tính điều kiện OJT từ GPA / tín chỉ.
+     ===================================================== */
+
+  const totalStudents = readNumber(dashboardData, [
+    "totalStudents",
+    "totalStudentCount",
+    "studentCount",
+    "summary.totalStudents",
+    "overview.totalStudents",
+    "statistics.totalStudents",
+    "dashboard.totalStudents",
+  ]);
+
+  const eligibleStudents = readNumber(dashboardData, [
+    "eligibleStudents",
+    "eligibleCount",
+    "summary.eligibleStudents",
+    "summary.eligibleCount",
+    "overview.eligibleStudents",
+    "eligibility.eligibleCount",
+    "eligibility.eligibleStudents",
+    "dashboard.eligibleStudents",
+  ]);
+
+  const ineligibleStudents = readNumber(dashboardData, [
+    "ineligibleStudents",
+    "ineligibleCount",
+    "notEligibleCount",
+    "summary.ineligibleStudents",
+    "summary.ineligibleCount",
+    "overview.ineligibleStudents",
+    "eligibility.ineligibleCount",
+    "eligibility.ineligibleStudents",
+    "dashboard.ineligibleStudents",
+  ]);
+
+  const alertCount =
+    readNumber(alertsData, [
+      "total",
+      "totalItems",
+      "totalElements",
+      "totalCount",
+      "pagination.total",
+    ]) ??
+    readNumber(dashboardData, [
+      "alertCount",
+      "totalAlerts",
+      "academicAlertCount",
+      "summary.alertCount",
+      "dashboard.alertCount",
+    ]);
+
+  const assessedStudents =
+    eligibleStudents !== null && ineligibleStudents !== null
+      ? eligibleStudents + ineligibleStudents
+      : null;
+
+  const eligiblePercent =
+    assessedStudents !== null && assessedStudents > 0
+      ? (eligibleStudents! / assessedStudents) * 100
+      : null;
+
+  const ineligiblePercent =
+    assessedStudents !== null && assessedStudents > 0
+      ? (ineligibleStudents! / assessedStudents) * 100
+      : null;
+
+  /* =====================================================
+     CHART DATA
+     ===================================================== */
+
+  const periodStatistics = useMemo(
+    () => parsePeriodStatistics(dashboardData),
+    [dashboardData],
+  );
+
+  const cohortProgress = useMemo(
+    () => parseCohortProgress(dashboardData),
+    [dashboardData],
+  );
+
+  const courseDemands = useMemo(
+    () => parseCourseDemand(courseDemandData),
+    [courseDemandData],
+  );
+
+  const academicAlerts = useMemo(() => parseAlerts(alertsData), [alertsData]);
+
+  const maxPeriodStudents = Math.max(
+    1,
+    ...periodStatistics.map((item) => item.eligible + item.ineligible),
+  );
+
+  const hasAlertContext = Boolean(
+    selectedPeriod && selectedOjtSemesterId && assessmentDeadline,
+  );
+
+  /* =====================================================
+     ACTIONS
+     ===================================================== */
+
+  const handleRefresh = () => {
+    setRefreshKey((current) => current + 1);
+  };
+
+  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedYear(event.target.value);
+    setSelectedPeriod("");
+  };
+
+  /* =====================================================
+     RENDER
+     ===================================================== */
 
   return (
-    <div className="space-y-6">
-      {/* =====================================================
-          HEADER
-          ===================================================== */}
+    <div className="mx-auto w-full max-w-[1500px]">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* =============================================
+            HEADER
+            ============================================= */}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-orange-600">
-            Trang chủ → Tổng quan Phòng Đào tạo
-          </p>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Theo dõi tiến độ học tập, điều kiện OJT và mức nguy cơ trễ OJT của
-            sinh viên.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-        >
-          Xuất báo cáo
-        </button>
-      </div>
-
-      {/* =====================================================
-          TỔNG QUAN
-          ===================================================== */}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Tổng sinh viên */}
-
-        <div className="card-glass p-5">
-          <div className="flex items-start justify-between">
+        <header className="border-b border-slate-200 px-5 py-5 md:px-7">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
-              <p className="text-sm font-medium text-slate-500">
-                Tổng sinh viên
+              <p className="text-xs font-semibold text-orange-600">
+                Trang chủ / Phòng Đào tạo
               </p>
 
-              <p className="mt-2 text-2xl font-extrabold text-slate-900">
-                {totalStudents.toLocaleString("en-US")}
-              </p>
+              <h1 className="mt-2 text-xl font-extrabold text-slate-900">
+                Tổng quan học vụ và OJT
+              </h1>
 
-              <div className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600">
-                <TrendingUp size={14} />
-                <span>5.2% so với kỳ trước</span>
-              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                Theo dõi sinh viên, điều kiện OJT và tình hình học vụ.
+              </p>
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-              <Users size={21} />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <RefreshCcw size={14} />
+                Tải lại
+              </button>
+
+              <button
+                type="button"
+                disabled
+                title="Chưa có API xuất báo cáo tổng hợp"
+                className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-400"
+              >
+                <FileDown size={14} />
+                Xuất báo cáo
+              </button>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Đủ điều kiện OJT */}
+        {/* =============================================
+            FILTERS
+            ============================================= */}
 
-        <div className="card-glass p-5">
-          <div className="flex items-start justify-between">
+        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
+          <div className="mb-4 flex items-center gap-2">
+            <CalendarDays size={16} className="text-orange-500" />
+
+            <h2 className="text-sm font-bold text-slate-800">
+              Phạm vi thống kê
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <p className="text-sm font-medium text-slate-500">
-                Đủ điều kiện OJT
-              </p>
+              <label
+                htmlFor="dashboard-year"
+                className="mb-2 block text-xs font-semibold text-slate-600"
+              >
+                Năm học
+              </label>
 
-              <p className="mt-2 text-2xl font-extrabold text-slate-900">
-                {eligibleStudents.toLocaleString("en-US")}
-              </p>
+              <select
+                id="dashboard-year"
+                value={selectedYear}
+                onChange={handleYearChange}
+                disabled={filtersLoading}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-orange-400 disabled:opacity-60"
+              >
+                <option value="">Tất cả năm học</option>
 
-              <p className="mt-2 text-xs font-medium text-green-600">
-                73.5% tổng sinh viên
-              </p>
+                {academicYears.map((year) => (
+                  <option key={year.id} value={year.id}>
+                    {year.code}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 text-green-600">
-              <CheckCircle2 size={21} />
-            </div>
-          </div>
-        </div>
-
-        {/* Chưa đủ điều kiện */}
-
-        <div className="card-glass p-5">
-          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">
-                Chưa đủ điều kiện OJT
-              </p>
+              <label
+                htmlFor="dashboard-period"
+                className="mb-2 block text-xs font-semibold text-slate-600"
+              >
+                Kỳ học
+              </label>
 
-              <p className="mt-2 text-2xl font-extrabold text-red-600">
-                {ineligibleStudents.toLocaleString("en-US")}
-              </p>
+              <select
+                id="dashboard-period"
+                value={selectedPeriod}
+                onChange={(event) => setSelectedPeriod(event.target.value)}
+                disabled={filtersLoading}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-orange-400 disabled:opacity-60"
+              >
+                <option value="">Tất cả kỳ học</option>
 
-              <p className="mt-2 text-xs font-medium text-red-500">
-                Cần theo dõi điều kiện OJT
-              </p>
+                {filteredPeriods.map((period) => (
+                  <option key={period.id} value={period.id}>
+                    {period.name}
+                    {period.code ? ` (${period.code})` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 text-red-600">
-              <AlertTriangle size={21} />
-            </div>
-          </div>
-        </div>
-
-        {/* Lớp hỗ trợ */}
-
-        <div className="card-glass p-5">
-          <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Lớp hỗ trợ</p>
+              <label
+                htmlFor="dashboard-cohort"
+                className="mb-2 block text-xs font-semibold text-slate-600"
+              >
+                Khóa
+              </label>
 
-              <p className="mt-2 text-2xl font-extrabold text-slate-900">12</p>
-
-              <p className="mt-2 text-xs font-medium text-blue-600">
-                Lớp hỗ trợ đang được quản lý
-              </p>
-            </div>
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-              <School size={21} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* =====================================================
-          PHÂN BỐ MỨC NGUY CƠ
-          ===================================================== */}
-
-      <div className="card-glass p-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          {/* Tiêu đề */}
-
-          <div className="lg:w-[260px]">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
-                <ShieldAlert size={21} />
-              </div>
-
-              <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Phân bố mức nguy cơ
-                </h2>
-
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Nguy cơ sinh viên bị trễ so với lộ trình OJT dự kiến.
-                </p>
-              </div>
+              <select
+                id="dashboard-cohort"
+                disabled
+                className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-400"
+              >
+                <option>Chưa hỗ trợ lọc theo khóa</option>
+              </select>
             </div>
           </div>
 
-          {/* Ba mức nguy cơ */}
-
-          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
-            {/* Thấp */}
-
-            <div className="rounded-2xl border border-green-100 bg-green-50/70 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-green-700">
-                    Nguy cơ thấp
-                  </p>
-
-                  <p className="mt-1 text-xl font-extrabold text-slate-900">
-                    {lowRiskStudents.toLocaleString("en-US")}
-                  </p>
-                </div>
-
-                <CheckCircle2 size={21} className="text-green-500" />
-              </div>
-
-              <p className="mt-2 text-xs font-semibold text-green-600">
-                {lowRiskPercent}% tổng sinh viên
-              </p>
+          {filtersError && (
+            <div className="mt-3">
+              <ErrorNotice message={filtersError} />
             </div>
+          )}
 
-            {/* Trung bình */}
+          <div className="mt-4 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-3 text-xs leading-5 text-blue-600">
+            <Info size={15} className="mt-0.5 shrink-0" />
 
-            <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-orange-700">
-                    Nguy cơ trung bình
-                  </p>
-
-                  <p className="mt-1 text-xl font-extrabold text-slate-900">
-                    {mediumRiskStudents.toLocaleString("en-US")}
-                  </p>
-                </div>
-
-                <AlertTriangle size={21} className="text-orange-500" />
-              </div>
-
-              <p className="mt-2 text-xs font-semibold text-orange-600">
-                {mediumRiskPercent}% tổng sinh viên
-              </p>
-            </div>
-
-            {/* Cao */}
-
-            <div className="rounded-2xl border border-red-100 bg-red-50/70 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-red-700">
-                    Nguy cơ cao
-                  </p>
-
-                  <p className="mt-1 text-xl font-extrabold text-slate-900">
-                    {highRiskStudents.toLocaleString("en-US")}
-                  </p>
-                </div>
-
-                <ShieldAlert size={21} className="text-red-500" />
-              </div>
-
-              <p className="mt-2 text-xs font-semibold text-red-600">
-                {highRiskPercent}% tổng sinh viên
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Thanh phân bố */}
-
-        <div className="mt-5">
-          <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full bg-green-500"
-              style={{ width: `${lowRiskPercent}%` }}
-            />
-
-            <div
-              className="h-full bg-orange-500"
-              style={{ width: `${mediumRiskPercent}%` }}
-            />
-
-            <div
-              className="h-full bg-red-500"
-              style={{ width: `${highRiskPercent}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* =====================================================
-          BIỂU ĐỒ
-          ===================================================== */}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Xu hướng nguy cơ */}
-
-        <div className="card-glass p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Xu hướng nguy cơ theo kỳ
-              </h2>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Số lượng sinh viên có mức nguy cơ cao theo từng kỳ.
-              </p>
-            </div>
-
-            <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
-              3 năm gần đây
+            <span>
+              {unsupportedPeriod
+                ? "Kỳ học này chưa có mã kỳ OJT trong dữ liệu trả về. Không tải thống kê để tránh hiển thị nhầm dữ liệu toàn hệ thống."
+                : selectedOjtSemesterId
+                  ? "Đang thống kê theo kỳ OJT được liên kết với kỳ học đã chọn."
+                  : selectedYear
+                    ? "Năm học đang được dùng để lọc danh sách kỳ học. Backend chưa hỗ trợ lọc trực tiếp thống kê bằng academicYearId nên số liệu bên dưới vẫn thuộc phạm vi toàn hệ thống."
+                    : "Đang xem thống kê toàn hệ thống. Chọn kỳ học có cấu hình OJT để lọc theo kỳ OJT."}
             </span>
           </div>
+        </section>
 
-          <div className="mt-6 flex h-48 items-end gap-3 border-b border-slate-200 px-2">
-            {[
-              { label: "Spring 23", value: 42 },
-              { label: "Summer 23", value: 51 },
-              { label: "Fall 23", value: 47 },
-              { label: "Spring 24", value: 68 },
-              { label: "Summer 24", value: 61 },
-              { label: "Fall 24", value: 82 },
-              { label: "Spring 25", value: 74 },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="flex h-full flex-1 flex-col items-center justify-end gap-2"
-              >
-                <span className="text-[10px] font-semibold text-slate-500">
-                  {item.value}
-                </span>
+        {/* =============================================
+            OVERVIEW
+            ============================================= */}
 
-                <div
-                  className="w-full max-w-8 rounded-t-md bg-orange-400 transition-all"
-                  style={{
-                    height: `${Math.max(item.value, 20)}%`,
-                  }}
+        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
+          <h2 className="mb-4 text-sm font-bold text-slate-800">
+            Thống kê tổng quan
+          </h2>
+
+          {dashboardError && (
+            <div className="mb-4">
+              <ErrorNotice message={`Dashboard: ${dashboardError}`} />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">
+            <div className="border-slate-200 sm:border-r sm:border-b xl:border-b-0">
+              <MetricCard
+                label="Tổng sinh viên"
+                value={totalStudents}
+                description="Theo dữ liệu thống kê học vụ"
+                icon={<Users size={18} />}
+                iconClass="bg-blue-50 text-blue-600"
+                loading={dashboardLoading}
+              />
+            </div>
+
+            <div className="border-slate-200 sm:border-b xl:border-r xl:border-b-0">
+              <MetricCard
+                label="Đủ điều kiện OJT"
+                value={eligibleStudents}
+                description="Được Backend xác nhận đủ điều kiện"
+                icon={<CheckCircle2 size={18} />}
+                iconClass="bg-green-50 text-green-600"
+                loading={dashboardLoading}
+              />
+            </div>
+
+            <div className="border-slate-200 sm:border-r">
+              <MetricCard
+                label="Chưa đủ điều kiện OJT"
+                value={ineligibleStudents}
+                description="Cần theo dõi điều kiện OJT"
+                icon={<AlertTriangle size={18} />}
+                iconClass="bg-red-50 text-red-600"
+                loading={dashboardLoading}
+              />
+            </div>
+
+            <MetricCard
+              label="Cảnh báo học vụ"
+              value={alertCount}
+              description="Cảnh báo được hệ thống ghi nhận"
+              icon={<BellRing size={18} />}
+              iconClass="bg-orange-50 text-orange-600"
+              loading={dashboardLoading || alertsLoading}
+            />
+          </div>
+        </section>
+
+        {/* =============================================
+            OJT STATISTICS
+            ============================================= */}
+
+        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
+          <h2 className="mb-4 text-sm font-bold text-slate-800">
+            Thống kê điều kiện OJT
+          </h2>
+
+          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 lg:grid-cols-2">
+            {/* OJT PERCENT */}
+
+            <div className="border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
+              <SectionTitle
+                icon={<PieChart size={18} />}
+                title="Tỷ lệ đủ điều kiện OJT"
+                description="Tính trên nhóm sinh viên đã có kết quả xét."
+                iconClass="bg-green-50 text-green-600"
+              />
+
+              {eligiblePercent === null ? (
+                <EmptyState
+                  loading={dashboardLoading}
+                  title="Chưa có kết quả xét điều kiện OJT"
+                  description="Biểu đồ sẽ hiển thị khi API Dashboard trả đủ số sinh viên đã xét."
                 />
+              ) : (
+                <div className="py-7">
+                  <div className="flex flex-col items-center justify-center gap-6 sm:flex-row">
+                    <div
+                      className="relative h-40 w-40 shrink-0 rounded-full"
+                      style={{
+                        background: `conic-gradient(
+                          #22c55e 0% ${clampPercent(eligiblePercent)}%,
+                          #f87171 ${clampPercent(eligiblePercent)}% 100%
+                        )`,
+                      }}
+                    >
+                      <div className="absolute inset-5 flex flex-col items-center justify-center rounded-full bg-white">
+                        <span className="text-2xl font-extrabold text-slate-800">
+                          {formatPercent(eligiblePercent)}
+                        </span>
 
-                <span className="whitespace-nowrap text-[9px] text-slate-400">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Phân bố điểm nguy cơ */}
-
-        <div className="card-glass p-6">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">
-              Phân bố điểm nguy cơ
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Phân loại sinh viên theo kết quả dự báo nguy cơ trễ OJT.
-            </p>
-          </div>
-
-          <div className="mt-5 flex flex-col items-center justify-center sm:flex-row sm:gap-10">
-            {/* Donut */}
-
-            <div
-              className="relative flex h-44 w-44 shrink-0 items-center justify-center rounded-full"
-              style={{
-                background:
-                  "conic-gradient(#22c55e 0deg 321deg, #f97316 321deg 350deg, #dc2626 350deg 360deg)",
-              }}
-            >
-              <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-white">
-                <span className="text-2xl font-extrabold text-slate-900">
-                  5.2k
-                </span>
-
-                <span className="text-xs text-slate-500">Tổng sinh viên</span>
-              </div>
-            </div>
-
-            {/* Chú thích */}
-
-            <div className="mt-5 w-full space-y-3 sm:mt-0 sm:w-auto">
-              <div className="flex items-center justify-between gap-8 text-xs">
-                <span className="flex items-center gap-2 text-slate-600">
-                  <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                  Nguy cơ thấp
-                </span>
-
-                <span className="font-bold text-slate-900">
-                  {lowRiskPercent}%
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-8 text-xs">
-                <span className="flex items-center gap-2 text-slate-600">
-                  <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-                  Nguy cơ trung bình
-                </span>
-
-                <span className="font-bold text-slate-900">
-                  {mediumRiskPercent}%
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-8 text-xs">
-                <span className="flex items-center gap-2 text-slate-600">
-                  <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-                  Nguy cơ cao
-                </span>
-
-                <span className="font-bold text-slate-900">
-                  {highRiskPercent}%
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* =====================================================
-          TIẾN ĐỘ + ĐIỀU KIỆN
-          ===================================================== */}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Tiến độ học tập */}
-
-        <div className="card-glass p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Tiến độ học tập theo khóa
-              </h2>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Theo dõi mức độ hoàn thành chương trình của sinh viên.
-              </p>
-            </div>
-
-            <BookOpen className="text-blue-500" size={21} />
-          </div>
-
-          <div className="mt-6 space-y-5">
-            {[
-              { label: "Khóa 16 (K16)", value: 98 },
-              { label: "Khóa 17 (K17)", value: 75 },
-              { label: "Khóa 18 (K18)", value: 42 },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-700">
-                    {item.label}
-                  </span>
-
-                  <span className="text-xs font-semibold text-slate-500">
-                    {item.value}% hoàn thành
-                  </span>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-blue-500"
-                    style={{
-                      width: `${item.value}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Điều kiện OJT */}
-
-        <div className="card-glass p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Thống kê điều kiện OJT
-              </h2>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Tỷ lệ sinh viên đủ và chưa đủ điều kiện OJT.
-              </p>
-            </div>
-
-            <UserCheck className="text-green-500" size={21} />
-          </div>
-
-          <div className="mt-6 space-y-5">
-            <div>
-              <div className="mb-2 flex justify-between text-xs">
-                <span className="font-semibold text-slate-700">
-                  Đủ điều kiện
-                </span>
-
-                <span className="font-bold text-green-600">
-                  {eligibleStudents.toLocaleString("en-US")}
-                </span>
-              </div>
-
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-green-500"
-                  style={{ width: "73.5%" }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 flex justify-between text-xs">
-                <span className="font-semibold text-slate-700">
-                  Chưa đủ điều kiện
-                </span>
-
-                <span className="font-bold text-red-600">
-                  {ineligibleStudents.toLocaleString("en-US")}
-                </span>
-              </div>
-
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-red-500"
-                  style={{ width: "26.5%" }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* =====================================================
-          SINH VIÊN CẦN ƯU TIÊN HỖ TRỢ
-          ===================================================== */}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
-        {/* Danh sách */}
-
-        <div className="card-glass overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 p-5">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Sinh viên cần ưu tiên hỗ trợ
-              </h2>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Sinh viên có mức nguy cơ cao hoặc có vấn đề ảnh hưởng đến tiến
-                độ OJT.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate("/education/risk-students")}
-              className="whitespace-nowrap text-xs font-semibold text-orange-600 transition hover:text-orange-700"
-            >
-              Xem tất cả
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-left">
-                  <th className="px-5 py-3 text-[10px] font-bold uppercase text-slate-500">
-                    Sinh viên
-                  </th>
-
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">
-                    MSSV
-                  </th>
-
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">
-                    Điểm nguy cơ
-                  </th>
-
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">
-                    Vấn đề chính
-                  </th>
-
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase text-slate-500">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {[
-                  {
-                    name: "Nguyễn Thành Phương",
-                    id: "SE161234",
-                    risk: "92/100",
-                    issue: "Thiếu điều kiện cần thiết cho OJT",
-                    action: "Xem",
-                  },
-                  {
-                    name: "Phan Lan Anh",
-                    id: "SE161458",
-                    risk: "78/100",
-                    issue: "Tiến độ học tập cần theo dõi",
-                    action: "Xem",
-                  },
-                  {
-                    name: "Trần Hùng Dũng",
-                    id: "SE161789",
-                    risk: "80/100",
-                    issue: "Chưa hoàn thành môn tiên quyết",
-                    action: "Xem",
-                  },
-                ].map((student) => (
-                  <tr
-                    key={student.id}
-                    className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
-                          {student.name.charAt(0)}
-                        </div>
-
-                        <span className="whitespace-nowrap text-xs font-semibold text-slate-800">
-                          {student.name}
+                        <span className="mt-1 text-[11px] text-slate-400">
+                          Đủ điều kiện
                         </span>
                       </div>
-                    </td>
+                    </div>
 
-                    <td className="px-4 py-4 text-xs text-slate-500">
-                      {student.id}
-                    </td>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <span className="h-3 w-3 rounded-full bg-green-500" />
 
-                    <td className="px-4 py-4">
-                      <span className="whitespace-nowrap rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600">
-                        {student.risk}
+                        <div>
+                          <p className="text-xs text-slate-500">Đủ điều kiện</p>
+
+                          <p className="text-sm font-bold text-slate-800">
+                            {formatNumber(eligibleStudents)} sinh viên
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="h-3 w-3 rounded-full bg-red-400" />
+
+                        <div>
+                          <p className="text-xs text-slate-500">
+                            Chưa đủ điều kiện
+                          </p>
+
+                          <p className="text-sm font-bold text-slate-800">
+                            {formatNumber(ineligibleStudents)} sinh viên
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-400">
+                        Tổng đã xét: {formatNumber(assessedStudents)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded-lg bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+                    Tỷ lệ chưa đủ điều kiện:{" "}
+                    <strong>{formatPercent(ineligiblePercent ?? 0)}</strong>.
+                    Kết quả được lấy từ dữ liệu Backend.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* OJT BY PERIOD */}
+
+            <div className="p-5">
+              <SectionTitle
+                icon={<BarChart3 size={18} />}
+                title="Điều kiện OJT theo kỳ"
+                description="So sánh kết quả xét giữa các kỳ học."
+                iconClass="bg-blue-50 text-blue-600"
+              />
+
+              {periodStatistics.length === 0 ? (
+                <EmptyState
+                  loading={dashboardLoading}
+                  title="Chưa có thống kê theo kỳ"
+                  description="API Dashboard chưa cung cấp danh sách thống kê điều kiện OJT theo từng kỳ."
+                />
+              ) : (
+                <div className="mt-6 space-y-5">
+                  {periodStatistics.map((period, index) => {
+                    const eligibleWidth =
+                      (period.eligible / maxPeriodStudents) * 100;
+
+                    const ineligibleWidth =
+                      (period.ineligible / maxPeriodStudents) * 100;
+
+                    return (
+                      <div key={`${period.label}-${index}`}>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-xs font-semibold text-slate-700">
+                            {period.label}
+                          </span>
+
+                          <span className="text-xs text-slate-400">
+                            {formatNumber(period.eligible + period.ineligible)}{" "}
+                            SV
+                          </span>
+                        </div>
+
+                        <div className="flex h-3 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="bg-green-500"
+                            style={{
+                              width: `${eligibleWidth}%`,
+                            }}
+                          />
+
+                          <div
+                            className="bg-red-400"
+                            style={{
+                              width: `${ineligibleWidth}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex flex-wrap gap-4 pt-2 text-xs text-slate-500">
+                    <span className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                      Đủ điều kiện
+                    </span>
+
+                    <span className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                      Chưa đủ điều kiện
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* =============================================
+            ACADEMIC STATISTICS
+            ============================================= */}
+
+        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
+          <h2 className="mb-4 text-sm font-bold text-slate-800">
+            Thống kê học tập
+          </h2>
+
+          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 lg:grid-cols-2">
+            {/* COHORT PROGRESS */}
+
+            <div className="border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
+              <SectionTitle
+                icon={<GraduationCap size={18} />}
+                title="Tiến độ học tập theo khóa"
+                description="Tỷ lệ hoàn thành chương trình học theo khóa."
+                iconClass="bg-blue-50 text-blue-600"
+              />
+
+              {cohortProgress.length === 0 ? (
+                <EmptyState
+                  loading={dashboardLoading}
+                  title="Chưa có dữ liệu tiến độ"
+                  description="Chưa nhận được tỷ lệ hoàn thành chương trình học theo khóa từ Backend."
+                />
+              ) : (
+                <div className="mt-6 space-y-5">
+                  {cohortProgress.map((cohort, index) => (
+                    <div key={`${cohort.label}-${index}`}>
+                      <div className="mb-2 flex justify-between gap-3">
+                        <span className="text-xs font-semibold text-slate-700">
+                          {cohort.label}
+                        </span>
+
+                        <span className="text-xs font-bold text-blue-600">
+                          {formatPercent(cohort.percent)}
+                        </span>
+                      </div>
+
+                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-blue-500"
+                          style={{
+                            width: `${cohort.percent}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* COURSE DEMAND */}
+
+            <div className="p-5">
+              <SectionTitle
+                icon={<BookOpen size={18} />}
+                title="Nhu cầu học phần"
+                description="Các học phần có nhu cầu học từ dữ liệu học vụ."
+                iconClass="bg-orange-50 text-orange-600"
+              />
+
+              {courseDemandError && (
+                <div className="mt-4">
+                  <ErrorNotice message={courseDemandError} />
+                </div>
+              )}
+
+              {courseDemands.length === 0 ? (
+                <EmptyState
+                  loading={dashboardLoading}
+                  title="Chưa có thống kê nhu cầu học phần"
+                  description="Chưa có dữ liệu học phần phù hợp từ Backend."
+                />
+              ) : (
+                <div className="mt-5 divide-y divide-slate-100">
+                  {courseDemands.slice(0, 5).map((course) => (
+                    <div
+                      key={course.id}
+                      className="flex items-center justify-between gap-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800">
+                          {course.code}
+                        </p>
+
+                        <p className="mt-1 truncate text-xs text-slate-500">
+                          {course.name}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold text-orange-600">
+                          {formatNumber(course.count)}
+                        </p>
+
+                        <p className="text-[11px] text-slate-400">Sinh viên</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* =============================================
+            ACADEMIC ALERTS
+            ============================================= */}
+
+        <section className="px-5 py-5 md:px-7">
+          <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <SectionTitle
+              icon={<BellRing size={18} />}
+              title="Danh sách cảnh báo học vụ"
+              description="Các cảnh báo được hệ thống ghi nhận để Phòng Đào tạo theo dõi."
+              iconClass="bg-orange-50 text-orange-600"
+            />
+
+            <div className="rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-600">
+              Tổng cảnh báo: {formatNumber(alertCount)}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            {alertsError && (
+              <div className="m-4">
+                <ErrorNotice message={alertsError} />
+              </div>
+            )}
+
+            {!hasAlertContext ? (
+              <EmptyState
+                title="Chưa đủ thông tin để tải cảnh báo"
+                description="Cần chọn kỳ học có cấu hình kỳ OJT và hạn đánh giá. Backend yêu cầu đủ các thông tin này để truy vấn cảnh báo."
+              />
+            ) : academicAlerts.length === 0 ? (
+              <EmptyState
+                loading={alertsLoading}
+                title="Chưa có cảnh báo học vụ"
+                description="Chưa có dữ liệu cảnh báo được trả về cho phạm vi đang chọn."
+              />
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {academicAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex items-start gap-3 px-5 py-4 transition hover:bg-slate-50"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
+                      <AlertTriangle size={17} />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-800">
+                        {alert.title}
+                      </p>
+
+                      {alert.description && (
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          {alert.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {alert.date && (
+                      <span className="shrink-0 text-xs text-slate-400">
+                        {formatDate(alert.date)}
                       </span>
-                    </td>
-
-                    <td className="px-4 py-4 text-xs text-slate-600">
-                      {student.issue}
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <button
-                        type="button"
-                        onClick={() => navigate("/education/risk-students")}
-                        className="text-xs font-semibold text-orange-600 transition hover:text-orange-700"
-                      >
-                        {student.action}
-                      </button>
-                    </td>
-                  </tr>
+                    )}
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
 
-        {/* =================================================
-            CẢNH BÁO + ĐỀ XUẤT AI
-            ================================================= */}
+        {/* =============================================
+            FOOTER
+            ============================================= */}
 
-        <div className="space-y-6">
-          {/* Cảnh báo AI */}
+        <footer className="flex items-start gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 text-xs leading-5 text-slate-500 md:px-7">
+          <Info size={15} className="mt-0.5 shrink-0 text-blue-500" />
 
-          <div className="card-glass p-5">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
-                <Bot size={19} />
-              </div>
-
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Cảnh báo mới từ AI
-                </h2>
-
-                <p className="text-[11px] text-slate-500">
-                  Các cảnh báo cần Phòng Đào tạo theo dõi.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <div className="rounded-xl border border-red-100 bg-red-50 p-3">
-                <p className="text-xs font-bold text-red-700">
-                  Cảnh báo nguy cơ cao
-                </p>
-
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  Phát hiện 42 sinh viên có mức nguy cơ cao và chưa đủ điều kiện
-                  OJT.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
-                <p className="text-xs font-bold text-orange-700">
-                  Đề xuất hỗ trợ
-                </p>
-
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  AI đề xuất mở lớp hỗ trợ cho nhóm sinh viên có cùng vấn đề học
-                  tập.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate("/education/risk-alerts")}
-              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-orange-600"
-            >
-              Xem cảnh báo
-              <ArrowRight size={14} />
-            </button>
-          </div>
-
-          {/* Đề xuất lớp */}
-
-          <div className="card-glass p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Đề xuất mở lớp từ AI
-                </h2>
-
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Lớp được đề xuất dựa trên nhu cầu hỗ trợ.
-                </p>
-              </div>
-
-              <Bot className="text-orange-500" size={19} />
-            </div>
-
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-700">
-                    SW302 - Software Design
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Dự kiến: 120 sinh viên
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => navigate("/education/ai-class-proposals")}
-                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-50 hover:text-orange-500"
-                >
-                  <ArrowRight size={15} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-700">
-                    PRN231 - .NET Application
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Dự kiến: 85 sinh viên
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => navigate("/education/ai-class-proposals")}
-                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-50 hover:text-orange-500"
-                >
-                  <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          <span>
+            Dashboard chỉ hiển thị số liệu do Backend cung cấp. Hệ thống không
+            tự xét điều kiện OJT, không tự tạo cảnh báo AI và không sử dụng dữ
+            liệu giả. Những thống kê chưa có dữ liệu phù hợp sẽ được để trống.
+          </span>
+        </footer>
       </div>
     </div>
   );
