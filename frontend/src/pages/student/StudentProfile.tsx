@@ -1,142 +1,230 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useBaseLayout } from '../../layouts/BaseLayout';
-import { ChevronDownIcon, BotSparkleIcon, CheckCircleIcon } from '@/components/common/icons/AppIcons';
-import { PageBanner } from '@/components/common/PageBanner';
-import { mockStudentProfile } from '@/data/student/mockStudentData';
+import { useState } from 'react';
+import { useStudentPortal } from '@/contexts/StudentPortalContext';
+import { useStudentResource } from '@/hooks/useStudentResource';
+import { getCourseResults, getCurriculum } from '@/services/student';
+import {
+  Card,
+  Empty,
+  Metrics,
+  Pagination,
+  ResourceState,
+  statusText,
+  StudentPage,
+  valueText,
+  inputClass,
+} from '@/components/student/PortalUI';
+import { ComboRegistration } from '@/components/student/ComboRegistration';
 
-import { AcademicStatsRow } from '@/components/student/academic-profile/AcademicStatsRow';
-import { CreditProgressChartCard } from '@/components/student/academic-profile/CreditProgressChartCard';
-import { AcademicRoadmapTimeline } from '@/components/student/academic-profile/AcademicRoadmapTimeline';
-import { SubjectListTableCard } from '@/components/student/academic-profile/SubjectListTableCard';
-
-import { mockAcademicStats } from '@/data/student/mockAcademicProfileData';
-
-export const StudentAcademicProfile: React.FC = () => {
-  const navigate = useNavigate();
-  const { openAIConsult } = useBaseLayout();
-  const [selectedSemester, setSelectedSemester] = useState('Spring 2024 (Kỳ 6)');
-
+export const StudentAcademicProfile = () => {
+  const { profile, revision, loading } = useStudentPortal();
+  const [page, setPage] = useState(1);
+  const [courseSearch, setCourseSearch] = useState('');
+  const results = useStudentResource(
+    !loading && profile
+      ? 'courses:' + profile.id + ':' + page + ':' + revision
+      : null,
+    (signal) => getCourseResults(profile!.id, page, signal),
+  );
+  const curriculum = useStudentResource(
+    !loading && profile ? 'curriculum:' + profile.id + ':' + revision : null,
+    getCurriculum,
+  );
+  const progress = profile?.academicProgress;
+  const visible = results.data?.items.filter((item) =>
+    (item.courseCode + ' ' + item.courseName)
+      .toLocaleLowerCase()
+      .includes(courseSearch.toLocaleLowerCase()),
+  );
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12 w-full max-w-[1400px] mx-auto font-outfit">
-      
-      {/* Top Reusable Page Banner with Premium Look */}
-      <PageBanner
-        student={mockStudentProfile}
-        menuId="academic-profile"
-        title="Hồ Sơ Học Tập & Tiến Độ"
-        description="Theo dõi toàn diện quá trình học tập, tín chỉ tích lũy và kiểm tra điều kiện tham gia OJT một cách trực quan nhất."
-        breadcrumb={
-          <div className="flex items-center gap-2 text-xs font-semibold text-purple-200/80">
-            <button
-              type="button"
-              onClick={() => navigate('/student/dashboard')}
-              className="hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-            >
-              Trang chủ
-            </button>
-            <span className="text-white/40">/</span>
-            <span className="text-amber-300 font-bold drop-shadow-md">Hồ sơ học tập</span>
-          </div>
-        }
-        badge={
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg border border-orange-400/50">
-            Kỳ 6 • KTPM
-          </span>
-        }
-        primaryAction={{
-          label: 'AI Tư vấn lộ trình tối ưu',
-          icon: <BotSparkleIcon size={16} />,
-          className: "bg-white text-purple-700 hover:bg-purple-50",
-          onClick: () =>
-            openAIConsult(
-              'Tôi muốn tư vấn tối ưu lộ trình môn học và các điều kiện tiên quyết từ kỳ 1 đến kỳ 6.'
-            ),
-        }}
-        extra={
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-xl rounded-2xl px-5 py-3 border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-              <span className="text-sm font-semibold text-purple-100 whitespace-nowrap">
-                Học kỳ hiện tại:
-              </span>
-              <div className="relative group">
-                <select
-                  value={selectedSemester}
-                  onChange={(e) => setSelectedSemester(e.target.value)}
-                  className="appearance-none bg-transparent pr-8 text-sm font-bold text-white focus:outline-none cursor-pointer"
-                >
-                  <option value="Spring 2024 (Kỳ 6)" className="bg-slate-900 text-white">Spring 2024 (Kỳ 6)</option>
-                  <option value="Fall 2023 (Kỳ 5)" className="bg-slate-900 text-white">Fall 2023 (Kỳ 5)</option>
-                  <option value="Summer 2023 (Kỳ 4)" className="bg-slate-900 text-white">Summer 2023 (Kỳ 4)</option>
-                </select>
-                <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-white/70 group-hover:text-white transition-colors">
-                  <ChevronDownIcon size={16} />
-                </div>
+    <StudentPage
+      title="Hồ sơ học tập & tiến độ"
+      description="Bảng điểm, chương trình đào tạo và đăng ký combo từ dữ liệu học vụ của bạn."
+      needsSemester={false}
+    >
+      {profile && progress && (
+        <>
+          <Card title={profile.fullName}>
+            <dl className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                Mã sinh viên: <strong>{profile.studentCode}</strong>
               </div>
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-emerald-300 font-medium px-2">
-              <CheckCircleIcon size={12} />
-              Đã đồng bộ dữ liệu FAP
-            </div>
-          </div>
-        }
-      />
-
-      {/* Section 1: Top 4 Metric Stat Cards */}
-      <div className="relative z-10 -mt-10 mx-4 lg:mx-8">
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-white shadow-2xl shadow-slate-200/50">
-          <AcademicStatsRow stats={mockAcademicStats} />
-        </div>
-      </div>
-
-      <div className="px-4 lg:px-8 space-y-8">
-        {/* Section 2: Middle Row - Credit Chart & Roadmap Timeline */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          {/* Tiến độ tín chỉ với Biểu đồ & Animation (7 cols) */}
-          <div className="lg:col-span-7 flex flex-col h-full rounded-3xl bg-white shadow-xl shadow-slate-200/40 border border-slate-100/60 overflow-hidden relative group hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 to-orange-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative z-10 p-6 flex-1 flex flex-col">
-              <CreditProgressChartCard />
-            </div>
-          </div>
-
-          {/* Lộ trình học tập cụ thể từ Kỳ 1 đến Kỳ 6 (5 cols) */}
-          <div className="lg:col-span-5 flex flex-col h-full rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 shadow-xl shadow-slate-900/20 border border-slate-700/50 overflow-hidden relative hover:shadow-2xl hover:shadow-orange-500/20 transition-all duration-500 text-white">
-            {/* Decoration */}
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div className="relative z-10 p-6 flex-1 flex flex-col">
-              <AcademicRoadmapTimeline
-                onViewDetailedRoadmap={() =>
-                  openAIConsult('Tôi muốn xem chi tiết lộ trình học tập và điều kiện hoàn thành từ kỳ 1 đến kỳ 6.')
-                }
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Bottom Row - Full Width Subject List Table */}
-        <div className="w-full rounded-3xl bg-white shadow-xl shadow-slate-200/40 border border-slate-100/60 p-6">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-800">Danh sách môn học</h2>
-              <p className="text-sm text-slate-500 mt-1">Chi tiết kết quả học tập và trạng thái các môn tiên quyết OJT</p>
-            </div>
-            <div className="flex gap-2">
-              <span className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-100">
-                24 Môn đã qua
-              </span>
-              <span className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold border border-rose-100">
-                1 Môn học lại
-              </span>
-            </div>
-          </div>
-          <SubjectListTableCard />
-        </div>
-      </div>
-    </div>
+              <div>Email: {profile.email}</div>
+              <div>Lớp: {profile.className || 'Chưa cập nhật'}</div>
+              <div>
+                Chương trình: {profile.program?.name || 'Chưa cập nhật'}
+              </div>
+              <div>
+                Chuyên ngành: {profile.program?.majorName || 'Chưa cập nhật'}
+              </div>
+              <div>
+                Kỳ học:{' '}
+                {profile.currentAcademicPeriod?.name ||
+                  profile.currentSemester ||
+                  'Chưa cập nhật'}
+              </div>
+            </dl>
+          </Card>
+          <Metrics
+            values={[
+              {
+                label: 'GPA',
+                value:
+                  progress.gpa == null
+                    ? 'Chưa có dữ liệu'
+                    : progress.gpa + ' / ' + (progress.gpaScale ?? '—'),
+              },
+              { label: 'Tín chỉ đã đạt', value: progress.credits.earned },
+              {
+                label: 'Tổng tín chỉ chương trình',
+                value: valueText(progress.credits.total),
+              },
+              {
+                label: 'Tín chỉ còn lại',
+                value: valueText(progress.credits.remaining),
+              },
+            ]}
+          />
+          {!!progress.issues.length && (
+            <Card title="Dữ liệu cần đối soát">
+              <p className="text-sm text-amber-700">
+                {progress.issues.join(' · ')}
+              </p>
+            </Card>
+          )}
+          <Card title="Bảng điểm học tập">
+            <ResourceState
+              loading={results.loading}
+              error={results.error}
+              retry={results.reload}
+            />
+            <input
+              className={inputClass}
+              aria-label="Tìm môn trong trang bảng điểm"
+              value={courseSearch}
+              onChange={(e) => setCourseSearch(e.target.value)}
+              placeholder="Tìm mã hoặc tên môn trong trang hiện tại..."
+            />
+            {results.data && (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="border-b text-slate-500">
+                        <th className="p-3">Môn học</th>
+                        <th>Kỳ học</th>
+                        <th>Lần học</th>
+                        <th>Điểm</th>
+                        <th>Điểm GPA</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visible?.map((item) => (
+                        <tr key={item.id} className="border-b">
+                          <td className="p-3">
+                            <strong>{item.courseCode}</strong>
+                            <p>{item.courseName}</p>
+                          </td>
+                          <td>{item.periodCode || 'Chưa cập nhật'}</td>
+                          <td>{item.attemptNumber}</td>
+                          <td>{item.score ?? '—'}</td>
+                          <td>{item.gradePoints ?? '—'}</td>
+                          <td>{statusText(item.status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {!visible?.length && <Empty>Không có môn học phù hợp.</Empty>}
+                <Pagination
+                  page={page}
+                  total={results.data.total}
+                  onChange={setPage}
+                />
+              </>
+            )}
+          </Card>
+          <Card title="Chương trình và lộ trình môn học">
+            <ResourceState
+              loading={curriculum.loading}
+              error={curriculum.error}
+              retry={curriculum.reload}
+            />
+            {curriculum.data && (
+              <>
+                <p className="text-sm text-slate-500">
+                  {curriculum.data.name} · {curriculum.data.code} · Phiên bản{' '}
+                  {curriculum.data.version}
+                </p>
+                <div className="overflow-x-auto max-h-[520px]">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="p-3">Môn học</th>
+                        <th>Kỳ gợi ý</th>
+                        <th>Tín chỉ</th>
+                        <th>Tiên quyết</th>
+                        <th>Tiến độ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {curriculum.data.courses.map((course) => {
+                        const requirement = progress.requirements.find(
+                          (item) => item.id === course.id,
+                        );
+                        return (
+                          <tr key={course.id} className="border-b">
+                            <td className="p-3">
+                              <strong>{course.courseCode}</strong>
+                              <p>{course.name}</p>
+                            </td>
+                            <td>{course.semester ?? '—'}</td>
+                            <td>{course.credits ?? '—'}</td>
+                            <td className="max-w-xs">
+                              {course.prerequisiteText || 'Chưa ghi nhận'}
+                            </td>
+                            <td>
+                              {requirement?.completed
+                                ? 'Đã hoàn thành'
+                                : 'Chưa hoàn thành'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {!curriculum.data.courses.length && (
+                  <Empty>Chưa có môn học được công bố.</Empty>
+                )}
+              </>
+            )}
+          </Card>
+          <Card title="Combo đã xác nhận">
+            {profile.comboSelections.length ? (
+              profile.comboSelections.map((combo) => (
+                <div key={combo.id}>
+                  <h3 className="font-bold">
+                    {combo.code} · {combo.name}
+                  </h3>
+                  <ul className="text-sm text-slate-600">
+                    {combo.courses.map((course) => (
+                      <li key={course.id}>
+                        {course.code} · {course.name} · {course.credits ?? '—'}{' '}
+                        tín chỉ
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            ) : (
+              <Empty>Chưa có combo được xác nhận.</Empty>
+            )}
+          </Card>
+          <ComboRegistration />
+        </>
+      )}
+    </StudentPage>
   );
 };
-
 export default StudentAcademicProfile;

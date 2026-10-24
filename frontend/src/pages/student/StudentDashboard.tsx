@@ -1,131 +1,175 @@
-import React from 'react';
-import { useBaseLayout } from '../../layouts/BaseLayout';
-import { PageBanner } from '@/components/common/PageBanner';
-import { StatCards } from '@/components/student/dashboard/StatCards';
-import { ProgressChartCard } from '@/components/student/dashboard/ProgressChartCard';
-import { RoadmapStepper } from '@/components/student/dashboard/RoadmapStepper';
-import { AIRiskScoreCard } from '@/components/student/dashboard/AIRiskScoreCard';
-import { AIRecommendationsCard } from '@/components/student/dashboard/AIRecommendationsCard';
-import { UpcomingDeadlinesCard } from '@/components/student/dashboard/UpcomingDeadlinesCard';
-import { RecentActivityCard } from '@/components/student/dashboard/RecentActivityCard';
-import { BotSparkleIcon, CalendarIcon } from '@/components/common/icons/AppIcons';
-
+import { Link } from 'react-router-dom';
+import { useStudentPortal } from '@/contexts/StudentPortalContext';
+import { useStudentResource } from '@/hooks/useStudentResource';
+import { getStudentDashboard } from '@/services/student';
 import {
-  mockStudentProfile,
-  mockSemesterProgress,
-  mockRoadmapSteps,
-  mockAIRiskScore,
-  mockAIRecommendations,
-  mockDeadlines,
-  mockRecentActivities,
-} from '@/data/student/mockStudentData';
-import type { AIRecommendation } from '@/types/student/studentDashboardTypes';
-import { useNavigate } from 'react-router-dom';
+  AcademicMetrics,
+  AssignmentCard,
+  Card,
+  dateText,
+  EligibilityCard,
+  Empty,
+  ResourceState,
+  StudentPage,
+  statusText,
+} from '@/components/student/PortalUI';
+import { RoadmapStepper } from '@/components/student/dashboard/RoadmapStepper';
 
-export const StudentDashboard: React.FC = () => {
-  const { openAIConsult } = useBaseLayout();
-  const navigate = useNavigate();
-
-  const handleRecClick = (rec: AIRecommendation) => {
-    openAIConsult(`Tôi muốn biết thêm về khuyến nghị: "${rec.title}"`);
-  };
-
+export const StudentDashboard = () => {
+  const { profile, semesterId, revision, loading } = useStudentPortal();
+  const resource = useStudentResource(
+    !loading && profile && semesterId
+      ? 'dashboard:' + profile.id + ':' + semesterId + ':' + revision
+      : null,
+    (signal) => getStudentDashboard(semesterId!, signal),
+  );
+  const data = resource.data;
+  const credits = profile?.academicProgress.credits;
+  const complete = !!data?.assignment;
+  const eligible =
+    data?.academic.officialEligibility?.status === 'ELIGIBLE' &&
+    !data.academic.officialEligibility.isStale;
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12 w-full max-w-[1400px] mx-auto font-outfit">
-      
-      {/* Hero Page Banner - Redesigned to be massive and impressive */}
-      <PageBanner
-        student={mockStudentProfile}
-        menuId="dashboard"
-        title={
-          <span className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-purple-200/80 uppercase tracking-widest font-inter">Cổng Sinh Viên</span>
-            <span>Xin chào, {mockStudentProfile.fullName}! 👋</span>
-          </span>
-        }
-        description="Tổng quan tiến độ học tập, trạng thái OJT và các cảnh báo rủi ro mới nhất."
-        badge={
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white backdrop-blur-md border border-white/20 shadow-inner">
-            <CalendarIcon size={14} /> Fall 2023 - Tuần 4
-          </span>
-        }
-        primaryAction={{
-          label: 'Đăng ký OJT',
-          className: 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-none shadow-orange-500/50 hover:shadow-orange-500/60',
-          onClick: () => navigate('/student/ojt-registration'),
-        }}
-        secondaryAction={{
-          label: 'Hỏi AI tổng quan',
-          icon: <BotSparkleIcon size={16} />,
-          className: 'bg-white/10 text-white hover:bg-white/20',
-          onClick: () =>
-            openAIConsult('Hãy tổng hợp ngắn gọn tiến độ học tập và rủi ro hiện tại của tôi.'),
-        }}
-        className="pb-24" // Extra padding to allow stat cards to overlap
+    <StudentPage
+      title={'Xin chào, ' + (profile?.fullName ?? 'bạn') + '!'}
+      description="Tổng quan học tập, điều kiện OJT, phân công thực tập và thông báo của bạn."
+    >
+      <ResourceState
+        loading={resource.loading}
+        error={resource.error}
+        retry={resource.reload}
       />
-
-      {/* Overlapping Main Grid Section */}
-      <div className="px-4 lg:px-8 relative z-10 -mt-20">
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-          
-          {/* Left & Middle Main Section (8 cols on XL) */}
-          <div className="xl:col-span-8 space-y-8">
-            
-            {/* 4 Metric Stats Cards - Overlapping the Banner */}
-            <div className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] p-2 border border-white/50 shadow-2xl shadow-slate-200/50">
-              <StatCards student={mockStudentProfile} />
+      {data && (
+        <>
+          <AcademicMetrics data={data.academic} />
+          <div className="grid xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2 space-y-6">
+              <Card title="Tiến độ chương trình đào tạo">
+                <p className="font-bold text-2xl">
+                  {credits?.earned ?? '—'} / {credits?.total ?? '—'} tín chỉ
+                </p>
+                {credits?.total != null && credits.total > 0 && (
+                  <progress
+                    className="w-full h-4 accent-orange-500"
+                    value={credits.earned}
+                    max={credits.total}
+                  />
+                )}
+                <p className="text-sm text-slate-500">
+                  {statusText(profile?.academicProgress.status)}
+                </p>
+                <Link
+                  to="/student/academic-profile"
+                  className="text-orange-600 font-semibold"
+                >
+                  Xem bảng điểm và chương trình →
+                </Link>
+              </Card>
+              <Card title="Lộ trình OJT">
+                <RoadmapStepper
+                  steps={[
+                    {
+                      id: 1,
+                      title: 'Xét điều kiện',
+                      status: eligible || complete ? 'completed' : 'current',
+                      iconType: 'check',
+                      description: eligible
+                        ? 'Có kết quả đủ điều kiện hiện hành'
+                        : 'Theo kết quả xác nhận của nhà trường',
+                    },
+                    {
+                      id: 2,
+                      title: 'Đăng ký OJT',
+                      status: complete
+                        ? 'completed'
+                        : eligible
+                          ? 'current'
+                          : 'upcoming',
+                      iconType: 'register',
+                      description: 'Nộp hồ sơ theo đợt đăng ký',
+                    },
+                    {
+                      id: 3,
+                      title: 'Thực tập',
+                      status: complete ? 'current' : 'upcoming',
+                      iconType: 'briefcase',
+                      description:
+                        data.assignment?.enterpriseName ??
+                        'Chờ phân công doanh nghiệp',
+                    },
+                  ]}
+                />
+              </Card>
+              <AssignmentCard assignment={data.assignment} />
             </div>
-
-            {/* Main Content Area */}
-            <div className="grid grid-cols-1 gap-8">
-              {/* Study Progress & Credits Bar Chart */}
-              <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100/60 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500">
-                <ProgressChartCard data={mockSemesterProgress} />
-              </div>
-
-              {/* Roadmap to OJT Semester Stepper */}
-              <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100/60 hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-500">
-                <RoadmapStepper steps={mockRoadmapSteps} />
-              </div>
-            </div>
-          </div>
-
-          {/* Right Sidebar Section (4 cols on XL) */}
-          <div className="xl:col-span-4 space-y-8 mt-12 xl:mt-0">
-            
-            {/* AI Risk Score Donut Gauge - Premium Style */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 shadow-xl shadow-slate-900/20 border border-slate-700/50 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-orange-500/20 transition-colors"></div>
-              <AIRiskScoreCard data={mockAIRiskScore} />
-            </div>
-
-            {/* AI Recommendations */}
-            <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100/60 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500">
-              <AIRecommendationsCard
-                recommendations={mockAIRecommendations}
-                onConsultAction={handleRecClick}
+            <div className="space-y-6">
+              <EligibilityCard
+                official={data.academic.officialEligibility}
+                current={data.academic.currentEligibility}
               />
-            </div>
-
-            {/* Upcoming Deadlines */}
-            <div className="bg-orange-50/50 rounded-3xl p-6 shadow-xl shadow-orange-100/40 border border-orange-100 hover:shadow-2xl hover:shadow-orange-200/50 transition-all duration-500">
-              <UpcomingDeadlinesCard
-                deadlines={mockDeadlines}
-                onViewAll={() =>
-                  openAIConsult('Hiển thị toàn bộ lịch trình và thời hạn học kỳ cho tôi.')
+              <Card title="Mốc thời gian">
+                {data.academic.deadline?.assessmentDeadline && (
+                  <p className="text-sm">
+                    Hạn xét điều kiện:{' '}
+                    {dateText(data.academic.deadline.assessmentDeadline)}
+                  </p>
+                )}
+                {data.registrationWindows.items.length ? (
+                  data.registrationWindows.items.map((window) => (
+                    <div key={window.id} className="text-sm border-b pb-3">
+                      <p className="font-bold">{window.name}</p>
+                      <p>
+                        {dateText(window.startsAt)} – {dateText(window.endsAt)}
+                      </p>
+                      <p>{statusText(window.status)}</p>
+                    </div>
+                  ))
+                ) : (
+                  <Empty>Chưa có đợt đăng ký.</Empty>
+                )}
+                <Link
+                  className="text-orange-600"
+                  to="/student/ojt-registration"
+                >
+                  Xem toàn bộ đợt đăng ký →
+                </Link>
+              </Card>
+              <Card
+                title={
+                  'Thông báo gần đây · ' +
+                  data.notifications.unreadCount +
+                  ' chưa đọc'
                 }
-              />
-            </div>
-
-            {/* Recent Activity Timeline */}
-            <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/40 border border-slate-100/60">
-              <RecentActivityCard activities={mockRecentActivities} />
+              >
+                {data.notifications.items.length ? (
+                  data.notifications.items.map((item) => (
+                    <div key={item.id} className="text-sm border-b pb-3">
+                      <p className={item.isRead ? '' : 'font-bold'}>
+                        {item.title}
+                      </p>
+                      <p className="text-slate-500">{dateText(item.sentAt)}</p>
+                    </div>
+                  ))
+                ) : (
+                  <Empty>Chưa có thông báo.</Empty>
+                )}
+                <Link className="text-orange-600" to="/student/notifications">
+                  Xem tất cả thông báo →
+                </Link>
+              </Card>
+              <Card title="Tư vấn lộ trình">
+                <p className="text-sm text-slate-600">
+                  Xem các môn cần hoàn thành và yêu cầu tư vấn từ dịch vụ AI.
+                </p>
+                <Link className="text-orange-600" to="/student/risk-prediction">
+                  Xem phân tích học vụ →
+                </Link>
+              </Card>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </StudentPage>
   );
 };
-
 export default StudentDashboard;

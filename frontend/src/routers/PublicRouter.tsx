@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
+import { StudentPortalProvider } from '@/contexts/StudentPortalContext';
 import { getMenuByRole } from "@/config";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
@@ -75,11 +76,13 @@ const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
 // Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
 const studentRoutes: RouteObject = {
   element: (
+    <StudentPortalProvider>
     <BaseLayout
       navItems={getMenuByRole("student")}
       homePath="/student/dashboard"
       brandSubtitle="Cổng Sinh viên"
     />
+    </StudentPortalProvider>
   ),
   children: [
     // Route chính của sinh viên.

@@ -6,7 +6,7 @@ import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { AIConsultModal } from "@/components/common/AIConsultModal";
 import { BotSparkleIcon } from "@/components/common/icons/AppIcons";
-import { mockStudentProfile } from "@/data/student/mockStudentData";
+import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
 import type { NavItem } from "@/types/common.types";
 
 interface BaseLayoutContextType {
@@ -41,6 +41,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   children,
 }) => {
   const { user, logout } = useAuth();
+  const portal = useOptionalStudentPortal();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -57,15 +58,15 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   };
 
   const resolvedUserSummary: HeaderUserSummary = userSummary || {
-    fullName: user?.name || mockStudentProfile.fullName,
-    email: user?.email || mockStudentProfile.email,
-    code: user?.id || mockStudentProfile.studentCode,
+    fullName: portal?.profile?.fullName || user?.name || 'Người dùng',
+    email: portal?.profile?.email || user?.email || '',
+    code: portal?.profile?.studentCode || user?.id,
     subtitle:
       user?.role === "student"
-        ? `${mockStudentProfile.studentCode} - ${mockStudentProfile.semester}`
+        ? [portal?.profile?.studentCode, portal?.profile?.currentAcademicPeriod?.name].filter(Boolean).join(' · ')
         : user?.role?.toUpperCase(),
-    avatar: user?.avatar || mockStudentProfile.avatar,
-    department: user?.role === "student" ? mockStudentProfile.major : undefined,
+    avatar: user?.avatar || '',
+    department: portal?.profile?.program?.majorName,
   };
 
   return (
@@ -86,7 +87,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
 
         {/* Điều hướng Sidebar */}
         <Sidebar
-          navItems={navItems}
+          navItems={portal ? navItems.map((item) => item.id === 'notifications' ? { ...item, hasBadge: (portal.unreadCount ?? 0) > 0 } : item) : navItems}
           title={brandTitle}
           subtitle={brandSubtitle}
           homePath={homePath}
@@ -99,8 +100,9 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
-            student={mockStudentProfile}
             user={resolvedUserSummary}
+            onOpenNotifications={portal ? () => navigate('/student/notifications') : undefined}
+            unreadCount={portal?.unreadCount ?? undefined}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
             showSearch={
@@ -144,7 +146,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <AIConsultModal
           isOpen={aiModalOpen}
           onClose={() => setAiModalOpen(false)}
-          student={mockStudentProfile}
+          student={{ fullName: resolvedUserSummary.fullName }}
           initialQuery={initialAiQuery}
         />
       </div>

@@ -1,178 +1,132 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  BotSparkleIcon,
-  CloseIcon,
-  LightningIcon,
-} from './icons/AppIcons';
-import type { StudentProfile } from '@/types/student/studentDashboardTypes';
+import { useEffect, useRef, useState } from 'react';
+import { BotSparkleIcon, CloseIcon } from './icons/AppIcons';
+import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
+import { getRoadmap } from '@/services/student';
+import type { Roadmap } from '@/types/student/portal';
+import { buttonClass } from '@/components/student/PortalUI';
 
 interface AIConsultModalProps {
   isOpen: boolean;
   onClose: () => void;
-  student: StudentProfile;
+  student: { fullName: string };
   initialQuery?: string;
 }
-
-export const AIConsultModal: React.FC<AIConsultModalProps> = ({
+export const AIConsultModal = ({
   isOpen,
   onClose,
   student,
-  initialQuery = '',
-}) => {
-  const [messages, setMessages] = useState<
-    { sender: 'ai' | 'user'; text: string; time: string }[]
-  >([
-    {
-      sender: 'ai',
-      text: `Xin chào ${student.fullName}! Tôi là AI Trợ lý Cố vấn OJT của FPT University. Dựa trên dữ liệu học tập kỳ 7 của bạn (GPA 3.42, 112/150 tín chỉ), bạn đã đủ điều kiện nộp hồ sơ OJT. Tôi có thể giúp gì cho bạn hôm nay?`,
-      time: 'Vừa xong',
-    },
-  ]);
-  const [inputVal, setInputVal] = useState(initialQuery);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-
-  // Auto scroll to bottom when new messages arrive
+}: AIConsultModalProps) => {
+  const portal = useOptionalStudentPortal();
+  const [data, setData] = useState<Roadmap | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  const locked = useRef(false);
+  const semester = portal?.semesterId;
   useEffect(() => {
-    if (isOpen) {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, isOpen]);
-
-  if (!isOpen) return null;
-
-  const handleSend = (textToSend?: string) => {
-    const query = textToSend || inputVal;
-    if (!query.trim()) return;
-
-    const userMsg = {
-      sender: 'user' as const,
-      text: query,
-      time: 'Bây giờ',
+    controller.current?.abort();
+    locked.current = false;
+    setData(null);
+    setError('');
+    setBusy(false);
+    return () => {
+      controller.current?.abort();
     };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputVal('');
-
-    // Tạo câu trả lời AI dựa trên từ khóa trong câu hỏi
-    setTimeout(() => {
-      let reply =
-        'Hệ thống AI đang phân tích dữ liệu thị trường và yêu cầu doanh nghiệp OJT... Bạn có cơ hội đậu cao vào các doanh nghiệp phần mềm như FPT Software, TMA Solutions, KMS Technology!';
-      if (query.toLowerCase().includes('react')) {
-        reply =
-          'Khóa học React Native & Web Development sẽ giúp bạn bổ sung 2 dự án thực tế vào CV, nâng tỷ lệ trúng tuyển OJT từ 65% lên 90%!';
-      } else if (query.toLowerCase().includes('rủi ro') || query.toLowerCase().includes('risk')) {
-        reply =
-          'Điểm rủi ro hiện tại của bạn là 72/100 (mức trung bình). Nguyên nhân chính là bạn còn thiếu chứng chỉ chuyên môn ngoài và một số môn chuyên ngành cuối kỳ 7. Duy trì GPA trên 3.2 để an toàn!';
-      } else if (query.toLowerCase().includes('lộ trình') || query.toLowerCase().includes('deadline')) {
-        reply =
-          'Lộ trình tối ưu: Hoàn tất cập nhật CV trước ngày 25/04, tham gia Mock Interview vào 28/04 để làm quen với quy trình phỏng vấn thực tế!';
+  }, [isOpen, semester, portal?.profile?.id]);
+  const request = async () => {
+    if (!semester || locked.current || portal?.loading) return;
+    const requestController = new AbortController();
+    controller.current = requestController;
+    locked.current = true;
+    setBusy(true);
+    setError('');
+    setData(null);
+    try {
+      const result = await getRoadmap(semester, requestController.signal);
+      if (!requestController.signal.aborted) setData(result);
+    } catch (err) {
+      if (!requestController.signal.aborted)
+        setError(
+          err instanceof Error ? err.message : 'Dịch vụ tư vấn chưa khả dụng.',
+        );
+    } finally {
+      if (!requestController.signal.aborted) {
+        locked.current = false;
+        setBusy(false);
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: 'ai',
-          text: reply,
-          time: 'Vừa xong',
-        },
-      ]);
-    }, 600);
+    }
   };
-
+  if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
-      {/* Fixed height container (h-[580px] max-h-[85vh]) */}
-      <div className="w-full max-w-lg bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/80 flex flex-col h-[580px] max-h-[85vh] overflow-hidden text-slate-800">
-        {/* Phần tiêu đề hộp thoại (Fixed Header) */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/20 bg-gradient-to-r from-orange-500 via-amber-500 to-purple-600 text-white flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs border border-white/20">
-              <BotSparkleIcon size={22} className="text-white" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base font-outfit leading-tight">
-                AI Cố vấn Lộ trình OJT
-              </h3>
-              <p className="text-xs text-orange-100">
-                Phân tích dữ liệu học tập thông minh & Cá nhân hóa
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/20 text-white/90 transition-colors cursor-pointer"
-          >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI tư vấn lộ trình OJT"
+        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+      >
+        <header className="flex justify-between items-center px-6 py-4 bg-gradient-to-r from-orange-500 via-amber-500 to-purple-600 text-white">
+          <h2 className="flex items-center gap-3 font-bold">
+            <BotSparkleIcon size={22} />
+            AI tư vấn lộ trình OJT
+          </h2>
+          <button type="button" onClick={onClose} aria-label="Đóng tư vấn">
             <CloseIcon size={20} />
           </button>
-        </div>
-
-        {/* Các gợi ý nhanh (Fixed Suggestions Bar) */}
-        <div className="p-3 bg-orange-50/50 border-b border-orange-100/60 flex items-center gap-2 overflow-x-auto text-xs custom-scrollbar flex-shrink-0">
-          <span className="text-slate-500 text-[11px] font-semibold flex items-center gap-1">
-            <LightningIcon size={12} className="text-amber-500" /> Gợi ý:
-          </span>
-          <button
-            type="button"
-            onClick={() => handleSend('Tại sao điểm rủi ro của tôi là 72?')}
-            className="px-2.5 py-1 rounded-full bg-white border border-orange-200/80 text-slate-700 hover:border-orange-500 hover:text-orange-600 whitespace-nowrap transition-colors cursor-pointer shadow-2xs"
-          >
-            Giải thích điểm rủi ro 72
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSend('Tư vấn kỹ năng còn thiếu')}
-            className="px-2.5 py-1 rounded-full bg-white border border-orange-200/80 text-slate-700 hover:border-orange-500 hover:text-orange-600 whitespace-nowrap transition-colors cursor-pointer shadow-2xs"
-          >
-            Kỹ năng cần bổ sung
-          </button>
-        </div>
-
-        {/* Danh sách hội thoại (Scrollable Messages Area) */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50/50 min-h-0">
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
+        </header>
+        <div className="p-6 overflow-y-auto space-y-4">
+          <p className="text-sm">
+            Xin chào {student.fullName}! Bạn có thể lấy tư vấn lộ trình dựa trên
+            hồ sơ học tập và đợt OJT đã chọn.
+          </p>
+          {!semester && (
+            <p className="text-sm text-amber-800">
+              Chọn đợt OJT trước khi yêu cầu tư vấn.
+            </p>
+          )}
+          {busy && (
+            <p role="status" className="text-sm">
+              Đang lấy tư vấn từ dịch vụ AI...
+            </p>
+          )}
+          {error && (
+            <p
+              role="alert"
+              className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800"
             >
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${
-                  m.sender === 'user'
-                    ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white rounded-br-none shadow-md shadow-orange-500/20 font-medium'
-                    : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none shadow-xs'
-                }`}
-              >
-                {m.text}
-              </div>
-              <span className="text-[10px] text-slate-400 mt-1 px-1">{m.time}</span>
-            </div>
-          ))}
-          <div ref={chatEndRef} />
+              {error}
+            </p>
+          )}
+          {data && (
+            <>
+              <p className="text-xs text-slate-500">
+                Mô hình: {data.modelVersion}
+              </p>
+              {data.recommendations.map((recommendation, index) => (
+                <p
+                  key={index}
+                  className="rounded-2xl bg-orange-50 p-4 text-sm whitespace-pre-wrap"
+                >
+                  {recommendation}
+                </p>
+              ))}
+              {!data.recommendations.length && (
+                <p className="text-sm">Chưa có khuyến nghị.</p>
+              )}
+            </>
+          )}
         </div>
-
-        {/* Ô nhập tin nhắn (Fixed Footer Input) */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="p-3 bg-white border-t border-slate-100 flex items-center gap-2 flex-shrink-0"
-        >
-          <input
-            type="text"
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            placeholder="Hỏi AI bất kỳ thắc mắc nào về OJT, tín chỉ, CV..."
-            className="flex-1 px-4 py-2 text-xs sm:text-sm bg-slate-100 rounded-full border border-slate-200 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
-          />
+        <footer className="border-t p-4">
           <button
-            type="submit"
-            className="btn-login px-5 py-2 rounded-full text-white text-xs sm:text-sm font-bold shadow-md shadow-orange-500/25 transition-transform active:scale-95 cursor-pointer"
+            type="button"
+            className={buttonClass}
+            disabled={busy || !semester || portal?.loading}
+            onClick={() => void request()}
           >
-            Gửi
+            {busy ? 'Đang xử lý...' : 'Lấy tư vấn lộ trình'}
           </button>
-        </form>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 };
