@@ -102,8 +102,17 @@ async function syncStudentProgress(client: PoolClient) {
     WHERE student."StudentID"=placement."StudentID"`);
 }
 
-export async function saveResource(resource: Resource, input: unknown, actorId: number, id?: number, existingClient?:PoolClient) {
-  return academicTransaction(async client => {
+export async function saveResource(resource: Resource, input: unknown, actorId: number, id?: number, existingClient?: PoolClient) {
+  return academicTransaction(client => saveResourceWithClient(client, resource, input, actorId, id), existingClient);
+}
+
+// A year-calendar update shares one transaction and validates its final state once.
+export async function finalizeCalendar(client: PoolClient) {
+  await validateCalendar(client);
+  await syncStudentProgress(client);
+}
+
+export async function saveResourceWithClient(client: PoolClient, resource: Resource, input: unknown, actorId: number, id?: number, validate = true) {
     const before = id === undefined ? undefined : await findRecord(client, resource, id);
     const row = parseResource(resource, input, before);
     const config = resources[resource], entries = Object.entries(config.fields);
@@ -140,12 +149,10 @@ export async function saveResource(resource: Resource, input: unknown, actorId: 
       }
       saved.groups = (await findRecord(client, resource, saved.id)).groups;
     }
-    await validateCalendar(client);
-    await syncStudentProgress(client);
-    if(resource==='academic-years')Object.assign(saved,await findRecord(client,resource,saved.id));
+    if (validate) await finalizeCalendar(client);
+    if (resource === 'academic-years') Object.assign(saved, await findRecord(client, resource, saved.id));
     await audit(client, actorId, config.table, saved.id, id === undefined ? 'CREATE' : 'UPDATE', before ?? null, saved);
-    return (await enrichListRows(client,[saved]))[0];
-  },existingClient);
+    return (await enrichListRows(client, [saved]))[0];
 }
 
 export async function assignPlacementWithClient(client:PoolClient,studentId:number,input:unknown,actorId:number) {
