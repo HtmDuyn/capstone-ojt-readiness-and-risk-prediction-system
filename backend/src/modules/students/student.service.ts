@@ -4,7 +4,7 @@ import { assignPlacementWithClient } from '../academic/academic.service';
 import { query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
-import { invalid, pagination, positiveId, inputObject, requiredText, optionalText, enumValue, resultValues } from './student.validation';
+import { invalid, pagination, positiveId, inputObject, requiredText, optionalText, enumValue, resultValues, batchId } from './student.validation';
 
 export const studentSelect = `SELECT s."StudentID" AS id,${currentCVSql('s."StudentID"')} AS cv,s."StudentCode" AS "studentCode",s."UserID" AS "userId",u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,u."Status" AS "accountStatus",s."ProgramID" AS "programId",s."EnrollmentYear" AS "enrollmentYear",s."CurrentSemester" AS "currentSemester",s."ClassName" AS "className",s."Status" AS status,p."CohortID" AS "cohortId",p."GroupCode" AS "groupCode",p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId",CASE WHEN tp."ProgramID" IS NULL THEN NULL ELSE jsonb_build_object('id',tp."ProgramID",'code',tp."ProgramCode",'name',tp."ProgramName",'version',to_jsonb(tp)->'Version','status',to_jsonb(tp)->>'Status','totalCredits',tp."TotalCredits",'majorId',tp."SpecializationID",'majorName',major."SpecializationName",'majorCode',major."SpecializationCode") END AS program,CASE WHEN cohort."CohortID" IS NULL THEN NULL ELSE jsonb_build_object('id',cohort."CohortID",'code',cohort."CohortCode",'name',cohort."Name") END AS cohort,CASE WHEN entry."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',entry."AcademicPeriodID",'code',entry."PeriodCode",'name',entry."Name",'kind',entry."Kind",'startDate',entry."StartDate",'endDate',entry."EndDate") END AS "entryAcademicPeriod",CASE WHEN current_period."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',current_period."AcademicPeriodID",'code',current_period."PeriodCode",'name',current_period."Name",'kind',current_period."Kind",'startDate',current_period."StartDate",'endDate',current_period."EndDate") END AS "currentAcademicPeriod" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" LEFT JOIN "Specializations" major ON major."SpecializationID"=tp."SpecializationID" LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=p."CohortID" LEFT JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=p."EntryAcademicPeriodID" LEFT JOIN "AcademicPeriods" current_period ON current_period."AcademicPeriodID"=p."CurrentAcademicPeriodID"`;
 export async function student(id: number) {
@@ -18,9 +18,19 @@ export async function assertStudentAccess(id: number, user: { userId: number; ro
   if (user.roleCode !== 'STUDENT' || row.userId !== user.userId) throw invalid('You cannot access this student.',403,'FORBIDDEN');
 }
 export async function listStudents(params: Record<string,unknown>, exporting=false):Promise<{total:number;items:Record<string,any>[];page:number;limit:number}> {
-  const p = pagination(params,['search','status','programId','cohortId','groupCode','enrollmentYear','currentSemester']);
+  const p = pagination(params,['search','status','programId','cohortId','groupCode','enrollmentYear','currentSemester','importedOnly','importBatchId']);
   const args: unknown[] = [], conditions: string[] = ['s."DeletedAt" IS NULL'];
   const add = (sql: string,v: unknown) => { args.push(v); conditions.push(sql.replace('?',`$${args.length}`)); };
+  const importedOnly = params.importedOnly === undefined ? false : enumValue(params.importedOnly, ['true','false'], 'importedOnly') === 'true';
+  if (importedOnly || params.importBatchId !== undefined) {
+    let scope = '';
+    if (params.importBatchId !== undefined) {
+      args.push(batchId(params.importBatchId));
+      scope = ` AND imported."BatchID"=$${args.length}::bigint`;
+    }
+    // EXISTS keeps one student row even when the same profile was imported repeatedly.
+    conditions.push(`EXISTS (SELECT 1 FROM "AccountImportRows" imported JOIN "AccountImportBatches" batch ON batch."BatchID"=imported."BatchID" WHERE imported."UserID"=s."UserID" AND batch."Kind"='STUDENT'${scope})`);
+  }
   if (params.search !== undefined) { args.push(`%${requiredText(params.search,'search',100)}%`); const n=args.length; conditions.push(`(s."StudentCode" ILIKE $${n} OR u."FullName" ILIKE $${n} OR u."Email" ILIKE $${n})`); }
   if (params.status !== undefined) add('s."Status"=?',requiredText(params.status,'status',30));
   if (params.groupCode !== undefined) add('p."GroupCode"=?',enumValue(params.groupCode,['A','B','C','D'],'groupCode'));
