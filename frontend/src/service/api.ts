@@ -1,8 +1,7 @@
+import { API_URL } from './apiConfig';
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-const baseURL =
-  import.meta.env.VITE_API_URL ||
-  'https://capstone-ojt-readiness-and-risk.onrender.com/api';
+const baseURL = API_URL;
 
 const API = axios.create({
   baseURL,
@@ -36,6 +35,8 @@ API.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
+    const body=error.response?.data as {message?:string}|undefined;
+    if(body?.message)error.message=body.message;
     if (error.response && error.response.status === 401) {
       console.error('Unauthorized, please login again.');
       // Xóa token hoặc chuyển hướng về trang login nếu cần

@@ -1,10 +1,9 @@
+import { API_ORIGIN } from "./apiConfig";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://capstone-ojt-readiness-and-risk.onrender.com"
-).replace(/\/+$/, "");
+const API_BASE_URL = API_ORIGIN;
 
-export type CourseResultStatus = "PASSED" | "FAILED";
+export type CourseResultStatus =
+  "PASSED" | "FAILED" | "IN_PROGRESS" | "WITHDRAWN" | "RECOGNIZED";
 
 export interface StudentCourseResult {
   courseCode: string;
@@ -13,6 +12,8 @@ export interface StudentCourseResult {
   score?: number;
   gradePoints?: number;
   grade?: string;
+  attemptNumber?: number;
+  sourceReference?: string;
 }
 
 export interface StudentPlacement {
@@ -23,6 +24,8 @@ export interface StudentPlacement {
 
 export interface StudentAcademicData {
   programId: number;
+  phone?: string;
+  className?: string;
   placement: StudentPlacement;
   courseResults: StudentCourseResult[];
 }
@@ -38,16 +41,6 @@ export interface StudentImportPayload {
   kind: "STUDENT";
   idempotencyKey: string;
   rows: StudentImportRow[];
-}
-
-// Cấu trúc payload nhập điểm cần đối chiếu Swagger BE.
-export interface CourseResultImportRow extends StudentCourseResult {
-  code: string;
-}
-
-export interface CourseResultImportPayload {
-  idempotencyKey: string;
-  rows: CourseResultImportRow[];
 }
 
 export interface ImportPreviewRow {
@@ -83,17 +76,15 @@ type ApiErrorResponse = {
   message?: string;
 };
 
-const sendImportRequest = async <T,>(
+const sendImportRequest = async <T>(
   endpoint: string,
-  payload: StudentImportPayload | CourseResultImportPayload,
+  payload: StudentImportPayload,
   fallbackError: string,
 ): Promise<T> => {
   const token = localStorage.getItem("ojt_auth_token");
 
   if (!token) {
-    throw new Error(
-      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
-    );
+    throw new Error("Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.");
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -116,22 +107,16 @@ const sendImportRequest = async <T,>(
   }
 
   const body =
-    result !== null &&
-    typeof result === "object" &&
-    !Array.isArray(result)
+    result !== null && typeof result === "object" && !Array.isArray(result)
       ? (result as ApiErrorResponse)
       : null;
 
   if (response.status === 401) {
-    throw new Error(
-      "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
-    );
+    throw new Error("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
   }
 
   if (response.status === 403) {
-    throw new Error(
-      "Tài khoản không có quyền thực hiện chức năng này.",
-    );
+    throw new Error("Tài khoản không có quyền thực hiện chức năng này.");
   }
 
   if (response.status === 404) {
@@ -143,15 +128,12 @@ const sendImportRequest = async <T,>(
 
   if (!response.ok || body?.success === false) {
     throw new Error(
-      body?.message ||
-        `${fallbackError} (HTTP ${response.status}).`,
+      body?.message || `${fallbackError} (HTTP ${response.status}).`,
     );
   }
 
   if (!body) {
-    throw new Error(
-      "Backend trả về cấu trúc kết quả không hợp lệ.",
-    );
+    throw new Error("Backend trả về cấu trúc kết quả không hợp lệ.");
   }
 
   return result as T;
@@ -170,20 +152,5 @@ export const importService = {
       "/api/imports/commit",
       payload,
       "Không thể nhập dữ liệu sinh viên",
-    ),
-
-  // Chưa xác nhận request/response của hai API này với BE.
-  previewCourseResultImport: (payload: CourseResultImportPayload) =>
-    sendImportRequest<unknown>(
-      "/api/course-result-imports/preview",
-      payload,
-      "Không thể kiểm tra bảng điểm",
-    ),
-
-  commitCourseResultImport: (payload: CourseResultImportPayload) =>
-    sendImportRequest<unknown>(
-      "/api/course-result-imports/commit",
-      payload,
-      "Không thể lưu bảng điểm",
     ),
 };

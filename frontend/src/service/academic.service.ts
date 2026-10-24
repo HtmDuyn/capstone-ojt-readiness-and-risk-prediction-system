@@ -1,18 +1,13 @@
+import { getAllItems } from "./educationApi";
+import { API_ORIGIN } from "./apiConfig";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://capstone-ojt-readiness-and-risk.onrender.com"
-).replace(/\/+$/, "");
+const API_BASE_URL = API_ORIGIN;
 
 // ======================================================
 // TYPES - ACADEMIC YEAR
 // ======================================================
 
-export type AcademicYearStatus =
-  | "PLANNED"
-  | "ACTIVE"
-  | "COMPLETED"
-  | "CLOSED";
+export type AcademicYearStatus = "PLANNED" | "ACTIVE" | "COMPLETED" | "CLOSED";
 
 export interface CreateAcademicYearPayload {
   yearCode: string;
@@ -33,16 +28,10 @@ export interface AcademicYear {
 // TYPES - ACADEMIC PERIOD
 // ======================================================
 
-export type AcademicPeriodKind =
-  | "SEMESTER"
-  | "BLOCK3";
+export type AcademicPeriodKind = "SEMESTER" | "BLOCK3";
 
 export type AcademicPeriodStatus =
-  | "PLANNED"
-  | "ACTIVE"
-  | "COMPLETED"
-  | "CLOSED"
-  | "ARCHIVED";
+  "PLANNED" | "ACTIVE" | "COMPLETED" | "CLOSED" | "ARCHIVED";
 
 export interface CreateAcademicPeriodPayload {
   academicYearId: number;
@@ -68,19 +57,18 @@ export interface AcademicPeriod {
 
 // PATCH chỉ gửi trường thực sự thay đổi.
 // Không gửi lại toàn bộ AcademicPeriod.
-export type UpdateAcademicPeriodPayload =
-  Partial<
-    Pick<
-      AcademicPeriod,
-      | "periodCode"
-      | "name"
-      | "kind"
-      | "parentPeriodId"
-      | "startDate"
-      | "endDate"
-      | "status"
-    >
-  >;
+export type UpdateAcademicPeriodPayload = Partial<
+  Pick<
+    AcademicPeriod,
+    | "periodCode"
+    | "name"
+    | "kind"
+    | "parentPeriodId"
+    | "startDate"
+    | "endDate"
+    | "status"
+  >
+>;
 
 export interface SearchAcademicPeriodsPayload {
   page: number;
@@ -144,14 +132,10 @@ interface DataResponse<T> {
 // ======================================================
 
 const getAuthToken = (): string => {
-  const token = localStorage.getItem(
-    "ojt_auth_token",
-  );
+  const token = localStorage.getItem("ojt_auth_token");
 
   if (!token) {
-    throw new Error(
-      "Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.",
-    );
+    throw new Error("Không tìm thấy token đăng nhập. Vui lòng đăng nhập lại.");
   }
 
   return token;
@@ -178,9 +162,7 @@ const authorizedFetch = async (
   });
 };
 
-const readJson = async <T,>(
-  response: Response,
-): Promise<T> => {
+const readJson = async <T>(response: Response): Promise<T> => {
   const text = await response.text();
 
   if (!text) {
@@ -190,9 +172,7 @@ const readJson = async <T,>(
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(
-      "Phản hồi từ máy chủ không đúng định dạng JSON.",
-    );
+    throw new Error("Phản hồi từ máy chủ không đúng định dạng JSON.");
   }
 };
 
@@ -209,10 +189,7 @@ const getErrorMessage = (
     return "Bạn không có quyền thực hiện thao tác này.";
   }
 
-  if (
-    error.errorCode ===
-    "ACADEMIC_CALENDAR_CONFLICT"
-  ) {
+  if (error.errorCode === "ACADEMIC_CALENDAR_CONFLICT") {
     return (
       "Thời gian kỳ học bị trùng với kỳ học " +
       "đã tồn tại trong hệ thống, bao gồm cả Block 3. " +
@@ -220,17 +197,12 @@ const getErrorMessage = (
     );
   }
 
-  if (
-    error.errorCode === "ACADEMIC_DUPLICATE"
-  ) {
+  if (error.errorCode === "ACADEMIC_DUPLICATE") {
     return "Dữ liệu năm học hoặc kỳ học đã tồn tại trong hệ thống.";
   }
 
   if (status === 409) {
-    return (
-      error.message ||
-      "Dữ liệu bị xung đột với thông tin đã tồn tại."
-    );
+    return error.message || "Dữ liệu bị xung đột với thông tin đã tồn tại.";
   }
 
   return error.message || fallback;
@@ -241,80 +213,26 @@ const checkResponse = (
   result: ApiErrorResponse,
   fallback: string,
 ): void => {
-  if (
-    !response.ok ||
-    result.success === false
-  ) {
-    throw new Error(
-      getErrorMessage(
-        response.status,
-        result,
-        fallback,
-      ),
-    );
+  if (!response.ok || result.success === false) {
+    throw new Error(getErrorMessage(response.status, result, fallback));
   }
 };
 
 // ======================================================
 // COMMON PAGINATED LIST API
-// POST /api/json/.../list
+// GET danh sách tài nguyên, phân trang qua query parameters
 // ======================================================
 
-const fetchAllListItems = async <T,>(
-  endpoint: string,
-): Promise<T[]> => {
-  const allItems: T[] = [];
-  const limit = 20;
-
-  for (let page = 1; page <= 200; page++) {
-    const response = await authorizedFetch(
-      endpoint,
-      "POST",
-      { page, limit },
-    );
-
-    const result =
-      await readJson<ListResponse<T>>(
-        response,
-      );
-
-    checkResponse(
-      response,
-      result,
-      "Không thể tải dữ liệu.",
-    );
-
-    if (!Array.isArray(result.items)) {
-      throw new Error(
-        "Danh sách từ máy chủ không hợp lệ.",
-      );
-    }
-
-    allItems.push(...result.items);
-
-    if (
-      allItems.length >= result.total ||
-      result.items.length < limit
-    ) {
-      return allItems;
-    }
-  }
-
-  throw new Error(
-    "Danh sách có quá nhiều trang, không thể tải hết dữ liệu.",
-  );
-};
+const fetchAllListItems = <T>(endpoint: string): Promise<T[]> =>
+  getAllItems<T>(endpoint);
 
 // ======================================================
 // ACADEMIC YEAR
 // ======================================================
 
 // Giữ API đang hoạt động tốt.
-const searchAcademicYears = (
-): Promise<AcademicYear[]> => {
-  return fetchAllListItems<AcademicYear>(
-    "/api/json/academic-years/list",
-  );
+const searchAcademicYears = (): Promise<AcademicYear[]> => {
+  return fetchAllListItems<AcademicYear>("/academic-years");
 };
 
 const createAcademicYear = async (
@@ -326,16 +244,11 @@ const createAcademicYear = async (
     payload,
   );
 
-  const result = await readJson<
-    DataResponse<AcademicYear> &
-      ApiErrorResponse
-  >(response);
-
-  checkResponse(
+  const result = await readJson<DataResponse<AcademicYear> & ApiErrorResponse>(
     response,
-    result,
-    "Không thể tạo năm học.",
   );
+
+  checkResponse(response, result, "Không thể tạo năm học.");
 
   if (!result.data) {
     throw new Error(
@@ -351,11 +264,8 @@ const createAcademicYear = async (
 // Giữ API danh sách đang hoạt động.
 // ======================================================
 
-const listAllAcademicPeriods = (
-): Promise<AcademicPeriod[]> => {
-  return fetchAllListItems<AcademicPeriod>(
-    "/api/json/academic-periods/list",
-  );
+const listAllAcademicPeriods = (): Promise<AcademicPeriod[]> => {
+  return fetchAllListItems<AcademicPeriod>("/academic-periods");
 };
 
 // ======================================================
@@ -368,30 +278,16 @@ const searchAcademicPeriods = async (
 ): Promise<AcademicPeriod[]> => {
   const params = new URLSearchParams();
 
-  params.set(
-    "page",
-    String(payload.page),
-  );
+  params.set("page", String(payload.page));
 
-  params.set(
-    "limit",
-    String(payload.limit),
-  );
+  params.set("limit", String(payload.limit));
 
-  if (
-    payload.academicYearId !== undefined
-  ) {
-    params.set(
-      "academicYearId",
-      String(payload.academicYearId),
-    );
+  if (payload.academicYearId !== undefined) {
+    params.set("academicYearId", String(payload.academicYearId));
   }
 
   if (payload.search) {
-    params.set(
-      "search",
-      payload.search,
-    );
+    params.set("search", payload.search);
   }
 
   const response = await authorizedFetch(
@@ -399,20 +295,12 @@ const searchAcademicPeriods = async (
     "GET",
   );
 
-  const result = await readJson<
-    ListResponse<AcademicPeriod>
-  >(response);
+  const result = await readJson<ListResponse<AcademicPeriod>>(response);
 
-  checkResponse(
-    response,
-    result,
-    "Không thể tìm kiếm kỳ học.",
-  );
+  checkResponse(response, result, "Không thể tìm kiếm kỳ học.");
 
   if (!Array.isArray(result.items)) {
-    throw new Error(
-      "Dữ liệu tìm kiếm kỳ học không hợp lệ.",
-    );
+    throw new Error("Dữ liệu tìm kiếm kỳ học không hợp lệ.");
   }
 
   return result.items;
@@ -429,20 +317,17 @@ const findAcademicPeriod = async (
   const limit = 20;
 
   for (let page = 1; page <= 100; page++) {
-    const periods =
-      await searchAcademicPeriods({
-        page,
-        limit,
-        academicYearId,
-        search: periodCode,
-      });
+    const periods = await searchAcademicPeriods({
+      page,
+      limit,
+      academicYearId,
+      search: periodCode,
+    });
 
     const exactPeriod = periods.find(
       (period) =>
-        period.academicYearId ===
-          academicYearId &&
-        period.periodCode ===
-          periodCode,
+        period.academicYearId === academicYearId &&
+        period.periodCode === periodCode,
     );
 
     if (exactPeriod) {
@@ -454,9 +339,7 @@ const findAcademicPeriod = async (
     }
   }
 
-  throw new Error(
-    "Không thể kiểm tra hết danh sách kỳ học. Vui lòng thử lại.",
-  );
+  throw new Error("Không thể kiểm tra hết danh sách kỳ học. Vui lòng thử lại.");
 };
 
 // ======================================================
@@ -474,15 +357,10 @@ const createAcademicPeriod = async (
   );
 
   const result = await readJson<
-    DataResponse<AcademicPeriod> &
-      ApiErrorResponse
+    DataResponse<AcademicPeriod> & ApiErrorResponse
   >(response);
 
-  checkResponse(
-    response,
-    result,
-    "Không thể tạo kỳ học.",
-  );
+  checkResponse(response, result, "Không thể tạo kỳ học.");
 
   // FE sẽ tải lại danh sách từ BE sau khi tạo.
   // Không bắt buộc response phải có data.
@@ -498,21 +376,12 @@ const updateAcademicPeriod = async (
   academicPeriodId: number,
   payload: UpdateAcademicPeriodPayload,
 ): Promise<AcademicPeriod | undefined> => {
-  if (
-    !Number.isInteger(academicPeriodId) ||
-    academicPeriodId <= 0
-  ) {
-    throw new Error(
-      "ID kỳ học không hợp lệ.",
-    );
+  if (!Number.isInteger(academicPeriodId) || academicPeriodId <= 0) {
+    throw new Error("ID kỳ học không hợp lệ.");
   }
 
-  if (
-    Object.keys(payload).length === 0
-  ) {
-    throw new Error(
-      "Không có thông tin nào cần cập nhật.",
-    );
+  if (Object.keys(payload).length === 0) {
+    throw new Error("Không có thông tin nào cần cập nhật.");
   }
 
   const response = await authorizedFetch(
@@ -522,15 +391,10 @@ const updateAcademicPeriod = async (
   );
 
   const result = await readJson<
-    DataResponse<AcademicPeriod> &
-      ApiErrorResponse
+    DataResponse<AcademicPeriod> & ApiErrorResponse
   >(response);
 
-  checkResponse(
-    response,
-    result,
-    "Không thể cập nhật kỳ học.",
-  );
+  checkResponse(response, result, "Không thể cập nhật kỳ học.");
 
   return result.data;
 };
@@ -543,29 +407,26 @@ const updateAcademicPeriod = async (
 const searchOjtSemesters = async (
   payload: SearchOjtSemestersPayload,
 ): Promise<OjtSemester[]> => {
-  const response = await authorizedFetch(
-    "/api/json/ojt-semesters/search",
-    "POST",
-    payload,
-  );
-
-  const result = await readJson<
-    ListResponse<OjtSemester>
-  >(response);
-
-  checkResponse(
-    response,
-    result,
-    "Không thể tải danh sách kỳ OJT.",
-  );
-
-  if (!Array.isArray(result.items)) {
-    throw new Error(
-      "Danh sách kỳ OJT không hợp lệ.",
+  const periods = await getAllItems<
+    AcademicPeriod & { ojt?: OjtSemester | null }
+  >("/academic-periods");
+  const terms = periods
+    .flatMap((p) => (p.ojt ? [p.ojt] : []))
+    .filter(
+      (t) =>
+        (!payload.academicYearId ||
+          t.academicYearId === payload.academicYearId) &&
+        (!payload.status || t.status === payload.status) &&
+        (!payload.search ||
+          (t.name + " " + t.semesterCode)
+            .toLowerCase()
+            .includes(payload.search.toLowerCase())),
     );
-  }
-
-  return result.items;
+  const unique = [...new Map(terms.map((t) => [t.id, t])).values()];
+  return unique.slice(
+    (payload.page - 1) * payload.limit,
+    payload.page * payload.limit,
+  );
 };
 
 // ======================================================

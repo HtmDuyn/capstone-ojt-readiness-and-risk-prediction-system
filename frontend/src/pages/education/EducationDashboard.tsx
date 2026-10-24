@@ -1,3 +1,4 @@
+import { getAllItems, apiData } from "@/service/educationApi";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -25,9 +26,9 @@ import API from "@/service/api";
 const API_PATHS = {
   years: "/academic-years",
   periods: "/academic-periods",
-  dashboard: "/json/academic/dashboard/search",
-  courseDemand: "/json/academic/course-demand/list",
-  alerts: "/json/academic/alerts/list",
+  dashboard: "/academic/dashboard",
+  courseDemand: "/academic/course-demand",
+  alerts: "/academic/alerts",
 } as const;
 
 type JsonObject = Record<string, unknown>;
@@ -254,18 +255,6 @@ const getJson = async (
   return response.data;
 };
 
-const postJson = async (
-  path: string,
-  body: QueryParams,
-  signal: AbortSignal,
-): Promise<unknown> => {
-  const response = await API.post<unknown>(path, body, {
-    signal,
-  });
-
-  return response.data;
-};
-
 /* =========================================================
    NORMALIZE ACADEMIC YEARS / PERIODS
    ========================================================= */
@@ -428,29 +417,17 @@ const parseCourseDemand = (value: unknown): CourseDemand[] => {
     .filter((item): item is CourseDemand => item !== null);
 };
 
-const parseAlerts = (value: unknown): AcademicAlert[] => {
-  return readList(value)
-    .map((item, index) => {
-      const title = readString(item, ["title", "alertTitle", "name", "type"]);
-
-      const description = readString(item, [
-        "message",
-        "description",
-        "content",
-        "reason",
-      ]);
-
-      if (!title && !description) return null;
-
-      return {
-        id: readString(item, ["id"]) || `alert-${index}`,
-        title: title || "Cảnh báo học vụ",
-        description: description || "",
-        date: readString(item, ["createdAt", "issuedAt", "date"]),
-      };
-    })
-    .filter((item): item is AcademicAlert => item !== null);
-};
+const parseAlerts = (value: unknown): AcademicAlert[] =>
+  readList(value).map((item, index) => ({
+    id: readString(item, ["studentId"]) ?? String(index),
+    title: [readString(item, ["studentCode"]), readString(item, ["fullName"])]
+      .filter(Boolean)
+      .join(" — "),
+    description: Array.isArray(item.alertTypes)
+      ? item.alertTypes.join(", ")
+      : (readString(item, ["category"]) ?? ""),
+    date: null,
+  }));
 
 /* =========================================================
    UI COMPONENTS
@@ -619,22 +596,8 @@ export const EducationDashboard: React.FC = () => {
       setFiltersError("");
 
       const results = await Promise.allSettled([
-        postJson(
-          API_PATHS.dashboard,
-          {
-            ...dashboardParams,
-          },
-          controller.signal,
-        ),
-        postJson(
-          API_PATHS.courseDemand,
-          {
-            page: 1,
-            limit: 20,
-            ...dashboardParams,
-          },
-          controller.signal,
-        ),
+        getAllItems(API_PATHS.years, {}, controller.signal),
+        getAllItems(API_PATHS.periods, {}, controller.signal),
       ]);
 
       if (controller.signal.aborted) return;
@@ -682,7 +645,14 @@ export const EducationDashboard: React.FC = () => {
     );
   }, [academicPeriods, selectedPeriod]);
 
-  const selectedOjtSemesterId = selectedPeriodInfo?.ojtSemesterId || null;
+  const [advisory, setAdvisory] = useState<{
+    periodId: string;
+    semesterId: string;
+    deadline: string;
+  } | null>(null);
+  const selectedOjtSemesterId =
+    selectedPeriodInfo?.ojtSemesterId ||
+    (advisory?.periodId === selectedPeriod ? advisory.semesterId : null);
 
   /*
    * Backend hiện không chấp nhận academicYearId
@@ -692,17 +662,18 @@ export const EducationDashboard: React.FC = () => {
    * liên kết với kỳ OJT.
    */
 
-  const unsupportedPeriod = Boolean(selectedPeriod) && !selectedOjtSemesterId;
+  const unsupportedPeriod = !selectedOjtSemesterId;
 
   const dashboardParams = useMemo<QueryParams>(() => {
     const params: QueryParams = {};
 
+    if (selectedPeriod) params.academicPeriodId = toApiId(selectedPeriod);
     if (selectedOjtSemesterId) {
       params.ojtSemesterId = toApiId(selectedOjtSemesterId);
     }
 
     return params;
-  }, [selectedOjtSemesterId]);
+  }, [selectedOjtSemesterId, selectedPeriod]);
 
   /* =====================================================
      LOAD DASHBOARD AND COURSE DEMAND
@@ -731,14 +702,14 @@ export const EducationDashboard: React.FC = () => {
       }
 
       const results = await Promise.allSettled([
-        postJson(
+        getJson(
           API_PATHS.dashboard,
           {
             ...dashboardParams,
           },
           controller.signal,
         ),
-        postJson(
+        getJson(
           API_PATHS.courseDemand,
           {
             page: 1,
@@ -779,11 +750,43 @@ export const EducationDashboard: React.FC = () => {
      - ojtSemesterId
      - assessmentDeadline
 
-     Dùng POST /api/json/academic/alerts/list
+     Dùng GET /api/academic/alerts
      trong danh sách Swagger mới.
      ===================================================== */
 
-  const assessmentDeadline = selectedPeriodInfo?.assessmentDeadline || null;
+  const [scheduleError, setScheduleError] = useState("");
+  useEffect(() => {
+    setAdvisory(null);
+    setScheduleError("");
+    if (!selectedPeriod) return;
+    const controller = new AbortController();
+    getJson(
+      `/academic-periods/${selectedPeriod}/ojt-advisory-schedule`,
+      {},
+      controller.signal,
+    )
+      .then((response) => {
+        const schedule = apiData<Record<string, unknown>>(response);
+        const deadline =
+          schedule.AssessmentDeadline ?? schedule.assessmentDeadline;
+        const sid = schedule.OJTSemesterID ?? schedule.ojtSemesterId;
+        if (typeof deadline === "string" && sid !== undefined)
+          setAdvisory({
+            periodId: selectedPeriod,
+            semesterId: String(sid),
+            deadline,
+          });
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setScheduleError(getErrorMessage(e));
+      });
+    return () => controller.abort();
+  }, [selectedPeriod, refreshKey]);
+  const assessmentDeadline =
+    advisory?.periodId === selectedPeriod &&
+    advisory.semesterId === selectedOjtSemesterId
+      ? advisory.deadline
+      : null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -802,7 +805,7 @@ export const EducationDashboard: React.FC = () => {
       setAlertsData(null);
 
       try {
-        const response = await postJson(
+        const response = await getJson(
           API_PATHS.alerts,
           {
             page: 1,
@@ -843,6 +846,7 @@ export const EducationDashboard: React.FC = () => {
     "totalStudents",
     "totalStudentCount",
     "studentCount",
+    "summary.total",
     "summary.totalStudents",
     "overview.totalStudents",
     "statistics.totalStudents",
@@ -852,6 +856,7 @@ export const EducationDashboard: React.FC = () => {
   const eligibleStudents = readNumber(dashboardData, [
     "eligibleStudents",
     "eligibleCount",
+    "summary.eligible",
     "summary.eligibleStudents",
     "summary.eligibleCount",
     "overview.eligibleStudents",
@@ -864,6 +869,7 @@ export const EducationDashboard: React.FC = () => {
     "ineligibleStudents",
     "ineligibleCount",
     "notEligibleCount",
+    "summary.notEligible",
     "summary.ineligibleStudents",
     "summary.ineligibleCount",
     "overview.ineligibleStudents",
@@ -1452,6 +1458,7 @@ export const EducationDashboard: React.FC = () => {
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200">
+            {scheduleError && <ErrorNotice message={scheduleError} />}
             {alertsError && (
               <div className="m-4">
                 <ErrorNotice message={alertsError} />

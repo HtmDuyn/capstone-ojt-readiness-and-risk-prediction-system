@@ -199,7 +199,7 @@ const getTermStatus = (
 // API HELPERS
 //
 // API trong service/api.ts đã có /api ở baseURL.
-// Vì vậy chỉ truyền /json/... vào Axios.
+// Truyền đường dẫn tài nguyên vào Axios.
 // =========================================================
 
 const fetchAllListItems = async <T,>(
@@ -390,7 +390,7 @@ const EducationAcademicYear: React.FC = () => {
 
   // =====================================================
   // LOAD ACADEMIC YEARS
-  // POST /api/json/academic-years/list
+  // GET /api/academic-years
   // =====================================================
 
   React.useEffect(() => {
@@ -441,7 +441,7 @@ const EducationAcademicYear: React.FC = () => {
 
   // =====================================================
   // LOAD ACADEMIC PERIODS
-  // POST /api/json/academic-periods/list
+  // GET /api/academic-periods
   // =====================================================
 
   React.useEffect(() => {

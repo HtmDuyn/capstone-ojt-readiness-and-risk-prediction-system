@@ -1,3 +1,4 @@
+import { getAllItems } from '@/service/educationApi';
 import React from "react";
 
 import {
@@ -177,61 +178,7 @@ const EducationOjtConditions: React.FC = () => {
        ========================= */
 
       try {
-        const majorCodes = ["AI", "SE", "IA", "IS"];
-
-        const majorResponses = await Promise.all(
-          majorCodes.map((code) =>
-            curriculumService.searchMajors({
-              page: 1,
-              limit: 20,
-              search: code,
-              parentMajorId: 1,
-            }),
-          ),
-        );
-
-        const majors = majorResponses
-          .flatMap((response) => response.data.items)
-          .filter((major) => majorCodes.includes(major.code))
-          .filter(
-            (major, index, array) =>
-              array.findIndex((item) => item.id === major.id) === index,
-          );
-
-        console.log("OJT majors:", majors);
-
-        const curriculumResponses = await Promise.all(
-          majors.map((major) =>
-            curriculumService.searchCurricula({
-              page: 1,
-              limit: 100,
-
-              /*
-               * Không gửi search rỗng.
-               * Dùng code chuyên ngành để backend search.
-               */
-              search: major.code,
-
-              majorId: major.id,
-            }),
-          ),
-        );
-
-        loadedCurricula = curriculumResponses
-          .flatMap((response) => response.data.items)
-          .filter(
-            (curriculum, index, array) =>
-              array.findIndex((item) => item.id === curriculum.id) === index,
-          )
-          .sort((a, b) => {
-            const majorCompare = a.majorName.localeCompare(b.majorName, "vi");
-
-            if (majorCompare !== 0) {
-              return majorCompare;
-            }
-
-            return (b.effectiveYear ?? 0) - (a.effectiveYear ?? 0);
-          });
+        loadedCurricula = await getAllItems<CurriculumSummary>('/curricula');
 
         console.log("OJT curricula:", loadedCurricula);
 

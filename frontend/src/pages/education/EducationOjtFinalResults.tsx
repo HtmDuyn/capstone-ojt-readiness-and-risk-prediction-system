@@ -1,514 +1,301 @@
-import React, { useMemo, useState } from 'react';
-import {
-  CheckCircle2,
-  ClipboardCheck,
-  Eye,
-  Search,
-  X,
-} from 'lucide-react';
-
-import { PageBanner } from '@/components/common/PageBanner';
-
-type FinalResult = 'Đạt' | 'Không đạt';
-type ConfirmationStatus = 'Chờ xác nhận' | 'Đã xác nhận';
-
-interface OjtResult {
-  id: string;
+import React from "react";
+import API from "@/service/api";
+import { getPage, type Page } from "@/service/educationApi";
+import { academicService, type OjtSemester } from "@/service/academic.service";
+import { PageBanner } from "@/components/common/PageBanner";
+type Result = {
+  id: number;
   studentCode: string;
   fullName: string;
-  studentClass: string;
-  company: string;
-  ojtTerm: string;
-
-  enterpriseScore: number;
-  enterpriseEvaluation: string;
-
-  finalResult: FinalResult | null;
-  confirmationStatus: ConfirmationStatus;
-}
-
-const INITIAL_RESULTS: OjtResult[] = [
-  {
-    id: 'ojt-result-001',
-    studentCode: 'SE181666',
-    fullName: 'Nguyễn Khánh Ly',
-    studentClass: 'K18D-19A',
-    company: 'FPT Software',
-    ojtTerm: 'Fall 2026',
-    enterpriseScore: 8.6,
-    enterpriseEvaluation:
-      'Hoàn thành tốt các nhiệm vụ được giao, có tinh thần học hỏi và phối hợp tốt với nhóm.',
-    finalResult: null,
-    confirmationStatus: 'Chờ xác nhận',
-  },
-  {
-    id: 'ojt-result-002',
-    studentCode: 'SE181402',
-    fullName: 'Đặng Hoàng Nam',
-    studentClass: 'K18D-19B',
-    company: 'TGL Solutions',
-    ojtTerm: 'Fall 2026',
-    enterpriseScore: 9.0,
-    enterpriseEvaluation:
-      'Thực hiện tốt công việc, chủ động trao đổi và đáp ứng yêu cầu của doanh nghiệp.',
-    finalResult: 'Đạt',
-    confirmationStatus: 'Đã xác nhận',
-  },
-  {
-    id: 'ojt-result-003',
-    studentCode: 'SE181934',
-    fullName: 'Phan Minh Hoàng',
-    studentClass: 'K18D-19A',
-    company: 'NashTech Vietnam',
-    ojtTerm: 'Fall 2026',
-    enterpriseScore: 6.4,
-    enterpriseEvaluation:
-      'Hoàn thành phần lớn nhiệm vụ nhưng cần cải thiện khả năng chủ động và quản lý thời gian.',
-    finalResult: null,
-    confirmationStatus: 'Chờ xác nhận',
-  },
-];
-
+  enterpriseName: string;
+  semesterCode: string;
+  status: string;
+  officialScore: number | null;
+  completionScore: number | null;
+  attitudeScore: number | null;
+  skillScore: number | null;
+  comments: string | null;
+  outcome: string | null;
+  confirmedAt: string | null;
+};
+const statuses: Record<string, string> = {
+  PENDING_ACADEMIC_CONFIRMATION: "Chờ xác nhận",
+  REVISION_REQUESTED: "Chờ QHDN đối soát",
+  CONFIRMED: "Đã xác nhận",
+};
+const outcome = (value: string | null) =>
+  value === "PASSED"
+    ? "Đạt"
+    : value === "FAILED"
+      ? "Không đạt"
+      : (value ?? "Chưa có kết quả chính thức");
 const EducationOjtFinalResults: React.FC = () => {
-  const [results, setResults] = useState<OjtResult[]>(INITIAL_RESULTS);
-
-  const [searchKeyword, setSearchKeyword] = useState('');
-
-  const [selectedResult, setSelectedResult] =
-    useState<OjtResult | null>(null);
-
-  const [selectedFinalResult, setSelectedFinalResult] =
-    useState<FinalResult>('Đạt');
-
-  const filteredResults = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase();
-
-    if (!keyword) {
-      return results;
+  const [data, setData] = React.useState<Page<Result> | null>(null),
+    [selected, setSelected] = React.useState<Result | null>(null);
+  const [semesters, setSemesters] = React.useState<OjtSemester[]>([]),
+    [semesterId, setSemesterId] = React.useState("");
+  const [search, setSearch] = React.useState(""),
+    [status, setStatus] = React.useState(""),
+    [page, setPage] = React.useState(1),
+    [refresh, setRefresh] = React.useState(0);
+  const [loading, setLoading] = React.useState(false),
+    [busy, setBusy] = React.useState(false),
+    [error, setError] = React.useState(""),
+    [notice, setNotice] = React.useState(""),
+    [reason, setReason] = React.useState("");
+  const keys = React.useRef(new Map<number, { reason: string; key: string }>());
+  React.useEffect(() => {
+    let active = true;
+    academicService
+      .searchOjtSemesters({ page: 1, limit: 10000 })
+      .then((rows) => {
+        if (active) setSemesters(rows);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    setData(null);
+    getPage<Result>(
+      "/ojt-results",
+      { page, limit: 20, search, status, ojtSemesterId: semesterId },
+      controller.signal,
+    )
+      .then(setData)
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [page, search, status, semesterId, refresh]);
+  async function confirm() {
+    if (!selected || busy || !reason.trim()) return;
+    const id = selected.id,
+      trimmed = reason.trim();
+    let attempt = keys.current.get(id);
+    if (!attempt || attempt.reason !== trimmed) {
+      attempt = { reason: trimmed, key: crypto.randomUUID() };
+      keys.current.set(id, attempt);
     }
-
-    return results.filter((result) => {
-      return (
-        result.studentCode.toLowerCase().includes(keyword) ||
-        result.fullName.toLowerCase().includes(keyword) ||
-        result.company.toLowerCase().includes(keyword)
-      );
-    });
-  }, [results, searchKeyword]);
-
-  const pendingCount = results.filter(
-    (result) => result.confirmationStatus === 'Chờ xác nhận',
-  ).length;
-
-  const confirmedCount = results.filter(
-    (result) => result.confirmationStatus === 'Đã xác nhận',
-  ).length;
-
-  const handleOpenDetail = (result: OjtResult) => {
-    setSelectedResult(result);
-
-    setSelectedFinalResult(result.finalResult ?? 'Đạt');
-  };
-
-  const handleCloseDetail = () => {
-    setSelectedResult(null);
-  };
-
-  const handleConfirmResult = () => {
-    if (!selectedResult) return;
-
-    const confirmed = window.confirm(
-      `Xác nhận kết quả OJT "${selectedFinalResult}" cho sinh viên ${selectedResult.fullName}?`,
-    );
-
-    if (!confirmed) return;
-
-    setResults((current) =>
-      current.map((result) =>
-        result.id === selectedResult.id
-          ? {
-              ...result,
-              finalResult: selectedFinalResult,
-              confirmationStatus: 'Đã xác nhận',
-            }
-          : result,
-      ),
-    );
-
-    setSelectedResult((current) =>
-      current
-        ? {
-            ...current,
-            finalResult: selectedFinalResult,
-            confirmationStatus: 'Đã xác nhận',
-          }
-        : null,
-    );
-  };
-
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await API.post(`/ojt-results/${id}/confirm`, {
+        reason: trimmed,
+        idempotencyKey: attempt.key,
+      });
+      setSelected(null);
+      setReason("");
+      setPage(1);
+      setRefresh((v) => v + 1);
+      setNotice("Đã xác nhận và ghi nhận kết quả OJT trên hệ thống.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể xác nhận kết quả.");
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className="space-y-6">
       <PageBanner
-        title="Cập nhật Kết quả OJT Cuối kỳ"
-        description="Xem kết quả OJT do Phòng Quan hệ Doanh nghiệp chuyển sang và xác nhận kết quả chính thức của sinh viên."
-        badge="Quản lý OJT"
+        title="Kết quả OJT cuối kỳ"
+        description="Kết quả do QHDN chuyển; điểm và kết quả chính thức do backend quy đổi khi xác nhận."
+        badge="Phòng Đào tạo"
       />
-
-      {/* =========================
-          OVERVIEW
-          ========================= */}
-
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-sm font-semibold text-amber-700">
-            Chờ xác nhận
-          </p>
-
-          <p className="mt-2 text-3xl font-black text-slate-900">
-            {pendingCount}
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Kết quả đang chờ Phòng Đào tạo xác nhận.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-sm font-semibold text-emerald-700">
-            Đã xác nhận
-          </p>
-
-          <p className="mt-2 text-3xl font-black text-slate-900">
-            {confirmedCount}
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Kết quả OJT đã được xác nhận chính thức.
-          </p>
-        </div>
-      </section>
-
-      {/* =========================
-          SEARCH
-          ========================= */}
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="relative max-w-md">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-
+      <section className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap gap-3">
           <input
-            type="text"
-            value={searchKeyword}
-            onChange={(event) =>
-              setSearchKeyword(event.target.value)
-            }
-            placeholder="Tìm theo MSSV, tên sinh viên hoặc doanh nghiệp..."
-            className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            aria-label="Tìm kết quả OJT"
+            className="rounded border p-2"
+            placeholder="Mã hoặc tên sinh viên"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
-        </div>
-      </section>
-
-      {/* =========================
-          TABLE
-          ========================= */}
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1150px] text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Sinh viên
-                </th>
-
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Lớp
-                </th>
-
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Doanh nghiệp
-                </th>
-
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Kỳ OJT
-                </th>
-
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Điểm DN
-                </th>
-
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Kết quả chính thức
-                </th>
-
-                <th className="px-5 py-4 font-semibold text-slate-600">
-                  Trạng thái
-                </th>
-
-                <th className="px-5 py-4 text-right font-semibold text-slate-600">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {filteredResults.map((result) => (
-                <tr
-                  key={result.id}
-                  className="transition hover:bg-slate-50/70"
-                >
-                  <td className="px-5 py-4">
-                    <div>
-                      <p className="font-semibold text-slate-800">
-                        {result.fullName}
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        {result.studentCode}
-                      </p>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {result.studentClass}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-700">
-                    {result.company}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {result.ojtTerm}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span className="font-bold text-slate-800">
-                      {result.enterpriseScore.toFixed(1)}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    {result.finalResult ? (
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                          result.finalResult === 'Đạt'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-red-200 bg-red-50 text-red-600'
-                        }`}
-                      >
-                        {result.finalResult}
-                      </span>
-                    ) : (
-                      <span className="text-xs font-medium text-slate-400">
-                        Chưa xác nhận
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                        result.confirmationStatus === 'Đã xác nhận'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : 'border-amber-200 bg-amber-50 text-amber-700'
-                      }`}
-                    >
-                      {result.confirmationStatus}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDetail(result)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
-                      >
-                        <Eye size={15} />
-                        Xem
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {filteredResults.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-5 py-12 text-center text-sm text-slate-500"
-                  >
-                    Không tìm thấy sinh viên phù hợp.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* =========================
-          DETAIL MODAL
-          ========================= */}
-
-      {selectedResult && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]"
-          onClick={handleCloseDetail}
-        >
-          <div
-            className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+          <select
+            aria-label="Kỳ OJT"
+            className="rounded border p-2"
+            value={semesterId}
+            onChange={(e) => {
+              setSemesterId(e.target.value);
+              setPage(1);
+            }}
           >
-            {/* HEADER */}
-
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-                  <ClipboardCheck size={22} />
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    Kết quả OJT cuối kỳ
-                  </h2>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedResult.fullName} -{' '}
-                    {selectedResult.studentCode}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCloseDetail}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X size={19} />
-              </button>
-            </div>
-
-            {/* BODY */}
-
-            <div className="space-y-5 px-6 py-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-medium text-slate-500">
-                    Lớp
-                  </p>
-
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {selectedResult.studentClass}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-medium text-slate-500">
-                    Kỳ OJT
-                  </p>
-
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {selectedResult.ojtTerm}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-medium text-slate-500">
-                    Doanh nghiệp
-                  </p>
-
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {selectedResult.company}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-medium text-slate-500">
-                    Điểm doanh nghiệp
-                  </p>
-
-                  <p className="mt-1 text-xl font-bold text-slate-900">
-                    {selectedResult.enterpriseScore.toFixed(1)}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold text-slate-700">
-                  Đánh giá từ doanh nghiệp
-                </p>
-
-                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                  {selectedResult.enterpriseEvaluation}
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Kết quả OJT chính thức
-                </label>
-
-                <select
-                  value={selectedFinalResult}
-                  onChange={(event) =>
-                    setSelectedFinalResult(
-                      event.target.value as FinalResult,
-                    )
-                  }
-                  disabled={
-                    selectedResult.confirmationStatus ===
-                    'Đã xác nhận'
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  <option value="Đạt">Đạt</option>
-                  <option value="Không đạt">Không đạt</option>
-                </select>
-              </div>
-
-              {selectedResult.confirmationStatus ===
-                'Đã xác nhận' && (
-                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
-                  <CheckCircle2 size={19} />
-
-                  Kết quả OJT của sinh viên đã được Phòng Đào tạo xác nhận.
-                </div>
-              )}
-            </div>
-
-            {/* FOOTER */}
-
-            <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
-              <button
-                type="button"
-                onClick={handleCloseDetail}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-              >
-                Đóng
-              </button>
-
-              {selectedResult.confirmationStatus ===
-                'Chờ xác nhận' && (
-                <button
-                  type="button"
-                  onClick={handleConfirmResult}
-                  className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
-                >
-                  <CheckCircle2 size={17} />
-
-                  Xác nhận kết quả
-                </button>
-              )}
-            </div>
-          </div>
+            <option value="">Tất cả kỳ OJT</option>
+            {semesters.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Trạng thái kết quả"
+            className="rounded border p-2"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Tất cả trạng thái</option>
+            {Object.entries(statuses).map(([value, name]) => (
+              <option key={value} value={value}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="rounded border px-3"
+            onClick={() => setRefresh((v) => v + 1)}
+          >
+            Tải lại
+          </button>
         </div>
+        {error && (
+          <p role="alert" className="text-red-700">
+            {error}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="text-green-700">
+            {notice}
+          </p>
+        )}
+        {loading && <p role="status">Đang tải...</p>}
+        {data && (
+          <>
+            <p>Tổng: {data.total} kết quả</p>
+            <div className="overflow-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr>
+                    {[
+                      "Sinh viên",
+                      "Doanh nghiệp",
+                      "Kỳ",
+                      "Điểm chính thức",
+                      "Trạng thái",
+                      "",
+                    ].map((h) => (
+                      <th className="p-3" key={h}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((r) => (
+                    <tr key={r.id} className="border-t">
+                      <td className="p-3">
+                        {r.studentCode}
+                        <br />
+                        {r.fullName}
+                      </td>
+                      <td>{r.enterpriseName}</td>
+                      <td>{r.semesterCode}</td>
+                      <td>{r.officialScore ?? "—"}</td>
+                      <td>{statuses[r.status] ?? r.status}</td>
+                      <td>
+                        <button
+                          disabled={busy}
+                          className="text-orange-700"
+                          onClick={() => {
+                            setSelected(r);
+                            setReason("");
+                            setError("");
+                          }}
+                        >
+                          Chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!data.items.length && <p>Không có kết quả phù hợp.</p>}
+            <div className="flex gap-4">
+              <button
+                disabled={loading || page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Trước
+              </button>
+              <span>Trang {page}</span>
+              <button
+                disabled={loading || page * 20 >= data.total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Sau
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+      {selected && (
+        <section className="space-y-3 rounded-2xl bg-white p-6 shadow-sm">
+          <button
+            className="float-right"
+            disabled={busy}
+            onClick={() => setSelected(null)}
+          >
+            Đóng
+          </button>
+          <h2 className="font-bold">
+            {selected.fullName} — {selected.studentCode}
+          </h2>
+          <p>Doanh nghiệp: {selected.enterpriseName}</p>
+          <p>
+            Hoàn thành: {selected.completionScore ?? "—"}; Thái độ:{" "}
+            {selected.attitudeScore ?? "—"}; Kỹ năng:{" "}
+            {selected.skillScore ?? "—"}
+          </p>
+          <p>Nhận xét: {selected.comments ?? "—"}</p>
+          <p>Điểm chính thức: {selected.officialScore ?? "Chưa xác nhận"}</p>
+          <p>Kết quả: {outcome(selected.outcome)}</p>
+          <p>
+            Ngày xác nhận:{" "}
+            {selected.confirmedAt
+              ? new Date(selected.confirmedAt).toLocaleString("vi-VN")
+              : "—"}
+          </p>
+          {selected.status === "PENDING_ACADEMIC_CONFIRMATION" && (
+            <>
+              <label className="block">
+                Lý do xác nhận
+                <textarea
+                  aria-label="Lý do xác nhận"
+                  className="mt-2 block w-full rounded border p-2"
+                  maxLength={2000}
+                  value={reason}
+                  disabled={busy}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </label>
+              <button
+                className="rounded bg-orange-500 px-4 py-2 text-white disabled:opacity-50"
+                disabled={busy || !reason.trim()}
+                onClick={() => void confirm()}
+              >
+                {busy ? "Đang xác nhận..." : "Xác nhận và ghi nhận điểm"}
+              </button>
+            </>
+          )}
+        </section>
       )}
     </div>
   );
 };
-
 export default EducationOjtFinalResults;

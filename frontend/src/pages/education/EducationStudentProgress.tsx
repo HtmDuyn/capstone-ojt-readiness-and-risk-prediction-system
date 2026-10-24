@@ -315,6 +315,7 @@ const EducationStudentProgress: React.FC = () => {
         badge="Quản lý sinh viên"
       />
 
+      <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">GPA, tín chỉ và kết quả môn học dùng dữ liệu hiện có. Kỳ OJT dự kiến, số kỳ chậm và đánh giá tiến độ sẽ phát triển sau.</p>
       {/* ===================================================
             FILTER
             =================================================== */}
@@ -424,11 +425,12 @@ const EducationStudentProgress: React.FC = () => {
           {/* PROGRESS */}
 
           <select
+            disabled title="Lộ trình và đánh giá tiến độ sẽ phát triển sau"
             value={progressFilter}
             onChange={(event) => setProgressFilter(event.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none"
           >
-            <option value="all">Tất cả trạng thái tiến độ</option>
+            <option value="all">Trạng thái tiến độ: phát triển sau</option>
 
             <option value="Đúng tiến độ">Đúng tiến độ</option>
 

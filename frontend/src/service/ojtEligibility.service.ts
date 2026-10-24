@@ -1,6 +1,6 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://capstone-ojt-readiness-and-risk.onrender.com";
+import { getJson, cleanQuery } from "./educationApi";
+import { API_ORIGIN } from "./apiConfig";
+const API_BASE_URL = API_ORIGIN;
 
 const TOKEN_KEY = "ojt_auth_token";
 
@@ -39,42 +39,31 @@ const requestJson = async <T>(
   headers.set("Content-Type", "application/json");
 
   if (token) {
-    headers.set(
-      "Authorization",
-      `Bearer ${token}`,
-    );
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}${path}`,
-    {
-      ...options,
-      headers,
-    },
-  );
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
 
   let responseData: unknown = null;
 
   try {
-    responseData =
-      await response.json();
+    responseData = await response.json();
   } catch {
     responseData = null;
   }
 
   if (!response.ok) {
-    const errorBody =
-      responseData as
-        | {
-            message?: string;
-            errorCode?: string;
-            data?: unknown;
-          }
-        | null;
+    const errorBody = responseData as {
+      message?: string;
+      errorCode?: string;
+      data?: unknown;
+    } | null;
 
     throw new OjtEligibilityApiError(
-      errorBody?.message ||
-        `Request failed with status ${response.status}.`,
+      errorBody?.message || `Request failed with status ${response.status}.`,
       response.status,
       errorBody?.errorCode,
       errorBody?.data,
@@ -84,19 +73,13 @@ const requestJson = async <T>(
   return responseData as T;
 };
 
-const postJson = <T>(
-  path: string,
-  body: unknown,
-) =>
+const postJson = <T>(path: string, body: unknown) =>
   requestJson<T>(path, {
     method: "POST",
     body: JSON.stringify(body),
   });
 
-const patchJson = <T>(
-  path: string,
-  body: unknown,
-) =>
+const patchJson = <T>(path: string, body: unknown) =>
   requestJson<T>(path, {
     method: "PATCH",
     body: JSON.stringify(body),
@@ -106,14 +89,9 @@ const patchJson = <T>(
    TYPES
    ========================================================= */
 
-export type OjtRuleSetStatus =
-  | "DRAFT"
-  | "PUBLISHED"
-  | string;
+export type OjtRuleSetStatus = "DRAFT" | "PUBLISHED" | string;
 
-export type OjtDebtBasis =
-  | "FAILED_ATTEMPTS"
-  | string;
+export type OjtDebtBasis = "FAILED_ATTEMPTS" | string;
 
 export interface OjtRuleSet {
   id: number;
@@ -241,36 +219,27 @@ export interface PublishOjtRuleSetResponse {
    API METHODS
    ========================================================= */
 
-const searchRuleSets = (
-  payload: SearchOjtRuleSetsPayload,
-) =>
-  postJson<SearchOjtRuleSetsResponse>(
-    "/api/json/ojt-rule-sets/search",
-    payload,
+const searchRuleSets = (payload: SearchOjtRuleSetsPayload) =>
+  getJson<SearchOjtRuleSetsResponse>(
+    "/ojt-rule-sets",
+    cleanQuery({
+      ...payload,
+      ...(payload.status === "ALL" ? { status: undefined } : {}),
+    }),
   );
 
-const createRuleSet = (
-  payload: CreateOjtRuleSetPayload,
-) =>
-  postJson<OjtRuleSetMutationResponse>(
-    "/api/ojt-rule-sets",
-    payload,
-  );
+const createRuleSet = (payload: CreateOjtRuleSetPayload) =>
+  postJson<OjtRuleSetMutationResponse>("/api/ojt-rule-sets", payload);
 
-const updateRuleSet = (
-  payload: UpdateOjtRuleSetPayload,
-) =>
+const updateRuleSet = ({ ruleSetId, ...payload }: UpdateOjtRuleSetPayload) =>
   patchJson<OjtRuleSetMutationResponse>(
-    "/api/json/ojt-rule-sets",
+    `/api/ojt-rule-sets/${ruleSetId}`,
     payload,
   );
-
-const publishRuleSet = (
-  payload: PublishOjtRuleSetPayload,
-) =>
+const publishRuleSet = ({ ruleSetId }: PublishOjtRuleSetPayload) =>
   postJson<PublishOjtRuleSetResponse>(
-    "/api/json/ojt-rule-sets/publish",
-    payload,
+    `/api/ojt-rule-sets/${ruleSetId}/publish`,
+    {},
   );
 
 /* =========================================================

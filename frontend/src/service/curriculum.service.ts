@@ -1,6 +1,6 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://capstone-ojt-readiness-and-risk.onrender.com";
+import { getJson } from "./educationApi";
+import { API_ORIGIN } from "./apiConfig";
+const API_BASE_URL = API_ORIGIN;
 
 /* =========================================================
    COMMON
@@ -18,15 +18,13 @@ const getAuthToken = () => {
 
 const requestJson = async <T>(
   path: string,
-  method: "POST" | "PUT" | "PATCH",
+  method: "POST",
   body: unknown,
 ): Promise<T> => {
   const token = getAuthToken();
 
   if (!token) {
-    throw new Error(
-      "Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.",
-    );
+    throw new Error("Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.");
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -59,40 +57,19 @@ const requestJson = async <T>(
         : null;
 
     if (response.status === 401) {
-      throw new Error(
-        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.",
-      );
+      throw new Error("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
     }
 
     throw new Error(
-      error?.message ||
-        `Yêu cầu không thành công (${response.status}).`,
+      error?.message || `Yêu cầu không thành công (${response.status}).`,
     );
   }
 
   return result as T;
 };
 
-const postJson = <T>(
-  path: string,
-  body: unknown,
-) => {
-  return requestJson<T>(
-    path,
-    "POST",
-    body,
-  );
-};
-
-const putJson = <T>(
-  path: string,
-  body: unknown,
-) => {
-  return requestJson<T>(
-    path,
-    "PUT",
-    body,
-  );
+const postJson = <T>(path: string, body: unknown) => {
+  return requestJson<T>(path, "POST", body);
 };
 
 /* =========================================================
@@ -160,15 +137,6 @@ export interface SearchCoursesResponse {
   };
 }
 
-export interface CreateCoursePayload {
-  code: string;
-  name: string;
-
-  defaultCredits: number;
-
-  isOjtPrerequisite: boolean;
-}
-
 /* =========================================================
    CURRICULUM SEARCH
    ========================================================= */
@@ -232,10 +200,7 @@ export interface SearchCurriculaResponse {
    ========================================================= */
 
 export type CurriculumEntryKind =
-  | "COURSE"
-  | "COMBO_SLOT"
-  | "ELECTIVE_SLOT"
-  | string;
+  "COURSE" | "COMBO_SLOT" | "ELECTIVE_SLOT" | string;
 
 export interface CurriculumCourse {
   id: number;
@@ -345,107 +310,11 @@ export interface CurriculumDetailResponse {
 }
 
 /* =========================================================
-   UPDATE CURRICULUM COURSES
-   ========================================================= */
-
-export interface UpdateCurriculumCourseItem {
-  courseId: number;
-
-  credits: number;
-  semester: number;
-
-  isRequired: boolean;
-
-  entryKind: CurriculumEntryKind;
-
-  prerequisiteText: string;
-}
-
-export interface UpdateCurriculumCoursesPayload {
-  courses: UpdateCurriculumCourseItem[];
-
-  programId: number;
-}
-
-/* =========================================================
-   CURRICULUM COMBOS
-   ========================================================= */
-
-export interface CreateCurriculumComboPayload {
-  code: string;
-  name: string;
-
-  selectionGroup: string | null;
-  note: string | null;
-
-  programId: number;
-}
-
-export interface SearchCurriculumCombosPayload {
-  programId: number;
-}
-
-export interface SearchCurriculumCombosResponse {
-  success: boolean;
-
-  data: CurriculumCombo[];
-}
-
-/* =========================================================
-   UPDATE COMBO COURSES
-   ========================================================= */
-
-export interface UpdateComboCourseItem {
-  /*
-   * Backend yêu cầu đúng một trong hai:
-   * courseId hoặc courseCode.
-   *
-   * FE dùng courseId.
-   */
-  courseId: number;
-
-  credits: number;
-  semester: number;
-
-  prerequisiteText: string | null;
-  note: string | null;
-
-  /*
-   * Đây là CourseID của COMBO_SLOT
-   * trong curriculum.
-   */
-  slotCourseIds: number[];
-}
-
-export interface UpdateComboChoiceGroupItem {
-  code: string;
-
-  minCourses: number;
-  maxCourses: number;
-
-  courseIds: number[];
-}
-
-export interface UpdateComboCoursesPayload {
-  courses: UpdateComboCourseItem[];
-
-  /*
-   * Backend bắt buộc field này.
-   * Combo thường hiện tại chưa có choice group
-   * nên FE gửi [].
-   */
-  choiceGroups: UpdateComboChoiceGroupItem[];
-
-  comboId: number;
-}
-/* =========================================================
    CURRICULUM IMPORT
    ========================================================= */
 
 export type CurriculumImportEntryKind =
-  | "COURSE"
-  | "COMBO_SLOT"
-  | "ELECTIVE_SLOT";
+  "COURSE" | "COMBO_SLOT" | "ELECTIVE_SLOT";
 
 export interface CurriculumImportPayload {
   idempotencyKey: string;
@@ -556,6 +425,7 @@ export interface CurriculumImportPreviewResponse {
     equivalenceCount: number;
 
     canCommit: boolean;
+    action?: "CREATE" | "REPLACE";
 
     preview: boolean;
 
@@ -609,104 +479,43 @@ export interface CurriculumImportPreviewResponse {
    API
    ========================================================= */
 
-const searchMajors = (
-  payload: SearchMajorsPayload,
-) => {
-  return postJson<SearchMajorsResponse>(
-    "/api/json/majors/search",
-    payload,
+const searchMajors = (payload: SearchMajorsPayload) =>
+  getJson<SearchMajorsResponse>(
+    "/majors",
+    payload as unknown as Record<string, unknown>,
   );
-};
-
-const searchCourses = (
-  payload: SearchCoursesPayload,
-) => {
-  return postJson<SearchCoursesResponse>(
-    "/api/json/courses/search",
-    payload,
+const searchCourses = (payload: SearchCoursesPayload) =>
+  getJson<SearchCoursesResponse>(
+    "/courses",
+    payload as unknown as Record<string, unknown>,
   );
-};
-
-const createCourse = (
-  payload: CreateCoursePayload,
-) => {
-  return postJson<unknown>(
-    "/api/courses",
-    payload,
+const searchCurricula = (payload: SearchCurriculaPayload) =>
+  getJson<SearchCurriculaResponse>(
+    "/curricula",
+    payload as unknown as Record<string, unknown>,
   );
-};
-
-const searchCurricula = (
-  payload: SearchCurriculaPayload,
-) => {
-  return postJson<SearchCurriculaResponse>(
-    "/api/json/curricula/search",
-    payload,
-  );
-};
-
-const getCurriculumDetail = (
-  programId: number,
-) => {
-  return postJson<CurriculumDetailResponse>(
-    "/api/json/curricula/detail",
-    {
-      programId,
-    },
-  );
-};
-
-const updateCurriculumCourses = (
-  payload: UpdateCurriculumCoursesPayload,
-) => {
-  return putJson<unknown>(
-    "/api/json/curricula/courses",
-    payload,
-  );
-};
-
-const createCurriculumCombo = (
-  payload: CreateCurriculumComboPayload,
-) => {
-  return postJson<unknown>(
-    "/api/json/curricula/combos",
-    payload,
-  );
-};
-
-const searchCurriculumCombos = (
-  payload: SearchCurriculumCombosPayload,
-) => {
-  return postJson<SearchCurriculumCombosResponse>(
-    "/api/json/curricula/combos/search",
-    payload,
-  );
-};
-
-const updateComboCourses = (
-  payload: UpdateComboCoursesPayload,
-) => {
-  return putJson<unknown>(
-    "/api/json/combos/courses",
-    payload,
-  );
-};
-const previewCurriculumImport = (
-  payload: CurriculumImportPayload,
-) => {
-  return postJson<CurriculumImportPreviewResponse>(
+const getCurriculumDetail = (programId: number) =>
+  getJson<CurriculumDetailResponse>(`/curricula/${programId}`);
+const approvedImports = new Map<string, string>();
+const previewCurriculumImport = async (payload: CurriculumImportPayload) => {
+  approvedImports.delete(payload.idempotencyKey);
+  const response = await postJson<CurriculumImportPreviewResponse>(
     "/api/curriculum-imports/preview",
     payload,
   );
+  if (response.data.canCommit) {
+    if (response.data.action !== "CREATE")
+      throw new Error(
+        "Mã chương trình đã tồn tại. Chỉ được import khung mới; không thay thế hoặc cập nhật khung đã nhập.",
+      );
+    approvedImports.set(payload.idempotencyKey, JSON.stringify(payload));
+  }
+  return response;
 };
-
-const commitCurriculumImport = (
-  payload: CurriculumImportPayload,
-) => {
-  return postJson<unknown>(
-    "/api/curriculum-imports/commit",
-    payload,
-  );
+const commitCurriculumImport = (payload: CurriculumImportPayload) => {
+  if (approvedImports.get(payload.idempotencyKey) !== JSON.stringify(payload))
+    throw new Error("Cần kiểm tra và xác nhận một khung mới trước khi import.");
+  return postJson<unknown>("/api/curriculum-imports/commit", payload);
 };
 
 /* =========================================================
@@ -717,15 +526,9 @@ export const curriculumService = {
   searchMajors,
 
   searchCourses,
-  createCourse,
 
   searchCurricula,
   getCurriculumDetail,
-  updateCurriculumCourses,
-
-  createCurriculumCombo,
-  searchCurriculumCombos,
-  updateComboCourses,
 
   previewCurriculumImport,
   commitCurriculumImport,
