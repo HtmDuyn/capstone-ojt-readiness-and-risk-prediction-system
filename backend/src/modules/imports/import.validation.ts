@@ -31,7 +31,7 @@ export function validateImport(body: unknown): ImportInput {
       codes.add(code); emails.add(email);
       const row: ImportRow = { code, email, fullName: text(r.fullName, 'fullName', 150) };
       if (b.kind === 'STUDENT') {
-        if (!r.academic || typeof r.academic !== 'object' || Array.isArray(r.academic)) throw fail('academic profile, placement and courseResults are required.');
+        if (!r.academic || typeof r.academic !== 'object' || Array.isArray(r.academic)) throw fail('academic must be a JSON object containing programId, placement and courseResults.');
         row.academic = r.academic as Record<string, any>;
       }
       if (b.kind === 'ENTERPRISE') {

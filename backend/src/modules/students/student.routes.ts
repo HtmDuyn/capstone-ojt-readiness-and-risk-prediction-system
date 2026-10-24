@@ -5,7 +5,7 @@ import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './student.validation';
 import { assertStudentAccess, listStudents, patchStudent, results, patchResult } from './student.service';
 import { studentProfile } from './student-profile.service';
-import { importHistory } from './academic-import.service';
+import { importHistory, courseResultImport } from './academic-import.service';
 import { listTasks } from '../qhdn/task.service';
 import { receiveCV, uploadStudentCV, readCV } from './cv.service';
 
@@ -31,6 +31,8 @@ router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.pa
 router.get('/students/:id/course-results',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
 router.patch('/course-results/:id',...staff,handle(req=>patchResult(positiveId(req.params.id),req.body,req.user.userId)));
 router.get('/internship-tasks',authenticate,authorizeRoles('STUDENT','ENTERPRISE','OJT_COORD','ADMIN'),handle(req=>listTasks(req.query,req.user)));
+router.post('/course-result-imports/preview',...staff,handle(req=>courseResultImport(req.body,req.user.userId,true)));
+router.post('/course-result-imports/commit',...staff,handle(req=>courseResultImport(req.body,req.user.userId,false)));
 router.get('/academic-imports',...staff,handle(req=>importHistory(req.query)));
 
 export default router;
