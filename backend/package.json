@@ -7,7 +7,7 @@
     "db:migrate:academic-rest": "npm run build && node scripts/migrate-academic-rest.cjs",
     "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
-    "docs:api": "node scripts/export-api-inputs.cjs && node scripts/export-list-input-audit.cjs",
+    "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",

@@ -89,9 +89,9 @@ Thay ID và ngày bằng dữ liệu thực tế. Chỉ doanh nghiệp sở hữ
 
 **20 route thực tế:**
 
-- Các route song song `/api/student/companies`, `/api/student/positions` và chi tiết: dùng `/api/students/me/opportunities`.
-- Các route `/api/student/applications`, chi tiết và withdraw thuộc luồng CV cũ: dùng luồng `/api/job-applications` hiện tại.
-- `POST/GET/DELETE /api/student/cv`, các route `/api/student/cv/analyses` và `/api/student/company-recommendations` thuộc kho CV song song; giữ upload CV chính thức `/api/students/me/cv`.
+- Các route song song `/api/students/me/companies`, `/api/students/me/positions` và chi tiết: dùng `/api/students/me/opportunities`.
+- Các route `/api/students/me/applications`, chi tiết và withdraw thuộc luồng CV cũ: dùng luồng `/api/job-applications` hiện tại.
+- `POST/GET/DELETE /api/students/me/cv`, các route `/api/students/me/cv/analyses` và `/api/students/me/company-recommendations` thuộc kho CV song song; giữ upload CV chính thức `/api/students/me/cv`.
 - `POST /api/ojt-results`, `POST /api/ojt-results/{id}/transfer`, `POST /api/ojt-results/{id}/revision-requests`, `PATCH /api/ojt-results/{id}`, `POST /api/ojt-results/{id}/confirm`.
 - `PUT /api/assignments/{id}/internship-evaluation`: bỏ nhập điểm thay doanh nghiệp từ phía QHDN.
 

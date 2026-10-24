@@ -1,14 +1,14 @@
 # Đầu vào API dành cho FE và test thủ công
 
 Nguồn: OpenAPI hiện tại của backend. Tạo lại bằng `npm run docs:api` sau `npm run build`.
-Phạm vi: 138 operations; 42 path parameters; 244 query parameters; 71 request bodies.
+Phạm vi: 154 operations; 40 path parameters; 224 query parameters; 99 request bodies.
 
 
-API dùng route REST gốc. GET truyền bộ lọc và phân trang qua query parameters, ID bản ghi qua path; không gửi GET body. POST tạo mới/thực hiện nghiệp vụ, PUT/PATCH cập nhật, DELETE xóa theo quy tắc nghiệp vụ. Các route /api/json/ đã bị xóa. Token, quyền và trạng thái nghiệp vụ vẫn bắt buộc.
+Nhóm Sinh viên dùng một JSON body chứa cả ID và bộ lọc tại /api/student/*; API đọc dùng POST, không có ô path/query. Upload CV dùng multipart/form-data. Các nhóm còn lại dùng route REST gốc. GET truyền bộ lọc và phân trang qua query parameters, ID bản ghi qua path; không gửi GET body. POST tạo mới/thực hiện nghiệp vụ, PUT/PATCH cập nhật, DELETE xóa theo quy tắc nghiệp vụ. Các route /api/json/ đã bị xóa. Token, quyền và trạng thái nghiệp vụ vẫn bắt buộc.
 
 Bạn tự insert dữ liệu mẫu: dùng đúng bảng/ID, FK, trạng thái, snapshot và fingerprint nguồn theo schema. Ví dụ confirm eligibility hoặc điểm OJT sẽ trả 409 nếu dữ liệu mẫu thiếu liên kết, snapshot hoặc không còn khớp nguồn. Không chỉ đổi một cột Status để giả lập hoàn tất nghiệp vụ.
 
-- Swagger: `/api-docs`. Nhấn Try it out rồi nhập path/query parameters và request body theo từng API. GET không có request body. Schema hiển thị các trường và ràng buộc.
+- Swagger: `/api-docs`. Nhóm Sinh viên: nhấn Try it out rồi sửa trực tiếp JSON request body, gồm cả ID; API không cần trường nào gửi {}. Các nhóm khác nhập path/query và body theo hợp đồng. GET không có request body. Schema hiển thị các trường và ràng buộc.
 - OpenAPI JSON cho FE: `/api-docs/openapi.json`.
 - `studentId` = StudentID; `programId` = ProgramID; `majorId` = SpecializationID; `courseId` = CourseID. Các loại ID không thay thế cho nhau.
 - Mọi ID trong ví dụ là minh họa; thay bằng ID thực tế trong dữ liệu mẫu. Không tự gọi các API tạo dữ liệu từ ví dụ.
@@ -1809,25 +1809,6 @@ Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có request body.
 
-## POST /api/job-applications
-
-Ứng tuyển vị trí doanh nghiệp
-
-Cần hồ sơ OJT của mình, xác nhận ELIGIBLE còn hiệu lực, đợt đăng ký sinh viên đang mở, tin đã công bố còn hạn và vị trí còn chỉ tiêu. Lưu doanh nghiệp/vị trí, kết quả chính thức và phiên bản CV hiện tại. Không tự bàn giao hoặc điều phối.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| registrationId | integer | Có | minimum=1 |  |
-| postId | integer | Có | minimum=1 |  |
-| positionId | integer | Có | minimum=1 |  |
-| coverLetter | string | Không / theo điều kiện nghiệp vụ | maxLength=5000 |  |
-
 ## GET /api/majors
 
 Danh sách chuyên ngành
@@ -2706,165 +2687,581 @@ Body: application/json — bắt buộc.
 | --- | --- | --- | --- | --- |
 | email | string | Có | format="email" |  |
 
-## GET /api/student/academic-summary
+## POST /api/student/academic-summary/search
 
 tín chỉ đã đạt/đang học/thiếu; môn nợ/chưa học/đang học. Kịch bản đạt ngưỡng không phải xác suất AI
 
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-
-Không có request body.
-
-## GET /api/student/assignments/current
-
-DN/vị trí/giám sát/thời gian của mình theo kỳ
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Không | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-
-Không có request body.
-
-## GET /api/student/combo-registration-windows
-
-các đợt/lựa chọn khả dụng
-
-Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | page | integer | Không | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
-| query | limit | integer | Không | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
-
-Không có request body.
-
-## GET /api/student/curriculum
-
-chương trình đã ban hành của mình
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
 Không có tham số URL/query.
 
-Không có request body.
+Body: application/json — bắt buộc.
 
-## GET /api/student/dashboard
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
 
-tổng hợp; không tạo thuật toán học vụ mới
+## PATCH /api/student/accounts/me/profile/update
 
-Xác thực: Bearer token; role/ownership theo chức năng.
+Cập nhật hồ sơ cá nhân
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-
-Không có request body.
-
-## GET /api/student/notifications
-
-thông báo/lọc unread/phân trang, trả unreadCount cùng response
-
-Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | unread | string ∈ "true", "false" | Không |  |  |
-| query | page | integer | Không | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
-| query | limit | integer | Không | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
+Không có tham số URL/query.
 
-Không có request body.
+Body: application/json — bắt buộc.
 
-## PATCH /api/student/notifications/{id}/read
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| fullName | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=150 |  |
+| phone | string | Không / theo điều kiện nghiệp vụ | maxLength=20; nullable=true |  |
 
-người nhận đánh dấu đọc, idempotent
+## POST /api/student/assignments/current/search
+
+DN/vị trí/giám sát/thời gian của mình theo kỳ
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| path | id | integer | Có | minimum=1; maximum=2147483647 | ID: bản ghi. |
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/auth/change-password
+
+Đổi mật khẩu
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Token cũ bị thu hồi; cần đăng nhập lại.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| currentPassword | string | Có | format="password" |  |
+| newPassword | string | Có | format="password"; minLength=12 | Maximum 72 UTF-8 bytes |
+
+## POST /api/student/auth/me/search
+
+Xem tài khoản đang đăng nhập
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Kèm ID hồ sơ sinh viên hoặc doanh nghiệp liên kết.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
 
 Body: application/json — bắt buộc.
 
 Schema: object
 
-## GET /api/student/ojt-registration-windows
+## POST /api/student/combo-registration-windows/preview
 
-scope/deadline, canRegister/blockReasons
+Xem ảnh hưởng của combo dự kiến
 
-Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Không | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-| query | page | integer | Không | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
-| query | limit | integer | Không | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
-
-Không có request body.
-
-## GET /api/student/ojt-results
-
-chỉ kết quả của mình được công bố
-
-Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Tính tín chỉ, môn còn thiếu và điều kiện OJT; không lưu lựa chọn chính thức.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Không | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-| query | page | integer | Không | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
-| query | limit | integer | Không | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
+Không có tham số URL/query.
 
-Không có request body.
+Body: application/json — bắt buộc.
 
-## GET /api/student/ojt-results/{id}
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID hồ sơ sinh viên, khác ID tài khoản. |
+| comboId | integer | Có | minimum=1 | ID combo (ProgramComboID). |
+| courseIds | array<integer> | Có | minItems=1; uniqueItems=true | Danh sách ID môn học. |
+| windowId | integer | Có | minimum=1 | windowId của tài nguyên cần truy cập. |
+
+## POST /api/student/combo-registration-windows/search
+
+Danh sách đợt chọn combo
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Sinh viên chỉ thấy đợt của mình, kèm lựa chọn hợp lệ, hạn gia hạn và lý do chưa thể nộp.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Số bản ghi mỗi trang. |
+| phase | string ∈ "INITIAL", "CONFIRMATION" | Không / theo điều kiện nghiệp vụ |  |  |
+| status | string ∈ "DRAFT", "OPEN", "CLOSED", "FINALIZED" | Không / theo điều kiện nghiệp vụ |  |  |
+| academicPeriodId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ học hoặc Block 3. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/combo-registration-windows/selections
+
+Gửi lựa chọn combo
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID hồ sơ sinh viên, khác ID tài khoản. |
+| comboId | integer | Có | minimum=1 | ID combo (ProgramComboID). |
+| courseIds | array<integer> | Có | maxItems=500; uniqueItems=true | Danh sách ID môn học. |
+| reason | string | Không / theo điều kiện nghiệp vụ | maxLength=2000 | Lý do thực hiện. |
+| windowId | integer | Có | minimum=1 | windowId của tài nguyên cần truy cập. |
+
+## POST /api/student/combo-selections/search
+
+Lịch sử lựa chọn combo của sinh viên
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 | studentId của tài nguyên cần truy cập. |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Số bản ghi mỗi trang. |
+
+## POST /api/student/course-results/search
+
+Điểm, lần học và trạng thái môn
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 | studentId của tài nguyên cần truy cập. |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Số bản ghi mỗi trang. |
+| courseId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID môn học (CourseID). |
+| academicPeriodId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ học hoặc Block 3. |
+| status | string ∈ "PASSED", "FAILED", "IN_PROGRESS", "WITHDRAWN", "RECOGNIZED" | Không / theo điều kiện nghiệp vụ |  |  |
+
+## POST /api/student/curriculum/search
+
+chương trình đã ban hành của mình
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/cv/download
+
+Tải CV của sinh viên
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. QHDN được xem CV sinh viên đã có bàn giao; không yêu cầu sinh viên phải đăng ký trước.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 | studentId của tài nguyên cần truy cập. |
+| cvFileId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+
+## POST /api/student/dashboard/search
+
+tổng hợp; không tạo thuật toán học vụ mới
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/eligibility-checks/search
+
+Lịch sử kiểm tra điều kiện OJT
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 | studentId của tài nguyên cần truy cập. |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ OJT. |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Số bản ghi mỗi trang. |
+
+## POST /api/student/eligibility/search
+
+Kết quả OJT và điều kiện còn thiếu
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. undefined Không truyền ojtSemesterId: trả items theo từng kỳ OJT; có truyền: trả một kết quả như trước.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 | studentId của tài nguyên cần truy cập. |
+| ojtSemesterId | integer | Có | minimum=1 | ID kỳ OJT. |
+
+## POST /api/student/internship-tasks/search
+
+Danh sách task trong phạm vi tài khoản
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| companyId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| positionId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| assignmentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+
+## POST /api/student/job-applications/create
+
+Ứng tuyển vị trí doanh nghiệp
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Cần hồ sơ OJT của mình, xác nhận ELIGIBLE còn hiệu lực, đợt đăng ký sinh viên đang mở, tin đã công bố còn hạn và vị trí còn chỉ tiêu. Lưu doanh nghiệp/vị trí, kết quả chính thức và phiên bản CV hiện tại. Không tự bàn giao hoặc điều phối.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| registrationId | integer | Có | minimum=1 |  |
+| postId | integer | Có | minimum=1 |  |
+| positionId | integer | Có | minimum=1 |  |
+| coverLetter | string | Không / theo điều kiện nghiệp vụ | maxLength=5000 |  |
+
+## POST /api/student/job-applications/search
+
+Danh sách hồ sơ ứng tuyển doanh nghiệp
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Sinh viên xem hồ sơ của mình; Admin/QHDN xem được trước bàn giao. Kèm vị trí, doanh nghiệp, tin tuyển, CV đã dùng và trạng thái điều phối.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| applicationId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| registrationId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| companyId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| positionId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| status | string ∈ "SUBMITTED", "REVIEWING", "INTERVIEW", "OFFERED", "ACCEPTED", "REJECTED", "WITHDRAWN" | Không / theo điều kiện nghiệp vụ |  |  |
+
+## POST /api/student/notifications/search
+
+thông báo/lọc unread/phân trang, trả unreadCount cùng response
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| unread | boolean | Không / theo điều kiện nghiệp vụ |  |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
+
+## PATCH /api/student/notifications/update
+
+người nhận đánh dấu đọc, idempotent
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| isRead | boolean | Có |  |  |
+| notificationId | integer | Có | minimum=1; maximum=2147483647 | notificationId của tài nguyên cần truy cập. |
+
+## POST /api/student/ojt-registration-windows/search
+
+Danh sách đợt đăng ký OJT
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ OJT. |
+| status | string ∈ "DRAFT", "OPEN", "CLOSED" | Không / theo điều kiện nghiệp vụ |  | Lọc theo trạng thái; bỏ trường này để xem tất cả. |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Số bản ghi mỗi trang. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/ojt-registrations/create
+
+Nộp hồ sơ đăng ký OJT
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. STUDENT nộp hồ sơ của mình; ADMIN/OJT_COORD có thể nhập thay với studentId. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN và trong thời hạn, đúng scope.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| windowId | integer | Có | minimum=1 | ID đợt đăng ký. |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID hồ sơ sinh viên, khác ID tài khoản. |
+| application | object | Không / theo điều kiện nghiệp vụ |  |  |
+| application.contactPhone | string | Không / theo điều kiện nghiệp vụ | maxLength=30 |  |
+| application.contactEmail | string | Không / theo điều kiện nghiệp vụ | format="email"; maxLength=100 |  |
+| application.note | string | Không / theo điều kiện nghiệp vụ | maxLength=2000 |  |
+
+## POST /api/student/ojt-registrations/search
+
+Danh sách hồ sơ đăng ký OJT
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Hồ sơ đăng ký: QHDN xem các hồ sơ thuộc danh sách được bàn giao, STUDENT chỉ xem hồ sơ của mình. status/registrationStatus trả LEGACY_REVIEW_REQUIRED cho HANDED_OFF cũ; legacyStatus giữ nguyên giá trị lịch sử. handoffStatus luôn lấy từ bảng bàn giao.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ OJT. |
+| windowId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID đợt đăng ký. |
+| studentId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID hồ sơ sinh viên, khác ID tài khoản. |
+| programId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID khóa. |
+| groupCode | string ∈ "A", "B", "C", "D" | Không / theo điều kiện nghiệp vụ |  |  |
+| status | string ∈ "SUBMITTED", "APPROVED", "REJECTED", "HANDED_OFF" | Không / theo điều kiện nghiệp vụ |  | Lọc theo trạng thái; bỏ trường này để xem tất cả. |
+| search | string | Không / theo điều kiện nghiệp vụ |  |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Số bản ghi mỗi trang. |
+| registrationId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Chọn một hồ sơ để trả thêm phần chi tiết. |
+| historyPage | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Phân trang history; chỉ dùng cùng registrationId. |
+| historyLimit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Phân trang history; chỉ dùng cùng registrationId. |
+| coordinationPage | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Phân trang coordination; chỉ dùng cùng registrationId. |
+| coordinationLimit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Phân trang coordination; chỉ dùng cùng registrationId. |
+| assignmentPage | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 | Phân trang assignment; chỉ dùng cùng registrationId. |
+| assignmentLimit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 | Phân trang assignment; chỉ dùng cùng registrationId. |
+
+## POST /api/student/ojt-results/detail
 
 điểm/nhận xét đã công bố
 
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| path | id | integer | Có | minimum=1; maximum=2147483647 | ID: bản ghi. |
-| query | ojtSemesterId | integer | Không | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+Không có tham số URL/query.
 
-Không có request body.
+Body: application/json — bắt buộc.
 
-## GET /api/student/roadmap-recommendations
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| resultId | integer | Có | minimum=1; maximum=2147483647 | resultId của tài nguyên cần truy cập. |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+
+## POST /api/student/ojt-results/search
+
+chỉ kết quả của mình được công bố
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
+
+## POST /api/student/ojt-semesters/students/search
+
+Theo dõi trạng thái OJT theo kỳ
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Danh sách theo kỳ: QHDN chỉ thấy sinh viên được bàn giao, kể cả chưa đăng ký. registration, handoff, officialEligibility, assignment là các quy trình độc lập.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1 | ojtSemesterId của tài nguyên cần truy cập. |
+| programId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID phiên bản chương trình đào tạo. |
+| cohortId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID khóa. |
+| groupCode | string | Không / theo điều kiện nghiệp vụ |  |  |
+| registrationStatus | string | Không / theo điều kiện nghiệp vụ |  |  |
+| search | string | Không / theo điều kiện nghiệp vụ |  |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Trang, bắt đầu từ 1. |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Số bản ghi mỗi trang. |
+| enterpriseId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
+| coordinationStatus | string ∈ "NOT_COORDINATED", "PENDING", "ACCEPTED", "REJECTED" | Không / theo điều kiện nghiệp vụ |  | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
+| assignmentStatus | string ∈ "UNASSIGNED", "ASSIGNED", "ACTIVE", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCELED", "FAILED" | Không / theo điều kiện nghiệp vụ |  | Filters the latest coordination and its assignment; QHDN remains restricted to handed-off students. |
+
+## POST /api/student/opportunities/search
+
+Vị trí tuyển dụng và quyền ứng tuyển
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1 |  |
+| page | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1 |  |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/profile/detail
+
+Hồ sơ học vụ tổng hợp
+
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. Kèm GPA, tín chỉ, điểm, combo và OJT; section=academicProgress chỉ lấy thông tin sinh viên và tiến độ, mặc định all.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| studentId | integer | Có | minimum=1 | studentId của tài nguyên cần truy cập. |
+| resultsPage | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 |  |
+| resultsLimit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 |  |
+| ojtPage | integer | Không / theo điều kiện nghiệp vụ | minimum=1; default=1 |  |
+| ojtLimit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100; default=20 |  |
+| ojtSemesterId | integer | Không / theo điều kiện nghiệp vụ | minimum=1 | ID kỳ OJT. |
+| section | string ∈ "all", "academicProgress" | Không / theo điều kiện nghiệp vụ | default="all" | all: hồ sơ đầy đủ; academicProgress: thông tin sinh viên và tiến độ học tập. |
+
+## POST /api/student/roadmap-recommendations/search
 
 tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc
 
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+Không có tham số URL/query.
 
-Không có request body.
+Body: application/json — bắt buộc.
 
-## GET /api/student/supplementary-course-options
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
+
+## POST /api/student/supplementary-course-options/search
 
 đề xuất môn/môn học lại, tín chỉ, lý do và tiên quyết; không lớp, không đăng ký học, không cam kết lịch
 
+Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters.
+
 Xác thực: Bearer token; role/ownership theo chức năng.
 
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+Không có tham số URL/query.
 
-Không có request body.
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
+| studentId | integer | Có | minimum=1; maximum=2147483647 | StudentID của sinh viên đang đăng nhập; phải khớp tài khoản được xác thực. |
 
 ## GET /api/students
 
@@ -3065,19 +3462,3 @@ Body: multipart/form-data — bắt buộc.
 | Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
 | --- | --- | --- | --- | --- |
 | cv | string | Có | format="binary" |  |
-
-## GET /api/students/me/opportunities
-
-Vị trí tuyển dụng và quyền ứng tuyển
-
-Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển. Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1 |  |
-| query | page | integer | Không | minimum=1 |  |
-| query | limit | integer | Không | minimum=1 |  |
-
-Không có request body.

@@ -5636,7 +5636,7 @@ CREATE UNIQUE INDEX "UQ_Course_Code" ON "Courses"(upper("CourseCode"));
 CREATE UNIQUE INDEX "UQ_Specialization_Code" ON "Specializations"(upper("SpecializationCode"));
 ALTER TABLE "AcademicImportBatches" DROP CONSTRAINT "AcademicImportBatches_Kind_check", ADD CONSTRAINT "AcademicImportBatches_Kind_check" CHECK ("Kind" IN ('STUDENT','COURSE_RESULT','CURRICULUM')),
  ADD COLUMN "CurriculumID" int REFERENCES "TrainingPrograms"("ProgramID");
--- Publication-specific columns, constraints and immutable triggers are intentionally omitted.
+-- Publication validation remains in the curriculum service; no immutable triggers.
 -- All other academic, combo and import tables remain unchanged.
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_curriculum_management');
 -- SECTION: 20261008 combo registration windows and confirmed choices

@@ -1,4 +1,3 @@
-import portalRoutes from '../modules/student-portal/portal.routes';
 import qhdnRoutes from '../modules/qhdn/qhdn.routes';
 import recruitmentRoutes from '../modules/recruitment/recruitment.routes';
 import enterpriseRoutes from '../modules/qhdn/enterprise.routes';
@@ -18,13 +17,14 @@ import comboRoutes from '../modules/combo-registration/combo.routes';
 
 import authRoutes from "../modules/auth/auth.routes";
 import accountRoutes from "../modules/accounts/account.routes";
+import { swaggerSpec } from '../config/swagger';
+import { createStudentJsonRouter } from '../middleware/student-json';
 const router = Router();
 router.use(academicJsonRequests);
 router.use(academicRestRoutes);
 router.use(adminRoutes);
 router.use(academicRoutes);
 router.use(qhdnRoutes);
-router.use(portalRoutes);
 router.use('/recruitment', recruitmentRoutes);
 router.use('/enterprise', enterpriseRoutes);
 router.use(resultRoutes);
@@ -56,4 +56,7 @@ router.use(
   accountRoutes,
 );
 
-export default router;
+const api = Router();
+api.use(createStudentJsonRouter(swaggerSpec));
+api.use(router);
+export default api;

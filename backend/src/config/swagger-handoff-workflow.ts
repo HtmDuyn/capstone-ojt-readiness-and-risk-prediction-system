@@ -43,7 +43,7 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
  for(const path of ['/api/qhdn/registered-students','/api/ojt-registrations','/api/ojt-semesters/{id}/students'])describeStates(spec.paths[path]?.get?.responses);
  const result=spec.paths['/api/ojt-results'].get;
  result.summary='Danh sách kết quả OJT đã được QHDN chuyển';result.description='resultId là OJTResults.ResultID. Chỉ kết quả được ACADEMIC xác nhận mới chính thức. Sinh viên chỉ xem CONFIRMED.';
- for(const path of ['/api/ojt-results','/api/ojt-semesters/{id}/results/export','/api/student/ojt-results']){
+ for(const path of ['/api/ojt-results','/api/ojt-semesters/{id}/results/export','/api/students/me/ojt-results']){
   const op=spec.paths[path]?.get;if(!op)continue;
   const status=op.parameters?.find((p:any)=>p.name==='status');if(status)status.schema.enum=['PENDING_ACADEMIC_CONFIRMATION','REVISION_REQUESTED','CONFIRMED'];
   const item=op.responses?.[200]?.content?.['application/json']?.schema?.properties?.data?.properties?.items?.items;

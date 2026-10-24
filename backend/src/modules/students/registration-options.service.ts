@@ -16,10 +16,10 @@ const blockerLabels:Record<string,string>={
   REGISTRATION_PERIOD_MISMATCH:'Kỳ đăng ký chưa khớp với kỳ OJT.'
 };
 
-async function ownStudent(c:PoolClient,userId:number):Promise<Row> {
+async function ownStudent(c:PoolClient,actor:Actor):Promise<Row> {
   const s=(await c.query(`SELECT s.*,u."FullName",u."Email",u."Phone",p."CohortID",p."GroupCode",p."EntryAcademicPeriodID",to_jsonb(tp)->>'Status' AS "ProgramStatus",tp."SpecializationID"
     FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
-    LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" WHERE s."UserID"=$1 AND s."DeletedAt" IS NULL`,[userId])).rows[0];
+    LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" WHERE ${actor.studentId!=null?'s."StudentID"=$1 AND s."UserID"=$2':'s."UserID"=$1'} AND s."DeletedAt" IS NULL`,actor.studentId!=null?[actor.studentId,actor.userId]:[actor.userId])).rows[0];
   if(!s)throw invalid('Student profile not found.',404,'STUDENT_NOT_FOUND');return s;
 }
 async function blocker(work:()=>Promise<unknown>):Promise<string|null> {
@@ -35,7 +35,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const status=params.status===undefined?null:enumValue(params.status,kind==='combo'?['DRAFT','OPEN','CLOSED','FINALIZED']:['DRAFT','OPEN','CLOSED'],'status');
   return readTransaction(async c=>{
-    const s=await ownStudent(c,actor.userId),args:unknown[]=[s.StudentID];
+    const s=await ownStudent(c,actor),args:unknown[]=[s.StudentID];
     const where=[`w."Status"<>'DRAFT'`];
     const add=(condition:string,value:unknown)=>{args.push(value);where.push(condition.replace('?',`$${args.length}`));};
     if(status)add('w."Status"=?',status);

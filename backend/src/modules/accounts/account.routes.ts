@@ -142,6 +142,7 @@ router.post(
 router.patch(
   "/me/profile",
   authenticate,
+  authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','ENTERPRISE'),
   updateMyProfile,
 );
 
