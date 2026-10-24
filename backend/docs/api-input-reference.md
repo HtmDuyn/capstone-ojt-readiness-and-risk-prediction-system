@@ -3025,7 +3025,7 @@ Body: application/json — bắt buộc.
 
 | Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
 | --- | --- | --- | --- | --- |
-| unread | string ∈ "true", "false" | Không / theo điều kiện nghiệp vụ |  |  |
+| unread | boolean | Không / theo điều kiện nghiệp vụ |  |  |
 | page | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
 | limit | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
 

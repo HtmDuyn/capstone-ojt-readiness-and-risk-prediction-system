@@ -57,6 +57,6 @@ router.use(
 );
 
 const api = Router();
-api.use(createStudentJsonRouter(swaggerSpec, router));
+api.use(createStudentJsonRouter(swaggerSpec));
 api.use(router);
 export default api;

@@ -5,7 +5,7 @@ import { positiveId, invalid } from '../students/student.validation';
 import { assertStudentAccess } from '../students/student.service';
 import { listRules,saveRule,publishRule,history,eligibility } from './eligibility.service';
 import { checkBatch } from './eligibility-run.service';
-const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT')];
+const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],read=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
 const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(req,res,next)=>{try{res.status(code).json({success:true,data:await work(req)});}catch(error){next(error);}};
 router.get('/ojt-rule-sets',...staff,handle(req=>listRules(req.query)));
 router.post('/ojt-rule-sets',...staff,handle(req=>saveRule(req.body,req.user.userId),201));

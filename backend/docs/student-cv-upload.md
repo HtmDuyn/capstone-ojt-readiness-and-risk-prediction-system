@@ -19,15 +19,15 @@ Không tự đặt Content-Type: trình duyệt thêm multipart boundary. Respon
 
 `StudentCVFiles.Content` lưu BYTEA. Upload thay thế tạo phiên bản mới; retry cùng file và tên trả cùng phiên bản. CV hiện tại là phiên bản có CVFileID lớn nhất của sinh viên. Giữ phiên bản cũ để hồ sơ ứng tuyển đã gửi vẫn tham chiếu đúng file ban đầu. Chưa tích hợp AI đọc/matching CV; file và SHA-256 đã sẵn sàng cho tác vụ sau này.
 
-Tải PDF qua `POST /api/json/students/cv/search`, JSON `{ "studentId": 1 }`; thêm `cvFileId` để tải phiên bản cũ. FE dùng `response.blob()`/Axios responseType blob và Bearer token. Sinh viên chỉ xem file của mình; Admin/Đào tạo được đọc; QHDN chỉ đọc CV của sinh viên đã đăng ký OJT, kể cả chưa bàn giao. Doanh nghiệp chưa được cấp quyền API này.
+Tải PDF qua `POST /api/student/cv/download`, JSON `{ "studentId": 1 }`; thêm `cvFileId` để tải phiên bản cũ. FE dùng `response.blob()`/Axios responseType blob và Bearer token. Sinh viên dùng API JSON chỉ xem file của mình; Admin/Đào tạo dùng GET /api/students/:id/cv; QHDN chỉ được đọc khi sinh viên đã có bản ghi bàn giao. Doanh nghiệp chưa được cấp quyền API này.
 
 API hồ sơ sinh viên trả `data.cv`; danh sách QHDN trả `items[].cv`. `registrations[].application.cv` là CV hiện tại từ hồ sơ sinh viên, không phải ảnh chụp CV của lần ứng tuyển. Bản CV đã dùng khi ứng tuyển nằm ở `JobApplications.CVFileID` và response hồ sơ ứng tuyển.
 
 ## Đăng ký OJT và ứng tuyển là hai nghiệp vụ
 
-`POST /api/ojt-registrations` chỉ nhận JSON `windowId`, application (contactPhone, contactEmail, note), studentId khi staff đăng ký thay. API này không nhận file hoặc cvUrl. Đăng ký OJT trước khi xét chính thức vẫn được phép; không tự cấp quyền ứng tuyển hay đi thực tập.
+`POST /api/student/ojt-registrations/create` dành cho Student; nhân sự dùng `POST /api/ojt-registrations`. Body JSON gồm `windowId`, application (contactPhone, contactEmail, note), studentId khi staff đăng ký thay. API này không nhận file hoặc cvUrl. Đăng ký được kiểm tra theo đợt, bàn giao và quy tắc hiện hành; không tự cấp quyền ứng tuyển hay đi thực tập.
 
-`POST /api/job-applications` dành cho STUDENT:
+`POST /api/student/job-applications/create` dành cho STUDENT:
 
 ```json
 {
@@ -42,7 +42,7 @@ Backend kiểm tra quyền sở hữu, hồ sơ đang hoạt động, kết qu�
 
 Lưu RegistrationID, StudentID, EnterpriseID, PositionID, PostID, OJTSemesterID, OfficialCheckID và CVFileID hiện tại (null nếu sinh viên chưa upload). Tạo FK đối chiếu đúng sinh viên/kỳ và đúng phiên bản CV. Gửi lại cùng hồ sơ/vị trí/tin và coverLetter không tạo ứng tuyển trùng.
 
-`POST /api/json/job-applications/list` nhận bộ lọc applicationId/studentId/registrationId/ojtSemesterId/companyId/positionId/status và page/limit. Sinh viên chỉ thấy ứng tuyển của mình; Admin/QHDN xem cả trước bàn giao. Response kèm sinh viên, công ty, vị trí, tin, phiên bản CV đã gửi, xác nhận chính thức được dùng, trạng thái bàn giao/điều phối.
+`POST /api/student/job-applications/search` nhận bộ lọc applicationId/studentId/registrationId/ojtSemesterId/companyId/positionId/status và page/limit. Sinh viên chỉ thấy ứng tuyển của mình; Admin/QHDN xem cả trước bàn giao. Response kèm sinh viên, công ty, vị trí, tin, phiên bản CV đã gửi, xác nhận chính thức được dùng, trạng thái bàn giao/điều phối.
 
 `POST /api/json/students/me/opportunities/list` nhận ojtSemesterId, page/limit. Trả vị trí còn công bố và thông tin FE cần, kèm canApply/blockers cho từng vị trí, chỉ tiêu còn, applicationId đã ứng tuyển, registrationId và officialEligibility. canApply tổng thể là điều kiện ở cấp sinh viên; FE dùng canApply trên từng item cho nút ứng tuyển. Backend luôn kiểm tra lại khi gửi.
 
