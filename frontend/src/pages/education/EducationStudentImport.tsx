@@ -1,10 +1,12 @@
 import { PageBanner } from "@/components/common/PageBanner";
+import { ImportedStudents } from '@/components/education/ImportedStudents';
 import { loadAcademicCatalogs } from '@/services/educationCatalog.service';
 import { importService } from '@/services/import.service';
 import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
-import { downloadStudentImportTemplate, parseStudentImportWorkbook } from '@/utils/studentImportWorkbook';
+import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
 import React from "react";
 const EducationStudentImport: React.FC = () => {
+  const [savedRevision, setSavedRevision] = React.useState(0);
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
     [rows, setRows] = React.useState<StudentImportRow[]>([]);
   const [preview, setPreview] = React.useState<ImportPreviewResponse | null>(
@@ -108,6 +110,8 @@ const EducationStudentImport: React.FC = () => {
     try {
       setResult(await importService.commitStudentImport(payload()));
       setPreview(null);
+      setRows([]); setSelected(null); setSearch('');
+      setSavedRevision(value => value + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không lưu được dữ liệu.");
     } finally {
@@ -123,7 +127,7 @@ const EducationStudentImport: React.FC = () => {
     <div className="space-y-6">
       <PageBanner
         title="Import sinh viên và bảng điểm"
-        description="Một tệp nhập thông tin sinh viên, chương trình, khóa/nhóm, kỳ hiện tại và các kết quả học tập tương ứng."
+        description="Một tệp nhập thông tin sinh viên, trạng thái học vụ, chương trình, khóa/nhóm, kỳ bắt đầu chuyên ngành, kỳ hiện tại và bảng điểm."
         badge="Phòng Đào tạo"
       />
       <section className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
@@ -131,12 +135,13 @@ const EducationStudentImport: React.FC = () => {
           Tệp gồm sheet <strong>Danh sách sinh viên</strong> và{" "}
           <strong>Kết quả học tập</strong>. Mỗi dòng điểm có MSSV để gắn vào
           đúng hồ sơ. Sinh viên chưa có điểm được để trống sheet kết quả.
+          Mẫu có thêm sheet <strong>Danh mục</strong> chứa ID/mã hợp lệ tại lúc tải và <strong>Hướng dẫn</strong> cho từng cột.
         </p>
         <div className="flex flex-wrap gap-3">
           <button
             className="rounded border p-2"
             disabled={!!busy}
-            onClick={downloadStudentImportTemplate}
+            onClick={() => downloadStudentImportTemplate(catalogs)}
           >
             Tải mẫu Excel đầy đủ
           </button>
@@ -284,6 +289,7 @@ const EducationStudentImport: React.FC = () => {
           </p>
         )}
       </section>
+      <ImportedStudents revision={savedRevision} catalogs={catalogs} />
       {selected && (
         <section className="space-y-3 rounded-2xl bg-white p-6 shadow-sm">
           <button className="float-right" onClick={() => setSelected(null)}>
@@ -297,6 +303,10 @@ const EducationStudentImport: React.FC = () => {
             {selected.academic.phone ?? "—"}; Lớp:{" "}
             {selected.academic.className ?? "—"}
           </p>
+          <p>Trạng thái sinh viên: {selected.academic.status ? STUDENT_STATUS_LABELS[selected.academic.status] : 'Mặc định ACTIVE khi tạo mới; giữ trạng thái khi cập nhật'}.</p>
+          <p>Kỳ bắt đầu chuyên ngành: {selected.academic.placement.entryAcademicPeriodId
+            ? catalogs?.periods.find(p => p.id === selected.academic.placement.entryAcademicPeriodId)?.label ?? selected.academic.placement.entryAcademicPeriodId
+            : 'Theo kỳ vào của nhóm khi tạo mới/đổi nhóm; giữ kỳ đã gán khi cập nhật'}.</p>
           {!selected.academic.courseResults.length ? (
             <p>Chưa có kết quả học tập trong tệp.</p>
           ) : (

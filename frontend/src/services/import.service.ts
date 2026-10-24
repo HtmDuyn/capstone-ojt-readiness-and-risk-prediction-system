@@ -1,5 +1,7 @@
 import { API_ORIGIN } from "@/config/api";
 import type { ImportCommitResponse, ImportPreviewResponse, StudentImportPayload } from '@/types/education/import.types';
+import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult, StudentImportBatch } from '@/types/education/import.types';
+import { apiData, getAllItems, getJson, getPage } from './educationApi';
 
 const API_BASE_URL = API_ORIGIN;
 
@@ -73,6 +75,14 @@ const sendImportRequest = async <T>(
 };
 
 export const importService = {
+  listImportedStudents: (filters: ImportedStudentFilters, page: number, signal?: AbortSignal) =>
+    getPage<ImportedStudent>('/students', { ...filters, importedOnly: 'true', page, limit: 20 }, signal),
+  listStudentImportBatches: (signal?: AbortSignal) =>
+    getAllItems<StudentImportBatch>('/academic-imports', { kind: 'STUDENT', status: 'COMPLETED' }, signal),
+  getImportedStudent: async (id: number, signal?: AbortSignal) =>
+    apiData<ImportedStudentProfile>(await getJson(`/students/${id}`, { resultsLimit: 1, ojtLimit: 1 }, signal)),
+  getStoredCourseResults: (id: number, page: number, signal?: AbortSignal) =>
+    getPage<StoredCourseResult>(`/students/${id}/course-results`, { page, limit: 20 }, signal),
   previewStudentImport: (payload: StudentImportPayload) =>
     sendImportRequest<ImportPreviewResponse>(
       "/api/imports/preview",

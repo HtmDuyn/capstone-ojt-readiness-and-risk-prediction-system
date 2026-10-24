@@ -105,7 +105,8 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
         (_match, term: string, year: string) => `${term} ${year}`,
       );
 
-      return buildOption(positiveId(item.id), [item.name, code, readableCode]);
+      const option = buildOption(positiveId(item.id), [item.name, code, readableCode]);
+      return option ? { ...option, kind: text(item.kind) } : null;
     }),
   );
 
