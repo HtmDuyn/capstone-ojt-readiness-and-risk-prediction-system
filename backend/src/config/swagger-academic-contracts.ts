@@ -9,41 +9,7 @@ const item=(spec:Spec,path:string,root=false)=>{
 };
 export function describeAcademicContracts(spec:Spec) {
   const yearUpdate=spec.paths['/api/academic-years/{id}'].patch;
-  delete spec.paths['/api/academic-years/{id}'].patch;
-  if(!Object.keys(spec.paths['/api/academic-years/{id}']).length)delete spec.paths['/api/academic-years/{id}'];
-  spec.paths['/api/academic-years'].patch=yearUpdate;
-  yearUpdate.parameters=[];
-  const patch=structuredClone(spec.components.schemas.AcademicYearPatch);
-  spec.components.schemas.AcademicYearUpdate={...patch,required:['id'],minProperties:2,
-    properties:{id:{...id,maximum:2147483647,description:'ID năm học cần cập nhật.'},...patch.properties},
-    example:{id:4,yearCode:'2026-2027',startDate:'2026-09-01',endDate:'2027-08-31',status:'ACTIVE'}};
-  yearUpdate.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/AcademicYearUpdate'}}}};
-  yearUpdate.description='Gửi một JSON body gồm id và các trường cần sửa: yearCode, startDate, endDate, status. Trả đầy đủ năm học sau cập nhật và các kỳ học liên quan.';
-  const periodUpdate=spec.paths['/api/academic-periods/{id}'].patch;
-  delete spec.paths['/api/academic-periods/{id}'].patch;
-  if(!Object.keys(spec.paths['/api/academic-periods/{id}']).length)delete spec.paths['/api/academic-periods/{id}'];
-  spec.paths['/api/academic-periods'].patch=periodUpdate;
-  periodUpdate.parameters=[];
-  const periodPatch=structuredClone(spec.components.schemas.AcademicPeriodPatch);
-  spec.components.schemas.AcademicPeriodUpdate={...periodPatch,required:['id'],minProperties:2,
-    properties:{id:{...id,maximum:2147483647,description:'ID kỳ học hoặc Block 3 cần cập nhật.'},...periodPatch.properties}};
-  periodUpdate.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/AcademicPeriodUpdate'},examples:{
-    semester:{summary:'Cập nhật học kỳ và thông tin OJT',value:{id:3,academicYearId:1,periodCode:'OJT-2026',name:'Học kỳ OJT 2026',kind:'SEMESTER',parentPeriodId:null,startDate:'2026-06-01',endDate:'2026-08-31',status:'ACTIVE',ojt:{startDate:'2026-06-01',endDate:'2026-08-31',regStartDate:'2026-05-01',regEndDate:'2026-05-31',status:'ACTIVE'}}},
-    block3:{summary:'Cập nhật Block 3',value:{id:2,academicYearId:1,periodCode:'BLOCK3-2026',name:'Block 3 năm 2026',kind:'BLOCK3',parentPeriodId:1,startDate:'2026-05-01',endDate:'2026-05-31',status:'CLOSED'}},
-  }}}};
-  periodUpdate.description='Gửi một JSON body gồm id và các trường cần cập nhật. Có thể sửa thông tin OJT bằng ojt đối với SEMESTER; BLOCK3 dùng parentPeriodId và không có ojt riêng. Thay các ID trong ví dụ bằng ID thực tế. Response trả đầy đủ kỳ học, năm học, kỳ cha và OJT liên quan.';
   const cohortUpdate=spec.paths['/api/cohorts/{id}'].patch;
-  delete spec.paths['/api/cohorts/{id}'].patch;
-  if(!Object.keys(spec.paths['/api/cohorts/{id}']).length)delete spec.paths['/api/cohorts/{id}'];
-  spec.paths['/api/cohorts'].patch=cohortUpdate;
-  cohortUpdate.parameters=[];
-  const cohortPatch=structuredClone(spec.components.schemas.CohortPatch);
-  spec.components.schemas.CohortUpdate={...cohortPatch,required:['id'],minProperties:2,
-    properties:{id:{...id,maximum:2147483647,description:'ID khóa cần cập nhật.'},...cohortPatch.properties},
-    example:{id:1,cohortCode:'K2026',name:'Khóa tuyển sinh 2026',enrollmentYear:2026,status:'ACTIVE',
-      groups:[{groupCode:'A',entryAcademicPeriodId:1},{groupCode:'B',entryAcademicPeriodId:1},{groupCode:'C',entryAcademicPeriodId:3},{groupCode:'D',entryAcademicPeriodId:3}]}};
-  cohortUpdate.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/CohortUpdate'}}}};
-  cohortUpdate.description='Gửi một JSON body gồm id và các trường cần cập nhật: cohortCode, name, enrollmentYear, status, groups. Có thể sửa 1–4 nhóm A–D; các nhóm không gửi giữ nguyên. Thay ID khóa và kỳ học trong ví dụ bằng ID thực tế. Response trả đầy đủ khóa và tất cả nhóm, kèm thông tin kỳ bắt đầu của từng nhóm.';
   const publish=spec.paths['/api/ojt-rule-sets/{id}/publish'].post;
   publish.requestBody={required:false,content:{'application/json':{schema:{type:'object',additionalProperties:false,maxProperties:0},example:{}}}};
   publish.description='Chỉ cần ID trên URL; có thể gửi {} hoặc không có body.';
@@ -58,7 +24,6 @@ export function describeAcademicContracts(spec:Spec) {
   yearUpdate.responses['200']={description:'Năm học sau cập nhật, kèm các kỳ học liên quan.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:structuredClone(years)}}}}};
   const periods=item(spec,'/academic-periods',true);
   periods.properties.parentPeriod={...object,nullable:true};
-  periodUpdate.responses['200']={description:'Kỳ học hoặc Block 3 sau cập nhật, kèm năm học, kỳ cha và OJT.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:structuredClone(periods)}}}}};
   const cohorts=item(spec,'/cohorts',true);
   cohorts.properties.groups.items.properties.entryAcademicPeriod={...object,nullable:true};
   cohortUpdate.responses['200']={description:'Khóa sau cập nhật, đầy đủ nhóm và thông tin kỳ bắt đầu.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:structuredClone(cohorts)}}}}};
