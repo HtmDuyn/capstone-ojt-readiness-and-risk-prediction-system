@@ -42,7 +42,7 @@ export function describeAcademicRest(spec: Spec): Spec {
       if(schema.$ref) schema=structuredClone(spec.components.schemas[schema.$ref.split('/').pop()]);
       delete schema.properties?.kind;
       if(schema.required) schema.required=schema.required.filter((name:string)=>name!=='kind');
-      operation.requestBody.content['application/json']={schema};
+      operation.requestBody.content={'application/json':{schema}};
     }
     add('/'+path,'patch','/'+from+'/commit','post','Xác nhận nhập dữ liệu đã kiểm tra',commit);
   }

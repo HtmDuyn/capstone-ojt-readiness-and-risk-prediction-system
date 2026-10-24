@@ -28,9 +28,9 @@ router.get('/students/me/opportunities',authenticate,authorizeRoles('STUDENT'),h
 router.get('/students',...staff,handle(req=>listStudents(req.query)));
 router.get('/students/:id',...read,handle(req=>studentProfile(positiveId(req.params.id),req.query,req.user)));
 router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.params.id),req.body,req.user.userId)));
-router.get('/students/:id/course-results',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
 router.patch('/course-results/:id',...staff,handle(req=>patchResult(positiveId(req.params.id),req.body,req.user.userId)));
 router.get('/internship-tasks',authenticate,authorizeRoles('STUDENT','ENTERPRISE','OJT_COORD','ADMIN'),handle(req=>listTasks(req.query,req.user)));
 router.get('/academic-imports',...staff,handle(req=>importHistory(req.query)));
 
+router.get('/students/:id/course-results',authenticate,authorizeRoles('STUDENT'),handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
 export default router;

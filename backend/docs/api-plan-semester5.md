@@ -180,7 +180,7 @@ Sau cùng mới làm AI dự báo, tư vấn tối ưu, đọc CV và matching.
 - src/modules/students/student.routes.ts; student.service.ts; academic-progress.ts.
 - src/modules/eligibility/eligibility.routes.ts; eligibility.service.ts.
 - src/modules/academic/academic.routes.ts; workflow.routes.ts; workflow-policy.ts.
-- src/modules/academic-reporting/report.routes.ts; report.repository.ts; report.service.ts; notification.service.ts.
+- src/modules/academic/rest.routes.ts; report.repository.ts; report-read.service.ts; notification.service.ts.
 - src/modules/ojt-registration/registration.routes.ts; registration.service.ts; handoff.service.ts.
 - src/modules/curriculum/curriculum.routes.ts; src/modules/combo-registration/combo.routes.ts.
 - src/modules/qhdn/qhdn.routes.ts; qhdn.repository.ts; workflow.service.ts.

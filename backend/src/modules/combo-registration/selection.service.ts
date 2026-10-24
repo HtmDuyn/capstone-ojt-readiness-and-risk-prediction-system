@@ -20,7 +20,7 @@ export async function assertRosterContext(client:PoolClient,r:Row) {
   if(relative!==4)throw invalid('Academic calendar changed and this roster no longer targets specialized semester 4.',409,'COMBO_ROSTER_CHANGED');
 }
 export async function validateChoice(client:PoolClient,programId:number,comboId:number,courseIds:number[]) {
-  const combo=(await client.query(`SELECT b.*,p."Status" AS "ProgramStatus",p."ProgramCode",p."Version" FROM "ProgramCombos" b JOIN "TrainingPrograms" p ON p."ProgramID"=b."ProgramID" WHERE b."ProgramComboID"=$1 AND b."ProgramID"=$2`,[comboId,programId])).rows[0];
+  const combo=(await client.query(`SELECT b.*,p."Status" AS "ProgramStatus",p."ProgramCode",NULL::text AS "Version" FROM "ProgramCombos" b JOIN "TrainingPrograms" p ON p."ProgramID"=b."ProgramID" WHERE b."ProgramComboID"=$1 AND b."ProgramID"=$2`,[comboId,programId])).rows[0];
   if(!combo || combo.ProgramStatus!=='PUBLISHED' || purpose(combo)!=='SPECIALIZATION')throw invalid('Choose a specialization combo in this student’s published curriculum.');
   const value=(await combos(client,programId)).find(c=>c.id===comboId)!;
   if(!value.coursesReviewed || !value.choiceGroups.length)throw invalid('Combo choices have not been reviewed.');

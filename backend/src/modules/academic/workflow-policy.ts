@@ -1,4 +1,3 @@
-import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from './academic.repository';
 import { invalid,inputObject,positiveId,requiredText,enumValue,score,optionalText } from '../students/student.validation';
@@ -74,7 +73,6 @@ export async function saveComboSchedule(periodId:number,body:unknown,actor:numbe
  await audit(c,actor,'AcademicPeriods',periodId,'SET_COMBO_PHASE_SCHEDULE',before,after,reason);return after;
  },existingClient);
 }
-export async function getComboSchedules(periodId:number) {return academicTransaction(async c=>{await actualPeriod(c,periodId);const rows=(await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 ORDER BY "Phase"',[periodId])).rows;return enrichListRows(c,rows.map(row=>({...row,academicPeriodId:row.AcademicPeriodID,confirmedBy:row.ConfirmedBy})));});}
 export async function getAssessment(c:PoolClient,semesterId:number) {
  const w=(await c.query('SELECT * FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1 FOR UPDATE',[semesterId])).rows[0];
  if(!w)throw invalid('Configure the post-Block-3 assessment window first.',409,'OJT_ASSESSMENT_NOT_CONFIGURED');return w;
@@ -102,11 +100,6 @@ export async function saveAssessment(semesterId:number,body:unknown,actor:number
  await audit(c,actor,'OJTSemesters',semesterId,'CONFIGURE_ASSESSMENT',before,after,reason);return after;
  },existingClient);
 }
-export async function assessmentDetails(id:number) {return academicTransaction(async c=>{
- const w=await getAssessment(c,id);
- return (await enrichListRows(c,[{...w,ojtSemesterId:w.OJTSemesterID,blockPeriodId:w.BlockPeriodID,
-  assessmentAcademicPeriodId:w.AssessmentAcademicPeriodID,configuredBy:w.ConfiguredBy,resultsFinalizedBy:w.ResultsFinalizedBy,closedBy:w.ClosedBy}]))[0];
-});}
 export async function changeAssessment(id:number,action:'open'|'close',body:unknown,actor:number) {
  const b=inputObject(body,action==='open'?['reason','resultsFinalized','reopen','closesAt']:['reason']),reason=requiredText(b.reason,'reason',2000);
  if(action==='open'&&b.resultsFinalized!==true)throw invalid('Explicitly acknowledge resultsFinalized: true after completing Block 3 result updates.');
@@ -147,4 +140,3 @@ export async function saveGradeMapping(programId:number,semesterId:number,body:u
  await audit(c,actor,'ProgramOJTGradeMappings',after.MappingID,'SET_OJT_GRADE_MAPPING',before,after,reason);return after;
  });
 }
-export async function gradeMappingDetails(programId:number,semesterId:number) {return academicTransaction(async c=>{const m=(await c.query('SELECT * FROM "ProgramOJTGradeMappings" WHERE "ProgramID"=$1 AND "OJTSemesterID"=$2',[programId,semesterId])).rows[0];if(!m)throw invalid('OJT grade mapping not found.',404);return (await enrichListRows(c,[{...m,programId:m.ProgramID,ojtSemesterId:m.OJTSemesterID,courseId:m.CourseID,academicPeriodId:m.AcademicPeriodID,confirmedBy:m.ConfirmedBy}]))[0];});}

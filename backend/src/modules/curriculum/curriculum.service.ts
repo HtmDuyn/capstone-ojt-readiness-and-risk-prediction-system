@@ -53,7 +53,7 @@ export async function publicationIssues(client:PoolClient,id:number) {
 }
 export async function publicationIssuesForData(client:PoolClient,data:Row) {
   const issues:string[]=[];
-  if(!data.version || !data.majorId || !data.effectiveYear)issues.push('Version, specialization and effective year must be defined.');
+  if(!data.majorId || !data.effectiveYear)issues.push('Specialization and effective year must be defined.');
   if(!data.gpaScale || data.retakePolicy!=='LATEST')issues.push('Confirm GPA scale 4/10 and latest-attempt policy.');
   if(!data.courses.length)issues.push('Curriculum must contain courses.');
   if(!data.prerequisitesReviewed)issues.push('Review and set prerequisites explicitly (an empty array confirms no prerequisites).');

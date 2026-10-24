@@ -99,10 +99,8 @@ Thay ID và ngày bằng dữ liệu thực tế. Chỉ doanh nghiệp sở hữ
 
 Adapter JSON cho các API bị loại bỏ cũng được gỡ. Các route gốc còn dùng làm đích dispatch cho adapter JSON được giữ. Không xóa dữ liệu lịch sử, tài khoản hoặc tin tuyển dụng cũ trong DB.
 
-## Kiểm thử
+## Kiểm tra backend
 
-Chạy `npm test`, `npm run build`, `npm run docs:api`.
+Chạy `npm run build` để kiểm tra TypeScript và `npm run docs:api` để sinh tài liệu API.
 
-12 nhóm kiểm thử dùng PostgreSQL nhúng PGlite, fixture độc lập và SMTP cục bộ nhận thư thật qua giao thức SMTP. Bao gồm import mới/trùng email/collision, password random/hash/email/replay, nhập Excel doanh nghiệp và sinh viên, rollback, phân quyền QHDN, ma trận task và giới hạn/phạm vi, điểm chính thức/danh sách/email cuối kỳ/chống gửi lặp, Swagger khớp route, HTTP với JWT và multipart.
-
-Không kết nối DB thật, không gửi mail cho địa chỉ thật, không kiểm chứng SMTP production hoặc migration đã được áp dụng ở môi trường triển khai. Fixture kiểm thử chỉ dựng các bảng cần cho luồng này, không thay thế kiểm thử toàn bộ schema production.
+Các script kiểm thử cũ đã được gỡ; hiện không có lệnh `npm test`. Kiểm tra HTTP hoặc SQL thủ công cần dùng database tạm; kiểm tra database thật chỉ đọc nếu chưa có yêu cầu thay đổi dữ liệu.

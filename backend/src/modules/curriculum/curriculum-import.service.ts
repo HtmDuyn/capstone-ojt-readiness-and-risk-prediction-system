@@ -21,7 +21,7 @@ async function prepare(client:PoolClient,body:unknown) {
   unique(combos.map(c=>c.code),'combo code');
   const comboCourses=combos.flatMap(c=>c.courses),prerequisites=normalizePrerequisites(b.prerequisites,courses,comboCourses),equivalences=await normalizeEquivalences(client,b.equivalences,courses,comboCourses);
   const publication=await publicationIssuesForData(client,{
-    version:meta.fields.Version,majorId:meta.fields.SpecializationID,effectiveYear:meta.fields.EffectiveYear,
+    majorId:meta.fields.SpecializationID,effectiveYear:meta.fields.EffectiveYear,
     totalCredits:meta.fields.TotalCredits,gpaScale:meta.gpaScale,retakePolicy:'LATEST',
     prerequisitesReviewed:true,equivalencesReviewed:true,courses,prerequisites,equivalences,
     combos:combos.map(combo=>({...combo,coursesReviewed:true})),

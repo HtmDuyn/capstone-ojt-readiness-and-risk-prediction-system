@@ -24,9 +24,5 @@ for (const resource of Object.keys(resources) as Resource[]) {
     try { res.status(201).json({ success: true, data: resource==='academic-periods'?await savePeriodResource(req.body,{userId:req.user!.userId,roleCode:req.user!.roleCode!}):await saveResource(resource, req.body, req.user!.userId) }); }
     catch (error) { next(error); }
   });
-  router.patch(`/${resource}/:id`, authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {
-    try { res.json({ success: true, data: await saveResource(resource, req.body, req.user!.userId, positiveId(req.params.id)) }); }
-    catch (error) { next(error); }
-  });
 }
 export default router;

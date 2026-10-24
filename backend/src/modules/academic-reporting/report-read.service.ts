@@ -2,44 +2,12 @@ import { enrichListRows } from '../../shared/list-context';
 import { academicTransaction } from '../academic/academic.repository';
 import { invalid,positiveId,pagination,enumValue } from '../students/student.validation';
 import { scopeKeys,type Row } from './report.repository';
-import { counts,demandRows } from './report-format';
+import { demandRows } from './report-format';
 import { readReports } from './read-scope';
 export { csvReport } from './report-format';
 
 const publicStudent=(r:Row)=>({studentId:r.studentId,studentCode:r.studentCode,fullName:r.fullName,programId:r.programId,cohortId:r.cohortId,groupCode:r.groupCode,majorId:r.majorId,comboIds:r.comboIds,category:r.category,officialCheckId:r.officialCheckId,officialStale:r.officialStale,evaluation:r.evaluation,missingRequiredCourses:r.missingRequiredCourses,alternativeRequirements:r.alternativeRequirements,dataIssues:r.dataIssues,alertTypes:r.alertTypes});
 const deadlineStatus=(deadline:unknown,now:string)=>deadline==null?'NOT_CONFIGURED':new Date(String(deadline))>new Date(now)?'UPCOMING':'OVERDUE';
-const summary=(rows:Row[])=>({...counts(rows),currentEvaluation:{eligible:rows.filter(r=>r.evaluation.status==='ELIGIBLE').length,notEligible:rows.filter(r=>r.evaluation.status==='NOT_ELIGIBLE').length,reviewRequired:rows.filter(r=>r.evaluation.status==='REVIEW_REQUIRED').length},staleConfirmations:rows.filter(r=>r.officialStale).length});
-
-export async function dashboard(params:Row) {
-  const {section='all',groupBy,...input}=params;
-  const selected=enumValue(section,['all','summary','statistics'],'section');
-  const grouping=enumValue(groupBy??'cohort',['cohort','group','major','combo'],'groupBy');
-  if(selected==='summary'&&groupBy!==undefined)throw invalid('groupBy only applies to statistics.');
-  if(input.page!==undefined||input.limit!==undefined)throw invalid('Dashboard does not accept pagination.');
-  return academicTransaction(async c=>{
-    const {requested,scopes,data}=await readReports(c,input),computedAt=new Date().toISOString();
-    const rows=data.flatMap(d=>d.rows),out:Row={scope:requested,scopes,computedAt,
-      semesterCount:scopes.length,uniqueStudentCount:new Set(rows.map(r=>r.studentId)).size,
-      countBasis:'STUDENT_PER_OJT_SEMESTER',semesters:scopes.map((scope,index)=>({...scope,summary:summary(data[index].rows)}))};
-    if(selected==='all'||selected==='summary')out.summary=summary(rows);
-    if(selected==='all'||selected==='statistics'){
-      const groups=new Map<string,Row>();
-      for(const d of data)for(const r of d.rows){
-        const keys=grouping==='combo'?(r.comboIds.length?r.comboIds:[null]):[grouping==='cohort'?r.cohortId:grouping==='major'?r.majorId:r.groupCode];
-        for(const id of keys){
-          const key=JSON.stringify(id);
-          if(!groups.has(key)){
-            const name=grouping==='cohort'?d.cohorts.find((x:Row)=>x.CohortID===id)?.Name:grouping==='major'?d.majors.find((x:Row)=>x.SpecializationID===id)?.SpecializationName:grouping==='combo'?d.combos.find((x:Row)=>x.ProgramComboID===id)?.ComboName:id;
-            groups.set(key,{id,name:name??null,students:[]});
-          }
-          groups.get(key)!.students.push(r);
-        }
-      }
-      out.statistics={groupBy:grouping,overall:counts(rows),groups:[...groups.values()].map(g=>({id:g.id,name:g.name,...counts(g.students)})),membershipCountsMayOverlap:grouping==='combo'};
-    }
-    return out;
-  });
-}
 
 export async function alerts(params:Row) {
   const p=pagination(params,[...scopeKeys,'type']);

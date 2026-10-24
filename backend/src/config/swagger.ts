@@ -1,6 +1,6 @@
 import { describeAcademicRest } from './swagger-academic-rest';
 import { describeHandoffWorkflow } from './swagger-handoff-workflow';
-import { describeAcademicContracts } from './swagger-academic-contracts';
+import { describeAcademicContracts, describeAcademicOperationContracts } from './swagger-academic-contracts';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
 import { describeListBaseFields } from './swagger-list-base-fields';
 import {
@@ -389,4 +389,4 @@ describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
 describeAcademicContracts(describedSpec);
-export const swaggerSpec = describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec)));
+export const swaggerSpec = describeAcademicOperationContracts(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec))));

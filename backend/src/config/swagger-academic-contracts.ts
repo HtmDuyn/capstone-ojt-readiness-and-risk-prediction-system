@@ -44,32 +44,6 @@ export function describeAcademicContracts(spec:Spec) {
       groups:[{groupCode:'A',entryAcademicPeriodId:1},{groupCode:'B',entryAcademicPeriodId:1},{groupCode:'C',entryAcademicPeriodId:3},{groupCode:'D',entryAcademicPeriodId:3}]}};
   cohortUpdate.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/CohortUpdate'}}}};
   cohortUpdate.description='Gửi một JSON body gồm id và các trường cần cập nhật: cohortCode, name, enrollmentYear, status, groups. Có thể sửa 1–4 nhóm A–D; các nhóm không gửi giữ nguyên. Thay ID khóa và kỳ học trong ví dụ bằng ID thực tế. Response trả đầy đủ khóa và tất cả nhóm, kèm thông tin kỳ bắt đầu của từng nhóm.';
-  for(const [path,methods] of Object.entries(academicOperations))for(const method of methods){
-    const op=spec.paths['/api'+path]?.[method];
-    if(!op)throw Error(`Missing academic operation: ${method} ${path}`);
-    if(method==='get'){
-      delete op.requestBody;
-      for(const parameter of op.parameters??[])if(parameter.in==='query')parameter.required=false;
-      op.description=[op.description,'Không nhận request body. Chỉ ID trên URL là bắt buộc (nếu có); bộ lọc query và phân trang đều tùy chọn. Danh sách mặc định page=1, limit=20.'].filter(Boolean).join(' ');
-      if(path==='/academic-years'){
-        op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
-        op.description='Không cần nhập tham số hoặc request body. Chỉ cần Bearer token và bấm Execute; trả toàn bộ năm học kèm các kỳ học liên quan.';
-      }
-      if(path==='/academic-periods'){
-        op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
-        op.description='Không cần nhập tham số hoặc request body. Chỉ cần Bearer token và bấm Execute; trả toàn bộ kỳ học và Block 3 ở mọi trạng thái, kèm năm học, kỳ cha và thông tin OJT liên quan.';
-      }
-      if(path==='/cohorts'){
-        op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
-        op.description='Không cần nhập tham số hoặc request body. Chỉ cần Bearer token và bấm Execute; trả JSON toàn bộ khóa ở mọi trạng thái, các nhóm và thông tin kỳ bắt đầu của từng nhóm.';
-      }
-    }else if(op.requestBody){
-      const json=op.requestBody.content?.['application/json'];
-      if(!json)throw Error(`Missing JSON contract: ${method} ${path}`);
-      op.requestBody.content={'application/json':json};
-      op.description=[op.description,'Dữ liệu đầu vào dùng JSON body với Content-Type: application/json; không truyền trường dữ liệu qua query hoặc form-data.'].filter(Boolean).join(' ');
-    }
-  }
   const publish=spec.paths['/api/ojt-rule-sets/{id}/publish'].post;
   publish.requestBody={required:false,content:{'application/json':{schema:{type:'object',additionalProperties:false,maxProperties:0},example:{}}}};
   publish.description='Chỉ cần ID trên URL; có thể gửi {} hoặc không có body.';
@@ -123,4 +97,35 @@ export function describeAcademicContracts(spec:Spec) {
   describeListDisplayFields(single,['student','semester']);
   response.content['application/json']={schema:{type:'object',properties:{success:{type:'boolean'},data:{oneOf:[single,{type:'object',properties:{studentId:id,total:{type:'integer'},items:array(single)}}]}}}};
   eligibility.description+=' Không truyền ojtSemesterId: trả items theo từng kỳ OJT; có truyền: trả một kết quả như trước.';
+}
+
+// Validate the final public contract after REST replacements and role transformations.
+export function describeAcademicOperationContracts(spec:Spec) {
+  for(const [path,methods] of Object.entries(academicOperations))for(const method of methods){
+    const op=spec.paths['/api'+path]?.[method];
+    if(!op)throw Error(`Missing academic operation: ${method} ${path}`);
+    if(method==='get'){
+      delete op.requestBody;
+      for(const parameter of op.parameters??[])if(parameter.in==='query')parameter.required=false;
+      op.description=[op.description,'Không nhận request body. Chỉ ID trên URL là bắt buộc (nếu có); bộ lọc query và phân trang đều tùy chọn. Danh sách mặc định page=1, limit=20.'].filter(Boolean).join(' ');
+      if(path==='/academic-years'){
+        op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
+        op.description='Không cần nhập tham số hoặc request body. Chỉ cần Bearer token và bấm Execute; trả toàn bộ năm học kèm các kỳ học liên quan.';
+      }
+      if(path==='/academic-periods'){
+        op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
+        op.description='Không cần nhập tham số hoặc request body. Chỉ cần Bearer token và bấm Execute; trả toàn bộ kỳ học và Block 3 ở mọi trạng thái, kèm năm học, kỳ cha và thông tin OJT liên quan.';
+      }
+      if(path==='/cohorts'){
+        op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
+        op.description='Không cần nhập tham số hoặc request body. Chỉ cần Bearer token và bấm Execute; trả JSON toàn bộ khóa ở mọi trạng thái, các nhóm và thông tin kỳ bắt đầu của từng nhóm.';
+      }
+    }else if(op.requestBody){
+      const json=op.requestBody.content?.['application/json'];
+      if(!json)throw Error(`Missing JSON contract: ${method} ${path}`);
+      op.requestBody.content={'application/json':json};
+      op.description=[op.description,'Dữ liệu đầu vào dùng JSON body với Content-Type: application/json; không truyền trường dữ liệu qua query hoặc form-data.'].filter(Boolean).join(' ');
+    }
+  }
+  return spec;
 }

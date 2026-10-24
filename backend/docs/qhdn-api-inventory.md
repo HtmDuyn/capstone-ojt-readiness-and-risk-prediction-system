@@ -171,7 +171,7 @@ Matching chỉ đưa ra gợi ý; nếu triển khai phân bổ tự động c�
 | Chuyển kết quả/đánh giá nguồn/export | `src/modules/ojt-results/result.routes.ts`, `result.service.ts` |
 | Danh mục kỳ/khóa/ngành | `src/modules/academic/academic.routes.ts`, `academic.repository.ts`, `src/modules/curriculum/curriculum.routes.ts` |
 | AI readiness/risk | `src/modules/admin/prediction.service.ts`, `reporting.service.ts` |
-| Thống kê/thông báo học vụ | `src/modules/academic-reporting/report.routes.ts`, `report.service.ts`, `notification.service.ts` |
+| Thống kê/thông báo học vụ | `src/modules/academic/rest.routes.ts`, `report-read.service.ts`, `notification.service.ts` |
 | DDL, chưa phải API | `DB` |
 | Nghiệp vụ tạm thay proposal | `../README.md` |
 | Ý tưởng màn hình QHDN | `../frontend/src/config/menus/qhdnMenu.tsx` |

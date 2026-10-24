@@ -12,9 +12,8 @@ for (const path of ['/preview', '/commit']) {
     try {
       const role = req.user!.roleCode;
       const kind = req.body?.kind;
-      if (!((['ADMIN', 'ACADEMIC'].includes(role!) && kind === 'STUDENT') ||
-        (role === 'OJT_COORD' && kind === 'ENTERPRISE'))) {
-        throw fail('Only QHDN can import enterprises; academic staff import students.', 403, 'FORBIDDEN');
+      if (!(role === 'OJT_COORD' && kind === 'ENTERPRISE')) {
+        throw fail('Use student-imports for students; this endpoint imports enterprises for QHDN.', 403, 'FORBIDDEN');
       }
       res.json({success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview')});
     } catch (error) { next(error); }

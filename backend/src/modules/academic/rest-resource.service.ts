@@ -71,7 +71,13 @@ export async function semesters(params:Row,id?:number){
 export async function semesterDossier(id:number,params:Row,actor:Actor){
   pagination(params,[]);
   const data=await semesters({},id);
-  return {...data,students:await semesterStudents(id,params,actor),handoffs:await handoffHistory(id,params),results:await ojtResults(params,id)};
+  const gradeMappings=await academicTransaction(async c=>{
+    const rows=(await c.query(`SELECT m.*,m."ProgramID" AS "programId",m."OJTSemesterID" AS "ojtSemesterId",
+      m."CourseID" AS "courseId",m."AcademicPeriodID" AS "academicPeriodId",m."ConfirmedBy" AS "confirmedBy"
+      FROM "ProgramOJTGradeMappings" m WHERE m."OJTSemesterID"=$1 ORDER BY m."ProgramID"`,[id])).rows;
+    return enrichListRows(c,rows);
+  });
+  return {...data,gradeMappings,students:await semesterStudents(id,params,actor),handoffs:await handoffHistory(id,params),results:await ojtResults(params,id)};
 }
 export async function createNotification(body:unknown,actor:Actor){
   if(!body||typeof body!=='object'||Array.isArray(body))throw invalid('Provide a JSON object.');

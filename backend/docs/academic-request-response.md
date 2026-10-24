@@ -92,7 +92,3 @@ Response bổ sung kỳ cha, năm học, OJT, kỳ bắt đầu của từng nh�
 | GET | `/api/academic/advisory-runs/{id}` | Không | trạng thái/lỗi từng sinh viên. |
 | GET | `/api/students/{id}/cv` | Không | Tải CV của sinh viên |
 | POST | `/api/ojt-results/{id}/confirm` | JSON | Phòng đào tạo xác nhận và ghi nhận điểm OJT |
-
-## Kiểm chứng
-
-`npm run test:academic-contracts` chạy trên PGlite tạm, không kết nối database ứng dụng. Kiểm tra 72 khai báo OpenAPI, 32 GET không truyền query/body, 40 API ghi từ chối form-data, tạo năm học bằng JSON, các trường liên quan, phân quyền và trường hợp chưa có kỳ OJT. Các kiểm tra định dạng không thay thế kiểm thử toàn bộ tình huống nghiệp vụ của từng API ghi.
