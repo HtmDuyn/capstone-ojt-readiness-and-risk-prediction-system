@@ -1,5 +1,9 @@
+import { API_ORIGIN } from "@/config/api";
+import type { AcademicPeriod, AcademicYear, CreateAcademicPeriodPayload, CreateAcademicYearPayload, OjtSemester, SearchAcademicPeriodsPayload, SearchOjtSemestersPayload } from '@/types/education/academic.types';
 import { getAllItems } from "./educationApi";
-import { API_ORIGIN } from "./apiConfig";
+import { apiData, getJson } from './educationApi';
+import API from './api';
+import type { AcademicCalendar, SemesterDates } from '@/types/education/academic.types';
 
 const API_BASE_URL = API_ORIGIN;
 
@@ -7,100 +11,16 @@ const API_BASE_URL = API_ORIGIN;
 // TYPES - ACADEMIC YEAR
 // ======================================================
 
-export type AcademicYearStatus = "PLANNED" | "ACTIVE" | "COMPLETED" | "CLOSED";
-
-export interface CreateAcademicYearPayload {
-  yearCode: string;
-  startDate: string;
-  endDate: string;
-  status: AcademicYearStatus;
-}
-
-export interface AcademicYear {
-  id: number;
-  yearCode: string;
-  startDate: string;
-  endDate: string;
-  status: AcademicYearStatus;
-}
-
 // ======================================================
 // TYPES - ACADEMIC PERIOD
 // ======================================================
 
-export type AcademicPeriodKind = "SEMESTER" | "BLOCK3";
-
-export type AcademicPeriodStatus =
-  "PLANNED" | "ACTIVE" | "COMPLETED" | "CLOSED" | "ARCHIVED";
-
-export interface CreateAcademicPeriodPayload {
-  academicYearId: number;
-  periodCode: string;
-  name: string;
-  kind: AcademicPeriodKind;
-  startDate: string;
-  endDate: string;
-  status?: AcademicPeriodStatus;
-}
-
-export interface AcademicPeriod {
-  id: number;
-  academicYearId: number;
-  periodCode: string;
-  name: string;
-  kind: AcademicPeriodKind;
-  parentPeriodId: number | null;
-  startDate: string;
-  endDate: string;
-  status: AcademicPeriodStatus;
-}
-
 // PATCH chỉ gửi trường thực sự thay đổi.
 // Không gửi lại toàn bộ AcademicPeriod.
-export type UpdateAcademicPeriodPayload = Partial<
-  Pick<
-    AcademicPeriod,
-    | "periodCode"
-    | "name"
-    | "kind"
-    | "parentPeriodId"
-    | "startDate"
-    | "endDate"
-    | "status"
-  >
->;
-
-export interface SearchAcademicPeriodsPayload {
-  page: number;
-  limit: number;
-  academicYearId?: number;
-  search?: string;
-}
 
 // ======================================================
 // TYPES - OJT
 // ======================================================
-
-export interface OjtSemester {
-  id: number;
-  academicYearId: number;
-  semesterCode: string;
-  name: string;
-  academicPeriodId: number | null;
-  startDate: string;
-  endDate: string;
-  regStartDate: string | null;
-  regEndDate: string | null;
-  status: AcademicPeriodStatus;
-}
-
-export interface SearchOjtSemestersPayload {
-  page: number;
-  limit: number;
-  search?: string;
-  status?: AcademicPeriodStatus;
-  academicYearId?: number;
-}
 
 // ======================================================
 // RESPONSE TYPES
@@ -143,7 +63,7 @@ const getAuthToken = (): string => {
 
 const authorizedFetch = async (
   path: string,
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST",
   payload?: unknown,
 ): Promise<Response> => {
   const token = getAuthToken();
@@ -237,26 +157,8 @@ const searchAcademicYears = (): Promise<AcademicYear[]> => {
 
 const createAcademicYear = async (
   payload: CreateAcademicYearPayload,
-): Promise<AcademicYear> => {
-  const response = await authorizedFetch(
-    "/api/academic-years",
-    "POST",
-    payload,
-  );
-
-  const result = await readJson<DataResponse<AcademicYear> & ApiErrorResponse>(
-    response,
-  );
-
-  checkResponse(response, result, "Không thể tạo năm học.");
-
-  if (!result.data) {
-    throw new Error(
-      "Máy chủ đã xử lý yêu cầu nhưng không trả về thông tin năm học.",
-    );
-  }
-
-  return result.data;
+): Promise<AcademicCalendar> => {
+  return apiData<AcademicCalendar>((await API.post('/academic-years', payload)).data);
 };
 
 // ======================================================
@@ -368,38 +270,6 @@ const createAcademicPeriod = async (
 };
 
 // ======================================================
-// ACADEMIC PERIOD - UPDATE
-// PATCH /api/academic-periods/{id}
-// ======================================================
-
-const updateAcademicPeriod = async (
-  academicPeriodId: number,
-  payload: UpdateAcademicPeriodPayload,
-): Promise<AcademicPeriod | undefined> => {
-  if (!Number.isInteger(academicPeriodId) || academicPeriodId <= 0) {
-    throw new Error("ID kỳ học không hợp lệ.");
-  }
-
-  if (Object.keys(payload).length === 0) {
-    throw new Error("Không có thông tin nào cần cập nhật.");
-  }
-
-  const response = await authorizedFetch(
-    `/api/academic-periods/${academicPeriodId}`,
-    "PATCH",
-    payload,
-  );
-
-  const result = await readJson<
-    DataResponse<AcademicPeriod> & ApiErrorResponse
-  >(response);
-
-  checkResponse(response, result, "Không thể cập nhật kỳ học.");
-
-  return result.data;
-};
-
-// ======================================================
 // OJT SEMESTERS
 // Giữ nguyên API hiện có.
 // ======================================================
@@ -434,6 +304,9 @@ const searchOjtSemesters = async (
 // ======================================================
 
 export const academicService = {
+  getCalendar: async (id: number, signal?: AbortSignal) => apiData<AcademicCalendar>(await getJson(`/academic-years/${id}/calendar`, {}, signal)),
+  updateCalendar: async (id: number, semesters: SemesterDates[], revision: string) =>
+    apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision })).data),
   createAcademicYear,
   searchAcademicYears,
 
@@ -441,7 +314,6 @@ export const academicService = {
   searchAcademicPeriods,
   findAcademicPeriod,
   listAllAcademicPeriods,
-  updateAcademicPeriod,
 
   searchOjtSemesters,
 };

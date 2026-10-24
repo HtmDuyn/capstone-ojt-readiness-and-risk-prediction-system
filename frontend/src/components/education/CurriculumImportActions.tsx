@@ -11,13 +11,8 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  curriculumService,
-  type CurriculumDetail,
-  type CurriculumImportPayload,
-  type CurriculumImportPreviewResponse,
-  type Major,
-} from "@/service/curriculum.service";
+import { curriculumService } from '@/services/curriculum.service';
+import type { CurriculumDetail, CurriculumImportPayload, CurriculumImportPreviewResponse, Major } from '@/types/education/curriculum.types';
 
 /* =========================================================
    TYPES

@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
-    "test:academic-reporting": "node scripts/test-academic-reporting.mjs",
-    "test:ojt-eligibility": "node scripts/test-ojt-eligibility.mjs"
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",

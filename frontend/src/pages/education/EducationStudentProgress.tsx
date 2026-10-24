@@ -1,27 +1,21 @@
-import React from "react";
+import { useEducationStudentProgress } from '@/hooks/useEducationStudentProgress';
 import {
-  Search,
-  Eye,
-  X,
-  GraduationCap,
-  Clock3,
-  TrendingUp,
   AlertTriangle,
   CheckCircle2,
-  XCircle,
-  Circle,
   ChevronRight,
+  Circle,
+  Clock3,
+  Eye,
+  GraduationCap,
+  Search,
+  TrendingUp,
+  X,
+  XCircle,
 } from "lucide-react";
+import React from "react";
 
 import { PageBanner } from "@/components/common/PageBanner";
-import { studentProgressService } from "@/service/studentProgress.service";
-import type {
-  OjtEligibilityStatus,
-  ProgressStatus,
-  StudentProgress,
-  StudentSubject,
-  SubjectStatus,
-} from "@/service/studentProgress.service";
+import type { OjtEligibilityStatus, ProgressStatus, StudentProgress, SubjectStatus } from '@/types/education/studentProgress.types';
 
 /* =========================================================
    TYPES
@@ -87,55 +81,7 @@ const OJT_ELIGIBILITY_STYLES: Record<OjtEligibilityStatus, string> = {
    ========================================================= */
 
 const EducationStudentProgress: React.FC = () => {
-  const [students, setStudents] = React.useState<StudentProgress[]>([]);
-
-  const [loading, setLoading] = React.useState(true);
-
-  const [loadError, setLoadError] = React.useState<string | null>(null);
-
-  const [loadWarning, setLoadWarning] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let active = true;
-
-    const loadStudents = async () => {
-      setLoading(true);
-      setLoadError(null);
-      setLoadWarning(null);
-
-      try {
-        const result = await studentProgressService.loadAll();
-        if (active) {
-          setStudents(result);
-          const partialCount = result.filter(
-            (student) => student.dataWarning,
-          ).length;
-          setLoadWarning(
-            partialCount > 0
-              ? `${partialCount} hồ sơ chưa tải đủ dữ liệu chi tiết từ API. Các trường chưa có dữ liệu sẽ hiển thị “—”.`
-              : null,
-          );
-        }
-      } catch (error) {
-        if (active) {
-          setStudents([]);
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : "Không thể tải danh sách sinh viên.",
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    void loadStudents();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { students, loading, loadError, loadWarning } = useEducationStudentProgress();
 
   const [selectedStudent, setSelectedStudent] =
     React.useState<StudentProgress | null>(null);

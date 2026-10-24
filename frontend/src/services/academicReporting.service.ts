@@ -1,19 +1,7 @@
+import type { Cohort, CourseDemand, DemandReport, ReportPeriod, ReportScope } from '@/types/education/reporting.types';
 import API from './api';
-import { cleanQuery, getAllItems, getPage, type Page } from './educationApi';
-import type { AcademicPeriod, OjtSemester } from './academic.service';
+import { cleanQuery, getAllItems, getPage } from './educationApi';
 
-export interface Cohort { id: number; cohortCode: string; name: string }
-export interface ReportScope { academicPeriodId: number; ojtSemesterId: number; cohortId?: number }
-export interface CourseDemand {
-  courseId: number; courseCode: string; courseName: string; periodCode: string;
-  studentCount: number; retakeCount: number; inProgressCount: number;
-}
-export interface DemandReport extends Page<CourseDemand> {
-  studentsWithDataIssues: { studentId: number }[];
-  unresolvedAlternatives: { studentId: number }[];
-  computedAt: string;
-}
-export type ReportPeriod = AcademicPeriod & { ojt?: OjtSemester | null };
 export const academicReportingService = {
   cohorts: (signal?: AbortSignal) => getAllItems<Cohort>('/cohorts', {}, signal),
   periods: (signal?: AbortSignal) => getAllItems<ReportPeriod>('/academic-periods', {}, signal),
@@ -40,13 +28,4 @@ export const academicReportingService = {
     }
   },
 };
-export function downloadCourseDemand(blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'nhu-cau-hoc-phan.csv';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+

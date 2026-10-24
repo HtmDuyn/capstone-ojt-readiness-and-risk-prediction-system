@@ -1,5 +1,6 @@
-import { getJson, cleanQuery, apiData, getPage } from "./educationApi";
-import { API_ORIGIN } from "./apiConfig";
+import { API_ORIGIN } from "@/config/api";
+import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityBatch, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
+import { apiData, cleanQuery, getJson, getPage } from "./educationApi";
 const API_BASE_URL = API_ORIGIN;
 
 const TOKEN_KEY = "ojt_auth_token";
@@ -89,131 +90,21 @@ const patchJson = <T>(path: string, body: unknown) =>
    TYPES
    ========================================================= */
 
-export type OjtRuleSetStatus = "DRAFT" | "PUBLISHED" | string;
-
-export type OjtDebtBasis = "FAILED_ATTEMPTS" | string;
-
-export interface OjtRuleSet {
-  id: number;
-
-  programId: number;
-
-  ojtSemesterId: number | null;
-
-  version: number;
-
-  name: string;
-
-  minCredits: number;
-
-  maxUnpassedCourses: number;
-
-  debtBasis: OjtDebtBasis;
-
-  status: OjtRuleSetStatus;
-
-  createdBy: number | null;
-
-  createdAt: string;
-
-  publishedBy: number | null;
-
-  publishedAt: string | null;
-
-  active?: boolean;
-}
-
 /* =========================================================
    CREATE RULE SET
    ========================================================= */
-
-export interface CreateOjtRuleSetPayload {
-  programId: number;
-
-  ojtSemesterId: number | null;
-
-  version: number;
-
-  name: string;
-
-  minCredits: number;
-
-  maxUnpassedCourses: number;
-
-  debtBasis: OjtDebtBasis;
-}
-
-export interface OjtRuleSetMutationResponse {
-  success: boolean;
-
-  data: OjtRuleSet;
-}
 
 /* =========================================================
    SEARCH RULE SET
    ========================================================= */
 
-export interface SearchOjtRuleSetsPayload {
-  programId?: number;
-
-  ojtSemesterId?: number;
-
-  status?: string;
-
-  page: number;
-
-  limit: number;
-}
-
-export interface SearchOjtRuleSetsResponse {
-  success: boolean;
-
-  data: {
-    items: OjtRuleSet[];
-
-    total: number;
-
-    page: number;
-
-    limit: number;
-  };
-}
-
 /* =========================================================
    UPDATE RULE SET
    ========================================================= */
 
-export interface UpdateOjtRuleSetPayload {
-  programId: number;
-
-  ojtSemesterId: number | null;
-
-  version: number;
-
-  name: string;
-
-  minCredits: number;
-
-  maxUnpassedCourses: number;
-
-  debtBasis: OjtDebtBasis;
-
-  ruleSetId: number;
-}
-
 /* =========================================================
    PUBLISH RULE SET
    ========================================================= */
-
-export interface PublishOjtRuleSetPayload {
-  ruleSetId: number;
-}
-
-export interface PublishOjtRuleSetResponse {
-  success: boolean;
-
-  data?: OjtRuleSet | unknown;
-}
 
 /* =========================================================
    API METHODS
@@ -245,67 +136,6 @@ const publishRuleSet = ({ ruleSetId }: PublishOjtRuleSetPayload) =>
 /* =========================================================
    EXPORT
    ========================================================= */
-
-export type EligibilityStatus = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'REVIEW_REQUIRED';
-export interface EligibilityEvaluation {
-  studentId: number;
-  ojtSemesterId: number;
-  status: EligibilityStatus;
-  rule: OjtRuleSet | null;
-  earnedCredits: number;
-  missingCredits: number | null;
-  unpassedCourseCount: number;
-  unpassedCourses: { courseId: number; courseCode: string }[];
-  excessUnpassedCourses: number | null;
-  reasons: string[];
-  academicIssues: string[];
-}
-export interface EligibilityCheck extends EligibilityEvaluation {
-  studentCode?: string;
-  fullName?: string;
-  checkId: number;
-  checkedAt: string;
-  isStale?: boolean;
-  confirmedAt?: string | null;
-  confirmation?: { confirmedAt: string; reason: string } | null;
-}
-export interface StudentEligibility {
-  current: EligibilityEvaluation;
-  latest: EligibilityCheck | null;
-  official: EligibilityCheck | null;
-}
-export interface EligibilityBatch {
-  runId: number;
-  total: number;
-  eligible: number;
-  notEligible: number;
-  reviewRequired: number;
-  items: EligibilityCheck[];
-  replayed: boolean;
-}
-export interface AssessmentWindow {
-  BlockPeriodID: number;
-  OpensAt: string;
-  ClosesAt: string;
-  Status: 'DRAFT' | 'OPEN' | 'CLOSED';
-  ResultsFinalizedAt: string | null;
-}
-export type EligibilityFilter = 'ALL' | EligibilityStatus;
-export function filterEligibilityResults(items: EligibilityCheck[], status: EligibilityFilter, search: string) {
-  const query = search.trim().toLocaleLowerCase('vi-VN');
-  return items.filter(item => (status === 'ALL' || item.status === status) &&
-    (!query || `${item.studentCode ?? ''} ${item.fullName ?? ''} ${item.studentId}`.toLocaleLowerCase('vi-VN').includes(query)));
-}
-export const eligibilityStatusLabel = (status: string) => ({
-  ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Không đủ điều kiện', REVIEW_REQUIRED: 'Cần đối soát',
-}[status] ?? status);
-export const eligibilityReasonLabel = (reason: string) => ({
-  OJT_RULE_NOT_PUBLISHED: 'Chưa có điều kiện OJT được áp dụng cho chương trình.',
-  ACADEMIC_CREDIT_DATA_INCOMPLETE: 'Dữ liệu tín chỉ hoặc khung chương trình chưa đầy đủ.',
-  STUDENT_NOT_ACTIVE: 'Sinh viên hoặc tài khoản không ở trạng thái hoạt động.',
-  MIN_CREDITS_NOT_MET: 'Chưa đạt số tín chỉ yêu cầu.',
-  MAX_UNPASSED_COURSES_EXCEEDED: 'Vượt số môn còn rớt cho phép.',
-}[reason] ?? reason);
 
 export const ojtEligibilityService = {
   searchRuleSets,

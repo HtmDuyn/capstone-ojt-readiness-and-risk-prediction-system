@@ -1,12 +1,11 @@
+import { getAllItems, getPage } from '@/services/educationApi';
+import { ojtEligibilityService as eligibility } from '@/services/ojtEligibility.service';
+import type { AcademicPeriod } from '@/types/education/academic.types';
+import type { Page } from '@/types/education/api.types';
+import type { AssessmentWindow, EligibilityBatch, EligibilityFilter, StudentEligibility } from '@/types/education/eligibility.types';
+import { eligibilityReasonLabel, eligibilityStatusLabel, filterEligibilityResults } from '@/utils/educationEligibility';
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { getAllItems, getPage, type Page } from '@/service/educationApi';
-import type { AcademicPeriod } from '@/service/academic.service';
-import {
-  ojtEligibilityService as eligibility, eligibilityStatusLabel, eligibilityReasonLabel,
-  filterEligibilityResults, type EligibilityFilter,
-  type AssessmentWindow, type EligibilityBatch, type StudentEligibility,
-} from '@/service/ojtEligibility.service';
 
 type Student = { id: number; studentCode: string; fullName: string };
 const time = (value: string) => new Date(value).toLocaleString('vi-VN');

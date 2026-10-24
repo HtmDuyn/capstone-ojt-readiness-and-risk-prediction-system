@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
 import LeftPanel from "@/components/auth/LeftPanel";
 import RightPanel from "@/components/auth/RightPanel";
-import type { UserRole } from "@/types/auth.types";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoleRedirect } from "@/hooks/useRoleRedirect";
-import { authService } from "@/service/authService";
+import { authService } from "@/services/authService";
+import type { UserRole } from "@/types/auth.types";
+import React, { useEffect, useRef, useState } from "react";
 
 const roleByCode: Record<string, UserRole> = {
   ADMIN: "admin",

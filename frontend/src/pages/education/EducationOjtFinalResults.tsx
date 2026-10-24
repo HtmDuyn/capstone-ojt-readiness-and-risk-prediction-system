@@ -1,8 +1,9 @@
-import React from "react";
-import API from "@/service/api";
-import { getPage, type Page } from "@/service/educationApi";
-import { academicService, type OjtSemester } from "@/service/academic.service";
 import { PageBanner } from "@/components/common/PageBanner";
+import { useEducationSemesters } from '@/hooks/useEducationSemesters';
+import API from "@/services/api";
+import { getPage } from '@/services/educationApi';
+import type { Page } from '@/types/education/api.types';
+import React from "react";
 type Result = {
   id: number;
   studentCode: string;
@@ -32,8 +33,8 @@ const outcome = (value: string | null) =>
 const EducationOjtFinalResults: React.FC = () => {
   const [data, setData] = React.useState<Page<Result> | null>(null),
     [selected, setSelected] = React.useState<Result | null>(null);
-  const [semesters, setSemesters] = React.useState<OjtSemester[]>([]),
-    [semesterId, setSemesterId] = React.useState("");
+  const [semesterId, setSemesterId] = React.useState('');
+  const { semesters, error: semesterError } = useEducationSemesters();
   const [search, setSearch] = React.useState(""),
     [status, setStatus] = React.useState(""),
     [page, setPage] = React.useState(1),
@@ -44,20 +45,7 @@ const EducationOjtFinalResults: React.FC = () => {
     [notice, setNotice] = React.useState(""),
     [reason, setReason] = React.useState("");
   const keys = React.useRef(new Map<number, { reason: string; key: string }>());
-  React.useEffect(() => {
-    let active = true;
-    academicService
-      .searchOjtSemesters({ page: 1, limit: 10000 })
-      .then((rows) => {
-        if (active) setSemesters(rows);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+
   React.useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -163,9 +151,9 @@ const EducationOjtFinalResults: React.FC = () => {
             Tải lại
           </button>
         </div>
-        {error && (
+        {(error || semesterError) && (
           <p role="alert" className="text-red-700">
-            {error}
+            {error || semesterError}
           </p>
         )}
         {notice && (

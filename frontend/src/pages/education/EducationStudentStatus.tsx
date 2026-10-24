@@ -1,9 +1,12 @@
-import React from "react";
 import { PageBanner } from "@/components/common/PageBanner";
-import { academicService, type OjtSemester } from "@/service/academic.service";
-import { getPage, type Page } from "@/service/educationApi";
+import { useEducationSemesters } from '@/hooks/useEducationSemesters';
+import { getPage } from '@/services/educationApi';
+import { ojtEligibilityService } from '@/services/ojtEligibility.service';
+import type { Page } from '@/types/education/api.types';
+import type { StudentEligibility } from '@/types/education/eligibility.types';
+import { eligibilityReasonLabel, eligibilityStatusLabel } from '@/utils/educationEligibility';
+import React from "react";
 import { Link } from 'react-router-dom';
-import { ojtEligibilityService, eligibilityStatusLabel, eligibilityReasonLabel, type StudentEligibility } from '@/service/ojtEligibility.service';
 type Row = Record<string, any>;
 const label = (value: unknown) =>
   value === null || value === undefined || value === "" ? "—" : String(value);
@@ -27,8 +30,8 @@ const statusNames: Record<string, string> = {
 };
 const state = (value: unknown) => statusNames[String(value)] ?? label(value);
 const EducationStudentStatus: React.FC = () => {
-  const [semesters, setSemesters] = React.useState<OjtSemester[]>([]),
-    [semesterId, setSemesterId] = React.useState("");
+  const [semesterId, setSemesterId] = React.useState('');
+  const { semesters, error: semesterError } = useEducationSemesters();
   const [search, setSearch] = React.useState(""),
     [page, setPage] = React.useState(1),
     [refresh, setRefresh] = React.useState(0);
@@ -48,20 +51,7 @@ const EducationStudentStatus: React.FC = () => {
       .finally(() => { if (!controller.signal.aborted) setEligibilityLoading(false); });
     return () => controller.abort();
   }, [selected, semesterId]);
-  React.useEffect(() => {
-    let active = true;
-    academicService
-      .searchOjtSemesters({ page: 1, limit: 10000 })
-      .then((items) => {
-        if (active) setSemesters(items);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+
   React.useEffect(() => {
     if (!semesterId) {
       setData(null);
@@ -131,9 +121,9 @@ const EducationStudentStatus: React.FC = () => {
           </button>
           <Link to="/education/ojt-conditions" className="rounded border p-2 text-orange-700">Xét và cập nhật điều kiện OJT</Link>
         </div>
-        {error && (
+        {(error || semesterError) && (
           <p role="alert" className="text-red-700">
-            {error}
+            {error || semesterError}
           </p>
         )}
         {loading && <p role="status">Đang tải...</p>}

@@ -1,13 +1,9 @@
-import React from "react";
 import { PageBanner } from "@/components/common/PageBanner";
 import { CurriculumImportActions } from "@/components/education/CurriculumImportActions";
-import { getAllItems } from "@/service/educationApi";
-import {
-  curriculumService,
-  type Major,
-  type CurriculumSummary,
-  type CurriculumDetail,
-} from "@/service/curriculum.service";
+import { curriculumService } from '@/services/curriculum.service';
+import { getAllItems } from "@/services/educationApi";
+import type { CurriculumDetail, CurriculumSummary, Major } from '@/types/education/curriculum.types';
+import React from "react";
 const EducationCurriculumPlan: React.FC = () => {
   const [majors, setMajors] = React.useState<Major[]>([]),
     [programs, setPrograms] = React.useState<CurriculumSummary[]>([]),

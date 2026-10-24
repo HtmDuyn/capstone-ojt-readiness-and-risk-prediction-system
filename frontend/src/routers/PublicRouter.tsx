@@ -5,24 +5,24 @@ import {
   type RouteObject,
 } from "react-router-dom";
 
-import { GuestRoute, PrivateRoute } from "./PrivateRouter";
-import { BaseLayout } from "@/layouts/BaseLayout";
 import { getMenuByRole } from "@/config";
+import { BaseLayout } from "@/layouts/BaseLayout";
+import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 
 import LoginPage from "@/pages/auth/LoginPage";
 
-import StudentDashboard from "@/pages/student/StudentDashboard";
-import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
-import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
-import EducationDashboard from "@/pages/education/EducationDashboard";
-import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
-import EducationStudentImport from "@/pages/education/EducationStudentImport";
+import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
+import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
+import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
+import EducationStudentImport from "@/pages/education/EducationStudentImport";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
-import EducationAiClassProposals from "@/pages/education/EducationAiClassProposals";
-import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
+import EducationSupportClassDemand from "@/pages/education/EducationSupportClassDemand";
+import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
+import StudentDashboard from "@/pages/student/StudentDashboard";
+import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -331,7 +331,7 @@ export const router = createBrowserRouter([
 
           {
             path: "/education/ai-class-proposals",
-            element: <EducationAiClassProposals />,
+            element: <EducationSupportClassDemand />,
           },
         ],
       },

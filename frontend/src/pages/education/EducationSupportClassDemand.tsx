@@ -1,7 +1,9 @@
-import React from "react";
 import { PageBanner } from "@/components/common/PageBanner";
-import { academicReportingService as reports, downloadCourseDemand, type Cohort, type ReportPeriod, type DemandReport, type ReportScope } from '@/service/academicReporting.service';
-const EducationAiClassProposals: React.FC = () => {
+import { academicReportingService as reports } from '@/services/academicReporting.service';
+import type { Cohort, DemandReport, ReportPeriod, ReportScope } from '@/types/education/reporting.types';
+import { downloadCourseDemand } from '@/utils/downloadFile';
+import React from "react";
+const EducationSupportClassDemand: React.FC = () => {
   const [periods, setPeriods] = React.useState<ReportPeriod[]>([]);
   const [cohorts, setCohorts] = React.useState<Cohort[]>([]);
   const [periodId, setPeriodId] = React.useState('');
@@ -92,4 +94,4 @@ const EducationAiClassProposals: React.FC = () => {
   </div>
   );
 };
-export default EducationAiClassProposals;
+export default EducationSupportClassDemand;

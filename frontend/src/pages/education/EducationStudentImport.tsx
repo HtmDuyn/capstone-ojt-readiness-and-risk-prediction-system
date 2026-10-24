@@ -1,17 +1,9 @@
-import React from "react";
 import { PageBanner } from "@/components/common/PageBanner";
-import {
-  importService,
-  type StudentImportRow,
-  type ImportPreviewResponse,
-  type ImportCommitResponse,
-} from "@/service/import.service";
-import {
-  downloadStudentImportTemplate,
-  loadAcademicCatalogs,
-  parseStudentImportWorkbook,
-  type AcademicCatalogs,
-} from "@/service/studentImportWorkbook";
+import { loadAcademicCatalogs } from '@/services/educationCatalog.service';
+import { importService } from '@/services/import.service';
+import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
+import { downloadStudentImportTemplate, parseStudentImportWorkbook } from '@/utils/studentImportWorkbook';
+import React from "react";
 const EducationStudentImport: React.FC = () => {
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
     [rows, setRows] = React.useState<StudentImportRow[]>([]);

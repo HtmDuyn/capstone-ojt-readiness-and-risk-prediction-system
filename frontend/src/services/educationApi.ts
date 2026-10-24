@@ -1,12 +1,6 @@
+import type { Page, Query } from '@/types/education/api.types';
 import API from "./api";
 
-export type Query = Record<string, unknown>;
-export type Page<T> = {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-};
 export const cleanQuery = (params: Query = {}) =>
   Object.fromEntries(
     Object.entries(params).filter(

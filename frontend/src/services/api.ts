@@ -1,4 +1,4 @@
-import { API_URL } from './apiConfig';
+import { API_URL } from '@/config/api';
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 const baseURL = API_URL;

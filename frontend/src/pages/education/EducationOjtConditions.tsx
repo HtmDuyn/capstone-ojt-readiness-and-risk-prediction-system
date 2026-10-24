@@ -1,38 +1,21 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarDays, CheckCircle2, GraduationCap, ShieldCheck } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { EligibilityAssessment } from '@/components/education/EligibilityAssessment';
-import { getAllItems } from '@/service/educationApi';
-import type { AcademicYear } from '@/service/academic.service';
-import type { CurriculumSummary } from '@/service/curriculum.service';
-import type { ReportPeriod } from '@/service/academicReporting.service';
+import { useEducationCatalogs } from '@/hooks/useEducationCatalogs';
+import { CalendarDays, CheckCircle2, GraduationCap, ShieldCheck } from 'lucide-react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 
 const EducationOjtConditions: React.FC = () => {
-  const [years, setYears] = React.useState<AcademicYear[]>([]);
-  const [periods, setPeriods] = React.useState<ReportPeriod[]>([]);
-  const [programs, setPrograms] = React.useState<CurriculumSummary[]>([]);
+
   const [yearId, setYearId] = React.useState('');
   const [periodId, setPeriodId] = React.useState('');
   const [programId, setProgramId] = React.useState('');
-  const [loading, setLoading] = React.useState(true);
+
   const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState('');
+
   const [refresh, setRefresh] = React.useState(0);
-  React.useEffect(() => {
-    const c = new AbortController();
-    setLoading(true); setError('');
-    Promise.all([
-      getAllItems<AcademicYear>('/academic-years', {}, c.signal),
-      getAllItems<ReportPeriod>('/academic-periods', {}, c.signal),
-      getAllItems<CurriculumSummary>('/curricula', {}, c.signal),
-    ]).then(([y, p, programs]) => {
-      if (c.signal.aborted) return;
-      setYears(y); setPeriods(p); setPrograms(programs);
-    }).catch(e => { if (!c.signal.aborted) setError(e.message); })
-      .finally(() => { if (!c.signal.aborted) setLoading(false); });
-    return () => c.abort();
-  }, [refresh]);
+
+  const { years, periods, programs, loading, error } = useEducationCatalogs(refresh);
   const selectedPeriod = periods.find(p => String(p.id) === periodId && String(p.academicYearId) === yearId);
   const semesterId = selectedPeriod?.ojt?.id ?? null;
   const selectedProgram = programs.find(p => String(p.id) === programId);
