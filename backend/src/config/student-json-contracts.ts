@@ -37,6 +37,7 @@ export function describeStudentJsonOperations(spec: Spec): Spec {
         }
         if (properties[name]) throw Error('Student JSON field collision: ' + path + ' ' + name);
         const schema = resolve(spec, parameter.schema ?? {});
+        if (parameter.name === 'unread') { schema.type = 'boolean'; delete schema.enum; }
         properties[name] = { ...schema, ...(parameter.description ? { description: parameter.description } : {}) };
         // Original generated descriptions sometimes misidentify every path ID as a student.
         if (parameter.in === 'path') properties[name].description = name + ' của tài nguyên cần truy cập.';
@@ -62,7 +63,7 @@ export function describeStudentJsonOperations(spec: Spec): Spec {
       operation.parameters = [];
       operation.tags = ['Sinh viên'];
       operation['x-roles'] = ['STUDENT'];
-      operation['x-original-operation'] = { method: method.toUpperCase(), path };
+      operation['x-student-handler'] = method.toUpperCase() + ' ' + path;
       operation['x-student-json'] = { bindings, bodyFields: Object.keys(body.properties ?? {}) };
       delete operation.operationId;
       operation.description = ('Gửi một JSON object chứa ID, bộ lọc và dữ liệu nghiệp vụ. Không truyền path/query parameters. ' + (source.description ?? '')).trim();

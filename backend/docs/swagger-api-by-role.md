@@ -172,36 +172,36 @@ Xem học tập, chọn combo và đăng ký OJT.
 | # | Method | Đường dẫn Swagger | Chức năng | Route gốc |
 |---:|---|---|---|---|
 | 1 | POST | `/api/students/me/cv` | Upload hoặc thay CV cá nhân | `POST /api/students/me/cv` |
-| 2 | POST | `/api/student/combo-registration-windows/preview` | Xem ảnh hưởng của combo dự kiến | `POST /api/combo-registration-windows/{id}/preview` |
-| 3 | PATCH | `/api/student/accounts/me/profile/update` | Cập nhật hồ sơ cá nhân | `PATCH /api/accounts/me/profile` |
-| 4 | POST | `/api/student/auth/me/search` | Xem tài khoản đang đăng nhập | `GET /api/auth/me` |
-| 5 | POST | `/api/student/combo-registration-windows/search` | Danh sách đợt chọn combo | `GET /api/combo-registration-windows` |
-| 6 | POST | `/api/student/combo-registration-windows/selections` | Gửi lựa chọn combo | `POST /api/combo-registration-windows/{id}/selections` |
-| 7 | POST | `/api/student/combo-selections/search` | Lịch sử lựa chọn combo của sinh viên | `GET /api/students/{id}/combo-selections` |
-| 8 | POST | `/api/student/eligibility-checks/search` | Lịch sử kiểm tra điều kiện OJT | `GET /api/students/{id}/eligibility-checks` |
-| 9 | POST | `/api/student/eligibility/search` | Kết quả OJT và điều kiện còn thiếu | `GET /api/students/{id}/eligibility` |
-| 10 | POST | `/api/student/auth/change-password` | Đổi mật khẩu | `POST /api/auth/change-password` |
-| 11 | POST | `/api/student/ojt-registration-windows/search` | Danh sách đợt đăng ký OJT | `GET /api/ojt-registration-windows` |
-| 12 | POST | `/api/student/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT | `GET /api/ojt-registrations` |
-| 13 | POST | `/api/student/ojt-registrations/create` | Nộp hồ sơ đăng ký OJT | `POST /api/ojt-registrations` |
-| 14 | POST | `/api/student/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ | `GET /api/ojt-semesters/{id}/students` |
-| 15 | POST | `/api/student/profile/detail` | Hồ sơ học vụ tổng hợp | `GET /api/students/{id}` |
-| 16 | POST | `/api/student/course-results/search` | Điểm, lần học và trạng thái môn | `GET /api/students/{id}/course-results` |
-| 17 | POST | `/api/student/academic-summary/search` | tín chỉ đã đạt/đang học/thiếu; môn nợ/chưa học/đang học. Kịch bản đạt ngưỡng không phải xác suất AI | `GET /api/students/me/academic-summary` |
-| 18 | POST | `/api/student/supplementary-course-options/search` | đề xuất môn/môn học lại, tín chỉ, lý do và tiên quyết; không lớp, không đăng ký học, không cam kết lịch | `GET /api/students/me/supplementary-course-options` |
-| 19 | POST | `/api/student/curriculum/search` | chương trình đã ban hành của mình | `GET /api/students/me/curriculum` |
-| 20 | POST | `/api/student/notifications/search` | thông báo/lọc unread/phân trang, trả unreadCount cùng response | `GET /api/students/me/notifications` |
-| 21 | PATCH | `/api/student/notifications/update` | người nhận đánh dấu đọc, idempotent | `PATCH /api/students/me/notifications/{id}` |
-| 22 | POST | `/api/student/assignments/current/search` | DN/vị trí/giám sát/thời gian của mình theo kỳ | `GET /api/students/me/assignments/current` |
-| 23 | POST | `/api/student/ojt-results/search` | chỉ kết quả của mình được công bố | `GET /api/students/me/ojt-results` |
-| 24 | POST | `/api/student/ojt-results/detail` | điểm/nhận xét đã công bố | `GET /api/students/me/ojt-results/{id}` |
-| 25 | POST | `/api/student/dashboard/search` | tổng hợp; không tạo thuật toán học vụ mới | `GET /api/students/me/dashboard` |
-| 26 | POST | `/api/student/roadmap-recommendations/search` | tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc | `GET /api/students/me/roadmap-recommendations` |
-| 27 | POST | `/api/student/cv/download` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
-| 28 | POST | `/api/student/job-applications/search` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
-| 29 | POST | `/api/student/job-applications/create` | Ứng tuyển vị trí doanh nghiệp | `POST /api/job-applications` |
-| 30 | POST | `/api/student/opportunities/search` | Vị trí tuyển dụng và quyền ứng tuyển | `GET /api/students/me/opportunities` |
-| 31 | POST | `/api/student/internship-tasks/search` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 2 | POST | `/api/student/combo-registration-windows/preview` | Xem ảnh hưởng của combo dự kiến | `POST /api/student/combo-registration-windows/preview` |
+| 3 | PATCH | `/api/student/accounts/me/profile/update` | Cập nhật hồ sơ cá nhân | `PATCH /api/student/accounts/me/profile/update` |
+| 4 | POST | `/api/student/auth/me/search` | Xem tài khoản đang đăng nhập | `POST /api/student/auth/me/search` |
+| 5 | POST | `/api/student/combo-registration-windows/search` | Danh sách đợt chọn combo | `POST /api/student/combo-registration-windows/search` |
+| 6 | POST | `/api/student/combo-registration-windows/selections` | Gửi lựa chọn combo | `POST /api/student/combo-registration-windows/selections` |
+| 7 | POST | `/api/student/combo-selections/search` | Lịch sử lựa chọn combo của sinh viên | `POST /api/student/combo-selections/search` |
+| 8 | POST | `/api/student/eligibility-checks/search` | Lịch sử kiểm tra điều kiện OJT | `POST /api/student/eligibility-checks/search` |
+| 9 | POST | `/api/student/eligibility/search` | Kết quả OJT và điều kiện còn thiếu | `POST /api/student/eligibility/search` |
+| 10 | POST | `/api/student/auth/change-password` | Đổi mật khẩu | `POST /api/student/auth/change-password` |
+| 11 | POST | `/api/student/ojt-registration-windows/search` | Danh sách đợt đăng ký OJT | `POST /api/student/ojt-registration-windows/search` |
+| 12 | POST | `/api/student/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT | `POST /api/student/ojt-registrations/search` |
+| 13 | POST | `/api/student/ojt-registrations/create` | Nộp hồ sơ đăng ký OJT | `POST /api/student/ojt-registrations/create` |
+| 14 | POST | `/api/student/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ | `POST /api/student/ojt-semesters/students/search` |
+| 15 | POST | `/api/student/profile/detail` | Hồ sơ học vụ tổng hợp | `POST /api/student/profile/detail` |
+| 16 | POST | `/api/student/course-results/search` | Điểm, lần học và trạng thái môn | `POST /api/student/course-results/search` |
+| 17 | POST | `/api/student/academic-summary/search` | tín chỉ đã đạt/đang học/thiếu; môn nợ/chưa học/đang học. Kịch bản đạt ngưỡng không phải xác suất AI | `POST /api/student/academic-summary/search` |
+| 18 | POST | `/api/student/supplementary-course-options/search` | đề xuất môn/môn học lại, tín chỉ, lý do và tiên quyết; không lớp, không đăng ký học, không cam kết lịch | `POST /api/student/supplementary-course-options/search` |
+| 19 | POST | `/api/student/curriculum/search` | chương trình đã ban hành của mình | `POST /api/student/curriculum/search` |
+| 20 | POST | `/api/student/notifications/search` | thông báo/lọc unread/phân trang, trả unreadCount cùng response | `POST /api/student/notifications/search` |
+| 21 | PATCH | `/api/student/notifications/update` | người nhận đánh dấu đọc, idempotent | `PATCH /api/student/notifications/update` |
+| 22 | POST | `/api/student/assignments/current/search` | DN/vị trí/giám sát/thời gian của mình theo kỳ | `POST /api/student/assignments/current/search` |
+| 23 | POST | `/api/student/ojt-results/search` | chỉ kết quả của mình được công bố | `POST /api/student/ojt-results/search` |
+| 24 | POST | `/api/student/ojt-results/detail` | điểm/nhận xét đã công bố | `POST /api/student/ojt-results/detail` |
+| 25 | POST | `/api/student/dashboard/search` | tổng hợp; không tạo thuật toán học vụ mới | `POST /api/student/dashboard/search` |
+| 26 | POST | `/api/student/roadmap-recommendations/search` | tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc | `POST /api/student/roadmap-recommendations/search` |
+| 27 | POST | `/api/student/cv/download` | Tải CV của sinh viên | `POST /api/student/cv/download` |
+| 28 | POST | `/api/student/job-applications/search` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `POST /api/student/job-applications/search` |
+| 29 | POST | `/api/student/job-applications/create` | Ứng tuyển vị trí doanh nghiệp | `POST /api/student/job-applications/create` |
+| 30 | POST | `/api/student/opportunities/search` | Vị trí tuyển dụng và quyền ứng tuyển | `POST /api/student/opportunities/search` |
+| 31 | POST | `/api/student/internship-tasks/search` | Danh sách task trong phạm vi tài khoản | `POST /api/student/internship-tasks/search` |
 
 ## Auth
 

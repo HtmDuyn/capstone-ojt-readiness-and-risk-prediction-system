@@ -4,8 +4,10 @@
 
 Các API academic-summary, supplementary-course-options, curriculum, roadmap-recommendations, assignments/current, dashboard, opportunities và hai danh sách đợt đăng ký bắt buộc `studentId` trong JSON. Lấy StudentID từ response đăng nhập/thông tin tài khoản; ID phải khớp hồ sơ của tài khoản được xác thực. Thông báo và cập nhật hồ sơ tài khoản vẫn dùng định danh tài khoản, không cần thêm studentId.
 
-Backend vẫn xác thực Bearer token và trạng thái tài khoản. Trong cùng request, adapter và handler gốc dùng lại kết quả xác thực; StudentID lấy từ DB hiện hành, không tin claim StudentID cũ trong token. Truy vấn hồ sơ dùng StudentID kèm UserID; các phần dashboard dùng lại hồ sơ theo request. Không cache xác thực/hồ sơ giữa các request. Chưa đo độ trễ trên dữ liệu thực tế.
+Backend vẫn xác thực Bearer token và trạng thái tài khoản. API JSON xác thực một lần rồi gọi trực tiếp handler nghiệp vụ, không sửa method/URL để chuyển tiếp; StudentID lấy từ DB hiện hành, không tin claim StudentID cũ trong token. Truy vấn hồ sơ dùng StudentID kèm UserID; các phần dashboard dùng lại hồ sơ theo request. Không cache xác thực/hồ sơ giữa các request. Chưa đo độ trễ trên dữ liệu thực tế.
 
+
+JSON được kiểm tra cả kiểu dữ liệu, ID, trường bắt buộc/trường dư, giới hạn chuỗi và mảng. Bộ lọc unread nhận boolean true/false (không gửi chuỗi "true"/"false"). Handler thiếu, trùng hoặc không được sử dụng sẽ bị phát hiện khi khởi tạo router.
 
 Nhóm **Sinh viên** trong Swagger có 30 operation dùng một JSON body tại `/api/student/*`. ID và bộ lọc nằm trong body; không còn ô path/query. Upload CV là ngoại lệ: `POST /api/students/me/cv` dùng multipart/form-data, trường file `cv`.
 
@@ -21,9 +23,9 @@ Nhóm **Sinh viên** trong Swagger có 30 operation dùng một JSON body tại 
 | Tải CV | POST /api/student/cv/download | {"studentId":1,"cvFileId":1} |
 | Chương trình học | POST /api/student/curriculum/search | {"studentId":1} |
 
-Gửi `Content-Type: application/json` và Bearer token STUDENT. Thiếu ID bắt buộc, sai kiểu, trường dư hoặc query URL trả 400; sai Content-Type trả 415. Adapter chuyển ID/bộ lọc vào handler nghiệp vụ hiện có, giữ nguyên kiểm tra quyền sở hữu và trạng thái nghiệp vụ. Sinh viên không thể xem hồ sơ của người khác bằng cách thay studentId.
+Gửi `Content-Type: application/json` và Bearer token STUDENT. Thiếu ID bắt buộc, sai kiểu, trường dư hoặc query URL trả 400; sai Content-Type trả 415. Bộ chuẩn hóa JSON chuyển ID/bộ lọc vào handler nghiệp vụ trực tiếp, giữ nguyên kiểm tra quyền sở hữu và trạng thái nghiệp vụ. Sinh viên không thể xem hồ sơ của người khác bằng cách thay studentId.
 
-Các route REST gốc tiếp tục hoạt động để giữ tương thích; trên Swagger, phiên bản dùng chung chỉ còn ở nhóm nhân sự, Sinh viên thấy phiên bản JSON. Không thêm lại các API đợt đăng ký portal bị trùng hay logic nghiệp vụ đã xóa. Các mô tả REST/service bên dưới là thông tin triển khai; hợp đồng gọi API Student hiện tại lấy từ `/api-docs/openapi.json` và `docs/api-input-reference.md`.
+Các route cũ dành riêng cho Student đã được gỡ khỏi router, bao gồm GET /students/me/dashboard, /academic-summary, /notifications, /opportunities và POST /job-applications. Các route dùng chung chỉ giữ quyền nhân sự; Student gọi phiên bản JSON. Upload CV và Auth chung vẫn hoạt động. Không thêm lại các API đợt đăng ký portal bị trùng hay logic nghiệp vụ đã xóa. Các mô tả REST/service bên dưới là thông tin triển khai; hợp đồng gọi API Student hiện tại lấy từ `/api-docs/openapi.json` và `docs/api-input-reference.md`.
 
 Đã triển khai 48 operation mới trong checklist và sửa/đối chiếu 24 operation hiện có được đánh dấu cần sửa. Các API `/students/me/...` chỉ nhận STUDENT; API Đào tạo nhận ADMIN/ACADEMIC; import/công bố nhận ADMIN/OJT_COORD; doanh nghiệp chỉ đọc đơn/CV đã được gửi đến doanh nghiệp mình và ghi decision/evaluation trong phạm vi.
 
