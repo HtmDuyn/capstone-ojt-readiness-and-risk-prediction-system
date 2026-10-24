@@ -6,7 +6,7 @@
   "scripts": {
     "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
-    "docs:api": "node scripts/export-api-inputs.cjs && node scripts/export-list-input-audit.cjs",
+    "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
@@ -40,7 +40,6 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
