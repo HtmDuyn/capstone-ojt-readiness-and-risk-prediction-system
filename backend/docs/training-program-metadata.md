@@ -3,7 +3,7 @@
 ## Khởi tạo DB mới bằng backend/DB
 
 Section cuối `20261024 publish seeded training programs` đưa đúng 40 chương trình
-catalog và chương trình `DEMO-OJT-READY` của file seed sang PUBLISHED, có người và
+catalog sang PUBLISHED; chương trình `DEMO-OJT-READY` cũng được công bố nếu phần demo được khởi tạo. Các chương trình này, có người và
 thời điểm công bố. Version mặc định `SEED-2026`, EffectiveYear `2026` biểu thị bản
 seed này, không suy luận năm nhập học từ mã khóa. Metadata có sẵn được giữ lại.
 

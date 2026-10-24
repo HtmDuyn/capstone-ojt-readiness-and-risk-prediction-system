@@ -4,8 +4,8 @@ Swagger `/api-docs`; tài liệu máy đọc `/api-docs/openapi.json`.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
-| Admin | 11 |
-| Phòng đào tạo | 72 |
+| Admin | 12 |
+| Phòng đào tạo | 64 |
 | Phòng QHDN | 39 |
 | Doanh nghiệp | 9 |
 | Sinh viên | 31 |

@@ -4,7 +4,7 @@
   "description": "A full-stack web system for managing OJT processes and connecting **Students, Universities, and Companies**.",
   "main": "dist/server.js",
   "scripts": {
-    "db:migrate:training-program-metadata": "npm run build && node scripts/migrate-training-program-metadata.cjs",
+    "db:migrate:academic-rest": "npm run build && node scripts/migrate-academic-rest.cjs",
     "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
     "prebuild": "node scripts/clean-build.cjs",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
-    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs"
+    "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs",
+    "db:migrate:training-program-metadata": "npm run build && node scripts/migrate-training-program-metadata.cjs"
   },
   "repository": {
     "type": "git",
@@ -53,5 +54,10 @@
     "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.23.15",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
   }
 }

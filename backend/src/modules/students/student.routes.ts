@@ -3,7 +3,7 @@ import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './student.validation';
-import { assertStudentAccess, listStudents, patchStudent, results, patchResult } from './student.service';
+import { listStudents, patchStudent, patchResult } from './student.service';
 import { studentProfile } from './student-profile.service';
 import { importHistory } from './academic-import.service';
 import { listTasks } from '../qhdn/task.service';
@@ -26,7 +26,6 @@ router.get('/job-applications',authenticate,authorizeRoles('ADMIN','OJT_COORD'),
 router.get('/students',...staff,handle(req=>listStudents(req.query)));
 router.get('/students/:id',...read,handle(req=>studentProfile(positiveId(req.params.id),req.query,req.user)));
 router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.params.id),req.body,req.user.userId)));
-router.get('/students/:id/course-results',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
 router.patch('/course-results/:id',...staff,handle(req=>patchResult(positiveId(req.params.id),req.body,req.user.userId)));
 router.get('/internship-tasks',authenticate,authorizeRoles('ENTERPRISE','OJT_COORD','ADMIN'),handle(req=>listTasks(req.query,req.user)));
 router.get('/academic-imports',...staff,handle(req=>importHistory(req.query)));

@@ -6398,8 +6398,8 @@ END $$;
 
 
 -- ============================================================
--- DEMO OJT SEMESTER: only if absent. Does not change existing rows.
--- Required for a fresh database to attach recruitment data.
+-- Demo calendar: ten sequential semesters with OJT in curriculum semester 6.
+-- Used by the readiness and recruitment demo seeds below.
 -- ============================================================
 SET LOCAL search_path = public, pg_catalog;
 CREATE TEMP TABLE _demo_study_periods(stage int PRIMARY KEY, period_id int NOT NULL) ON COMMIT DROP;
@@ -6477,7 +6477,8 @@ BEGIN
   FROM public."OJTSemesters" s
   WHERE s."SemesterCode" = 'DEMO-OJT-S6';
   IF v_semester_id IS NULL THEN
-    RAISE EXCEPTION 'No OJT semester exists. Create an OJT semester first.';
+    RAISE NOTICE 'Skipping optional demo recruitment: demo OJT semester is not configured.';
+    RETURN;
   END IF;
 
   -- Ensure an open RecruitmentWindows exists
@@ -6902,6 +6903,45 @@ END $verify$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES('20261025_complete_20_student_seed');
 -- The latest catalog publication below is part of the same reset transaction.
 
+-- BEGIN INCREMENTAL UPDATE: 20261023_academic_rest_resources
+-- Existing databases: run only this block; no existing application rows are changed.
+-- From backend/: npm run db:migrate:academic-rest
+-- Stores validated student/curriculum import requests for the REST preview/commit workflow.
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+CREATE TABLE IF NOT EXISTS "AcademicImportRequests" (
+ "ImportID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "Kind" varchar(20) NOT NULL CHECK("Kind" IN ('STUDENT','CURRICULUM')),
+ "IdempotencyKey" varchar(100) NOT NULL,"RequestHash" char(64) NOT NULL,
+ "Payload" jsonb NOT NULL CHECK(jsonb_typeof("Payload")='object'),
+ "Preview" jsonb NOT NULL CHECK(jsonb_typeof("Preview")='object'),
+ "Status" varchar(20) NOT NULL DEFAULT 'VALIDATED' CHECK("Status" IN ('VALIDATED','COMMITTED')),
+ "Result" jsonb,"CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),
+ "CreatedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),"CommittedAt" timestamptz,
+ "AccountBatchID" bigint REFERENCES "AccountImportBatches"("BatchID"),
+ "AcademicBatchID" bigint REFERENCES "AcademicImportBatches"("BatchID"),
+ UNIQUE("Kind","CreatedBy","IdempotencyKey"),
+ CHECK(("Status"='COMMITTED')=("CommittedAt" IS NOT NULL)),
+ CHECK("Status"<>'COMMITTED' OR ("Result" IS NOT NULL AND "AcademicBatchID" IS NOT NULL))
+);
+COMMENT ON TABLE "AcademicImportRequests" IS 'Validated student and curriculum imports; committed requests retain results and batch references.';
+COMMENT ON COLUMN "AcademicImportRequests"."IdempotencyKey" IS 'Retry key scoped to import kind and staff creator; the request hash detects changed payloads.';
+COMMENT ON COLUMN "AcademicImportRequests"."Status" IS 'VALIDATED stores the preview; COMMITTED records an applied import and its result.';
+CREATE INDEX IF NOT EXISTS "IX_AcademicImportRequests_KindID" ON "AcademicImportRequests"("Kind","ImportID" DESC);
+ALTER TABLE "AcademicImportRequests" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "AcademicImportRequests" FROM PUBLIC;
+DO $$ DECLARE role_name text; BEGIN
+ FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON TABLE "AcademicImportRequests" FROM %I',role_name); END IF;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE "AcademicImportRequests" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE "AcademicImportRequests_ImportID_seq" TO service_role;
+ END IF;
+END $$;
+INSERT INTO "SchemaMigrations"("Version") VALUES('20261023_academic_rest_resources') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: 20261023_academic_rest_resources
 
 -- SECTION: 20261024 publish seeded training programs
 -- Fresh-install seed acceptance, scoped only to program codes inserted by this file.
@@ -6977,3 +7017,30 @@ BEGIN
  INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261024_publish_seeded_programs') ON CONFLICT DO NOTHING;
 END $publish_seed$;
 COMMIT;
+-- BEGIN SEED OJT ASSESSMENT WINDOWS: 20261024
+-- Only seed OJT terms with a completed preparation semester and Block 3.
+-- One window per term; reruns preserve any configuration made by staff.
+BEGIN;
+SET LOCAL search_path = public, pg_catalog;
+INSERT INTO "OJTAssessmentWindows"
+ ("OJTSemesterID","BlockPeriodID","AssessmentAcademicPeriodID","RequiredRelativeSemester",
+  "OpensAt","ClosesAt","Status","Reason","ConfiguredBy")
+SELECT o."OJTSemesterID", prep.block_id, prep.parent_id, 5,
+       prep.ready_at, prep.ready_at + interval '7 days', 'DRAFT',
+       'Lịch xét điều kiện sau học kỳ chuẩn bị và Block 3; cần Phòng đào tạo xác nhận trước khi mở.', actor."UserID"
+FROM "OJTSemesters" o
+CROSS JOIN LATERAL (
+ SELECT b."AcademicPeriodID" block_id, p."AcademicPeriodID" parent_id,
+        (GREATEST(b."EndDate",p."EndDate") + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh' ready_at
+ FROM "AcademicPeriods" b JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=b."ParentPeriodID"
+ WHERE b."Kind"='BLOCK3' AND p."Kind"='SEMESTER'
+   AND b."EndDate" < o."StartDate" AND p."EndDate" < o."StartDate"
+ ORDER BY GREATEST(b."EndDate",p."EndDate") DESC,b."AcademicPeriodID" DESC LIMIT 1
+) prep
+CROSS JOIN LATERAL (
+ SELECT u."UserID" FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID"
+ WHERE r."RoleCode"='ACADEMIC' AND u."Status"='ACTIVE' ORDER BY u."UserID" LIMIT 1
+) actor
+ON CONFLICT ("OJTSemesterID") DO NOTHING;
+COMMIT;
+-- END SEED OJT ASSESSMENT WINDOWS: 20261024

@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { enrichListRows } from '../../shared/list-context';
 import { ensureOjtSemesterForPeriod } from './ojt-semester-link';
 import { academicError, dateInput, dateRange, inputObject, positiveId, requiredText, statusInput } from './academic.schema';
 import { academicTransaction, asApi, audit, findRecord, resources, type AcademicRecord, type Resource } from './academic.repository';
@@ -71,7 +72,9 @@ async function validateCalendar(client: PoolClient) {
     WHERE p."StartDate"<y."StartDate" OR p."EndDate">y."EndDate"
     OR (p."Kind"='BLOCK3' AND (parent."Kind"<>'SEMESTER' OR parent."AcademicYearID"<>p."AcademicYearID" OR p."StartDate"<parent."StartDate" OR p."EndDate">parent."EndDate")) LIMIT 1`, 'Periods must be within their academic year; Block 3 must be within its parent semester.');
   await assertNoRows(client, `SELECT 1 FROM "AcademicPeriods" a JOIN "AcademicPeriods" b ON a."AcademicPeriodID"<b."AcademicPeriodID"
-    AND a."StartDate"<=b."EndDate" AND b."StartDate"<=a."EndDate" AND a."AcademicPeriodID" IS DISTINCT FROM b."ParentPeriodID" AND b."AcademicPeriodID" IS DISTINCT FROM a."ParentPeriodID" LIMIT 1`, 'Separate calendar semesters cannot overlap; a Block 3 belongs inside its parent.');
+    AND a."AcademicYearID"=b."AcademicYearID"
+    AND a."StartDate"<=b."EndDate" AND b."StartDate"<=a."EndDate"
+    AND a."AcademicPeriodID" IS DISTINCT FROM b."ParentPeriodID" AND b."AcademicPeriodID" IS DISTINCT FROM a."ParentPeriodID" LIMIT 1`, 'Academic periods in the same academic year cannot overlap except when a Block 3 is contained by its parent semester.');
   await assertNoRows(client, `SELECT 1 FROM "OJTSemesters" o JOIN "AcademicYears" y ON y."AcademicYearID"=o."AcademicYearID"
     LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=o."AcademicPeriodID"
     WHERE o."StartDate"<y."StartDate" OR o."EndDate">y."EndDate"
@@ -99,7 +102,7 @@ async function syncStudentProgress(client: PoolClient) {
     WHERE student."StudentID"=placement."StudentID"`);
 }
 
-export async function saveResource(resource: Resource, input: unknown, actorId: number, id?: number) {
+export async function saveResource(resource: Resource, input: unknown, actorId: number, id?: number, existingClient?:PoolClient) {
   return academicTransaction(async client => {
     const before = id === undefined ? undefined : await findRecord(client, resource, id);
     const row = parseResource(resource, input, before);
@@ -139,9 +142,10 @@ export async function saveResource(resource: Resource, input: unknown, actorId: 
     }
     await validateCalendar(client);
     await syncStudentProgress(client);
+    if(resource==='academic-years')Object.assign(saved,await findRecord(client,resource,saved.id));
     await audit(client, actorId, config.table, saved.id, id === undefined ? 'CREATE' : 'UPDATE', before ?? null, saved);
-    return saved;
-  });
+    return (await enrichListRows(client,[saved]))[0];
+  },existingClient);
 }
 
 export async function assignPlacementWithClient(client:PoolClient,studentId:number,input:unknown,actorId:number) {

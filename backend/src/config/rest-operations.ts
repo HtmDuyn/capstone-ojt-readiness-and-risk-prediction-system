@@ -3,8 +3,6 @@ type Spec = Record<string, any>;
 // Describe the actual routes: URL IDs, query filters, and JSON bodies for writes.
 export function describeRestOperations(spec: Spec): Spec {
   const requiredQueries: Record<string, string[]> = {
-    '/api/academic/alerts': ['ojtSemesterId', 'academicPeriodId', 'assessmentDeadline'],
-    '/api/academic/course-demand': ['ojtSemesterId', 'academicPeriodId'],
     '/api/students/me/opportunities': ['ojtSemesterId'],
     '/api/recruitment/posts': ['companyId'],
     '/api/enterprise/candidates': ['companyId'],
