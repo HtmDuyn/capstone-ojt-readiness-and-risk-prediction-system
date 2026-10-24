@@ -2,6 +2,8 @@ import React from "react";
 import { PageBanner } from "@/components/common/PageBanner";
 import { academicService, type OjtSemester } from "@/service/academic.service";
 import { getPage, type Page } from "@/service/educationApi";
+import { Link } from 'react-router-dom';
+import { ojtEligibilityService, eligibilityStatusLabel, eligibilityReasonLabel, type StudentEligibility } from '@/service/ojtEligibility.service';
 type Row = Record<string, any>;
 const label = (value: unknown) =>
   value === null || value === undefined || value === "" ? "—" : String(value);
@@ -34,6 +36,18 @@ const EducationStudentStatus: React.FC = () => {
     [selected, setSelected] = React.useState<Row | null>(null);
   const [loading, setLoading] = React.useState(false),
     [error, setError] = React.useState("");
+  const [eligibility, setEligibility] = React.useState<StudentEligibility | null>(null);
+  const [eligibilityLoading, setEligibilityLoading] = React.useState(false);
+  const [eligibilityError, setEligibilityError] = React.useState('');
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setEligibility(null); setEligibilityError(''); setEligibilityLoading(Boolean(selected && semesterId));
+    if (selected && semesterId) ojtEligibilityService.getStudentEligibility(selected.studentId, Number(semesterId), controller.signal)
+      .then(data => { if (!controller.signal.aborted) setEligibility(data); })
+      .catch(e => { if (!controller.signal.aborted) setEligibilityError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setEligibilityLoading(false); });
+    return () => controller.abort();
+  }, [selected, semesterId]);
   React.useEffect(() => {
     let active = true;
     academicService
@@ -51,6 +65,8 @@ const EducationStudentStatus: React.FC = () => {
   React.useEffect(() => {
     if (!semesterId) {
       setData(null);
+      setSelected(null);
+      setLoading(false);
       return;
     }
     const controller = new AbortController();
@@ -113,6 +129,7 @@ const EducationStudentStatus: React.FC = () => {
           >
             Tải lại
           </button>
+          <Link to="/education/ojt-conditions" className="rounded border p-2 text-orange-700">Xét và cập nhật điều kiện OJT</Link>
         </div>
         {error && (
           <p role="alert" className="text-red-700">
@@ -201,6 +218,18 @@ const EducationStudentStatus: React.FC = () => {
           </h2>
           <p>Email: {label(selected.email)}</p>
           <p>Nhóm: {label(selected.groupCode)}</p>
+          {eligibilityLoading && <p role="status">Đang tính điều kiện từ dữ liệu hiện tại...</p>}
+          {eligibilityError && <p role="alert" className="text-red-700">{eligibilityError}</p>}
+          {eligibility && <div className="space-y-2 rounded-lg border p-4">
+            <h3 className="font-semibold">Điều kiện OJT: từ 70 tín chỉ, tối đa 2 môn còn rớt</h3>
+            <p>Tính hiện tại (chưa phải quyết định chính thức): <strong>{eligibilityStatusLabel(eligibility.current.status)}</strong>.</p>
+            <p>Tín chỉ đạt: {eligibility.current.earnedCredits}; còn thiếu: {eligibility.current.missingCredits ?? 'chưa xác định'}; môn còn rớt: {eligibility.current.unpassedCourseCount}.</p>
+            <p>Môn còn rớt: {eligibility.current.unpassedCourses.map(c => c.courseCode).join(', ') || 'Không có'}.</p>
+            <p>{eligibility.current.reasons.map(eligibilityReasonLabel).join(' ')}</p>
+            {eligibility.current.academicIssues.length > 0 && <p className="text-amber-800">Cần đối soát: {eligibility.current.academicIssues.join(', ')}.</p>}
+            <p>Quyết định chính thức: {!eligibility.official ? 'Chưa xác nhận' : eligibility.official.isStale ? 'Đã cũ — cần xét lại trước khi sử dụng' : eligibilityStatusLabel(eligibility.official.status)}.</p>
+            {eligibility.official?.confirmation && <p>Đã xác nhận lúc {new Date(eligibility.official.confirmation.confirmedAt).toLocaleString('vi-VN')}.</p>}
+          </div>}
           <p>
             Doanh nghiệp:{" "}
             {label(

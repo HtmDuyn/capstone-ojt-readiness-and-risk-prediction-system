@@ -842,9 +842,9 @@ const EducationAcademicYear: React.FC = () => {
           ================================================ */}
 
       <PageBanner
-        title="Khởi tạo Năm học"
-        description="Thiết lập năm học và thời gian bắt đầu, kết thúc của từng kỳ học."
-        badge="Quản lý dữ liệu"
+        title="Quản lý năm học và học kỳ"
+        description="Quản lý năm học, lịch học kỳ và Block 3. Phòng Quan hệ Doanh nghiệp mở các đợt đăng ký OJT trong học kỳ."
+        badge="Phòng Đào tạo"
       />
 
       {/* ================================================

@@ -39,19 +39,19 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
   // =========================
   {
     id: 'data-management',
-    label: 'Quản lý dữ liệu',
+    label: 'Quản lý học vụ',
     path: '',
     icon: <Database size={20} />,
     children: [
       {
         id: 'academic-year',
-        label: 'Khởi tạo năm học',
+        label: 'Năm học và học kỳ',
         path: '/education/academic-year',
         icon: <CalendarDays size={20} />,
         banner: {
-          title: 'Khởi tạo Năm học',
+          title: 'Quản lý năm học và học kỳ',
           description:
-            'Quản lý và khởi tạo năm học cho hệ thống OJT.',
+            'Quản lý năm học và lịch học kỳ; Phòng QHDN phụ trách mở đợt đăng ký OJT.',
           badge: 'Quản lý dữ liệu',
         },
       },
@@ -76,18 +76,6 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
           title: 'Quản lý Chương trình Đào tạo',
           description:
             'Quản lý chương trình đào tạo phục vụ theo dõi tiến độ và điều kiện OJT.',
-          badge: 'Quản lý dữ liệu',
-        },
-      },
-      {
-        id: 'ojt-conditions',
-        label: 'Quản lý điều kiện OJT',
-        path: '/education/ojt-conditions',
-        icon: <FileCheck size={20} />,
-        banner: {
-          title: 'Quản lý Điều kiện OJT',
-          description:
-            'Quản lý các điều kiện cần thiết để sinh viên đủ điều kiện tham gia OJT.',
           badge: 'Quản lý dữ liệu',
         },
       },
@@ -140,6 +128,17 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
     icon: <CalendarDays size={20} />,
     children: [
       {
+        id: 'ojt-conditions',
+        label: 'Xét điều kiện và danh sách',
+        path: '/education/ojt-conditions',
+        icon: <FileCheck size={20} />,
+        banner: {
+          title: 'Xét điều kiện đi OJT',
+          description: 'Quy tắc chung: từ 70 tín chỉ, tối đa 2 môn còn rớt. Lọc danh sách theo kết quả xét.',
+          badge: 'Phòng Đào tạo',
+        },
+      },
+      {
         id: 'ojt-final-results',
         label: 'Kết quả OJT cuối kỳ',
         path: '/education/ojt-final-results',
@@ -159,13 +158,13 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
   // =========================
   {
     id: 'ai-class-proposals',
-    label: 'Đề xuất lớp hỗ trợ từ AI',
+    label: 'Nhu cầu lớp hỗ trợ',
     path: '/education/ai-class-proposals',
     icon: <RoadmapConsultingIcon size={20} />,
     banner: {
-      title: 'Đề xuất Lớp hỗ trợ từ AI',
+      title: 'Nhu cầu lớp hỗ trợ',
       description:
-        'Xem các đề xuất lớp hỗ trợ được AI hình thành từ dữ liệu học tập và mức nguy cơ của sinh viên.',
+        'Xem nhu cầu học phần từ hồ sơ học tập và điều kiện OJT để cân nhắc mở lớp hỗ trợ.',
       badge: 'Phòng Đào tạo',
     },
   },

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import API from "@/service/api";
+import { academicReportingService, downloadCourseDemand, type Cohort } from '@/service/academicReporting.service';
 
 /* =========================================================
    API PATHS
@@ -274,11 +275,6 @@ const parseAcademicYears = (value: unknown): AcademicYear[] => {
 
 const parseAcademicPeriods = (value: unknown): AcademicPeriod[] => {
   return readList(value)
-    .filter((item) => {
-      const kind = readString(item, ["kind"]);
-
-      return !kind || kind === "SEMESTER";
-    })
     .map((item) => {
       const id = readString(item, ["id"]);
 
@@ -310,8 +306,9 @@ const parseAcademicPeriods = (value: unknown): AcademicPeriod[] => {
    NORMALIZE DASHBOARD
    ========================================================= */
 
-const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
+export const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
   const items = readList(value, [
+    "statistics.groups",
     "eligibilityByPeriod",
     "eligibilityTrend",
     "periodStatistics",
@@ -328,7 +325,7 @@ const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
         "periodCode",
         "name",
         "label",
-      ]);
+      ]) ?? (item.id === null ? 'Chưa phân khóa' : null);
 
       const eligible = readNumber(item, [
         "eligibleStudents",
@@ -341,6 +338,7 @@ const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
         "ineligibleCount",
         "notEligibleCount",
         "ineligible",
+        "notEligible",
       ]);
 
       if (!label || (eligible === null && ineligible === null)) {
@@ -356,8 +354,9 @@ const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
     .filter((item): item is PeriodStatistic => item !== null);
 };
 
-const parseCohortProgress = (value: unknown): CohortProgress[] => {
+export const parseCohortProgress = (value: unknown): CohortProgress[] => {
   const items = readList(value, [
+    "statistics.groups",
     "cohortProgress",
     "progressByCohort",
     "cohortStatistics",
@@ -372,9 +371,13 @@ const parseCohortProgress = (value: unknown): CohortProgress[] => {
         "cohortName",
         "name",
         "label",
-      ]);
+      ]) ?? (item.id === null ? 'Chưa phân khóa' : null);
 
-      const percent = readNumber(item, [
+      const total = readNumber(item, ['total']);
+      const eligible = readNumber(item, ['eligible']);
+      const percent = total !== null && total > 0 && eligible !== null
+        ? eligible / total * 100
+        : readNumber(item, [
         "completionPercentage",
         "completionPercent",
         "completionRate",
@@ -557,6 +560,10 @@ export const EducationDashboard: React.FC = () => {
 
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [selectedCohort, setSelectedCohort] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   /* ---------------- BACKEND DATA ---------------- */
 
@@ -598,6 +605,7 @@ export const EducationDashboard: React.FC = () => {
       const results = await Promise.allSettled([
         getAllItems(API_PATHS.years, {}, controller.signal),
         getAllItems(API_PATHS.periods, {}, controller.signal),
+        academicReportingService.cohorts(controller.signal),
       ]);
 
       if (controller.signal.aborted) return;
@@ -618,6 +626,8 @@ export const EducationDashboard: React.FC = () => {
         errors.push(`Kỳ học: ${getErrorMessage(results[1].reason)}`);
       }
 
+      if (results[2].status === 'fulfilled') setCohorts(results[2].value);
+      else { setCohorts([]); errors.push(`Khóa: ${getErrorMessage(results[2].reason)}`); }
       setFiltersError(errors.join(" | "));
       setFiltersLoading(false);
     };
@@ -671,9 +681,10 @@ export const EducationDashboard: React.FC = () => {
     if (selectedOjtSemesterId) {
       params.ojtSemesterId = toApiId(selectedOjtSemesterId);
     }
+    if (selectedCohort) params.cohortId = toApiId(selectedCohort);
 
     return params;
-  }, [selectedOjtSemesterId, selectedPeriod]);
+  }, [selectedOjtSemesterId, selectedPeriod, selectedCohort]);
 
   /* =====================================================
      LOAD DASHBOARD AND COURSE DEMAND
@@ -681,8 +692,7 @@ export const EducationDashboard: React.FC = () => {
      GET /api/academic/dashboard
      GET /api/academic/course-demand
 
-     Không truyền academicYearId hoặc academicPeriodId
-     vì chưa được xác nhận là query parameter hợp lệ.
+     Truyền academicPeriodId, ojtSemesterId và cohortId khi đã chọn.
      ===================================================== */
 
   useEffect(() => {
@@ -813,6 +823,7 @@ export const EducationDashboard: React.FC = () => {
             academicPeriodId: toApiId(selectedPeriod),
             ojtSemesterId: toApiId(selectedOjtSemesterId),
             assessmentDeadline,
+            ...(selectedCohort ? { cohortId: toApiId(selectedCohort) } : {}),
           },
           controller.signal,
         );
@@ -834,7 +845,7 @@ export const EducationDashboard: React.FC = () => {
     void loadAlerts();
 
     return () => controller.abort();
-  }, [selectedPeriod, selectedOjtSemesterId, assessmentDeadline, refreshKey]);
+  }, [selectedPeriod, selectedOjtSemesterId, assessmentDeadline, selectedCohort, refreshKey]);
 
   /* =====================================================
      STATISTICS FROM BACKEND
@@ -951,6 +962,19 @@ export const EducationDashboard: React.FC = () => {
     setSelectedYear(event.target.value);
     setSelectedPeriod("");
   };
+  useEffect(() => { setExportError(''); }, [dashboardParams]);
+  const handleExport = async () => {
+    if (!selectedPeriod || !selectedOjtSemesterId || exporting) return;
+    setExporting(true);
+    setExportError('');
+    try {
+      downloadCourseDemand(await academicReportingService.exportCourseDemand({
+        academicPeriodId: Number(selectedPeriod), ojtSemesterId: Number(selectedOjtSemesterId),
+        ...(selectedCohort ? { cohortId: Number(selectedCohort) } : {}),
+      }));
+    } catch (error) { setExportError(getErrorMessage(error)); }
+    finally { setExporting(false); }
+  };
 
   /* =====================================================
      RENDER
@@ -991,12 +1015,13 @@ export const EducationDashboard: React.FC = () => {
 
               <button
                 type="button"
-                disabled
-                title="Chưa có API xuất báo cáo tổng hợp"
-                className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-400"
+                disabled={unsupportedPeriod || exporting || dashboardLoading}
+                onClick={handleExport}
+                title="Xuất nhu cầu học phần theo phạm vi đang chọn"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FileDown size={14} />
-                Xuất báo cáo
+                {exporting ? 'Đang xuất...' : 'Xuất nhu cầu CSV'}
               </button>
             </div>
           </div>
@@ -1077,10 +1102,13 @@ export const EducationDashboard: React.FC = () => {
 
               <select
                 id="dashboard-cohort"
-                disabled
-                className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-400"
+                value={selectedCohort}
+                onChange={event => setSelectedCohort(event.target.value)}
+                disabled={filtersLoading}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
               >
-                <option>Chưa hỗ trợ lọc theo khóa</option>
+                <option value="">Tất cả khóa</option>
+                {cohorts.map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.cohortCode} — {cohort.name}</option>)}
               </select>
             </div>
           </div>
@@ -1090,6 +1118,7 @@ export const EducationDashboard: React.FC = () => {
               <ErrorNotice message={filtersError} />
             </div>
           )}
+          {exportError && <div className="mt-3"><ErrorNotice message={exportError} /></div>}
 
           <div className="mt-4 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-3 text-xs leading-5 text-blue-600">
             <Info size={15} className="mt-0.5 shrink-0" />
@@ -1262,16 +1291,16 @@ export const EducationDashboard: React.FC = () => {
             <div className="p-5">
               <SectionTitle
                 icon={<BarChart3 size={18} />}
-                title="Điều kiện OJT theo kỳ"
-                description="So sánh kết quả xét giữa các kỳ học."
+                title="Điều kiện OJT theo khóa"
+                description="Kết quả xét của từng khóa trong phạm vi đã chọn."
                 iconClass="bg-blue-50 text-blue-600"
               />
 
               {periodStatistics.length === 0 ? (
                 <EmptyState
                   loading={dashboardLoading}
-                  title="Chưa có thống kê theo kỳ"
-                  description="API Dashboard chưa cung cấp danh sách thống kê điều kiện OJT theo từng kỳ."
+                  title="Chưa có thống kê theo khóa"
+                  description="Chọn kỳ học có liên kết OJT để xem kết quả theo khóa."
                 />
               ) : (
                 <div className="mt-6 space-y-5">
@@ -1346,16 +1375,16 @@ export const EducationDashboard: React.FC = () => {
             <div className="border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
               <SectionTitle
                 icon={<GraduationCap size={18} />}
-                title="Tiến độ học tập theo khóa"
-                description="Tỷ lệ hoàn thành chương trình học theo khóa."
+                title="Tỷ lệ đủ điều kiện OJT theo khóa"
+                description="Số sinh viên đủ điều kiện trên tổng sinh viên của từng khóa."
                 iconClass="bg-blue-50 text-blue-600"
               />
 
               {cohortProgress.length === 0 ? (
                 <EmptyState
                   loading={dashboardLoading}
-                  title="Chưa có dữ liệu tiến độ"
-                  description="Chưa nhận được tỷ lệ hoàn thành chương trình học theo khóa từ Backend."
+                  title="Chưa có tỷ lệ theo khóa"
+                  description="Tỷ lệ hiển thị khi phạm vi đã chọn có sinh viên."
                 />
               ) : (
                 <div className="mt-6 space-y-5">

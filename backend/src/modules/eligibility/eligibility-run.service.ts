@@ -13,8 +13,8 @@ async function ensureFixedRule(c:import('pg').PoolClient,programId:number|null,s
  await audit(c,actor,'OJTRuleSets',rule.RuleSetID,'PUBLISH_FIXED_POLICY',null,{minCredits:70,maxUnpassedCourses:2});
 }
 async function batchSummary(c:import('pg').PoolClient,runId:number,semesterId:number,replayed:boolean){
- const rows=(await c.query(`SELECT e."CheckID" AS "checkId",e."CheckedAt" AS "checkedAt",e."Result" AS result,f."ConfirmedAt" AS "confirmedAt" FROM "EligibilityChecks" e LEFT JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID" WHERE e."RunID"=$1 ORDER BY e."StudentID"`,[runId])).rows;
- const items=rows.map(row=>({...row.result,checkId:row.checkId,checkedAt:row.checkedAt,confirmedAt:row.confirmedAt??null}));
+ const rows=(await c.query(`SELECT e."CheckID" AS "checkId",e."CheckedAt" AS "checkedAt",e."Result" AS result,f."ConfirmedAt" AS "confirmedAt",s."StudentCode" AS "studentCode",u."FullName" AS "fullName" FROM "EligibilityChecks" e JOIN "Students" s ON s."StudentID"=e."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID" WHERE e."RunID"=$1 ORDER BY e."StudentID"`,[runId])).rows;
+ const items=rows.map(row=>({...row.result,studentCode:row.studentCode,fullName:row.fullName,checkId:row.checkId,checkedAt:row.checkedAt,confirmedAt:row.confirmedAt??null}));
  return {runId,ojtSemesterId:semesterId,status:'COMPLETED',total:items.length,eligible:items.filter(item=>item.status==='ELIGIBLE').length,notEligible:items.filter(item=>item.status==='NOT_ELIGIBLE').length,reviewRequired:items.filter(item=>item.status==='REVIEW_REQUIRED').length,items,replayed};
 }
 export async function checkBatch(body:unknown,actorId:number) {
