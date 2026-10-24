@@ -4,36 +4,34 @@ const API_BASE_URL = (
   "https://capstone-ojt-readiness-and-risk.onrender.com"
 ).replace(/\/+$/, "");
 
-/* =========================================================
-   STUDENT IMPORT TYPES
-   ========================================================= */
+export type CourseResultStatus = "PASSED" | "FAILED";
 
 export interface StudentCourseResult {
   courseCode: string;
   academicPeriodId: number;
-  status: string;
+  status: CourseResultStatus;
   score?: number;
   gradePoints?: number;
   grade?: string;
 }
 
 export interface StudentPlacement {
-  cohortId?: number;
-  groupCode?: string;
-  currentAcademicPeriodId?: number;
+  cohortId: number;
+  groupCode: "A" | "B" | "C" | "D";
+  currentAcademicPeriodId: number;
 }
 
 export interface StudentAcademicData {
-  programId?: number;
-  placement?: StudentPlacement;
-  courseResults?: StudentCourseResult[];
+  programId: number;
+  placement: StudentPlacement;
+  courseResults: StudentCourseResult[];
 }
 
 export interface StudentImportRow {
   code: string;
   email: string;
   fullName: string;
-  academic?: StudentAcademicData;
+  academic: StudentAcademicData;
 }
 
 export interface StudentImportPayload {
@@ -42,14 +40,22 @@ export interface StudentImportPayload {
   rows: StudentImportRow[];
 }
 
-/* =========================================================
-   PREVIEW RESPONSE
-   ========================================================= */
+// Cấu trúc payload nhập điểm cần đối chiếu Swagger BE.
+export interface CourseResultImportRow extends StudentCourseResult {
+  code: string;
+}
+
+export interface CourseResultImportPayload {
+  idempotencyKey: string;
+  rows: CourseResultImportRow[];
+}
 
 export interface ImportPreviewRow {
   rowNumber: number;
-  code: string;
-  action: string;
+  code?: string;
+  action?: string;
+  message?: string;
+  errors?: string[];
 }
 
 export interface ImportPreviewResponse {
@@ -61,48 +67,28 @@ export interface ImportPreviewResponse {
   rows: ImportPreviewRow[];
 }
 
-/* =========================================================
-   COMMIT RESPONSE
-   ========================================================= */
-
 export interface ImportCommitResponse {
   success: boolean;
   created: number;
   updated: number;
   total: number;
-  batchId: string;
-  academicImportId: string;
-  replayed: boolean;
+  batchId?: string;
+  academicImportId?: string;
+  replayed?: boolean;
 }
 
-/* =========================================================
-   API ERROR
-   ========================================================= */
-
-interface ApiErrorResponse {
+type ApiErrorResponse = {
   success?: boolean;
   errorCode?: string;
   message?: string;
-}
-
-/* =========================================================
-   AUTH
-   ========================================================= */
-
-const getAuthToken = (): string | null => {
-  return localStorage.getItem("ojt_auth_token");
 };
 
-/* =========================================================
-   SHARED REQUEST
-   ========================================================= */
-
-const sendImportRequest = async <T>(
+const sendImportRequest = async <T,>(
   endpoint: string,
-  payload: StudentImportPayload,
+  payload: StudentImportPayload | CourseResultImportPayload,
   fallbackError: string,
 ): Promise<T> => {
-  const token = getAuthToken();
+  const token = localStorage.getItem("ojt_auth_token");
 
   if (!token) {
     throw new Error(
@@ -110,17 +96,14 @@ const sendImportRequest = async <T>(
     );
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}${endpoint}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-  );
+    body: JSON.stringify(payload),
+  });
 
   let result: unknown;
 
@@ -132,7 +115,7 @@ const sendImportRequest = async <T>(
     );
   }
 
-  const apiResult =
+  const body =
     result !== null &&
     typeof result === "object" &&
     !Array.isArray(result)
@@ -151,25 +134,21 @@ const sendImportRequest = async <T>(
     );
   }
 
-  if (!response.ok || apiResult?.success === false) {
-    if (response.status === 409) {
-      throw new Error(
-        apiResult?.message ||
-          "Dữ liệu bị xung đột hoặc mã idempotency đã được sử dụng.",
-      );
-    }
-
+  if (response.status === 404) {
     throw new Error(
-      apiResult?.message ||
+      `API ${endpoint} chưa có trên Backend đang deploy (HTTP 404). ` +
+        "Kiểm tra nhánh đã merge và phiên bản Render.",
+    );
+  }
+
+  if (!response.ok || body?.success === false) {
+    throw new Error(
+      body?.message ||
         `${fallbackError} (HTTP ${response.status}).`,
     );
   }
 
-  if (
-    result === null ||
-    typeof result !== "object" ||
-    Array.isArray(result)
-  ) {
+  if (!body) {
     throw new Error(
       "Backend trả về cấu trúc kết quả không hợp lệ.",
     );
@@ -178,39 +157,33 @@ const sendImportRequest = async <T>(
   return result as T;
 };
 
-/* =========================================================
-   PREVIEW
-   ========================================================= */
-
-const previewStudentImport = (
-  payload: StudentImportPayload,
-): Promise<ImportPreviewResponse> => {
-  return sendImportRequest<ImportPreviewResponse>(
-    "/api/imports/preview",
-    payload,
-    "Không thể kiểm tra dữ liệu sinh viên",
-  );
-};
-
-/* =========================================================
-   COMMIT
-   ========================================================= */
-
-const commitStudentImport = (
-  payload: StudentImportPayload,
-): Promise<ImportCommitResponse> => {
-  return sendImportRequest<ImportCommitResponse>(
-    "/api/imports/commit",
-    payload,
-    "Không thể nhập dữ liệu sinh viên",
-  );
-};
-
-/* =========================================================
-   EXPORT
-   ========================================================= */
-
 export const importService = {
-  previewStudentImport,
-  commitStudentImport,
+  previewStudentImport: (payload: StudentImportPayload) =>
+    sendImportRequest<ImportPreviewResponse>(
+      "/api/imports/preview",
+      payload,
+      "Không thể kiểm tra dữ liệu sinh viên",
+    ),
+
+  commitStudentImport: (payload: StudentImportPayload) =>
+    sendImportRequest<ImportCommitResponse>(
+      "/api/imports/commit",
+      payload,
+      "Không thể nhập dữ liệu sinh viên",
+    ),
+
+  // Chưa xác nhận request/response của hai API này với BE.
+  previewCourseResultImport: (payload: CourseResultImportPayload) =>
+    sendImportRequest<unknown>(
+      "/api/course-result-imports/preview",
+      payload,
+      "Không thể kiểm tra bảng điểm",
+    ),
+
+  commitCourseResultImport: (payload: CourseResultImportPayload) =>
+    sendImportRequest<unknown>(
+      "/api/course-result-imports/commit",
+      payload,
+      "Không thể lưu bảng điểm",
+    ),
 };

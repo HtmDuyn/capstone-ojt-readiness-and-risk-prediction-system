@@ -1,433 +1,425 @@
 
 import * as XLSX from "xlsx";
-
 import API from "@/service/api";
 import type {
-  StudentAcademicData,
-  StudentCourseResult,
+  CourseResultImportRow,
+  CourseResultStatus,
   StudentImportRow,
+  StudentPlacement,
 } from "@/service/import.service";
 
-type RecordData = Record<string, unknown>;
+type DataObject = Record<string, unknown>;
 
-const asRecord = (value: unknown): RecordData | null =>
-  value !== null &&
-  typeof value === "object" &&
-  !Array.isArray(value)
-    ? (value as RecordData)
+export interface CatalogOption {
+  id: number;
+  label: string;
+  aliases: string[];
+}
+
+export interface AcademicCatalogs {
+  programs: CatalogOption[];
+  cohorts: CatalogOption[];
+  periods: CatalogOption[];
+}
+
+const asObject = (value: unknown): DataObject | null =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as DataObject)
     : null;
 
-const toText = (value: unknown): string =>
-  value === null || value === undefined
-    ? ""
-    : String(value).trim();
+const text = (value: unknown): string =>
+  value === undefined || value === null ? "" : String(value).trim();
 
 const normalize = (value: string): string =>
   value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
+    .replace(/[đĐ]/g, "d")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
-const getCell = (
-  row: RecordData,
-  aliases: string[],
-): string => {
-  const expected = aliases.map(normalize);
+const positiveId = (value: unknown): number | undefined => {
+  const raw = text(value);
+  if (!raw) return undefined;
+
+  const id = Number(raw);
+  return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+};
+
+const getCell = (row: DataObject, aliases: string[]): string => {
+  const keys = aliases.map(normalize);
 
   for (const [key, value] of Object.entries(row)) {
-    if (expected.includes(normalize(key))) {
-      return toText(value);
+    if (keys.includes(normalize(key)) && text(value) !== "") {
+      return text(value);
     }
   }
 
   return "";
 };
 
-const positiveId = (value: unknown): number | undefined => {
-  if (value === "" || value === null || value === undefined) {
-    return undefined;
+const extractItems = (
+  response: unknown,
+  endpoint: string,
+): {
+  items: DataObject[];
+  total?: number;
+} => {
+  if (Array.isArray(response)) {
+    return {
+      items: response
+        .map(asObject)
+        .filter((v): v is DataObject => !!v),
+    };
   }
 
-  const number = Number(value);
+  const outer = asObject(response);
 
-  return Number.isInteger(number) && number > 0
-    ? number
-    : undefined;
-};
-
-const directId = (
-  raw: string,
-  label: string,
-  rowNumber: number,
-): number | undefined => {
-  if (!raw) return undefined;
-
-  const id = positiveId(raw);
-
-  if (!id) {
+  if (outer?.success === false) {
     throw new Error(
-      `Dòng ${rowNumber}: ${label} phải là ID hợp lệ.`,
+      text(outer.message) || `Không tải được ${endpoint}.`,
     );
   }
 
-  return id;
-};
+  const inner = asObject(outer?.data) ?? outer;
 
-const optionalNumber = (
-  raw: string,
-  label: string,
-  rowNumber: number,
-): number | undefined => {
-  if (!raw) return undefined;
+  const rawItems = Array.isArray(inner?.items)
+    ? inner.items
+    : Array.isArray(inner?.data)
+      ? inner.data
+      : null;
 
-  const number = Number(raw.replace(",", "."));
-
-  if (!Number.isFinite(number)) {
+  if (!rawItems) {
     throw new Error(
-      `Dòng ${rowNumber}: ${label} không phải là số hợp lệ.`,
+      `API ${endpoint} không trả về mảng items hợp lệ.`,
     );
   }
 
-  return number;
+  const totalValue = Number(inner?.total);
+
+  return {
+    items: rawItems
+      .map(asObject)
+      .filter((v): v is DataObject => !!v),
+    total:
+      Number.isFinite(totalValue) && totalValue >= 0
+        ? totalValue
+        : undefined,
+  };
 };
-
-const hasData = (row: RecordData): boolean =>
-  Object.values(row).some((value) => toText(value) !== "");
-
-const readSheet = (
-  sheet?: XLSX.WorkSheet,
-): RecordData[] =>
-  sheet
-    ? XLSX.utils
-        .sheet_to_json<RecordData>(sheet, { defval: "" })
-        .filter(hasData)
-    : [];
-
-/* =====================================================
-   LẤY DANH MỤC TỪ BACKEND
-   ===================================================== */
 
 const fetchCatalog = async (
   endpoint: string,
-): Promise<RecordData[]> => {
-  const all: RecordData[] = [];
+): Promise<DataObject[]> => {
+  const result: DataObject[] = [];
   const limit = 100;
 
   for (let page = 1; page <= 50; page++) {
-    const response = await API.get<unknown>(endpoint, {
-      params: { page, limit },
+    // API.post sử dụng baseURL /api.
+    const response = await API.post<unknown>(endpoint, {
+      page,
+      limit,
     });
 
-    const raw = response.data;
+    const { items, total } = extractItems(
+      response.data,
+      endpoint,
+    );
 
-    if (Array.isArray(raw)) {
-      return raw.map(asRecord).filter(
-        (item): item is RecordData => item !== null,
-      );
-    }
-
-    const outer = asRecord(raw);
-
-    if (outer?.success === false) {
-      throw new Error(
-        toText(outer.message) ||
-          `Không thể tải danh mục ${endpoint}.`,
-      );
-    }
-
-    const content = outer?.data ?? raw;
-
-    if (Array.isArray(content)) {
-      return content.map(asRecord).filter(
-        (item): item is RecordData => item !== null,
-      );
-    }
-
-    const result = asRecord(content);
-
-    if (!Array.isArray(result?.items)) {
-      throw new Error(
-        `API ${endpoint} trả về danh sách không đúng định dạng.`,
-      );
-    }
-
-    const items = result.items
-      .map(asRecord)
-      .filter(
-        (item): item is RecordData => item !== null,
-      );
-
-    all.push(...items);
-
-    const total = Number(result.total);
-    const actualLimit =
-      positiveId(result.limit) ?? limit;
+    result.push(...items);
 
     if (
-      items.length === 0 ||
-      items.length < actualLimit ||
-      (Number.isFinite(total) && all.length >= total)
+      items.length < limit ||
+      (total !== undefined && result.length >= total)
     ) {
-      return all;
+      return result;
     }
   }
 
   throw new Error(
-    `Không thể tải đầy đủ danh mục ${endpoint}.`,
+    `Danh mục ${endpoint} vượt quá giới hạn 5.000 bản ghi.`,
   );
 };
 
-/* =====================================================
-   ÁNH XẠ TÊN / MÃ THÀNH ID
-   ===================================================== */
+const buildOption = (
+  id: number | undefined,
+  candidates: unknown[],
+): CatalogOption | null => {
+  if (!id) return null;
 
-const findUniqueId = (
+  const aliases = [
+    ...new Set(candidates.map(text).filter(Boolean)),
+  ];
+
+  return {
+    id,
+    label: aliases[0] || `ID ${id}`,
+    aliases,
+  };
+};
+
+const uniqueOptions = (
+  options: Array<CatalogOption | null>,
+): CatalogOption[] => {
+  const map = new Map<number, CatalogOption>();
+
+  for (const option of options) {
+    if (!option) continue;
+
+    const existing = map.get(option.id);
+
+    if (existing) {
+      existing.aliases = [
+        ...new Set([...existing.aliases, ...option.aliases]),
+      ];
+    } else {
+      map.set(option.id, option);
+    }
+  }
+
+  return [...map.values()].sort((a, b) =>
+    a.label.localeCompare(b.label, "vi"),
+  );
+};
+
+export const loadAcademicCatalogs =
+  async (): Promise<AcademicCatalogs> => {
+    const [curricula, cohorts, periods] = await Promise.all([
+      fetchCatalog("/json/curricula/list"),
+      fetchCatalog("/json/cohorts/list"),
+      fetchCatalog("/json/academic-periods/list"),
+    ]);
+
+    const programs = uniqueOptions(
+      curricula.map((item) => {
+        const program = asObject(item.program);
+
+        // curriculum.id KHÔNG phải programId.
+        return buildOption(
+          positiveId(item.programId) ??
+            positiveId(program?.id),
+          [
+            program?.name,
+            program?.code,
+            item.programName,
+            item.programCode,
+          ],
+        );
+      }),
+    );
+
+    const cohortOptions = uniqueOptions(
+      cohorts.map((item) =>
+        buildOption(positiveId(item.id), [
+          item.cohortCode,
+          item.code,
+          item.cohortName,
+          item.name,
+        ]),
+      ),
+    );
+
+    const periodOptions = uniqueOptions(
+      periods.map((item) => {
+        const code = text(item.periodCode);
+
+        const readableCode = code.replace(
+          /^(FALL|SPRING|SUMMER)(\d{4})$/i,
+          (_match, term: string, year: string) =>
+            `${term} ${year}`,
+        );
+
+        return buildOption(positiveId(item.id), [
+          item.name,
+          code,
+          readableCode,
+        ]);
+      }),
+    );
+
+    if (
+      !programs.length ||
+      !cohortOptions.length ||
+      !periodOptions.length
+    ) {
+      throw new Error(
+        "Thiếu danh mục chương trình, khóa hoặc kỳ học từ Backend. " +
+          "Đặc biệt, danh sách CTĐT phải trả về programId hoặc program.id; " +
+          "không được dùng curriculum.id thay thế.",
+      );
+    }
+
+    return {
+      programs,
+      cohorts: cohortOptions,
+      periods: periodOptions,
+    };
+  };
+
+const resolveOption = (
   input: string,
-  items: RecordData[],
-  getLabels: (item: RecordData) => string[],
-  getId: (item: RecordData) => number | undefined,
+  options: CatalogOption[],
   label: string,
-  rowNumber: number,
+  row: number,
 ): number => {
-  const matching = items.filter((item) =>
-    getLabels(item).some(
-      (candidate) =>
-        candidate !== "" &&
-        normalize(candidate) === normalize(input),
-    ),
+  if (!input) {
+    throw new Error(`Dòng ${row}: Thiếu ${label}.`);
+  }
+
+  const id = positiveId(input);
+
+  const matches = options.filter(
+    (item) =>
+      (id !== undefined && item.id === id) ||
+      item.aliases.some(
+        (alias) => normalize(alias) === normalize(input),
+      ),
   );
 
-  if (matching.length === 0) {
+  if (matches.length === 0) {
     throw new Error(
-      `Dòng ${rowNumber}: Không tìm thấy ${label} "${input}" trong hệ thống.`,
+      `Dòng ${row}: ${label} "${input}" không có trong danh mục Backend.`,
     );
   }
 
-  const ids = [
-    ...new Set(
-      matching
-        .map(getId)
-        .filter(
-          (id): id is number => id !== undefined,
-        ),
-    ),
-  ];
-
-  if (ids.length !== 1) {
+  if (matches.length > 1) {
     throw new Error(
-      `Dòng ${rowNumber}: Không xác định được ID duy nhất cho ${label} "${input}".`,
+      `Dòng ${row}: ${label} "${input}" trùng nhiều mục. Hãy dùng ID.`,
     );
   }
 
-  return ids[0];
+  return matches[0].id;
 };
 
-const programIdFromCurriculum = (
-  item: RecordData,
-): number | undefined => {
-  const program = asRecord(item.program);
+const readRows = (
+  file: File,
+  sheetName: string,
+): Promise<DataObject[]> =>
+  file.arrayBuffer().then((buffer) => {
+    const book = XLSX.read(buffer, { type: "array" });
 
-  // Không tự lấy curriculum.id làm programId.
-  return (
-    positiveId(item.programId) ??
-    positiveId(program?.id)
-  );
-};
+    const name =
+      book.SheetNames.find(
+        (item) => normalize(item) === normalize(sheetName),
+      ) ??
+      (book.SheetNames.length === 1
+        ? book.SheetNames[0]
+        : undefined);
 
-const programLabels = (item: RecordData): string[] => {
-  const program = asRecord(item.program);
+    if (!name) {
+      throw new Error(
+        `Không tìm thấy sheet "${sheetName}".`,
+      );
+    }
 
-  return [
-    toText(item.programCode),
-    toText(item.programName),
-    toText(item.code),
-    toText(item.name),
-    toText(program?.code),
-    toText(program?.name),
-  ];
-};
+    const sheet = book.Sheets[name];
 
-const cohortLabels = (item: RecordData): string[] => [
-  toText(item.cohortCode),
-  toText(item.cohortName),
-  toText(item.code),
-  toText(item.name),
-];
+    if (!sheet) {
+      throw new Error(
+        `Không đọc được sheet "${sheetName}".`,
+      );
+    }
 
-const periodLabels = (item: RecordData): string[] => {
-  const periodCode = toText(item.periodCode);
+    const rows = XLSX.utils.sheet_to_json<DataObject>(
+      sheet,
+      { defval: "" },
+    );
 
-  const readableCode = periodCode.replace(
-    /^(FALL|SPRING|SUMMER)(\d{4})$/i,
-    (_match, term: string, year: string) =>
-      `${term} ${year}`,
-  );
+    const data = rows.filter((row) =>
+      Object.values(row).some((v) => text(v) !== ""),
+    );
 
-  return [
-    periodCode,
-    readableCode,
-    toText(item.name),
-  ];
-};
+    if (!data.length) {
+      throw new Error(
+        `Sheet "${sheetName}" chưa có dữ liệu.`,
+      );
+    }
 
-/* =====================================================
-   TẠO FILE EXCEL MẪU
-   ===================================================== */
+    return data;
+  });
 
-export const downloadStudentImportTemplate = (): void => {
-  const workbook = XLSX.utils.book_new();
+const createTemplate = (
+  name: string,
+  sheetName: string,
+  headers: string[],
+) => {
+  const book = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([headers]);
 
-  const studentHeaders = [
-    "Mã sinh viên",
-    "Họ và tên",
-    "Email",
-    "Chương trình đào tạo",
-    "Khóa",
-    "Nhóm",
-    "Kỳ hiện tại",
-  ];
-
-  const resultHeaders = [
-    "Mã sinh viên",
-    "Mã môn",
-    "Kỳ học",
-    "Trạng thái",
-    "Điểm số",
-    "Điểm hệ 4",
-    "Điểm chữ",
-  ];
-
-  const studentSheet =
-    XLSX.utils.aoa_to_sheet([studentHeaders]);
-
-studentSheet["!cols"] = [
-  { wch: 19 },
-  { wch: 28 },
-  { wch: 35 },
-  { wch: 32 },
-  { wch: 18 },
-  { wch: 15 },
-  { wch: 23 },
-];
-
-  const resultSheet =
-    XLSX.utils.aoa_to_sheet([resultHeaders]);
-
-  resultSheet["!cols"] = [
-    { wch: 19 },
-    { wch: 19 },
-    { wch: 23 },
-    { wch: 20 },
-    { wch: 17 },
-    { wch: 17 },
-    { wch: 17 },
-  ];
+  sheet["!cols"] = headers.map(() => ({ wch: 26 }));
 
   XLSX.utils.book_append_sheet(
-    workbook,
-    studentSheet,
-    "Danh sách sinh viên",
+    book,
+    sheet,
+    sheetName,
   );
+
+  const guide = XLSX.utils.aoa_to_sheet([
+    ["HƯỚNG DẪN"],
+    ["Nhập dữ liệu vào sheet đầu tiên, mỗi dòng là một bản ghi."],
+    ["Các trường chương trình, khóa và kỳ: nhập ID hoặc mã/tên có trong danh mục Backend."],
+    ["Không dùng ID ví dụ hoặc ID tự đặt."],
+    ["Nhóm sinh viên chỉ nhận A, B, C hoặc D."],
+    ["Không có bảng điểm thì sinh viên mới được gửi courseResults: []."],
+  ]);
+
+  guide["!cols"] = [{ wch: 90 }];
 
   XLSX.utils.book_append_sheet(
-    workbook,
-    resultSheet,
-    "Kết quả học tập",
+    book,
+    guide,
+    "Hướng dẫn",
   );
 
-  XLSX.writeFile(
-    workbook,
+  XLSX.writeFile(book, name);
+};
+
+export const downloadStudentImportTemplate = () =>
+  createTemplate(
     "mau-import-sinh-vien-PDT.xlsx",
+    "Danh sách sinh viên",
+    [
+      "Mã sinh viên",
+      "Họ và tên",
+      "Email",
+      "Chương trình đào tạo",
+      "Khóa",
+      "Nhóm",
+      "Kỳ hiện tại",
+    ],
   );
-};
 
-/* =====================================================
-   ĐỌC EXCEL VÀ CHUYỂN SANG PAYLOAD API
-   ===================================================== */
+export const downloadCourseResultImportTemplate = () =>
+  createTemplate(
+    "mau-import-ket-qua-hoc-tap-PDT.xlsx",
+    "Kết quả học tập",
+    [
+      "Mã sinh viên",
+      "Mã môn",
+      "Kỳ học",
+      "Trạng thái",
+      "Điểm số",
+      "Điểm hệ 4",
+      "Điểm chữ",
+    ],
+  );
 
 export const parseStudentImportWorkbook = async (
   file: File,
+  providedCatalogs?: AcademicCatalogs,
 ): Promise<StudentImportRow[]> => {
-  const buffer = await file.arrayBuffer();
+  const catalogs =
+    providedCatalogs ?? (await loadAcademicCatalogs());
 
-  const workbook = XLSX.read(buffer, {
-    type: "array",
-  });
-
-  const studentSheetName =
-    workbook.SheetNames.find(
-      (name) =>
-        normalize(name) ===
-        normalize("Danh sách sinh viên"),
-    ) ?? workbook.SheetNames[0];
-
-  if (!studentSheetName) {
-    throw new Error("File không có sheet dữ liệu sinh viên.");
-  }
-
-  const resultSheetName = workbook.SheetNames.find(
-    (name) =>
-      normalize(name) ===
-      normalize("Kết quả học tập"),
+  const rows = await readRows(
+    file,
+    "Danh sách sinh viên",
   );
 
-  const studentRows = readSheet(
-    workbook.Sheets[studentSheetName],
-  );
+  const seen = new Set<string>();
 
-  const resultRows = readSheet(
-    resultSheetName
-      ? workbook.Sheets[resultSheetName]
-      : undefined,
-  );
-
-  if (studentRows.length === 0) {
-    throw new Error(
-      "Sheet Danh sách sinh viên chưa có dữ liệu.",
-    );
-  }
-
-  // Chỉ tải danh mục khi Excel có nhập tên/mã cần ánh xạ.
-  const needsPrograms = studentRows.some((row) =>
-    getCell(row, ["Chương trình đào tạo", "programName"]),
-  );
-
-  const needsCohorts = studentRows.some((row) =>
-    getCell(row, ["Khóa", "cohortCode"]),
-  );
-
-  const needsPeriods =
-    studentRows.some((row) =>
-      getCell(row, ["Kỳ hiện tại"]),
-    ) ||
-    resultRows.some((row) =>
-      getCell(row, ["Kỳ học"]),
-    );
-
-  const [programs, cohorts, periods] = await Promise.all([
-    needsPrograms
-      ? fetchCatalog("/curricula")
-      : Promise.resolve([]),
-    needsCohorts
-      ? fetchCatalog("/cohorts")
-      : Promise.resolve([]),
-    needsPeriods
-      ? fetchCatalog("/academic-periods")
-      : Promise.resolve([]),
-  ]);
-
-  const students: StudentImportRow[] = [];
-  const studentMap = new Map<string, StudentImportRow>();
-
-  /* =====================
-     SHEET SINH VIÊN
-     ===================== */
-
-  studentRows.forEach((row, index) => {
-    const rowNumber = index + 2;
+  return rows.map((row, index) => {
+    const number = index + 2;
 
     const code = getCell(row, [
       "Mã sinh viên",
@@ -441,143 +433,147 @@ export const parseStudentImportWorkbook = async (
       "fullName",
     ]);
 
-    const email = getCell(row, [
-      "Email",
-      "email",
-    ]);
+    const email = getCell(row, ["Email"]);
 
     if (!code || !fullName || !email) {
       throw new Error(
-        `Sheet Danh sách sinh viên, dòng ${rowNumber}: Thiếu MSSV, họ tên hoặc email.`,
+        `Dòng ${number}: Thiếu MSSV, họ tên hoặc email.`,
       );
     }
 
-    const key = code.toLowerCase();
-
-    if (studentMap.has(key)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       throw new Error(
-        `MSSV "${code}" xuất hiện nhiều lần trong sheet Danh sách sinh viên.`,
+        `Dòng ${number}: Email không hợp lệ.`,
       );
     }
 
-    const programName = getCell(row, [
-      "Chương trình đào tạo",
-      "programName",
-    ]);
+    if (seen.has(normalize(code))) {
+      throw new Error(
+        `Dòng ${number}: Trùng MSSV ${code}.`,
+      );
+    }
 
-    const cohortName = getCell(row, [
-      "Khóa",
-      "cohortCode",
-    ]);
+    seen.add(normalize(code));
 
-    const periodName = getCell(row, [
-      "Kỳ hiện tại",
-    ]);
+    const programId = resolveOption(
+      getCell(row, [
+        "Chương trình đào tạo",
+        "programId",
+        "programName",
+      ]),
+      catalogs.programs,
+      "chương trình đào tạo",
+      number,
+    );
 
-    const groupCode = getCell(row, [
+    const cohortId = resolveOption(
+      getCell(row, [
+        "Khóa",
+        "cohortId",
+        "cohortCode",
+      ]),
+      catalogs.cohorts,
+      "khóa",
+      number,
+    );
+
+    const currentAcademicPeriodId = resolveOption(
+      getCell(row, [
+        "Kỳ hiện tại",
+        "currentAcademicPeriodId",
+      ]),
+      catalogs.periods,
+      "kỳ hiện tại",
+      number,
+    );
+
+    const group = getCell(row, [
       "Nhóm",
       "groupCode",
-    ]);
+    ]).toUpperCase();
 
-    const programId =
-      directId(
-        getCell(row, ["programId"]),
-        "programId",
-        rowNumber,
-      ) ??
-      (programName
-        ? findUniqueId(
-            programName,
-            programs,
-            programLabels,
-            programIdFromCurriculum,
-            "chương trình đào tạo",
-            rowNumber,
-          )
-        : undefined);
-
-    const cohortId =
-      directId(
-        getCell(row, ["cohortId"]),
-        "cohortId",
-        rowNumber,
-      ) ??
-      (cohortName
-        ? findUniqueId(
-            cohortName,
-            cohorts,
-            cohortLabels,
-            (item) => positiveId(item.id),
-            "khóa học",
-            rowNumber,
-          )
-        : undefined);
-
-    const currentAcademicPeriodId =
-      directId(
-        getCell(row, ["currentAcademicPeriodId"]),
-        "currentAcademicPeriodId",
-        rowNumber,
-      ) ??
-      (periodName
-        ? findUniqueId(
-            periodName,
-            periods,
-            periodLabels,
-            (item) => positiveId(item.id),
-            "kỳ học",
-            rowNumber,
-          )
-        : undefined);
-
-    const academic: StudentAcademicData = {};
-
-    if (programId !== undefined) {
-      academic.programId = programId;
+    if (!["A", "B", "C", "D"].includes(group)) {
+      throw new Error(
+        `Dòng ${number}: Nhóm phải là A, B, C hoặc D.`,
+      );
     }
 
-    if (
-      cohortId !== undefined ||
-      groupCode ||
-      currentAcademicPeriodId !== undefined
-    ) {
-      academic.placement = {};
-
-      if (cohortId !== undefined) {
-        academic.placement.cohortId = cohortId;
-      }
-
-      if (groupCode) {
-        academic.placement.groupCode = groupCode;
-      }
-
-      if (currentAcademicPeriodId !== undefined) {
-        academic.placement.currentAcademicPeriodId =
-          currentAcademicPeriodId;
-      }
-    }
-
-    const student: StudentImportRow = {
+    return {
       code,
-      email,
       fullName,
-      ...(Object.keys(academic).length > 0
-        ? { academic }
-        : {}),
+      email,
+      academic: {
+        programId,
+        placement: {
+          cohortId,
+          groupCode:
+            group as StudentPlacement["groupCode"],
+          currentAcademicPeriodId,
+        },
+        courseResults: [],
+      },
     };
-
-    students.push(student);
-    studentMap.set(key, student);
   });
+};
 
-  /* =====================
-     SHEET KẾT QUẢ HỌC TẬP
-     ===================== */
+const parseNumber = (
+  raw: string,
+  max: number,
+  label: string,
+  rowNumber: number,
+): number | undefined => {
+  if (!raw) return undefined;
 
-  const usedCourseKeys = new Set<string>();
+  const value = Number(raw.replace(",", "."));
 
-  resultRows.forEach((row, index) => {
-    const rowNumber = index + 2;
+  if (
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > max
+  ) {
+    throw new Error(
+      `Dòng ${rowNumber}: ${label} phải từ 0 đến ${max}.`,
+    );
+  }
+
+  return value;
+};
+
+const parseStatus = (
+  raw: string,
+  rowNumber: number,
+): CourseResultStatus => {
+  const value = normalize(raw);
+
+  if (["dat", "passed"].includes(value)) {
+    return "PASSED";
+  }
+
+  if (["khongdat", "failed"].includes(value)) {
+    return "FAILED";
+  }
+
+  throw new Error(
+    `Dòng ${rowNumber}: Trạng thái phải là Đạt hoặc Không đạt.`,
+  );
+};
+
+export const parseCourseResultImportWorkbook = async (
+  file: File,
+  providedCatalogs?: AcademicCatalogs,
+): Promise<CourseResultImportRow[]> => {
+  const catalogs =
+    providedCatalogs ?? (await loadAcademicCatalogs());
+
+  const rows = await readRows(
+    file,
+    "Kết quả học tập",
+  );
+
+  const seen = new Set<string>();
+
+  return rows.map((row, index) => {
+    const number = index + 2;
 
     const code = getCell(row, [
       "Mã sinh viên",
@@ -590,104 +586,58 @@ export const parseStudentImportWorkbook = async (
       "courseCode",
     ]);
 
-    const periodName = getCell(row, [
+    const period = getCell(row, [
       "Kỳ học",
+      "academicPeriodId",
     ]);
 
-    const rawStatus = getCell(row, [
-      "Trạng thái",
-      "status",
-    ]);
-
-    if (!code || !courseCode || !rawStatus) {
+    if (!code || !courseCode || !period) {
       throw new Error(
-        `Sheet Kết quả học tập, dòng ${rowNumber}: Thiếu MSSV, mã môn hoặc trạng thái.`,
+        `Dòng ${number}: Thiếu MSSV, mã môn hoặc kỳ học.`,
       );
     }
 
-    const student = studentMap.get(
-      code.toLowerCase(),
+    const academicPeriodId = resolveOption(
+      period,
+      catalogs.periods,
+      "kỳ học",
+      number,
     );
 
-    if (!student) {
-      throw new Error(
-        `Sheet Kết quả học tập, dòng ${rowNumber}: MSSV "${code}" không có trong sheet Danh sách sinh viên.`,
-      );
-    }
+    const status = parseStatus(
+      getCell(row, ["Trạng thái", "status"]),
+      number,
+    );
 
-    const academicPeriodId =
-      directId(
-        getCell(row, ["academicPeriodId"]),
-        "academicPeriodId",
-        rowNumber,
-      ) ??
-      (periodName
-        ? findUniqueId(
-            periodName,
-            periods,
-            periodLabels,
-            (item) => positiveId(item.id),
-            "kỳ học",
-            rowNumber,
-          )
-        : undefined);
-
-    if (academicPeriodId === undefined) {
-      throw new Error(
-        `Sheet Kết quả học tập, dòng ${rowNumber}: Chưa nhập kỳ học.`,
-      );
-    }
-
-    let status: string;
-
-    const normalizedStatus = normalize(rawStatus);
-
-    if (
-      normalizedStatus === "dat" ||
-      normalizedStatus === "passed"
-    ) {
-      status = "PASSED";
-    } else if (
-      normalizedStatus === "khongdat" ||
-      normalizedStatus === "failed"
-    ) {
-      status = "FAILED";
-    } else {
-      throw new Error(
-        `Sheet Kết quả học tập, dòng ${rowNumber}: Trạng thái "${rawStatus}" chưa được hỗ trợ.`,
-      );
-    }
-
-    const courseKey = [
-      code.toLowerCase(),
-      courseCode.toLowerCase(),
+    const key = [
+      normalize(code),
+      normalize(courseCode),
       academicPeriodId,
     ].join("|");
 
-    if (usedCourseKeys.has(courseKey)) {
+    if (seen.has(key)) {
       throw new Error(
-        `Sheet Kết quả học tập, dòng ${rowNumber}: Trùng môn ${courseCode} trong cùng kỳ.`,
+        `Dòng ${number}: Trùng môn trong cùng kỳ.`,
       );
     }
 
-    usedCourseKeys.add(courseKey);
+    seen.add(key);
 
-    const result: StudentCourseResult = {
-      courseCode,
-      academicPeriodId,
-      status,
-    };
-
-    const score = optionalNumber(
+    const score = parseNumber(
       getCell(row, ["Điểm số", "score"]),
+      10,
       "Điểm số",
-      rowNumber,
+      number,
     );
 
-    const gradePoints = optionalNumber(
-      getCell(row, ["Điểm hệ 4", "gradePoints"]),
+    const gradePoints = parseNumber(
+      getCell(row, [
+        "Điểm hệ 4",
+        "gradePoints",
+      ]),
+      4,
       "Điểm hệ 4",
-      rowNumber,
+      number,
     );
 
     const grade = getCell(row, [
@@ -695,28 +645,16 @@ export const parseStudentImportWorkbook = async (
       "grade",
     ]);
 
-    if (score !== undefined) {
-      result.score = score;
-    }
-
-    if (gradePoints !== undefined) {
-      result.gradePoints = gradePoints;
-    }
-
-    if (grade) {
-      result.grade = grade;
-    }
-
-    if (!student.academic) {
-      student.academic = {};
-    }
-
-    if (!student.academic.courseResults) {
-      student.academic.courseResults = [];
-    }
-
-    student.academic.courseResults.push(result);
+    return {
+      code,
+      courseCode,
+      academicPeriodId,
+      status,
+      ...(score !== undefined ? { score } : {}),
+      ...(gradePoints !== undefined
+        ? { gradePoints }
+        : {}),
+      ...(grade ? { grade } : {}),
+    };
   });
-
-  return students;
 };
