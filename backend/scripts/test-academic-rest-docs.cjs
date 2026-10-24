@@ -21,6 +21,10 @@ for(const path of ['/academic-years','/academic-periods','/cohorts']){
  assert.deepEqual(spec.paths['/api'+path].get.parameters,[]);
 }
 assert(spec.paths['/api/imports/preview'].post.tags.includes('Phòng QHDN'));
-assert(spec.paths['/api/students/{id}/course-results'].get.tags.includes('Sinh viên'));
+const studentResults=spec.paths['/api/student/course-results/search'].post;
+assert(studentResults.tags.includes('Sinh viên'));
+assert.deepEqual(studentResults.parameters,[]);
+assert(studentResults.requestBody.content['application/json'].schema.required.includes('studentId'));
+assert.equal(studentResults['x-original-operation'].path,'/api/students/{id}/course-results');
 for(const item of Object.values(spec.paths))for(const [method,op]of Object.entries(item))if(method==='get')assert(!op.requestBody);
 console.log('Academic REST Swagger checks passed: retired operations hidden, replacements present, shared roles preserved, GET has no body.');

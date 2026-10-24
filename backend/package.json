@@ -6,6 +6,7 @@
   "scripts": {
     "db:migrate:academic-rest": "npm run build && node scripts/migrate-academic-rest.cjs",
     "test:academic-contracts": "npm run build && node scripts/test-academic-contracts.cjs",
+    "db:migrate:training-program-metadata": "npm run build && node scripts/migrate-training-program-metadata.cjs",
     "db:migrate:admin": "npm run build && node scripts/migrate-admin.cjs",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.cjs",
     "docs:api": "node scripts/export-api-inputs.cjs",

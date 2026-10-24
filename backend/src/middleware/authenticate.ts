@@ -18,6 +18,8 @@ import type {
   AuthTokenPayload,
 } from "../modules/auth/auth.types";
 
+// Reuse only within the same request, for the same target and credentials.
+const verifiedRequests = new WeakMap<Request, { user: Request['user']; authorization: string; method: string; url: string }>();
 export const authenticate = async (
   req: Request,
   res: Response,
@@ -25,6 +27,12 @@ export const authenticate = async (
 ): Promise<void> => {
   const authorization =
     req.headers.authorization ?? "";
+  const verified = verifiedRequests.get(req);
+  if (verified && verified.user === req.user && verified.authorization === authorization
+    && verified.method === req.method && verified.url === req.originalUrl) {
+    next();
+    return;
+  }
 
   /*
    * Authorization header phải có:
@@ -205,10 +213,12 @@ export const authenticate = async (
 
       roleCode:
         currentUser.role_code,
+      studentId: currentUser.studentId,
     };
 
     req.token =
       token;
+    verifiedRequests.set(req, { user: req.user, authorization, method: req.method, url: req.originalUrl });
 
     /*
      * Authentication thành công.

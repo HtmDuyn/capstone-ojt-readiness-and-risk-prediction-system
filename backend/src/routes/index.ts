@@ -19,6 +19,8 @@ import comboRoutes from '../modules/combo-registration/combo.routes';
 
 import authRoutes from "../modules/auth/auth.routes";
 import accountRoutes from "../modules/accounts/account.routes";
+import { swaggerSpec } from '../config/swagger';
+import { createStudentJsonRouter } from '../middleware/student-json';
 const router = Router();
 router.use(academicJsonRequests);
 router.use(academicRestRoutes);
@@ -58,4 +60,7 @@ router.use(
   accountRoutes,
 );
 
-export default router;
+const api = Router();
+api.use(createStudentJsonRouter(swaggerSpec, router));
+api.use(router);
+export default api;
