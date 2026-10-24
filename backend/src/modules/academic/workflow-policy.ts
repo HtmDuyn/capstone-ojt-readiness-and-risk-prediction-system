@@ -62,7 +62,7 @@ export async function comboSchedule(c:PoolClient,periodId:number,phase:string) {
  if(!row)throw invalid('Configure the explicit combo phase schedule first.',409,'COMBO_PHASE_SCHEDULE_REQUIRED');
  const bounds=periodBounds(p);if(new Date(row.StartsAt)<bounds.start||new Date(row.EndsAt)>bounds.end)throw invalid('Combo schedule no longer fits its academic period.',409,'COMBO_PHASE_SCHEDULE_STALE');return row;
 }
-export async function saveComboSchedule(periodId:number,body:unknown,actor:number) {
+export async function saveComboSchedule(periodId:number,body:unknown,actor:number,existingClient?:PoolClient) {
  const b=inputObject(body,['phase','startsAt','endsAt','reason']),phase=enumValue(b.phase,['INITIAL','CONFIRMATION'],'phase'),start=timestamp(b.startsAt,'startsAt'),end=timestamp(b.endsAt,'endsAt'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
  const p=await actualPeriod(c,periodId),bounds=periodBounds(p);
@@ -72,7 +72,7 @@ export async function saveComboSchedule(periodId:number,body:unknown,actor:numbe
  const before=(await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 AND "Phase"=$2',[periodId,phase])).rows[0];
  const after=(await c.query(`INSERT INTO "ComboPhaseSchedules" ("AcademicPeriodID","Phase","StartsAt","EndsAt","Reason","ConfirmedBy") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT ("AcademicPeriodID","Phase") DO UPDATE SET "StartsAt"=EXCLUDED."StartsAt","EndsAt"=EXCLUDED."EndsAt","Reason"=EXCLUDED."Reason","ConfirmedBy"=EXCLUDED."ConfirmedBy","ConfirmedAt"=now() RETURNING *`,[periodId,phase,start,end,reason,actor])).rows[0];
  await audit(c,actor,'AcademicPeriods',periodId,'SET_COMBO_PHASE_SCHEDULE',before,after,reason);return after;
- });
+ },existingClient);
 }
 export async function getComboSchedules(periodId:number) {return academicTransaction(async c=>{await actualPeriod(c,periodId);const rows=(await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 ORDER BY "Phase"',[periodId])).rows;return enrichListRows(c,rows.map(row=>({...row,academicPeriodId:row.AcademicPeriodID,confirmedBy:row.ConfirmedBy})));});}
 export async function getAssessment(c:PoolClient,semesterId:number) {
@@ -88,7 +88,7 @@ async function assessmentBounds(c:PoolClient,w:Row) {
  const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rows[0];if(!term)throw invalid('OJT semester not found.',404);
  if(term.StartDate&&periodBounds(p).end>new Date(dayString(term.StartDate)+'T00:00:00+07:00'))throw invalid('Assessment Block 3 must finish on or before the OJT start date.');return p;
 }
-export async function saveAssessment(semesterId:number,body:unknown,actor:number) {
+export async function saveAssessment(semesterId:number,body:unknown,actor:number,existingClient?:PoolClient) {
  const b=inputObject(body,['blockPeriodId','assessmentAcademicPeriodId','requiredRelativeSemester','opensAt','closesAt','reason']);const w={OJTSemesterID:semesterId,BlockPeriodID:positiveId(b.blockPeriodId,'blockPeriodId'),OpensAt:timestamp(b.opensAt,'opensAt'),ClosesAt:timestamp(b.closesAt,'closesAt')},reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
  const block=await actualPeriod(c,w.BlockPeriodID);
@@ -100,9 +100,13 @@ export async function saveAssessment(semesterId:number,body:unknown,actor:number
  await c.query('UPDATE "OJTAssessmentWindows" SET "AssessmentAcademicPeriodID"=$2,"RequiredRelativeSemester"=$3 WHERE "OJTSemesterID"=$1',[semesterId,(w as Row).AssessmentAcademicPeriodID,(w as Row).RequiredRelativeSemester]);
  Object.assign(after,{AssessmentAcademicPeriodID:(w as Row).AssessmentAcademicPeriodID,RequiredRelativeSemester:(w as Row).RequiredRelativeSemester});
  await audit(c,actor,'OJTSemesters',semesterId,'CONFIGURE_ASSESSMENT',before,after,reason);return after;
- });
+ },existingClient);
 }
-export async function assessmentDetails(id:number) {return academicTransaction(c=>getAssessment(c,id));}
+export async function assessmentDetails(id:number) {return academicTransaction(async c=>{
+ const w=await getAssessment(c,id);
+ return (await enrichListRows(c,[{...w,ojtSemesterId:w.OJTSemesterID,blockPeriodId:w.BlockPeriodID,
+  assessmentAcademicPeriodId:w.AssessmentAcademicPeriodID,configuredBy:w.ConfiguredBy,resultsFinalizedBy:w.ResultsFinalizedBy,closedBy:w.ClosedBy}]))[0];
+});}
 export async function changeAssessment(id:number,action:'open'|'close',body:unknown,actor:number) {
  const b=inputObject(body,action==='open'?['reason','resultsFinalized','reopen','closesAt']:['reason']),reason=requiredText(b.reason,'reason',2000);
  if(action==='open'&&b.resultsFinalized!==true)throw invalid('Explicitly acknowledge resultsFinalized: true after completing Block 3 result updates.');
@@ -143,4 +147,4 @@ export async function saveGradeMapping(programId:number,semesterId:number,body:u
  await audit(c,actor,'ProgramOJTGradeMappings',after.MappingID,'SET_OJT_GRADE_MAPPING',before,after,reason);return after;
  });
 }
-export async function gradeMappingDetails(programId:number,semesterId:number) {return academicTransaction(async c=>{const m=(await c.query('SELECT * FROM "ProgramOJTGradeMappings" WHERE "ProgramID"=$1 AND "OJTSemesterID"=$2',[programId,semesterId])).rows[0];if(!m)throw invalid('OJT grade mapping not found.',404);return m;});}
+export async function gradeMappingDetails(programId:number,semesterId:number) {return academicTransaction(async c=>{const m=(await c.query('SELECT * FROM "ProgramOJTGradeMappings" WHERE "ProgramID"=$1 AND "OJTSemesterID"=$2',[programId,semesterId])).rows[0];if(!m)throw invalid('OJT grade mapping not found.',404);return (await enrichListRows(c,[{...m,programId:m.ProgramID,ojtSemesterId:m.OJTSemesterID,courseId:m.CourseID,academicPeriodId:m.AcademicPeriodID,confirmedBy:m.ConfirmedBy}]))[0];});}

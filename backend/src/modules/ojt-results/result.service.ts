@@ -18,7 +18,9 @@ export function resultApi(r: Row) {
     officialScore:r.OfficialScore==null?null:Number(r.OfficialScore),completionScore:r.CompletionScore==null?null:Number(r.CompletionScore),
     attitudeScore:r.AttitudeScore==null?null:Number(r.AttitudeScore),skillScore:r.SkillScore==null?null:Number(r.SkillScore),
     comments:r.Comments,evaluatedBy:r.EvaluatedBy,confirmedBy:r.ConfirmedBy,confirmedAt:r.ConfirmedAt,transferredBy:r.TransferredBy,transferredAt:r.TransferredAt,
-    source:'ACADEMIC_CONFIRMATION',outcome:r.Outcome};
+    source:'ACADEMIC_CONFIRMATION',outcome:r.Outcome,version:r.Version,
+    courseResultId:r.CourseResultID??null,gradeMappingId:r.GradeMappingID??null,
+    gradeMappingSnapshot:r.GradeMappingSnapshot??null,confirmationReason:r.ConfirmationReason??null};
 }
 export async function list(params:Row,semesterId?:number,exportAll=false,studentUserId?:number) {
   const p=pagination(params,['status','ojtSemesterId','studentId','search','resultId',...(exportAll?['format']:[])]);
