@@ -75,9 +75,11 @@ export interface CatalogOption {
   label: string;
   aliases: string[];
   kind?: string;
+  academicYearId?: number;
 }
 
 export interface AcademicCatalogs {
+  years: CatalogOption[];
   programs: CatalogOption[];
   cohorts: CatalogOption[];
   periods: CatalogOption[];

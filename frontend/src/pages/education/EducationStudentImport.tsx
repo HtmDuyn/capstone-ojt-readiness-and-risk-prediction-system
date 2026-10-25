@@ -19,6 +19,12 @@ const EducationStudentImport: React.FC = () => {
     [fileName, setFileName] = React.useState(""),
     [search, setSearch] = React.useState(""),
     [selected, setSelected] = React.useState<StudentImportRow | null>(null);
+  const [skipped, setSkipped] = React.useState<Set<string>>(new Set());
+  const [yearId, setYearId] = React.useState('');
+  const [periodId, setPeriodId] = React.useState('');
+  const [reviewFilter, setReviewFilter] = React.useState<'all' | 'valid' | 'error' | 'skipped'>('all');
+  const [reviewErrors, setReviewErrors] = React.useState<Record<string, string[]>>({});
+  const [previewSignature, setPreviewSignature] = React.useState('');
   const key = React.useRef(""),
     [catalogRefresh, setCatalogRefresh] = React.useState(0);
   React.useEffect(() => {
@@ -36,23 +42,37 @@ const EducationStudentImport: React.FC = () => {
       active = false;
     };
   }, [catalogRefresh]);
-  const gradeCount = rows.reduce(
+  const keptRows = rows.filter(row => !skipped.has(row.code));
+  const selectedPeriod = catalogs?.periods.find(period => String(period.id) === periodId && String(period.academicYearId) === yearId);
+  const periodErrors = (row: StudentImportRow): string[] => {
+    if (!selectedPeriod) return [];
+    const errors: string[] = [];
+    if (row.academic.placement.currentAcademicPeriodId !== selectedPeriod.id) errors.push('Kỳ hiện tại của sinh viên khác kỳ đã chọn.');
+    if (row.academic.courseResults.some(result => result.academicPeriodId !== selectedPeriod.id)) errors.push('Có kết quả học tập thuộc kỳ khác kỳ đã chọn.');
+    return errors;
+  };
+  const rowErrors = (row: StudentImportRow) => [...periodErrors(row), ...(reviewErrors[row.code] ?? [])];
+  const gradeCount = keptRows.reduce(
     (n, row) => n + row.academic.courseResults.length,
     0,
   );
   const canCommit =
     preview?.preview === true &&
-    preview.total === rows.length &&
-    preview.created + preview.updated === rows.length &&
+    previewSignature === keptRows.map(row => row.code).join('|') &&
+    keptRows.length > 0 &&
+    preview.total === keptRows.length &&
+    preview.created + preview.updated === keptRows.length &&
     !preview.rows?.some((row) => row.errors?.length) &&
+    !!selectedPeriod &&
+    !keptRows.some(row => rowErrors(row).length) &&
     !result;
   const payload = () => ({
     kind: "STUDENT" as const,
     idempotencyKey: key.current,
-    rows,
+    rows: keptRows,
   });
   async function readFile(file: File) {
-    if (!catalogs) return;
+    if (!catalogs || !selectedPeriod) return;
     setBusy("read");
     setRows([]);
     setPreview(null);
@@ -60,6 +80,10 @@ const EducationStudentImport: React.FC = () => {
     setSelected(null);
     setError("");
     setFileName("");
+    setSkipped(new Set());
+    setReviewFilter('all');
+    setReviewErrors({});
+    setPreviewSignature('');
     try {
       if (!/\.(xlsx|xls)$/i.test(file.name))
         throw new Error("Chọn tệp Excel .xlsx hoặc .xls theo mẫu hai sheet.");
@@ -76,24 +100,31 @@ const EducationStudentImport: React.FC = () => {
     }
   }
   async function check() {
+    if (!keptRows.length || !selectedPeriod || keptRows.some(row => periodErrors(row).length)) return;
     setBusy("preview");
     setError("");
     setPreview(null);
+    setPreviewSignature('');
     try {
       const response = await importService.previewStudentImport(payload());
       setPreview(response);
+      setReviewErrors(Object.fromEntries(keptRows.map((row, index) => [row.code, response.rows?.[index]?.errors ?? []])));
       if (
         response.preview !== true ||
-        response.total !== rows.length ||
-        response.created + response.updated !== rows.length ||
+        response.total !== keptRows.length ||
+        response.created + response.updated !== keptRows.length ||
         response.rows?.some((row) => row.errors?.length)
       )
         throw new Error(
           "Kết quả kiểm tra chưa hợp lệ; chưa thể xác nhận import.",
         );
+      setPreviewSignature(keptRows.map(row => row.code).join('|'));
     } catch (e) {
-      setPreview(null);
-      setError(e instanceof Error ? e.message : "Không kiểm tra được dữ liệu.");
+      const message = e instanceof Error ? e.message : "Không kiểm tra được dữ liệu.";
+      const match = message.match(/(?:Row|Dòng)\s+(\d+)\s*:/i);
+      const row = match ? keptRows[Number(match[1]) - 1] : undefined;
+      if (row) setReviewErrors(previous => ({ ...previous, [row.code]: [message] }));
+      setError(message);
     } finally {
       setBusy("");
     }
@@ -102,7 +133,7 @@ const EducationStudentImport: React.FC = () => {
     if (!canCommit || busy) return;
     if (
       !window.confirm(
-        `Nhập ${rows.length} sinh viên và ${gradeCount} kết quả học tập vào hệ thống?`,
+        `Nhập ${keptRows.length} sinh viên và ${gradeCount} kết quả học tập vào hệ thống?`,
       )
     )
       return;
@@ -111,7 +142,7 @@ const EducationStudentImport: React.FC = () => {
     try {
       setResult(await importService.commitStudentImport(payload()));
       setPreview(null);
-      setRows([]); setSelected(null); setSearch('');
+      setRows([]); setSelected(null); setSearch(''); setSkipped(new Set()); setReviewErrors({}); setPreviewSignature('');
       setSavedRevision(value => value + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không lưu được dữ liệu.");
@@ -123,7 +154,16 @@ const EducationStudentImport: React.FC = () => {
     (row.code + " " + row.fullName + " " + row.email)
       .toLowerCase()
       .includes(search.toLowerCase()),
-  );
+  ).filter(row => reviewFilter === 'all' || (reviewFilter === 'skipped' ? skipped.has(row.code) : reviewFilter === 'error' ? !skipped.has(row.code) && !!rowErrors(row).length : !skipped.has(row.code) && !!previewSignature && !rowErrors(row).length));
+  const errorCount = rows.filter(row => !!rowErrors(row).length).length;
+  const validCount = previewSignature ? keptRows.filter(row => !rowErrors(row).length).length : 0;
+  const selectedErrorCount = keptRows.filter(row => !!rowErrors(row).length).length;
+  const toggleSkip = (code: string) => {
+    setSkipped(previous => { const next = new Set(previous); if (next.has(code)) next.delete(code); else next.add(code); return next; });
+    setPreview(null);
+    setPreviewSignature('');
+    setError('');
+  };
   return (
     <div className="space-y-6 pb-8">
       <PageBanner
@@ -134,25 +174,32 @@ const EducationStudentImport: React.FC = () => {
       <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex items-start gap-4">
           <div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><FileSpreadsheet size={24} /></div>
-          <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600">Một tệp cho hồ sơ sinh viên mới và kết quả học tập theo từng kỳ.</p></div>
+          <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600"></p></div>
         </div>
-        <p className="rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-          Tệp gồm sheet <strong>Danh sách sinh viên</strong> và{" "}
-          <strong>Kết quả học tập</strong>. Mỗi dòng điểm có MSSV để gắn vào
-          đúng hồ sơ. Sinh viên chưa có điểm được để trống sheet kết quả.
-          Mẫu có thêm sheet <strong>Danh mục</strong> chứa ID/mã hợp lệ tại lúc tải và <strong>Hướng dẫn</strong> cho từng cột.
-        </p>
+        <div className="grid gap-4 rounded-2xl border border-slate-200 p-5 md:grid-cols-2">
+          <label className="text-sm font-semibold text-slate-700">Năm học
+            <select aria-label="Chọn năm học cho đợt import" value={yearId} disabled={!!busy || !!rows.length} onChange={e => { setYearId(e.target.value); setPeriodId(''); }} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+              <option value="">Chọn năm học</option>{catalogs?.years.map(year => <option key={year.id} value={year.id}>{year.label}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-semibold text-slate-700">Kỳ học
+            <select aria-label="Chọn kỳ học cho đợt import" value={periodId} disabled={!!busy || !!rows.length || !yearId} onChange={e => setPeriodId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+              <option value="">Chọn kỳ học</option>{catalogs?.periods.filter(period => String(period.academicYearId) === yearId && period.kind === 'SEMESTER').map(period => <option key={period.id} value={period.id}>{period.label}</option>)}
+            </select>
+          </label>
+          <p className="text-sm text-slate-500 md:col-span-2">Mỗi đợt chỉ nhận sinh viên và kết quả học tập của kỳ đã chọn. Nếu cần đổi kỳ, quay lại bước chọn tệp.</p>
+        </div>
         <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-orange-300 bg-orange-50/40 p-5 sm:p-6">
           <div className="flex items-start gap-3"><UploadCloud className="mt-0.5 shrink-0 text-orange-600" size={22} /><div><p className="font-semibold text-slate-900">Chọn tệp Excel để bắt đầu</p><p className="mt-1 text-sm text-slate-500">Định dạng .xlsx hoặc .xls, tối đa 8 MB. Dữ liệu sẽ được kiểm tra trước khi lưu.</p></div></div>
           <div className="flex flex-wrap items-center gap-3">
-          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
+          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !selectedPeriod ? 'cursor-not-allowed opacity-50' : ''}`}>
             <FileSpreadsheet size={18} /> Chọn tệp Excel
             <input
               aria-label="Tệp sinh viên và bảng điểm"
               className="sr-only"
               type="file"
               accept=".xlsx,.xls"
-              disabled={!!busy || !catalogs}
+              disabled={!!busy || !selectedPeriod}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
@@ -196,10 +243,20 @@ const EducationStudentImport: React.FC = () => {
         )}
         {rows.length > 0 && (
           <>
-            <p className="rounded-xl bg-orange-50 px-4 py-3 text-sm text-slate-700">
-              {fileName}: <strong>{rows.length} sinh viên</strong>,{" "}
-              <strong>{gradeCount} kết quả học tập</strong>.
-            </p>
+            <div className="border-t border-slate-100 pt-6">
+              <h2 className="text-xl font-bold text-slate-900">Xem trước dữ liệu Import</h2>
+              <p className="mt-1 text-sm text-slate-500">Kiểm tra danh sách từ {fileName} cho kỳ {selectedPeriod?.label}. Sinh viên bị bỏ qua cùng toàn bộ kết quả học tập của họ sẽ không được gửi để lưu.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                ['Tổng sinh viên', rows.length],
+                ['Hợp lệ', validCount],
+                ['Có lỗi', errorCount],
+                ['Được chọn Import', keptRows.length],
+                ['Bị bỏ qua', skipped.size],
+              ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
             <input
               aria-label="Tìm sinh viên trong tệp"
               className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 sm:max-w-sm"
@@ -207,17 +264,25 @@ const EducationStudentImport: React.FC = () => {
               placeholder="MSSV, tên hoặc email"
               onChange={(e) => setSearch(e.target.value)}
             />
+            <select aria-label="Lọc dữ liệu xem trước" value={reviewFilter} onChange={e => setReviewFilter(e.target.value as typeof reviewFilter)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
+              <option value="all">Tất cả</option><option value="valid">Hợp lệ</option><option value="error">Có lỗi</option><option value="skipped">Bị bỏ qua</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="accent-orange-600" checked={errorCount > 0 && rows.filter(row => rowErrors(row).length).every(row => skipped.has(row.code))} disabled={!errorCount || !!busy} onChange={e => { const next = new Set(skipped); rows.filter(row => rowErrors(row).length).forEach(row => e.target.checked ? next.add(row.code) : next.delete(row.code)); setSkipped(next); setPreview(null); setPreviewSignature(''); setError(''); }} />Bỏ qua tất cả dòng lỗi</label>
+            </div>
             <div className="overflow-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[850px] text-left text-sm">
+              <table className="w-full min-w-[1050px] text-left text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     {[
-                      "MSSV",
-                      "Họ tên / Email",
+                      "STT",
+                      "Mã sinh viên",
+                      "Họ tên",
+                      "Email",
                       "Chương trình",
                       "Khóa / Nhóm",
-                      "Kỳ hiện tại",
-                      "Số kết quả",
+                      "Trạng thái kiểm tra",
+                      "Chi tiết lỗi",
+                      "Bỏ qua",
                       "",
                     ].map((h) => (
                       <th key={h} className="whitespace-nowrap px-4 py-3 font-semibold">
@@ -228,13 +293,11 @@ const EducationStudentImport: React.FC = () => {
                 </thead>
                 <tbody>
                   {visible.map((row) => (
-                    <tr key={row.code} className="border-t border-slate-100 hover:bg-orange-50/30">
+                    <tr key={row.code} className={`border-t border-slate-100 ${rowErrors(row).length ? 'bg-red-50/70' : 'hover:bg-orange-50/30'} ${skipped.has(row.code) ? 'opacity-60' : ''}`}>
+                      <td className="px-4 py-3 text-slate-500">{rows.indexOf(row) + 1}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{row.code}</td>
-                      <td className="px-4 py-3">
-                        {row.fullName}
-                        <br />
-                        {row.email}
-                      </td>
+                      <td className="px-4 py-3">{row.fullName}</td>
+                      <td className="px-4 py-3">{row.email}</td>
                       <td className="px-4 py-3">
                         {catalogs?.programs.find(
                           (p) => p.id === row.academic.programId,
@@ -246,15 +309,9 @@ const EducationStudentImport: React.FC = () => {
                         )?.label ?? row.academic.placement.cohortId}{" "}
                         / {row.academic.placement.groupCode}
                       </td>
-                      <td className="px-4 py-3">
-                        {catalogs?.periods.find(
-                          (p) =>
-                            p.id ===
-                            row.academic.placement.currentAcademicPeriodId,
-                        )?.label ??
-                          row.academic.placement.currentAcademicPeriodId}
-                      </td>
-                      <td className="px-4 py-3">{row.academic.courseResults.length}</td>
+                      <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${rowErrors(row).length ? 'bg-red-100 text-red-700' : previewSignature ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>{rowErrors(row).length ? 'Có lỗi' : previewSignature ? 'Hợp lệ' : 'Chờ kiểm tra'}</span></td>
+                      <td className="max-w-64 px-4 py-3 text-red-700">{rowErrors(row).join('; ') || '—'}</td>
+                      <td className="px-4 py-3"><input type="checkbox" aria-label={`Bỏ qua ${row.code}`} className="h-4 w-4 accent-orange-600" checked={skipped.has(row.code)} disabled={!!busy} onChange={() => toggleSkip(row.code)} /></td>
                       <td className="px-4 py-3">
                         <button
                           className="font-medium text-orange-700 hover:underline"
@@ -268,20 +325,22 @@ const EducationStudentImport: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {selectedErrorCount > 0 && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Còn {selectedErrorCount} sinh viên có lỗi được chọn. Hãy bỏ qua các dòng lỗi và kiểm tra lại trước khi lưu.</p>}
             <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+              <button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" disabled={!!busy} onClick={() => { setRows([]); setPreview(null); setPreviewSignature(''); setSkipped(new Set()); setReviewErrors({}); setFileName(''); setError(''); setSelected(null); }}>Quay lại chọn file</button>
               <button
                 className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                disabled={!!busy || !!result}
+                disabled={!!busy || !!result || !keptRows.length || keptRows.some(row => periodErrors(row).length)}
                 onClick={() => void check()}
               >
-                Kiểm tra dữ liệu
+                {previewSignature ? 'Kiểm tra lại dữ liệu' : 'Kiểm tra dữ liệu'}
               </button>
               <button
                 className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                 disabled={!!busy || !canCommit}
                 onClick={() => void commit()}
               >
-                Xác nhận import
+                Xác nhận Import {keptRows.length} sinh viên
               </button>
             </div>
           </>

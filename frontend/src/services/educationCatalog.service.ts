@@ -58,10 +58,11 @@ const uniqueOptions = (
 };
 
 export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
-  const [curricula, cohorts, periods] = await Promise.all([
+  const [curricula, cohorts, periods, years] = await Promise.all([
     fetchCatalog("/curricula"),
     fetchCatalog("/cohorts"),
     fetchCatalog("/academic-periods"),
+    fetchCatalog("/academic-years"),
   ]);
 
   const programs = uniqueOptions(
@@ -106,11 +107,12 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
       );
 
       const option = buildOption(positiveId(item.id), [item.name, code, readableCode]);
-      return option ? { ...option, kind: text(item.kind) } : null;
+      return option ? { ...option, kind: text(item.kind), academicYearId: positiveId(item.academicYearId) } : null;
     }),
   );
+  const yearOptions = uniqueOptions(years.map(item => buildOption(positiveId(item.id), [item.yearCode])));
 
-  if (!programs.length || !cohortOptions.length || !periodOptions.length) {
+  if (!programs.length || !cohortOptions.length || !periodOptions.length || !yearOptions.length) {
     throw new Error(
       "Thiếu danh mục chương trình, khóa hoặc kỳ học từ Backend. " +
         "Đặc biệt, danh sách CTĐT phải trả về programId hoặc program.id; " +
@@ -119,6 +121,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
   }
 
   return {
+    years: yearOptions,
     programs,
     cohorts: cohortOptions,
     periods: periodOptions,
