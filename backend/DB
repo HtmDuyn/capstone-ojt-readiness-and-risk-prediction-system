@@ -1,12 +1,13 @@
--- OJT FULL DATABASE: schema, catalog, demo data and workflow updates (2026-10-22).
+-- OJT FULL DATABASE: schema, catalog, demo data and workflow updates (2026-10-25).
 -- FULL RESET: deletes existing application data. Use only on an empty/test database.
--- Existing databases: run only the marked incremental update block at the end.
+-- This is a full reset, not an incremental migration. All sections run atomically.
 -- Display-only verification queries are omitted; data and integrity checks are retained.
 
 -- Centralized database schema and catalog data. Resets application tables; initialize deliberately.
 
-BEGIN;
 
+BEGIN;
+SET LOCAL TIME ZONE 'Asia/Bangkok';
 SET LOCAL search_path=public,pg_catalog;
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
@@ -5271,13 +5272,6 @@ FROM (
         'OJT_COORD'
     ),
     (
-        'student01',
-        '$2b$12$/7w0sgql7uF34ubVsXY4eOztDZ3XG7jUXXE/qhDOVPz3CU/HsLlRm',
-        'student01@student.edu.vn',
-        'Student 01',
-        'STUDENT'
-    ),
-    (
         'enterprise01',
         '$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii',
         'hr@techviet.example',
@@ -5304,38 +5298,6 @@ DO UPDATE SET
 
 
     /* ============================================================
-   TEST STUDENT PROFILE
-   ============================================================ */
-
-
-INSERT INTO "Students"
-(
-    "UserID",
-    "StudentCode",
-    "ProgramID",
-    "EnrollmentYear",
-    "CurrentSemester",
-    "ClassName",
-    "Status"
-)
-SELECT
-    u."UserID",
-    'SE180001',
-    NULL,
-    2022,
-    5,
-    'SE18A',
-    'ACTIVE'
-FROM "Users" u
-WHERE u."Email" = 'student01@student.edu.vn'
-ON CONFLICT ("UserID")
-DO UPDATE SET
-    "Status" = 'ACTIVE';
-
-
-
-
-/* ============================================================
    TEST ENTERPRISE
    ============================================================ */
 
@@ -5535,7 +5497,7 @@ ALTER TABLE "StudentCourseResults"
 CREATE UNIQUE INDEX "UQ_StudentResults_ActualAttempt" ON "StudentCourseResults"("StudentID","CourseID","AcademicPeriodID","AttemptNumber") WHERE "AcademicPeriodID" IS NOT NULL;
 CREATE INDEX "IX_StudentResults_History" ON "StudentCourseResults"("StudentID","AcademicPeriodID","CourseID");
 COMMENT ON COLUMN "StudentCourseResults"."Status" IS 'New API values: PASSED, FAILED, IN_PROGRESS, WITHDRAWN, RECOGNIZED. Imported status is authoritative; the API does not guess a passing score.';
-COMMENT ON COLUMN "StudentCourseResults"."SemesterTaken" IS 'Legacy relative specialized semester; new rows derive it from actual student placement and the academic period. Block 3 does not advance it.';
+COMMENT ON COLUMN "StudentCourseResults"."SemesterTaken" IS 'Curriculum stage 0..9, mapped explicitly by cohort/group to the actual calendar semester. Block 3 retains the parent stage.';
 CREATE TABLE "AcademicGradingPolicies" (
  "ProgramID" int PRIMARY KEY REFERENCES "TrainingPrograms"("ProgramID"),
  "GpaScale" int NOT NULL CHECK ("GpaScale" IN (4,10)),
@@ -5604,10 +5566,28 @@ BEGIN
  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO service_role',seq); END IF;
 END $$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_student_academic_records');
+-- SECTION: 20261024 training program metadata compatibility
+-- Additive repair for the curriculum API contract; safe to run on an existing DB.
+-- Legacy programs remain DRAFT/unreviewed. Version/year/actor metadata is unknown,
+-- so it stays NULL until academic staff supplies verified values.
+SELECT pg_advisory_xact_lock(hashtext('training-program-metadata-migration'));
+ALTER TABLE "TrainingPrograms"
+ ADD COLUMN IF NOT EXISTS "Version" varchar(10),
+ ADD COLUMN IF NOT EXISTS "EffectiveYear" int CHECK ("EffectiveYear" BETWEEN 1900 AND 2200),
+ ADD COLUMN IF NOT EXISTS "Status" varchar(20) NOT NULL DEFAULT 'DRAFT' CHECK ("Status" IN ('DRAFT','PUBLISHED')),
+ ADD COLUMN IF NOT EXISTS "PrerequisitesReviewed" boolean NOT NULL DEFAULT false,
+ ADD COLUMN IF NOT EXISTS "EquivalencesReviewed" boolean NOT NULL DEFAULT false,
+ ADD COLUMN IF NOT EXISTS "CreatedBy" int REFERENCES "Users"("UserID") ON DELETE SET NULL,
+ ADD COLUMN IF NOT EXISTS "CreatedAt" timestamptz NOT NULL DEFAULT now(),
+ ADD COLUMN IF NOT EXISTS "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
+ ADD COLUMN IF NOT EXISTS "PublishedBy" int REFERENCES "Users"("UserID") ON DELETE SET NULL,
+ ADD COLUMN IF NOT EXISTS "PublishedAt" timestamptz;
+COMMENT ON COLUMN "TrainingPrograms"."CreatedAt" IS 'Creation timestamp; pre-migration records receive migration time, not a reconstructed historical timestamp.';
+INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261024_training_program_metadata') ON CONFLICT ("Version") DO NOTHING;
+
 -- SECTION: 20261008 curriculum management and publication
 ALTER TABLE "Courses" ALTER COLUMN "Credits" TYPE numeric(6,2);
--- Curriculum simplification: keep ProgramID, ProgramCode, ProgramName,
--- TotalCredits and SpecializationID. No publication workflow for TrainingPrograms.
+-- Program metadata is defined by the additive compatibility section above.
 ALTER TABLE "TrainingPrograms" ALTER COLUMN "TotalCredits" TYPE numeric(6,2);
 CREATE UNIQUE INDEX "UQ_Curriculum_ProgramCode_CI" ON "TrainingPrograms"(upper("ProgramCode"));
 ALTER TABLE "ProgramCombos" ALTER COLUMN "SourceComboID" DROP NOT NULL, ADD COLUMN "CoursesReviewed" boolean NOT NULL DEFAULT false;
@@ -5618,7 +5598,7 @@ CREATE UNIQUE INDEX "UQ_Course_Code" ON "Courses"(upper("CourseCode"));
 CREATE UNIQUE INDEX "UQ_Specialization_Code" ON "Specializations"(upper("SpecializationCode"));
 ALTER TABLE "AcademicImportBatches" DROP CONSTRAINT "AcademicImportBatches_Kind_check", ADD CONSTRAINT "AcademicImportBatches_Kind_check" CHECK ("Kind" IN ('STUDENT','COURSE_RESULT','CURRICULUM')),
  ADD COLUMN "CurriculumID" int REFERENCES "TrainingPrograms"("ProgramID");
--- Publication-specific columns, constraints and immutable triggers are intentionally omitted.
+-- Publication validation remains in the curriculum service; no immutable triggers.
 -- All other academic, combo and import tables remain unchanged.
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_curriculum_management');
 -- SECTION: 20261008 combo registration windows and confirmed choices
@@ -6043,7 +6023,7 @@ INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_ojt_results');
 -- SECTION: 20261008 academic workflow gap fixes
 ALTER TABLE "OJTRegistrationWindows"
  ADD COLUMN "AcademicPeriodID" int REFERENCES "AcademicPeriods"("AcademicPeriodID"),
- ADD COLUMN "RequiredRelativeSemester" int NOT NULL DEFAULT 5 CHECK ("RequiredRelativeSemester" BETWEEN 1 AND 20);
+ ADD COLUMN "RequiredRelativeSemester" int NOT NULL DEFAULT 6 CHECK ("RequiredRelativeSemester"=6);
 ALTER TABLE "OJTRegistrations" ADD COLUMN "PathwaySnapshot" jsonb;
 CREATE TABLE "OJTRegistrationExceptions" (
  "ExceptionID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -6150,11 +6130,9 @@ BEGIN
  END LOOP;
 END $$;
 INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261008_academic_workflow_gaps');
-COMMIT;
 
 -- SECTION: Admin management APIs
 -- Additive admin section. scripts/migrate-admin.cjs reads only this section for upgrades.
-BEGIN;
 ALTER TABLE "Students" ADD COLUMN "DeletedAt" timestamptz;
 ALTER TABLE "Enterprises" ADD COLUMN "DeletedAt" timestamptz;
 ALTER TABLE "InternshipPositions" ADD COLUMN "DeletedAt" timestamptz;
@@ -6255,10 +6233,8 @@ BEGIN
  END LOOP;
 END $$;
 INSERT INTO "SchemaMigrations"("Version") VALUES ('20261008_admin_api');
-COMMIT;
 
 -- SECTION: Semester 5 student portal APIs
-BEGIN;
 ALTER TABLE "OJTAssessmentWindows" ADD COLUMN "AssessmentAcademicPeriodID" int REFERENCES "AcademicPeriods"("AcademicPeriodID"), ADD COLUMN "RequiredRelativeSemester" int NOT NULL DEFAULT 5 CHECK ("RequiredRelativeSemester"=5), ADD COLUMN "Revision" int NOT NULL DEFAULT 1 CHECK ("Revision">=1);
 UPDATE "OJTAssessmentWindows" w SET "AssessmentAcademicPeriodID"=p."ParentPeriodID" FROM "AcademicPeriods" p WHERE p."AcademicPeriodID"=w."BlockPeriodID";
 CREATE TABLE "StudentCVVersions" (
@@ -6322,66 +6298,10 @@ DO $$ DECLARE t text; role_name text; seq text; BEGIN
  END LOOP;
 END $$;
 INSERT INTO "SchemaMigrations"("Version") VALUES ('20261013_student_portal');
-COMMIT;
 
 
-BEGIN;
-SET LOCAL search_path=public,pg_catalog;
+-- Student fixtures are consolidated in the final 20-student seed.
 
-DO $$ BEGIN
- IF NOT EXISTS (SELECT 1 FROM "Roles" WHERE "RoleCode" = 'STUDENT') THEN
-  RAISE EXCEPTION 'Role STUDENT does not exist';
- END IF;
-END $$;
-
-CREATE TEMP TABLE _seed_student_cases (n int PRIMARY KEY, credits int, failed int, description text) ON COMMIT DROP;
-INSERT INTO _seed_student_cases VALUES
- (1,70,2,'ELIGIBLE boundary'),
- (2,69,2,'Missing 1 credit'),
- (3,70,3,'One extra failed course'),
- (4,69,3,'Both conditions fail'),
- (5,70,0,'Eligible zero fails'),
- (6,85,2,'Eligible two fails'),
- (7,50,0,'Low credits'),
- (8,100,4,'Many failed'),
- (9,NULL,1,'Unknown credits'),
- (10,73,NULL,'Unknown failed count'),
- (11,73,2,'Eligible 73 and 2');
-
--- Reuse the original student01 password hash; existing credentials remain unchanged.
-INSERT INTO "Users" ("Username","PasswordHash","Email","FullName","RoleID","Status")
-SELECT ('student'||lpad(x.n::text,2,'0')),
- '$2b$12$/7w0sgql7uF34ubVsXY4eOztDZ3XG7jUXXE/qhDOVPz3CU/HsLlRm',
- ('student'||lpad(x.n::text,2,'0')||'@student.edu.vn'),
- ('Student '||lpad(x.n::text,2,'0')),r."RoleID",'ACTIVE'
-FROM _seed_student_cases x JOIN "Roles" r ON r."RoleCode"='STUDENT'
-WHERE NOT EXISTS (SELECT 1 FROM "Users" u WHERE u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn'))
-ON CONFLICT DO NOTHING;
-
--- Student01 profile is preserved if already present. New profiles are inserted only.
-INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
-SELECT u."UserID", ('SE18'||lpad(x.n::text,4,'0')),
-  (SELECT p."ProgramID" FROM "TrainingPrograms" p JOIN "Specializations" sp ON sp."SpecializationID"=p."SpecializationID"
-    WHERE sp."SpecializationCode"='SE' ORDER BY (p."ProgramCode" LIKE '%K18%') DESC, p."ProgramID" LIMIT 1),
- 2022, 5, 'SE18A', 'ACTIVE'
-FROM _seed_student_cases x JOIN "Users" u ON u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn')
-WHERE NOT EXISTS (SELECT 1 FROM "Students" s WHERE s."UserID"=u."UserID")
-  AND NOT EXISTS (SELECT 1 FROM "Students" s WHERE s."StudentCode"=('SE18'||lpad(x.n::text,4,'0')))
-ON CONFLICT DO NOTHING;
-
--- One fixture snapshot per new test profile; NEVER overwrite prior snapshots.
-INSERT INTO "StudentAcademicSnapshot" ("StudentID","SnapshotDate","AccumulatedCredits","FailedCoursesCount","CurrentSemester","RemainingCredits")
-SELECT s."StudentID", DATE '2026-10-19', x.credits,x.failed,5,
- CASE WHEN x.credits IS NULL OR p."TotalCredits" IS NULL THEN NULL ELSE GREATEST(p."TotalCredits"-x.credits,0) END
-FROM _seed_student_cases x
-JOIN "Users" u ON u."Email"=('student'||lpad(x.n::text,2,'0')||'@student.edu.vn')
-JOIN "Students" s ON s."UserID"=u."UserID"
-LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
-WHERE NOT EXISTS (SELECT 1 FROM "StudentAcademicSnapshot" a WHERE a."StudentID"=s."StudentID");
-
-
-COMMIT;
-BEGIN;
 ALTER TABLE "EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
 ALTER TABLE "EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
   CHECK ("Kind" IN ('ACCOUNT','COMBO_REMINDER','ACADEMIC_ALERT','OJT_RESULT'));
@@ -6394,7 +6314,6 @@ CREATE TABLE IF NOT EXISTS "OJTCompletionDeliveries" (
 );
 ALTER TABLE "OJTCompletionDeliveries" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "OJTCompletionDeliveries" FROM PUBLIC;
-COMMIT;
 
 -- SECTION: 20261018 recruitment intake and student CV upload
 CREATE UNIQUE INDEX IF NOT EXISTS "UQ_OJTSemesters_AcademicPeriod"
@@ -6479,37 +6398,37 @@ END $$;
 
 
 -- ============================================================
--- DEMO OJT SEMESTER: only if absent. Does not change existing rows.
--- Required for a fresh database to attach recruitment data.
+-- Demo calendar: ten sequential semesters with OJT in curriculum semester 6.
+-- Used by the readiness and recruitment demo seeds below.
 -- ============================================================
-BEGIN;
 SET LOCAL search_path = public, pg_catalog;
-INSERT INTO public."AcademicYears" ("YearCode", "StartDate", "EndDate", "Status")
-VALUES ('DEMO-2026-2027', DATE '2026-09-01', DATE '2027-08-31', 'PLANNED')
-ON CONFLICT ("YearCode") DO NOTHING;
-
-INSERT INTO public."AcademicPeriods" ("AcademicYearID", "PeriodCode", "Name", "Kind", "StartDate", "EndDate", "Status")
-SELECT y."AcademicYearID", 'DEMO-SEMESTER-2027', 'Học kỳ OJT demo đầu năm 2027', 'SEMESTER', DATE '2026-11-01', DATE '2027-04-30', 'ACTIVE'
-FROM public."AcademicYears" y
-WHERE y."YearCode" = 'DEMO-2026-2027'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO public."OJTSemesters"
-  ("AcademicYearID", "AcademicPeriodID", "SemesterCode", "Name", "RegStartDate", "RegEndDate", "StartDate", "EndDate", "Status")
-SELECT y."AcademicYearID", p."AcademicPeriodID", 'DEMO-OJT-2027-01',
-       'Học kỳ OJT demo đầu năm 2027', DATE '2026-11-01', DATE '2026-12-31',
-       DATE '2027-01-01', DATE '2027-04-30', 'ACTIVE'
-FROM public."AcademicYears" y
-JOIN public."AcademicPeriods" p ON p."PeriodCode" = 'DEMO-SEMESTER-2027'
-WHERE y."YearCode" = 'DEMO-2026-2027'
-ON CONFLICT ("SemesterCode") DO UPDATE
-SET "AcademicPeriodID" = EXCLUDED."AcademicPeriodID", "Status" = 'ACTIVE';
-COMMIT;
+CREATE TEMP TABLE _demo_study_periods(stage int PRIMARY KEY, period_id int NOT NULL) ON COMMIT DROP;
+DO $calendar$
+DECLARE target date; start_day date; end_day date; y int; period_id int; stage int; season text;
+BEGIN
+ target := (date_trunc('year',current_date)+(4*((extract(month FROM current_date)::int-1)/4+1))*interval '1 month')::date;
+ FOR stage IN 0..9 LOOP
+  start_day := (target+(stage-6)*interval '4 months')::date;
+  end_day := (start_day+interval '4 months'-interval '1 day')::date;
+  season := CASE extract(month FROM start_day)::int WHEN 1 THEN 'SPRING' WHEN 5 THEN 'SUMMER' ELSE 'FALL' END;
+  INSERT INTO "AcademicYears" ("YearCode","StartDate","EndDate","Status")
+  VALUES('DEMO-'||extract(year FROM start_day)::int,make_date(extract(year FROM start_day)::int,1,1),make_date(extract(year FROM start_day)::int,12,31),
+   CASE WHEN extract(year FROM start_day)<extract(year FROM current_date) THEN 'CLOSED' WHEN extract(year FROM start_day)=extract(year FROM current_date) THEN 'ACTIVE' ELSE 'PLANNED' END)
+  ON CONFLICT ("YearCode") DO UPDATE SET "YearCode"=EXCLUDED."YearCode" RETURNING "AcademicYearID" INTO y;
+  INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","StartDate","EndDate","Status")
+  VALUES(y,'DEMO-'||extract(year FROM start_day)::int||'-'||season,initcap(season)||' '||extract(year FROM start_day)::int,'SEMESTER',start_day,end_day,
+   CASE WHEN end_day<current_date THEN 'CLOSED' WHEN start_day<=current_date THEN 'ACTIVE' ELSE 'PLANNED' END)
+  RETURNING "AcademicPeriodID" INTO period_id;
+  INSERT INTO _demo_study_periods VALUES(stage,period_id);
+ END LOOP;
+ INSERT INTO "OJTSemesters" ("AcademicYearID","AcademicPeriodID","SemesterCode","Name","RegStartDate","RegEndDate","StartDate","EndDate","Status")
+ SELECT p."AcademicYearID",p."AcademicPeriodID",'DEMO-OJT-S6','OJT kỳ chương trình 6 - '||p."Name",current_date,least(current_date+21,target-1),p."StartDate",p."EndDate",'PLANNED'
+ FROM _demo_study_periods m JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=m.period_id WHERE m.stage=6;
+END $calendar$;
 
 -- OJT: seed sample enterprise recruitment without resetting or overwriting current data.
 -- IMPORTANT: These are fictional DEMO vacancies, NOT real job offers.
 -- Requires existing TECHVIET enterprise, its enterprise user, and an OJT semester.
-BEGIN;
 SET LOCAL search_path = public, pg_catalog;
 
 DO $seed$
@@ -6525,19 +6444,6 @@ DECLARE
   v_position_id integer;
   v_post_id integer;
   v_row record;
-  v_pos1_id integer;
-  v_pos2_id integer;
-  v_post1_id integer;
-  v_post2_id integer;
-  v_student1_id integer;
-  v_student2_id integer;
-  v_reg1_id integer;
-  v_reg2_id integer;
-  v_app1_id integer;
-  v_app2_id integer;
-  v_coord1_id integer;
-  v_coord2_id integer;
-  v_assign_id integer;
 BEGIN
   SELECT e."EnterpriseID" INTO v_enterprise_id
   FROM public."Enterprises" e WHERE e."EnterpriseCode" = 'TECHVIET';
@@ -6569,9 +6475,10 @@ BEGIN
   -- Use the dedicated DEMO OJT semester inserted above.
   SELECT s."OJTSemesterID", s."SemesterCode", s."AcademicPeriodID" INTO v_semester_id, v_semester_code, v_period_id
   FROM public."OJTSemesters" s
-  WHERE s."SemesterCode" = 'DEMO-OJT-2027-01';
+  WHERE s."SemesterCode" = 'DEMO-OJT-S6';
   IF v_semester_id IS NULL THEN
-    RAISE EXCEPTION 'No OJT semester exists. Create an OJT semester first.';
+    RAISE NOTICE 'Skipping optional demo recruitment: demo OJT semester is not configured.';
+    RETURN;
   END IF;
 
   -- Ensure an open RecruitmentWindows exists
@@ -6584,7 +6491,7 @@ BEGIN
     INSERT INTO public."RecruitmentWindows"
       ("AcademicPeriodID", "OJTSemesterID", "Name", "StartsAt", "EndsAt", "Status", "CreatedBy")
     VALUES
-      (v_period_id, v_semester_id, 'Đợt nhận nhu cầu tuyển dụng demo 2027', now() - interval '10 days', now() + interval '60 days', 'OPEN', v_user_id)
+      (v_period_id, v_semester_id, 'Đợt tuyển dụng cho kỳ 6 OJT minh họa', now() - interval '10 days', now() + interval '21 days', 'OPEN', v_user_id)
     RETURNING "WindowID" INTO v_window_id;
   END IF;
 
@@ -6639,13 +6546,13 @@ BEGIN
          v_row.description || E'\nYêu cầu: ' || v_row.requirements,
          'Được hướng dẫn công việc và tham gia dự án thực tế (dữ liệu DEMO).',
          'Đăng ký qua hệ thống OJT của trường (chỉ dùng để kiểm thử).',
-         'PUBLISHED', now(), now() + interval '60 days', v_user_id)
+         'PUBLISHED', now(), now() + interval '21 days', v_user_id)
       RETURNING "PostID" INTO v_post_id;
     ELSE
       UPDATE public."RecruitmentPosts"
       SET "WindowID" = COALESCE("WindowID", v_window_id),
           "Status" = 'PUBLISHED',
-          "DeadlineAt" = GREATEST("DeadlineAt", now() + interval '30 days')
+          "DeadlineAt" = GREATEST("DeadlineAt", now() + interval '21 days')
       WHERE "PostID" = v_post_id;
     END IF;
 
@@ -6661,93 +6568,14 @@ BEGIN
     ON CONFLICT DO NOTHING;
   END LOOP;
 
-  -- Seed demo candidate and intern records for TECHVIET
-  SELECT "PositionID" INTO v_pos1_id FROM public."InternshipPositions"
-  WHERE "EnterpriseID" = v_enterprise_id AND "OJTSemesterID" = v_semester_id AND "RecruitmentCode" = 'DEMO-TV-WEB-01';
-  SELECT "PositionID" INTO v_pos2_id FROM public."InternshipPositions"
-  WHERE "EnterpriseID" = v_enterprise_id AND "OJTSemesterID" = v_semester_id AND "RecruitmentCode" = 'DEMO-TV-BA-02';
-  SELECT rp."PostID" INTO v_post1_id
-  FROM public."RecruitmentPosts" rp
-  JOIN public."RecruitmentPostPositions" rpp ON rpp."PostID" = rp."PostID"
-  WHERE rp."EnterpriseID" = v_enterprise_id AND rp."OJTSemesterID" = v_semester_id
-    AND rpp."PositionID" = v_pos1_id AND rpp."OJTSemesterID" = v_semester_id
-    AND rp."Status" = 'PUBLISHED'
-  ORDER BY rp."PostID" LIMIT 1;
-  SELECT rp."PostID" INTO v_post2_id
-  FROM public."RecruitmentPosts" rp
-  JOIN public."RecruitmentPostPositions" rpp ON rpp."PostID" = rp."PostID"
-  WHERE rp."EnterpriseID" = v_enterprise_id AND rp."OJTSemesterID" = v_semester_id
-    AND rpp."PositionID" = v_pos2_id AND rpp."OJTSemesterID" = v_semester_id
-    AND rp."Status" = 'PUBLISHED'
-  ORDER BY rp."PostID" LIMIT 1;
-  IF v_pos1_id IS NULL OR v_pos2_id IS NULL OR v_post1_id IS NULL OR v_post2_id IS NULL THEN
-    RAISE EXCEPTION 'Missing demo position or published recruitment post mapping (WEB/BA); seed stopped.';
-  END IF;
-  SELECT "StudentID" INTO v_student1_id FROM public."Students" s JOIN public."Users" u ON u."UserID" = s."UserID" WHERE u."Email" LIKE 'student01%' OR s."StudentCode" LIKE '%0001%' LIMIT 1;
-  SELECT "StudentID" INTO v_student2_id FROM public."Students" s JOIN public."Users" u ON u."UserID" = s."UserID" WHERE (u."Email" LIKE 'student02%' OR s."StudentCode" LIKE '%0002%') AND s."StudentID" <> v_student1_id LIMIT 1;
-
-  IF v_student1_id IS NOT NULL AND v_pos1_id IS NOT NULL THEN
-    SELECT "RegistrationID" INTO v_reg1_id FROM public."OJTRegistrations" WHERE "StudentID" = v_student1_id AND "OJTSemesterID" = v_semester_id LIMIT 1;
-    IF v_reg1_id IS NULL THEN
-      INSERT INTO public."OJTRegistrations" ("StudentID", "OJTSemesterID", "Status", "Application", "SubmittedBy")
-      VALUES (v_student1_id, v_semester_id, 'HANDED_OFF', '{"phone":"0901234567","email":"student01@student.edu.vn"}'::jsonb, v_user_id)
-      RETURNING "RegistrationID" INTO v_reg1_id;
-    END IF;
-
-    SELECT "ApplicationID" INTO v_app1_id FROM public."JobApplications" WHERE "RegistrationID" = v_reg1_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
-    IF v_app1_id IS NULL THEN
-      INSERT INTO public."JobApplications" ("RegistrationID", "StudentID", "EnterpriseID", "PostID", "PositionID", "OJTSemesterID", "CoverLetter", "Status")
-      VALUES (v_reg1_id, v_student1_id, v_enterprise_id, v_post1_id, v_pos1_id, v_semester_id, 'Em mong muốn thực tập vị trí phát triển Web tại TECHVIET.', 'SUBMITTED')
-      RETURNING "ApplicationID" INTO v_app1_id;
-    END IF;
-
-    SELECT "CoordinationID" INTO v_coord1_id FROM public."StudentEnterpriseCoordination" WHERE "RegistrationID" = v_reg1_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
-    IF v_coord1_id IS NULL THEN
-      INSERT INTO public."StudentEnterpriseCoordination" ("RegistrationID", "EnterpriseID", "PositionID", "ApplicationID", "OJTSemesterID", "CoordinatedBy", "Decision", "CoordinatedAt")
-      VALUES (v_reg1_id, v_enterprise_id, v_pos1_id, v_app1_id, v_semester_id, v_coordinator_id, 'PENDING', now() - interval '2 days')
-      RETURNING "CoordinationID" INTO v_coord1_id;
-    END IF;
-  END IF;
-
-  IF v_student2_id IS NOT NULL AND v_pos2_id IS NOT NULL THEN
-    SELECT "RegistrationID" INTO v_reg2_id FROM public."OJTRegistrations" WHERE "StudentID" = v_student2_id AND "OJTSemesterID" = v_semester_id LIMIT 1;
-    IF v_reg2_id IS NULL THEN
-      INSERT INTO public."OJTRegistrations" ("StudentID", "OJTSemesterID", "Status", "Application", "SubmittedBy")
-      VALUES (v_student2_id, v_semester_id, 'HANDED_OFF', '{"phone":"0907654321","email":"student02@student.edu.vn"}'::jsonb, v_user_id)
-      RETURNING "RegistrationID" INTO v_reg2_id;
-    END IF;
-
-    SELECT "ApplicationID" INTO v_app2_id FROM public."JobApplications" WHERE "RegistrationID" = v_reg2_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
-    IF v_app2_id IS NULL THEN
-      INSERT INTO public."JobApplications" ("RegistrationID", "StudentID", "EnterpriseID", "PostID", "PositionID", "OJTSemesterID", "CoverLetter", "Status")
-      VALUES (v_reg2_id, v_student2_id, v_enterprise_id, v_post2_id, v_pos2_id, v_semester_id, 'Em xin ứng tuyển vị trí BA tại TECHVIET.', 'ACCEPTED')
-      RETURNING "ApplicationID" INTO v_app2_id;
-    END IF;
-
-    SELECT "CoordinationID" INTO v_coord2_id FROM public."StudentEnterpriseCoordination" WHERE "RegistrationID" = v_reg2_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
-    IF v_coord2_id IS NULL THEN
-      INSERT INTO public."StudentEnterpriseCoordination" ("RegistrationID", "EnterpriseID", "PositionID", "ApplicationID", "OJTSemesterID", "CoordinatedBy", "Decision", "CoordinatedAt", "DecisionAt")
-      VALUES (v_reg2_id, v_enterprise_id, v_pos2_id, v_app2_id, v_semester_id, v_coordinator_id, 'ACCEPTED', now() - interval '5 days', now() - interval '3 days')
-      RETURNING "CoordinationID" INTO v_coord2_id;
-    END IF;
-
-    SELECT "AssignmentID" INTO v_assign_id FROM public."InternshipAssignments" WHERE "StudentID" = v_student2_id AND "EnterpriseID" = v_enterprise_id LIMIT 1;
-    IF v_assign_id IS NULL AND v_coord2_id IS NOT NULL THEN
-      INSERT INTO public."InternshipAssignments" ("CoordinationID", "StudentID", "EnterpriseID", "PositionID", "EnterpriseSupervisorName", "StartDate", "EndDate", "Status")
-      VALUES (v_coord2_id, v_student2_id, v_enterprise_id, v_pos2_id, 'Nguyễn Văn Quản Lý', current_date - 10, current_date + 80, 'ACTIVE')
-      RETURNING "AssignmentID" INTO v_assign_id;
-    END IF;
-  END IF;
-
+  -- Student registrations/decisions are created through the validated backend workflow.
   RAISE NOTICE 'Seed completed for enterprise TECHVIET, OJT semester % (ID %).', v_semester_code, v_semester_id;
 END $seed$;
-COMMIT;
 
 
 
 -- BEGIN INCREMENTAL UPDATE: 20261022_handoff_before_registration
--- Existing databases: run only this block; the full file above resets data.
-BEGIN;
+-- Historical handoff update, included in the outer reset transaction.
 SET LOCAL lock_timeout='5s';
 SET LOCAL search_path=public,pg_catalog;
 -- No historical row is rewritten. Existing foreign keys and append-only history remain.
@@ -6773,107 +6601,446 @@ DO $$ BEGIN
  END IF;
 END $$;
 INSERT INTO "SchemaMigrations"("Version") VALUES ('20261022_handoff_before_registration') ON CONFLICT DO NOTHING;
-COMMIT;
 -- END INCREMENTAL UPDATE: 20261022_handoff_before_registration
 
 
--- BEGIN DEMO PREPARATION CALENDAR: 20261022
--- Demo dates support assessment opening on 2026-10-22. Existing rows are preserved.
-BEGIN;
-SET LOCAL search_path = public, pg_catalog;
-INSERT INTO "AcademicPeriods"
-  ("AcademicYearID", "PeriodCode", "Name", "Kind", "StartDate", "EndDate", "Status")
-SELECT "AcademicYearID", 'DEMO-PREP-2026', 'Học kỳ chuẩn bị OJT demo',
-       'SEMESTER', DATE '2026-09-01', DATE '2026-10-10', 'CLOSED'
-FROM "AcademicYears" WHERE "YearCode" = 'DEMO-2026-2027'
-ON CONFLICT ("PeriodCode") DO NOTHING;
+CREATE TABLE "CohortCurriculumPeriods" (
+ "CohortID" int NOT NULL, "GroupCode" char(1) NOT NULL,
+ "CurriculumSemester" int NOT NULL CHECK ("CurriculumSemester" BETWEEN 0 AND 9),
+ "AcademicPeriodID" int NOT NULL REFERENCES "AcademicPeriods"("AcademicPeriodID"),
+ PRIMARY KEY ("CohortID","GroupCode","CurriculumSemester"),
+ UNIQUE ("CohortID","GroupCode","AcademicPeriodID"),
+ FOREIGN KEY ("CohortID","GroupCode") REFERENCES "CohortGroups"("CohortID","GroupCode")
+);
+CREATE OR REPLACE FUNCTION "StudentCurriculumSemester"(student_id int, period_id int)
+RETURNS int LANGUAGE sql STABLE SET search_path=public,pg_catalog AS $stage$
+ SELECT plan."CurriculumSemester" FROM "StudentAcademicPlacements" placement
+ JOIN "CohortCurriculumPeriods" plan ON plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode"
+ JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=period_id
+ WHERE placement."StudentID"=student_id AND plan."AcademicPeriodID"=CASE WHEN period."Kind"='BLOCK3' THEN period."ParentPeriodID" ELSE period."AcademicPeriodID" END
+$stage$;
 
-INSERT INTO "AcademicPeriods"
-  ("AcademicYearID", "PeriodCode", "Name", "Kind", "ParentPeriodID", "StartDate", "EndDate", "Status")
-SELECT "AcademicYearID", 'DEMO-PREP-B3-2026', 'Block 3 chuẩn bị OJT demo',
-       'BLOCK3', "AcademicPeriodID", DATE '2026-10-11', DATE '2026-10-21', 'CLOSED'
-FROM "AcademicPeriods" WHERE "PeriodCode" = 'DEMO-PREP-2026'
-ON CONFLICT ("PeriodCode") DO NOTHING;
+-- SECTION: Fixed OJT semester 6 (preparation and assessment remain semester 5).
+-- Curriculum stages use explicit cohort mappings, never counts of calendar rows.
+CREATE OR REPLACE FUNCTION "AssertStudentOJTTerm6"(student_id int, semester_id int)
+RETURNS void LANGUAGE plpgsql SET search_path=public,pg_catalog AS $fixed$
+DECLARE entry_start date; target_start date; target_kind text; relative_term int;
+BEGIN
+ SELECT entry."StartDate" INTO entry_start FROM "StudentAcademicPlacements" placement
+ JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID"
+ WHERE placement."StudentID"=student_id AND entry."Kind"='SEMESTER';
+ SELECT target."StartDate",target."Kind" INTO target_start,target_kind FROM "OJTSemesters" term
+ JOIN "AcademicPeriods" target ON target."AcademicPeriodID"=term."AcademicPeriodID"
+ WHERE term."OJTSemesterID"=semester_id;
+ IF entry_start IS NULL OR target_start IS NULL OR target_kind<>'SEMESTER' THEN
+  RAISE EXCEPTION 'OJT requires an actual student entry semester and a target semester.' USING ERRCODE='23514';
+ END IF;
+ SELECT "StudentCurriculumSemester"(student_id,"AcademicPeriodID") INTO relative_term FROM "OJTSemesters" WHERE "OJTSemesterID"=semester_id;
+ IF relative_term IS DISTINCT FROM 6 THEN
+  RAISE EXCEPTION 'OJT is fixed in relative semester 6; student % is in semester % for this target.',student_id,relative_term USING ERRCODE='23514';
+ END IF;
+END $fixed$;
+CREATE OR REPLACE FUNCTION "GuardFixedOJTSemester6"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $fixed$
+DECLARE term_id int; period_id int; root_period int; relative_term int; entry_start date; target_start date; is_ojt boolean;
+BEGIN
+ IF TG_TABLE_NAME='ProgramCourses' THEN
+  SELECT upper("CourseCode")='OJT202' INTO is_ojt FROM "Courses" WHERE "CourseID"=NEW."CourseID";
+  IF is_ojt AND (NEW."RecommendedSemester" IS DISTINCT FROM 6 OR NEW."EntryKind"<>'COURSE') THEN
+   RAISE EXCEPTION 'OJT202 must be a concrete curriculum course in semester 6.' USING ERRCODE='23514';
+  END IF;
+ ELSIF TG_TABLE_NAME='OJTRegistrationWindows' THEN
+  SELECT "AcademicPeriodID" INTO period_id FROM "OJTSemesters" WHERE "OJTSemesterID"=NEW."OJTSemesterID";
+  IF NEW."RequiredRelativeSemester"<>6 OR NEW."AcademicPeriodID" IS DISTINCT FROM period_id OR period_id IS NULL THEN
+   RAISE EXCEPTION 'The registration window must target OJT semester 6 and its linked academic period.' USING ERRCODE='23514';
+  END IF;
+ ELSIF TG_TABLE_NAME='OJTRegistrations' OR TG_TABLE_NAME='EligibleStudentHandoffItems' THEN
+  PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",NEW."OJTSemesterID");
+ ELSIF TG_TABLE_NAME='InternshipAssignments' THEN
+  SELECT "OJTSemesterID" INTO term_id FROM "InternshipPositions" WHERE "PositionID"=NEW."PositionID";
+  PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",term_id);
+ ELSIF TG_TABLE_NAME='ProgramOJTGradeMappings' THEN
+  IF NOT EXISTS(SELECT 1 FROM "ProgramCourses" pc JOIN "Courses" c USING("CourseID") WHERE pc."ProgramID"=NEW."ProgramID" AND pc."CourseID"=NEW."CourseID" AND upper(c."CourseCode")='OJT202' AND pc."RecommendedSemester"=6 AND pc."EntryKind"='COURSE') THEN
+   RAISE EXCEPTION 'OJT grade mapping must use the curriculum OJT202 course in semester 6.' USING ERRCODE='23514';
+  END IF;
+  SELECT "AcademicPeriodID" INTO period_id FROM "OJTSemesters" WHERE "OJTSemesterID"=NEW."OJTSemesterID";
+  SELECT CASE WHEN "Kind"='BLOCK3' THEN "ParentPeriodID" ELSE "AcademicPeriodID" END INTO root_period FROM "AcademicPeriods" WHERE "AcademicPeriodID"=NEW."AcademicPeriodID";
+  IF root_period IS DISTINCT FROM period_id OR root_period IS NULL THEN
+   RAISE EXCEPTION 'OJT grades must be recorded in the target OJT semester, or its Block 3.' USING ERRCODE='23514';
+  END IF;
+ ELSIF TG_TABLE_NAME='StudentCourseResults' THEN
+  SELECT upper("CourseCode")='OJT202' INTO is_ojt FROM "Courses" WHERE "CourseID"=NEW."CourseID";
+  IF is_ojt THEN
+   SELECT entry."StartDate" INTO entry_start FROM "StudentAcademicPlacements" placement JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID" WHERE placement."StudentID"=NEW."StudentID";
+   SELECT root."StartDate" INTO target_start FROM "AcademicPeriods" p JOIN "AcademicPeriods" root ON root."AcademicPeriodID"=CASE WHEN p."Kind"='BLOCK3' THEN p."ParentPeriodID" ELSE p."AcademicPeriodID" END WHERE p."AcademicPeriodID"=NEW."AcademicPeriodID" AND root."Kind"='SEMESTER';
+   relative_term := "StudentCurriculumSemester"(NEW."StudentID",NEW."AcademicPeriodID");
+   IF NEW."SemesterTaken" IS DISTINCT FROM 6 OR relative_term IS DISTINCT FROM 6 OR entry_start IS NULL OR target_start IS NULL THEN
+    RAISE EXCEPTION 'OJT202 results must belong to the student relative semester 6.' USING ERRCODE='23514';
+   END IF;
+  END IF;
+ END IF;
+ RETURN NEW;
+END $fixed$;
+CREATE TRIGGER "TR_FixedOJT_Curriculum" BEFORE INSERT OR UPDATE ON "ProgramCourses" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+CREATE TRIGGER "TR_FixedOJT_Window" BEFORE INSERT OR UPDATE ON "OJTRegistrationWindows" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+CREATE TRIGGER "TR_FixedOJT_Registration" BEFORE INSERT OR UPDATE OF "StudentID","OJTSemesterID" ON "OJTRegistrations" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+CREATE TRIGGER "TR_FixedOJT_Handoff" BEFORE INSERT ON "EligibleStudentHandoffItems" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+CREATE TRIGGER "TR_FixedOJT_Assignment" BEFORE INSERT OR UPDATE OF "StudentID","PositionID" ON "InternshipAssignments" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+CREATE TRIGGER "TR_FixedOJT_GradeMapping" BEFORE INSERT OR UPDATE ON "ProgramOJTGradeMappings" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+CREATE TRIGGER "TR_FixedOJT_Result" BEFORE INSERT OR UPDATE ON "StudentCourseResults" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
+DO $fixed$ BEGIN
+ IF EXISTS(SELECT 1 FROM "ProgramCourses" pc JOIN "Courses" c USING("CourseID") WHERE upper(c."CourseCode")='OJT202' AND (pc."RecommendedSemester" IS DISTINCT FROM 6 OR pc."EntryKind"<>'COURSE')) THEN
+  RAISE EXCEPTION 'Catalog OJT202 courses must consistently use semester 6.';
+ END IF;
+END $fixed$;
+INSERT INTO "SchemaMigrations" ("Version") VALUES('20261025_fixed_ojt_semester_6');
 
--- Match the automatic semester link created by the academic-period API.
-INSERT INTO "OJTSemesters"
-  ("AcademicYearID", "SemesterCode", "Name", "AcademicPeriodID", "StartDate", "EndDate", "Status")
-SELECT p."AcademicYearID", 'OJT-AP-' || p."AcademicPeriodID", p."Name",
-       p."AcademicPeriodID", p."StartDate", p."EndDate", 'PLANNED'
-FROM "AcademicPeriods" p WHERE p."PeriodCode" = 'DEMO-PREP-2026'
-  AND NOT EXISTS (SELECT 1 FROM "OJTSemesters" o WHERE o."AcademicPeriodID" = p."AcademicPeriodID")
-ON CONFLICT DO NOTHING;
-COMMIT;
--- END DEMO PREPARATION CALENDAR: 20261022
+-- SECTION: Complete, deterministic 20-student demo fixture.
+-- Runs only as part of this full reset. Accounts and scores below are fictional.
+-- Login: student01@student.edu.vn ... student20@student.edu.vn / Student@123.
+SET LOCAL search_path=public,pg_catalog;
+CREATE TEMP TABLE _demo_student_cases (
+ n int PRIMARY KEY, full_name text NOT NULL, base_score numeric NOT NULL,
+ failed_codes text[] NOT NULL DEFAULT '{}', passed_retake boolean NOT NULL DEFAULT false,
+ withdraw_fifth boolean NOT NULL DEFAULT false
+) ON COMMIT DROP;
+INSERT INTO _demo_student_cases VALUES
+ (1,'Nguyễn Minh Anh',8.1,'{}',false,false),
+ (2,'Trần Quốc Bảo',7.4,'{}',false,false),
+ (3,'Lê Ngọc Châu',8.7,'{}',false,false),
+ (4,'Phạm Thành Đạt',6.8,'{}',false,false),
+ (5,'Hoàng Thùy Dương',7.1,'{SWR302}',false,false),
+ (6,'Vũ Gia Hân',6.9,'{SWR302,SWT301}',false,false),
+ (7,'Đặng Minh Hiếu',6.3,'{SWP391,SWR302,SWT301}',false,false),
+ (8,'Bùi Khánh Hòa',7.0,'{WDU203c}',false,false),
+ (9,'Đỗ Tuấn Hùng',7.8,'{SWR302}',true,false),
+ (10,'Hồ Thanh Hương',6.1,'{SWP391,SWR302,WDU203c}',false,false),
+ (11,'Ngô Đức Khang',8.4,'{}',false,false),
+ (12,'Dương Bảo Linh',8.8,'{}',false,false),
+ (13,'Lý Hoàng Long',7.6,'{}',false,false),
+ (14,'Mai Phương Mai',8.0,'{}',false,false),
+ (15,'Tạ Quang Minh',6.7,'{SWT301}',false,false),
+ (16,'Phan Hải Nam',7.2,'{}',false,true),
+ (17,'Cao Bích Ngọc',6.6,'{SWR302,SWT301}',false,false),
+ (18,'Trịnh Hoài Phong',7.9,'{SWR302,SWT301}',true,false),
+ (19,'Võ Minh Quân',5.6,'{}',false,false),
+ (20,'Đinh Hà Trang',9.2,'{}',false,false);
 
+DO $students$
+DECLARE actor_id int; source_program int; program_id int; cohort_id int; entry_id int;
+ target_period int; prep_id int; block_id int; term_id int; year_id int; entry_year int;
+BEGIN
+ SELECT "UserID" INTO STRICT actor_id FROM "Users" WHERE "Email"='academic@ojtrpa.edu.vn';
+ SELECT "OJTSemesterID","AcademicPeriodID" INTO STRICT term_id,target_period FROM "OJTSemesters" WHERE "SemesterCode"='DEMO-OJT-S6';
+ SELECT period_id INTO STRICT entry_id FROM _demo_study_periods WHERE stage=0;
+ SELECT period_id INTO STRICT prep_id FROM _demo_study_periods WHERE stage=5;
+ SELECT "AcademicYearID" INTO STRICT year_id FROM "AcademicPeriods" WHERE "AcademicPeriodID"=prep_id;
+ SELECT extract(year FROM "StartDate")::int INTO entry_year FROM "AcademicPeriods" WHERE "AcademicPeriodID"=entry_id;
+ INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","ParentPeriodID","StartDate","EndDate","Status")
+ SELECT year_id,'DEMO-PREP-B3','Block 3 - '||"Name",'BLOCK3',prep_id,greatest("StartDate",current_date-30),greatest("StartDate",current_date-1),
+ CASE WHEN "StartDate"<current_date THEN 'CLOSED' ELSE 'ACTIVE' END FROM "AcademicPeriods" WHERE "AcademicPeriodID"=prep_id
+ RETURNING "AcademicPeriodID" INTO block_id;
 
--- BEGIN DEMO OJT READY STUDENT: 20261022
--- Fictional curriculum, grades and account for Swagger workflow testing only.
--- Additive seed: never changes an existing student's curriculum, grades or registrations.
+ -- Keep the student demo self-contained using actual concrete catalog subjects.
+ -- Catalog publication follows the latest seed acceptance block at the end.
+ SELECT p."ProgramID" INTO STRICT source_program FROM "TrainingPrograms" p
+ JOIN "Specializations" sp ON sp."SpecializationID"=p."SpecializationID"
+ WHERE sp."SpecializationCode"='SE' AND p."ProgramCode"='BIT_SE_K18D_19A';
+ INSERT INTO "TrainingPrograms" ("ProgramCode","ProgramName","TotalCredits","SpecializationID","Version","EffectiveYear","CreatedBy")
+ SELECT 'DEMO-SE-FULL','Khung minh họa SE - 39 môn cụ thể / 114 tín chỉ (không phải CTĐT chính thức)',
+  (SELECT sum(pc."Credits") FROM "ProgramCourses" pc WHERE pc."ProgramID"=p."ProgramID" AND pc."EntryKind"='COURSE'),
+  p."SpecializationID",'1.0',entry_year,actor_id FROM "TrainingPrograms" p WHERE p."ProgramID"=source_program
+ RETURNING "ProgramID" INTO program_id;
+ INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","Credits","RecommendedSemester","IsRequired","EntryKind","PrerequisiteText")
+ SELECT program_id,"CourseID","CourseName","Credits","RecommendedSemester",true,'COURSE',NULL
+ FROM "ProgramCourses" WHERE "ProgramID"=source_program AND "EntryKind"='COURSE'
+ ORDER BY "RecommendedSemester","ProgramCourseID";
+ INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","ConfirmedBy") VALUES(program_id,10,actor_id);
+
+ -- Explicit prerequisite examples apply only to this fictional demo curriculum.
+ INSERT INTO "ProgramPrerequisiteGroups" ("ProgramID","ProgramCourseID","GroupCode","MinimumPassed")
+ SELECT program_id,pc."ProgramCourseID",'DEMO-ALL',count(*) FROM (VALUES
+  ('PRO192','PRF192'),('CSD201','PRO192'),('LAB211','PRO192'),
+  ('PRJ301','PRO192'),('PRJ301','DBI202'),('SWP391','PRJ301'),
+  ('SWP391','SWE201c'),('SWT301','SWE201c'),('JPD123','JPD113'),('SWD392','SWE201c')
+ ) v(target,prerequisite) JOIN "Courses" c ON c."CourseCode"=v.target
+ JOIN "ProgramCourses" pc ON pc."CourseID"=c."CourseID" AND pc."ProgramID"=program_id GROUP BY pc."ProgramCourseID";
+ INSERT INTO "ProgramPrerequisiteMembers" ("ProgramID","GroupID","CourseID")
+ SELECT program_id,g."GroupID",pr."CourseID" FROM (VALUES
+  ('PRO192','PRF192'),('CSD201','PRO192'),('LAB211','PRO192'),
+  ('PRJ301','PRO192'),('PRJ301','DBI202'),('SWP391','PRJ301'),
+  ('SWP391','SWE201c'),('SWT301','SWE201c'),('JPD123','JPD113'),('SWD392','SWE201c')
+ ) v(target,prerequisite) JOIN "Courses" c ON c."CourseCode"=v.target JOIN "Courses" pr ON pr."CourseCode"=v.prerequisite
+ JOIN "ProgramCourses" pc ON pc."CourseID"=c."CourseID" AND pc."ProgramID"=program_id
+ JOIN "ProgramPrerequisiteGroups" g ON g."ProgramCourseID"=pc."ProgramCourseID" AND g."ProgramID"=program_id;
+ UPDATE "ProgramCourses" pc SET "PrerequisiteText"=v.description FROM (
+  SELECT g."ProgramCourseID",string_agg(c."CourseCode",' AND ' ORDER BY c."CourseCode") AS description
+  FROM "ProgramPrerequisiteGroups" g JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID"
+  JOIN "Courses" c ON c."CourseID"=m."CourseID" WHERE g."ProgramID"=program_id GROUP BY g."ProgramCourseID"
+ ) v WHERE pc."ProgramCourseID"=v."ProgramCourseID";
+ UPDATE "TrainingPrograms" SET "PrerequisitesReviewed"=true,"EquivalencesReviewed"=true,
+  "Status"='PUBLISHED',"PublishedBy"=actor_id,"PublishedAt"=now() WHERE "ProgramID"=program_id;
+
+ INSERT INTO "Cohorts" ("CohortCode","Name","EnrollmentYear","Status")
+ VALUES('DEMO-SE-COHORT','Khóa SE minh họa '||entry_year,entry_year,'ACTIVE') RETURNING "CohortID" INTO cohort_id;
+ INSERT INTO "CohortGroups" ("CohortID","GroupCode","EntryAcademicPeriodID")
+ SELECT cohort_id,v,entry_id FROM unnest(ARRAY['A','B','C','D']) AS v;
+
+ INSERT INTO "CohortCurriculumPeriods" ("CohortID","GroupCode","CurriculumSemester","AcademicPeriodID")
+ SELECT cohort_id,g,stage,period_id FROM unnest(ARRAY['A','B','C','D']) g CROSS JOIN _demo_study_periods;
+
+ INSERT INTO "Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status")
+ SELECT 'student'||lpad(d.n::text,2,'0'),'$2b$10$4qpatgMq9N2Fgc.qnWP4keLOFOTuazu8A9d67lUS9gn/AyhWHHCV.',
+ 'student'||lpad(d.n::text,2,'0')||'@student.edu.vn','090100'||lpad(d.n::text,4,'0'),d.full_name,r."RoleID",'ACTIVE'
+ FROM _demo_student_cases d CROSS JOIN "Roles" r WHERE r."RoleCode"='STUDENT'
+ ON CONFLICT ("Email") DO UPDATE SET "FullName"=EXCLUDED."FullName","Phone"=EXCLUDED."Phone",
+  "PasswordHash"=EXCLUDED."PasswordHash","Status"='ACTIVE';
+ INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
+ SELECT u."UserID",'SE'||right(entry_year::text,2)||lpad(d.n::text,4,'0'),program_id,entry_year,5,
+ 'SE'||right(entry_year::text,2)||chr(65+(d.n-1)%4),'ACTIVE'
+ FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0')
+ ON CONFLICT ("UserID") DO UPDATE SET "StudentCode"=EXCLUDED."StudentCode","ProgramID"=EXCLUDED."ProgramID",
+  "EnrollmentYear"=EXCLUDED."EnrollmentYear","CurrentSemester"=EXCLUDED."CurrentSemester","ClassName"=EXCLUDED."ClassName","Status"='ACTIVE';
+ INSERT INTO "StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
+ SELECT s."StudentID",cohort_id,chr(65+(d.n-1)%4),entry_id,prep_id,actor_id
+ FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0') JOIN "Students" s ON s."UserID"=u."UserID";
+
+ -- Completed coursework preserves curriculum stages 0..5, including stage 0.
+ -- Vary scores by stable course codes, not global identity sequence values.
+ INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","AcademicPeriodID","AttemptNumber","Score","Grade","Status","SourceReference","RecordedBy")
+ SELECT student."StudentID",pc."CourseID",pc."RecommendedSemester",period."AcademicYearID",period."AcademicPeriodID",1,
+ mark.score,CASE WHEN mark.score IS NULL THEN NULL WHEN mark.score<5 THEN 'F' WHEN mark.score>=8 THEN 'A' WHEN mark.score>=7 THEN 'B' WHEN mark.score>=6 THEN 'C' ELSE 'D' END,
+ CASE WHEN mark.score IS NULL THEN 'WITHDRAWN' WHEN mark.score<5 THEN 'FAILED' ELSE 'PASSED' END,
+ 'DEMO-20-STUDENTS:FINALIZED-CURRICULUM-0-5',actor_id
+ FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0') JOIN "Students" student ON student."UserID"=u."UserID"
+ CROSS JOIN "ProgramCourses" pc JOIN "Courses" course ON course."CourseID"=pc."CourseID"
+ JOIN _demo_study_periods plan ON plan.stage=pc."RecommendedSemester"
+ JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=plan.period_id
+ CROSS JOIN LATERAL (SELECT CASE
+  WHEN d.withdraw_fifth AND pc."RecommendedSemester"=5 THEN NULL
+  WHEN course."CourseCode"=ANY(d.failed_codes) THEN round(2.5+((d.n+ascii(course."CourseCode"))%11)*0.2,2)
+  ELSE round(least(9.8,greatest(5.0,d.base_score+(((ascii(course."CourseCode")+length(course."CourseCode")+d.n)%5)-2)*0.15)),2)
+ END AS score) mark
+ WHERE pc."ProgramID"=program_id AND pc."RecommendedSemester" BETWEEN 0 AND 5;
+
+ -- Resits in semester 5 retain the initial failed attempt and count credit once.
+ INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","AcademicPeriodID","AttemptNumber","Score","Grade","Status","SourceReference","RecordedBy")
+ SELECT student."StudentID",course."CourseID",5,year_id,prep_id,2,mark.score,
+ CASE WHEN mark.score>=8 THEN 'A' WHEN mark.score>=7 THEN 'B' WHEN mark.score>=6 THEN 'C' ELSE 'D' END,
+ 'PASSED','DEMO-20-STUDENTS:SEMESTER-5-RESIT',actor_id
+ FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0') JOIN "Students" student ON student."UserID"=u."UserID"
+ JOIN "Courses" course ON course."CourseCode"=ANY(d.failed_codes)
+ CROSS JOIN LATERAL (SELECT round(least(9.8,d.base_score+0.35),2) AS score) mark
+ WHERE d.passed_retake;
+
+ -- OJT202, ENW493c and unfinished retakes in semester 6 have not started yet.
+ -- Keep them in the curriculum; do not invent IN_PROGRESS rows or grades in the future.
+
+ INSERT INTO "OJTRuleSets" ("ProgramID","OJTSemesterID","Version","Name","CreatedBy","Status","PublishedBy","PublishedAt")
+ VALUES(program_id,term_id,1,'DEMO: tối thiểu 70 tín chỉ, tối đa 2 môn nợ',actor_id,'PUBLISHED',actor_id,now());
+ INSERT INTO "OJTActiveRuleSets" ("ProgramID","ScopeSemesterID","RuleSetID")
+ SELECT program_id,term_id,"RuleSetID" FROM "OJTRuleSets" WHERE "ProgramID"=program_id AND "OJTSemesterID"=term_id;
+ INSERT INTO "OJTAssessmentWindows" ("OJTSemesterID","BlockPeriodID","AssessmentAcademicPeriodID","RequiredRelativeSemester","OpensAt","ClosesAt","Status","ConfiguredBy","Reason","ResultsFinalizedBy","ResultsFinalizedAt")
+ VALUES(term_id,block_id,prep_id,5,current_date,least(current_date+7,(SELECT "StartDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=term_id)),'OPEN',actor_id,'Mốc xét dữ liệu minh họa sau Block 3 kỳ 5',actor_id,clock_timestamp()-interval '1 second');
+ INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","Name","Scope","AcademicPeriodID","RequiredRelativeSemester","StartsAt","EndsAt","Status","CreatedBy","OpenedBy","OpenedAt")
+ VALUES(term_id,'Đợt đăng ký OJT cho 20 sinh viên demo',jsonb_build_object('programIds',jsonb_build_array(program_id)),target_period,6,current_date::timestamptz,(SELECT "RegEndDate"::timestamptz FROM "OJTSemesters" WHERE "OJTSemesterID"=term_id),'OPEN',actor_id,actor_id,now());
+ INSERT INTO "ProgramOJTGradeMappings" ("ProgramID","OJTSemesterID","CourseID","AcademicPeriodID","GradeBands","Reason","ConfirmedBy")
+ SELECT program_id,term_id,"CourseID",target_period,'[{"minimumScore":0,"outcome":"FAILED","grade":"F"},{"minimumScore":5,"outcome":"PASSED","grade":"D"},{"minimumScore":6,"outcome":"PASSED","grade":"C"},{"minimumScore":7,"outcome":"PASSED","grade":"B"},{"minimumScore":8,"outcome":"PASSED","grade":"A"}]'::jsonb,
+ 'Ánh xạ OJT của chương trình minh họa, thang 10',actor_id FROM "Courses" WHERE "CourseCode"='OJT202';
+END $students$;
+
+-- Cache only values derived from the actual attempts. The backend still recalculates
+-- GPA/credits itself and official eligibility is confirmed through the normal workflow.
+INSERT INTO "StudentAcademicSnapshot" ("StudentID","SnapshotDate","GPA","AccumulatedCredits","RemainingCredits","FailedCoursesCount","CurrentSemester","TargetOJTSemesterID")
+SELECT s."StudentID",current_date,
+ (SELECT round(sum(r."Score"*pc."Credits")/NULLIF(sum(pc."Credits"),0),2) FROM (
+  SELECT DISTINCT ON (r."CourseID") r.* FROM "StudentCourseResults" r JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=r."AcademicPeriodID"
+  WHERE r."StudentID"=s."StudentID" AND r."Status" IN ('PASSED','FAILED') ORDER BY r."CourseID",ap."StartDate" DESC,r."AttemptNumber" DESC,r."ResultID" DESC
+ ) r JOIN "ProgramCourses" pc ON pc."CourseID"=r."CourseID" AND pc."ProgramID"=s."ProgramID"),
+ totals.earned,p."TotalCredits"-totals.earned,totals.failed,s."CurrentSemester",o."OJTSemesterID"
+FROM "Students" s JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
+CROSS JOIN "OJTSemesters" o CROSS JOIN LATERAL (
+ SELECT coalesce(sum(pc."Credits") FILTER (WHERE EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID" AND r."CourseID"=pc."CourseID" AND r."Status" IN ('PASSED','RECOGNIZED'))),0)::int AS earned,
+ count(*) FILTER (WHERE EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID" AND r."CourseID"=pc."CourseID" AND r."Status"='FAILED') AND NOT EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID" AND r."CourseID"=pc."CourseID" AND r."Status" IN ('PASSED','RECOGNIZED')))::int AS failed
+ FROM "ProgramCourses" pc WHERE pc."ProgramID"=s."ProgramID"
+) totals WHERE p."ProgramCode"='DEMO-SE-FULL' AND o."SemesterCode"='DEMO-OJT-S6';
+INSERT INTO "Notifications" ("UserID","Title","Content","SentAt","IsRead")
+SELECT "UserID",'Hồ sơ học tập demo đã sẵn sàng',
+ 'Bạn đã có kết quả học phần đến kỳ chương trình 5. Kỳ 6 OJT chưa bắt đầu. Hãy kiểm tra bảng điểm và điều kiện OJT; kết quả chính thức cần được Phòng Đào tạo xét, xác nhận và bàn giao trước khi đăng ký.',now(),false FROM "Students";
+
+DO $verify$
+BEGIN
+ IF (SELECT count(*) FROM "Students")<>20 OR (SELECT count(*) FROM "StudentAcademicPlacements")<>20
+ OR (SELECT count(*) FROM "StudentAcademicSnapshot")<>20 THEN
+  RAISE EXCEPTION 'The reset must create exactly 20 complete student profiles.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "Students" s WHERE s."ProgramID" IS NULL OR NOT EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID")) THEN
+  RAISE EXCEPTION 'A demo student is missing a curriculum or course results.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."Status"='IN_PROGRESS' AND r."Score" IS NOT NULL) THEN
+  RAISE EXCEPTION 'In-progress courses must not have fabricated grades.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "StudentCourseResults" result WHERE result."SemesterTaken" IS DISTINCT FROM "StudentCurriculumSemester"(result."StudentID",result."AcademicPeriodID")) THEN
+  RAISE EXCEPTION 'Transcript curriculum stage must match the explicit cohort/calendar mapping.';
+ END IF;
+ -- The cohort is at curriculum stage 5; stage 6 OJT is in the next calendar semester.
+ IF EXISTS(SELECT 1 FROM "Students" student JOIN "StudentAcademicPlacements" placement USING("StudentID") JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=placement."CurrentAcademicPeriodID" WHERE student."CurrentSemester"<>5 OR period."AcademicPeriodID"<>(SELECT period_id FROM _demo_study_periods WHERE stage=5)) THEN
+  RAISE EXCEPTION 'Student progress must remain at mapped curriculum stage 5 before the upcoming OJT6 target.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "StudentCourseResults" result JOIN "Students" student USING("StudentID") JOIN "AcademicPeriods" period USING("AcademicPeriodID") WHERE result."SemesterTaken">student."CurrentSemester" OR period."StartDate">current_date OR result."AcademicYearID"<>period."AcademicYearID") THEN
+  RAISE EXCEPTION 'Transcript contains future courses or an inconsistent semester/year.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "StudentCourseResults" result WHERE result."Grade" IS DISTINCT FROM CASE WHEN result."Score" IS NULL THEN NULL WHEN result."Score"<5 THEN 'F' WHEN result."Score">=8 THEN 'A' WHEN result."Score">=7 THEN 'B' WHEN result."Score">=6 THEN 'C' ELSE 'D' END) THEN
+  RAISE EXCEPTION 'Letter grades must be calculated from the actual numeric attempt score.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM _demo_student_cases sample CROSS JOIN LATERAL unnest(sample.failed_codes) failed(code) JOIN "Users" account ON account."Username"='student'||lpad(sample.n::text,2,'0') JOIN "Students" student ON student."UserID"=account."UserID" WHERE NOT EXISTS(SELECT 1 FROM "ProgramCourses" pc JOIN "Courses" course USING("CourseID") WHERE pc."ProgramID"=student."ProgramID" AND course."CourseCode"=failed.code)) THEN
+  RAISE EXCEPTION 'A failed/retaken course is missing from the student curriculum.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM "OJTSemesters" term JOIN "OJTRegistrationWindows" registration_window ON registration_window."OJTSemesterID"=term."OJTSemesterID" WHERE term."SemesterCode"='DEMO-OJT-S6' AND (term."StartDate"<=current_date OR term."Status"<>'PLANNED' OR registration_window."EndsAt">term."StartDate"::timestamptz)) THEN
+  RAISE EXCEPTION 'OJT6 must begin after the assessment and registration period.';
+ END IF;
+END $verify$;
+INSERT INTO "SchemaMigrations" ("Version") VALUES('20261025_complete_20_student_seed');
+-- The latest catalog publication below is part of the same reset transaction.
+
+-- BEGIN INCREMENTAL UPDATE: 20261023_academic_rest_resources
+-- Existing databases: run only this block; no existing application rows are changed.
+-- From backend/: npm run db:migrate:academic-rest
+-- Stores validated student/curriculum import requests for the REST preview/commit workflow.
 BEGIN;
 SET LOCAL search_path=public,pg_catalog;
-SET LOCAL lock_timeout='10s';
-DO $demo$
-DECLARE actor_id int; program_id int; user_id int; student_id int; cohort_id int;
-        entry_id int; prep_id int; term_id int; term_period int; year_id int;
-        period_id int; course_id int; rule_id int; n int; sem int; rec record;
+CREATE TABLE IF NOT EXISTS "AcademicImportRequests" (
+ "ImportID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "Kind" varchar(20) NOT NULL CHECK("Kind" IN ('STUDENT','CURRICULUM')),
+ "IdempotencyKey" varchar(100) NOT NULL,"RequestHash" char(64) NOT NULL,
+ "Payload" jsonb NOT NULL CHECK(jsonb_typeof("Payload")='object'),
+ "Preview" jsonb NOT NULL CHECK(jsonb_typeof("Preview")='object'),
+ "Status" varchar(20) NOT NULL DEFAULT 'VALIDATED' CHECK("Status" IN ('VALIDATED','COMMITTED')),
+ "Result" jsonb,"CreatedBy" int NOT NULL REFERENCES "Users"("UserID"),
+ "CreatedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),"CommittedAt" timestamptz,
+ "AccountBatchID" bigint REFERENCES "AccountImportBatches"("BatchID"),
+ "AcademicBatchID" bigint REFERENCES "AcademicImportBatches"("BatchID"),
+ UNIQUE("Kind","CreatedBy","IdempotencyKey"),
+ CHECK(("Status"='COMMITTED')=("CommittedAt" IS NOT NULL)),
+ CHECK("Status"<>'COMMITTED' OR ("Result" IS NOT NULL AND "AcademicBatchID" IS NOT NULL))
+);
+COMMENT ON TABLE "AcademicImportRequests" IS 'Validated student and curriculum imports; committed requests retain results and batch references.';
+COMMENT ON COLUMN "AcademicImportRequests"."IdempotencyKey" IS 'Retry key scoped to import kind and staff creator; the request hash detects changed payloads.';
+COMMENT ON COLUMN "AcademicImportRequests"."Status" IS 'VALIDATED stores the preview; COMMITTED records an applied import and its result.';
+CREATE INDEX IF NOT EXISTS "IX_AcademicImportRequests_KindID" ON "AcademicImportRequests"("Kind","ImportID" DESC);
+ALTER TABLE "AcademicImportRequests" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "AcademicImportRequests" FROM PUBLIC;
+DO $$ DECLARE role_name text; BEGIN
+ FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON TABLE "AcademicImportRequests" FROM %I',role_name); END IF;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE "AcademicImportRequests" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE "AcademicImportRequests_ImportID_seq" TO service_role;
+ END IF;
+END $$;
+INSERT INTO "SchemaMigrations"("Version") VALUES('20261023_academic_rest_resources') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: 20261023_academic_rest_resources
+
+-- SECTION: 20261024 publish seeded training programs
+-- Fresh-install seed acceptance, scoped only to program codes inserted by this file.
+-- SEED-2026 / 2026 identify this seed release, not a guessed cohort entry year.
+DO $publish_seed$
+DECLARE actor_id int;
 BEGIN
- PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
- IF EXISTS (SELECT 1 FROM "SchemaMigrations" WHERE "Version"='20261022_demo_ojt_ready_student') THEN RETURN; END IF;
  SELECT u."UserID" INTO STRICT actor_id FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID"
  WHERE u."Email"='academic@ojtrpa.edu.vn' AND r."RoleCode"='ACADEMIC';
- SELECT "AcademicPeriodID" INTO STRICT prep_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-PREP-2026';
- SELECT "OJTSemesterID","AcademicPeriodID" INTO STRICT term_id,term_period FROM "OJTSemesters" WHERE "SemesterCode"='DEMO-OJT-2027-01';
- INSERT INTO "AcademicYears" ("YearCode","StartDate","EndDate","Status") VALUES
- ('DEMO-2024-2025','2024-09-01','2025-08-31','CLOSED'),
- ('DEMO-2025-2026','2025-09-01','2026-08-31','CLOSED') ON CONFLICT ("YearCode") DO NOTHING;
- FOR rec IN SELECT * FROM (VALUES
- ('DEMO-READY-S1','DEMO-2024-2025',DATE '2024-09-01',DATE '2024-12-31'),
- ('DEMO-READY-S2','DEMO-2024-2025',DATE '2025-01-01',DATE '2025-04-30'),
- ('DEMO-READY-S3','DEMO-2025-2026',DATE '2025-09-01',DATE '2025-12-31'),
- ('DEMO-READY-S4','DEMO-2025-2026',DATE '2026-01-01',DATE '2026-04-30')) AS v(code,year_code,start_day,end_day)
- LOOP
-  IF EXISTS (SELECT 1 FROM "AcademicPeriods" WHERE "StartDate"<=rec.end_day AND "EndDate">=rec.start_day) THEN
-   RAISE EXCEPTION 'Demo calendar overlaps an existing academic period: %',rec.code;
-  END IF;
-  SELECT "AcademicYearID" INTO STRICT year_id FROM "AcademicYears" WHERE "YearCode"=rec.year_code;
-  INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","StartDate","EndDate","Status")
-  VALUES(year_id,rec.code,'Học kỳ demo '||rec.code,'SEMESTER',rec.start_day,rec.end_day,'CLOSED');
- END LOOP;
- SELECT "AcademicPeriodID" INTO STRICT entry_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-READY-S1';
- INSERT INTO "TrainingPrograms" ("ProgramCode","ProgramName","TotalCredits","SpecializationID")
- SELECT 'DEMO-OJT-READY','Chương trình giả lập kiểm thử OJT (không phải CTĐT chính thức)',82,"SpecializationID"
- FROM "Specializations" WHERE "SpecializationCode"='SE' RETURNING "ProgramID" INTO STRICT program_id;
- INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","ConfirmedBy") VALUES(program_id,10,actor_id);
- INSERT INTO "Users" ("Username","PasswordHash","Email","FullName","RoleID","Status")
- SELECT 'demo.ojt01','$2b$12$/7w0sgql7uF34ubVsXY4eOztDZ3XG7jUXXE/qhDOVPz3CU/HsLlRm','demo.ojt01@student.edu.vn','Sinh viên demo luồng OJT',"RoleID",'ACTIVE'
- FROM "Roles" WHERE "RoleCode"='STUDENT' RETURNING "UserID" INTO STRICT user_id;
- INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
- VALUES(user_id,'DEMO-OJT-001',program_id,2024,5,'DEMO-OJT','ACTIVE') RETURNING "StudentID" INTO student_id;
- INSERT INTO "Cohorts" ("CohortCode","Name","EnrollmentYear","Status") VALUES('DEMO-READY-2024','Khóa demo OJT',2024,'ACTIVE') RETURNING "CohortID" INTO cohort_id;
- INSERT INTO "CohortGroups" VALUES(cohort_id,'A',entry_id);
- INSERT INTO "StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
- VALUES(student_id,cohort_id,'A',entry_id,prep_id,actor_id);
- FOR n IN 1..24 LOOP
-  sem:=((n-1)/6)+1;
-  INSERT INTO "Courses" ("CourseCode","CourseName","Credits") VALUES('DEMO-READY-'||lpad(n::text,2,'0'),'Môn giả lập kiểm thử '||n,3) RETURNING "CourseID" INTO course_id;
-  INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","Credits","RecommendedSemester","IsRequired","EntryKind")
-  VALUES(program_id,course_id,'Môn giả lập kiểm thử '||n,3,sem,true,'COURSE');
-  SELECT "AcademicPeriodID","AcademicYearID" INTO STRICT period_id,year_id FROM "AcademicPeriods" WHERE "PeriodCode"='DEMO-READY-S'||sem;
-  INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","AcademicPeriodID","Score","Grade","Status","SourceReference","RecordedBy")
-  VALUES(student_id,course_id,sem,year_id,period_id,8,'B','PASSED','DEMO-ONLY-20261022',actor_id);
- END LOOP;
- INSERT INTO "Courses" ("CourseCode","CourseName","Credits") VALUES('DEMO-READY-OJT','OJT giả lập kiểm thử',10) RETURNING "CourseID" INTO course_id;
- INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","Credits","RecommendedSemester","IsRequired","EntryKind")
- VALUES(program_id,course_id,'OJT giả lập kiểm thử',10,6,true,'COURSE');
- INSERT INTO "OJTRuleSets" ("ProgramID","OJTSemesterID","Version","Name","CreatedBy","Status","PublishedBy","PublishedAt")
- VALUES(program_id,term_id,1,'Quy tắc demo: 70 tín chỉ, tối đa 2 môn nợ',actor_id,'PUBLISHED',actor_id,now()) RETURNING "RuleSetID" INTO rule_id;
- INSERT INTO "OJTActiveRuleSets" VALUES(program_id,term_id,rule_id);
- INSERT INTO "ProgramOJTGradeMappings" ("ProgramID","OJTSemesterID","CourseID","AcademicPeriodID","GradeBands","Reason","ConfirmedBy")
- VALUES(program_id,term_id,course_id,term_period,'[{"minimumScore":0,"outcome":"FAILED","gradePoints":0,"grade":"F"},{"minimumScore":5,"outcome":"PASSED","gradePoints":2,"grade":"C"},{"minimumScore":7,"outcome":"PASSED","gradePoints":3,"grade":"B"},{"minimumScore":8.5,"outcome":"PASSED","gradePoints":4,"grade":"A"}]','Bảng điểm giả lập chỉ dùng test',actor_id);
- INSERT INTO "AuditLogs" ("UserID","Action","EntityType","EntityID","Detail")
- VALUES(actor_id,'SEED_DEMO','Students',student_id,jsonb_build_object('source','20261022_demo_ojt_ready_student','fictional',true)::text);
- INSERT INTO "SchemaMigrations" ("Version") VALUES('20261022_demo_ojt_ready_student');
-END $demo$;
+ CREATE TEMP TABLE seed_published_programs ("ProgramID" int PRIMARY KEY) ON COMMIT DROP;
+ INSERT INTO seed_published_programs
+ SELECT p."ProgramID" FROM "TrainingPrograms" p JOIN (VALUES
+ ('BIT_AI_K18D-19A'),
+ ('BIT_AI_K18D-19A_FNO'),
+ ('BIT_AI_K19B_FNO'),
+ ('BIT_AI_K19D-20A'),
+ ('BIT_AI_K20B'),
+ ('BIT_AI_K20B_FNO'),
+ ('BIT_AI_K20C'),
+ ('BIT_AI_K20D-21A'),
+ ('BIT_AI_K21B'),
+ ('BIT_AI_K21C'),
+ ('BIT_AI_K21D-22A'),
+ ('BIT_IA_K18D-19A'),
+ ('BIT_IA_K18D-19A_FNO'),
+ ('BIT_IA_K19B_FNO'),
+ ('BIT_IA_K19D-20A'),
+ ('BIT_IA_K20B'),
+ ('BIT_IA_K20B_FNO'),
+ ('BIT_IA_K20C'),
+ ('BIT_IA_K20D-21A'),
+ ('BIT_IA_K21B'),
+ ('BIT_IA_K21C'),
+ ('BIT_IA_K21D-22A'),
+ ('BIT_IS_K18D_19A'),
+ ('BIT_IS_K19B'),
+ ('BIT_IS_K19C'),
+ ('BIT_IS_K19D_K20A'),
+ ('BIT_IS_K20B'),
+ ('BIT_IS_K20C'),
+ ('BIT_IS_K20D'),
+ ('BIT_IS_K20D-21A'),
+ ('BIT_SE_K18D_19A'),
+ ('BIT_SE_K19B'),
+ ('BIT_SE_K19C'),
+ ('BIT_SE_K19D_K20A'),
+ ('BIT_SE_K20B'),
+ ('BIT_SE_K20C'),
+ ('BIT_SE_K20D_K21A'),
+ ('BIT_SE_K21B'),
+ ('BIT_SE_K21C'),
+ ('BIT_SE-2026_K21D_K22A'),
+ ('DEMO-SE-FULL')
+ ) AS seed(code) ON seed.code=p."ProgramCode";
+
+ UPDATE "TrainingPrograms" p SET
+  "Version"=COALESCE(p."Version",'SEED-2026'),
+  "EffectiveYear"=COALESCE(p."EffectiveYear",2026),
+  "Status"='PUBLISHED',"PrerequisitesReviewed"=true,"EquivalencesReviewed"=true,
+  "CreatedBy"=COALESCE(p."CreatedBy",actor_id),
+  "PublishedBy"=COALESCE(p."PublishedBy",actor_id),
+  "PublishedAt"=COALESCE(p."PublishedAt",now()),"UpdatedAt"=now()
+ FROM seed_published_programs seed WHERE seed."ProgramID"=p."ProgramID";
+ UPDATE "ProgramCombos" b SET "CoursesReviewed"=true
+ FROM seed_published_programs seed WHERE seed."ProgramID"=b."ProgramID";
+ -- Accept curriculum requirements from this seed; slot rows remain choice slots.
+ UPDATE "ProgramCourses" pc SET "IsRequired"=true
+ FROM seed_published_programs seed WHERE seed."ProgramID"=pc."ProgramID" AND pc."IsRequired" IS NULL;
+ -- Seed/demo grades use the 0..10 scale; preserve any policy already configured.
+ INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","RetakePolicy","ConfirmedBy")
+ SELECT "ProgramID",10,'LATEST',actor_id FROM seed_published_programs
+ ON CONFLICT ("ProgramID") DO NOTHING;
+ INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261024_publish_seeded_programs') ON CONFLICT DO NOTHING;
+END $publish_seed$;
 COMMIT;
--- END DEMO OJT READY STUDENT: 20261022
+-- BEGIN SEED OJT ASSESSMENT WINDOWS: 20261024
+-- Only seed OJT terms with a completed preparation semester and Block 3.
+-- One window per term; reruns preserve any configuration made by staff.
+BEGIN;
+SET LOCAL search_path = public, pg_catalog;
+INSERT INTO "OJTAssessmentWindows"
+ ("OJTSemesterID","BlockPeriodID","AssessmentAcademicPeriodID","RequiredRelativeSemester",
+  "OpensAt","ClosesAt","Status","Reason","ConfiguredBy")
+SELECT o."OJTSemesterID", prep.block_id, prep.parent_id, 5,
+       prep.ready_at, prep.ready_at + interval '7 days', 'DRAFT',
+       'Lịch xét điều kiện sau học kỳ chuẩn bị và Block 3; cần Phòng đào tạo xác nhận trước khi mở.', actor."UserID"
+FROM "OJTSemesters" o
+CROSS JOIN LATERAL (
+ SELECT b."AcademicPeriodID" block_id, p."AcademicPeriodID" parent_id,
+        (GREATEST(b."EndDate",p."EndDate") + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh' ready_at
+ FROM "AcademicPeriods" b JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=b."ParentPeriodID"
+ WHERE b."Kind"='BLOCK3' AND p."Kind"='SEMESTER'
+   AND b."EndDate" < o."StartDate" AND p."EndDate" < o."StartDate"
+ ORDER BY GREATEST(b."EndDate",p."EndDate") DESC,b."AcademicPeriodID" DESC LIMIT 1
+) prep
+CROSS JOIN LATERAL (
+ SELECT u."UserID" FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID"
+ WHERE r."RoleCode"='ACADEMIC' AND u."Status"='ACTIVE' ORDER BY u."UserID" LIMIT 1
+) actor
+ON CONFLICT ("OJTSemesterID") DO NOTHING;
+COMMIT;
+-- END SEED OJT ASSESSMENT WINDOWS: 20261024

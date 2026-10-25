@@ -800,19 +800,19 @@ const operationTags: Readonly<Record<string, readonly string[]>> = {
     "Admin",
     "Phòng QHDN"
   ],
-  "POST /api/student/applications": [
+  "POST /api/students/me/applications": [
     "Student"
   ],
-  "GET /api/student/curriculum": [
+  "GET /api/students/me/curriculum": [
     "Student"
   ],
-  "DELETE /api/student/cv": [
+  "DELETE /api/students/me/cv": [
     "Student"
   ],
-  "POST /api/student/cv": [
+  "POST /api/students/me/cv": [
     "Student"
   ],
-  "POST /api/student/cv/analyses": [
+  "POST /api/students/me/cv/analyses": [
     "Student"
   ],
   "POST /api/students": [

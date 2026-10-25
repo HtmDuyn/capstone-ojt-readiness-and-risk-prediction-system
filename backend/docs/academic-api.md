@@ -6,10 +6,10 @@ All 13 endpoints require a bearer token for `ACADEMIC` or `ADMIN`. Accounts with
 
 | Resource | List | Create | Update |
 |---|---|---|---|
-| Academic years | `GET /api/academic-years` | `POST /api/academic-years` | `PATCH /api/academic-years/:id` |
-| Specialized semesters / Block 3 | `GET /api/academic-periods` | `POST /api/academic-periods` | `PATCH /api/academic-periods/:id` |
+| Academic years | `GET /api/academic-years` | `POST /api/academic-years` | `PATCH /api/academic-years` |
+| Specialized semesters / Block 3 | `GET /api/academic-periods` | `POST /api/academic-periods` | `PATCH /api/academic-periods` |
 | OJT metadata | Trong search/detail academic-periods | Tự tạo khi tạo học kỳ | PATCH academic-periods với `ojt` |
-| Cohorts / groups A–D | `GET /api/cohorts` | `POST /api/cohorts` | `PATCH /api/cohorts/:id` |
+| Cohorts / groups A–D | `GET /api/cohorts` | `POST /api/cohorts` | `PATCH /api/cohorts` |
 
 The final endpoint is `PATCH /api/students/:id/academic-placement`. `:id` is a `StudentID`, not a `UserID`.
 
@@ -49,7 +49,7 @@ npm start
 }
 ```
 
-`PATCH /api/academic-years/1` can update any of these fields. The year cannot be shortened so that an existing academic period or OJT semester falls outside it.
+`PATCH /api/academic-years` accepts one JSON body containing `id` and the fields to update. For example: `{"id":4,"yearCode":"2026-2027","startDate":"2026-09-01","endDate":"2027-08-31","status":"ACTIVE"}`. The response includes the updated year and its related periods. The year cannot be shortened so that an existing academic period or OJT semester falls outside it.
 
 ## 2. Academic period
 
@@ -80,7 +80,7 @@ Then create its Block 3, using the returned semester ID:
 }
 ```
 
-Rules: both are within the academic year; a Block 3 starts after its parent semester ends, belongs to the same year and has a `SEMESTER` parent. Each semester has at most one Block 3. Periods cannot overlap, including periods from different academic years. Regular semesters have no parent. PATCH checks child blocks, linked OJT semesters and existing student placements before committing.
+Rules: both are within the academic year; a Block 3 starts after its parent semester ends, belongs to the same year and has a `SEMESTER` parent. Each semester has at most one Block 3. Periods within the same academic year cannot overlap, including Block 3. Periods belonging to different academic years may share dates. Regular semesters have no parent. PATCH checks child blocks, linked OJT semesters and existing student placements before committing.
 
 Configure the full school calendar, including past regular semesters needed to calculate student progression. The API counts declared semesters, not an assumed number of months or semesters per year.
 

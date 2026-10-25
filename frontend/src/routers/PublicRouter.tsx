@@ -23,6 +23,11 @@ import EducationSupportClassDemand from "@/pages/education/EducationSupportClass
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
+import AdminAiConfig from "@/pages/admin/AdminAiConfig";
+import AdminSettings from "@/pages/admin/AdminSettings";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -246,8 +251,41 @@ export const router = createBrowserRouter([
 
   {
     element: <PrivateRoute allowedRoles={["admin"]} />,
-
-    children: [createRoleRoutes("admin")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("admin")}
+            homePath="/admin/dashboard"
+            brandSubtitle="Quản trị viên"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          {
+            path: "/admin/dashboard",
+            element: <AdminDashboard />,
+          },
+          ...getMenuByRole("admin")
+            .filter((item) => item.path !== "/admin/dashboard")
+            .map((item) => ({
+              path: item.path,
+              element:
+                item.path === "/admin/users" ? (
+                  <AdminUsers />
+                ) : item.path === "/admin/metrics" ? (
+                  <AdminSystemMetrics />
+                ) : item.path === "/admin/ai-config" ? (
+                  <AdminAiConfig />
+                ) : item.path === "/admin/settings" ? (
+                  <AdminSettings />
+                ) : (
+                  <RolePlaceholderPage role="admin" />
+                ),
+            })),
+        ],
+      },
+    ],
   },
 
   /* =======================================================

@@ -156,7 +156,12 @@
 }
 
 
-/* Keep Swagger path/query parameters and their input fields visible. */
+/* This list has no inputs: keep Execute and responses, without an empty Parameters section. */
+.swagger-ui [id="operations-Phòng_đào_tạo-get_api_cohorts"] .opblock-body > .opblock-section {
+    display: none;
+}
+
+/* Keep Swagger path/query parameters and their input fields visible for other operations. */
 
 /* ============================================================
    REQUEST BODY

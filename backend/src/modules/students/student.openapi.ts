@@ -305,6 +305,24 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
+ *           },
+ *           {
+ *             "name": "importedOnly",
+ *             "in": "query",
+ *             "description": "Only students included in a successful student account import.",
+ *             "schema": {
+ *               "type": "boolean",
+ *               "default": false
+ *             }
+ *           },
+ *           {
+ *             "name": "importBatchId",
+ *             "in": "query",
+ *             "description": "Filter by the source account import batch ID (positive bigint string).",
+ *             "schema": {
+ *               "type": "string",
+ *               "pattern": "^[1-9][0-9]*$"
+ *             }
  *           }
  *         ],
  *         "responses": {

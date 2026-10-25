@@ -10,7 +10,7 @@ const roleNames: Record<RoleCode, string> = {
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},
-  {roles:["STUDENT"],operations:["GET /api/student/academic-summary","GET /api/student/supplementary-course-options","GET /api/student/ojt-registration-windows","GET /api/student/curriculum","GET /api/student/notifications","PATCH /api/student/notifications/{id}/read","GET /api/student/combo-registration-windows","GET /api/student/assignments/current","GET /api/student/ojt-results","GET /api/student/ojt-results/{id}","GET /api/student/dashboard","GET /api/student/roadmap-recommendations"]},
+  {roles:["STUDENT"],operations:["GET /api/students/me/academic-summary","GET /api/students/me/supplementary-course-options","GET /api/students/me/curriculum","GET /api/students/me/notifications","PATCH /api/students/me/notifications/{id}","GET /api/students/me/assignments/current","GET /api/students/me/ojt-results","GET /api/students/me/ojt-results/{id}","GET /api/students/me/dashboard","GET /api/students/me/roadmap-recommendations"]},
   {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
   {roles:['ADMIN','OJT_COORD','ENTERPRISE','STUDENT'],operations:['GET /api/internship-tasks']},
   {roles:['STUDENT'],operations:['POST /api/students/me/cv','POST /api/job-applications','GET /api/students/me/opportunities']},
@@ -33,7 +33,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/ojt-rule-sets",
     "GET /api/ojt-semesters/{id}/assessment-window",
     "GET /api/students",
-    "PATCH /api/academic-periods/{id}",
     "PATCH /api/academic-years/{id}",
     "PATCH /api/cohorts/{id}",
     "PATCH /api/combo-registration-windows/{id}",
@@ -163,6 +162,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     if (access.has(key)) throw new Error('Duplicate Swagger access entry: ' + key);
     access.set(key, group.roles);
   }
+  for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
   for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
   for(const key of ['GET /api/ojt-registration-windows','POST /api/ojt-registrations','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);

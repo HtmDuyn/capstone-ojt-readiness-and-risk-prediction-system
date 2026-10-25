@@ -5,3 +5,4 @@ const configured = (
 ).replace(/\/+$/, "");
 export const API_ORIGIN = configured.replace(/\/api$/, "");
 export const API_URL = API_ORIGIN + "/api";
+export const API_BASE_URL = API_URL;

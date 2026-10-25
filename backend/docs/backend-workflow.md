@@ -89,9 +89,9 @@ Thay ID và ngày bằng dữ liệu thực tế. Chỉ doanh nghiệp sở hữ
 
 **20 route thực tế:**
 
-- Các route song song `/api/student/companies`, `/api/student/positions` và chi tiết: dùng `/api/students/me/opportunities`.
-- Các route `/api/student/applications`, chi tiết và withdraw thuộc luồng CV cũ: dùng luồng `/api/job-applications` hiện tại.
-- `POST/GET/DELETE /api/student/cv`, các route `/api/student/cv/analyses` và `/api/student/company-recommendations` thuộc kho CV song song; giữ upload CV chính thức `/api/students/me/cv`.
+- Các route song song `/api/students/me/companies`, `/api/students/me/positions` và chi tiết: dùng `/api/students/me/opportunities`.
+- Các route `/api/students/me/applications`, chi tiết và withdraw thuộc luồng CV cũ: dùng luồng `/api/job-applications` hiện tại.
+- `POST/GET/DELETE /api/students/me/cv`, các route `/api/students/me/cv/analyses` và `/api/students/me/company-recommendations` thuộc kho CV song song; giữ upload CV chính thức `/api/students/me/cv`.
 - `POST /api/ojt-results`, `POST /api/ojt-results/{id}/transfer`, `POST /api/ojt-results/{id}/revision-requests`, `PATCH /api/ojt-results/{id}`, `POST /api/ojt-results/{id}/confirm`.
 - `PUT /api/assignments/{id}/internship-evaluation`: bỏ nhập điểm thay doanh nghiệp từ phía QHDN.
 
@@ -99,10 +99,8 @@ Thay ID và ngày bằng dữ liệu thực tế. Chỉ doanh nghiệp sở hữ
 
 Adapter JSON cho các API bị loại bỏ cũng được gỡ. Các route gốc còn dùng làm đích dispatch cho adapter JSON được giữ. Không xóa dữ liệu lịch sử, tài khoản hoặc tin tuyển dụng cũ trong DB.
 
-## Kiểm thử
+## Kiểm tra backend
 
-Chạy `npm test`, `npm run build`, `npm run docs:api`.
+Chạy `npm run build` để kiểm tra TypeScript và `npm run docs:api` để sinh tài liệu API.
 
-12 nhóm kiểm thử dùng PostgreSQL nhúng PGlite, fixture độc lập và SMTP cục bộ nhận thư thật qua giao thức SMTP. Bao gồm import mới/trùng email/collision, password random/hash/email/replay, nhập Excel doanh nghiệp và sinh viên, rollback, phân quyền QHDN, ma trận task và giới hạn/phạm vi, điểm chính thức/danh sách/email cuối kỳ/chống gửi lặp, Swagger khớp route, HTTP với JWT và multipart.
-
-Không kết nối DB thật, không gửi mail cho địa chỉ thật, không kiểm chứng SMTP production hoặc migration đã được áp dụng ở môi trường triển khai. Fixture kiểm thử chỉ dựng các bảng cần cho luồng này, không thay thế kiểm thử toàn bộ schema production.
+Các script kiểm thử cũ đã được gỡ; hiện không có lệnh `npm test`. Kiểm tra HTTP hoặc SQL thủ công cần dùng database tạm; kiểm tra database thật chỉ đọc nếu chưa có yêu cầu thay đổi dữ liệu.
