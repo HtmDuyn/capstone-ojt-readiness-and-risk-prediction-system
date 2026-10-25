@@ -1,4 +1,6 @@
+import { describeAcademicRest } from './swagger-academic-rest';
 import { describeHandoffWorkflow } from './swagger-handoff-workflow';
+import { describeAcademicContracts, describeAcademicOperationContracts } from './swagger-academic-contracts';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
 import { describeListBaseFields } from './swagger-list-base-fields';
 import {
@@ -15,6 +17,7 @@ import { mergeSharedRoleContracts } from './shared-role-contracts';
 import { addEnterpriseOperations } from '../modules/qhdn/enterprise.openapi';
 import { addRecruitmentOperations } from '../modules/recruitment/recruitment.openapi';
 import { describeRestOperations } from './rest-operations';
+import { describeStudentJsonOperations } from './student-json-contracts';
 import { groupSwaggerByRole } from './swagger-role-groups';
 import { describeMergedSearchResponses } from './swagger-search-contracts';
 import { describeFeResponses } from './swagger-fe-contracts';
@@ -386,4 +389,5 @@ describeOfficialResults(describedSpec);
 describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
-export const swaggerSpec = describeRestOperations(groupSwaggerByRole(describedSpec));
+describeAcademicContracts(describedSpec);
+export const swaggerSpec = describeAcademicOperationContracts(describeStudentJsonOperations(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec)))));

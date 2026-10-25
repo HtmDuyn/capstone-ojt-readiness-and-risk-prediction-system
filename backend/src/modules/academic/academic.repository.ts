@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { pool, query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicError, pageInput, positiveId, statusInput } from './academic.schema';
@@ -5,11 +6,12 @@ import { academicError, pageInput, positiveId, statusInput } from './academic.sc
 export const resources = {
   'academic-years': { table: 'AcademicYears', id: 'AcademicYearID', code: 'YearCode', fields: { yearCode: 'YearCode', startDate: 'StartDate', endDate: 'EndDate', status: 'Status' } },
   'academic-periods': { table: 'AcademicPeriods', id: 'AcademicPeriodID', code: 'PeriodCode', fields: { academicYearId: 'AcademicYearID', periodCode: 'PeriodCode', name: 'Name', kind: 'Kind', parentPeriodId: 'ParentPeriodID', startDate: 'StartDate', endDate: 'EndDate', status: 'Status' } },
-  'ojt-semesters': { table: 'OJTSemesters', id: 'OJTSemesterID', code: 'SemesterCode', fields: { academicYearId: 'AcademicYearID', semesterCode: 'SemesterCode', name: 'Name', academicPeriodId: 'AcademicPeriodID', startDate: 'StartDate', endDate: 'EndDate', regStartDate: 'RegStartDate', regEndDate: 'RegEndDate', status: 'Status' } },
   cohorts: { table: 'Cohorts', id: 'CohortID', code: 'CohortCode', fields: { cohortCode: 'CohortCode', name: 'Name', enrollmentYear: 'EnrollmentYear', status: 'Status' } },
 } as const;
 export type Resource = keyof typeof resources;
 export type AcademicRecord = Record<string, any>;
+
+const periodOjt = `, (SELECT jsonb_build_object('id',o."OJTSemesterID",'academicPeriodId',o."AcademicPeriodID",'academicYearId',o."AcademicYearID",'semesterCode',o."SemesterCode",'name',o."Name",'startDate',o."StartDate",'endDate',o."EndDate",'regStartDate',o."RegStartDate",'regEndDate',o."RegEndDate",'status',o."Status") FROM "OJTSemesters" o WHERE o."AcademicPeriodID"=t."AcademicPeriodID") AS ojt`;
 
 export function asApi(resource: Resource, row: AcademicRecord): AcademicRecord {
   const config = resources[resource];
@@ -20,20 +22,27 @@ export function asApi(resource: Resource, row: AcademicRecord): AcademicRecord {
     value[key] = field instanceof Date ? `${field.getFullYear()}-${String(field.getMonth()+1).padStart(2,'0')}-${String(field.getDate()).padStart(2,'0')}` : field;
   }
   if (resource === 'cohorts') value.groups = row.groups ?? [];
+  if (resource === 'academic-years') value.periods = row.periods ?? [];
+  if (resource === 'academic-periods') { value.ojt = row.ojt ?? null; value.ojtSemesterId = row.ojt?.id ?? null; }
+  if(resource==='academic-periods'&&row.comboPhaseSchedules!==undefined){value.comboPhaseSchedules=row.comboPhaseSchedules;value.advisorySchedule=row.advisorySchedule;}
   return value;
 }
 export async function findRecord(client: PoolClient, resource: Resource, id: number) {
   const c = resources[resource];
-  const result = await client.query(`SELECT * FROM "${c.table}" WHERE "${c.id}"=$1 FOR UPDATE`, [id]);
+  const result = await client.query(`SELECT t.* ${resource === 'academic-periods' ? periodOjt : ''} FROM "${c.table}" t WHERE t."${c.id}"=$1 FOR UPDATE OF t`, [id]);
   if (!result.rows[0]) throw academicError(`${resource} record not found.`, 404, 'ACADEMIC_RECORD_NOT_FOUND');
   const row = asApi(resource, result.rows[0]);
-  if (resource === 'cohorts') row.groups = (await client.query('SELECT "GroupCode" AS "groupCode","EntryAcademicPeriodID" AS "entryAcademicPeriodId" FROM "CohortGroups" WHERE "CohortID"=$1 ORDER BY "GroupCode"', [id])).rows;
+  if(resource==='academic-years')row.periods=(await client.query(`SELECT p."AcademicPeriodID" AS id,p."PeriodCode" AS "periodCode",p."Name" AS name,p."Kind" AS kind,
+    p."ParentPeriodID" AS "parentPeriodId",to_char(p."StartDate",'YYYY-MM-DD') AS "startDate",to_char(p."EndDate",'YYYY-MM-DD') AS "endDate",p."Status" AS status,o."OJTSemesterID" AS "ojtSemesterId"
+    FROM "AcademicPeriods" p LEFT JOIN "OJTSemesters" o ON o."AcademicPeriodID"=p."AcademicPeriodID" WHERE p."AcademicYearID"=$1 ORDER BY p."StartDate",p."AcademicPeriodID"`,[id])).rows;
+  if (resource === 'cohorts') row.groups = (await client.query('SELECT g."GroupCode" AS "groupCode",g."EntryAcademicPeriodID" AS "entryAcademicPeriodId",COALESCE((SELECT jsonb_agg(jsonb_build_object(\'semester\',m."CurriculumSemester",\'academicPeriodId\',m."AcademicPeriodID") ORDER BY m."CurriculumSemester") FROM "CohortCurriculumPeriods" m WHERE m."CohortID"=g."CohortID" AND m."GroupCode"=g."GroupCode"),\'[]\'::jsonb) AS "curriculumPeriods" FROM "CohortGroups" g WHERE g."CohortID"=$1 ORDER BY g."GroupCode"', [id])).rows;
   return row;
 }
 
-export async function listRecords(resource: Resource, params: Record<string, unknown>) {
+export async function listRecords(resource: Resource, params: Record<string, unknown>,includeWorkflow=true) {
   const c = resources[resource], p = pageInput(params);
-  const allowed = ['page','limit','search','status', ...(resource === 'academic-periods' ? ['academicYearId','kind'] : resource === 'ojt-semesters' ? ['academicYearId'] : [])];
+  const allCalendarRecords = Object.keys(params).length === 0;
+  const allowed = ['page','limit','search','status', ...(resource === 'academic-periods' ? ['academicYearId','kind','academicPeriodId'] : [])];
   for (const key of Object.keys(params)) if (!allowed.includes(key)) throw academicError(`Unknown query parameter: ${key}.`);
   const args: unknown[] = [];
   const conditions: string[] = [];
@@ -44,16 +53,26 @@ export async function listRecords(resource: Resource, params: Record<string, unk
     if (!['SEMESTER','BLOCK3'].includes(params.kind as string)) throw academicError('kind must be SEMESTER or BLOCK3.');
     args.push(params.kind); conditions.push(`t."Kind"=$${args.length}`);
   }
+  if (params.academicPeriodId !== undefined) { args.push(positiveId(params.academicPeriodId,"academicPeriodId")); conditions.push(`t."AcademicPeriodID"=$${args.length}`); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   // Use one statement so total and page share the same database snapshot, including an empty page.
-  const grouped = resource === 'cohorts' ? `, COALESCE((SELECT jsonb_agg(jsonb_build_object('groupCode',g."GroupCode",'entryAcademicPeriodId',g."EntryAcademicPeriodID") ORDER BY g."GroupCode") FROM "CohortGroups" g WHERE g."CohortID"=t."CohortID"),'[]'::jsonb) AS groups` : '';
-  const result = await query(`WITH filtered AS (SELECT t.* ${grouped} FROM "${c.table}" t ${where}), page AS (
-    SELECT * FROM filtered ORDER BY "${c.id}" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}
-  ) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(page) ORDER BY page."${c.id}" DESC) FILTER (WHERE page."${c.id}" IS NOT NULL),'[]'::jsonb) AS items FROM page`, [...args, p.limit, p.offset]);
-  return { items: result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r)), page: p.page, limit: p.limit, total: result.rows[0].total };
+  const grouped = resource === 'cohorts' ? `, COALESCE((SELECT jsonb_agg(jsonb_build_object('groupCode',g."GroupCode",'entryAcademicPeriodId',g."EntryAcademicPeriodID",'curriculumPeriods',COALESCE((SELECT jsonb_agg(jsonb_build_object('semester',m."CurriculumSemester",'academicPeriodId',m."AcademicPeriodID") ORDER BY m."CurriculumSemester") FROM "CohortCurriculumPeriods" m WHERE m."CohortID"=g."CohortID" AND m."GroupCode"=g."GroupCode"),'[]'::jsonb)) ORDER BY g."GroupCode") FROM "CohortGroups" g WHERE g."CohortID"=t."CohortID"),'[]'::jsonb) AS groups` : resource === 'academic-periods' ? periodOjt : `,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('id',p."AcademicPeriodID",'periodCode',p."PeriodCode",'name',p."Name",'kind',p."Kind",
+      'parentPeriodId',p."ParentPeriodID",'startDate',p."StartDate",'endDate',p."EndDate",'status',p."Status",'ojtSemesterId',o."OJTSemesterID") ORDER BY p."StartDate",p."AcademicPeriodID")
+      FROM "AcademicPeriods" p LEFT JOIN "OJTSemesters" o ON o."AcademicPeriodID"=p."AcademicPeriodID" WHERE p."AcademicYearID"=t."AcademicYearID"),'[]'::jsonb) AS periods`;
+  const workflow=resource==='academic-periods'&&includeWorkflow?`,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('phase',s."Phase",'startsAt',s."StartsAt",'endsAt',s."EndsAt",'reason',s."Reason",'confirmedBy',s."ConfirmedBy",'confirmedAt',s."ConfirmedAt") ORDER BY s."Phase")
+      FROM "ComboPhaseSchedules" s WHERE s."AcademicPeriodID"=t."AcademicPeriodID"),'[]'::jsonb) AS "comboPhaseSchedules",
+    (SELECT jsonb_build_object('ojtSemesterId',a."OJTSemesterID",'sendAt',a."SendAt",'assessmentDeadline',a."AssessmentDeadline",'scope',a."Scope",'enabled',a."Enabled",'version',a."Version",'updatedBy',a."UpdatedBy",'updatedAt',a."UpdatedAt")
+      FROM "OJTAdvisorySchedules" a WHERE a."AcademicPeriodID"=t."AcademicPeriodID") AS "advisorySchedule"`:'';
+  const result = await query(`WITH filtered AS (SELECT t.* ${grouped} ${workflow} FROM "${c.table}" t ${where}), page AS (
+    SELECT * FROM filtered ORDER BY "${c.id}" DESC ${allCalendarRecords ? '' : `LIMIT $${args.length+1} OFFSET $${args.length+2}`}
+  ) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(page) ORDER BY page."${c.id}" DESC) FILTER (WHERE page."${c.id}" IS NOT NULL),'[]'::jsonb) AS items FROM page`, allCalendarRecords ? args : [...args, p.limit, p.offset]);
+  return { items: await enrichListRows({query},result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r))), page: p.page, limit: allCalendarRecords ? Math.max(1,result.rows[0].total) : p.limit, total: result.rows[0].total };
 }
 
-export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>, existingClient?:PoolClient): Promise<T> {
+  if(existingClient)return work(existingClient);
   if (!pool) throw academicError('Database is not configured.', 503, 'DATABASE_UNAVAILABLE');
   const client = await pool.connect();
   try {

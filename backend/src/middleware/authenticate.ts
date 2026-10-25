@@ -18,6 +18,8 @@ import type {
   AuthTokenPayload,
 } from "../modules/auth/auth.types";
 
+// Reuse only within the same request, for the same target and credentials.
+const verifiedRequests = new WeakMap<Request, { user: Request['user']; authorization: string; method: string; url: string }>();
 export const authenticate = async (
   req: Request,
   res: Response,
@@ -25,6 +27,12 @@ export const authenticate = async (
 ): Promise<void> => {
   const authorization =
     req.headers.authorization ?? "";
+  const verified = verifiedRequests.get(req);
+  if (verified && verified.user === req.user && verified.authorization === authorization
+    && verified.method === req.method && verified.url === req.originalUrl) {
+    next();
+    return;
+  }
 
   /*
    * Authorization header phải có:
@@ -147,6 +155,17 @@ export const authenticate = async (
       return;
     }
 
+    // A full database reset can reuse a UserID for another seed account.
+    // Never let a token issued for that previous account inherit the new identity.
+    if (payload.username !== currentUser.username) {
+      res.status(401).json({
+        success: false,
+        errorCode: 'TOKEN_REVOKED',
+        message: 'Your account identity has changed. Please login again.',
+      });
+      return;
+    }
+
     /*
      * ==============================
      * 3. CHECK USER STATUS
@@ -187,7 +206,7 @@ export const authenticate = async (
         res.status(403).json({ success: false, errorCode: 'TEMPORARY_PASSWORD_EXPIRED', message: 'Temporary password expired. Contact your importing department.' });
         return;
       }
-      const allowed = (req.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout'].includes(req.originalUrl.split('?')[0]))
+      const allowed = (req.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout', '/api/student/auth/change-password', '/api/student/auth/me/search'].includes(req.originalUrl.split('?')[0]))
         || (req.method === 'GET' && req.originalUrl.split('?')[0] === '/api/auth/me');
       if (!allowed) {
         res.status(403).json({ success: false, errorCode: 'PASSWORD_CHANGE_REQUIRED', message: 'Change your temporary password first.' });
@@ -205,10 +224,12 @@ export const authenticate = async (
 
       roleCode:
         currentUser.role_code,
+      studentId: currentUser.studentId,
     };
 
     req.token =
       token;
+    verifiedRequests.set(req, { user: req.user, authorization, method: req.method, url: req.originalUrl });
 
     /*
      * Authentication thành công.

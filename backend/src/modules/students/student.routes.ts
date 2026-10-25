@@ -1,24 +1,33 @@
+import { listApplications } from './job-application.service';
 import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './student.validation';
-import { assertStudentAccess, listStudents, student, patchStudent, results, patchResult } from './student.service';
-import { academicProgress } from './academic-progress';
-import { courseResultImport, importHistory, importDetails } from './academic-import.service';
+import { listStudents, patchStudent, patchResult } from './student.service';
+import { studentProfile } from './student-profile.service';
+import { importHistory } from './academic-import.service';
+import { listTasks } from '../qhdn/task.service';
+import { receiveCV, uploadStudentCV, readCV } from './cv.service';
 
 const router=Router();
+router.post('/students/me/cv',authenticate,authorizeRoles('STUDENT'),receiveCV,async(req,res,next)=>{try{
+ res.status(201).json({success:true,data:await uploadStudentCV(req.file!,(req as any).user)});
+}catch(error){next(error);}});
+router.get('/students/:id/cv',authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD'),async(req,res,next)=>{try{
+ const file=await readCV(positiveId(req.params.id),(req as any).user,req.query.cvFileId===undefined?undefined:positiveId(req.query.cvFileId,'cvFileId'));
+ res.setHeader('Content-Type',file.MimeType);
+ res.setHeader('Content-Disposition',`attachment; filename="cv.pdf"; filename*=UTF-8''${encodeURIComponent(file.FileName).replace(/'/g,'%27')}`);
+ res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Content-Type-Options','nosniff');res.send(file.Content);
+}catch(error){next(error);}});
 const staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
-const read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT')];
-const handle=(work:(req:any)=>Promise<unknown>):RequestHandler=>async(req,res,next)=>{try{res.json({success:true,data:await work(req)});}catch(error){next(error);}};
+const read=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
+const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
+router.get('/job-applications',authenticate,authorizeRoles('ADMIN','OJT_COORD'),handle(req=>listApplications(req.query,req.user)));
 router.get('/students',...staff,handle(req=>listStudents(req.query)));
-router.get('/students/:id',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return student(id);}));
+router.get('/students/:id',...read,handle(req=>studentProfile(positiveId(req.params.id),req.query,req.user)));
 router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.params.id),req.body,req.user.userId)));
-router.get('/students/:id/course-results',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return results(id,req.query);}));
-router.get('/students/:id/academic-progress',...read,handle(async req=>{const id=positiveId(req.params.id);await assertStudentAccess(id,req.user);return academicProgress(id);}));
 router.patch('/course-results/:id',...staff,handle(req=>patchResult(positiveId(req.params.id),req.body,req.user.userId)));
-for(const mode of ['preview','commit']) router.post(`/course-result-imports/${mode}`,...staff,async(req,res,next)=>{
-  try{const data=await courseResultImport(req.body,req.user!.userId,mode==='preview');res.status((data as any).rejectedBatch?422:200).json({success:!(data as any).rejectedBatch,data});}catch(error){next(error);}
-});
+router.get('/internship-tasks',authenticate,authorizeRoles('ENTERPRISE','OJT_COORD','ADMIN'),handle(req=>listTasks(req.query,req.user)));
 router.get('/academic-imports',...staff,handle(req=>importHistory(req.query)));
-router.get('/academic-imports/:id',...staff,handle(req=>importDetails(req.params.id,req.query)));
+
 export default router;

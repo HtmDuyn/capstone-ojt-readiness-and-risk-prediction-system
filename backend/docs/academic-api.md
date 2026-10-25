@@ -6,10 +6,10 @@ All 13 endpoints require a bearer token for `ACADEMIC` or `ADMIN`. Accounts with
 
 | Resource | List | Create | Update |
 |---|---|---|---|
-| Academic years | `GET /api/academic-years` | `POST /api/academic-years` | `PATCH /api/academic-years/:id` |
-| Specialized semesters / Block 3 | `GET /api/academic-periods` | `POST /api/academic-periods` | `PATCH /api/academic-periods/:id` |
-| OJT semesters | `GET /api/ojt-semesters` | `POST /api/ojt-semesters` | `PATCH /api/ojt-semesters/:id` |
-| Cohorts / groups A–D | `GET /api/cohorts` | `POST /api/cohorts` | `PATCH /api/cohorts/:id` |
+| Academic years | `GET /api/academic-years` | `POST /api/academic-years` | `PATCH /api/academic-years` |
+| Specialized semesters / Block 3 | `GET /api/academic-periods` | `POST /api/academic-periods` | `PATCH /api/academic-periods` |
+| OJT metadata | Trong search/detail academic-periods | Tự tạo khi tạo học kỳ | PATCH academic-periods với `ojt` |
+| Cohorts / groups A–D | `GET /api/cohorts` | `POST /api/cohorts` | `PATCH /api/cohorts` |
 
 The final endpoint is `PATCH /api/students/:id/academic-placement`. `:id` is a `StudentID`, not a `UserID`.
 
@@ -49,7 +49,7 @@ npm start
 }
 ```
 
-`PATCH /api/academic-years/1` can update any of these fields. The year cannot be shortened so that an existing academic period or OJT semester falls outside it.
+`PATCH /api/academic-years` accepts one JSON body containing `id` and the fields to update. For example: `{"id":4,"yearCode":"2026-2027","startDate":"2026-09-01","endDate":"2027-08-31","status":"ACTIVE"}`. The response includes the updated year and its related periods. The year cannot be shortened so that an existing academic period or OJT semester falls outside it.
 
 ## 2. Academic period
 
@@ -80,31 +80,13 @@ Then create its Block 3, using the returned semester ID:
 }
 ```
 
-Rules: both are within the academic year; a Block 3 starts after its parent semester ends, belongs to the same year and has a `SEMESTER` parent. Each semester has at most one Block 3. Periods cannot overlap, including periods from different academic years. Regular semesters have no parent. PATCH checks child blocks, linked OJT semesters and existing student placements before committing.
+Rules: both are within the academic year; a Block 3 starts after its parent semester ends, belongs to the same year and has a `SEMESTER` parent. Each semester has at most one Block 3. Periods within the same academic year cannot overlap, including Block 3. Periods belonging to different academic years may share dates. Regular semesters have no parent. PATCH checks child blocks, linked OJT semesters and existing student placements before committing.
 
 Configure the full school calendar, including past regular semesters needed to calculate student progression. The API counts declared semesters, not an assumed number of months or semesters per year.
 
 ## 3. OJT semester
 
-`POST /api/ojt-semesters`
-
-```json
-{
-  "academicYearId": 1,
-  "semesterCode": "OJT-FALL2026",
-  "name": "Kỳ OJT Fall 2026",
-  "academicPeriodId": 1,
-  "startDate": "2026-09-01",
-  "endDate": "2026-12-10",
-  "regStartDate": "2026-08-01",
-  "regEndDate": "2026-08-25",
-  "status": "PLANNED"
-}
-```
-
-`academicPeriodId` is optional and may be null. When provided it must be a regular semester in the same year, and OJT dates must fall within it. Registration dates are optional as a pair: provide both or set both to null. Registration ends on or before the OJT start date. Registration may begin before the academic year starts.
-
-Existing enterprise import/retention logic continues to use `OJTSemesters`; this API does not import recruitment or create registrations.
+Thông tin OJT được trả trong `ojt` và `ojtSemesterId` của học kỳ. Đào tạo cấu hình qua PATCH học kỳ; QHDN chọn học kỳ có sẵn để mở đợt tuyển dụng. Các API tạo/search/detail/sửa kỳ OJT độc lập đã xóa. Xem [hợp đồng mới](api-consolidation.md).
 
 ## 4. Cohort and groups
 

@@ -1,3 +1,4 @@
+import { enrichListRows } from '../../shared/list-context';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -15,11 +16,11 @@ import { prospectiveEligibility } from '../eligibility/eligibility.service';
 export async function assertRosterContext(client:PoolClient,r:Row) {
   const current=(await client.query(`SELECT s."ProgramID",s."Status",u."Status" AS "AccountStatus",p."CohortID",p."GroupCode",p."EntryAcademicPeriodID" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" WHERE s."StudentID"=$1`,[r.studentId])).rows[0];
   if(!current || current.Status!=='ACTIVE' || current.AccountStatus!=='ACTIVE' || current.ProgramID!==r.programId || current.CohortID!==r.scopeSnapshot.cohortId || current.GroupCode!==r.scopeSnapshot.groupCode || current.EntryAcademicPeriodID!==r.scopeSnapshot.entryAcademicPeriodId)throw invalid(`Student ${r.studentId}'s academic placement/account changed after scope was frozen. Review the roster.`,409,'COMBO_ROSTER_CHANGED');
-  const relative=(await client.query(`SELECT count(*)::int AS n FROM "AcademicPeriods" sem JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=$1 JOIN "AcademicPeriods" target ON target."AcademicPeriodID"=$2 LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=target."ParentPeriodID" WHERE sem."Kind"='SEMESTER' AND sem."StartDate">=entry."StartDate" AND sem."StartDate"<=COALESCE(parent."StartDate",target."StartDate")`,[current.EntryAcademicPeriodID,r.scopeSnapshot.academicPeriodId])).rows[0].n;
+  const relative=(await client.query('SELECT "StudentCurriculumSemester"($1,$2) AS n',[r.studentId,r.scopeSnapshot.academicPeriodId])).rows[0].n;
   if(relative!==4)throw invalid('Academic calendar changed and this roster no longer targets specialized semester 4.',409,'COMBO_ROSTER_CHANGED');
 }
 export async function validateChoice(client:PoolClient,programId:number,comboId:number,courseIds:number[]) {
-  const combo=(await client.query(`SELECT b.*,p."Status" AS "ProgramStatus",p."ProgramCode",p."Version" FROM "ProgramCombos" b JOIN "TrainingPrograms" p ON p."ProgramID"=b."ProgramID" WHERE b."ProgramComboID"=$1 AND b."ProgramID"=$2`,[comboId,programId])).rows[0];
+  const combo=(await client.query(`SELECT b.*,p."Status" AS "ProgramStatus",p."ProgramCode",NULL::text AS "Version" FROM "ProgramCombos" b JOIN "TrainingPrograms" p ON p."ProgramID"=b."ProgramID" WHERE b."ProgramComboID"=$1 AND b."ProgramID"=$2`,[comboId,programId])).rows[0];
   if(!combo || combo.ProgramStatus!=='PUBLISHED' || purpose(combo)!=='SPECIALIZATION')throw invalid('Choose a specialization combo in this student’s published curriculum.');
   const value=(await combos(client,programId)).find(c=>c.id===comboId)!;
   if(!value.coursesReviewed || !value.choiceGroups.length)throw invalid('Combo choices have not been reviewed.');
@@ -103,11 +104,11 @@ export async function finalizeWindow(id:number,body:unknown,actorId:number) {
   });
 }
 export async function studentComboHistory(studentId:number,params:Record<string,unknown>,user:{userId:number;roleCode:string}) {
-  await assertStudentAccess(studentId,user);await student(studentId);const p=pagination(params,[]);
+  await assertStudentAccess(studentId,user);const profile=await student(studentId);const p=pagination(params,[]);
   return academicTransaction(async client=>{
     const current=(await client.query('SELECT "ProgramID" FROM "Students" WHERE "StudentID"=$1',[studentId])).rows[0];
     const count=(await client.query('SELECT count(*)::int AS n FROM "StudentComboSelectionEvents" WHERE "StudentID"=$1',[studentId])).rows[0].n;
-    const events=(await client.query(`SELECT e."EventID" AS id,e."WindowID" AS "windowId",w."Phase" AS phase,w."InitialWindowID" AS "initialWindowId",e."EventType" AS type,e."ChoiceSnapshot" AS choice,e."PreviousSnapshot" AS previous,e."CreatedBy" AS "createdBy",e."CreatedAt" AS "createdAt",e."Reason" AS reason,e."SourceEventID" AS "sourceEventId",r."Progress" AS progress,r."Eligibility" AS eligibility FROM "StudentComboSelectionEvents" e JOIN "ComboRegistrationWindows" w ON w."WindowID"=e."WindowID" LEFT JOIN "StudentAcademicRecalculations" r ON r."EventID"=e."EventID" WHERE e."StudentID"=$1 ORDER BY e."EventID" DESC LIMIT $2 OFFSET $3`,[studentId,p.limit,p.offset])).rows;
-    return {studentId,current:await activeChoice(client,studentId,current.ProgramID),items:events,total:count,page:p.page,limit:p.limit};
+    const events=(await client.query(`SELECT e."EventID" AS id,e."WindowID" AS "windowId",e."ProgramComboID" AS "comboId",e."CourseIDs" AS "courseIds",w."AcademicPeriodID" AS "academicPeriodId",w."OJTSemesterID" AS "ojtSemesterId",w."Name" AS "windowName",w."Phase" AS phase,w."InitialWindowID" AS "initialWindowId",e."EventType" AS type,e."ChoiceSnapshot" AS choice,e."PreviousSnapshot" AS previous,e."CreatedBy" AS "createdBy",e."CreatedAt" AS "createdAt",e."Reason" AS reason,e."SourceEventID" AS "sourceEventId",r."Progress" AS progress,r."Eligibility" AS eligibility FROM "StudentComboSelectionEvents" e JOIN "ComboRegistrationWindows" w ON w."WindowID"=e."WindowID" LEFT JOIN "StudentAcademicRecalculations" r ON r."EventID"=e."EventID" WHERE e."StudentID"=$1 ORDER BY e."EventID" DESC LIMIT $2 OFFSET $3`,[studentId,p.limit,p.offset])).rows;
+    return {studentId,student:profile,current:await activeChoice(client,studentId,current.ProgramID),items:await enrichListRows(client,events),total:count,page:p.page,limit:p.limit};
   });
 }

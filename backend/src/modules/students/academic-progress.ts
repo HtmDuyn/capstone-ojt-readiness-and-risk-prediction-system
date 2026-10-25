@@ -96,14 +96,16 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
     const latest=graded[0],value=scale===4?latest.gradePoints:latest.score,credit=weights.get(key);
     if (credit===undefined) {gpaIssues.push(`GPA_CREDIT_UNMAPPED:${key}`);continue;}
     if (value===null || value===undefined || !Number.isFinite(Number(value))) {gpaIssues.push(`GPA_SCORE_MISSING:${latest.id}`);continue;}
-    numerator+=Number(value)*credit;denominator+=credit;
+    // Scores and credits are stored to two decimal places. Integer accumulation
+    // prevents a mathematical 7.305 GPA from rounding down to 7.30 in binary floats.
+    numerator+=Math.round(Number(value)*100)*Math.round(credit*100);denominator+=Math.round(credit*100);
     gpaCourses.push({courseId:key,resultId:latest.id,score:value,credits:credit});
   }
   const total=program.TotalCredits==null?null:Number(program.TotalCredits);
   if (total===null || total<=0) issues.push('PROGRAM_TOTAL_CREDITS_MISSING');
   if (total!==null && earned>total) issues.push('EARNED_CREDITS_EXCEED_PROGRAM_TOTAL');
   const allIssues=[...new Set([...issues,...gpaIssues])];
-  return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator*100)/100,gpaScale:scale??null,gpaCredits:denominator,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
+  return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
 export async function academicProgressWithClient(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
     const s=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1',[studentId])).rows[0];
