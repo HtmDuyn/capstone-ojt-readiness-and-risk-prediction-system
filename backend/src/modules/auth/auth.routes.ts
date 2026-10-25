@@ -1,3 +1,4 @@
+import { requireJsonBody } from '../../middleware/json-body';
 import { Router } from "express";
 import { changePassword } from './auth.service';
 import { requestPasswordReset } from './password-reset.service';
@@ -22,7 +23,7 @@ router.post('/users/password-reset', authenticate, authorizeRoles('ADMIN'), asyn
   }
   catch(error) { next(error); }
 });
-router.post('/change-password', authenticate, async (req, res, next) => {
+router.post('/change-password', authenticate, requireJsonBody, async (req, res, next) => {
   try {
     await changePassword(req.user!.userId, req.body?.currentPassword, req.body?.newPassword);
     res.json({ success: true, message: 'Password changed. Please login again.' });
@@ -146,6 +147,7 @@ router.post('/change-password', authenticate, async (req, res, next) => {
  */
 router.post(
   "/login",
+  requireJsonBody,
   login,
 );
 

@@ -64,7 +64,7 @@ Seed **không giả kết quả xét chính thức, bàn giao, đăng ký, ứng
 
 Sau reset, Phòng Đào tạo chạy xét theo kỳ `DEMO-OJT-S6`, xác nhận kết quả rồi bàn giao danh sách đủ điều kiện. Sinh viên sau đó đăng ký OJT và ứng tuyển qua API bình thường. CV được sinh viên tải lên; không tự tạo CV giả.
 
-Theo hợp đồng API mới, sinh viên dùng POST và JSON body: `/api/student/auth/me/search` với `{}` để lấy tài khoản và `studentId`, `/api/student/profile/detail` với `studentId`, và `/api/student/dashboard/search` với `studentId` cùng `ojtSemesterId`. Các route GET hồ sơ cũ dành cho nhân viên; không dùng chúng cho phiên sinh viên.
+Theo hợp đồng REST, sinh viên dùng `GET /api/auth/me` để lấy tài khoản và studentId, `GET /api/students/:id` để lấy hồ sơ của mình và `GET /api/students/me/dashboard?ojtSemesterId=...` cho dashboard. GET không gửi body; POST/PATCH dùng JSON khi có dữ liệu nghiệp vụ. Xem student-portal-api.md.
 
 Script reset chỉ xóa đối tượng ứng dụng trong `public`, giữ schema khác và đối tượng thuộc extension. Gặp phụ thuộc ngoài phạm vi thì dừng để đối soát. Hai script migration Admin/Student Portal vẫn có transaction riêng khi được chạy độc lập; không dùng chúng thay cho full reset và bộ seed này.
 

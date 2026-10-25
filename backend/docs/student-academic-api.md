@@ -4,17 +4,19 @@ Base URL: `http://localhost:3000/api`. Gửi `Authorization: Bearer <token>` c�
 
 Schema được quản lý tại **backend/DB**, phần `20261008 student records and academic imports`. Không có tạo bảng, seed hoặc migration tự chạy trong API. File DB đầy đủ là script khởi tạo/reset; không chạy toàn bộ trên dữ liệu production đang dùng.
 
+Xem thêm [các API Student đã gộp](student-portal-api.md).
+
 ## Sinh viên
 
 | API | Dữ liệu |
 |---|---|
-| `GET /students` | `page`, `limit` tối đa 100; `search` tìm mã/tên/email; `status`, `programId`, `cohortId`, `groupCode`, `enrollmentYear`, `currentSemester` |
+| `GET /students` | `page`, `limit` tối đa 100; `search` tìm mã/tên/email; `status`, `programId`, `cohortId`, `groupCode`, `enrollmentYear`, `currentSemester`, `importedOnly`, `importBatchId` |
 | `GET /students/:id` | Hồ sơ và các mốc chuyên ngành thực tế |
 | `PATCH /students/:id` | `fullName`, `phone`, `className`, `status`, `programId`; bắt buộc `reason` |
-| `GET /students/:id/course-results` | Tất cả các lần học; lọc `courseId`, `academicPeriodId`, `status`, phân trang |
-| `GET /students/:id/academic-progress` | GPA, tín chỉ, yêu cầu đã hoàn thành/chưa hoàn thành và lỗi cấu hình |
+| `GET /students/:id?include=courseResults` | Tất cả các lần học; lọc `courseId`, `academicPeriodId`, `courseStatus`, phân trang resultsPage/resultsLimit |
+| `GET /students/:id?section=academicProgress` | GPA, tín chỉ, yêu cầu đã hoàn thành/chưa hoàn thành và lỗi cấu hình |
 
-`id` là StudentID, không phải UserID hoặc mã sinh viên. Mã sinh viên và email không sửa qua hồ sơ học vụ. Khóa, nhóm, kỳ vào chuyên ngành và kỳ hiện tại sửa qua `PATCH /students/:id/academic-placement` đã có; không sửa trực tiếp các giá trị suy ra `currentSemester`/`enrollmentYear`. Chuyển chương trình có thể bị từ chối nếu xung đột lộ trình combo đã lưu.
+`id` là StudentID, không phải UserID hoặc mã sinh viên. Mã sinh viên và email không sửa qua hồ sơ học vụ. Nhân sự sửa khóa, nhóm, kỳ vào chuyên ngành và kỳ hiện tại qua trường `placement` trong JSON body của `PATCH /students/:id`; không sửa trực tiếp các giá trị suy ra `currentSemester`/`enrollmentYear`. Chuyển chương trình có thể bị từ chối nếu xung đột lộ trình combo đã lưu.
 
 ```json
 {

@@ -206,7 +206,7 @@ export const authenticate = async (
         res.status(403).json({ success: false, errorCode: 'TEMPORARY_PASSWORD_EXPIRED', message: 'Temporary password expired. Contact your importing department.' });
         return;
       }
-      const allowed = (req.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout', '/api/student/auth/change-password', '/api/student/auth/me/search'].includes(req.originalUrl.split('?')[0]))
+      const allowed = (req.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout'].includes(req.originalUrl.split('?')[0]))
         || (req.method === 'GET' && req.originalUrl.split('?')[0] === '/api/auth/me');
       if (!allowed) {
         res.status(403).json({ success: false, errorCode: 'PASSWORD_CHANGE_REQUIRED', message: 'Change your temporary password first.' });
