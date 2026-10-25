@@ -183,7 +183,7 @@ test('QHDN received eligible roster: database, HTTP access and Swagger', async t
     try {
       const url = `http://127.0.0.1:${server.address().port}/api/qhdn/eligible-students?ojtSemesterId=${semesterId}`;
       assert.equal((await fetch(url)).status, 401);
-      const headers = userId => ({ Authorization: 'Bearer ' + jwt.sign({ userId, authVersion: 0 }, process.env.JWT_SECRET) });
+      const headers = userId => ({ Authorization: 'Bearer ' + jwt.sign({ userId, username: userId === coordId ? 'REVIEW_COORD' : 'REVIEW_RECEIVED_A', authVersion: 0 }, process.env.JWT_SECRET) });
       assert.equal((await fetch(url, { headers: headers(first.userId) })).status, 403);
       const response = await fetch(url, { headers: headers(coordId) });
       assert.equal(response.status, 200);
