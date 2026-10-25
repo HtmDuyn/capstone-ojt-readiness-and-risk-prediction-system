@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { clearEducationReadCache } from './educationReadCache';
 
 export { API_BASE_URL };
 
@@ -32,6 +33,9 @@ API.interceptors.request.use(
 // Response Interceptor: Chạy khi nhận được response (ví dụ: xử lý lỗi 401 chung)
 API.interceptors.response.use(
   (response: AxiosResponse) => {
+    if (!['get', 'head'].includes(response.config.method?.toLowerCase() ?? 'get')) {
+      clearEducationReadCache();
+    }
     return response;
   },
   (error: AxiosError) => {

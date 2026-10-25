@@ -11,8 +11,9 @@ export async function getJson<T>(
   path: string,
   params: Query = {},
   signal?: AbortSignal,
+  timeout = 30000,
 ): Promise<T> {
-  return (await API.get<T>(path, { params: cleanQuery(params), signal })).data;
+  return (await API.get<T>(path, { params: cleanQuery(params), signal, timeout })).data;
 }
 export function apiData<T>(response: unknown): T {
   const root = response as { success?: boolean; message?: string; data?: T };

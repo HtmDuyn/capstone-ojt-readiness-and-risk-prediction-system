@@ -1,6 +1,6 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
-import { getPage } from '@/services/educationApi';
+import { apiData, getJson } from '@/services/educationApi';
 import { ojtEligibilityService } from '@/services/ojtEligibility.service';
 import type { Page } from '@/types/education/api.types';
 import type { StudentEligibility } from '@/types/education/eligibility.types';
@@ -64,12 +64,12 @@ const EducationStudentStatus: React.FC = () => {
     setError("");
     setData(null);
     setSelected(null);
-    getPage<Row>(
-      `/ojt-semesters/${semesterId}/students`,
+    getJson(
+      `/ojt-semesters/${semesterId}`,
       { page, limit: 20, search },
       controller.signal,
     )
-      .then(setData)
+      .then(response => { if (!controller.signal.aborted) setData(apiData<{ students: Page<Row> }>(response).students); })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
       })

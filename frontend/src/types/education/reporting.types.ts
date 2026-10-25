@@ -3,10 +3,10 @@ import type { Page } from './api.types';
 
 export interface Cohort { id: number; cohortCode: string; name: string }
 
-export interface ReportScope { academicPeriodId: number; ojtSemesterId: number; cohortId?: number }
+export interface ReportScope { academicPeriodId?: number; ojtSemesterId?: number; cohortId?: number }
 
 export interface CourseDemand {
-  courseId: number; courseCode: string; courseName: string; periodCode: string;
+  ojtSemesterId: number; academicPeriodId: number; courseId: number; courseCode: string; courseName: string; periodCode: string;
   studentCount: number; retakeCount: number; inProgressCount: number;
 }
 

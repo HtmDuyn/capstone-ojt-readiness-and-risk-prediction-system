@@ -48,10 +48,15 @@ async function loadStudent(
     }
   }
   const first = profile.courseResults;
-  const attempts: Row[] =
-    first?.items?.length >= first?.total
-      ? first.items
-      : await getAllItems<Row>(`/students/${row.id}/course-results`);
+  const attempts: Row[] = [...(first?.items ?? [])];
+  // Results are a paginated section of the student profile.
+  for (let page = (first?.page ?? 1) + 1; attempts.length < (first?.total ?? 0); page++) {
+    const next = apiData<Row>(await getJson(`/students/${row.id}`, {
+      include: "courseResults", resultsPage: page, resultsLimit: first.limit,
+    })).courseResults;
+    if (!next?.items?.length) throw new Error("Không tải đủ kết quả học tập của sinh viên.");
+    attempts.push(...next.items);
+  }
   const requirements: Row[] = progress.requirements ?? [];
   const subjects: StudentSubject[] = requirements.map((required: Row) => {
     const matching = attempts.filter((a) =>
@@ -84,7 +89,7 @@ async function loadStudent(
     return {
       id: String(required.id),
       curriculumSemester: number(course?.semester),
-      actualTerm: text(result?.academicPeriod?.name ?? result?.periodCode),
+      actualTerm: text(result?.academicPeriod?.name ?? result?.periodName ?? result?.periodCode),
       code: text(required.courseCode),
       name: text(required.name),
       credits: number(required.credits),

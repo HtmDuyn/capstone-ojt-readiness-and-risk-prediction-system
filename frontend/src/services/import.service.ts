@@ -81,8 +81,10 @@ export const importService = {
     getAllItems<StudentImportBatch>('/academic-imports', { kind: 'STUDENT', status: 'COMPLETED' }, signal),
   getImportedStudent: async (id: number, signal?: AbortSignal) =>
     apiData<ImportedStudentProfile>(await getJson(`/students/${id}`, { resultsLimit: 1, ojtLimit: 1 }, signal)),
-  getStoredCourseResults: (id: number, page: number, signal?: AbortSignal) =>
-    getPage<StoredCourseResult>(`/students/${id}/course-results`, { page, limit: 20 }, signal),
+  getStoredCourseResults: async (id: number, page: number, signal?: AbortSignal) =>
+    apiData<{ courseResults: import('@/types/education/api.types').Page<StoredCourseResult> }>(
+      await getJson(`/students/${id}`, { include: 'courseResults', resultsPage: page, resultsLimit: 20 }, signal),
+    ).courseResults,
   previewStudentImport: (payload: StudentImportPayload) =>
     sendImportRequest<ImportPreviewResponse>(
       "/api/imports/preview",

@@ -1,5 +1,7 @@
+import { clearEducationReadCache, educationRead } from '@/services/educationReadCache';
+import { educationOverviewService } from '@/services/educationOverview.service';
 import { academicReportingService } from '@/services/academicReporting.service';
-import { apiData, getAllItems, getJson } from '@/services/educationApi';
+import { getAllItems, getJson } from '@/services/educationApi';
 import type { AcademicPeriod, AcademicYear, QueryParams } from '@/types/education/dashboard.types';
 import type { Cohort } from '@/types/education/reporting.types';
 import { downloadCourseDemand } from '@/utils/downloadFile';
@@ -13,9 +15,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 const API_PATHS = {
   years: "/academic-years",
   periods: "/academic-periods",
-  dashboard: "/academic/dashboard",
-  courseDemand: "/academic/course-demand",
-  alerts: "/academic/alerts",
+  courseDemand: "/course-demands",
+  alerts: "/academic-alerts",
 } as const;
 
 /* =========================================================
@@ -45,6 +46,9 @@ export function useEducationDashboard() {
   /* ---------------- BACKEND DATA ---------------- */
 
   const [dashboardData, setDashboardData] = useState<unknown>(null);
+  const [studentTotal, setStudentTotal] = useState<number | null>(null);
+  const [dashboardWarning, setDashboardWarning] = useState("");
+  const [courseDemandLoading, setCourseDemandLoading] = useState(true);
 
   const [courseDemandData, setCourseDemandData] = useState<unknown>(null);
 
@@ -87,9 +91,9 @@ export function useEducationDashboard() {
       setFiltersError("");
 
       const results = await Promise.allSettled([
-        getAllItems(API_PATHS.years, {}, controller.signal),
-        getAllItems(API_PATHS.periods, {}, controller.signal),
-        academicReportingService.cohorts(controller.signal),
+        educationRead('catalog:years', () => getAllItems(API_PATHS.years), controller.signal),
+        educationRead('catalog:periods', () => getAllItems(API_PATHS.periods), controller.signal),
+        educationRead('catalog:cohorts', () => academicReportingService.cohorts(), controller.signal),
       ]);
 
       if (controller.signal.aborted) return;
@@ -139,25 +143,7 @@ export function useEducationDashboard() {
     );
   }, [academicPeriods, selectedPeriod]);
 
-  const [advisory, setAdvisory] = useState<{
-    periodId: string;
-    semesterId: string;
-    deadline: string;
-  } | null>(null);
-
-  const selectedOjtSemesterId =
-    selectedPeriodInfo?.ojtSemesterId ||
-    (advisory?.periodId === selectedPeriod ? advisory.semesterId : null);
-
-  /*
-   * Backend hiện không chấp nhận academicYearId
-   * trong GET /academic/dashboard.
-   *
-   * Chỉ truyền ojtSemesterId khi kỳ học đã có
-   * liên kết với kỳ OJT.
-   */
-
-  const unsupportedPeriod = !selectedOjtSemesterId;
+  const selectedOjtSemesterId = selectedPeriodInfo?.ojtSemesterId ?? null;
 
   const dashboardParams = useMemo<QueryParams>(() => {
     const params: QueryParams = {};
@@ -171,130 +157,56 @@ export function useEducationDashboard() {
     return params;
   }, [selectedOjtSemesterId, selectedPeriod, selectedCohort]);
 
+  // Overview eligibility depends on cohort and OJT semester, not the assessment period.
+  const overviewParams = useMemo<QueryParams>(() => ({
+    ...(selectedOjtSemesterId ? { ojtSemesterId: toApiId(selectedOjtSemesterId) } : {}),
+    ...(selectedCohort ? { cohortId: toApiId(selectedCohort) } : {}),
+  }), [selectedOjtSemesterId, selectedCohort]);
+
   /* =====================================================
      LOAD DASHBOARD AND COURSE DEMAND
 
-     GET /api/academic/dashboard
-     GET /api/academic/course-demand
+     GET /api/students and GET /api/students/:id?include=eligibility
+     GET /api/course-demands
 
      Truyền academicPeriodId, ojtSemesterId và cohortId khi đã chọn.
      ===================================================== */
 
   useEffect(() => {
     const controller = new AbortController();
-
-    const loadDashboard = async () => {
-      setDashboardLoading(true);
-      setDashboardError("");
-      setCourseDemandError("");
-
-      setDashboardData(null);
-      setCourseDemandData(null);
-
-      if (unsupportedPeriod) {
-        setDashboardLoading(false);
-        return;
-      }
-
-      const results = await Promise.allSettled([
-        getJson(
-          API_PATHS.dashboard,
-          {
-            ...dashboardParams,
-          },
-          controller.signal,
-        ),
-        getJson(
-          API_PATHS.courseDemand,
-          {
-            page: 1,
-            limit: 20,
-            ...dashboardParams,
-          },
-          controller.signal,
-        ),
-      ]);
-
-      if (controller.signal.aborted) return;
-
-      if (results[0].status === "fulfilled") {
-        setDashboardData(results[0].value);
-      } else {
-        setDashboardError(getErrorMessage(results[0].reason));
-      }
-
-      if (results[1].status === "fulfilled") {
-        setCourseDemandData(results[1].value);
-      } else {
-        setCourseDemandError(getErrorMessage(results[1].reason));
-      }
-
-      setDashboardLoading(false);
-    };
-
-    void loadDashboard();
-
+    setDashboardLoading(true); setDashboardError(''); setDashboardWarning('');
+    setDashboardData(null); setStudentTotal(null);
+    educationOverviewService.load(overviewParams, controller.signal, total => {
+      if (!controller.signal.aborted) setStudentTotal(total);
+    }).then(data => {
+      if (!controller.signal.aborted) { setDashboardData(data); setDashboardWarning(data.warning); }
+    }).catch(error => {
+      if (!controller.signal.aborted) setDashboardError(getErrorMessage(error));
+    }).finally(() => {
+      if (!controller.signal.aborted) setDashboardLoading(false);
+    });
     return () => controller.abort();
-  }, [dashboardParams, unsupportedPeriod, refreshKey]);
+  }, [overviewParams, refreshKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCourseDemandLoading(true); setCourseDemandError(''); setCourseDemandData(null);
+    educationRead(`demand:${JSON.stringify(dashboardParams)}`, () =>
+      getJson(API_PATHS.courseDemand, { page: 1, limit: 20, ...dashboardParams }), controller.signal)
+      .then(data => { if (!controller.signal.aborted) setCourseDemandData(data); })
+      .catch(error => { if (!controller.signal.aborted) setCourseDemandError(getErrorMessage(error)); })
+      .finally(() => { if (!controller.signal.aborted) setCourseDemandLoading(false); });
+    return () => controller.abort();
+  }, [dashboardParams, refreshKey]);
 
   /* =====================================================
      LOAD ACADEMIC ALERTS
 
-     Chỉ gọi khi có đủ:
-     - academicPeriodId
-     - ojtSemesterId
-     - assessmentDeadline
-
-     Dùng GET /api/academic/alerts
-     trong danh sách Swagger mới.
+     Backend resolves periods and assessment deadlines for omitted filters.
      ===================================================== */
 
-  const [scheduleError, setScheduleError] = useState("");
-
-  useEffect(() => {
-    setAdvisory(null);
-    setScheduleError("");
-    if (!selectedPeriod) return;
-    const controller = new AbortController();
-    getJson(
-      `/academic-periods/${selectedPeriod}/ojt-advisory-schedule`,
-      {},
-      controller.signal,
-    )
-      .then((response) => {
-        const schedule = apiData<Record<string, unknown>>(response);
-        const deadline =
-          schedule.AssessmentDeadline ?? schedule.assessmentDeadline;
-        const sid = schedule.OJTSemesterID ?? schedule.ojtSemesterId;
-        if (typeof deadline === "string" && sid !== undefined)
-          setAdvisory({
-            periodId: selectedPeriod,
-            semesterId: String(sid),
-            deadline,
-          });
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setScheduleError(getErrorMessage(e));
-      });
-    return () => controller.abort();
-  }, [selectedPeriod, refreshKey]);
-
-  const assessmentDeadline =
-    advisory?.periodId === selectedPeriod &&
-    advisory.semesterId === selectedOjtSemesterId
-      ? advisory.deadline
-      : null;
-
   useEffect(() => {
     const controller = new AbortController();
-
-    if (!selectedPeriod || !selectedOjtSemesterId || !assessmentDeadline) {
-      setAlertsData(null);
-      setAlertsError("");
-      setAlertsLoading(false);
-
-      return () => controller.abort();
-    }
 
     const loadAlerts = async () => {
       setAlertsLoading(true);
@@ -302,18 +214,14 @@ export function useEducationDashboard() {
       setAlertsData(null);
 
       try {
-        const response = await getJson(
+        const response = await educationRead(`alerts:${JSON.stringify(dashboardParams)}`, () => getJson(
           API_PATHS.alerts,
           {
             page: 1,
             limit: 10,
-            academicPeriodId: toApiId(selectedPeriod),
-            ojtSemesterId: toApiId(selectedOjtSemesterId),
-            assessmentDeadline,
-            ...(selectedCohort ? { cohortId: toApiId(selectedCohort) } : {}),
+            ...dashboardParams,
           },
-          controller.signal,
-        );
+        ), controller.signal);
 
         if (controller.signal.aborted) return;
 
@@ -332,7 +240,7 @@ export function useEducationDashboard() {
     void loadAlerts();
 
     return () => controller.abort();
-  }, [selectedPeriod, selectedOjtSemesterId, assessmentDeadline, selectedCohort, refreshKey]);
+  }, [dashboardParams, refreshKey]);
 
   /* =====================================================
      STATISTICS FROM BACKEND
@@ -340,7 +248,7 @@ export function useEducationDashboard() {
      Không tự tính điều kiện OJT từ GPA / tín chỉ.
      ===================================================== */
 
-  const totalStudents = readNumber(dashboardData, [
+  const totalStudents = studentTotal ?? readNumber(dashboardData, [
     "totalStudents",
     "totalStudentCount",
     "studentCount",
@@ -433,15 +341,15 @@ export function useEducationDashboard() {
     ...periodStatistics.map((item) => item.eligible + item.ineligible),
   );
 
-  const hasAlertContext = Boolean(
-    selectedPeriod && selectedOjtSemesterId && assessmentDeadline,
-  );
+  const insufficientDataStudents = readNumber(dashboardData, ["summary.insufficientData"]);
+  const awaitingConfirmationStudents = readNumber(dashboardData, ["summary.awaitingConfirmation"]);
 
   /* =====================================================
      ACTIONS
      ===================================================== */
 
   const handleRefresh = () => {
+    clearEducationReadCache();
     setRefreshKey((current) => current + 1);
   };
 
@@ -453,16 +361,17 @@ export function useEducationDashboard() {
   useEffect(() => { setExportError(''); }, [dashboardParams]);
 
   const handleExport = async () => {
-    if (!selectedPeriod || !selectedOjtSemesterId || exporting) return;
+    if (exporting) return;
     setExporting(true);
     setExportError('');
     try {
       downloadCourseDemand(await academicReportingService.exportCourseDemand({
-        academicPeriodId: Number(selectedPeriod), ojtSemesterId: Number(selectedOjtSemesterId),
+        ...(selectedPeriod ? { academicPeriodId: Number(selectedPeriod) } : {}),
+        ...(selectedOjtSemesterId ? { ojtSemesterId: Number(selectedOjtSemesterId) } : {}),
         ...(selectedCohort ? { cohortId: Number(selectedCohort) } : {}),
       }));
     } catch (error) { setExportError(getErrorMessage(error)); }
     finally { setExporting(false); }
   };
-  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, unsupportedPeriod, scheduleError, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, hasAlertContext, handleRefresh, handleYearChange, handleExport };
+  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId,  totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
 }

@@ -63,7 +63,7 @@ export function EligibilityAssessment({ programId, semesterId, scopeLabel, onBus
     const c = new AbortController();
     setWindow(null); setWindowError(''); setMissingWindow(false); setFinalized(false);
     if (semesterId) eligibility.assessment(semesterId, c.signal)
-      .then(w => { if (!c.signal.aborted) setWindow(w); })
+      .then(w => { if (!c.signal.aborted) { setWindow(w); setMissingWindow(!w); } })
       .catch((e: any) => {
         if (c.signal.aborted) return;
         if (e.response?.data?.errorCode === 'OJT_ASSESSMENT_NOT_CONFIGURED') setMissingWindow(true);

@@ -5,7 +5,7 @@ import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle
 import React from 'react';
 
 export const EducationDashboard: React.FC = () => {
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, unsupportedPeriod, scheduleError, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, hasAlertContext, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
   return (
     <div className="mx-auto w-full max-w-[1500px]">
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -41,7 +41,7 @@ export const EducationDashboard: React.FC = () => {
 
               <button
                 type="button"
-                disabled={unsupportedPeriod || exporting || dashboardLoading}
+                disabled={exporting || dashboardLoading}
                 onClick={handleExport}
                 title="Xuất nhu cầu học phần theo phạm vi đang chọn"
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -150,13 +150,13 @@ export const EducationDashboard: React.FC = () => {
             <Info size={15} className="mt-0.5 shrink-0" />
 
             <span>
-              {unsupportedPeriod
-                ? "Kỳ học này chưa có mã kỳ OJT trong dữ liệu trả về. Không tải thống kê để tránh hiển thị nhầm dữ liệu toàn hệ thống."
-                : selectedOjtSemesterId
+              {selectedOjtSemesterId
                   ? "Đang thống kê theo kỳ OJT được liên kết với kỳ học đã chọn."
-                  : selectedYear
+                  : selectedPeriod
+                    ? "Đang xem học vụ theo kỳ học đã chọn; kết quả OJT lấy theo kỳ do hồ sơ API xác định."
+                    : selectedYear
                     ? "Năm học đang được dùng để lọc danh sách kỳ học. Backend chưa hỗ trợ lọc trực tiếp thống kê bằng academicYearId nên số liệu bên dưới vẫn thuộc phạm vi toàn hệ thống."
-                    : "Đang xem thống kê toàn hệ thống. Chọn kỳ học có cấu hình OJT để lọc theo kỳ OJT."}
+                    : "Đang xem toàn hệ thống. Mỗi sinh viên được tính một lần theo kỳ OJT do hồ sơ API xác định."}
             </span>
           </div>
         </section>
@@ -170,6 +170,7 @@ export const EducationDashboard: React.FC = () => {
             Thống kê tổng quan
           </h2>
 
+          {dashboardWarning && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{dashboardWarning}</p>}
           {dashboardError && (
             <div className="mb-4">
               <ErrorNotice message={`Dashboard: ${dashboardError}`} />
@@ -181,10 +182,10 @@ export const EducationDashboard: React.FC = () => {
               <MetricCard
                 label="Tổng sinh viên"
                 value={totalStudents}
-                description="Theo dữ liệu thống kê học vụ"
+                description="Sinh viên và tài khoản đang hoạt động"
                 icon={<Users size={18} />}
                 iconClass="bg-blue-50 text-blue-600"
-                loading={dashboardLoading}
+                loading={dashboardLoading && totalStudents === null}
               />
             </div>
 
@@ -216,8 +217,12 @@ export const EducationDashboard: React.FC = () => {
               description="Cảnh báo được hệ thống ghi nhận"
               icon={<BellRing size={18} />}
               iconClass="bg-orange-50 text-orange-600"
-              loading={dashboardLoading || alertsLoading}
+              loading={alertsLoading}
             />
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <MetricCard label="Chờ xác nhận kết quả" value={awaitingConfirmationStudents} description="Chưa xác nhận hoặc xác nhận đã cũ" icon={<Info size={18} />} iconClass="bg-blue-50 text-blue-600" loading={dashboardLoading} />
+            <MetricCard label="Cần đối soát dữ liệu" value={insufficientDataStudents} description="Chưa đủ cấu hình để xét điều kiện" icon={<AlertTriangle size={18} />} iconClass="bg-orange-50 text-orange-600" loading={dashboardLoading} />
           </div>
         </section>
 
@@ -458,7 +463,7 @@ export const EducationDashboard: React.FC = () => {
 
               {courseDemands.length === 0 ? (
                 <EmptyState
-                  loading={dashboardLoading}
+                  loading={courseDemandLoading}
                   title="Chưa có thống kê nhu cầu học phần"
                   description="Chưa có dữ liệu học phần phù hợp từ Backend."
                 />
@@ -513,19 +518,13 @@ export const EducationDashboard: React.FC = () => {
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200">
-            {scheduleError && <ErrorNotice message={scheduleError} />}
             {alertsError && (
               <div className="m-4">
                 <ErrorNotice message={alertsError} />
               </div>
             )}
 
-            {!hasAlertContext ? (
-              <EmptyState
-                title="Chưa đủ thông tin để tải cảnh báo"
-                description="Cần chọn kỳ học có cấu hình kỳ OJT và hạn đánh giá. Backend yêu cầu đủ các thông tin này để truy vấn cảnh báo."
-              />
-            ) : academicAlerts.length === 0 ? (
+            {academicAlerts.length === 0 ? (
               <EmptyState
                 loading={alertsLoading}
                 title="Chưa có cảnh báo học vụ"

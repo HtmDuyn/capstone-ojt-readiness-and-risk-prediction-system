@@ -6,12 +6,12 @@ export const academicReportingService = {
   cohorts: (signal?: AbortSignal) => getAllItems<Cohort>('/cohorts', {}, signal),
   periods: (signal?: AbortSignal) => getAllItems<ReportPeriod>('/academic-periods', {}, signal),
   courseDemand: (scope: ReportScope, page: number, includeInProgress: boolean, signal?: AbortSignal) =>
-    getPage<CourseDemand>('/academic/course-demand', {
+    getPage<CourseDemand>('/course-demands', {
       ...scope, page, limit: 20, includeInProgress: String(includeInProgress),
     }, signal) as Promise<DemandReport>,
   exportCourseDemand: async (scope: ReportScope, includeInProgress = false) => {
     try {
-      const response = await API.get<Blob>('/academic/course-demand/export', {
+      const response = await API.get<Blob>('/course-demands/export', {
         params: cleanQuery({ ...scope, includeInProgress: String(includeInProgress), format: 'csv' }),
         responseType: 'blob',
       });

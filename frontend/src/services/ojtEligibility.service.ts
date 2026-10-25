@@ -124,18 +124,26 @@ const createRuleSet = (payload: CreateOjtRuleSetPayload) =>
 
 const updateRuleSet = ({ ruleSetId, ...payload }: UpdateOjtRuleSetPayload) =>
   patchJson<OjtRuleSetMutationResponse>(
-    `/api/ojt-rule-sets/${ruleSetId}`,
-    payload,
+    "/api/ojt-rule-sets",
+    { id: ruleSetId, ...payload },
   );
 const publishRuleSet = ({ ruleSetId }: PublishOjtRuleSetPayload) =>
-  postJson<PublishOjtRuleSetResponse>(
-    `/api/ojt-rule-sets/${ruleSetId}/publish`,
-    {},
+  patchJson<PublishOjtRuleSetResponse>(
+    "/api/ojt-rule-sets",
+    { id: ruleSetId, status: "PUBLISHED" },
   );
 
 /* =========================================================
    EXPORT
    ========================================================= */
+
+async function saveAssessmentWindow(semesterId: number, payload: { blockPeriodId: number; opensAt: string; closesAt: string; reason: string }) {
+  const existing = await getPage<AssessmentWindow>("/assessment-windows", { ojtSemesterId: semesterId, page: 1, limit: 1 });
+  return apiData<AssessmentWindow>(await requestJson("/api/assessment-windows", {
+    method: existing.total ? "PATCH" : "POST",
+    body: JSON.stringify({ ...payload, ...(existing.total ? { id: semesterId } : { ojtSemesterId: semesterId }) }),
+  }));
+}
 
 export const ojtEligibilityService = {
   searchRuleSets,
@@ -143,17 +151,17 @@ export const ojtEligibilityService = {
   updateRuleSet,
   publishRuleSet,
   getStudentEligibility: async (studentId: number, ojtSemesterId: number, signal?: AbortSignal) =>
-    apiData<StudentEligibility>(await getJson(`/students/${studentId}/eligibility`, { ojtSemesterId }, signal)),
-  history: (studentId: number, ojtSemesterId: number, page = 1, signal?: AbortSignal) =>
-    getPage<EligibilityCheck>(`/students/${studentId}/eligibility-checks`, { ojtSemesterId, page, limit: 10 }, signal),
+    apiData<{ eligibility: StudentEligibility }>(await getJson(`/students/${studentId}`, { include: "eligibility", ojtSemesterId }, signal)).eligibility,
+  history: async (studentId: number, ojtSemesterId: number, page = 1, signal?: AbortSignal) =>
+    apiData<{ eligibilityChecks: import("@/types/education/api.types").Page<EligibilityCheck> }>(await getJson(`/students/${studentId}`, { include: "eligibilityChecks", ojtSemesterId, checksPage: page, checksLimit: 10 }, signal)).eligibilityChecks,
   checkBatch: async (payload: { ojtSemesterId: number; programIds?: number[]; studentIds?: number[]; idempotencyKey: string }) =>
     apiData<EligibilityBatch>(await postJson('/api/eligibility-check-runs', payload)),
   assessment: async (semesterId: number, signal?: AbortSignal) =>
-    apiData<AssessmentWindow>(await getJson(`/ojt-semesters/${semesterId}/assessment-window`, {}, signal)),
+    (await getPage<AssessmentWindow>("/assessment-windows", { ojtSemesterId: semesterId, page: 1, limit: 1 }, signal)).items[0] ?? null,
   saveAssessment: async (semesterId: number, payload: { blockPeriodId: number; opensAt: string; closesAt: string; reason: string }) =>
-    apiData<AssessmentWindow>(await requestJson(`/api/ojt-semesters/${semesterId}/assessment-window`, { method: 'PUT', body: JSON.stringify(payload) })),
+    saveAssessmentWindow(semesterId, payload),
   openAssessment: async (semesterId: number, reason: string) =>
-    apiData<AssessmentWindow>(await postJson(`/api/ojt-semesters/${semesterId}/assessment-window/open`, { reason, resultsFinalized: true })),
+    apiData<AssessmentWindow>(await patchJson("/api/assessment-windows", { id: semesterId, status: "OPEN", reason, resultsFinalized: true })),
 };
 
 export default ojtEligibilityService;

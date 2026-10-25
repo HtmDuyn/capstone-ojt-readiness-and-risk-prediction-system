@@ -194,10 +194,12 @@ export const parseAcademicPeriods = (value: unknown): AcademicPeriod[] => {
         ojtSemesterId: readString(item, [
           "ojtSemesterId",
           "ojtSemester.id",
+          "advisorySchedule.ojtSemesterId",
           "ojt.id",
         ]),
         assessmentDeadline: readString(item, [
           "assessmentDeadline",
+          "advisorySchedule.assessmentDeadline",
           "ojt.assessmentDeadline",
           "ojtSemester.assessmentDeadline",
           "assessmentWindow.deadline",
@@ -306,7 +308,7 @@ export const parseCourseDemand = (value: unknown): CourseDemand[] => {
       if (!code && !name) return null;
 
       return {
-        id: readString(item, ["id", "courseId"]) || `course-${index}`,
+        id: `${readString(item, ["ojtSemesterId"]) ?? ""}:${readString(item, ["academicPeriodId"]) ?? ""}:${readString(item, ["id", "courseId"]) || index}`,
         code: code || "—",
         name: name || "Chưa có tên học phần",
         count: readNumber(item, [
@@ -323,12 +325,12 @@ export const parseCourseDemand = (value: unknown): CourseDemand[] => {
 
 export const parseAlerts = (value: unknown): AcademicAlert[] =>
   readList(value).map((item, index) => ({
-    id: readString(item, ["studentId"]) ?? String(index),
+    id: `${readString(item, ["ojtSemesterId"]) ?? ""}:${readString(item, ["studentId"]) ?? index}`,
     title: [readString(item, ["studentCode"]), readString(item, ["fullName"])]
       .filter(Boolean)
       .join(" — "),
     description: Array.isArray(item.alertTypes)
-      ? item.alertTypes.join(", ")
+      ? item.alertTypes.map(type => ({ CREDIT_SHORTFALL: "Thiếu tín chỉ xét OJT", MISSING_REQUIRED_COURSES: "Chưa hoàn thành môn bắt buộc", EXCESS_FAILED_COURSES: "Vượt số môn còn rớt cho phép" } as Record<string, string>)[String(type)] ?? String(type)).join(", ")
       : (readString(item, ["category"]) ?? ""),
     date: null,
   }));
