@@ -65,7 +65,7 @@ export function describeAcademicRest(spec: Spec): Spec {
   for (const [path,methods] of Object.entries(retired)) for (const method of methods) {
     const item=spec.paths['/api'+path],op=item?.[method]; if(!op) continue;
     const remaining=(op['x-roles']??[]).filter((role:string)=>!['ADMIN','ACADEMIC'].includes(role));
-    if(remaining.length){op.tags=(op.tags??[]).filter((tag:string)=>!['Admin','Phòng đào tạo'].includes(tag));}
+    if(remaining.length){op['x-roles']=remaining;op.tags=(op.tags??[]).filter((tag:string)=>!['Admin','Phòng đào tạo'].includes(tag));}
     else delete item[method];
     if(!Object.keys(item).length)delete spec.paths['/api'+path];
   }

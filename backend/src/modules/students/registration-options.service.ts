@@ -29,7 +29,7 @@ const periodFields=`jsonb_build_object('id',p."AcademicPeriodID",'code',p."Perio
   jsonb_build_object('id',o."OJTSemesterID",'code',o."SemesterCode",'name',o."Name") AS semester`;
 
 // Student projections deliberately omit cohort rosters, raw Scope and staff summaries.
-export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) {
+export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,existingClient?:PoolClient) {
   if(actor.roleCode!=='STUDENT')throw invalid('Student role required.',403,'FORBIDDEN');
   const page=pagination(params,kind==='combo'?['phase','status','academicPeriodId']:['status','ojtSemesterId']);
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
@@ -86,5 +86,5 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
           {requiredRelativeSemester:w.RequiredRelativeSemester,pathway,registration:w.registration})});
     }
     return {studentId:s.StudentID,student:{id:s.StudentID,studentCode:s.StudentCode,fullName:s.FullName,email:s.Email,phone:s.Phone},items,total,page:page.page,limit:page.limit};
-  });
+  },existingClient);
 }

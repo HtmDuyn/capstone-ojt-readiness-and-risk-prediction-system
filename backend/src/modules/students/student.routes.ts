@@ -13,16 +13,16 @@ const router=Router();
 router.post('/students/me/cv',authenticate,authorizeRoles('STUDENT'),receiveCV,async(req,res,next)=>{try{
  res.status(201).json({success:true,data:await uploadStudentCV(req.file!,(req as any).user)});
 }catch(error){next(error);}});
-router.get('/students/:id/cv',authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD'),async(req,res,next)=>{try{
+router.get('/students/:id/cv',authenticate,authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','STUDENT'),async(req,res,next)=>{try{
  const file=await readCV(positiveId(req.params.id),(req as any).user,req.query.cvFileId===undefined?undefined:positiveId(req.query.cvFileId,'cvFileId'));
  res.setHeader('Content-Type',file.MimeType);
  res.setHeader('Content-Disposition',`attachment; filename="cv.pdf"; filename*=UTF-8''${encodeURIComponent(file.FileName).replace(/'/g,'%27')}`);
  res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Content-Type-Options','nosniff');res.send(file.Content);
 }catch(error){next(error);}});
 const staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
-const read=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
+const read=[authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
-router.get('/job-applications',authenticate,authorizeRoles('ADMIN','OJT_COORD'),handle(req=>listApplications(req.query,req.user)));
+router.get('/job-applications',authenticate,authorizeRoles('ADMIN','OJT_COORD','STUDENT'),handle(req=>listApplications(req.query,req.user)));
 router.get('/students',...staff,handle(req=>listStudents(req.query)));
 router.get('/students/:id',...read,handle(req=>studentProfile(positiveId(req.params.id),req.query,req.user)));
 router.patch('/students/:id',...staff,handle(req=>patchStudent(positiveId(req.params.id),req.body,req.user.userId)));

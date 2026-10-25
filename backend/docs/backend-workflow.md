@@ -1,6 +1,6 @@
 # Luồng import, task và kết quả OJT
 
-Cập nhật 20/10/2026. Swagger hiện tại có **159 API duy nhất**, tất cả adapter JSON có route đích. Danh mục đầy đủ: [swagger-api-by-role.md](swagger-api-by-role.md).
+Sinh viên và các nhóm nghiệp vụ dùng REST. GET không có body; POST/PUT/PATCH dùng JSON khi có dữ liệu nghiệp vụ, upload dùng multipart. Danh mục đầy đủ: [swagger-api-by-role.md](swagger-api-by-role.md).
 
 ## Mã doanh nghiệp và import tài khoản
 
@@ -77,7 +77,7 @@ Thay ID và ngày bằng dữ liệu thực tế. Chỉ doanh nghiệp sở hữ
 - `OverallScore` của đánh giá `SUBMITTED` là điểm chính thức. Không cần QHDN chuyển hồ sơ hoặc phòng đào tạo nhập/xác nhận lại.
 - Phòng đào tạo xem `POST /api/json/ojt-results/list` với JSON bộ lọc, ví dụ `{"ojtSemesterId":1,"page":1,"limit":20}`. API gốc: `GET /api/ojt-results`.
 - Xuất danh sách: `POST /api/json/ojt-semesters/results/export` với `ojtSemesterId`, `format` (`csv`, `json`, `pdf`).
-- Sinh viên xem điểm của mình qua `POST /api/json/student/ojt-results/list` hoặc chi tiết tương ứng. `resultId` hiện là **EvaluationID**, không phải ID của bảng OJTResults cũ.
+- Sinh viên xem điểm của mình qua `GET /api/students/me/internships` (results) hoặc `GET /api/students/me/internships?resultId=...` (result). `resultId` là **ResultID của OJTResults**, chỉ trả kết quả CONFIRMED của mình.
 - Sau cả ngày kết thúc phân công và ngày kết thúc kỳ OJT, worker gửi một email và thông báo trong hệ thống cho sinh viên. Phòng đào tạo lấy danh sách trên API; không gửi email hàng loạt cho cán bộ.
 - Sau khi kết thúc kỳ, đánh giá đã nộp bị khóa. Điểm chưa nộp không được tự sinh. Email lấy điểm của doanh nghiệp, không lấy điểm nhập tay cũ.
 - Không tự suy ra ngưỡng đậu/rớt hoặc thay đổi GPA: response `outcome` hiện là null. Yêu cầu hiện tại là điểm chính thức, email sinh viên và danh sách phòng đào tạo; không thêm quy chế quy đổi điểm mới.

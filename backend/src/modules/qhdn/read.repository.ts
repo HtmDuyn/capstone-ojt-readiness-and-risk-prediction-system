@@ -3,7 +3,8 @@ import type { PoolClient } from 'pg';
 import { invalid } from '../students/student.validation';
 
 // Reports and catalog reads share one snapshot without taking the write advisory lock.
-export async function readTransaction<T>(work:(client:PoolClient)=>Promise<T>):Promise<T>{
+export async function readTransaction<T>(work:(client:PoolClient)=>Promise<T>,existingClient?:PoolClient):Promise<T>{
+  if(existingClient)return work(existingClient);
   if(!pool)throw invalid('Database is not configured.',503,'DATABASE_UNAVAILABLE');
   const client=await pool.connect();
   try{

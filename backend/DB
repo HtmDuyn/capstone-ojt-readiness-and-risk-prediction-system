@@ -6398,8 +6398,8 @@ END $$;
 
 
 -- ============================================================
--- Demo calendar: ten sequential semesters with OJT in curriculum semester 6.
--- Used by the readiness and recruitment demo seeds below.
+-- Demo OJT semester: calendar mapping for curriculum stages 0–9.
+-- Keep the stage-6 target and the twenty-student seed in the reset transaction.
 -- ============================================================
 SET LOCAL search_path = public, pg_catalog;
 CREATE TEMP TABLE _demo_study_periods(stage int PRIMARY KEY, period_id int NOT NULL) ON COMMIT DROP;
@@ -6904,10 +6904,9 @@ INSERT INTO "SchemaMigrations" ("Version") VALUES('20261025_complete_20_student_
 -- The latest catalog publication below is part of the same reset transaction.
 
 -- BEGIN INCREMENTAL UPDATE: 20261023_academic_rest_resources
--- Existing databases: run only this block; no existing application rows are changed.
+-- Existing databases: execute only this block inside BEGIN/COMMIT; existing rows are preserved.
 -- From backend/: npm run db:migrate:academic-rest
 -- Stores validated student/curriculum import requests for the REST preview/commit workflow.
-BEGIN;
 SET LOCAL search_path=public,pg_catalog;
 CREATE TABLE IF NOT EXISTS "AcademicImportRequests" (
  "ImportID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -6940,7 +6939,6 @@ DO $$ DECLARE role_name text; BEGIN
  END IF;
 END $$;
 INSERT INTO "SchemaMigrations"("Version") VALUES('20261023_academic_rest_resources') ON CONFLICT DO NOTHING;
-COMMIT;
 -- END INCREMENTAL UPDATE: 20261023_academic_rest_resources
 
 -- SECTION: 20261024 publish seeded training programs
@@ -7016,11 +7014,9 @@ BEGIN
  ON CONFLICT ("ProgramID") DO NOTHING;
  INSERT INTO "SchemaMigrations" ("Version") VALUES ('20261024_publish_seeded_programs') ON CONFLICT DO NOTHING;
 END $publish_seed$;
-COMMIT;
 -- BEGIN SEED OJT ASSESSMENT WINDOWS: 20261024
 -- Only seed OJT terms with a completed preparation semester and Block 3.
 -- One window per term; reruns preserve any configuration made by staff.
-BEGIN;
 SET LOCAL search_path = public, pg_catalog;
 INSERT INTO "OJTAssessmentWindows"
  ("OJTSemesterID","BlockPeriodID","AssessmentAcademicPeriodID","RequiredRelativeSemester",
