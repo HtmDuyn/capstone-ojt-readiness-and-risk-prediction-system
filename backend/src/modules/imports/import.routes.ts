@@ -1,5 +1,3 @@
-import multer from 'multer';
-import { parseImportSheet } from './import-sheet.service';
 import { Router } from 'express';
 import { archiveRecruitment } from '../../jobs/provisioning';
 import { authenticate } from '../../middleware/authenticate';
@@ -9,18 +7,15 @@ import { query } from '../../config/database';
 import { fail } from './import.validation';
 const router = Router();
 router.use(authenticate, authorizeRoles('ADMIN', 'ACADEMIC', 'OJT_COORD'));
-const sheetUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: 8 * 1024 * 1024, files: 1, fields: 12}});
 for (const path of ['/preview', '/commit']) {
-  router.post(path, sheetUpload.single('file'), async (req, res, next) => {
+  router.post(path, async (req, res, next) => {
     try {
       const role = req.user!.roleCode;
       const kind = req.body?.kind;
-      if (!((['ADMIN', 'ACADEMIC'].includes(role!) && kind === 'STUDENT') ||
-        (role === 'OJT_COORD' && kind === 'ENTERPRISE'))) {
-        throw fail('Only QHDN can import enterprises; academic staff import students.', 403, 'FORBIDDEN');
+      if (!(role === 'OJT_COORD' && kind === 'ENTERPRISE')) {
+        throw fail('Use student-imports for students; this endpoint imports enterprises for QHDN.', 403, 'FORBIDDEN');
       }
-      const input = await parseImportSheet(req.body, req.file);
-      res.json({success: true, ...await importAccounts(input, req.user!.userId, path === '/preview')});
+      res.json({success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview')});
     } catch (error) { next(error); }
   });
 }

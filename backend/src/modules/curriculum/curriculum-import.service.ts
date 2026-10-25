@@ -6,6 +6,7 @@ import { array, inputObject, requiredText, optionalText, metadata, unique, inval
 import { normalizeCourses, normalizeCombo, normalizePrerequisites, normalizeEquivalences, writeCourses, writeComboCourses, writePrerequisites, writeEquivalences, type Row } from './curriculum.structure';
 import { comboMetadata, insertCombo, writeMetadata, publicationIssues, publicationIssuesForData } from './curriculum.service';
 import { detail } from './curriculum.repository';
+import type { ImportCommitHook } from '../imports/import.service';
 
 async function prepare(client:PoolClient,body:unknown) {
   const b=inputObject(body,['idempotencyKey','sourceName','curriculum','courses','prerequisites','combos','equivalences']);
@@ -20,7 +21,7 @@ async function prepare(client:PoolClient,body:unknown) {
   unique(combos.map(c=>c.code),'combo code');
   const comboCourses=combos.flatMap(c=>c.courses),prerequisites=normalizePrerequisites(b.prerequisites,courses,comboCourses),equivalences=await normalizeEquivalences(client,b.equivalences,courses,comboCourses);
   const publication=await publicationIssuesForData(client,{
-    version:meta.fields.Version,majorId:meta.fields.SpecializationID,effectiveYear:meta.fields.EffectiveYear,
+    majorId:meta.fields.SpecializationID,effectiveYear:meta.fields.EffectiveYear,
     totalCredits:meta.fields.TotalCredits,gpaScale:meta.gpaScale,retakePolicy:'LATEST',
     prerequisitesReviewed:true,equivalencesReviewed:true,courses,prerequisites,equivalences,
     combos:combos.map(combo=>({...combo,coursesReviewed:true})),
@@ -38,12 +39,12 @@ async function prepare(client:PoolClient,body:unknown) {
   }
   return {key,sourceName,curriculum:b.curriculum,courses,combos,prerequisites,equivalences,existingId:existing[0]?.ProgramID as number|undefined};
 }
-export async function importCurriculum(body:unknown,actorId:number,preview:boolean) {
+export async function importCurriculum(body:unknown,actorId:number,preview:boolean,onCommit?:ImportCommitHook) {
   try {
     const b=inputObject(body,['idempotencyKey','sourceName','curriculum','courses','prerequisites','combos','equivalences']);
     const key=requiredText(b.idempotencyKey,'idempotencyKey',100),hash=createHash('sha256').update(JSON.stringify({sourceName:b.sourceName??null,curriculum:b.curriculum,courses:b.courses,prerequisites:b.prerequisites,combos:b.combos,equivalences:b.equivalences})).digest('hex');
     return await academicTransaction(async client=>{
-      if(!preview){const old=(await client.query(`SELECT * FROM "AcademicImportBatches" WHERE "Kind"='CURRICULUM' AND "Status"='COMPLETED' AND "IdempotencyKey"=$1`,[key])).rows[0];if(old){if(old.PayloadHash!==hash||old.ImportedBy!==actorId)throw invalid('Idempotency key belongs to another payload or actor.',409,'IMPORT_CONFLICT');return {...old.Summary,batchId:old.BatchID,replayed:true};}}
+      if(!preview){const old=(await client.query(`SELECT * FROM "AcademicImportBatches" WHERE "Kind"='CURRICULUM' AND "Status"='COMPLETED' AND "IdempotencyKey"=$1`,[key])).rows[0];if(old){if(old.PayloadHash!==hash||old.ImportedBy!==actorId)throw invalid('Idempotency key belongs to another payload or actor.',409,'IMPORT_CONFLICT');const result={...old.Summary,batchId:old.BatchID,replayed:true};if(onCommit)await onCommit(client,result);return result;}}
       const p=await prepare(client,body);
       const summary={courseCount:p.courses.length,comboCount:p.combos.length,prerequisiteGroupCount:p.prerequisites.length,equivalenceCount:p.equivalences.length,canCommit:true,action:p.existingId?'REPLACE':'CREATE',curriculumId:p.existingId??null,status:'PUBLISHED'};
       if(preview)return {...summary,preview:true,normalized:p};
@@ -74,7 +75,9 @@ export async function importCurriculum(body:unknown,actorId:number,preview:boole
       const after=await detail(client,id);await audit(client,actorId,'TrainingPrograms',id,p.existingId?'REPLACE_CURRICULUM':'IMPORT_CURRICULUM',before,after);
       const result={...summary,curriculumId:id,status:'PUBLISHED'};
       const batchId=await saveHistory(client,{kind:'CURRICULUM',key,hash,sourceName:p.sourceName,status:'COMPLETED',summary:result,curriculumId:id},actorId,[{raw:p,normalized:{curriculumId:id},status:'IMPORTED'}]);
-      return {...result,batchId,replayed:false};
+      const committed={...result,batchId,replayed:false};
+      if(onCommit)await onCommit(client,committed);
+      return committed;
     });
   }catch(error:any){
     if(preview && error.statusCode && error.statusCode<500)return {preview:true,canCommit:false,errors:[{code:error.errorCode??'INVALID_CURRICULUM_IMPORT',message:error.message}]};

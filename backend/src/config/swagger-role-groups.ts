@@ -33,7 +33,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/ojt-rule-sets",
     "GET /api/ojt-semesters/{id}/assessment-window",
     "GET /api/students",
-    "PATCH /api/academic-periods/{id}",
     "PATCH /api/academic-years/{id}",
     "PATCH /api/cohorts/{id}",
     "PATCH /api/combo-registration-windows/{id}",
@@ -163,6 +162,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     if (access.has(key)) throw new Error('Duplicate Swagger access entry: ' + key);
     access.set(key, group.roles);
   }
+  for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
   for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
   for(const key of ['GET /api/ojt-registration-windows','POST /api/ojt-registrations','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);
