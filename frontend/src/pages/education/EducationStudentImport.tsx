@@ -5,6 +5,7 @@ import { importService } from '@/services/import.service';
 import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
 import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
 import React from "react";
+import { FileSpreadsheet, Download, RefreshCw, CheckCircle2, AlertCircle, UploadCloud } from 'lucide-react';
 const EducationStudentImport: React.FC = () => {
   const [savedRevision, setSavedRevision] = React.useState(0);
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
@@ -124,32 +125,31 @@ const EducationStudentImport: React.FC = () => {
       .includes(search.toLowerCase()),
   );
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       <PageBanner
         title="Import sinh viên và bảng điểm"
         description="Một tệp nhập thông tin sinh viên, trạng thái học vụ, chương trình, khóa/nhóm, kỳ bắt đầu chuyên ngành, kỳ hiện tại và bảng điểm."
         badge="Phòng Đào tạo"
       />
-      <section className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
-        <p>
+      <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><FileSpreadsheet size={24} /></div>
+          <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600">Một tệp cho hồ sơ sinh viên mới và kết quả học tập theo từng kỳ.</p></div>
+        </div>
+        <p className="rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
           Tệp gồm sheet <strong>Danh sách sinh viên</strong> và{" "}
           <strong>Kết quả học tập</strong>. Mỗi dòng điểm có MSSV để gắn vào
           đúng hồ sơ. Sinh viên chưa có điểm được để trống sheet kết quả.
           Mẫu có thêm sheet <strong>Danh mục</strong> chứa ID/mã hợp lệ tại lúc tải và <strong>Hướng dẫn</strong> cho từng cột.
         </p>
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="rounded border p-2"
-            disabled={!!busy}
-            onClick={() => downloadStudentImportTemplate(catalogs)}
-          >
-            Tải mẫu Excel đầy đủ
-          </button>
-          <label className="rounded border p-2">
-            Chọn tệp Excel
+        <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-orange-300 bg-orange-50/40 p-5 sm:p-6">
+          <div className="flex items-start gap-3"><UploadCloud className="mt-0.5 shrink-0 text-orange-600" size={22} /><div><p className="font-semibold text-slate-900">Chọn tệp Excel để bắt đầu</p><p className="mt-1 text-sm text-slate-500">Định dạng .xlsx hoặc .xls, tối đa 8 MB. Dữ liệu sẽ được kiểm tra trước khi lưu.</p></div></div>
+          <div className="flex flex-wrap items-center gap-3">
+          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
+            <FileSpreadsheet size={18} /> Chọn tệp Excel
             <input
               aria-label="Tệp sinh viên và bảng điểm"
-              className="ml-2"
+              className="sr-only"
               type="file"
               accept=".xlsx,.xls"
               disabled={!!busy || !catalogs}
@@ -160,17 +160,28 @@ const EducationStudentImport: React.FC = () => {
               }}
             />
           </label>
+          <span className="min-w-0 break-all text-sm text-slate-600" aria-live="polite">{fileName || 'Chưa chọn tệp'}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
           <button
-            className="rounded border p-2"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
+            disabled={!!busy}
+            onClick={() => downloadStudentImportTemplate(catalogs)}
+          >
+            <Download size={16} /> Tải mẫu Excel đầy đủ
+          </button>
+          <button
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
             disabled={!!busy}
             onClick={() => setCatalogRefresh((v) => v + 1)}
           >
-            Tải lại danh mục
+            <RefreshCw size={16} /> Tải lại danh mục
           </button>
         </div>
-        {!catalogs && <p>Đang chờ danh mục chương trình, khóa và kỳ học.</p>}
+        {!catalogs && <p className="text-sm text-slate-500">Đang chờ danh mục chương trình, khóa và kỳ học.</p>}
         {busy && (
-          <p role="status">
+          <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
             {busy === "read"
               ? "Đang đọc và ghép dữ liệu..."
               : busy === "preview"
@@ -179,26 +190,26 @@ const EducationStudentImport: React.FC = () => {
           </p>
         )}
         {error && (
-          <p role="alert" className="text-red-700">
-            {error}
+          <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle size={18} className="shrink-0" /> {error}
           </p>
         )}
         {rows.length > 0 && (
           <>
-            <p>
+            <p className="rounded-xl bg-orange-50 px-4 py-3 text-sm text-slate-700">
               {fileName}: <strong>{rows.length} sinh viên</strong>,{" "}
               <strong>{gradeCount} kết quả học tập</strong>.
             </p>
             <input
               aria-label="Tìm sinh viên trong tệp"
-              className="rounded border p-2"
+              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 sm:max-w-sm"
               value={search}
               placeholder="MSSV, tên hoặc email"
               onChange={(e) => setSearch(e.target.value)}
             />
-            <div className="overflow-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
+            <div className="overflow-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[850px] text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     {[
                       "MSSV",
@@ -209,7 +220,7 @@ const EducationStudentImport: React.FC = () => {
                       "Số kết quả",
                       "",
                     ].map((h) => (
-                      <th key={h} className="p-3">
+                      <th key={h} className="whitespace-nowrap px-4 py-3 font-semibold">
                         {h}
                       </th>
                     ))}
@@ -217,25 +228,25 @@ const EducationStudentImport: React.FC = () => {
                 </thead>
                 <tbody>
                   {visible.map((row) => (
-                    <tr key={row.code} className="border-t">
-                      <td className="p-3">{row.code}</td>
-                      <td>
+                    <tr key={row.code} className="border-t border-slate-100 hover:bg-orange-50/30">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{row.code}</td>
+                      <td className="px-4 py-3">
                         {row.fullName}
                         <br />
                         {row.email}
                       </td>
-                      <td>
+                      <td className="px-4 py-3">
                         {catalogs?.programs.find(
                           (p) => p.id === row.academic.programId,
                         )?.label ?? row.academic.programId}
                       </td>
-                      <td>
+                      <td className="px-4 py-3">
                         {catalogs?.cohorts.find(
                           (c) => c.id === row.academic.placement.cohortId,
                         )?.label ?? row.academic.placement.cohortId}{" "}
                         / {row.academic.placement.groupCode}
                       </td>
-                      <td>
+                      <td className="px-4 py-3">
                         {catalogs?.periods.find(
                           (p) =>
                             p.id ===
@@ -243,10 +254,10 @@ const EducationStudentImport: React.FC = () => {
                         )?.label ??
                           row.academic.placement.currentAcademicPeriodId}
                       </td>
-                      <td>{row.academic.courseResults.length}</td>
-                      <td>
+                      <td className="px-4 py-3">{row.academic.courseResults.length}</td>
+                      <td className="px-4 py-3">
                         <button
-                          className="text-orange-700"
+                          className="font-medium text-orange-700 hover:underline"
                           onClick={() => setSelected(row)}
                         >
                           Xem hồ sơ và bảng điểm
@@ -257,16 +268,16 @@ const EducationStudentImport: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
               <button
-                className="rounded border p-2"
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 disabled={!!busy || !!result}
                 onClick={() => void check()}
               >
                 Kiểm tra dữ liệu
               </button>
               <button
-                className="rounded bg-orange-500 p-2 text-white disabled:opacity-50"
+                className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
                 disabled={!!busy || !canCommit}
                 onClick={() => void commit()}
               >
@@ -276,13 +287,14 @@ const EducationStudentImport: React.FC = () => {
           </>
         )}
         {preview && (
-          <p role="status">
+          <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
             Kiểm tra: {preview.total} sinh viên, tạo mới {preview.created}, hồ
             sơ hiện có {preview.updated}. Dữ liệu chưa được lưu.
           </p>
         )}
         {result && (
-          <p role="status" className="text-green-700">
+          <p role="status" className="flex items-start gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <CheckCircle2 size={18} className="shrink-0" />
             Đã nhập {result.total} sinh viên cùng bảng điểm tương ứng. Mã đợt:{" "}
             {result.academicImportId ?? result.batchId ?? "—"}
             {result.replayed ? " (yêu cầu đã được xử lý trước đó)" : ""}.
