@@ -1,3 +1,4 @@
+import { requireJsonBody } from '../../middleware/json-body';
 import { Router } from "express";
 
 import {
@@ -142,7 +143,8 @@ router.post(
 router.patch(
   "/me/profile",
   authenticate,
-  authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','ENTERPRISE'),
+  authorizeRoles('ADMIN','ACADEMIC','OJT_COORD','ENTERPRISE','STUDENT'),
+  requireJsonBody,
   updateMyProfile,
 );
 

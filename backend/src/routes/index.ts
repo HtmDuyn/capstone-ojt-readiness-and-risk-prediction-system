@@ -17,9 +17,11 @@ import comboRoutes from '../modules/combo-registration/combo.routes';
 
 import authRoutes from "../modules/auth/auth.routes";
 import accountRoutes from "../modules/accounts/account.routes";
-import { swaggerSpec } from '../config/swagger';
-import { createStudentJsonRouter } from '../middleware/student-json';
+import portalRoutes from '../modules/student-portal/portal.routes';
+import { requireNoBody } from '../middleware/json-body';
 const router = Router();
+router.use((req, res, next) => req.method === 'GET' ? requireNoBody(req, res, next) : next());
+router.use(portalRoutes);
 router.use(academicJsonRequests);
 router.use(academicRestRoutes);
 router.use(adminRoutes);
@@ -56,7 +58,4 @@ router.use(
   accountRoutes,
 );
 
-const api = Router();
-api.use(createStudentJsonRouter(swaggerSpec));
-api.use(router);
-export default api;
+export default router;

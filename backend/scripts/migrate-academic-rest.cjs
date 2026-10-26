@@ -9,6 +9,11 @@ const {pool}=require('../dist/config/database');
  const end=source.indexOf('-- END INCREMENTAL UPDATE: 20261023_academic_rest_resources',start);
  if(start<0||end<start)throw Error('Academic REST migration boundaries are missing.');
  const c=await pool.connect();
- try{await c.query(source.slice(start,end));console.log('Academic REST migration installed; existing data preserved.');}
+ try{
+  await c.query('BEGIN');
+  await c.query(source.slice(start,end));
+  await c.query('COMMIT');
+  console.log('Academic REST migration installed; existing data preserved.');
+ }
  catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 })().catch(error=>{console.error(error.message);process.exitCode=1;}).finally(()=>pool?.end());

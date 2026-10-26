@@ -2,15 +2,15 @@
 
 Tạo từ OpenAPI hiện hành bằng `npm run docs:api` sau `npm run build`.
 
-Tổng 154 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
+Tổng 128 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
 | Admin | 12 |
-| Phòng đào tạo | 64 |
+| Phòng đào tạo | 65 |
 | Phòng QHDN | 39 |
 | Doanh nghiệp | 9 |
-| Sinh viên | 31 |
+| Sinh viên | 19 |
 | Auth | 3 |
 
 ## Admin
@@ -40,68 +40,69 @@ Quản lý học vụ và xét điều kiện OJT.
 |---:|---|---|---|---|
 | 1 | GET | `/api/academic-years` | Danh sách năm học | `GET /api/academic-years` |
 | 2 | POST | `/api/academic-years` | Tạo năm học | `POST /api/academic-years` |
-| 3 | PATCH | `/api/academic-years` | Cập nhật năm học | `PATCH /api/academic-years` |
+| 3 | PATCH | `/api/academic-years/{id}` | Cập nhật năm học | `PATCH /api/academic-years/{id}` |
 | 4 | GET | `/api/academic-periods` | Danh sách kỳ học và Block 3 | `GET /api/academic-periods` |
 | 5 | POST | `/api/academic-periods` | Tạo kỳ học và Block 3 | `POST /api/academic-periods` |
-| 6 | PATCH | `/api/academic-periods` | Cập nhật kỳ học và Block 3 | `PATCH /api/academic-periods` |
-| 7 | GET | `/api/cohorts` | Danh sách khóa và nhóm | `GET /api/cohorts` |
-| 8 | POST | `/api/cohorts` | Tạo khóa và nhóm | `POST /api/cohorts` |
-| 9 | PATCH | `/api/cohorts` | Cập nhật khóa và nhóm | `PATCH /api/cohorts` |
-| 10 | POST | `/api/ojt-registration-windows/{id}/semester-exceptions` | Thêm ngoại lệ kỳ đăng ký OJT | `POST /api/ojt-registration-windows/{id}/semester-exceptions` |
-| 11 | POST | `/api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke` | Thu hồi ngoại lệ kỳ đăng ký OJT | `POST /api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke` |
-| 12 | POST | `/api/combo-registration-windows/{id}/preview` | Xem ảnh hưởng của combo dự kiến | `POST /api/combo-registration-windows/{id}/preview` |
-| 13 | PATCH | `/api/accounts/me/profile` | Cập nhật hồ sơ cá nhân | `PATCH /api/accounts/me/profile` |
-| 14 | GET | `/api/combo-registration-windows` | Danh sách đợt chọn combo | `GET /api/combo-registration-windows` |
-| 15 | POST | `/api/combo-registration-windows` | Tạo đợt chọn hoặc xác nhận combo | `POST /api/combo-registration-windows` |
-| 16 | GET | `/api/combo-registration-windows/{id}` | Chi tiết đợt và các lựa chọn combo | `GET /api/combo-registration-windows/{id}` |
-| 17 | PATCH | `/api/combo-registration-windows/{id}` | Cập nhật hoặc mở/đóng đợt chọn combo | `PATCH /api/combo-registration-windows/{id}` |
-| 18 | POST | `/api/combo-registration-windows/{id}/extensions` | Gia hạn chọn combo | `POST /api/combo-registration-windows/{id}/extensions` |
-| 19 | POST | `/api/combo-registration-windows/{id}/selections` | Gửi lựa chọn combo | `POST /api/combo-registration-windows/{id}/selections` |
-| 20 | POST | `/api/combo-registration-windows/{id}/reminders` | Gửi nhắc chọn combo | `POST /api/combo-registration-windows/{id}/reminders` |
-| 21 | POST | `/api/combo-registration-windows/{id}/finalize` | Chốt lựa chọn combo | `POST /api/combo-registration-windows/{id}/finalize` |
-| 22 | GET | `/api/majors` | Danh sách chuyên ngành | `GET /api/majors` |
-| 23 | POST | `/api/majors` | Tạo chuyên ngành | `POST /api/majors` |
-| 24 | GET | `/api/courses` | Danh sách môn học | `GET /api/courses` |
-| 25 | POST | `/api/courses` | Tạo môn học | `POST /api/courses` |
-| 26 | GET | `/api/curricula` | Danh sách chương trình đào tạo đã nhập | `GET /api/curricula` |
-| 27 | PATCH | `/api/courses/{id}` | Cập nhật môn học | `PATCH /api/courses/{id}` |
-| 28 | GET | `/api/curricula/{id}` | Chi tiết chương trình đào tạo | `GET /api/curricula/{id}` |
-| 29 | GET | `/api/ojt-rule-sets` | Danh sách bộ quy tắc OJT | `GET /api/ojt-rule-sets` |
-| 30 | POST | `/api/ojt-rule-sets` | Tạo bộ quy tắc OJT | `POST /api/ojt-rule-sets` |
-| 31 | PATCH | `/api/ojt-rule-sets` | Cập nhật hoặc ban hành bộ quy tắc | `PATCH /api/ojt-rule-sets` |
-| 32 | POST | `/api/eligibility-check-runs` | Xét điều kiện OJT hàng loạt và cập nhật trạng thái | `POST /api/eligibility-check-runs` |
-| 33 | GET | `/api/ojt-semesters/{id}/students` | Theo dõi trạng thái OJT theo kỳ | `GET /api/ojt-semesters/{id}/students` |
-| 34 | GET | `/api/students` | Tìm kiếm và lọc sinh viên | `GET /api/students` |
-| 35 | GET | `/api/students/{id}` | Hồ sơ học vụ tổng hợp | `GET /api/students/{id}` |
-| 36 | PATCH | `/api/students/{id}` | Cập nhật hồ sơ và lộ trình học vụ | `PATCH /api/students/{id}` |
-| 37 | PATCH | `/api/course-results/{id}` | Sửa kết quả học tập và ghi lý do | `PATCH /api/course-results/{id}` |
-| 38 | GET | `/api/academic-imports` | Lịch sử nhập dữ liệu học vụ | `GET /api/academic-imports` |
-| 39 | GET | `/api/ojt-results` | Danh sách kết quả OJT đã được QHDN chuyển | `GET /api/ojt-results` |
-| 40 | GET | `/api/ojt-semesters/{id}/results/export` | Xuất danh sách điểm OJT chính thức | `GET /api/ojt-semesters/{id}/results/export` |
-| 41 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
-| 42 | POST | `/api/ojt-results/{id}/confirm` | Phòng đào tạo xác nhận và ghi nhận điểm OJT | `POST /api/ojt-results/{id}/confirm` |
-| 43 | GET | `/api/assessment-windows` | Danh sách đợt xét điều kiện | `GET /api/assessment-windows` |
-| 44 | POST | `/api/assessment-windows` | Tạo đợt xét điều kiện | `POST /api/assessment-windows` |
-| 45 | PATCH | `/api/assessment-windows` | Cập nhật đợt xét hoặc trạng thái mở/đóng | `PATCH /api/assessment-windows` |
-| 46 | GET | `/api/ojt-semesters` | Danh sách kỳ OJT | `GET /api/ojt-semesters` |
-| 47 | GET | `/api/ojt-semesters/{id}` | Chi tiết kỳ OJT, sinh viên, bàn giao và kết quả | `GET /api/ojt-semesters/{id}` |
-| 48 | PUT | `/api/ojt-grade-mappings` | Thiết lập quy đổi điểm OJT | `PUT /api/ojt-grade-mappings` |
-| 49 | GET | `/api/eligible-student-handoffs` | Lịch sử bàn giao sinh viên | `GET /api/eligible-student-handoffs` |
-| 50 | POST | `/api/eligible-student-handoffs` | Bàn giao sinh viên đủ điều kiện | `POST /api/eligible-student-handoffs` |
-| 51 | GET | `/api/academic-notifications` | Lịch sử thông báo học vụ | `GET /api/academic-notifications` |
-| 52 | POST | `/api/academic-notifications` | Tạo thông báo học vụ theo loại | `POST /api/academic-notifications` |
-| 53 | GET | `/api/academic-notifications/{id}` | Chi tiết thông báo và trạng thái từng sinh viên | `GET /api/academic-notifications/{id}` |
-| 54 | GET | `/api/student-imports` | Danh sách yêu cầu nhập dữ liệu | `GET /api/student-imports` |
-| 55 | POST | `/api/student-imports` | Kiểm tra và lưu yêu cầu nhập dữ liệu | `POST /api/student-imports` |
-| 56 | PATCH | `/api/student-imports` | Xác nhận nhập dữ liệu đã kiểm tra | `PATCH /api/student-imports` |
-| 57 | GET | `/api/student-imports/{id}` | Chi tiết yêu cầu, kết quả và lỗi nhập dữ liệu | `GET /api/student-imports/{id}` |
-| 58 | GET | `/api/curriculum-imports` | Danh sách yêu cầu nhập dữ liệu | `GET /api/curriculum-imports` |
-| 59 | POST | `/api/curriculum-imports` | Kiểm tra và lưu yêu cầu nhập dữ liệu | `POST /api/curriculum-imports` |
-| 60 | PATCH | `/api/curriculum-imports` | Xác nhận nhập dữ liệu đã kiểm tra | `PATCH /api/curriculum-imports` |
-| 61 | GET | `/api/curriculum-imports/{id}` | Chi tiết yêu cầu, kết quả và lỗi nhập dữ liệu | `GET /api/curriculum-imports/{id}` |
-| 62 | GET | `/api/academic-alerts` | Danh sách cảnh báo thiếu điều kiện OJT | `GET /api/academic-alerts` |
-| 63 | GET | `/api/course-demands` | Thống kê nhu cầu học môn còn thiếu | `GET /api/course-demands` |
-| 64 | GET | `/api/course-demands/export` | Xuất nhu cầu học theo môn, kỳ và Block | `GET /api/course-demands/export` |
+| 6 | GET | `/api/cohorts` | Danh sách khóa và nhóm | `GET /api/cohorts` |
+| 7 | POST | `/api/cohorts` | Tạo khóa và nhóm | `POST /api/cohorts` |
+| 8 | PATCH | `/api/cohorts/{id}` | Cập nhật khóa và nhóm | `PATCH /api/cohorts/{id}` |
+| 9 | GET | `/api/academic-years/{id}/calendar` | Read a year calendar and its current revision | `GET /api/academic-years/{id}/calendar` |
+| 10 | PUT | `/api/academic-years/{id}/calendar` | Save Spring, Summer and Fall dates together | `PUT /api/academic-years/{id}/calendar` |
+| 11 | POST | `/api/ojt-registration-windows/{id}/semester-exceptions` | Thêm ngoại lệ kỳ đăng ký OJT | `POST /api/ojt-registration-windows/{id}/semester-exceptions` |
+| 12 | POST | `/api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke` | Thu hồi ngoại lệ kỳ đăng ký OJT | `POST /api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke` |
+| 13 | POST | `/api/combo-registration-windows/{id}/preview` | Xem ảnh hưởng của combo dự kiến | `POST /api/combo-registration-windows/{id}/preview` |
+| 14 | PATCH | `/api/accounts/me/profile` | Cập nhật hồ sơ cá nhân | `PATCH /api/accounts/me/profile` |
+| 15 | GET | `/api/combo-registration-windows` | Danh sách đợt chọn combo | `GET /api/combo-registration-windows` |
+| 16 | POST | `/api/combo-registration-windows` | Tạo đợt chọn hoặc xác nhận combo | `POST /api/combo-registration-windows` |
+| 17 | GET | `/api/combo-registration-windows/{id}` | Chi tiết đợt và các lựa chọn combo | `GET /api/combo-registration-windows/{id}` |
+| 18 | PATCH | `/api/combo-registration-windows/{id}` | Cập nhật hoặc mở/đóng đợt chọn combo | `PATCH /api/combo-registration-windows/{id}` |
+| 19 | POST | `/api/combo-registration-windows/{id}/extensions` | Gia hạn chọn combo | `POST /api/combo-registration-windows/{id}/extensions` |
+| 20 | POST | `/api/combo-registration-windows/{id}/selections` | Gửi lựa chọn combo | `POST /api/combo-registration-windows/{id}/selections` |
+| 21 | POST | `/api/combo-registration-windows/{id}/reminders` | Gửi nhắc chọn combo | `POST /api/combo-registration-windows/{id}/reminders` |
+| 22 | POST | `/api/combo-registration-windows/{id}/finalize` | Chốt lựa chọn combo | `POST /api/combo-registration-windows/{id}/finalize` |
+| 23 | GET | `/api/majors` | Danh sách chuyên ngành | `GET /api/majors` |
+| 24 | POST | `/api/majors` | Tạo chuyên ngành | `POST /api/majors` |
+| 25 | GET | `/api/courses` | Danh sách môn học | `GET /api/courses` |
+| 26 | POST | `/api/courses` | Tạo môn học | `POST /api/courses` |
+| 27 | GET | `/api/curricula` | Danh sách chương trình đào tạo đã nhập | `GET /api/curricula` |
+| 28 | PATCH | `/api/courses/{id}` | Cập nhật môn học | `PATCH /api/courses/{id}` |
+| 29 | GET | `/api/curricula/{id}` | Chi tiết chương trình đào tạo | `GET /api/curricula/{id}` |
+| 30 | GET | `/api/ojt-rule-sets` | Danh sách bộ quy tắc OJT | `GET /api/ojt-rule-sets` |
+| 31 | POST | `/api/ojt-rule-sets` | Tạo bộ quy tắc OJT | `POST /api/ojt-rule-sets` |
+| 32 | PATCH | `/api/ojt-rule-sets` | Cập nhật hoặc ban hành bộ quy tắc | `PATCH /api/ojt-rule-sets` |
+| 33 | POST | `/api/eligibility-check-runs` | Xét điều kiện OJT hàng loạt và cập nhật trạng thái | `POST /api/eligibility-check-runs` |
+| 34 | GET | `/api/ojt-semesters/{id}/students` | Theo dõi trạng thái OJT theo kỳ | `GET /api/ojt-semesters/{id}/students` |
+| 35 | GET | `/api/students` | Tìm kiếm và lọc sinh viên | `GET /api/students` |
+| 36 | GET | `/api/students/{id}` | Hồ sơ học vụ tổng hợp | `GET /api/students/{id}` |
+| 37 | PATCH | `/api/students/{id}` | Cập nhật hồ sơ và lộ trình học vụ | `PATCH /api/students/{id}` |
+| 38 | PATCH | `/api/course-results/{id}` | Sửa kết quả học tập và ghi lý do | `PATCH /api/course-results/{id}` |
+| 39 | GET | `/api/academic-imports` | Lịch sử nhập dữ liệu học vụ | `GET /api/academic-imports` |
+| 40 | GET | `/api/ojt-results` | Danh sách kết quả OJT đã được QHDN chuyển | `GET /api/ojt-results` |
+| 41 | GET | `/api/ojt-semesters/{id}/results/export` | Xuất danh sách điểm OJT chính thức | `GET /api/ojt-semesters/{id}/results/export` |
+| 42 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
+| 43 | POST | `/api/ojt-results/{id}/confirm` | Phòng đào tạo xác nhận và ghi nhận điểm OJT | `POST /api/ojt-results/{id}/confirm` |
+| 44 | GET | `/api/assessment-windows` | Danh sách đợt xét điều kiện | `GET /api/assessment-windows` |
+| 45 | POST | `/api/assessment-windows` | Tạo đợt xét điều kiện | `POST /api/assessment-windows` |
+| 46 | PATCH | `/api/assessment-windows` | Cập nhật đợt xét hoặc trạng thái mở/đóng | `PATCH /api/assessment-windows` |
+| 47 | GET | `/api/ojt-semesters` | Danh sách kỳ OJT | `GET /api/ojt-semesters` |
+| 48 | GET | `/api/ojt-semesters/{id}` | Chi tiết kỳ OJT, sinh viên, bàn giao và kết quả | `GET /api/ojt-semesters/{id}` |
+| 49 | PUT | `/api/ojt-grade-mappings` | Thiết lập quy đổi điểm OJT | `PUT /api/ojt-grade-mappings` |
+| 50 | GET | `/api/eligible-student-handoffs` | Lịch sử bàn giao sinh viên | `GET /api/eligible-student-handoffs` |
+| 51 | POST | `/api/eligible-student-handoffs` | Bàn giao sinh viên đủ điều kiện | `POST /api/eligible-student-handoffs` |
+| 52 | GET | `/api/academic-notifications` | Lịch sử thông báo học vụ | `GET /api/academic-notifications` |
+| 53 | POST | `/api/academic-notifications` | Tạo thông báo học vụ theo loại | `POST /api/academic-notifications` |
+| 54 | GET | `/api/academic-notifications/{id}` | Chi tiết thông báo và trạng thái từng sinh viên | `GET /api/academic-notifications/{id}` |
+| 55 | GET | `/api/student-imports` | Danh sách yêu cầu nhập dữ liệu | `GET /api/student-imports` |
+| 56 | POST | `/api/student-imports` | Kiểm tra và lưu yêu cầu nhập dữ liệu | `POST /api/student-imports` |
+| 57 | PATCH | `/api/student-imports` | Xác nhận nhập dữ liệu đã kiểm tra | `PATCH /api/student-imports` |
+| 58 | GET | `/api/student-imports/{id}` | Chi tiết yêu cầu, kết quả và lỗi nhập dữ liệu | `GET /api/student-imports/{id}` |
+| 59 | GET | `/api/curriculum-imports` | Danh sách yêu cầu nhập dữ liệu | `GET /api/curriculum-imports` |
+| 60 | POST | `/api/curriculum-imports` | Kiểm tra và lưu yêu cầu nhập dữ liệu | `POST /api/curriculum-imports` |
+| 61 | PATCH | `/api/curriculum-imports` | Xác nhận nhập dữ liệu đã kiểm tra | `PATCH /api/curriculum-imports` |
+| 62 | GET | `/api/curriculum-imports/{id}` | Chi tiết yêu cầu, kết quả và lỗi nhập dữ liệu | `GET /api/curriculum-imports/{id}` |
+| 63 | GET | `/api/academic-alerts` | Danh sách cảnh báo thiếu điều kiện OJT | `GET /api/academic-alerts` |
+| 64 | GET | `/api/course-demands` | Thống kê nhu cầu học môn còn thiếu | `GET /api/course-demands` |
+| 65 | GET | `/api/course-demands/export` | Xuất nhu cầu học theo môn, kỳ và Block | `GET /api/course-demands/export` |
 
 ## Phòng QHDN
 
@@ -171,37 +172,25 @@ Xem học tập, chọn combo và đăng ký OJT.
 
 | # | Method | Đường dẫn Swagger | Chức năng | Route gốc |
 |---:|---|---|---|---|
-| 1 | POST | `/api/students/me/cv` | Upload hoặc thay CV cá nhân | `POST /api/students/me/cv` |
-| 2 | POST | `/api/student/combo-registration-windows/preview` | Xem ảnh hưởng của combo dự kiến | `POST /api/student/combo-registration-windows/preview` |
-| 3 | PATCH | `/api/student/accounts/me/profile/update` | Cập nhật hồ sơ cá nhân | `PATCH /api/student/accounts/me/profile/update` |
-| 4 | POST | `/api/student/auth/me/search` | Xem tài khoản đang đăng nhập | `POST /api/student/auth/me/search` |
-| 5 | POST | `/api/student/combo-registration-windows/search` | Danh sách đợt chọn combo | `POST /api/student/combo-registration-windows/search` |
-| 6 | POST | `/api/student/combo-registration-windows/selections` | Gửi lựa chọn combo | `POST /api/student/combo-registration-windows/selections` |
-| 7 | POST | `/api/student/combo-selections/search` | Lịch sử lựa chọn combo của sinh viên | `POST /api/student/combo-selections/search` |
-| 8 | POST | `/api/student/eligibility-checks/search` | Lịch sử kiểm tra điều kiện OJT | `POST /api/student/eligibility-checks/search` |
-| 9 | POST | `/api/student/eligibility/search` | Kết quả OJT và điều kiện còn thiếu | `POST /api/student/eligibility/search` |
-| 10 | POST | `/api/student/auth/change-password` | Đổi mật khẩu | `POST /api/student/auth/change-password` |
-| 11 | POST | `/api/student/ojt-registration-windows/search` | Danh sách đợt đăng ký OJT | `POST /api/student/ojt-registration-windows/search` |
-| 12 | POST | `/api/student/ojt-registrations/search` | Danh sách hồ sơ đăng ký OJT | `POST /api/student/ojt-registrations/search` |
-| 13 | POST | `/api/student/ojt-registrations/create` | Nộp hồ sơ đăng ký OJT | `POST /api/student/ojt-registrations/create` |
-| 14 | POST | `/api/student/ojt-semesters/students/search` | Theo dõi trạng thái OJT theo kỳ | `POST /api/student/ojt-semesters/students/search` |
-| 15 | POST | `/api/student/profile/detail` | Hồ sơ học vụ tổng hợp | `POST /api/student/profile/detail` |
-| 16 | POST | `/api/student/course-results/search` | Điểm, lần học và trạng thái môn | `POST /api/student/course-results/search` |
-| 17 | POST | `/api/student/academic-summary/search` | tín chỉ đã đạt/đang học/thiếu; môn nợ/chưa học/đang học. Kịch bản đạt ngưỡng không phải xác suất AI | `POST /api/student/academic-summary/search` |
-| 18 | POST | `/api/student/supplementary-course-options/search` | đề xuất môn/môn học lại, tín chỉ, lý do và tiên quyết; không lớp, không đăng ký học, không cam kết lịch | `POST /api/student/supplementary-course-options/search` |
-| 19 | POST | `/api/student/curriculum/search` | chương trình đã ban hành của mình | `POST /api/student/curriculum/search` |
-| 20 | POST | `/api/student/notifications/search` | thông báo/lọc unread/phân trang, trả unreadCount cùng response | `POST /api/student/notifications/search` |
-| 21 | PATCH | `/api/student/notifications/update` | người nhận đánh dấu đọc, idempotent | `PATCH /api/student/notifications/update` |
-| 22 | POST | `/api/student/assignments/current/search` | DN/vị trí/giám sát/thời gian của mình theo kỳ | `POST /api/student/assignments/current/search` |
-| 23 | POST | `/api/student/ojt-results/search` | chỉ kết quả của mình được công bố | `POST /api/student/ojt-results/search` |
-| 24 | POST | `/api/student/ojt-results/detail` | điểm/nhận xét đã công bố | `POST /api/student/ojt-results/detail` |
-| 25 | POST | `/api/student/dashboard/search` | tổng hợp; không tạo thuật toán học vụ mới | `POST /api/student/dashboard/search` |
-| 26 | POST | `/api/student/roadmap-recommendations/search` | tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc | `POST /api/student/roadmap-recommendations/search` |
-| 27 | POST | `/api/student/cv/download` | Tải CV của sinh viên | `POST /api/student/cv/download` |
-| 28 | POST | `/api/student/job-applications/search` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `POST /api/student/job-applications/search` |
-| 29 | POST | `/api/student/job-applications/create` | Ứng tuyển vị trí doanh nghiệp | `POST /api/student/job-applications/create` |
-| 30 | POST | `/api/student/opportunities/search` | Vị trí tuyển dụng và quyền ứng tuyển | `POST /api/student/opportunities/search` |
-| 31 | POST | `/api/student/internship-tasks/search` | Danh sách task trong phạm vi tài khoản | `POST /api/student/internship-tasks/search` |
+| 1 | POST | `/api/combo-registration-windows/{id}/preview` | Xem ảnh hưởng của combo dự kiến | `POST /api/combo-registration-windows/{id}/preview` |
+| 2 | PATCH | `/api/accounts/me/profile` | Cập nhật hồ sơ cá nhân | `PATCH /api/accounts/me/profile` |
+| 3 | GET | `/api/combo-registration-windows` | Danh sách đợt chọn combo | `GET /api/combo-registration-windows` |
+| 4 | POST | `/api/combo-registration-windows/{id}/selections` | Gửi lựa chọn combo | `POST /api/combo-registration-windows/{id}/selections` |
+| 5 | GET | `/api/ojt-registration-windows` | Danh sách đợt đăng ký OJT | `GET /api/ojt-registration-windows` |
+| 6 | GET | `/api/ojt-registrations` | Danh sách hồ sơ đăng ký OJT | `GET /api/ojt-registrations` |
+| 7 | POST | `/api/ojt-registrations` | Nộp hồ sơ đăng ký OJT | `POST /api/ojt-registrations` |
+| 8 | GET | `/api/ojt-semesters/{id}/students` | Theo dõi trạng thái OJT theo kỳ | `GET /api/ojt-semesters/{id}/students` |
+| 9 | GET | `/api/students/{id}` | Hồ sơ học vụ tổng hợp | `GET /api/students/{id}` |
+| 10 | GET | `/api/students/me/notifications` | thông báo/lọc unread/phân trang, trả unreadCount cùng response | `GET /api/students/me/notifications` |
+| 11 | PATCH | `/api/students/me/notifications/{id}` | người nhận đánh dấu đọc, idempotent | `PATCH /api/students/me/notifications/{id}` |
+| 12 | GET | `/api/students/me/dashboard` | tổng hợp; không tạo thuật toán học vụ mới | `GET /api/students/me/dashboard` |
+| 13 | GET | `/api/students/me/roadmap-recommendations` | tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc | `GET /api/students/me/roadmap-recommendations` |
+| 14 | POST | `/api/students/me/cv` | Upload hoặc thay CV cá nhân | `POST /api/students/me/cv` |
+| 15 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
+| 16 | GET | `/api/job-applications` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
+| 17 | POST | `/api/job-applications` | Ứng tuyển vị trí doanh nghiệp | `POST /api/job-applications` |
+| 18 | GET | `/api/students/me/opportunities` | Vị trí tuyển dụng và quyền ứng tuyển | `GET /api/students/me/opportunities` |
+| 19 | GET | `/api/students/me/internships` | Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố | `GET /api/students/me/internships` |
 
 ## Auth
 

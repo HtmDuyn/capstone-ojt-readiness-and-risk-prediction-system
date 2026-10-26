@@ -1,5 +1,4 @@
 import type { PoolClient } from 'pg';
-import { pool } from '../../config/database';
 import { invalid } from './student.validation';
 import { resultSelect } from './student.service';
 
@@ -107,7 +106,7 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   const allIssues=[...new Set([...issues,...gpaIssues])];
   return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
-export async function academicProgressWithClient(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
+export async function loadAcademicProgress(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
     const s=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1',[studentId])).rows[0];
     if (!s) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
     const program=(await client.query('SELECT * FROM "TrainingPrograms" WHERE "ProgramID"=$1',[s.ProgramID])).rows[0];
@@ -120,15 +119,15 @@ export async function academicProgressWithClient(client:PoolClient, studentId:nu
     const invalidGroups=(await client.query(`SELECT g."ChoiceGroupID" FROM "StudentComboSelections" sc JOIN "ComboCourseChoiceGroups" g ON g."ProgramComboID"=sc."ProgramComboID" LEFT JOIN "ComboCourseChoiceMembers" m ON m."ChoiceGroupID"=g."ChoiceGroupID" LEFT JOIN "StudentComboCourseSelections" c ON c."SelectionID"=sc."SelectionID" AND c."ComboCourseID"=m."ComboCourseID" WHERE sc."StudentID"=$1 AND sc."ConfirmedAt" IS NOT NULL AND (NOT $2::boolean OR sc."SelectionPurpose"<>'SPECIALIZATION') GROUP BY g."ChoiceGroupID",g."MinCourses",g."MaxCourses" HAVING count(c."ComboCourseID")<g."MinCourses" OR count(c."ComboCourseID")>g."MaxCourses"`,[studentId,!!prospective])).rows;
     const issues=invalidGroups.map(r=>`COMBO_CHOICE_GROUP_INVALID:${r.ChoiceGroupID}`);
     const gradeWeights=(await client.query(`SELECT cc."CourseID",cc."Credits" FROM "ComboCourses" cc JOIN "ProgramCombos" c ON c."ProgramComboID"=cc."ProgramComboID" WHERE c."ProgramID"=$1 AND c."CoursesReviewed"=true`,[s.ProgramID])).rows;
-    const output=calculateProgress(program,courses,attempts,aliases,invalidGroups.length?[]:options,policy,issues,gradeWeights);
-    return {studentId,...output};
+    return {studentId,program,courses,attempts,aliases,options:invalidGroups.length?[]:options,policy,issues,gradeWeights};
 }
-export async function academicProgress(studentId:number) {
-  if (!pool) throw invalid('Database is unavailable.',503);
-  const client=await pool.connect();
-  try {
-    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    const output=await academicProgressWithClient(client,studentId);
-    await client.query('COMMIT');return output;
-  } catch(error) {await client.query('ROLLBACK');throw error;} finally {client.release();}
+
+export type AcademicProgressData = Awaited<ReturnType<typeof loadAcademicProgress>>;
+export function progressFromData(data:AcademicProgressData,assumeInProgressPassed=false) {
+  const {studentId,program,courses,attempts,aliases,options,policy,issues,gradeWeights}=data;
+  const grades=assumeInProgressPassed?attempts.map(r=>r.status==='IN_PROGRESS'?{...r,status:'RECOGNIZED'}:r):attempts;
+  return {studentId,...calculateProgress(program,courses,grades,aliases,options,policy,issues,gradeWeights)};
+}
+export async function academicProgressWithClient(client:PoolClient,studentId:number,prospective?:{comboId:number;courseIds:number[]},assumeInProgressPassed=false) {
+  return progressFromData(await loadAcademicProgress(client,studentId,prospective),assumeInProgressPassed);
 }
