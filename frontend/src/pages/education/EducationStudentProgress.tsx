@@ -261,12 +261,12 @@ const EducationStudentProgress: React.FC = () => {
         badge="Quản lý sinh viên"
       />
 
-      <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">GPA, tín chỉ và kết quả môn học dùng dữ liệu hiện có. Kỳ OJT dự kiến, số kỳ chậm và đánh giá tiến độ sẽ phát triển sau.</p>
+      <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
       {/* ===================================================
             FILTER
             =================================================== */}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="border-b border-slate-200 p-5 md:p-6">
         <div className="relative">
           <Search
             size={18}
@@ -282,7 +282,7 @@ const EducationStudentProgress: React.FC = () => {
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {/* COHORT */}
 
           <select
@@ -427,7 +427,7 @@ const EducationStudentProgress: React.FC = () => {
           </select>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-3 flex justify-end">
           <button
             type="button"
             onClick={resetFilters}
@@ -436,14 +436,15 @@ const EducationStudentProgress: React.FC = () => {
             Xóa bộ lọc
           </button>
         </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">GPA, tín chỉ và kết quả môn học dùng dữ liệu hiện có. Kỳ OJT dự kiến, số kỳ chậm và đánh giá tiến độ sẽ phát triển sau.</p>
       </section>
 
       {/* ===================================================
             SUMMARY
             =================================================== */}
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="grid grid-cols-1 border-b border-slate-200 px-5 py-4 md:grid-cols-3 md:px-6">
+        <div className="py-2 md:pr-5">
           <p className="text-sm text-slate-500">Sinh viên hiển thị</p>
 
           <p className="mt-2 text-2xl font-bold text-slate-800">
@@ -451,7 +452,7 @@ const EducationStudentProgress: React.FC = () => {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="border-t border-slate-200 py-2 md:border-l md:border-t-0 md:px-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Đúng tiến độ</p>
@@ -469,7 +470,7 @@ const EducationStudentProgress: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="border-t border-slate-200 py-2 md:border-l md:border-t-0 md:pl-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Chậm tiến độ</p>
@@ -492,7 +493,7 @@ const EducationStudentProgress: React.FC = () => {
             STUDENT TABLE
             =================================================== */}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-800">Danh sách sinh viên</h2>
 
@@ -508,8 +509,8 @@ const EducationStudentProgress: React.FC = () => {
         )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1420px] text-left text-sm">
-            <thead className="bg-slate-50">
-              <tr>
+            <thead className="bg-[#EFF6FF] text-[#334155] [&_th]:text-[#334155]">
+              <tr className="border-b border-[#D6E4F0]">
                 <th className="px-5 py-3 font-semibold text-slate-600">MSSV</th>
 
                 <th className="px-5 py-3 font-semibold text-slate-600">
@@ -702,6 +703,7 @@ const EducationStudentProgress: React.FC = () => {
           </table>
         </div>
       </section>
+      </div>
 
       {/* ===================================================
             STUDENT DETAIL MODAL

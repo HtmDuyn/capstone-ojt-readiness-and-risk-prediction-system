@@ -133,8 +133,8 @@ const EducationCurriculumPlan: React.FC = () => {
             <h3 className="font-semibold">Môn học trong khung</h3>
             <div className="overflow-auto">
               <table className="w-full text-left text-sm">
-                <thead>
-                  <tr>
+                <thead className="bg-[#EFF6FF] text-[#334155]">
+                  <tr className="border-b border-[#D6E4F0]">
                     {[
                       "Mã môn",
                       "Tên môn",
@@ -143,7 +143,7 @@ const EducationCurriculumPlan: React.FC = () => {
                       "Loại",
                       "Tiên quyết",
                     ].map((h) => (
-                      <th key={h} className="p-2">
+                      <th key={h} className="p-2 font-semibold">
                         {h}
                       </th>
                     ))}
@@ -173,8 +173,8 @@ const EducationCurriculumPlan: React.FC = () => {
                 <p>{combo.note}</p>
                 <div className="overflow-auto">
                   <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr>
+                    <thead className="bg-[#EFF6FF] text-[#334155]">
+                      <tr className="border-b border-[#D6E4F0]">
                         {[
                           "Mã môn",
                           "Tên môn",
@@ -182,7 +182,7 @@ const EducationCurriculumPlan: React.FC = () => {
                           "Tín chỉ",
                           "Tiên quyết",
                         ].map((h) => (
-                          <th className="p-2" key={h}>
+                          <th className="p-2 font-semibold" key={h}>
                             {h}
                           </th>
                         ))}
