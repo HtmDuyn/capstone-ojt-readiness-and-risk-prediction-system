@@ -1,46 +1,20 @@
 import { useEffect, useState } from "react";
 import {
-  listQhdnOjtSemesters,
+  listEligibleStudents,
   listStudentsInSemester,
 } from "@/services/qhdnService";
 import { loadAllPages } from "@/utils/loadAllPages";
 import { errorMessage } from "@/components/qhdn/QhdnUi";
 import type {
   HandoffStudentItem,
-  OjtSemesterItem,
 } from "@/types/qhdn/qhdnTypes";
+import { useQhdnAcademicPeriods } from "./useQhdnAcademicPeriods";
 
 export function useQhdnSemesters(initialId = "") {
-  const [semesters, setSemesters] = useState<OjtSemesterItem[]>([]),
-    [semesterId, setSemesterId] = useState("");
-  const [loading, setLoading] = useState(true),
-    [error, setError] = useState("");
-  useEffect(() => {
-    let active = true;
-    listQhdnOjtSemesters()
-      .then((r) => {
-        if (!active) return;
-        setSemesters(r.items);
-        const initial =
-          r.items.find((s) => String(s.id) === initialId) ??
-          r.items.find((s) => s.status === "ACTIVE") ??
-          r.items[0];
-        setSemesterId(initial ? String(initial.id) : "");
-      })
-      .catch((e) => {
-        if (active) setError(errorMessage(e));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [initialId]);
-  return { semesters, semesterId, setSemesterId, loading, error };
+  return useQhdnAcademicPeriods(initialId);
 }
 
-export function useQhdnRoster(semesterId: string) {
+export function useQhdnRoster(semesterId: string, source: "semester" | "eligible" = "semester") {
   const [students, setStudents] = useState<HandoffStudentItem[]>([]),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
@@ -54,12 +28,35 @@ export function useQhdnRoster(semesterId: string) {
       return;
     }
     setLoading(true);
-    // API theo kỳ đã trả lượt điều phối mới nhất; không đếm lại lịch sử cũ.
-    loadAllPages((page) =>
-      listStudentsInSemester(Number(semesterId), { page, limit: 100 }).then(
-        (r) => r.data,
-      ),
-    )
+    const fetchStudents = async () => {
+      const loadSemesterStudents = () => loadAllPages((page) =>
+        listStudentsInSemester(Number(semesterId), { page, limit: 100 }).then(
+          (r) => r.data,
+        ),
+      );
+      if (source === "semester") return loadSemesterStudents();
+
+      const eligible = await loadAllPages((page) =>
+        listEligibleStudents({ ojtSemesterId: Number(semesterId), page, limit: 100 })
+          .then((r) => r.data),
+      );
+      if (!eligible.length || !active) return eligible;
+
+      // Only the eligible endpoint determines who appears in reception.
+      // The semester endpoint adds CV, application and latest coordination details.
+      const details = new Map((await loadSemesterStudents()).map((s) => [s.studentId, s]));
+      return eligible.map((student) => {
+        const detail = details.get(student.studentId);
+        return {
+          ...detail,
+          ...student,
+          registration: student.registration
+            ? { ...detail?.registration, ...student.registration }
+            : student.registration,
+        };
+      });
+    };
+    fetchStudents()
       .then((items) => {
         if (active) setStudents(items);
       })
@@ -72,6 +69,6 @@ export function useQhdnRoster(semesterId: string) {
     return () => {
       active = false;
     };
-  }, [semesterId, revision]);
+  }, [semesterId, source, revision]);
   return { students, loading, error, reload: () => setRevision((v) => v + 1) };
 }

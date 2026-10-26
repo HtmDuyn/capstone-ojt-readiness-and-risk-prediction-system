@@ -2,11 +2,9 @@ import {
   listCompanies,
   listInternshipEvaluations,
   listOjtResults,
-  listQhdnOjtSemesters,
   transferOjtResult,
   exportQhdnReport,
   exportOjtResults,
-  listReports,
 } from "@/services/qhdnService";
 import { downloadFile } from "@/utils/downloadFile";
 import { useEffect, useState, type FormEvent } from "react";
@@ -28,37 +26,18 @@ import { loadAllPages } from "@/utils/loadAllPages";
 import type {
   CompanyListItem,
   InternshipEvaluationItem,
-  OjtSemesterItem,
 } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
+import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
+import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
 const score = (value: number | null | undefined) =>
   value == null ? "Chưa có điểm" : Number(value).toFixed(1);
-const labels: Record<string, string> = {
-  companyName: "Doanh nghiệp",
-  semesterCode: "Kỳ",
-  currentStudents: "Sinh viên hiện tại",
-  pending: "Chờ phản hồi",
-  accepted: "Tiếp nhận",
-  rejected: "Từ chối",
-  acceptanceRate: "Tỷ lệ tiếp nhận (%)",
-  totalAssignments: "Tổng phân công",
-  assigned: "Đã phân công",
-  active: "Đang thực tập",
-  completed: "Hoàn thành",
-  failed: "Không đạt",
-  cancelled: "Đã hủy",
-  confirmedResults: "Kết quả xác nhận",
-  evaluationCount: "Số đánh giá",
-  missingEvaluations: "Thiếu đánh giá",
-  evaluationCoverageRate: "Tỷ lệ đánh giá (%)",
-  averageOverallScore: "Điểm trung bình",
-};
 export default function QhdnEnterpriseEvaluations() {
   const [tab, setTab] = useState<"evaluations" | "results" | "reports">(
     "evaluations",
   );
-  const [semesters, setSemesters] = useState<OjtSemesterItem[]>([]),
-    [semesterId, setSemesterId] = useState("");
+  const catalog = useQhdnAcademicPeriods();
+  const { semesterId } = catalog;
   const [companies, setCompanies] = useState<CompanyListItem[]>([]),
     [companyId, setCompanyId] = useState("");
   const [type, setType] = useState<ReportType>("acceptance"),
@@ -70,16 +49,11 @@ export default function QhdnEnterpriseEvaluations() {
   const keyFor = useIdempotencyKey();
   useEffect(() => {
     let active = true;
-    Promise.all([
-      listQhdnOjtSemesters(),
-      loadAllPages((page) =>
+    loadAllPages((page) =>
         listCompanies({ page, limit: 100 }).then((r) => r.data),
-      ),
-    ])
-      .then(([s, c]) => {
+      )
+      .then((c) => {
         if (active) {
-          setSemesters(s.items);
-          setSemesterId(s.items[0] ? String(s.items[0].id) : "");
           setCompanies(c);
         }
       })
@@ -90,6 +64,10 @@ export default function QhdnEnterpriseEvaluations() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    setTarget(null);
+    setDetail(null);
+  }, [catalog.periodId]);
   const filters = {
     ojtSemesterId: Number(semesterId),
     ...(companyId ? { companyId: Number(companyId) } : {}),
@@ -113,12 +91,7 @@ export default function QhdnEnterpriseEvaluations() {
     key,
     !!semesterId && tab === "results",
   );
-  const reports = usePaged(
-    (page) => listReports(type, { ...filters, page, limit: 10 }),
-    key,
-    !!semesterId && tab === "reports",
-  );
-  const current = { evaluations, results, reports }[tab];
+  const current = tab === "results" ? results : evaluations;
   const run = async (work: () => Promise<unknown>, success: string) => {
     setBusy(true);
     setMessage("");
@@ -145,9 +118,6 @@ export default function QhdnEnterpriseEvaluations() {
       setRevision((v) => v + 1);
     }, "Đã chuyển kết quả cho Phòng Đào tạo.");
   };
-  const columns = Object.keys(labels).filter((k) =>
-    reports.data.items.some((r) => k in r),
-  );
   return (
     <div className="space-y-5 pb-10">
       <PageBanner
@@ -156,25 +126,7 @@ export default function QhdnEnterpriseEvaluations() {
         badge="Phòng QHDN"
       />
       <div className="flex flex-wrap gap-3">
-        <Field label="Kỳ OJT">
-          <select
-            className={control}
-            value={semesterId}
-            disabled={busy}
-            onChange={(e) => {
-              setSemesterId(e.target.value);
-              setTarget(null);
-              setDetail(null);
-            }}
-          >
-            <option value="">Chọn kỳ OJT</option>
-            {semesters.map((s) => (
-              <option value={s.id} key={s.id}>
-                {s.name || s.code}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <AcademicPeriodFilter selection={catalog} disabled={busy} controlClassName={control} />
         {tab !== "results" && (
           <Field label="Doanh nghiệp">
             <select
@@ -202,7 +154,7 @@ export default function QhdnEnterpriseEvaluations() {
           [
             ["evaluations", "Phiếu đánh giá"],
             ["results", "Kết quả chuyển giao"],
-            ["reports", "Báo cáo chi tiết"],
+            ["reports", "Xuất báo cáo"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -219,13 +171,17 @@ export default function QhdnEnterpriseEvaluations() {
           </button>
         ))}
       </div>
+      {catalog.error && <Notice>{catalog.error}</Notice>}
+      {!catalog.loading && catalog.selectedPeriod && !semesterId && (
+        <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Chưa có đánh giá hoặc kết quả OJT để hiển thị.</Notice>
+      )}
       {message && <Notice>{message}</Notice>}
       <Panel
         title={
           {
             evaluations: "Đánh giá doanh nghiệp",
             results: "Kết quả OJT",
-            reports: "Báo cáo QHDN",
+            reports: "Xuất báo cáo QHDN",
           }[tab]
         }
       >
@@ -241,7 +197,7 @@ export default function QhdnEnterpriseEvaluations() {
             <option value="enterprise-feedback">Phản hồi doanh nghiệp</option>
           </select>
         )}
-        {current.error && <Notice>{current.error}</Notice>}
+        {tab !== "reports" && current.error && <Notice>{current.error}</Notice>}
         {current.busy ? (
           <p>Đang tải…</p>
         ) : (
@@ -326,18 +282,7 @@ export default function QhdnEnterpriseEvaluations() {
                 ))}
               </Table>
             )}
-            {tab === "reports" && (
-              <Table headers={columns.map((k) => labels[k])}>
-                {reports.data.items.map((r, i) => (
-                  <tr key={i}>
-                    {columns.map((k) => (
-                      <td key={k}>{r[k] == null ? "—" : String(r[k])}</td>
-                    ))}
-                  </tr>
-                ))}
-              </Table>
-            )}
-            {!current.error && !current.data.items.length && (
+            {tab !== "reports" && !current.error && !current.data.items.length && (
               <p className="py-4 text-slate-500">
                 {semesterId
                   ? "Không có dữ liệu phù hợp."
@@ -346,21 +291,21 @@ export default function QhdnEnterpriseEvaluations() {
             )}
           </>
         )}
-        <Pager
+        {tab !== "reports" && <Pager
           page={current.page}
           total={current.data.total}
           limit={current.data.limit}
           busy={current.busy || busy}
           onChange={current.setPage}
-        />
+        />}
         <div className="flex flex-wrap gap-2">
-          <button
+          {tab !== "reports" && <button
             className={control}
             disabled={busy || current.busy}
             onClick={current.reload}
           >
             Tải lại
-          </button>
+          </button>}
           {tab === "reports" ? (
             <button
               className={action}

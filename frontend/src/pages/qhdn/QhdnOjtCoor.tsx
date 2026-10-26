@@ -26,7 +26,7 @@ import {
 } from "@/components/qhdn/QhdnUi";
 import {
   EmptyStudents,
-  SemesterFilter,
+  AcademicPeriodFilter,
   StatCard,
   StudentIdentity,
   WorkflowBadge,
@@ -251,13 +251,6 @@ export default function QhdnOjtCoordination() {
         title="Theo dõi & Điều phối OJT"
         description="Theo dõi phản hồi doanh nghiệp, ưu tiên xử lý sinh viên bị từ chối và điều phối lại đến vị trí phù hợp."
         badge="Phòng QHDN"
-        secondaryAction={{
-          label: "Về màn hình tiếp nhận",
-          icon: <ArrowRight size={16} />,
-          onClick: () => {
-            window.location.href = receptionLink();
-          },
-        }}
       />
       <WorkflowSteps current="placement" />
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -311,7 +304,7 @@ export default function QhdnOjtCoordination() {
           </button>
         </div>
       )}
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm sm:flex-row sm:items-end">
+      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm xl:flex-row xl:items-end">
         <div>
           <h2 className="text-sm font-bold text-slate-900">
             Danh sách sinh viên sau duyệt hồ sơ
@@ -320,13 +313,8 @@ export default function QhdnOjtCoordination() {
             Theo dõi lượt gửi gần nhất của từng sinh viên trong học kỳ.
           </p>
         </div>
-        <div className="flex items-end gap-2">
-          <SemesterFilter
-            semesters={semester.semesters}
-            value={semester.semesterId}
-            onChange={semester.setSemesterId}
-            disabled={busy}
-          />
+        <div className="flex flex-wrap items-end gap-2">
+          <AcademicPeriodFilter selection={semester} disabled={busy} />
           <button
             className={workflowSecondary}
             aria-label="Tải lại điều phối"
@@ -338,6 +326,9 @@ export default function QhdnOjtCoordination() {
         </div>
       </div>
       {semester.error && <Notice>{semester.error}</Notice>}
+      {!semester.loading && semester.selectedPeriod && !semester.semesterId && (
+        <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Chưa có dữ liệu điều phối OJT để hiển thị.</Notice>
+      )}
       {roster.error && <Notice>{roster.error}</Notice>}
       {message && <Notice>{message}</Notice>}
       <div className="flex flex-wrap gap-6 border-b border-slate-200">
@@ -547,7 +538,7 @@ export default function QhdnOjtCoordination() {
                                 className={workflowSecondary}
                                 to={receptionLink(s)}
                               >
-                                Gửi từ Tiếp nhận
+                                Xem hồ sơ
                                 <ArrowRight size={14} />
                               </Link>
                             ) : (
@@ -592,7 +583,7 @@ export default function QhdnOjtCoordination() {
               }
               description={
                 status === "UNSENT"
-                  ? "Hồ sơ đã duyệt nhưng chưa gửi sẽ hiển thị ở đây. Gửi hồ sơ từ màn hình Tiếp nhận."
+                  ? "Hồ sơ đã duyệt nhưng chưa có lượt điều phối sẽ hiển thị ở đây."
                   : "Thử đổi bộ lọc hoặc học kỳ. Sinh viên sẽ xuất hiện sau bước duyệt hồ sơ."
               }
             />

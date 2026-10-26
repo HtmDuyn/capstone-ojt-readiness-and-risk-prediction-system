@@ -1,642 +1,679 @@
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  getAcademicPeriods,
-  listCompanies,
-  archiveRecruitment,
-  closeRecruitmentPost,
-  createRecruitmentWindow,
-  listRecruitmentPosts,
-  reviewRecruitmentPost,
-  updateCompany,
-  updateRecruitmentWindow,
-} from "@/services/qhdnService";
-import { useEffect, useState, type FormEvent } from "react";
+  Archive,
+  ArrowUpRight,
+  BriefcaseBusiness,
+  Building2,
+  Filter,
+  Mail,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
+  Upload,
+  Users,
+} from "lucide-react";
 import { PageBanner } from "@/components/common/PageBanner";
+import { Field, Notice, Pager, errorMessage } from "@/components/qhdn/QhdnUi";
 import {
-  action,
-  control,
-  errorMessage,
-  Field,
-  Notice,
-  Pager,
-  Panel,
-  Table,
-  usePaged,
-} from "@/components/qhdn/QhdnUi";
+  AcademicPeriodFilter,
+  WorkflowModal,
+  workflowInput,
+  workflowPrimary,
+  workflowSecondary,
+} from "@/components/qhdn/StudentWorkflowUi";
+import {
+  EnterpriseDetailsModal,
+  EnterpriseStatus,
+} from "@/components/qhdn/EnterpriseDetailsModal";
+import { EnterpriseRecruitment } from "@/components/qhdn/EnterpriseRecruitment";
 import { QhdnEnterpriseImportModal } from "@/components/qhdn/import/QhdnEnterpriseImportModal";
-
+import {
+  archiveRecruitment,
+  listCompanies,
+  listPositions,
+} from "@/services/qhdnService";
 import { loadAllPages } from "@/utils/loadAllPages";
-
+import { positionTotals } from "@/utils/qhdnEnterprise";
 import type {
-  AcademicPeriodItem,
   CompanyListItem,
+  PositionListItem,
 } from "@/types/qhdn/qhdnTypes";
-import type { RecruitmentWindow } from "@/types/qhdn/workflowTypes";
+import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
+import { linkedOjtSemesterId } from "@/utils/qhdnAcademicPeriods";
 
+const cell = "px-5 py-5 align-middle";
+function StatCard({
+  label,
+  value,
+  icon,
+  hint,
+  onClick,
+}: {
+  label: string;
+  value: number | string;
+  icon: ReactNode;
+  hint: string;
+  onClick?: () => void;
+}) {
+  const content = (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
+        <span className="rounded-xl border border-orange-100 bg-orange-50 p-2 text-orange-600">
+          {icon}
+        </span>
+      </div>
+      <p className="mt-3 text-3xl font-bold text-slate-900">{value}</p>
+      <p className="mt-2 text-xs text-slate-500">{hint}</p>
+    </>
+  );
+  const classes =
+    "rounded-2xl border border-slate-100 bg-white p-5 text-left shadow-sm";
+  return onClick ? (
+    <button
+      className={
+        classes + " transition hover:border-orange-300 hover:shadow-md"
+      }
+      onClick={onClick}
+    >
+      {content}
+    </button>
+  ) : (
+    <div className={classes}>{content}</div>
+  );
+}
 export default function QhdnEnterpriseManagement() {
-  const [tab, setTab] = useState<"companies" | "windows" | "posts">(
+  const [tab, setTab] = useState<"companies" | "posts">(
     "companies",
   );
-  const [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false),
-    [revision, setRevision] = useState(0);
+  const catalog = useQhdnAcademicPeriods("", true);
+  const { periods, semesterId: semester } = catalog;
+  const scopeOjtIds = useMemo(() => new Set(catalog.filteredPeriods
+    .map(linkedOjtSemesterId).filter((id): id is number => id !== null)), [catalog.filteredPeriods]);
+  const [companies, setCompanies] = useState<CompanyListItem[]>([]),
+    [positions, setPositions] = useState<PositionListItem[]>([]);
+  const [loading, setLoading] = useState(true),
+    [positionsLoading, setPositionsLoading] = useState(true);
+  const [error, setError] = useState(""),
+    [positionsError, setPositionsError] = useState(""),
+    [message, setMessage] = useState("");
+  const [revision, setRevision] = useState(0);
   const [search, setSearch] = useState(""),
-    [query, setQuery] = useState("");
-  const [catalog, setCatalog] = useState<CompanyListItem[]>([]),
-    [periods, setPeriods] = useState<AcademicPeriodItem[]>([]);
+    [status, setStatus] = useState(""),
+    [recruiting, setRecruiting] = useState(""),
+    [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<{
+    company: CompanyListItem;
+    tab: "overview" | "positions" | "edit";
+  } | null>(null);
   const [companyId, setCompanyId] = useState(""),
-    [postStatus, setPostStatus] = useState("");
-  const [editing, setEditing] = useState<CompanyListItem | null>(null),
     [importing, setImporting] = useState(false);
-  const [windowId, setWindowId] = useState(""),
-    [lastWindow, setLastWindow] = useState<RecruitmentWindow | null>(null);
-  const companies = usePaged(
-    (page) =>
-      listCompanies({
-        page,
-        limit: 10,
-        ...(query ? { search: query } : {}),
-      }).then((r) => r.data),
-    query + revision,
-  );
-  const posts = usePaged(
-    (page) =>
-      listRecruitmentPosts({
-        page,
-        limit: 10,
-        companyId: Number(companyId),
-        ...(postStatus ? { status: postStatus } : {}),
-      }),
-    companyId + postStatus + revision,
-    tab === "posts" && !!companyId,
-  );
+  const [archiving, setArchiving] = useState(false),
+    [busy, setBusy] = useState(false),
+    [archiveError, setArchiveError] = useState("");
   useEffect(() => {
     let active = true;
-    Promise.all([
-      loadAllPages((page) =>
-        listCompanies({ page, limit: 100 }).then((r) => r.data),
-      ),
-      loadAllPages((page) => getAcademicPeriods({ page, limit: 100 })),
-    ])
-      .then(([c, p]) => {
+    setLoading(true);
+    setError("");
+    loadAllPages((p) =>
+        listCompanies({ page: p, limit: 100 }).then((r) => r.data),
+      )
+      .then((c) => {
         if (active) {
-          setCatalog(c);
-          setPeriods(p);
+          setCompanies(c);
         }
       })
       .catch((e) => {
-        if (active) setMessage(errorMessage(e));
+        if (active) {
+          setError(errorMessage(e));
+          setCompanies([]);
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, [revision]);
-  const run = async (work: () => Promise<unknown>, success: string) => {
-    setBusy(true);
-    setMessage("");
-    try {
-      await work();
-      setMessage(success);
-      setRevision((v) => v + 1);
-      return true;
-    } catch (e) {
-      setMessage(errorMessage(e));
-      return false;
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    let active = true;
+    setPositions([]);
+    setPositionsLoading(true);
+    setPositionsError("");
+    if (catalog.loading || (!catalog.allPeriods && !semester) ||
+      (catalog.allPeriods && catalog.yearId && !scopeOjtIds.size)) {
+      setPositionsLoading(catalog.loading);
+      return;
     }
-  };
-  const saveCompany = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editing) return;
-    const f = new FormData(e.currentTarget);
-    const value = (k: string) => String(f.get(k) || "").trim();
-    if (
-      await run(
-        () =>
-          updateCompany(editing.id, {
-            name: value("name"),
-            address: value("address") || null,
-            industry: value("industry") || null,
-            contactPersonName: value("contactPersonName") || null,
-            contactEmail: value("contactEmail") || null,
-            contactPhone: value("contactPhone") || null,
-            status: value("status"),
-            reason: value("reason"),
-          }),
-        "Đã cập nhật doanh nghiệp.",
-      )
+    // Tải chung vị trí cho toàn bảng, không gọi lặp theo từng doanh nghiệp.
+    loadAllPages((p) =>
+      listPositions({
+        page: p,
+        limit: 100,
+        ...(semester ? { ojtSemesterId: Number(semester) } : {}),
+      }).then((r) => r.data),
     )
-      setEditing(null);
-  };
-  const saveWindow = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      value = (k: string) => String(f.get(k) || "").trim();
-    const start = new Date(value("startsAt")),
-      end = new Date(value("endsAt"));
-    if (end <= start) {
-      setMessage("Ngày kết thúc phải sau ngày bắt đầu.");
-      return;
-    }
-    await run(async () => {
-      const w = await createRecruitmentWindow({
-        academicPeriodId: Number(value("period")),
-        name: value("name"),
-        startsAt: start.toISOString(),
-        endsAt: end.toISOString(),
-        reason: value("reason"),
+      .then((p) => {
+        if (active) setPositions(catalog.allPeriods && catalog.yearId
+          ? p.filter((position) => scopeOjtIds.has(position.ojtSemesterId)) : p);
+      })
+      .catch((e) => {
+        if (active) setPositionsError(errorMessage(e));
+      })
+      .finally(() => {
+        if (active) setPositionsLoading(false);
       });
-      setLastWindow(w);
-      setWindowId(String(w.id));
-    }, "Đã tạo đợt tuyển dụng. Hãy mở đợt trước khi import.");
-  };
-  const changeWindow = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const endsAt = String(f.get("endsAt") || "");
-    await run(async () => {
-      const w = await updateRecruitmentWindow(Number(windowId), {
-        status: String(f.get("status")) as "OPEN" | "CLOSED",
-        reason: String(f.get("reason")),
-        ...(endsAt ? { endsAt: new Date(endsAt).toISOString() } : {}),
-      });
-      setLastWindow(w);
-    }, "Đã cập nhật đợt tuyển dụng.");
-  };
-  const postAction = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const id = Number(f.get("postId")),
-      kind = String(f.get("decision")),
-      reason = String(f.get("reason"));
-    const deadlineAt = String(f.get("deadlineAt") || "");
-    const selectedPost = posts.data.items.find((p) => p.id === id);
-    if (kind !== "CLOSE" && selectedPost?.status !== "PENDING_REVIEW") {
-      setMessage("Chỉ tin chờ duyệt mới được công bố hoặc từ chối.");
-      return;
-    }
-    await run(
-      () =>
-        kind === "CLOSE"
-          ? closeRecruitmentPost(id, reason)
-          : reviewRecruitmentPost(id, {
-              decision: kind as "PUBLISH" | "REJECT",
-              reason,
-              ...(deadlineAt
-                ? { deadlineAt: new Date(deadlineAt).toISOString() }
-                : {}),
-            }),
-      "Đã xử lý tin tuyển dụng.",
+    return () => {
+      active = false;
+    };
+  }, [revision, semester, catalog.loading, catalog.allPeriods, catalog.yearId, scopeOjtIds]);
+  useEffect(() => setPage(1), [search, status, recruiting, catalog.periodId, catalog.yearId]);
+  const scope = catalog.selectedPeriod?.name ||
+    (catalog.yearId ? "Năm học " + catalog.years.find((y) => String(y.id) === catalog.yearId)?.code : "Tất cả học kỳ / Block 3");
+  const grouped = useMemo(() => {
+    const map = new Map<number, PositionListItem[]>();
+    positions.forEach((p) => {
+      const id = p.companyId ?? p.company?.id;
+      if (id) map.set(id, [...(map.get(id) || []), p]);
+    });
+    return map;
+  }, [positions]);
+  const filtered = companies.filter((c) => {
+    const roles = grouped.get(c.id) || [],
+      totals = positionTotals(roles);
+    return (
+      (!status || c.status === status) &&
+      (positionsLoading ||
+        !!positionsError ||
+        !recruiting ||
+        (recruiting === "OPEN"
+          ? totals.open > 0
+          : recruiting === "AVAILABLE"
+            ? c.status === "ACTIVE" && totals.available > 0
+            : !roles.length)) &&
+      [c.name, c.code, c.industry, c.contactPersonName, c.contactEmail].some(
+        (v) =>
+          String(v || "")
+            .toLocaleLowerCase("vi")
+            .includes(search.trim().toLocaleLowerCase("vi")),
+      )
     );
+  });
+  const currentPage = Math.min(
+    page,
+    Math.max(1, Math.ceil(filtered.length / 10)),
+  );
+  const totals = positionTotals(positions),
+    ready = !positionsLoading && !positionsError,
+    metricsReady = ready && !loading && !error;
+  const reset = () => {
+    setSearch("");
+    setStatus("");
+    setRecruiting("");
   };
   return (
     <div className="space-y-5 pb-10">
       <PageBanner
         title="Doanh nghiệp & Tuyển dụng"
-        description="Quản lý đối tác, đợt tuyển dụng và duyệt tin trước khi sinh viên ứng tuyển."
+        description="Theo dõi đối tác, vị trí tuyển dụng và chỉ tiêu tiếp nhận sinh viên trong một nơi."
         badge="Phòng QHDN"
       />
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["companies", "Doanh nghiệp"],
-            ["windows", "Đợt tuyển dụng"],
-            ["posts", "Tin tuyển dụng"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            className={tab === id ? action : control}
-            key={id}
-            disabled={busy}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-        <button
-          className={control}
-          disabled={busy}
-          onClick={() => setImporting(true)}
-        >
-          Import doanh nghiệp
-        </button>
-        <button
-          className={control}
-          disabled={busy}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Doanh nghiệp liên kết"
+          value={loading || error ? "—" : companies.length}
+          icon={<Building2 size={20} />}
+          hint="Toàn bộ đối tác trong hệ thống"
+          onClick={reset}
+        />
+        <StatCard
+          label="Đang tuyển dụng"
+          value={
+            metricsReady
+              ? companies.filter(
+                  (c) =>
+                    c.status === "ACTIVE" &&
+                    (grouped.get(c.id) || []).some((p) => p.status === "OPEN"),
+                ).length
+              : "—"
+          }
+          icon={<BriefcaseBusiness size={20} />}
+          hint="Đối tác đang hợp tác có vị trí mở"
           onClick={() => {
-            if (
-              window.confirm("Lưu trữ tuyển dụng đủ điều kiện sau hai học kỳ?")
-            )
-              run(
-                () => archiveRecruitment(),
-                "Đã thực hiện lưu trữ tuyển dụng theo quy định.",
-              );
+            reset();
+            setStatus("ACTIVE");
+            setRecruiting("OPEN");
           }}
-        >
-          Lưu trữ tuyển dụng
-        </button>
+        />
+        <StatCard
+          label="Tổng chỉ tiêu"
+          value={metricsReady ? totals.capacity : "—"}
+          icon={<Users size={20} />}
+          hint={`${totals.count} vị trí · Theo học kỳ đang chọn`}
+        />
+        <StatCard
+          label="Chỗ còn nhận"
+          value={
+            metricsReady
+              ? positions
+                  .filter((p) =>
+                    companies.some(
+                      (c) =>
+                        c.id === (p.companyId ?? p.company?.id) &&
+                        c.status === "ACTIVE",
+                    ),
+                  )
+                  .reduce(
+                    (n, p) => n + (p.status === "OPEN" ? p.remainingSlots : 0),
+                    0,
+                  )
+              : "—"
+          }
+          icon={<ArrowUpRight size={20} />}
+          hint="Vị trí mở tại doanh nghiệp đang hợp tác"
+          onClick={() => {
+            reset();
+            setStatus("ACTIVE");
+            setRecruiting("AVAILABLE");
+          }}
+        />
       </div>
-      {message && <Notice>{message}</Notice>}
-      {tab === "companies" && (
-        <Panel title="Doanh nghiệp liên kết">
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setQuery(search.trim());
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/80">
+        <div className="flex flex-wrap gap-1">
+          {(
+            [
+              ["companies", "Danh sách doanh nghiệp", Building2],
+              ["posts", "Tin tuyển dụng", BriefcaseBusiness],
+            ] as const
+          ).map(([id, label, Icon]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-2 border-b-2 px-3 py-4 text-sm font-semibold transition ${tab === id ? "border-orange-600 text-orange-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            >
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 pb-3 lg:w-auto lg:pb-0">
+          <button
+            type="button"
+            className={workflowSecondary + " flex-1 sm:flex-none"}
+            onClick={() => {
+              setArchiveError("");
+              setArchiving(true);
             }}
           >
-            <input
-              className={control}
-              aria-label="Tìm doanh nghiệp"
-              placeholder="Tên hoặc mã doanh nghiệp"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <button className={action}>Tìm kiếm</button>
-          </form>
-          {companies.error && <Notice>{companies.error}</Notice>}
-          {companies.busy ? (
-            <p>Đang tải…</p>
-          ) : (
-            <>
-              <Table
-                headers={[
-                  "Mã",
-                  "Tên doanh nghiệp",
-                  "Liên hệ",
-                  "Trạng thái",
-                  "Thao tác",
-                ]}
-              >
-                {companies.data.items.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.code}</td>
-                    <td>{c.name}</td>
-                    <td>
-                      {c.contactPersonName || "—"}
-                      <br />
-                      {c.contactEmail || "—"}
-                    </td>
-                    <td>{c.status}</td>
-                    <td>
-                      <button className={control} onClick={() => setEditing(c)}>
-                        Cập nhật
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </Table>
-              {!companies.error && !companies.data.items.length && (
-                <p>Không có doanh nghiệp phù hợp.</p>
-              )}
-            </>
-          )}
-          <Pager
-            page={companies.page}
-            total={companies.data.total}
-            limit={companies.data.limit}
-            busy={companies.busy}
-            onChange={companies.setPage}
-          />
-        </Panel>
-      )}
-      {tab === "windows" && (
-        <>
-          <Panel title="Tạo đợt tuyển dụng">
-            <form onSubmit={saveWindow} className="grid gap-3 md:grid-cols-2">
-              <Field label="Kỳ học">
-                <select
-                  className={control}
-                  name="period"
-                  required
-                  defaultValue=""
-                >
-                  <option value="" disabled>
-                    Chọn kỳ học
-                  </option>
-                  {periods.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Tên đợt">
-                <input
-                  className={control}
-                  name="name"
-                  required
-                  maxLength={150}
-                />
-              </Field>
-              <Field label="Bắt đầu">
-                <input
-                  className={control}
-                  name="startsAt"
-                  type="datetime-local"
-                  required
-                />
-              </Field>
-              <Field label="Kết thúc">
-                <input
-                  className={control}
-                  name="endsAt"
-                  type="datetime-local"
-                  required
-                />
-              </Field>
-              <Field label="Lý do">
-                <input
-                  className={control}
-                  name="reason"
-                  required
-                  maxLength={2000}
-                />
-              </Field>
-              <button className={action} disabled={busy || !periods.length}>
-                Tạo đợt
-              </button>
-            </form>
-          </Panel>
-          <Panel title="Mở, đóng hoặc gia hạn đợt">
-            <p className="text-sm text-slate-600">
-              Nhập mã đợt vừa tạo hoặc mã đợt được ghi trong tin tuyển dụng.
-            </p>
-            {lastWindow && (
-              <Notice>
-                Mã đợt: {lastWindow.id} · {lastWindow.name || "—"} ·{" "}
-                {lastWindow.status || "—"}
-              </Notice>
-            )}
-            <form onSubmit={changeWindow} className="grid gap-3 md:grid-cols-2">
-              <Field label="Mã đợt">
-                <input
-                  className={control}
-                  type="number"
-                  min="1"
-                  step="1"
-                  required
-                  value={windowId}
-                  onChange={(e) => setWindowId(e.target.value)}
-                />
-              </Field>
-              <Field label="Trạng thái">
-                <select className={control} name="status">
-                  <option value="OPEN">Mở</option>
-                  <option value="CLOSED">Đóng</option>
-                </select>
-              </Field>
-              <Field label="Hạn mới (tùy chọn)">
-                <input
-                  className={control}
-                  name="endsAt"
-                  type="datetime-local"
-                />
-              </Field>
-              <Field label="Lý do">
-                <input
-                  className={control}
-                  name="reason"
-                  required
-                  maxLength={2000}
-                />
-              </Field>
-              <button className={action} disabled={busy}>
-                Xác nhận cập nhật đợt
-              </button>
-            </form>
-          </Panel>
-        </>
-      )}
-      {tab === "posts" && (
-        <Panel title="Duyệt và đóng tin tuyển dụng">
-          <div className="flex flex-wrap gap-2">
-            <select
-              className={control}
-              aria-label="Doanh nghiệp tuyển dụng"
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-            >
-              <option value="">Chọn doanh nghiệp</option>
-              {catalog.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className={control}
-              aria-label="Trạng thái tin"
-              value={postStatus}
-              onChange={(e) => setPostStatus(e.target.value)}
-            >
-              <option value="">Tất cả trạng thái</option>
-              {[
-                "DRAFT",
-                "PENDING_REVIEW",
-                "PUBLISHED",
-                "REJECTED",
-                "CLOSED",
-                "ARCHIVED",
-              ].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          {posts.error && <Notice>{posts.error}</Notice>}
-          {posts.busy ? (
-            <p>Đang tải…</p>
-          ) : (
-            <>
-              <Table
-                headers={[
-                  "Tin tuyển dụng",
-                  "Đợt",
-                  "Vị trí / chỉ tiêu còn lại",
-                  "Trạng thái",
-                ]}
-              >
-                {posts.data.items.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      #{p.id} · {p.title}
-                      <p className="max-w-lg whitespace-pre-wrap text-slate-600">
-                        {p.content || "Chưa có nội dung."}
-                      </p>
-                    </td>
-                    <td>{p.windowId || "—"}</td>
-                    <td>
-                      {p.positions?.map((v) => (
-                        <div key={v.id}>
-                          {v.title} · {v.remainingSlots}/{v.capacity}
-                        </div>
-                      ))}
-                    </td>
-                    <td>{p.status}</td>
-                  </tr>
-                ))}
-              </Table>
-              {companyId && !posts.error && !posts.data.items.length && (
-                <p>Không có tin tuyển dụng phù hợp.</p>
-              )}
-            </>
-          )}
-          <Pager
-            page={posts.page}
-            total={posts.data.total}
-            limit={posts.data.limit}
-            busy={posts.busy}
-            onChange={posts.setPage}
-          />
-          <form
-            onSubmit={postAction}
-            className="grid gap-3 border-t pt-4 md:grid-cols-2"
+            <Archive size={15} />
+            Lưu trữ tuyển dụng
+          </button>
+          <button
+            type="button"
+            className={workflowPrimary + " flex-1 sm:flex-none"}
+            onClick={() => setImporting(true)}
           >
-            <Field label="Tin cần xử lý">
-              <select
-                className={control}
-                name="postId"
-                required
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Chọn tin trong trang này
-                </option>
-                {posts.data.items
-                  .filter((p) => !["CLOSED", "ARCHIVED"].includes(p.status))
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      #{p.id} {p.title} · {p.status}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-            <Field label="Thao tác">
-              <select className={control} name="decision">
-                <option value="PUBLISH">Công bố</option>
-                <option value="REJECT">Từ chối</option>
-                <option value="CLOSE">Đóng tin</option>
-              </select>
-            </Field>
-            <Field label="Hạn ứng tuyển (khi công bố)">
-              <input
-                className={control}
-                name="deadlineAt"
-                type="datetime-local"
-              />
-            </Field>
-            <Field label="Lý do">
-              <input
-                className={control}
-                name="reason"
-                required
-                maxLength={2000}
-              />
-            </Field>
-            <button
-              className={action}
-              disabled={busy || !companyId || posts.busy}
-            >
-              Xác nhận xử lý tin
-            </button>
-          </form>
-        </Panel>
+            <Upload size={17} />
+            Import doanh nghiệp
+          </button>
+        </div>
+      </div>
+      {message && <Notice>{message}</Notice>}
+      {catalog.error && <Notice>{catalog.error}</Notice>}
+      {!catalog.loading && catalog.selectedPeriod && !semester && (
+        <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Danh mục doanh nghiệp vẫn được giữ; chưa có chỉ tiêu OJT theo kỳ để hiển thị.</Notice>
       )}
-      {editing && (
-        <Panel title={"Cập nhật: " + editing.name}>
-          <form
-            key={editing.id}
-            onSubmit={saveCompany}
-            className="grid gap-3 md:grid-cols-2"
-          >
-            {(
-              [
-                "name",
-                "address",
-                "industry",
-                "contactPersonName",
-                "contactPhone",
-                "contactEmail",
-              ] as const
-            ).map((k, i) => (
-              <Field
-                key={k}
-                label={
-                  [
-                    "Tên doanh nghiệp",
-                    "Địa chỉ",
-                    "Lĩnh vực",
-                    "Người liên hệ",
-                    "Điện thoại",
-                    "Email",
-                  ][i]
-                }
-              >
-                <input
-                  className={control}
-                  name={k}
-                  defaultValue={editing[k] || ""}
-                  required={k === "name"}
-                  type={k === "contactEmail" ? "email" : "text"}
-                  maxLength={
-                    k === "name"
-                      ? 200
-                      : k === "address"
-                        ? 300
-                        : k === "contactPhone"
-                          ? 20
-                          : 100
-                  }
-                />
-              </Field>
-            ))}
-            <Field label="Trạng thái">
-              <select
-                name="status"
-                className={control}
-                defaultValue={editing.status}
-              >
-                <option>ACTIVE</option>
-                <option>INACTIVE</option>
-              </select>
-            </Field>
-            <Field label="Lý do">
-              <input
-                className={control}
-                name="reason"
-                required
-                maxLength={2000}
-              />
-            </Field>
-            <div className="flex gap-2">
-              <button className={action} disabled={busy}>
-                Lưu thay đổi
-              </button>
+      {error && <Notice>{error}</Notice>}
+      {tab === "companies" ? (
+        <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="space-y-5 border-b border-slate-100 p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Danh sách doanh nghiệp liên kết{" "}
+                  <span className="ml-2 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-500">
+                    {filtered.length}
+                  </span>
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Chọn doanh nghiệp để xem thông tin liên hệ, vị trí và nhu cầu
+                  tiếp nhận.
+                </p>
+              </div>
               <button
-                type="button"
-                className={control}
-                onClick={() => setEditing(null)}
-                disabled={busy}
+                className={workflowSecondary}
+                disabled={loading || positionsLoading}
+                onClick={() => setRevision((v) => v + 1)}
               >
-                Hủy
+                <RefreshCw size={16} />
+                Làm mới
               </button>
             </div>
-          </form>
-        </Panel>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
+              <Field label="Tìm doanh nghiệp">
+                <div className="relative">
+                  <Search
+                    size={17}
+                    className="absolute left-3 top-3 text-slate-400"
+                  />
+                  <input
+                    aria-label="Tìm doanh nghiệp"
+                    className={workflowInput + " pl-10"}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Tên, mã, lĩnh vực hoặc email…"
+                  />
+                </div>
+              </Field>
+              <AcademicPeriodFilter selection={catalog} />
+              <Field label="Trạng thái hợp tác">
+                <select
+                  aria-label="Trạng thái hợp tác"
+                  className={workflowInput}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="ACTIVE">Đang hợp tác</option>
+                  <option value="INACTIVE">Ngừng hợp tác</option>
+                </select>
+              </Field>
+              <Field label="Nhu cầu tuyển dụng">
+                <select
+                  aria-label="Nhu cầu tuyển dụng"
+                  className={workflowInput}
+                  value={recruiting}
+                  disabled={!ready}
+                  onChange={(e) => setRecruiting(e.target.value)}
+                >
+                  <option value="">Tất cả nhu cầu</option>
+                  <option value="OPEN">Có vị trí đang mở</option>
+                  <option value="AVAILABLE">Còn chỗ tiếp nhận</option>
+                  <option value="NONE">Chưa có vị trí</option>
+                </select>
+              </Field>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+              <span>
+                <strong className="font-semibold text-slate-600">
+                  Phạm vi chỉ tiêu:
+                </strong>{" "}
+                {scope}. Chỗ còn nhận chỉ tính vị trí đang mở.
+              </span>
+              {(search || status || recruiting) && (
+                <button
+                  className="flex items-center gap-1 font-semibold text-orange-600"
+                  onClick={reset}
+                >
+                  <Filter size={14} />
+                  Đặt lại bộ lọc
+                </button>
+              )}
+            </div>
+            {positionsError && (
+              <Notice>
+                Không tải được chỉ tiêu: {positionsError}{" "}
+                <button
+                  className="ml-2 font-bold underline"
+                  onClick={() => setRevision((v) => v + 1)}
+                >
+                  Thử lại
+                </button>
+              </Notice>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1050px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  {[
+                    "Doanh nghiệp",
+                    "Liên hệ",
+                    "Vị trí tuyển dụng",
+                    "Chỉ tiêu tiếp nhận",
+                    "Trạng thái",
+                    "Thao tác",
+                  ].map((h) => (
+                    <th className="px-5 py-4 font-bold" key={h}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {!loading &&
+                  !error &&
+                  filtered
+                    .slice((currentPage - 1) * 10, currentPage * 10)
+                    .map((c) => {
+                      const roles = grouped.get(c.id) || [],
+                        total = positionTotals(roles);
+                      return (
+                        <tr
+                          key={c.id}
+                          className="transition hover:bg-orange-50/30"
+                        >
+                          <td className={cell}>
+                            <div className="flex items-center gap-3">
+                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-100 bg-orange-50 text-orange-600">
+                                <Building2 size={21} />
+                              </span>
+                              <div>
+                                <button
+                                  className="text-left font-bold text-slate-800 hover:text-orange-600"
+                                  disabled={positionsLoading}
+                                  onClick={() =>
+                                    setSelected({ company: c, tab: "overview" })
+                                  }
+                                >
+                                  {c.name}
+                                </button>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {c.code} · {c.industry || "Chưa có lĩnh vực"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={cell}>
+                            <p className="font-medium text-slate-700">
+                              {c.contactPersonName || "Chưa có người liên hệ"}
+                            </p>
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                              <Mail size={12} />
+                              {c.contactEmail || "Chưa có email"}
+                            </p>
+                          </td>
+                          <td className={cell}>
+                            {ready ? (
+                              <button
+                                className="text-left hover:text-orange-700"
+                                onClick={() =>
+                                  setSelected({ company: c, tab: "positions" })
+                                }
+                              >
+                                <span className="font-semibold text-slate-800">
+                                  {total.count} vị trí{" "}
+                                  <span className="ml-1 text-xs font-normal text-slate-500">
+                                    · {total.open} mở
+                                  </span>
+                                </span>
+                                <p
+                                  className="mt-1 max-w-[210px] truncate text-xs text-slate-500"
+                                  title={roles.map((p) => p.title).join(", ")}
+                                >
+                                  {roles
+                                    .slice(0, 2)
+                                    .map((p) => p.title)
+                                    .join(", ") || "Chưa có vị trí tuyển dụng"}
+                                  {roles.length > 2
+                                    ? ` +${roles.length - 2}`
+                                    : ""}
+                                </p>
+                              </button>
+                            ) : (
+                              <span className="text-slate-400">
+                                {positionsLoading
+                                  ? "Đang tải…"
+                                  : "Chưa tải được"}
+                              </span>
+                            )}
+                          </td>
+                          <td className={cell}>
+                            {ready ? (
+                              <>
+                                <p className="font-bold text-slate-800">
+                                  {total.capacity}{" "}
+                                  <span className="text-xs font-normal text-slate-500">
+                                    sinh viên
+                                  </span>
+                                </p>
+                                <p
+                                  className={`mt-1 text-xs font-medium ${c.status === "ACTIVE" && total.available > 0 ? "text-emerald-700" : "text-slate-500"}`}
+                                >
+                                  {c.status === "ACTIVE"
+                                    ? `Còn nhận ${total.available} chỗ`
+                                    : "Tạm ngừng tiếp nhận"}
+                                </p>
+                              </>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className={cell}>
+                            <EnterpriseStatus status={c.status} />
+                          </td>
+                          <td className={cell}>
+                            <button
+                              className={
+                                workflowSecondary + " whitespace-nowrap"
+                              }
+                              disabled={positionsLoading}
+                              onClick={() =>
+                                setSelected({ company: c, tab: "overview" })
+                              }
+                            >
+                              <MoreHorizontal size={17} />
+                              Quản lý
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+              </tbody>
+            </table>
+          </div>
+          {(loading || !filtered.length) && (
+            <div className="flex flex-col items-center gap-3 p-12 text-center text-sm text-slate-500">
+              <Building2 size={30} className="text-slate-300" />
+              <p>
+                {loading
+                  ? "Đang tải doanh nghiệp…"
+                  : error
+                    ? "Không tải được danh sách doanh nghiệp."
+                    : "Không có doanh nghiệp phù hợp bộ lọc."}
+              </p>
+            </div>
+          )}
+          <div className="border-t border-slate-100 p-5">
+            <Pager
+              page={currentPage}
+              total={filtered.length}
+              limit={10}
+              busy={loading}
+              onChange={setPage}
+            />
+          </div>
+        </section>
+      ) : (
+        <EnterpriseRecruitment
+          companies={companies}
+          companyId={companyId}
+          onCompanyChange={setCompanyId}
+          onDataChanged={() => setRevision((v) => v + 1)}
+        />
+      )}
+      {selected && (
+        <EnterpriseDetailsModal
+          company={selected.company}
+          positions={grouped.get(selected.company.id) || []}
+          positionsError={positionsError}
+          scope={scope}
+          initialTab={selected.tab}
+          onClose={() => setSelected(null)}
+          onUpdated={() => {
+            setRevision((v) => v + 1);
+            setMessage("Đã cập nhật thông tin doanh nghiệp.");
+          }}
+          onPosts={() => {
+            setCompanyId(String(selected.company.id));
+            setSelected(null);
+            setTab("posts");
+          }}
+        />
       )}
       {importing && (
         <QhdnEnterpriseImportModal
           isOpen
+          periods={periods}
+          periodsLoading={catalog.loading}
+          initialAcademicPeriodId={catalog.selectedPeriod?.kind === "SEMESTER" ? catalog.selectedPeriod.id : undefined}
           onClose={() => setImporting(false)}
-          initialWindowId={lastWindow?.id}
           onImported={() => {
             setRevision((v) => v + 1);
             setMessage(
-              "Import thành công. Danh sách được tải lại từ hệ thống.",
+              "Đã import doanh nghiệp. Danh sách được cập nhật từ hệ thống.",
             );
           }}
         />
+      )}
+      {archiving && (
+        <WorkflowModal
+          title="Lưu trữ tuyển dụng"
+          subtitle="Dọn các dữ liệu tuyển dụng đã đủ điều kiện lưu trữ."
+          onClose={() => setArchiving(false)}
+          busy={busy}
+        >
+          <div className="space-y-5">
+            {archiveError && <Notice>{archiveError}</Notice>}
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+              Hệ thống sẽ lưu trữ tuyển dụng đủ điều kiện sau hai học kỳ. Kiểm
+              tra trước khi xác nhận thực hiện.
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className={workflowSecondary}
+                disabled={busy}
+                onClick={() => setArchiving(false)}
+              >
+                Để sau
+              </button>
+              <button
+                className={workflowPrimary}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setArchiveError("");
+                  try {
+                    const r = await archiveRecruitment();
+                    setMessage(
+                      `Đã lưu trữ ${r.archivedCount} mục tuyển dụng đủ điều kiện.`,
+                    );
+                    setArchiving(false);
+                    setRevision((v) => v + 1);
+                  } catch (e) {
+                    setArchiveError(errorMessage(e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Archive size={16} />
+                {busy ? "Đang xử lý…" : "Xác nhận lưu trữ"}
+              </button>
+            </div>
+          </div>
+        </WorkflowModal>
       )}
     </div>
   );

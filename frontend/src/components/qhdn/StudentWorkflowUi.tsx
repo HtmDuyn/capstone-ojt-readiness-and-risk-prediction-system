@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowRight,
   Check,
@@ -12,8 +13,9 @@ import {
 } from "lucide-react";
 import type {
   HandoffStudentItem,
-  OjtSemesterItem,
 } from "@/types/qhdn/qhdnTypes";
+import type { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
+import { academicPeriodLabel } from "@/utils/qhdnAcademicPeriods";
 import {
   placementLabels,
   receptionLabels,
@@ -127,35 +129,42 @@ export function WorkflowSteps({
     </div>
   );
 }
-export function SemesterFilter({
-  semesters,
-  value,
-  onChange,
+export function AcademicPeriodFilter({
+  selection,
   disabled,
+  controlClassName = workflowInput,
 }: {
-  semesters: OjtSemesterItem[];
-  value: string;
-  onChange: (id: string) => void;
+  selection: ReturnType<typeof useQhdnAcademicPeriods>;
   disabled?: boolean;
+  controlClassName?: string;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
-      Học kỳ OJT
-      <select
-        aria-label="Học kỳ OJT"
-        className={workflowInput}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Chọn học kỳ OJT</option>
-        {semesters.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name || s.code}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="flex min-w-0 max-w-full flex-wrap items-end gap-3">
+      <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
+        Năm học
+        <select aria-label="Năm học" className={controlClassName} value={selection.yearId}
+          disabled={disabled || selection.loading} onChange={(e) => selection.selectYear(e.target.value)}>
+          <option value="">Tất cả năm học</option>
+          {selection.years.map((year) => <option key={year.id} value={year.id}>{year.code}</option>)}
+        </select>
+      </label>
+      <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-slate-500">
+        Học kỳ / Block 3
+        <select aria-label="Học kỳ / Block 3" className={controlClassName + " max-w-full sm:max-w-md"}
+          value={selection.periodId} disabled={disabled || selection.loading || !selection.filteredPeriods.length}
+          onChange={(e) => selection.selectPeriod(e.target.value)}>
+          {selection.allowAll && <option value="ALL">Tất cả học kỳ / Block 3</option>}
+          {!selection.filteredPeriods.length && <option value="">{selection.loading ? "Đang tải…" : "Không có học kỳ / Block 3"}</option>}
+          {selection.years.filter((year) => !selection.yearId || String(year.id) === selection.yearId).map((year) => (
+            <optgroup key={year.id} label={year.code}>
+              {selection.filteredPeriods.filter((p) => p.academicYearId === year.id).map((period) => (
+                <option key={period.id} value={period.id}>{academicPeriodLabel(period)}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 }
 export function StatCard({
@@ -266,9 +275,10 @@ export function WorkflowModal({
       previous?.focus();
     };
   }, []);
-  return (
+  // Đưa dialog ra ngoài layout để header/sidebar không che popup trên mobile.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) close.current();
       }}
@@ -334,6 +344,7 @@ export function WorkflowModal({
         </header>
         <div className="p-5 sm:p-6">{children}</div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

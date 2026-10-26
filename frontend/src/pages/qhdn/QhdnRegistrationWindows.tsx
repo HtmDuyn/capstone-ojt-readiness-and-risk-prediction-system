@@ -17,7 +17,7 @@ import { PageBanner } from "@/components/common/PageBanner";
 import { Pager, Notice, Field, errorMessage } from "@/components/qhdn/QhdnUi";
 import {
   EmptyStudents,
-  SemesterFilter,
+  AcademicPeriodFilter,
   StatCard,
   StudentIdentity,
   WorkflowBadge,
@@ -62,7 +62,7 @@ const localDate = (s: string) =>
 export default function QhdnRegistrationWindows() {
   const [url] = useSearchParams();
   const semester = useQhdnSemesters(url.get("semester") || "");
-  const roster = useQhdnRoster(semester.semesterId);
+  const roster = useQhdnRoster(semester.semesterId, "eligible");
   const [tab, setTab] = useState<"students" | "windows">("students");
   const [search, setSearch] = useState(url.get("student") || ""),
     [status, setStatus] = useState<ReceptionStatus | "ALL">("ALL"),
@@ -175,7 +175,7 @@ export default function QhdnRegistrationWindows() {
   };
   const windowSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!windowTask || busy) return;
+    if (!windowTask || busy || !semester.semesterId) return;
     const form = new FormData(e.currentTarget),
       value = (k: string) => String(form.get(k) || "").trim(),
       reason = value("reason");
@@ -244,13 +244,8 @@ export default function QhdnRegistrationWindows() {
     <div className="space-y-5 pb-10">
       <PageBanner
         title="Tiếp nhận & Duyệt hồ sơ OJT"
-        description="Tiếp nhận danh sách từ Phòng Đào tạo, mở đăng ký và duyệt hồ sơ để gửi doanh nghiệp."
+        description="Tiếp nhận danh sách từ Phòng Đào tạo, mở đăng ký và kiểm tra hồ sơ OJT."
         badge="Phòng QHDN"
-        primaryAction={{
-          label: "Mở đợt đăng ký",
-          icon: <Plus size={17} />,
-          onClick: () => openWindowTask("create"),
-        }}
       />
       <WorkflowSteps current="reception" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -292,13 +287,8 @@ export default function QhdnRegistrationWindows() {
             </p>
           </div>
         </div>
-        <div className="flex items-end gap-2">
-          <SemesterFilter
-            semesters={semester.semesters}
-            value={semester.semesterId}
-            onChange={semester.setSemesterId}
-            disabled={busy}
-          />
+        <div className="flex min-w-0 flex-wrap items-end gap-2">
+          <AcademicPeriodFilter selection={semester} disabled={busy} />
           <button
             aria-label="Tải lại danh sách"
             className={workflowSecondary}
@@ -310,6 +300,9 @@ export default function QhdnRegistrationWindows() {
         </div>
       </div>
       {semester.error && <Notice>{semester.error}</Notice>}
+      {!semester.loading && semester.selectedPeriod && !semester.semesterId && (
+        <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Chưa có danh sách bàn giao hoặc đợt đăng ký OJT để hiển thị.</Notice>
+      )}
       {roster.error && <Notice>{roster.error}</Notice>}
       {message && <Notice>{message}</Notice>}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
@@ -345,16 +338,27 @@ export default function QhdnRegistrationWindows() {
             </span>
           </button>
         </div>
-        <Link
-          to={
-            "/qhdn/coordination" +
-            (semester.semesterId ? "?semester=" + semester.semesterId : "")
-          }
-          className="inline-flex items-center gap-2 py-3 text-xs font-semibold text-orange-700"
-        >
-          Theo dõi doanh nghiệp phản hồi
-          <ArrowRight size={14} />
-        </Link>
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 pb-3 lg:w-auto lg:pb-0">
+          <Link
+            to={
+              "/qhdn/coordination" +
+              (semester.semesterId ? "?semester=" + semester.semesterId : "")
+            }
+            className="inline-flex items-center gap-2 py-3 text-xs font-semibold text-orange-700"
+          >
+            Theo dõi doanh nghiệp phản hồi
+            <ArrowRight size={14} />
+          </Link>
+          <button
+            type="button"
+            className={workflowPrimary + " w-full sm:w-auto"}
+            disabled={busy || loading || !semester.semesterId}
+            onClick={() => openWindowTask("create")}
+          >
+            <Plus size={17} />
+            Mở đợt đăng ký
+          </button>
+        </div>
       </div>
       {tab === "students" ? (
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -564,9 +568,9 @@ export default function QhdnRegistrationWindows() {
                               {process ? (
                                 <>
                                   <Send size={15} />
-                                  {state === "APPROVED"
-                                    ? "Gửi doanh nghiệp"
-                                    : "Duyệt & gửi"}
+                                    {state === "APPROVED"
+                                      ? "Xem hồ sơ"
+                                      : "Duyệt hồ sơ"}
                                 </>
                               ) : (
                                 <>

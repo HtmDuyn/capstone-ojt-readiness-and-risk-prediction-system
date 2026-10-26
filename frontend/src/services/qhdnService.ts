@@ -1,4 +1,10 @@
-import type { ImportPreviewResponse } from "@/types/qhdn/qhdnTypes";
+import type {
+  ImportCommitResponse,
+  EnterpriseImportPayload,
+  ImportPreviewApiResponse,
+  ImportPreviewResponse,
+} from "@/types/qhdn/qhdnTypes";
+import { normalizeEnterpriseImportPreview } from "@/utils/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type {
   Application,
@@ -7,12 +13,8 @@ import type {
   Page,
   PageQuery,
   RecruitmentPost,
-  RecruitmentWindow,
-  Registration,
-  ReportPage,
   ReportType,
   Result,
-  WindowInput,
 } from "@/types/qhdn/workflowTypes";
 import { loadAllPages } from "../utils/loadAllPages";
 import API from "./api";
@@ -20,7 +22,6 @@ import type {
   OjtSemesterItem,
   CompanyListResponse,
   PositionListResponse,
-  CreateCoordinationRequest,
   ReassignCoordinationRequest,
   EnterpriseDecisionRequest,
   TransferOjtResultRequest,
@@ -29,8 +30,8 @@ import type {
   InternshipEvaluationListResponse,
   OjtResultListResponse,
   HandoffStudentListResponse,
-  QhdnDashboardData,
   AcademicPeriodItem,
+  AcademicPeriodListResponse,
   RegistrationWindowItem,
   CreateRegistrationWindowRequest,
   UpdateRegistrationWindowRequest,
@@ -91,6 +92,7 @@ export const listQhdnOjtSemesters = async (
     ));
   const semesters = new Map<number, OjtSemesterItem>();
   for (const period of periods) {
+    if (period.kind !== "SEMESTER") continue;
     const ojt = period.ojt;
     const id = period.ojtSemesterId || ojt?.id;
     // Academic periods without an OJT link are not OJT semesters.
@@ -116,6 +118,29 @@ export const listQhdnOjtSemesters = async (
 // 1. LUỒNG TIẾP NHẬN DANH SÁCH SINH VIÊN TỪ PHÒNG ĐÀO TẠO (ACADEMIC -> QHDN)
 // =========================================================================
 
+/** GET /api/qhdn/eligible-students: sinh viên đủ điều kiện đã được Đào tạo bàn giao. */
+export const listEligibleStudents = async (params: {
+  ojtSemesterId: number;
+  studentId?: number;
+  handoffId?: number;
+  programId?: number;
+  cohortId?: number;
+  groupCode?: "A" | "B" | "C" | "D";
+  search?: string;
+  registrationStatus?: "NOT_REGISTERED" | "SUBMITTED" | "APPROVED" | "REJECTED" | "LEGACY_REVIEW_REQUIRED";
+  page?: number;
+  limit?: number;
+}): Promise<HandoffStudentListResponse> => {
+  const { data } = await API.get<HandoffStudentListResponse>(
+    "/qhdn/eligible-students",
+    { params: { page: 1, limit: 100, ...params } },
+  );
+  if (data.success !== true) {
+    throw new Error(data.message || "Không tải được danh sách sinh viên đã bàn giao.");
+  }
+  return data;
+};
+
 /**
  * GET /api/ojt-semesters/:id/students
  * Tiếp nhận danh sách sinh viên trong kỳ OJT từ phòng đào tạo (kèm trạng thái bàn giao và đăng ký).
@@ -139,7 +164,7 @@ export const listStudentsInSemester = async (
 
 /**
  * GET /api/academic-periods
- * Danh sách kỳ học và năm học do phòng đào tạo khởi tạo.
+ * Danh sách học kỳ và Block 3, kèm năm học và liên kết OJT do phòng đào tạo khởi tạo.
  */
 export const getAcademicPeriods = async (
   params: {
@@ -147,22 +172,16 @@ export const getAcademicPeriods = async (
     limit?: number;
     search?: string;
     status?: string;
-  } = { page: 1, limit: 100 },
-): Promise<{
-  success: boolean;
-  items: AcademicPeriodItem[];
-  total: number;
-  page: number;
-  limit: number;
-}> => {
-  const response = await API.get<{
-    success: boolean;
-    items: AcademicPeriodItem[];
-    total: number;
-    page: number;
-    limit: number;
-  }>("/academic-periods", { params });
-  return response.data;
+  } = {},
+): Promise<AcademicPeriodListResponse> => {
+  const { data } = await API.get<AcademicPeriodListResponse>("/academic-periods", {
+    params: { page: 1, limit: 100, ...params },
+  });
+  if (data.success !== true) {
+    throw new Error(data.message || "Không tải được danh sách kỳ học.");
+  }
+  // The API returns { success, items, page, limit, total }, without a data wrapper.
+  return data;
 };
 
 /**
@@ -254,20 +273,6 @@ export const listCoordinations = async (
   const response = await API.get<CoordinationListResponse>(
     "/ojt-coordinations",
     { params },
-  );
-  return response.data;
-};
-
-/**
- * POST /api/ojt-coordinations
- * Điều phối hồ sơ sinh viên đã bàn giao đến doanh nghiệp (lần đầu).
- */
-export const coordinateStudent = async (
-  payload: CreateCoordinationRequest,
-): Promise<{ success: boolean; data: any }> => {
-  const response = await API.post<{ success: boolean; data: any }>(
-    "/ojt-coordinations",
-    payload,
   );
   return response.data;
 };
@@ -381,24 +386,6 @@ export const listOjtResults = async (
   return response.data;
 };
 
-// =========================================================================
-// 4. DASHBOARD & BÁO CÁO QHDN
-// =========================================================================
-
-/**
- * GET /api/qhdn/dashboard
- * Dữ liệu tổng quan phòng QHDN (bàn giao, sức chứa, tiếp nhận, kết quả).
- */
-export const getQhdnDashboard = async (
-  params: { ojtSemesterId?: number; companyId?: number } = {},
-): Promise<{ success: boolean; data: QhdnDashboardData }> => {
-  const response = await API.get<{ success: boolean; data: QhdnDashboardData }>(
-    "/qhdn/dashboard",
-    { params },
-  );
-  return response.data;
-};
-
 export const archiveRecruitment = async () =>
   (
     await API.post<{ success: boolean; archivedCount: number }>(
@@ -406,9 +393,6 @@ export const archiveRecruitment = async () =>
     )
   ).data;
 
-export const listRegistrations = async (params: PageQuery) =>
-  (await API.get<Result<Page<Registration>>>("/ojt-registrations", { params }))
-    .data.data;
 export const listApplications = async (params: PageQuery) =>
   (await API.get<Result<Page<Application>>>("/job-applications", { params }))
     .data.data;
@@ -443,22 +427,6 @@ export const listRecruitmentPosts = async (
       params,
     })
   ).data.data;
-export const createRecruitmentWindow = async (payload: WindowInput) =>
-  (await API.post<Result<RecruitmentWindow>>("/recruitment/windows", payload))
-    .data.data;
-export const updateRecruitmentWindow = async (
-  id: number,
-  payload: Partial<WindowInput> & {
-    reason: string;
-    status?: "OPEN" | "CLOSED";
-  },
-) =>
-  (
-    await API.patch<Result<RecruitmentWindow>>(
-      `/recruitment/windows/${id}`,
-      payload,
-    )
-  ).data.data;
 export const reviewRecruitmentPost = async (
   id: number,
   payload: {
@@ -467,18 +435,10 @@ export const reviewRecruitmentPost = async (
     deadlineAt?: string;
   },
 ) => (await API.post(`/recruitment/posts/${id}/review`, payload)).data;
-export const closeRecruitmentPost = async (id: number, reason: string) =>
-  (await API.post(`/recruitment/posts/${id}/close`, { reason })).data;
 export const assignInternship = async (payload: AssignmentInput) =>
   (await API.post("/assignments", payload)).data;
 export const editInternship = async (id: number, payload: AssignmentUpdate) =>
   (await API.patch(`/assignments/${id}`, payload)).data;
-export const listReports = async (type: ReportType, params: PageQuery) =>
-  (
-    await API.get<Result<ReportPage>>("/qhdn/reports", {
-      params: { ...params, type },
-    })
-  ).data.data;
 
 // API trả Blob; utils/downloadFile phụ trách lưu file trên trình duyệt.
 export const getCvFile = async (
@@ -513,16 +473,28 @@ export const exportQhdnReport = async (
   ).data;
 
 export const previewEnterpriseImport = async (
-  payload: FormData,
-): Promise<ImportPreviewResponse> =>
-  (
-    await API.post<ImportPreviewResponse>("/imports/preview", payload, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })
-  ).data;
-export const commitEnterpriseImport = async (payload: FormData) =>
-  (
-    await API.post<{ success: boolean }>("/imports/commit", payload, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })
-  ).data;
+  payload: EnterpriseImportPayload,
+): Promise<ImportPreviewResponse> => {
+  const { data } = await API.post<ImportPreviewApiResponse>(
+    "/imports/preview",
+    payload,
+    {
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  return normalizeEnterpriseImportPreview(data);
+};
+export const commitEnterpriseImport = async (
+  payload: EnterpriseImportPayload,
+): Promise<ImportCommitResponse> => {
+  const { data } = await API.post<ImportCommitResponse>(
+    "/imports/commit",
+    payload,
+    {
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  if (data.success !== true)
+    throw new Error("Import chưa được hệ thống xác nhận thành công.");
+  return data;
+};

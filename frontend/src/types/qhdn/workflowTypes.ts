@@ -59,15 +59,9 @@ export interface RecruitmentWindow {
   name?: string;
   status?: string;
   academicPeriodId?: number;
+  ojtSemesterId?: number;
   startsAt?: string;
   endsAt?: string;
-}
-export interface WindowInput {
-  academicPeriodId: number;
-  name: string;
-  startsAt: string;
-  endsAt: string;
-  reason: string;
 }
 export interface AssignmentInput {
   coordinationId: number;
@@ -84,7 +78,3 @@ export interface AssignmentUpdate {
   reason: string;
 }
 export type ReportType = "acceptance" | "internships" | "enterprise-feedback";
-export type ReportRow = Record<string, unknown>;
-export interface ReportPage extends Page<ReportRow> {
-  type: ReportType;
-}

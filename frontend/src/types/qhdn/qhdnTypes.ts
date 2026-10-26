@@ -5,15 +5,50 @@ export interface ImportPreviewRowResult {
   error?: string;
 }
 
-export interface ImportPreviewResponse {
+export interface ImportSummary {
   success: boolean;
   total: number;
   created: number;
   updated: number;
-  errors: string[];
-  canCommit: boolean;
+}
+
+export interface ImportPreviewApiResponse extends ImportSummary {
+  errors?: string[];
+  canCommit?: boolean;
   preview: boolean;
   rows: ImportPreviewRowResult[];
+}
+
+export interface ImportPreviewResponse extends ImportPreviewApiResponse {
+  errors: string[];
+  canCommit: boolean;
+}
+
+export interface ImportCommitResponse extends ImportSummary {
+  batchId: number;
+  replayed: boolean;
+}
+
+export interface EnterpriseImportRow {
+  code: string;
+  email: string;
+  fullName: string;
+  name: string;
+  address?: string;
+  positions: {
+    code: string;
+    title: string;
+    description: string;
+    requirements: string;
+    capacity: number;
+  }[];
+}
+
+export interface EnterpriseImportPayload {
+  kind: "ENTERPRISE";
+  windowId: number;
+  idempotencyKey: string;
+  rows: EnterpriseImportRow[];
 }
 
 export interface CompanyListItem {
@@ -103,17 +138,6 @@ export interface OjtSemesterItem {
 // =========================================================================
 // TYPES CHO LUỒNG ĐIỀU PHỐI, DOANH NGHIỆP DUYỆT, ĐÁNH GIÁ VÀ CHUYỂN GIAO PĐT
 // =========================================================================
-
-/**
- * Payload cho POST /api/ojt-coordinations (Điều phối lần đầu)
- */
-export interface CreateCoordinationRequest {
-  registrationId: number;
-  positionId: number;
-  applicationId?: number;
-  reason: string;
-  idempotencyKey: string;
-}
 
 /**
  * Payload cho POST /api/ojt-coordinations/:id/reassign (Điều phối lại sau khi bị từ chối)
@@ -314,23 +338,23 @@ export interface OjtResultListResponse {
 }
 
 /**
- * Sinh viên trong kỳ OJT nhận từ phòng đào tạo (GET /api/ojt-semesters/:id/students)
+ * Sinh viên đã bàn giao từ /qhdn/eligible-students; API students theo kỳ bổ sung thông tin xử lý hồ sơ.
  */
 export interface HandoffStudentItem {
   studentId: number;
   studentCode: string;
   fullName: string;
   email?: string;
-  phone?: string;
+  phone?: string | null;
   major?: string;
-  cohortName?: string;
-  programName?: string;
-  programCode?: string;
-  programId?: number;
-  cohortId?: number;
+  cohortName?: string | null;
+  programName?: string | null;
+  programCode?: string | null;
+  programId?: number | null;
+  cohortId?: number | null;
   gpa?: number;
   englishLevel?: string;
-  groupCode?: string;
+  groupCode?: string | null;
   handoffStatus?: "HANDED_OFF" | "NOT_HANDED_OFF";
   handoffId?: number;
   handoff?: {
@@ -338,10 +362,23 @@ export interface HandoffStudentItem {
     reason?: string;
     createdAt?: string;
     createdBy?: number;
+    createdByName?: string | null;
     createdByUser?: {
       id: number;
       fullName: string;
     };
+  };
+  eligibilityAtHandoff?: {
+    checkId: number;
+    status: "ELIGIBLE";
+    checkedAt: string;
+    confirmedAt: string;
+    confirmedBy: number;
+    ruleSetId?: number | null;
+    earnedCredits?: number | null;
+    missingCredits?: number | null;
+    unpassedCourseCount?: number | null;
+    validity: "AT_HANDOFF";
   };
   registrationStatus?: string;
   legacyRegistrationStatus?: string | null;
@@ -357,7 +394,7 @@ export interface HandoffStudentItem {
       note?: string;
       cvUrl?: string;
     };
-  };
+  } | null;
   window?: {
     id: number;
     name: string;
@@ -441,47 +478,21 @@ export interface HandoffStudentListResponse {
   message?: string;
 }
 
-export interface QhdnDashboardData {
-  filters: { ojtSemesterId: number | null; companyId: number | null };
-  partners: { total: number; active: number; inactive: number };
-  positions: {
-    total: number;
-    open: number;
-    totalCapacity: number;
-    occupiedSlots: number;
-    remainingSlots: number;
-    openRemainingSlots: number;
-  };
-  students: {
-    handedOff: number;
-    unallocated: number;
-    notCoordinated: number;
-    waitingForEnterprise: number;
-    enterpriseRejected: number;
-    acceptedAwaitingAssignment: number;
-    assigned: number;
-  };
-  assignments: {
-    total: number;
-    assigned: number;
-    active: number;
-    completed: number;
-    failed: number;
-    cancelled: number;
-  };
-  results: {
-    total: number;
-    pending: number;
-    revisionRequested: number;
-    confirmed: number;
-    passed: number;
-    failed: number;
-  };
-}
-
 /**
  * Học kỳ học vụ (Academic Period) lấy từ GET /api/academic-periods
  */
+export interface AcademicPeriodReference {
+  id: number;
+  code: string;
+  name: string;
+  kind: "SEMESTER" | "BLOCK3";
+  status: string;
+  startDate: string;
+  endDate: string;
+  academicYearId?: number;
+  parentPeriodId?: number | null;
+}
+
 export interface AcademicPeriodItem {
   id: number;
   periodCode: string;
@@ -492,13 +503,15 @@ export interface AcademicPeriodItem {
   endDate: string;
   academicYearId: number;
   parentPeriodId?: number | null;
+  parentPeriod?: AcademicPeriodReference | null;
+  semesterCode?: string;
   academicYear?: {
     id: number;
     code: string;
     status: string;
     startDate: string;
     endDate: string;
-  };
+  } | null;
   ojtSemesterId?: number | null;
   ojt?: {
     id: number;
@@ -521,7 +534,18 @@ export interface AcademicPeriodItem {
     endDate: string;
     academicYearId: number;
     academicPeriodId: number;
+    academicPeriod?: AcademicPeriodReference | null;
   } | null;
+}
+
+/** This endpoint returns items and pagination at the top level, without data. */
+export interface AcademicPeriodListResponse {
+  success: boolean;
+  items: AcademicPeriodItem[];
+  total: number;
+  page: number;
+  limit: number;
+  message?: string;
 }
 
 /**
