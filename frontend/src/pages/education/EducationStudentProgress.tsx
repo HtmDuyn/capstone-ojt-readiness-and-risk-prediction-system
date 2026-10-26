@@ -611,6 +611,9 @@ const EducationStudentProgress: React.FC = () => {
                             ? "—"
                             : `Kỳ ${student.currentCurriculumSemester}`}
                         </span>
+                        <p className="mt-2 text-xs text-orange-700">
+                          {student.courseSemesterTag == null ? 'Chưa có môn đang học' : `Tag môn đang học: Kỳ ${student.courseSemesterTag}`}
+                        </p>
                       </td>
 
                       <td className="px-5 py-4 text-center font-semibold text-slate-700">
@@ -833,6 +836,9 @@ const EducationStudentProgress: React.FC = () => {
                     {selectedStudent.currentCurriculumSemester === null
                       ? "—"
                       : `Kỳ ${selectedStudent.currentCurriculumSemester}`}
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-orange-700">
+                    {selectedStudent.courseSemesterTag == null ? 'Chưa có môn đang học' : `Tag môn đang học: Kỳ ${selectedStudent.courseSemesterTag}`}
                   </p>
 
                   <p className="mt-1 text-xs text-slate-400">

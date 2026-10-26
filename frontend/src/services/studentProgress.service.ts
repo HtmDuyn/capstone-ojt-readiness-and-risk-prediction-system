@@ -1,18 +1,7 @@
-import { API_ORIGIN } from "@/config/api";
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { apiData, getAllItems, getJson } from "./educationApi";
-const API_BASE_URL = API_ORIGIN;
 
 type Row = Record<string, any>;
-export const unwrapApiData = (response: unknown): unknown => apiData(response);
-export const getApiItems = (response: unknown): unknown[] => {
-  const data = apiData<Row>(response);
-  return Array.isArray(data)
-    ? data
-    : Array.isArray(data?.items)
-      ? data.items
-      : [];
-};
 const text = (value: unknown) =>
   value === undefined || value === null || value === "" ? "—" : String(value);
 const number = (value: unknown): number | null =>
@@ -116,6 +105,7 @@ async function loadStudent(
     studentClass: text(profile.className),
     curriculumCode: text(program.code),
     currentCurriculumSemester: number(profile.currentSemester),
+    courseSemesterTag: number(profile.courseSemesterTag),
     currentTerm: text(profile.currentAcademicPeriod?.name),
     gpa: number(progress.gpa),
     completedCredits: number(credits.earned),

@@ -1,11 +1,10 @@
-import React from 'react';
 import {
   DashboardGridIcon,
   BriefcaseIcon,
   EvaluationResultsIcon,
   InternshipProgressIcon,
 } from '@/components/common/icons/AppIcons';
-import { Users, FileText, Award } from 'lucide-react';
+import { Users } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const ENTERPRISE_NAV_ITEMS: NavItem[] = [

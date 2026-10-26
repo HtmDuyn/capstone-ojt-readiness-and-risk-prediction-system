@@ -48,6 +48,3 @@ export async function getAllItems<T>(
   }
   throw new Error("Danh sách vượt giới hạn tải; hãy thu hẹp bộ lọc.");
 }
-export const unavailable = (feature: string): never => {
-  throw new Error(feature + " chưa được backend hiện tại hỗ trợ.");
-};

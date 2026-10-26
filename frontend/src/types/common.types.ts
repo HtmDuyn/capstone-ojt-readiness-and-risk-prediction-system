@@ -22,19 +22,3 @@ export interface NavItem {
   badgeText?: string;
   banner?: BannerPreset;
 }
-
-export interface ActionButtonConfig {
-  label: string;
-  onClick: () => void;
-  icon?: React.ReactNode;
-}
-
-export interface UserProfileSummary {
-  id: string;
-  code?: string;
-  fullName: string;
-  email: string;
-  avatar: string;
-  roleName?: string;
-  department?: string;
-}

@@ -26,6 +26,7 @@ export interface StudentProgress {
   studentClass: string;
   curriculumCode: string;
   currentCurriculumSemester: number | null;
+  courseSemesterTag?: number | null;
   currentTerm: string;
   gpa: number | null;
   completedCredits: number | null;

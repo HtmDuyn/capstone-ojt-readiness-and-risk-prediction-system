@@ -19,9 +19,6 @@ const positiveId = (value: unknown): number | undefined => {
   return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 };
 
-const fetchCatalog = (endpoint: string): Promise<DataObject[]> =>
-  getAllItems<DataObject>(endpoint);
-
 const buildOption = (
   id: number | undefined,
   candidates: unknown[],
@@ -58,11 +55,10 @@ const uniqueOptions = (
 };
 
 export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
-  const [curricula, cohorts, periods, years] = await Promise.all([
-    fetchCatalog("/curricula"),
-    fetchCatalog("/cohorts"),
-    fetchCatalog("/academic-periods"),
-    fetchCatalog("/academic-years"),
+  const [curricula, cohorts, periods] = await Promise.all([
+    getAllItems<DataObject>("/curricula", { status: 'PUBLISHED' }),
+    getAllItems<DataObject>("/cohorts"),
+    getAllItems<DataObject>("/academic-periods"),
   ]);
 
   const programs = uniqueOptions(
@@ -87,14 +83,15 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
   );
 
   const cohortOptions = uniqueOptions(
-    cohorts.map((item) =>
-      buildOption(positiveId(item.id), [
+    cohorts.filter(item => item.status !== 'ARCHIVED').map((item) => {
+      const option = buildOption(positiveId(item.id), [
         item.cohortCode,
         item.code,
         item.cohortName,
         item.name,
-      ]),
-    ),
+      ]);
+      return option ? { ...option, groups: Array.isArray(item.groups) ? item.groups as NonNullable<CatalogOption['groups']> : [] } : null;
+    }),
   );
 
   const periodOptions = uniqueOptions(
@@ -107,12 +104,11 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
       );
 
       const option = buildOption(positiveId(item.id), [item.name, code, readableCode]);
-      return option ? { ...option, kind: text(item.kind), academicYearId: positiveId(item.academicYearId) } : null;
+      return option ? { ...option, kind: text(item.kind) } : null;
     }),
   );
-  const yearOptions = uniqueOptions(years.map(item => buildOption(positiveId(item.id), [item.yearCode])));
 
-  if (!programs.length || !cohortOptions.length || !periodOptions.length || !yearOptions.length) {
+  if (!programs.length || !cohortOptions.length || !periodOptions.length) {
     throw new Error(
       "Thiếu danh mục chương trình, khóa hoặc kỳ học từ Backend. " +
         "Đặc biệt, danh sách CTĐT phải trả về programId hoặc program.id; " +
@@ -121,7 +117,6 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
   }
 
   return {
-    years: yearOptions,
     programs,
     cohorts: cohortOptions,
     periods: periodOptions,

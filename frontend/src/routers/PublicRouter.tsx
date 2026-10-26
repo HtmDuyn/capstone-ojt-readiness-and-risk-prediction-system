@@ -12,12 +12,9 @@ import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import LoginPage from "@/pages/auth/LoginPage";
 
 import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
-import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
 import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
-import EducationStudentImport from "@/pages/education/EducationStudentImport";
-import EducationStudentDetail from "@/pages/education/EducationStudentDetail";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
 import EducationSupportClassDemand from "@/pages/education/EducationSupportClassDemand";
@@ -333,16 +330,16 @@ export const router = createBrowserRouter([
 
           {
             path: "/education/student-import",
-            element: <EducationStudentImport />,
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentImport")).default }),
           },
           {
             path: "/education/student-import/students/:studentId",
-            element: <EducationStudentDetail />,
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentDetail")).default }),
           },
 
           {
             path: "/education/curriculum-plan",
-            element: <EducationCurriculumPlan />,
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationCurriculumPlan")).default }),
           },
 
           {

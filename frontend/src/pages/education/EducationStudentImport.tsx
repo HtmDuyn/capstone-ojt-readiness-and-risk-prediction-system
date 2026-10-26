@@ -1,31 +1,16 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { ImportedStudents } from '@/components/education/ImportedStudents';
 import { loadAcademicCatalogs } from '@/services/educationCatalog.service';
-import { importService } from '@/services/import.service';
+import { importService, type ImportedEligibilitySummary } from '@/services/import.service';
 import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
 import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
 import React from "react";
 import { FileSpreadsheet, Download, RefreshCw, CheckCircle2, AlertCircle, UploadCloud } from 'lucide-react';
-const latestYearId = (catalogs: AcademicCatalogs) => {
-  const years = [...catalogs.years].sort((a, b) => {
-    const aYear = Number(a.label.match(/^\d{4}/)?.[0] ?? 0);
-    const bYear = Number(b.label.match(/^\d{4}/)?.[0] ?? 0);
-    return aYear - bYear || a.label.localeCompare(b.label, 'vi') || a.id - b.id;
-  });
-  return String(years[years.length - 1]?.id ?? '');
-};
-const latestPeriodId = (catalogs: AcademicCatalogs, yearId: string) => {
-  const order = { SPRING: 0, SUMMER: 1, FALL: 2 };
-  const rank = (aliases: string[]) => {
-    const match = aliases.map(alias => alias.match(/\b(SPRING|SUMMER|FALL)\s*(\d{4})\b/i)).find(Boolean);
-    return match ? Number(match[2]) * 3 + order[match[1].toUpperCase() as keyof typeof order] : -1;
-  };
-  const periods = catalogs.periods.filter(period => String(period.academicYearId) === yearId && period.kind === 'SEMESTER')
-    .sort((a, b) => rank(a.aliases) - rank(b.aliases) || a.id - b.id);
-  return String(periods[periods.length - 1]?.id ?? '');
-};
 const EducationStudentImport: React.FC = () => {
   const [savedRevision, setSavedRevision] = React.useState(0);
+  const [eligibility, setEligibility] = React.useState<{status:'idle'|'running'|'done'|'error';summary?:ImportedEligibilitySummary;message?:string}>({status:'idle'});
+  const eligibilityRun = React.useRef(0);
+  React.useEffect(()=>()=>{eligibilityRun.current++;},[]);
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
     [rows, setRows] = React.useState<StudentImportRow[]>([]);
   const [preview, setPreview] = React.useState<ImportPreviewResponse | null>(
@@ -38,14 +23,10 @@ const EducationStudentImport: React.FC = () => {
     [search, setSearch] = React.useState(""),
     [selected, setSelected] = React.useState<StudentImportRow | null>(null);
   const [skipped, setSkipped] = React.useState<Set<string>>(new Set());
-  const [yearId, setYearId] = React.useState('');
-  const [periodId, setPeriodId] = React.useState('');
   const [reviewFilter, setReviewFilter] = React.useState<'all' | 'valid' | 'error' | 'skipped'>('all');
   const [reviewErrors, setReviewErrors] = React.useState<Record<string, string[]>>({});
   const [previewSignature, setPreviewSignature] = React.useState('');
-  const selectionInitialized = React.useRef(false);
-  const key = React.useRef(""),
-    [catalogRefresh, setCatalogRefresh] = React.useState(0);
+  const [catalogRefresh, setCatalogRefresh] = React.useState(0);
   React.useEffect(() => {
     let active = true;
     setCatalogs(null);
@@ -61,44 +42,25 @@ const EducationStudentImport: React.FC = () => {
       active = false;
     };
   }, [catalogRefresh]);
-  React.useEffect(() => {
-    if (!catalogs || selectionInitialized.current) return;
-    selectionInitialized.current = true;
-    const newestYear = latestYearId(catalogs);
-    setYearId(newestYear);
-    setPeriodId(latestPeriodId(catalogs, newestYear));
-  }, [catalogs]);
   const keptRows = rows.filter(row => !skipped.has(row.code));
-  const selectedPeriod = catalogs?.periods.find(period => String(period.id) === periodId && String(period.academicYearId) === yearId);
-  const periodErrors = (row: StudentImportRow): string[] => {
-    if (!selectedPeriod) return [];
-    const errors: string[] = [];
-    if (row.academic.placement.currentAcademicPeriodId !== selectedPeriod.id) errors.push('Kỳ hiện tại của sinh viên khác kỳ đã chọn.');
-    if (row.academic.courseResults.some(result => result.academicPeriodId !== selectedPeriod.id)) errors.push('Có kết quả học tập thuộc kỳ khác kỳ đã chọn.');
-    return errors;
-  };
-  const rowErrors = (row: StudentImportRow) => [...periodErrors(row), ...(reviewErrors[row.code] ?? [])];
+  const rowErrors = (row: StudentImportRow) => reviewErrors[row.code] ?? [];
   const gradeCount = keptRows.reduce(
     (n, row) => n + row.academic.courseResults.length,
     0,
   );
   const canCommit =
-    preview?.preview === true &&
+    preview?.preview === true && !!preview.importId &&
     previewSignature === keptRows.map(row => row.code).join('|') &&
     keptRows.length > 0 &&
     preview.total === keptRows.length &&
     preview.created + preview.updated === keptRows.length &&
     !preview.rows?.some((row) => row.errors?.length) &&
-    !!selectedPeriod &&
     !keptRows.some(row => rowErrors(row).length) &&
     !result;
-  const payload = () => ({
-    kind: "STUDENT" as const,
-    idempotencyKey: key.current,
-    rows: keptRows,
-  });
   async function readFile(file: File) {
-    if (!catalogs || !selectedPeriod) return;
+    if (!catalogs) return;
+    eligibilityRun.current++;
+    setEligibility({status:'idle'});
     setBusy("read");
     setRows([]);
     setPreview(null);
@@ -116,7 +78,6 @@ const EducationStudentImport: React.FC = () => {
       if (file.size > 8 * 1024 * 1024)
         throw new Error("Tệp Excel không được vượt quá 8 MB.");
       const parsed = await parseStudentImportWorkbook(file, catalogs);
-      key.current = crypto.randomUUID();
       setRows(parsed);
       setFileName(file.name);
     } catch (e) {
@@ -126,13 +87,17 @@ const EducationStudentImport: React.FC = () => {
     }
   }
   async function check() {
-    if (!keptRows.length || !selectedPeriod || keptRows.some(row => periodErrors(row).length)) return;
+    if (!keptRows.length) return;
     setBusy("preview");
     setError("");
     setPreview(null);
     setPreviewSignature('');
     try {
-      const response = await importService.previewStudentImport(payload());
+      const response = await importService.previewStudentImport({
+        kind: 'STUDENT',
+        idempotencyKey: crypto.randomUUID(),
+        rows: keptRows,
+      });
       setPreview(response);
       setReviewErrors(Object.fromEntries(keptRows.map((row, index) => [row.code, response.rows?.[index]?.errors ?? []])));
       if (
@@ -155,6 +120,21 @@ const EducationStudentImport: React.FC = () => {
       setBusy("");
     }
   }
+  async function checkImportedEligibility(imported: ImportCommitResponse) {
+    const run=++eligibilityRun.current;
+    setEligibility({status:'running'});
+    try {
+      const summary=await importService.calculateImportedEligibility(imported);
+      if(run!==eligibilityRun.current)return;
+      setEligibility({status:'done',summary});
+      setSavedRevision(value=>value+1);
+    } catch(e) {
+      if(run===eligibilityRun.current){
+        setEligibility({status:'error',message:e instanceof Error?e.message:'Chưa xét được điều kiện OJT.'});
+        setSavedRevision(value=>value+1);
+      }
+    }
+  }
   async function commit() {
     if (!canCommit || busy) return;
     if (
@@ -166,10 +146,12 @@ const EducationStudentImport: React.FC = () => {
     setBusy("commit");
     setError("");
     try {
-      setResult(await importService.commitStudentImport(payload()));
+      const imported=await importService.commitStudentImport(preview!.importId!);
+      setResult(imported);
       setPreview(null);
       setRows([]); setSelected(null); setSearch(''); setSkipped(new Set()); setReviewErrors({}); setPreviewSignature('');
       setSavedRevision(value => value + 1);
+      void checkImportedEligibility(imported);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không lưu được dữ liệu.");
     } finally {
@@ -181,7 +163,8 @@ const EducationStudentImport: React.FC = () => {
       .toLowerCase()
       .includes(search.toLowerCase()),
   ).filter(row => reviewFilter === 'all' || (reviewFilter === 'skipped' ? skipped.has(row.code) : reviewFilter === 'error' ? !skipped.has(row.code) && !!rowErrors(row).length : !skipped.has(row.code) && !!previewSignature && !rowErrors(row).length));
-  const errorCount = rows.filter(row => !!rowErrors(row).length).length;
+  const errorRows = rows.filter(row => rowErrors(row).length > 0);
+  const errorCount = errorRows.length;
   const validCount = previewSignature ? keptRows.filter(row => !rowErrors(row).length).length : 0;
   const selectedErrorCount = keptRows.filter(row => !!rowErrors(row).length).length;
   const toggleSkip = (code: string) => {
@@ -194,38 +177,26 @@ const EducationStudentImport: React.FC = () => {
     <div className="space-y-6 pb-8">
       <PageBanner
         title="Import sinh viên và bảng điểm"
-        description="Một tệp nhập thông tin sinh viên, trạng thái học vụ, chương trình, khóa/nhóm, kỳ bắt đầu chuyên ngành, kỳ hiện tại và bảng điểm."
+        description="Tải mẫu trống, điền hồ sơ sinh viên và bảng điểm rồi kiểm tra trước khi lưu."
         badge="Phòng Đào tạo"
       />
       <section className="space-y-6 rounded-2xl border border-slate-300 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex items-start gap-4">
           <div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><FileSpreadsheet size={24} /></div>
-          <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600"></p></div>
+          <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600">Tạo mới hoặc cập nhật theo email; tài khoản đã có giữ nguyên mật khẩu. Bảng điểm có thể chứa lịch sử các học kỳ trước.</p></div>
         </div>
-        <div className="grid gap-4 rounded-2xl border border-slate-300 p-5 md:grid-cols-2">
-          <label className="text-sm font-semibold text-slate-700">Năm học
-            <select aria-label="Chọn năm học cho đợt import" value={yearId} disabled={!!busy || !!rows.length} onChange={e => { const nextYear = e.target.value; setYearId(nextYear); setPeriodId(catalogs && nextYear ? latestPeriodId(catalogs, nextYear) : ''); }} className="mt-2 w-full rounded-xl border border-slate-400 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
-              <option value="">Chọn năm học</option>{catalogs?.years.map(year => <option key={year.id} value={year.id}>{year.label}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-semibold text-slate-700">Kỳ học
-            <select aria-label="Chọn kỳ học cho đợt import" value={periodId} disabled={!!busy || !!rows.length || !yearId} onChange={e => setPeriodId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-400 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
-              <option value="">Chọn kỳ học</option>{catalogs?.periods.filter(period => String(period.academicYearId) === yearId && period.kind === 'SEMESTER').map(period => <option key={period.id} value={period.id}>{period.label}</option>)}
-            </select>
-          </label>
-          <p className="text-sm text-slate-500 md:col-span-2"></p>
-        </div>
+        <p className="text-sm text-slate-600">Mẫu Excel trống gồm hai sheet: Danh sách sinh viên và Kết quả học tập. Nhập đủ chương trình, khóa, nhóm và học kỳ hiện tại; mỗi dòng điểm dùng đúng học kỳ đã học. Để trống điểm cho môn đang học.</p>
         <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-orange-400 bg-orange-50/40 p-5 sm:p-6">
           <div className="flex items-start gap-3"><UploadCloud className="mt-0.5 shrink-0 text-orange-600" size={22} /><div><p className="font-semibold text-slate-900">Chọn tệp Excel để bắt đầu</p><p className="mt-1 text-sm text-slate-500">Định dạng .xlsx hoặc .xls, tối đa 8 MB. Dữ liệu sẽ được kiểm tra trước khi lưu.</p></div></div>
           <div className="flex flex-wrap items-center gap-3">
-          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !selectedPeriod ? 'cursor-not-allowed opacity-50' : ''}`}>
+          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
             <FileSpreadsheet size={18} /> Chọn tệp Excel
             <input
               aria-label="Tệp sinh viên và bảng điểm"
               className="sr-only"
               type="file"
               accept=".xlsx,.xls"
-              disabled={!!busy || !selectedPeriod}
+              disabled={!!busy || !catalogs}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
@@ -240,9 +211,12 @@ const EducationStudentImport: React.FC = () => {
           <button
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
             disabled={!!busy}
-            onClick={() => downloadStudentImportTemplate(catalogs)}
+            onClick={() => {
+              try { downloadStudentImportTemplate(); }
+              catch(e) { setError(e instanceof Error?e.message:'Không tải được mẫu Excel.'); }
+            }}
           >
-            <Download size={16} /> Tải mẫu Excel đầy đủ
+            <Download size={16} /> Tải mẫu Excel trống
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
@@ -252,7 +226,16 @@ const EducationStudentImport: React.FC = () => {
             <RefreshCw size={16} /> Tải lại danh mục
           </button>
         </div>
-        {!catalogs && <p className="text-sm text-slate-500">Đang chờ danh mục chương trình, khóa và kỳ học.</p>}
+        {catalogs && <details className="rounded-xl border border-slate-200 p-4 text-sm">
+          <summary className="cursor-pointer font-semibold text-slate-800">Tra cứu mã chương trình, khóa/nhóm và học kỳ để điền file</summary>
+          <p className="mt-3 text-sm text-slate-600">Chọn khung chương trình áp dụng cho mã khóa của sinh viên. Ví dụ K21 có thể dùng khung K21A, K21B, K21C hoặc K21D; nhóm nhập học A/B/C/D được chọn riêng theo lộ trình đã cấu hình, không phải khớp chữ cái trong mã khung.</p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <div><h3 className="font-semibold">Chương trình đào tạo</h3><ul className="mt-2 max-h-64 space-y-2 overflow-auto text-slate-600">{catalogs.programs.map(item=><li key={item.id} className="break-words">{item.id} — {item.aliases.join(' / ')}</li>)}</ul></div>
+            <div><h3 className="font-semibold">Khóa / nhóm</h3><ul className="mt-2 max-h-64 space-y-3 overflow-auto text-slate-600">{catalogs.cohorts.map(item=><li key={item.id}><p>{item.id} — {item.aliases.join(' / ')}</p><p className="mt-1 text-xs">{item.groups?.length?item.groups.map(group=>`Nhóm ${group.groupCode}: bắt đầu ${catalogs.periods.find(period=>period.id===group.entryAcademicPeriodId)?.label??group.entryAcademicPeriodId}`).join('; '):'Chưa cấu hình nhóm nhập học.'}</p></li>)}</ul></div>
+            <div><h3 className="font-semibold">Học kỳ</h3><ul className="mt-2 max-h-64 space-y-2 overflow-auto text-slate-600">{catalogs.periods.map(item=><li key={item.id}>{item.id} — {item.aliases.join(' / ')}</li>)}</ul></div>
+          </div>
+        </details>}
+        {!catalogs && <p className="text-sm text-slate-500">Bạn có thể tải mẫu trống ngay. Cần tải danh mục chương trình, khóa và học kỳ để kiểm tra file khi import.</p>}
         {busy && (
           <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
             {busy === "read"
@@ -271,7 +254,7 @@ const EducationStudentImport: React.FC = () => {
           <>
             <div className="border-t border-slate-100 pt-6">
               <h2 className="text-xl font-bold text-slate-900">Xem trước dữ liệu Import</h2>
-              <p className="mt-1 text-sm text-slate-500">Kiểm tra danh sách từ {fileName} cho kỳ {selectedPeriod?.label}. Sinh viên bị bỏ qua cùng toàn bộ kết quả học tập của họ sẽ không được gửi để lưu.</p>
+              <p className="mt-1 text-sm text-slate-500">Kiểm tra danh sách từ {fileName}. Sinh viên bị bỏ qua cùng toàn bộ kết quả học tập của họ sẽ không được gửi để lưu.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {[
@@ -293,7 +276,7 @@ const EducationStudentImport: React.FC = () => {
             <select aria-label="Lọc dữ liệu xem trước" value={reviewFilter} onChange={e => setReviewFilter(e.target.value as typeof reviewFilter)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
               <option value="all">Tất cả</option><option value="valid">Hợp lệ</option><option value="error">Có lỗi</option><option value="skipped">Bị bỏ qua</option>
             </select>
-            <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="accent-orange-600" checked={errorCount > 0 && rows.filter(row => rowErrors(row).length).every(row => skipped.has(row.code))} disabled={!errorCount || !!busy} onChange={e => { const next = new Set(skipped); rows.filter(row => rowErrors(row).length).forEach(row => e.target.checked ? next.add(row.code) : next.delete(row.code)); setSkipped(next); setPreview(null); setPreviewSignature(''); setError(''); }} />Bỏ qua tất cả dòng lỗi</label>
+            <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="accent-orange-600" checked={errorCount > 0 && errorRows.every(row => skipped.has(row.code))} disabled={!errorCount || !!busy} onChange={e => { const next = new Set(skipped); errorRows.forEach(row => e.target.checked ? next.add(row.code) : next.delete(row.code)); setSkipped(next); setPreview(null); setPreviewSignature(''); setError(''); }} />Bỏ qua tất cả dòng lỗi</label>
             </div>
             <div className="overflow-auto rounded-xl border border-slate-200">
               <table className="w-full min-w-[1050px] text-left text-sm">
@@ -356,7 +339,7 @@ const EducationStudentImport: React.FC = () => {
               <button className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" disabled={!!busy} onClick={() => { setRows([]); setPreview(null); setPreviewSignature(''); setSkipped(new Set()); setReviewErrors({}); setFileName(''); setError(''); setSelected(null); }}>Quay lại chọn file</button>
               <button
                 className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                disabled={!!busy || !!result || !keptRows.length || keptRows.some(row => periodErrors(row).length)}
+                disabled={!!busy || !!result || !keptRows.length}
                 onClick={() => void check()}
               >
                 {previewSignature ? 'Kiểm tra lại dữ liệu' : 'Kiểm tra dữ liệu'}
@@ -385,6 +368,9 @@ const EducationStudentImport: React.FC = () => {
             {result.replayed ? " (yêu cầu đã được xử lý trước đó)" : ""}.
           </p>
         )}
+        {eligibility.status==='running' && <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">Import đã hoàn tất. Đang xét điều kiện OJT ở chế độ nền: tối thiểu 70 tín chỉ, tối đa 2 môn nợ...</p>}
+        {eligibility.status==='done' && eligibility.summary && <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">Đã xét {eligibility.summary.total} sinh viên: {eligibility.summary.eligible} đủ điều kiện, {eligibility.summary.notEligible} chưa đủ, {eligibility.summary.reviewRequired} cần đối soát.{eligibility.summary.skipped>0 && ` Chưa xét ${eligibility.summary.skipped} sinh viên do tài khoản/học vụ không hoạt động hoặc chưa có học kỳ OJT trong lộ trình.`}</p>}
+        {eligibility.status==='error' && result && <div role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900"><p>Import đã lưu thành công; xét điều kiện OJT chưa hoàn tất: {eligibility.message}</p><button className="mt-2 font-semibold underline" onClick={()=>void checkImportedEligibility(result)}>Thử xét lại điều kiện OJT</button></div>}
       </section>
       <ImportedStudents revision={savedRevision} catalogs={catalogs} />
       {selected && (

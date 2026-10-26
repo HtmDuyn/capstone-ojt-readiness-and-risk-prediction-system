@@ -1876,11 +1876,7 @@ export const CurriculumImportActions:
             }
           } else {
             groups =
-              rows.map(
-                (
-                  row,
-                  index,
-                ) => {
+              rows.map((row) => {
                   const rowNumber =
                     choiceGroupRows.indexOf(
                       row,

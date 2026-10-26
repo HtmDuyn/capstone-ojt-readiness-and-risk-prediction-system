@@ -52,6 +52,7 @@ export interface ImportPreviewRow {
 }
 
 export interface ImportPreviewResponse {
+  importId?: number;
   success: boolean;
   created: number;
   updated: number;
@@ -68,6 +69,8 @@ export interface ImportCommitResponse {
   batchId?: string;
   academicImportId?: string;
   replayed?: boolean;
+  eligibilityTargets?: { ojtSemesterId: number; studentIds: number[] }[];
+  eligibilitySkipped?: number;
 }
 
 export interface CatalogOption {
@@ -75,11 +78,10 @@ export interface CatalogOption {
   label: string;
   aliases: string[];
   kind?: string;
-  academicYearId?: number;
+  groups?: { groupCode: string; entryAcademicPeriodId: number; curriculumPeriods: { semester: number; academicPeriodId: number }[] }[];
 }
 
 export interface AcademicCatalogs {
-  years: CatalogOption[];
   programs: CatalogOption[];
   cohorts: CatalogOption[];
   periods: CatalogOption[];
@@ -102,6 +104,8 @@ export interface ImportedStudent {
   currentAcademicPeriodId: number | null;
   enrollmentYear: number | null;
   currentSemester: number | null;
+  courseSemesterTag: number | null;
+  latestOjtCheck?: {status:'ELIGIBLE'|'NOT_ELIGIBLE'|'REVIEW_REQUIRED';checkedAt:string;isStale:boolean;ojtSemesterId:number} | null;
   program: (ImportedRelation & { majorName?: string; majorCode?: string }) | null;
   cohort: ImportedRelation | null;
   entryAcademicPeriod: ImportedRelation | null;

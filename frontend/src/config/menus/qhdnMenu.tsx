@@ -1,9 +1,5 @@
-import React from 'react';
 import {
   DashboardGridIcon,
-  OjtRegisterIcon,
-  RoadmapConsultingIcon,
-  EvaluationResultsIcon,
 } from '@/components/common/icons/AppIcons';
 import { Building2, Handshake, BarChart3, MailCheck } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';

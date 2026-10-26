@@ -154,7 +154,7 @@ export const ojtEligibilityService = {
     apiData<{ eligibility: StudentEligibility }>(await getJson(`/students/${studentId}`, { include: "eligibility", ojtSemesterId }, signal)).eligibility,
   history: async (studentId: number, ojtSemesterId: number, page = 1, signal?: AbortSignal) =>
     apiData<{ eligibilityChecks: import("@/types/education/api.types").Page<EligibilityCheck> }>(await getJson(`/students/${studentId}`, { include: "eligibilityChecks", ojtSemesterId, checksPage: page, checksLimit: 10 }, signal)).eligibilityChecks,
-  checkBatch: async (payload: { ojtSemesterId: number; programIds?: number[]; studentIds?: number[]; idempotencyKey: string }) =>
+  checkBatch: async (payload: { ojtSemesterId: number; programIds?: number[]; studentIds?: number[]; idempotencyKey: string; confirmResults?: boolean }) =>
     apiData<EligibilityBatch>(await postJson('/api/eligibility-check-runs', payload)),
   assessment: async (semesterId: number, signal?: AbortSignal) =>
     (await getPage<AssessmentWindow>("/assessment-windows", { ojtSemesterId: semesterId, page: 1, limit: 1 }, signal)).items[0] ?? null,
