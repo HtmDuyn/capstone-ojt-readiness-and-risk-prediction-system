@@ -6,6 +6,24 @@ import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, Stu
 import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
 import React from "react";
 import { FileSpreadsheet, Download, RefreshCw, CheckCircle2, AlertCircle, UploadCloud } from 'lucide-react';
+const latestYearId = (catalogs: AcademicCatalogs) => {
+  const years = [...catalogs.years].sort((a, b) => {
+    const aYear = Number(a.label.match(/^\d{4}/)?.[0] ?? 0);
+    const bYear = Number(b.label.match(/^\d{4}/)?.[0] ?? 0);
+    return aYear - bYear || a.label.localeCompare(b.label, 'vi') || a.id - b.id;
+  });
+  return String(years[years.length - 1]?.id ?? '');
+};
+const latestPeriodId = (catalogs: AcademicCatalogs, yearId: string) => {
+  const order = { SPRING: 0, SUMMER: 1, FALL: 2 };
+  const rank = (aliases: string[]) => {
+    const match = aliases.map(alias => alias.match(/\b(SPRING|SUMMER|FALL)\s*(\d{4})\b/i)).find(Boolean);
+    return match ? Number(match[2]) * 3 + order[match[1].toUpperCase() as keyof typeof order] : -1;
+  };
+  const periods = catalogs.periods.filter(period => String(period.academicYearId) === yearId && period.kind === 'SEMESTER')
+    .sort((a, b) => rank(a.aliases) - rank(b.aliases) || a.id - b.id);
+  return String(periods[periods.length - 1]?.id ?? '');
+};
 const EducationStudentImport: React.FC = () => {
   const [savedRevision, setSavedRevision] = React.useState(0);
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
@@ -25,6 +43,7 @@ const EducationStudentImport: React.FC = () => {
   const [reviewFilter, setReviewFilter] = React.useState<'all' | 'valid' | 'error' | 'skipped'>('all');
   const [reviewErrors, setReviewErrors] = React.useState<Record<string, string[]>>({});
   const [previewSignature, setPreviewSignature] = React.useState('');
+  const selectionInitialized = React.useRef(false);
   const key = React.useRef(""),
     [catalogRefresh, setCatalogRefresh] = React.useState(0);
   React.useEffect(() => {
@@ -42,6 +61,13 @@ const EducationStudentImport: React.FC = () => {
       active = false;
     };
   }, [catalogRefresh]);
+  React.useEffect(() => {
+    if (!catalogs || selectionInitialized.current) return;
+    selectionInitialized.current = true;
+    const newestYear = latestYearId(catalogs);
+    setYearId(newestYear);
+    setPeriodId(latestPeriodId(catalogs, newestYear));
+  }, [catalogs]);
   const keptRows = rows.filter(row => !skipped.has(row.code));
   const selectedPeriod = catalogs?.periods.find(period => String(period.id) === periodId && String(period.academicYearId) === yearId);
   const periodErrors = (row: StudentImportRow): string[] => {
@@ -171,25 +197,25 @@ const EducationStudentImport: React.FC = () => {
         description="Một tệp nhập thông tin sinh viên, trạng thái học vụ, chương trình, khóa/nhóm, kỳ bắt đầu chuyên ngành, kỳ hiện tại và bảng điểm."
         badge="Phòng Đào tạo"
       />
-      <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+      <section className="space-y-6 rounded-2xl border border-slate-300 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex items-start gap-4">
           <div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><FileSpreadsheet size={24} /></div>
           <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600"></p></div>
         </div>
-        <div className="grid gap-4 rounded-2xl border border-slate-200 p-5 md:grid-cols-2">
+        <div className="grid gap-4 rounded-2xl border border-slate-300 p-5 md:grid-cols-2">
           <label className="text-sm font-semibold text-slate-700">Năm học
-            <select aria-label="Chọn năm học cho đợt import" value={yearId} disabled={!!busy || !!rows.length} onChange={e => { setYearId(e.target.value); setPeriodId(''); }} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+            <select aria-label="Chọn năm học cho đợt import" value={yearId} disabled={!!busy || !!rows.length} onChange={e => { const nextYear = e.target.value; setYearId(nextYear); setPeriodId(catalogs && nextYear ? latestPeriodId(catalogs, nextYear) : ''); }} className="mt-2 w-full rounded-xl border border-slate-400 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
               <option value="">Chọn năm học</option>{catalogs?.years.map(year => <option key={year.id} value={year.id}>{year.label}</option>)}
             </select>
           </label>
           <label className="text-sm font-semibold text-slate-700">Kỳ học
-            <select aria-label="Chọn kỳ học cho đợt import" value={periodId} disabled={!!busy || !!rows.length || !yearId} onChange={e => setPeriodId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+            <select aria-label="Chọn kỳ học cho đợt import" value={periodId} disabled={!!busy || !!rows.length || !yearId} onChange={e => setPeriodId(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-400 bg-white px-4 py-3 font-normal outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
               <option value="">Chọn kỳ học</option>{catalogs?.periods.filter(period => String(period.academicYearId) === yearId && period.kind === 'SEMESTER').map(period => <option key={period.id} value={period.id}>{period.label}</option>)}
             </select>
           </label>
-          <p className="text-sm text-slate-500 md:col-span-2">Mỗi đợt chỉ nhận sinh viên và kết quả học tập của kỳ đã chọn. Nếu cần đổi kỳ, quay lại bước chọn tệp.</p>
+          <p className="text-sm text-slate-500 md:col-span-2"></p>
         </div>
-        <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-orange-300 bg-orange-50/40 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-orange-400 bg-orange-50/40 p-5 sm:p-6">
           <div className="flex items-start gap-3"><UploadCloud className="mt-0.5 shrink-0 text-orange-600" size={22} /><div><p className="font-semibold text-slate-900">Chọn tệp Excel để bắt đầu</p><p className="mt-1 text-sm text-slate-500">Định dạng .xlsx hoặc .xls, tối đa 8 MB. Dữ liệu sẽ được kiểm tra trước khi lưu.</p></div></div>
           <div className="flex flex-wrap items-center gap-3">
           <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !selectedPeriod ? 'cursor-not-allowed opacity-50' : ''}`}>
@@ -254,7 +280,7 @@ const EducationStudentImport: React.FC = () => {
                 ['Có lỗi', errorCount],
                 ['Được chọn Import', keptRows.length],
                 ['Bị bỏ qua', skipped.size],
-              ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}
+              ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-300 bg-slate-50 p-4"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}
             </div>
             <div className="flex flex-wrap items-center gap-3">
             <input
@@ -317,7 +343,7 @@ const EducationStudentImport: React.FC = () => {
                           className="font-medium text-orange-700 hover:underline"
                           onClick={() => setSelected(row)}
                         >
-                          Xem hồ sơ và bảng điểm
+                          Xem dữ liệu trong tệp
                         </button>
                       </td>
                     </tr>
@@ -362,7 +388,7 @@ const EducationStudentImport: React.FC = () => {
       </section>
       <ImportedStudents revision={savedRevision} catalogs={catalogs} />
       {selected && (
-        <section className="space-y-3 rounded-2xl bg-white p-6 shadow-sm">
+        <section className="space-y-3 rounded-2xl border border-slate-300 bg-white p-6 shadow-sm">
           <button className="float-right" onClick={() => setSelected(null)}>
             Đóng
           </button>

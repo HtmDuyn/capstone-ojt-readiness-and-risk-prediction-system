@@ -17,6 +17,7 @@ import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
 import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
 import EducationStudentImport from "@/pages/education/EducationStudentImport";
+import EducationStudentDetail from "@/pages/education/EducationStudentDetail";
 import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
 import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
 import EducationSupportClassDemand from "@/pages/education/EducationSupportClassDemand";
@@ -333,6 +334,10 @@ export const router = createBrowserRouter([
           {
             path: "/education/student-import",
             element: <EducationStudentImport />,
+          },
+          {
+            path: "/education/student-import/students/:studentId",
+            element: <EducationStudentDetail />,
           },
 
           {

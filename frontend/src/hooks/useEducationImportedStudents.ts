@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { importService } from '@/services/import.service';
 import type { Page } from '@/types/education/api.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult, StudentImportBatch } from '@/types/education/import.types';
@@ -6,15 +6,22 @@ import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, S
 const emptyFilters = (): ImportedStudentFilters => ({ search: '', programId: '', cohortId: '', status: '', importBatchId: '' });
 const message = (e: unknown) => e instanceof Error ? e.message : 'Không tải được dữ liệu đã lưu.';
 export function useEducationImportedStudents(revision: number) {
-  const [filters, setFilters] = useState(emptyFilters);
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<ImportedStudentFilters>(() => {
+    const query = new URLSearchParams(window.location.search);
+    return { search: query.get('search') ?? '', programId: query.get('programId') ?? '', cohortId: query.get('cohortId') ?? '', status: query.get('status') ?? '', importBatchId: query.get('importBatchId') ?? '' };
+  });
+  const [page, setPage] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('page'));
+    return Number.isSafeInteger(value) && value > 0 ? value : 1;
+  });
+  const previousRevision = useRef(revision);
   const [data, setData] = useState<Page<ImportedStudent> | null>(null);
   const [batches, setBatches] = useState<StudentImportBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [batchError, setBatchError] = useState('');
   const [refresh, setRefresh] = useState(0);
-  useEffect(() => { setFilters(emptyFilters()); setPage(1); }, [revision]);
+  useEffect(() => { if (previousRevision.current !== revision) { previousRevision.current = revision; setFilters(emptyFilters()); setPage(1); } }, [revision]);
   useEffect(() => {
     const c = new AbortController();
     setLoading(true); setError(''); setData(null);
