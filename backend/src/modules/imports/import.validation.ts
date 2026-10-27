@@ -3,7 +3,7 @@ export const fail = (message: string, statusCode = 400, errorCode = 'INVALID_IMP
 
 export interface PositionInput { code: string; title: string; description: string; requirements: string; capacity: number }
 export interface ImportRow { code: string; email: string; fullName: string; name?: string; address?: string; positions?: PositionInput[]; academic?: Record<string, any> }
-export interface ImportInput { kind: 'STUDENT' | 'ENTERPRISE'; idempotencyKey: string; windowId?: number; semesterId?: number; rows: ImportRow[] }
+export interface ImportInput { kind: 'STUDENT' | 'ENTERPRISE'; idempotencyKey: string; semesterId?: number; windowId?: number; rows: ImportRow[] }
 
 const text = (v: unknown, label: string, max: number) => {
   if (typeof v !== 'string' || !v.trim() || v.trim().length > max) throw fail(`${label} is required (maximum ${max} characters).`);
@@ -15,9 +15,8 @@ export function validateImport(body: unknown): ImportInput {
   if (b.kind !== 'STUDENT' && b.kind !== 'ENTERPRISE') throw fail('kind must be STUDENT or ENTERPRISE.');
   const idempotencyKey = text(b.idempotencyKey, 'idempotencyKey', 100);
   if (!Array.isArray(b.rows) || b.rows.length < 1 || b.rows.length > 500) throw fail('Import between 1 and 500 rows per batch.');
-  if (b.kind === 'ENTERPRISE' && b.semesterId !== undefined) throw fail('Use windowId of the academic recruitment intake, not semesterId.');
-  const windowId = b.kind === 'ENTERPRISE' ? Number(b.windowId) : undefined;
-  if (b.kind === 'ENTERPRISE' && (!Number.isSafeInteger(windowId) || windowId! <= 0 || windowId! > 2147483647)) throw fail('A valid recruitment windowId is required.');
+  const semesterId = b.kind === 'ENTERPRISE' ? Number(b.semesterId) : undefined;
+  if (b.kind === 'ENTERPRISE' && (!Number.isSafeInteger(semesterId) || semesterId! <= 0)) throw fail('semesterId is required.');
   const codes = new Set<string>(), emails = new Set<string>();
   const rows = b.rows.map((raw, index) => {
     try {
@@ -51,5 +50,5 @@ export function validateImport(body: unknown): ImportInput {
       return row;
     } catch (error) { throw fail(`Row ${index + 1}: ${(error as Error).message}`); }
   });
-  return { kind: b.kind, idempotencyKey, windowId, rows };
+  return { kind: b.kind, idempotencyKey, semesterId, rows };
 }
