@@ -193,29 +193,3 @@ export const accountTransaction = async <T>(work: (client: PoolClient) => Promis
   catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 };
-
-export const updateOwnProfile = async (
-  userId: number,
-  fullName: string,
-  phone: string | null,
-): Promise<void> => {
-  await query(
-    `
-      UPDATE "Users"
-
-      SET
-        "FullName" = $2,
-        "Phone" = $3,
-        "UpdatedAt" =
-          CURRENT_TIMESTAMP
-
-      WHERE
-        "UserID" = $1;
-    `,
-    [
-      userId,
-      fullName,
-      phone,
-    ],
-  );
-};

@@ -14,6 +14,7 @@ export function score(value: unknown, max: number, name: string) {
 export function resultValues(body: Record<string, unknown>) {
   const status = enumValue(body.status, resultStatuses, 'status');
   const value = { status, score: score(body.score,10,'score'), gradePoints: score(body.gradePoints,4,'gradePoints'), grade: optionalText(body.grade,'grade',2), sourceReference: optionalText(body.sourceReference,'sourceReference',200) };
+  if (status === 'IN_PROGRESS' && (value.score !== null || value.gradePoints !== null || value.grade !== null)) throw academicError('In-progress courses must not have grades.');
   if (status === 'RECOGNIZED' && (value.score !== null || value.gradePoints !== null)) throw academicError('Recognized courses earn credit but must not have GPA scores.');
   return value;
 }

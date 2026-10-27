@@ -18,12 +18,14 @@ async function batchSummary(c:import('pg').PoolClient,runId:number,semesterId:nu
  return {runId,ojtSemesterId:semesterId,status:'COMPLETED',total:items.length,eligible:items.filter(item=>item.status==='ELIGIBLE').length,notEligible:items.filter(item=>item.status==='NOT_ELIGIBLE').length,reviewRequired:items.filter(item=>item.status==='REVIEW_REQUIRED').length,items,replayed};
 }
 export async function checkBatch(body:unknown,actorId:number) {
- const b=inputObject(body,['ojtSemesterId','programIds','cohortIds','studentIds','groupCodes','idempotencyKey']);
+ const b=inputObject(body,['ojtSemesterId','programIds','cohortIds','studentIds','groupCodes','idempotencyKey','confirmResults']);
+ if(b.confirmResults!==undefined&&typeof b.confirmResults!=='boolean')throw invalid('confirmResults must be a boolean.');
+ const confirmResults=b.confirmResults??true;
  const semesterId=positiveId(b.ojtSemesterId,'ojtSemesterId'),key=b.idempotencyKey===undefined?randomUUID():requiredText(b.idempotencyKey,'idempotencyKey',100);
  const programIds=ids(b.programIds,'programIds'),cohortIds=ids(b.cohortIds,'cohortIds'),studentIds=ids(b.studentIds,'studentIds');
  if(!programIds&&!cohortIds&&!studentIds)throw invalid('Provide programIds, cohortIds or studentIds to delimit the batch.');
  let groupCodes:string[]|null=null;if(b.groupCodes!==undefined){if(!Array.isArray(b.groupCodes)||!b.groupCodes.length||b.groupCodes.some(v=>!['A','B','C','D'].includes(v as string))||new Set(b.groupCodes).size!==b.groupCodes.length)throw invalid('groupCodes must contain distinct A, B, C or D.');groupCodes=(b.groupCodes as string[]).sort();}
- const scope={ojtSemesterId:semesterId,programIds,cohortIds,studentIds,groupCodes},hash=fingerprint(scope);
+ const scope={ojtSemesterId:semesterId,programIds,cohortIds,studentIds,groupCodes,...(confirmResults?{}:{confirmResults:false})},hash=fingerprint(scope);
  return academicTransaction(async c=>{
  const existing=(await c.query('SELECT * FROM "EligibilityCheckRuns" WHERE "IdempotencyKey"=$1',[key])).rows[0];if(existing){if(existing.CreatedBy!==actorId||existing.RequestHash!==hash)throw invalid('Idempotency key belongs to a different request.',409,'IDEMPOTENCY_CONFLICT');if(existing.Status!=='COMPLETED')throw invalid('This key belongs to an unfinished legacy batch; use a new key.',409,'LEGACY_ELIGIBILITY_RUN');return batchSummary(c,existing.RunID,semesterId,true);}
  if(!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[semesterId])).rowCount)throw invalid('OJT semester not found.',404);
@@ -36,7 +38,7 @@ export async function checkBatch(body:unknown,actorId:number) {
  await c.query(`INSERT INTO "EligibilityRunStudents" ("RunID","StudentID","ProgramID","RuleSetID") SELECT $1,s."StudentID",s."ProgramID",rule."RuleSetID" FROM "Students" s LEFT JOIN LATERAL (SELECT a."RuleSetID" FROM "OJTActiveRuleSets" a WHERE a."ProgramID"=s."ProgramID" AND a."ScopeSemesterID" IN (0,$3) ORDER BY a."ScopeSemesterID" DESC LIMIT 1) rule ON true WHERE s."StudentID"=ANY($2::int[]) ORDER BY s."StudentID"`,[run.RunID,students.map(s=>s.StudentID),semesterId]);
  for(const student of students){
   const check=await performEligibilityCheck(c,student.StudentID,semesterId,actorId,'BATCH',run.RunID);
-  if(check.status!=='REVIEW_REQUIRED')await confirmEligibilityWithClient(c,check.checkId,actorId,'Xét điều kiện OJT hàng loạt: tối thiểu 70 tín chỉ, tối đa 2 môn còn nợ.');
+  if(confirmResults&&check.status!=='REVIEW_REQUIRED')await confirmEligibilityWithClient(c,check.checkId,actorId,'Xét điều kiện OJT hàng loạt: tối thiểu 70 tín chỉ, tối đa 2 môn còn nợ.');
   await c.query('UPDATE "EligibilityRunStudents" SET "Status"=\'COMPLETED\',"CheckID"=$3 WHERE "RunID"=$1 AND "StudentID"=$2',[run.RunID,student.StudentID,check.checkId]);
  }
  await c.query('UPDATE "EligibilityCheckRuns" SET "Status"=\'COMPLETED\',"CompletedAt"=now() WHERE "RunID"=$1',[run.RunID]);

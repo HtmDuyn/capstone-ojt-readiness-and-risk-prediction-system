@@ -2,8 +2,8 @@ export const fail = (message: string, statusCode = 400, errorCode = 'INVALID_IMP
   Object.assign(new Error(message), { statusCode, errorCode });
 
 export interface PositionInput { code: string; title: string; description: string; requirements: string; capacity: number }
-export interface ImportRow { code: string; email: string; fullName: string; name?: string; address?: string; positions?: PositionInput[] }
-export interface ImportInput { kind: 'STUDENT' | 'ENTERPRISE'; idempotencyKey: string; semesterId?: number; rows: ImportRow[] }
+export interface ImportRow { code: string; email: string; fullName: string; name?: string; address?: string; positions?: PositionInput[]; academic?: Record<string, any> }
+export interface ImportInput { kind: 'STUDENT' | 'ENTERPRISE'; idempotencyKey: string; semesterId?: number; windowId?: number; rows: ImportRow[] }
 
 const text = (v: unknown, label: string, max: number) => {
   if (typeof v !== 'string' || !v.trim() || v.trim().length > max) throw fail(`${label} is required (maximum ${max} characters).`);
@@ -29,6 +29,10 @@ export function validateImport(body: unknown): ImportInput {
       if (codes.has(code) || emails.has(email)) throw fail('Duplicate code or email within the file.');
       codes.add(code); emails.add(email);
       const row: ImportRow = { code, email, fullName: text(r.fullName, 'fullName', 150) };
+      if (b.kind === 'STUDENT') {
+        if (!r.academic || typeof r.academic !== 'object' || Array.isArray(r.academic)) throw fail('academic profile, placement and courseResults are required.');
+        row.academic = r.academic as Record<string, any>;
+      }
       if (b.kind === 'ENTERPRISE') {
         row.name = text(r.name, 'name', 200);
         row.address = r.address === undefined ? undefined : text(r.address, 'address', 300);

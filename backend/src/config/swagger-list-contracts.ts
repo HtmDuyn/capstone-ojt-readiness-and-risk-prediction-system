@@ -46,7 +46,7 @@ const listContexts:Record<string,string[]>={
  '/api/ojt-results':['student','program','company','position','semester','transferredByUser','confirmedByUser'],
  '/api/positions':['company','semester'], '/api/ojt-coordinations':['student','company','position','semester','coordinatedByUser'],
  '/api/assignments':['student','company','position','semester'], '/api/internship-evaluations':['student','company','position','semester','evaluatedByUser'],
- '/api/qhdn/registered-students':['student','program','cohort'], '/api/academic-imports':['importedByUser'],
+ '/api/qhdn/registered-students':['student','program','cohort'],
 
  '/api/enterprise/candidates':['student','company','position','semester'], '/api/enterprise/internships':['student','company','position','semester'],
  '/api/recruitment/posts':['company','semester','academicPeriod'],
