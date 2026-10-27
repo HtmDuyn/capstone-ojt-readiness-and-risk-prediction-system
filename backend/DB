@@ -11,7 +11,7 @@ SET LOCAL search_path=public,pg_catalog;
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
  SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('StudentCVFiles','RecruitmentWindows','OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
+ WHERE n.nspname='public' AND c.relname IN ('OJTEligibilityResultBatches','StudentOJTCalculatedResults','StudentCVFiles','RecruitmentWindows','OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
 ), edges AS (
  SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
  UNION
@@ -6724,6 +6724,7 @@ BEGIN
  END LOOP;
 END $sequences$;
 
+
 -- 7. Foreign keys and runtime triggers validate the finished dataset.
 ALTER TABLE public."AcademicAlertNotificationBatches" ADD CONSTRAINT "AcademicAlertNotificationBatches_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."AcademicAlertNotificationBatches" ADD CONSTRAINT "AcademicAlertNotificationBatches_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
@@ -7759,4 +7760,80 @@ BEGIN
  END IF;
 END $accept_seed$;
 SET CONSTRAINTS ALL IMMEDIATE;
+
+-- BEGIN INCREMENTAL UPDATE: 20261027_pro192_prerequisite
+-- Translate only the explicit PRO192 requirement "Pass PRF192".
+-- Existing staff-configured groups, other prose and demo curricula are preserved.
+DO $pro192_prerequisite$
+DECLARE target record; prerequisite_id int; group_id int;
+BEGIN
+ FOR target IN
+  SELECT pc."ProgramID",pc."ProgramCourseID"
+  FROM "ProgramCourses" pc
+  JOIN "Courses" course USING ("CourseID")
+  JOIN "TrainingPrograms" program USING ("ProgramID")
+  WHERE upper(course."CourseCode")='PRO192' AND pc."EntryKind"='COURSE'
+    AND lower(btrim(pc."PrerequisiteText"))='pass prf192'
+    AND program."ProgramCode" NOT LIKE 'DEMO-%'
+    AND NOT EXISTS (SELECT 1 FROM "ProgramPrerequisiteGroups" existing
+      WHERE existing."ProgramID"=pc."ProgramID" AND existing."ProgramCourseID"=pc."ProgramCourseID")
+ LOOP
+  SELECT course."CourseID" INTO prerequisite_id
+  FROM "ProgramCourses" pc JOIN "Courses" course USING ("CourseID")
+  WHERE pc."ProgramID"=target."ProgramID" AND pc."EntryKind"='COURSE'
+    AND upper(course."CourseCode")='PRF192';
+  IF prerequisite_id IS NULL THEN
+   RAISE EXCEPTION 'Cannot configure PRO192: PRF192 is missing from program %.',target."ProgramID";
+  END IF;
+  INSERT INTO "ProgramPrerequisiteGroups" ("ProgramID","ProgramCourseID","GroupCode","MinimumPassed")
+  VALUES (target."ProgramID",target."ProgramCourseID",'PRF192_REQUIRED',1)
+  RETURNING "GroupID" INTO group_id;
+  INSERT INTO "ProgramPrerequisiteMembers" ("ProgramID","GroupID","CourseID")
+  VALUES (target."ProgramID",group_id,prerequisite_id);
+ END LOOP;
+END $pro192_prerequisite$;
+-- END INCREMENTAL UPDATE: 20261027_pro192_prerequisite
+
+-- BEGIN INCREMENTAL UPDATE: 20261027_frontend_ojt_results
+CREATE TABLE IF NOT EXISTS public."OJTEligibilityResultBatches" (
+  "BatchID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "IdempotencyKey" varchar(100) NOT NULL,
+  "RequestHash" char(64) NOT NULL,
+  "SavedBy" int NOT NULL REFERENCES public."Users"("UserID"),
+  "SavedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),
+  "SavedCount" int NOT NULL CHECK ("SavedCount" BETWEEN 1 AND 10000),
+  "Results" jsonb NOT NULL CHECK (jsonb_typeof("Results")='array' AND jsonb_array_length("Results")="SavedCount"),
+  UNIQUE ("SavedBy","IdempotencyKey")
+);
+CREATE TABLE IF NOT EXISTS public."StudentOJTCalculatedResults" (
+  "StudentID" int PRIMARY KEY REFERENCES public."Students"("StudentID"),
+  "BatchID" int NOT NULL REFERENCES public."OJTEligibilityResultBatches"("BatchID"),
+  "ProgramID" int REFERENCES public."TrainingPrograms"("ProgramID"),
+  "Status" varchar(20) NOT NULL CHECK ("Status" IN ('ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED')),
+  "Result" jsonb NOT NULL CHECK (jsonb_typeof("Result")='object' AND "Result"->>'status'="Status"),
+  "CheckedAt" timestamptz NOT NULL,
+  "SavedAt" timestamptz NOT NULL,
+  "SavedBy" int NOT NULL REFERENCES public."Users"("UserID")
+);
+CREATE INDEX IF NOT EXISTS "IX_CalculatedOJT_Status" ON public."StudentOJTCalculatedResults"("Status","SavedAt" DESC);
+ALTER TABLE public."OJTEligibilityResultBatches" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."StudentOJTCalculatedResults" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public."OJTEligibilityResultBatches",public."StudentOJTCalculatedResults" FROM PUBLIC;
+REVOKE ALL ON SEQUENCE public."OJTEligibilityResultBatches_BatchID_seq" FROM PUBLIC;
+DO $security$
+DECLARE role_name text;
+BEGIN
+ FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN
+   EXECUTE format('REVOKE ALL ON public."OJTEligibilityResultBatches",public."StudentOJTCalculatedResults" FROM %I',role_name);
+   EXECUTE format('REVOKE ALL ON SEQUENCE public."OJTEligibilityResultBatches_BatchID_seq" FROM %I',role_name);
+  END IF;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT ALL ON public."OJTEligibilityResultBatches",public."StudentOJTCalculatedResults" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE public."OJTEligibilityResultBatches_BatchID_seq" TO service_role;
+ END IF;
+END $security$;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261027_frontend_ojt_results') ON CONFLICT DO NOTHING;
+-- END INCREMENTAL UPDATE: 20261027_frontend_ojt_results
 COMMIT;
