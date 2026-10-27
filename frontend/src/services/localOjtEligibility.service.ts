@@ -1,4 +1,5 @@
-import { apiData, getJson } from './educationApi';
+import { apiData, getAllItems, getJson } from './educationApi';
+import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import type { EligibilityStatus } from '@/types/education/eligibility.types';
 import API from './api';
 import { clearEducationReadCache } from './educationReadCache';
@@ -12,16 +13,18 @@ type Profile = {
 export type LocalOjtResult = {
   studentId: number; status: EligibilityStatus; earnedCredits: number | null;
   unpassedCourseCount: number; reasons: string[]; academicIssues: string[]; checkedAt: string;
+  savedAt?: string; isStale?: boolean;
 };
 
-// Proposed API contract for the backend implementation; see docs/ojt-eligibility-save-api.md.
+// Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
 export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
+export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
 export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string): Promise<number> {
   if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
   try {
     const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number } }>(LOCAL_OJT_SAVE_ENDPOINT, {
       idempotencyKey, source: 'FRONTEND', rule: { minCredits: 70, maxUnpassedCourses: 2 },
-      results: [...results].sort((a, b) => a.studentId - b.studentId),
+      results: [...results].sort((a, b) => a.studentId - b.studentId).map(({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt }) => ({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt })),
     });
     const body = response.data;
     if (body.success !== true || body.data?.savedCount !== results.length) {

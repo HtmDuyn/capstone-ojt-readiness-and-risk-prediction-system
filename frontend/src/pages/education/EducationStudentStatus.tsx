@@ -2,6 +2,8 @@ import { PageBanner } from "@/components/common/PageBanner";
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
 import { apiData, getJson } from '@/services/educationApi';
 import { ojtEligibilityService } from '@/services/ojtEligibility.service';
+import { loadSavedLocalOjtResults } from '@/services/localOjtEligibility.service';
+import { savedOjtLabel, type SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import type { Page } from '@/types/education/api.types';
 import type { StudentEligibility } from '@/types/education/eligibility.types';
 import { eligibilityReasonLabel, eligibilityStatusLabel } from '@/utils/educationEligibility';
@@ -42,6 +44,16 @@ const EducationStudentStatus: React.FC = () => {
   const [eligibility, setEligibility] = React.useState<StudentEligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = React.useState(false);
   const [eligibilityError, setEligibilityError] = React.useState('');
+  const [savedResults, setSavedResults] = React.useState<Record<number, SavedOjtEligibility>>({});
+  const [savedError, setSavedError] = React.useState('');
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setSavedResults({}); setSavedError('');
+    loadSavedLocalOjtResults(controller.signal)
+      .then(rows => { if (!controller.signal.aborted) setSavedResults(Object.fromEntries(rows.map(row => [row.studentId, row]))); })
+      .catch(e => { if (!controller.signal.aborted) setSavedError(e instanceof Error ? e.message : 'Không tải được kết quả FE đã lưu.'); });
+    return () => controller.abort();
+  }, [refresh]);
   React.useEffect(() => {
     const controller = new AbortController();
     setEligibility(null); setEligibilityError(''); setEligibilityLoading(Boolean(selected && semesterId));
@@ -121,9 +133,9 @@ const EducationStudentStatus: React.FC = () => {
           </button>
           <Link to="/education/ojt-conditions" className="rounded border p-2 text-orange-700">Xét và cập nhật điều kiện OJT</Link>
         </div>
-        {(error || semesterError) && (
+        {(error || semesterError || savedError) && (
           <p role="alert" className="text-red-700">
-            {error || semesterError}
+            {error || semesterError || savedError}
           </p>
         )}
         {loading && <p role="status">Đang tải...</p>}
@@ -140,7 +152,8 @@ const EducationStudentStatus: React.FC = () => {
                   <tr>
                     {[
                       "Sinh viên",
-                      "Điều kiện đã lưu",
+                      "Kết quả FE đã lưu",
+                      "Quyết định OJT chính thức",
                       "Đăng ký",
                       "Bàn giao",
                       "Trạng thái OJT",
@@ -160,6 +173,7 @@ const EducationStudentStatus: React.FC = () => {
                         <br />
                         {r.fullName}
                       </td>
+                      <td>{savedResults[r.studentId] ? savedOjtLabel(savedResults[r.studentId]) : 'Chưa xét'}</td>
                       <td>{state(r.officialEligibilityStatus)}</td>
                       <td>{state(r.registrationStatus)}</td>
                       <td>{state(r.handoffStatus)}</td>

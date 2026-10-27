@@ -138,6 +138,17 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
         },
       },
       {
+        id: 'ojt-handoff',
+        label: 'Bàn giao OJT',
+        path: '/education/ojt-handoff',
+        icon: <Users size={20} />,
+        banner: {
+          title: 'Bàn giao OJT',
+          description: 'Bàn giao danh sách sinh viên đủ điều kiện và theo dõi lịch sử bàn giao.',
+          badge: 'Quản lý OJT',
+        },
+      },
+      {
         id: 'ojt-final-results',
         label: 'Kết quả OJT cuối kỳ',
         path: '/education/ojt-final-results',

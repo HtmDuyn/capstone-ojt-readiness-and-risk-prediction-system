@@ -4,7 +4,7 @@ export type SubjectStatus =
   "Passed" | "Not Passed" | "Not Started" | "In Progress" | "Chưa xác định";
 
 export type OjtEligibilityStatus =
-  "Đủ điều kiện" | "Chưa đủ điều kiện" | "Chưa có kết quả";
+  "Đủ điều kiện" | "Chưa đủ điều kiện" | "Chưa có kết quả" | "Cần đối soát" | "Cần xét lại";
 
 export interface StudentSubject {
   id: string;
@@ -36,6 +36,7 @@ export interface StudentProgress {
   delayTerms: number | null;
   progressStatus: ProgressStatus;
   eligibilityStatus: OjtEligibilityStatus;
+  eligibilitySource?: 'FRONTEND' | 'OFFICIAL' | null;
   subjects: StudentSubject[];
   dataWarning?: string;
   detailsUnavailable?: boolean;

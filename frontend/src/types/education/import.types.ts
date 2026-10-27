@@ -1,3 +1,5 @@
+import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
+
 export type CourseResultStatus =
   "PASSED" | "FAILED" | "IN_PROGRESS" | "WITHDRAWN" | "RECOGNIZED";
 
@@ -104,6 +106,7 @@ export interface ImportedStudent {
   currentSemester: number | null;
   courseSemesterTag: number | null;
   latestOjtCheck?: {status:'ELIGIBLE'|'NOT_ELIGIBLE'|'REVIEW_REQUIRED';checkedAt:string;isStale:boolean;ojtSemesterId:number} | null;
+  calculatedEligibility?: SavedOjtEligibility | null;
   program: (ImportedRelation & { majorName?: string; majorCode?: string }) | null;
   cohort: ImportedRelation | null;
   entryAcademicPeriod: ImportedRelation | null;

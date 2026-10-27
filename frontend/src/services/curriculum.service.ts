@@ -1,153 +1,38 @@
-import { API_ORIGIN } from "@/config/api";
 import type { CurriculumDetailResponse, CurriculumImportPayload, CurriculumImportPreviewResponse, SearchCoursesPayload, SearchCoursesResponse, SearchCurriculaPayload, SearchCurriculaResponse, SearchMajorsPayload, SearchMajorsResponse } from '@/types/education/curriculum.types';
-import { getJson } from "./educationApi";
-const API_BASE_URL = API_ORIGIN;
+import API from './api';
+import { apiData, getJson } from './educationApi';
 
-/* =========================================================
-   COMMON
-   ========================================================= */
-
-interface ApiErrorResponse {
-  success?: boolean;
-  errorCode?: string;
-  message?: string;
+interface ImportResource {
+  id: number;
+  status: string;
+  preview: CurriculumImportPreviewResponse['data'];
+  result?: Record<string, unknown>;
 }
-
-const getAuthToken = () => {
-  return localStorage.getItem("ojt_auth_token");
-};
-
-const requestJson = async <T>(
-  path: string,
-  method: "POST",
-  body: unknown,
-): Promise<T> => {
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.");
-  }
-
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-
-    body: JSON.stringify(body),
-  });
-
-  const responseText = await response.text();
-
-  let result: unknown = null;
-
-  if (responseText) {
-    try {
-      result = JSON.parse(responseText);
-    } catch {
-      result = responseText;
-    }
-  }
-
-  if (!response.ok) {
-    const error =
-      typeof result === "object" && result !== null
-        ? (result as ApiErrorResponse)
-        : null;
-
-    if (response.status === 401) {
-      throw new Error("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
-    }
-
-    throw new Error(
-      error?.message || `Yêu cầu không thành công (${response.status}).`,
-    );
-  }
-
-  return result as T;
-};
-
-const postJson = <T>(path: string, body: unknown) => {
-  return requestJson<T>(path, "POST", body);
-};
-
-/* =========================================================
-   MAJOR
-   ========================================================= */
-
-/* =========================================================
-   COURSE CATALOG
-   ========================================================= */
-
-/* =========================================================
-   CURRICULUM SEARCH
-   ========================================================= */
-
-/* =========================================================
-   CURRICULUM DETAIL
-   ========================================================= */
-
-/* =========================================================
-   CURRICULUM IMPORT
-   ========================================================= */
-
-/* =========================================================
-   API
-   ========================================================= */
-
-const searchMajors = (payload: SearchMajorsPayload) =>
-  getJson<SearchMajorsResponse>(
-    "/majors",
-    payload as unknown as Record<string, unknown>,
-  );
-const searchCourses = (payload: SearchCoursesPayload) =>
-  getJson<SearchCoursesResponse>(
-    "/courses",
-    payload as unknown as Record<string, unknown>,
-  );
-const searchCurricula = (payload: SearchCurriculaPayload) =>
-  getJson<SearchCurriculaResponse>(
-    "/curricula",
-    payload as unknown as Record<string, unknown>,
-  );
-const getCurriculumDetail = (programId: number) =>
-  getJson<CurriculumDetailResponse>(`/curricula/${programId}`);
-const approvedImports = new Map<string, string>();
-const previewCurriculumImport = async (payload: CurriculumImportPayload) => {
+const approvedImports = new Map<string, { id: number; payload: string }>();
+const previewCurriculumImport = async (payload: CurriculumImportPayload): Promise<CurriculumImportPreviewResponse> => {
   approvedImports.delete(payload.idempotencyKey);
-  const response = await postJson<CurriculumImportPreviewResponse>(
-    "/api/curriculum-imports/preview",
-    payload,
-  );
-  if (response.data.canCommit) {
-    if (response.data.action !== "CREATE")
-      throw new Error(
-        "Mã chương trình đã tồn tại. Chỉ được import khung mới; không thay thế hoặc cập nhật khung đã nhập.",
-      );
-    approvedImports.set(payload.idempotencyKey, JSON.stringify(payload));
+  const resource = apiData<ImportResource>((await API.post('/curriculum-imports', payload)).data);
+  if (!Number.isSafeInteger(resource.id) || resource.id <= 0 || !['VALIDATED', 'COMMITTED'].includes(resource.status) || resource.preview?.preview !== true || !resource.preview.canCommit) {
+    throw new Error('Backend chưa xác nhận khung chương trình hợp lệ để import.');
   }
-  return response;
+  if (resource.preview.action !== 'CREATE') throw new Error('Mã chương trình đã tồn tại. Chỉ được import khung mới; không thay thế khung đã nhập.');
+  if (approvedImports.size >= 100) approvedImports.delete(approvedImports.keys().next().value!);
+  approvedImports.set(payload.idempotencyKey, { id: resource.id, payload: JSON.stringify(payload) });
+  return { success: true, data: resource.preview };
 };
-const commitCurriculumImport = (payload: CurriculumImportPayload) => {
-  if (approvedImports.get(payload.idempotencyKey) !== JSON.stringify(payload))
-    throw new Error("Cần kiểm tra và xác nhận một khung mới trước khi import.");
-  return postJson<unknown>("/api/curriculum-imports/commit", payload);
+const commitCurriculumImport = async (payload: CurriculumImportPayload) => {
+  const approved = approvedImports.get(payload.idempotencyKey);
+  if (!approved || approved.payload !== JSON.stringify(payload)) throw new Error('Cần kiểm tra và xác nhận đúng khung chương trình trước khi import.');
+  const resource = apiData<ImportResource>((await API.patch('/curriculum-imports', { id: approved.id, status: 'COMMITTED' })).data);
+  if (resource.status !== 'COMMITTED' || !resource.result) throw new Error('Backend chưa xác nhận hoàn tất import chương trình.');
+  return { success: true, data: resource.result };
 };
-
-/* =========================================================
-   EXPORT
-   ========================================================= */
 
 export const curriculumService = {
-  searchMajors,
-
-  searchCourses,
-
-  searchCurricula,
-  getCurriculumDetail,
-
+  searchMajors: (payload: SearchMajorsPayload) => getJson<SearchMajorsResponse>('/majors', payload as unknown as Record<string, unknown>),
+  searchCourses: (payload: SearchCoursesPayload) => getJson<SearchCoursesResponse>('/courses', payload as unknown as Record<string, unknown>),
+  searchCurricula: (payload: SearchCurriculaPayload) => getJson<SearchCurriculaResponse>('/curricula', payload as unknown as Record<string, unknown>),
+  getCurriculumDetail: (programId: number) => getJson<CurriculumDetailResponse>(`/curricula/${programId}`),
   previewCurriculumImport,
   commitCurriculumImport,
 };

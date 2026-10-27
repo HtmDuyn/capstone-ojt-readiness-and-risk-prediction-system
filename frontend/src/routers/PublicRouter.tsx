@@ -346,6 +346,10 @@ export const router = createBrowserRouter([
             path: "/education/ojt-conditions",
             element: <EducationOjtConditions />,
           },
+          {
+            path: "/education/ojt-handoff",
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtHandoff")).default }),
+          },
 
           /* =========================
              QUẢN LÝ SINH VIÊN

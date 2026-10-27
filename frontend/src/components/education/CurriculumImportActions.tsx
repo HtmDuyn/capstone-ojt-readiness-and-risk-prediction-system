@@ -2248,8 +2248,8 @@ export const CurriculumImportActions:
 
           /*
            * Payload này được giữ nguyên.
-           * Commit sẽ gửi lại đúng payload
-           * đã dùng cho preview.
+           * Service đối chiếu đúng payload này
+           * rồi commit bằng ID BE trả về khi kiểm tra.
            */
           setPayload(
             parsedPayload,
@@ -2320,8 +2320,8 @@ export const CurriculumImportActions:
         try {
           /*
            * Quan trọng:
-           * gửi lại đúng payload gốc,
-           * cùng idempotencyKey đã preview.
+           * Service lấy ID đã kiểm tra cho đúng payload,
+           * gửi PATCH status COMMITTED và giữ ID khi thử lại.
            */
           await curriculumService.commitCurriculumImport(
             payload,

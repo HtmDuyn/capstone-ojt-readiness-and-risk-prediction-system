@@ -102,7 +102,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
       </div>
       {advanced && <div id="progress-advanced-filters" className="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 xl:grid-cols-4">
         {select('semester', 'Kỳ chuyên ngành', semesters.map(value => ({ value: String(value), label: `Kỳ ${value}` })))}
-        {select('eligibility', 'Kết quả xét OJT', options(['Đủ điều kiện', 'Chưa đủ điều kiện', 'Chưa có kết quả']))}
+        {select('eligibility', 'Kết quả xét OJT', options(['Đủ điều kiện', 'Chưa đủ điều kiện', 'Chưa có kết quả', 'Cần đối soát', 'Cần xét lại']))}
         {select('subject', 'Môn học', subjects.map(([code, name]) => ({ value: code, label: `${code} — ${name}` })))}
         {select('subjectStatus', 'Trạng thái môn học', Object.entries(subjectLabels).map(([value, label]) => ({ value, label })))}
         <p className="text-xs text-slate-500 sm:col-span-2 xl:col-span-4">Chọn môn để lọc trạng thái của môn đó. Để tất cả môn để tìm sinh viên có ít nhất một môn mang trạng thái đã chọn.</p>

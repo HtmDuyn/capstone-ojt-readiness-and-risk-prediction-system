@@ -73,6 +73,8 @@ const OJT_ELIGIBILITY_STYLES: Record<OjtEligibilityStatus, string> = {
   "Chưa đủ điều kiện": "border-red-200 bg-red-50 text-red-700",
 
   "Chưa có kết quả": "border-slate-200 bg-slate-50 text-slate-500",
+  "Cần đối soát": "border-amber-200 bg-amber-50 text-amber-700",
+  "Cần xét lại": "border-amber-200 bg-amber-50 text-amber-700",
 };
 
 /* =========================================================
@@ -312,14 +314,15 @@ const EducationStudentProgress: React.FC = () => {
 
                         <div>
                           <h3 className="font-semibold text-slate-800">
-                            Điều kiện tham gia OJT
+                            Kết quả điều kiện OJT đã lưu
                           </h3>
 
                           <p className="mt-1 text-sm text-slate-500">
                             Sinh viên cần tích lũy ít nhất {OJT_MIN_CREDITS} tín
                             chỉ và có không quá {OJT_MAX_NOT_PASSED_SUBJECTS}{" "}
-                            môn Not Passed.
+                            môn chưa đạt.
                           </p>
+                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả FE đã tính và lưu; không thay thế quyết định OJT chính thức.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức từ backend.' : 'Chưa có kết quả đã lưu.'}</p>
                         </div>
                       </div>
                     </div>

@@ -15,6 +15,7 @@ export function useEducationStudentProgress() {
 
   React.useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
     const loadStudents = async () => {
       setLoading(true);
@@ -22,7 +23,7 @@ export function useEducationStudentProgress() {
       setLoadWarning(null);
 
       try {
-        const result = await studentProgressService.loadAll();
+        const result = await studentProgressService.loadAll(controller.signal);
         if (active) {
           setStudents(result);
           const partialCount = result.filter(
@@ -52,6 +53,7 @@ export function useEducationStudentProgress() {
 
     return () => {
       active = false;
+      controller.abort();
     };
   }, [revision]);
 

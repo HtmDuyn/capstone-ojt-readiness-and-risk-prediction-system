@@ -1,5 +1,6 @@
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { apiData, getAllItems, getJson } from "./educationApi";
+import { savedOjtLabel, type SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 
 type Row = Record<string, any>;
 const text = (value: unknown) =>
@@ -13,8 +14,9 @@ const number = (value: unknown): number | null =>
 async function loadStudent(
   row: Row,
   curricula: Map<number, Promise<Row>>,
+  signal?: AbortSignal,
 ): Promise<StudentProgress> {
-  const profile = apiData<Row>(await getJson(`/students/${row.id}`));
+  const profile = apiData<Row>(await getJson(`/students/${row.id}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
   const progress = profile.academicProgress ?? {},
     program = profile.program ?? {},
     credits = progress.credits ?? {};
@@ -25,7 +27,7 @@ async function loadStudent(
     if (!curricula.has(programId))
       curricula.set(
         programId,
-        getJson(`/curricula/${programId}`).then((response) =>
+        getJson(`/curricula/${programId}`, {}, signal).then((response) =>
           apiData<Row>(response),
         ),
       );
@@ -42,7 +44,7 @@ async function loadStudent(
   for (let page = (first?.page ?? 1) + 1; attempts.length < (first?.total ?? 0); page++) {
     const next = apiData<Row>(await getJson(`/students/${row.id}`, {
       include: "courseResults", resultsPage: page, resultsLimit: first.limit,
-    })).courseResults;
+    }, signal)).courseResults;
     if (!next?.items?.length) throw new Error("Không tải đủ kết quả học tập của sinh viên.");
     attempts.push(...next.items);
   }
@@ -91,7 +93,8 @@ async function loadStudent(
   const decision = official?.isStale
     ? "REVIEW_REQUIRED"
     : profile.officialDecision;
-  const eligibilityStatus: OjtEligibilityStatus =
+  const saved = profile.calculatedEligibility as SavedOjtEligibility | null | undefined;
+  const eligibilityStatus: OjtEligibilityStatus = saved ? savedOjtLabel(saved) :
     decision === "ELIGIBLE"
       ? "Đủ điều kiện"
       : decision === "NOT_ELIGIBLE"
@@ -115,6 +118,7 @@ async function loadStudent(
     delayTerms: null,
     progressStatus: "Chưa xác định",
     eligibilityStatus,
+    eligibilitySource: saved ? 'FRONTEND' : ['ELIGIBLE', 'NOT_ELIGIBLE'].includes(decision) ? 'OFFICIAL' : null,
     subjects,
     dataWarning:
       [
@@ -128,18 +132,20 @@ async function loadStudent(
   };
 }
 export const studentProgressService = {
-  async loadAll(): Promise<StudentProgress[]> {
+  async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
     const curricula = new Map<number, Promise<Row>>();
-    const students = await getAllItems<Row>("/students"),
+    const students = await getAllItems<Row>("/students", {}, signal),
       items: StudentProgress[] = new Array(students.length);
     let next = 0;
     await Promise.all(
       Array.from({ length: Math.min(4, students.length) }, async () => {
         while (next < students.length) {
+          signal?.throwIfAborted();
           const index = next++;
           try {
-            items[index] = await loadStudent(students[index], curricula);
+            items[index] = await loadStudent(students[index], curricula, signal);
           } catch (error) {
+            signal?.throwIfAborted();
             const row = students[index];
             const message = text(row.studentCode) +
                 ": " +

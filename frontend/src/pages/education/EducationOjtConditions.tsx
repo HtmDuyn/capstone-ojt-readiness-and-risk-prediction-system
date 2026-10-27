@@ -1,6 +1,6 @@
 import { PageBanner } from '@/components/common/PageBanner';
 import { getAllItems } from '@/services/educationApi';
-import { loadAndCalculateLocalEligibility, saveLocalOjtResults, type LocalOjtResult } from '@/services/localOjtEligibility.service';
+import { loadAndCalculateLocalEligibility, loadSavedLocalOjtResults, saveLocalOjtResults, type LocalOjtResult } from '@/services/localOjtEligibility.service';
 import type { ImportedStudent } from '@/types/education/import.types';
 import { eligibilityStatusLabel } from '@/utils/educationEligibility';
 import { CheckCircle2, RefreshCw, Save, Search, ShieldCheck } from 'lucide-react';
@@ -32,9 +32,23 @@ const EducationOjtConditions: React.FC = () => {
     const c = new AbortController();
     setLoading(true); setError(''); setResults({}); setFailures({}); setNotice(''); setTargets([]); activeRequest.current?.abort();
     setSavedCount(null); saveKey.current = null;
-    getAllItems<ImportedStudent>('/students', {}, c.signal).then(students => {
+    Promise.allSettled([
+      getAllItems<ImportedStudent>('/students', {}, c.signal),
+      loadSavedLocalOjtResults(c.signal),
+    ]).then(([studentResponse, savedResponse]) => {
       if (c.signal.aborted) return;
+      if (studentResponse.status === 'rejected') throw studentResponse.reason;
+      const students = studentResponse.value;
       setTargets(students.map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
+      const stored = savedResponse.status === 'fulfilled' ? savedResponse.value : students.flatMap(student => student.calculatedEligibility ? [{ ...student.calculatedEligibility, studentId: student.id }] : []);
+      const studentIds = new Set(students.map(student => student.id));
+      const restored = stored.filter(result => studentIds.has(result.studentId));
+      setResults(Object.fromEntries(restored.map(result => [result.studentId, { ...result, reasons: result.reasons ?? [], academicIssues: result.academicIssues ?? [] }])));
+      if (restored.length) {
+        setSavedCount(restored.length);
+        setNotice('Đã tải ' + restored.length + ' kết quả đã lưu.' + (restored.some(result => result.isStale) ? ' Có dữ liệu đã thay đổi; hãy xét lại trước khi sử dụng.' : ''));
+      }
+      if (savedResponse.status === 'rejected') setError('Không tải được API kết quả đã lưu: ' + (savedResponse.reason instanceof Error ? savedResponse.reason.message : 'Lỗi kết nối.'));
     }).catch(e => { if (!c.signal.aborted) setError(e instanceof Error ? e.message : 'Không tải được sinh viên.'); })
       .finally(() => { if (!c.signal.aborted) setLoading(false); });
     return () => { c.abort(); activeRequest.current?.abort(); };
@@ -81,10 +95,11 @@ const EducationOjtConditions: React.FC = () => {
     } finally { savingRequest.current = false; setSaving(false); }
   }
   const visible = targets.filter(t => (!search.trim() || normalize(`${t.student.studentCode} ${t.student.fullName}`).includes(normalize(search)))
-    && (filter === 'ALL' || (filter === 'PENDING' ? !results[t.student.id] : results[t.student.id]?.status === filter)));
+    && (filter === 'ALL' || (filter === 'PENDING' ? !results[t.student.id] || results[t.student.id].isStale : !results[t.student.id]?.isStale && results[t.student.id]?.status === filter)));
   React.useEffect(() => setPage(1), [search, filter, revision]);
   const pages = Math.max(1, Math.ceil(visible.length / 20)), currentPage = Math.min(page, pages);
   const checked = Object.values(results);
+  const currentResults = checked.filter(result => !result.isStale);
   return <div className="space-y-6">
     <PageBanner title="Xét điều kiện đi OJT" description="Xét trực tiếp từ tín chỉ tích lũy và bảng điểm của tất cả sinh viên, không cần chọn năm học hoặc kỳ OJT." badge="Phòng Đào tạo" />
     <section className="space-y-4 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
@@ -101,14 +116,14 @@ const EducationOjtConditions: React.FC = () => {
       {notice && <p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{notice}</p>}
     </section>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{[
-      ['Tổng sinh viên', targets.length], ['Đủ điều kiện', checked.filter(r => r.status === 'ELIGIBLE').length],
-      ['Chưa đủ điều kiện', checked.filter(r => r.status === 'NOT_ELIGIBLE').length], ['Cần đối soát', checked.filter(r => r.status === 'REVIEW_REQUIRED').length], ['Chưa xét / gặp lỗi', targets.length - checked.length],
+      ['Tổng sinh viên', targets.length], ['Đủ điều kiện', currentResults.filter(r => r.status === 'ELIGIBLE').length],
+      ['Chưa đủ điều kiện', checked.filter(r => r.status === 'NOT_ELIGIBLE').length], ['Cần đối soát', checked.filter(r => r.status === 'REVIEW_REQUIRED').length], ['Chưa xét / gặp lỗi', targets.length - currentResults.length],
     ].map(([label, count]) => <div key={label} className="rounded-xl border bg-white p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-slate-900">{loading ? '—' : count}</p></div>)}</div>
     <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 p-5"><h2 className="font-semibold">Danh sách sinh viên và kết quả xét</h2><div className="flex flex-wrap gap-2"><label className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input aria-label="Tìm sinh viên" value={search} onChange={e => setSearch(e.target.value)} placeholder="MSSV hoặc họ tên" className="rounded-lg border py-2 pl-9 pr-3 text-sm" /></label><select aria-label="Lọc kết quả OJT" value={filter} onChange={e => setFilter(e.target.value)} className="rounded-lg border p-2 text-sm"><option value="ALL">Tất cả sinh viên</option><option value="ELIGIBLE">Đủ điều kiện</option><option value="NOT_ELIGIBLE">Chưa đủ điều kiện</option><option value="REVIEW_REQUIRED">Cần đối soát</option><option value="PENDING">Chưa xét / gặp lỗi</option></select></div></div>
       <div className="overflow-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="bg-slate-50"><tr>{['Sinh viên', 'Khóa / Nhóm', 'Chương trình', 'Tín chỉ đạt', 'Môn chưa đạt', 'Kết quả', 'Lý do'].map(h => <th key={h} className="px-4 py-3 text-xs font-semibold text-slate-500">{h}</th>)}</tr></thead><tbody className="divide-y">{visible.slice((currentPage - 1) * 20, currentPage * 20).map(t => {
         const r = results[t.student.id];
-        return <tr key={t.student.id} className="align-top hover:bg-orange-50/30"><td className="px-4 py-3"><strong>{t.student.fullName}</strong><p className="mt-1 text-xs text-orange-700">{t.student.studentCode}</p></td><td className="px-4 py-3">{t.student.cohort?.code ?? '—'} / {t.student.groupCode ?? '—'}</td><td className="px-4 py-3 text-xs">{t.student.program?.code ?? '—'}</td><td className="px-4 py-3">{r?.earnedCredits ?? '—'}</td><td className="px-4 py-3">{r?.unpassedCourseCount ?? '—'}</td><td className="px-4 py-3"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs ${r?.status === 'ELIGIBLE' ? 'bg-green-50 text-green-700' : r?.status === 'NOT_ELIGIBLE' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{r ? eligibilityStatusLabel(r.status) : failures[t.student.id] ? 'Gặp lỗi' : 'Chưa xét'}</span></td><td className="max-w-xs px-4 py-3 text-xs text-slate-600">{failures[t.student.id] || t.reason || (r ? [...r.reasons, ...r.academicIssues].join(' ') || 'Đạt điều kiện.' : 'Chờ chạy xét điều kiện.')}</td></tr>;
+        return <tr key={t.student.id} className="align-top hover:bg-orange-50/30"><td className="px-4 py-3"><strong>{t.student.fullName}</strong><p className="mt-1 text-xs text-orange-700">{t.student.studentCode}</p></td><td className="px-4 py-3">{t.student.cohort?.code ?? '—'} / {t.student.groupCode ?? '—'}</td><td className="px-4 py-3 text-xs">{t.student.program?.code ?? '—'}</td><td className="px-4 py-3">{r?.earnedCredits ?? '—'}</td><td className="px-4 py-3">{r?.unpassedCourseCount ?? '—'}</td><td className="px-4 py-3"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs ${!r?.isStale && r?.status === 'ELIGIBLE' ? 'bg-green-50 text-green-700' : !r?.isStale && r?.status === 'NOT_ELIGIBLE' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{r?.isStale ? 'Cần xét lại' : r ? eligibilityStatusLabel(r.status) : failures[t.student.id] ? 'Gặp lỗi' : 'Chưa xét'}</span></td><td className="max-w-xs px-4 py-3 text-xs text-slate-600">{failures[t.student.id] || t.reason || (r?.isStale ? 'Dữ liệu học vụ đã thay đổi sau lần xét; cần xét lại.' : '') || (r ? [...r.reasons, ...r.academicIssues].join(' ') || 'Đạt điều kiện.' : 'Chờ chạy xét điều kiện.')}</td></tr>;
       })}{!visible.length && <tr><td colSpan={7} className="p-10 text-center text-slate-500">{loading ? 'Đang tải...' : 'Không có sinh viên phù hợp.'}</td></tr>}</tbody></table></div>
       <div className="flex items-center justify-between gap-3 border-t p-4 text-sm text-slate-500"><span>{visible.length} sinh viên · Trang {currentPage}/{pages}</span><div className="flex gap-2"><button disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trước</button><button disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Sau</button></div></div>
     </section>

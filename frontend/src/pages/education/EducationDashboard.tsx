@@ -25,7 +25,7 @@ export const EducationDashboard: React.FC = () => {
               </h1>
 
               <p className="mt-1 text-sm text-slate-500">
-                Theo dõi sinh viên, điều kiện OJT và tình hình học vụ.
+                Theo dõi sinh viên, kết quả xét OJT đã lưu từ FE và tình hình học vụ.
               </p>
             </div>
 
@@ -151,12 +151,12 @@ export const EducationDashboard: React.FC = () => {
 
             <span>
               {selectedOjtSemesterId
-                  ? "Đang thống kê theo kỳ OJT được liên kết với kỳ học đã chọn."
+                  ? "Báo cáo học vụ theo kỳ đã chọn; thống kê điều kiện OJT dùng kết quả FE đã lưu, độc lập với kỳ học."
                   : selectedPeriod
                     ? "Đang xem học vụ theo kỳ học đã chọn; kết quả OJT lấy theo kỳ do hồ sơ API xác định."
                     : selectedYear
                     ? "Năm học đang được dùng để lọc danh sách kỳ học. Backend chưa hỗ trợ lọc trực tiếp thống kê bằng academicYearId nên số liệu bên dưới vẫn thuộc phạm vi toàn hệ thống."
-                    : "Đang xem toàn hệ thống. Mỗi sinh viên được tính một lần theo kỳ OJT do hồ sơ API xác định."}
+                    : "Đang xem toàn hệ thống. Mỗi sinh viên được tính một lần theo kết quả FE đã lưu; kết quả này không phải quyết định OJT chính thức."}
             </span>
           </div>
         </section>
@@ -193,7 +193,7 @@ export const EducationDashboard: React.FC = () => {
               <MetricCard
                 label="Đủ điều kiện OJT"
                 value={eligibleStudents}
-                description="Được Backend xác nhận đủ điều kiện"
+                description="Theo kết quả FE đã lưu"
                 icon={<CheckCircle2 size={18} />}
                 iconClass="bg-green-50 text-green-600"
                 loading={dashboardLoading}
@@ -221,7 +221,7 @@ export const EducationDashboard: React.FC = () => {
             />
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <MetricCard label="Chờ xác nhận kết quả" value={awaitingConfirmationStudents} description="Chưa xác nhận hoặc xác nhận đã cũ" icon={<Info size={18} />} iconClass="bg-blue-50 text-blue-600" loading={dashboardLoading} />
+            <MetricCard label="Chưa xét / cần xét lại" value={awaitingConfirmationStudents} description="Chưa có kết quả đã lưu hoặc dữ liệu đã thay đổi" icon={<Info size={18} />} iconClass="bg-blue-50 text-blue-600" loading={dashboardLoading} />
             <MetricCard label="Cần đối soát dữ liệu" value={insufficientDataStudents} description="Chưa đủ cấu hình để xét điều kiện" icon={<AlertTriangle size={18} />} iconClass="bg-orange-50 text-orange-600" loading={dashboardLoading} />
           </div>
         </section>

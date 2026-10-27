@@ -4,11 +4,12 @@ import { Eye, RefreshCw, Users, Search, Inbox } from 'lucide-react';
 import { useEducationImportedStudents } from '@/hooks/useEducationImportedStudents';
 import type { AcademicCatalogs, ImportedRelation, ImportedStudent, StudentAcademicStatus } from '@/types/education/import.types';
 import { STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
+import { savedOjtLabel } from '@/utils/savedOjtEligibility';
 
 const text = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value);
 const relation = (row: ImportedRelation | null, fallback?: number | null) => row ? [row.code, row.name].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' — ') || text(row.id) : text(fallback);
 const status = (value: string) => STUDENT_STATUS_LABELS[value as StudentAcademicStatus] ?? value;
-const ojtStatus = (row: ImportedStudent) => !row.latestOjtCheck ? 'Chưa xét' : row.latestOjtCheck.isStale ? 'Cần xét lại' : ({ELIGIBLE:'Đủ điều kiện',NOT_ELIGIBLE:'Chưa đủ điều kiện',REVIEW_REQUIRED:'Cần đối soát'}[row.latestOjtCheck.status]);
+const ojtStatus = (row: ImportedStudent) => row.calculatedEligibility ? savedOjtLabel(row.calculatedEligibility) : !row.latestOjtCheck ? 'Chưa xét' : row.latestOjtCheck.isStale ? 'Cần xét lại' : ({ELIGIBLE:'Đủ điều kiện',NOT_ELIGIBLE:'Chưa đủ điều kiện',REVIEW_REQUIRED:'Cần đối soát'}[row.latestOjtCheck.status]);
 
 export function ImportedStudents({ revision, catalogs }: { revision: number; catalogs: AcademicCatalogs | null }) {
   const model = useEducationImportedStudents(revision);

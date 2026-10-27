@@ -1,6 +1,6 @@
-# API dự kiến: lưu kết quả xét OJT từ FE
+# API lưu kết quả xét OJT từ FE
 
-Endpoint này chưa có trên BE main. FE đã chuẩn bị gọi endpoint sau khi người dùng bấm **Lưu kết quả**. Có thể đổi đường dẫn tại `LOCAL_OJT_SAVE_ENDPOINT` trong `src/services/localOjtEligibility.service.ts`.
+FE gọi endpoint sau khi người dùng bấm **Lưu kết quả**. Đường dẫn được khai báo tại `LOCAL_OJT_SAVE_ENDPOINT` trong `src/services/localOjtEligibility.service.ts`. BE đã hỗ trợ lưu và đọc lại kết quả.
 
 ## Request
 
@@ -45,3 +45,19 @@ Endpoint này chưa có trên BE main. FE đã chuẩn bị gọi endpoint sau k
 `savedCount` phải bằng số phần tử gửi lên. FE chỉ hiển thị **Đã lưu kết quả** và khóa nút lưu khi nhận xác nhận này. HTTP lỗi hoặc `success: false` không được coi là lưu thành công.
 
 Khi chưa triển khai endpoint (404/405/501), FE thông báo chưa có API và giữ nguyên kết quả trên trang để người dùng thử lại.
+
+## Đọc lại và đồng bộ giao diện
+
+`GET /api/ojt-eligibility-results?page=1&limit=100` trả `{success:true,data:{items,total,page,limit}}`. FE tải hết các trang khi mở trang xét OJT và phục hồi kết quả theo `studentId`.
+
+Mỗi kết quả có thêm `savedAt`, `savedBy`, `batchId`, `source` và `isStale`. Kết quả có `isStale: true` hiển thị **Cần xét lại**, không tính vào số đủ/chưa đủ điều kiện hiện tại.
+
+Danh sách import, hồ sơ, tiến độ và tổng quan đọc `calculatedEligibility` trong API `/students` hoặc `/students/:id`. Trang trạng thái hiển thị riêng **Kết quả FE đã lưu** và **Quyết định OJT chính thức**; không tự xác nhận hoặc thay thế quyết định chính thức.
+
+## Bàn giao sinh viên kỳ 5 sang kỳ OJT thứ 6
+
+Trang `/education/ojt-handoff` dùng kết quả từ DB qua GET trên, chỉ lấy sinh viên `currentSemester === 5`, sinh viên/tài khoản `ACTIVE`, kết quả `ELIGIBLE` và không stale. Kỳ nhận là OJT liên kết với `academicPeriodId` của kỳ 6 trong `cohorts.groups.curriculumPeriods` đúng khóa/nhóm. Kỳ 5 phải khớp `currentAcademicPeriodId`; thiếu cấu hình thì chặn gửi. Chọn kỳ OJT sẽ chỉ giữ sinh viên có kỳ 6 tương ứng, không cho bàn giao trùng kỳ.
+
+FE gọi `POST /api/eligible-student-handoffs` với `{ojtSemesterId, studentIds, idempotencyKey, reason}` và đọc lịch sử bằng GET cùng endpoint. Không yêu cầu thêm thao tác xác nhận điều kiện trên FE.
+
+**Phần BE cần đồng bộ:** `origin/main` hiện còn gọi `officialEligibilityWithClient` và trả `CONFIRMED_ELIGIBILITY_REQUIRED` nếu chưa có xác nhận cũ. Luồng mới cần đọc `StudentOJTCalculatedResults`, kiểm tra `ELIGIBLE` còn hiệu lực, sinh viên kỳ 5 và kỳ nhận tương ứng kỳ 6 trong transaction; lưu snapshot kết quả đã lưu, chống bàn giao trùng và giữ idempotency. `EligibleStudentHandoffItems.CheckID` và các ràng buộc liên quan cần tương thích với kết quả FE (không tạo giả `EligibilityChecks`/xác nhận). FE hiện báo rõ lỗi này, không báo bàn giao thành công khi BE từ chối.
