@@ -1,4 +1,5 @@
 import { describeAcademicRest } from './swagger-academic-rest';
+import { describeFrontendEligibilityResults } from '../modules/eligibility/frontend-results.openapi';
 import { describeHandoffWorkflow } from './swagger-handoff-workflow';
 import { describeAcademicContracts, describeAcademicOperationContracts } from './swagger-academic-contracts';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
@@ -381,6 +382,7 @@ describeOfficialResults(swaggerWithQhdn as Record<string, any>);
 describeMergedSearchResponses(swaggerWithQhdn);
 describeFeResponses(swaggerWithQhdn);
 const describedSpec = describeManualInputs(addPortalOperations(swaggerWithQhdn));
+describeFrontendEligibilityResults(describedSpec);
 describeStudentWorkflow(describedSpec);
 describeListResponses(describedSpec);
 describeMergedDetailLists(describedSpec);
