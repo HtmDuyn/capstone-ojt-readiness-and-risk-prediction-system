@@ -24,8 +24,9 @@ const message = (error: unknown) => {
   return (code && labels[code]) || (error instanceof Error ? error.message : 'Không thực hiện được yêu cầu.');
 };
 
-export function EligibilityAssessment({ programId, semesterId, scopeLabel, onBusyChange }: {
+export function EligibilityAssessment({ programId, semesterId, scopeLabel, onBusyChange, onReadyChange, runFormId }: {
   programId: number | null; semesterId: number | null; scopeLabel: string; onBusyChange: (busy: boolean) => void;
+  onReadyChange?: (ready: boolean) => void; runFormId?: string;
 }) {
   const [window, setWindow] = React.useState<AssessmentWindow | null>(null);
   const [missingWindow, setMissingWindow] = React.useState(false);
@@ -98,7 +99,7 @@ export function EligibilityAssessment({ programId, semesterId, scopeLabel, onBus
     finally { setBusy(false); onBusyChange(false); }
   }
   async function runBatch() {
-    if (!programId || !semesterId || busy) return;
+    if (!programId || !semesterId || busy || loading || !canRun) return;
     await mutate(async () => {
       key.current ??= crypto.randomUUID();
       const data = await eligibility.checkBatch({ programIds: [programId], ojtSemesterId: semesterId, idempotencyKey: key.current });
@@ -121,6 +122,10 @@ export function EligibilityAssessment({ programId, semesterId, scopeLabel, onBus
 
   const withinWindow = Boolean(window && now >= new Date(window.OpensAt).getTime() && now < new Date(window.ClosesAt).getTime());
   const canRun = Boolean(programId && semesterId && window?.Status === 'OPEN' && window.ResultsFinalizedAt && withinWindow && students?.total && students.total <= 1000);
+  React.useEffect(() => {
+    onReadyChange?.(canRun && !busy && !loading);
+    return () => onReadyChange?.(false);
+  }, [canRun, busy, loading, onReadyChange]);
   const filtered = React.useMemo(() => filterEligibilityResults(result?.items ?? [], status, search), [result, status, search]);
   const visibleResults = filtered.slice((resultPage - 1) * 20, resultPage * 20);
   return <section className="space-y-5 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
@@ -167,11 +172,11 @@ export function EligibilityAssessment({ programId, semesterId, scopeLabel, onBus
     </div>}
     {window?.Status === 'CLOSED' && <p className="text-amber-800">Đợt xét đã đóng. Không cập nhật kết quả chính thức trong đợt này.</p>}
     </details>
-    <div className="flex flex-wrap items-center gap-3">
-      <button disabled={!canRun || busy || loading} onClick={runBatch} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy ? 'Đang xét sinh viên...' : result ? 'Xét lại và cập nhật danh sách' : 'Xét điều kiện và lưu danh sách'}</button>
-      <button disabled={busy} onClick={() => setRefresh(v => v + 1)} className="rounded border px-3 py-2">Tải lại</button>
+    <form id={runFormId} onSubmit={event => { event.preventDefault(); void runBatch(); }} className="flex flex-wrap items-center gap-3">
+      <button type="submit" disabled={!canRun || busy || loading} className="rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy ? 'Đang xét sinh viên...' : result ? 'Xét lại điều kiện OJT' : 'Xét điều kiện OJT'}</button>
+      <button type="button" disabled={busy} onClick={() => setRefresh(v => v + 1)} className="rounded border px-3 py-2">Tải lại</button>
       <Link className="text-orange-700 underline" to="/education/student-status">Theo dõi kết quả và trạng thái OJT</Link>
-    </div>
+    </form>
     <p className="text-sm text-slate-600">Xét toàn bộ sinh viên đang hoạt động thuộc chương trình đã chọn, tối đa 1.000 sinh viên/lần. Hệ thống lưu kết quả theo quy tắc chung; hồ sơ thiếu dữ liệu được đưa vào nhóm cần đối soát. Sau khi xét, danh sách đủ điều kiện phục vụ bàn giao cho Phòng QHDN.</p>
     {students && students.total > 1000 && <p role="alert" className="text-amber-800">Phạm vi vượt 1.000 sinh viên; cần thu hẹp trước khi xét.</p>}
     {error && <p role="alert" className="text-red-700">{error}</p>}

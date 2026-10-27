@@ -69,8 +69,6 @@ export interface ImportCommitResponse {
   batchId?: string;
   academicImportId?: string;
   replayed?: boolean;
-  eligibilityTargets?: { ojtSemesterId: number; studentIds: number[] }[];
-  eligibilitySkipped?: number;
 }
 
 export interface CatalogOption {

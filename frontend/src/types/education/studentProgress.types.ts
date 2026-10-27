@@ -38,4 +38,5 @@ export interface StudentProgress {
   eligibilityStatus: OjtEligibilityStatus;
   subjects: StudentSubject[];
   dataWarning?: string;
+  detailsUnavailable?: boolean;
 }

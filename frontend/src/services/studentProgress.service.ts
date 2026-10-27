@@ -133,7 +133,6 @@ export const studentProgressService = {
     const students = await getAllItems<Row>("/students"),
       items: StudentProgress[] = new Array(students.length);
     let next = 0;
-    const errors: string[] = [];
     await Promise.all(
       Array.from({ length: Math.min(4, students.length) }, async () => {
         while (next < students.length) {
@@ -141,19 +140,25 @@ export const studentProgressService = {
           try {
             items[index] = await loadStudent(students[index], curricula);
           } catch (error) {
-            errors.push(
-              text(students[index].studentCode) +
+            const row = students[index];
+            const message = text(row.studentCode) +
                 ": " +
                 (error instanceof Error
                   ? error.message
-                  : "Không tải được hồ sơ"),
-            );
+                  : "Không tải được hồ sơ");
+            items[index] = {
+              id: String(row.id), studentCode: text(row.studentCode), fullName: text(row.fullName),
+              cohort: text(row.cohort?.code ?? row.cohortCode), studentClass: text(row.className),
+              curriculumCode: text(row.program?.code), currentCurriculumSemester: number(row.currentSemester),
+              currentTerm: text(row.currentAcademicPeriod?.name), gpa: null,
+              completedCredits: null, totalCredits: null, plannedOjtTerm: '—',
+              currentEstimatedOjtTerm: '—', delayTerms: null, progressStatus: 'Chưa xác định',
+              eligibilityStatus: 'Chưa có kết quả', subjects: [], dataWarning: message, detailsUnavailable: true,
+            };
           }
         }
       }),
     );
-    if (errors.length)
-      throw new Error("Không tải đủ hồ sơ sinh viên. " + errors.join("; "));
     return items;
   },
 };

@@ -3,6 +3,8 @@ import type { StudentProgress } from '@/types/education/studentProgress.types';
 import React from 'react';
 
 export function useEducationStudentProgress() {
+  const [revision, setRevision] = React.useState(0);
+  const reload = React.useCallback(() => setRevision(value => value + 1), []);
   const [students, setStudents] = React.useState<StudentProgress[]>([]);
 
   const [loading, setLoading] = React.useState(true);
@@ -51,7 +53,7 @@ export function useEducationStudentProgress() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [revision]);
 
-  return { students, loading, loadError, loadWarning };
+  return { students, loading, loadError, loadWarning, reload };
 }

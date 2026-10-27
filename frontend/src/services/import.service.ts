@@ -80,15 +80,6 @@ interface StudentImportResource {
   status: string;
   preview: Omit<ImportPreviewResponse, 'success'>;
   result?: Omit<ImportCommitResponse, 'success'>;
-  students?: {studentId: number | null; studentStatus: string; accountStatus: string; ojtSemesterId: number | null}[];
-}
-
-export interface ImportedEligibilitySummary {
-  total: number;
-  eligible: number;
-  notEligible: number;
-  reviewRequired: number;
-  skipped: number;
 }
 
 export const importService = {
@@ -122,28 +113,6 @@ export const importService = {
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'COMMITTED' || !resource.result)
       throw new Error('Backend chưa xác nhận hoàn tất import.');
-    const targets=new Map<number,Set<number>>();
-    let skipped=0;
-    for(const student of resource.students ?? []) {
-      if(!student.studentId || !student.ojtSemesterId || student.studentStatus!=='ACTIVE' || student.accountStatus!=='ACTIVE') { skipped++;continue; }
-      const ids=targets.get(student.ojtSemesterId)??new Set<number>();
-      ids.add(student.studentId);targets.set(student.ojtSemesterId,ids);
-    }
-    return { ...resource.result, success: true,
-      eligibilityTargets:[...targets].map(([ojtSemesterId,ids])=>({ojtSemesterId,studentIds:[...ids]})),
-      eligibilitySkipped:skipped+(resource.students?0:resource.result.total),
-    };
-  },
-  calculateImportedEligibility: async (result: ImportCommitResponse): Promise<ImportedEligibilitySummary> => {
-    const summary:ImportedEligibilitySummary={total:0,eligible:0,notEligible:0,reviewRequired:0,skipped:result.eligibilitySkipped??0};
-    for(const target of result.eligibilityTargets??[]) {
-      const response=await sendImportRequest<unknown>('/api/eligibility-check-runs',{
-        ...target,confirmResults:false,idempotencyKey:`student-import-${result.batchId}-eligibility-${target.ojtSemesterId}`,
-      },'Đã import thành công nhưng chưa xét được điều kiện OJT.');
-      const run=apiData<{status:string;total:number;eligible:number;notEligible:number;reviewRequired:number}>(response);
-      if(run.status!=='COMPLETED')throw new Error('Đợt xét điều kiện OJT chưa hoàn tất.');
-      summary.total+=run.total;summary.eligible+=run.eligible;summary.notEligible+=run.notEligible;summary.reviewRequired+=run.reviewRequired;
-    }
-    return summary;
+    return { ...resource.result, success: true };
   },
 };
