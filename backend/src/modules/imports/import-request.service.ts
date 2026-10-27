@@ -24,10 +24,13 @@ export async function importRequests(kind:ImportKind,params:Row,actor:Actor,id?:
     if(!id)return {items,total,page:p.page,limit:p.limit};
     const result=items[0];
     if(kind==='STUDENT'&&result.accountImportId){
-      const students=(await c.query(`SELECT r."RowNumber" AS "rowNumber",r."SourceCode" AS "studentCode",r."UserID" AS "userId",s."StudentID" AS "studentId",r."Action" AS action,
+      const students=(await c.query(`SELECT r."RowNumber" AS "rowNumber",r."SourceCode" AS "studentCode",r."UserID" AS "userId",s."StudentID" AS "studentId",s."Status" AS "studentStatus",ojt."OJTSemesterID" AS "ojtSemesterId",r."Action" AS action,
         u."FullName" AS "fullName",u."Email" AS email,u."Status" AS "accountStatus",u."MustChangePassword" AS "mustChangePassword",u."TemporaryPasswordExpiresAt" AS "temporaryPasswordExpiresAt",
         mail."EmailID"::text AS "emailId",CASE WHEN r."Action"='CREATED' THEN COALESCE(mail."Status",'NOT_QUEUED') ELSE 'NOT_QUEUED' END AS "emailStatus",mail."SentAt" AS "emailSentAt"
         FROM "AccountImportRows" r JOIN "Users" u ON u."UserID"=r."UserID" LEFT JOIN "Students" s ON s."UserID"=r."UserID"
+        LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
+        LEFT JOIN "CohortCurriculumPeriods" target ON target."CohortID"=placement."CohortID" AND target."GroupCode"=placement."GroupCode" AND target."CurriculumSemester"=6
+        LEFT JOIN "OJTSemesters" ojt ON ojt."AcademicPeriodID"=target."AcademicPeriodID"
         LEFT JOIN LATERAL (SELECT e."EmailID",e."Status",e."SentAt" FROM "EmailOutbox" e WHERE e."UserID"=r."UserID" AND e."Kind"='ACCOUNT' AND r."Action"='CREATED' ORDER BY e."EmailID" DESC LIMIT 1) mail ON true
         WHERE r."BatchID"=$1 ORDER BY r."RowNumber"`,[result.accountImportId])).rows;
       return {...result,students};

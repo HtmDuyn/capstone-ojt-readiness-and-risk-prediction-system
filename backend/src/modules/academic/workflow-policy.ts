@@ -32,11 +32,6 @@ export async function registrationPeriod(c:PoolClient,w:Row) {
  if(!term)throw invalid('OJT semester not found.',404);
  if(target.Kind!=='SEMESTER'||term.AcademicPeriodID!==target.AcademicPeriodID||w.RequiredRelativeSemester!==6)throw invalid('The registration window must target OJT semester 6 and its linked academic period.',409,'REGISTRATION_PERIOD_MISMATCH');
 }
-export async function assertRegistrationSemester(c:PoolClient,w:Row,studentId:number) {
- await registrationPeriod(c,w);
- await assertOjtSemesterSix(c,studentId,w.OJTSemesterID);
- return {relativeSemester:6,exceptionId:null};
-}
 export async function saveRegistrationExceptions(windowId:number,body:unknown,actor:number) {
  const b=inputObject(body,['studentIds','relativeSemester','expiresAt','reason']),students=ids(b.studentIds,'studentIds'),relative=positiveId(b.relativeSemester,'relativeSemester');
  if(!students.length)throw invalid('Select students.');

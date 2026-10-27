@@ -10,7 +10,7 @@ Xem thêm [các API Student đã gộp](student-portal-api.md).
 
 | API | Dữ liệu |
 |---|---|
-| `GET /students` | `page`, `limit` tối đa 100; `search` tìm mã/tên/email; `status`, `programId`, `cohortId`, `groupCode`, `enrollmentYear`, `currentSemester`, `importedOnly`, `importBatchId` |
+| `GET /students` | `page`, `limit` tối đa 100; `search` tìm mã/tên/email; `status`, `programId`, `cohortId`, `groupCode`, `enrollmentYear`, `currentSemester` từ 0–9, `importedOnly`, `importBatchId` |
 | `GET /students/:id` | Hồ sơ và các mốc chuyên ngành thực tế |
 | `PATCH /students/:id` | `fullName`, `phone`, `className`, `status`, `programId`; bắt buộc `reason` |
 | `GET /students/:id?include=courseResults` | Tất cả các lần học; lọc `courseId`, `academicPeriodId`, `courseStatus`, phân trang resultsPage/resultsLimit |

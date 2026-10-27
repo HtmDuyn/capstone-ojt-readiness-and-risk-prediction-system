@@ -43,6 +43,8 @@ export function describeAcademicRest(spec: Spec): Spec {
       delete schema.properties?.kind;
       if(schema.required) schema.required=schema.required.filter((name:string)=>name!=='kind');
       operation.requestBody.content={'application/json':{schema}};
+      operation.description='FE đọc hai sheet Danh sách sinh viên và Kết quả học tập thành rows JSON. Học kỳ thực tế được ánh xạ sang kỳ chương trình 0–9 theo khóa/nhóm. Bắt buộc chương trình PUBLISHED; sinh viên qua kỳ 0 phải có lịch sử kỳ trước (trong tệp hoặc đã lưu). Môn thuộc khung/combo được duyệt; được học vượt tag kỳ khi không có hoặc đã đạt đủ tiên quyết; nhóm tiên quyết phải đạt ở kỳ trước. Preview chạy cả ràng buộc deferred trước khi lưu yêu cầu VALIDATED. PATCH cùng tài nguyên với {id,status:"COMMITTED"} để nhập dữ liệu.';
+      operation.responses['422']={description:'Lịch sử học, kỳ chương trình hoặc môn tiên quyết không hợp lệ.'};
     }
     add('/'+path,'patch','/'+from+'/commit','post','Xác nhận nhập dữ liệu đã kiểm tra',commit);
   }
@@ -69,5 +71,7 @@ export function describeAcademicRest(spec: Spec): Spec {
     else delete item[method];
     if(!Object.keys(item).length)delete spec.paths['/api'+path];
   }
+  const eligibilitySchema=spec.paths['/api/eligibility-check-runs']?.post?.requestBody?.content?.['application/json']?.schema;
+  if(eligibilitySchema?.properties)eligibilitySchema.properties.confirmResults={type:'boolean',default:true,description:'false: chỉ tính và cập nhật StudentOJTEligibility, không xác nhận kết quả chính thức. FE dùng false cho lần xét nền sau import.'};
   return spec;
 }

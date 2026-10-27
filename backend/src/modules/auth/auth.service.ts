@@ -9,10 +9,7 @@ import {
   findById,
 } from "./auth.repository";
 
-import type {
-  AuthError,
-  AuthUserRecord,
-} from "./auth.types";
+import type { AuthError, AuthUserRecord } from "./auth.types";
 
 const createAuthError = (
   message: string,

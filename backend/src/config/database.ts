@@ -1,4 +1,3 @@
-import path from "node:path";
 import {
   Pool,
   type QueryResult,
@@ -121,8 +120,3 @@ export const closeDatabaseConnection =
       "PostgreSQL database connection closed",
     );
   };
-
-export const databasePath = path.resolve(
-  __dirname,
-  "../../",
-);

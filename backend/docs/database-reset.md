@@ -2,6 +2,16 @@
 
 `backend/DB` là script **full reset**: xóa bảng/dữ liệu ứng dụng cũ, tạo schema, nạp danh mục và đúng **20 sinh viên** trong một transaction. Chỉ chạy khi muốn khởi tạo lại database. Nếu có lỗi ở bất kỳ phần nào, cả lần reset được rollback.
 
+## Thứ tự khởi tạo
+
+File tạo trực tiếp schema cuối cùng: dọn đối tượng ứng dụng → tạo bảng đủ cột → khóa/index → hàm/view → INSERT catalog và cấu hình cuối → seed lịch/hồ sơ → foreign key/trigger → quyền truy cập → kiểm tra và COMMIT. Không còn các đoạn ALTER để thêm lại cột hoặc UPDATE để vá bản ghi vừa INSERT.
+
+Các khóa ngoại được lắp sau khi đã có đủ bản ghi tham chiếu, để xử lý các quan hệ vòng mà không tắt trigger hoặc dùng chế độ bỏ qua ràng buộc. Các kiểm tra lịch sử học và seed chạy trước commit.
+
+Hàm nghiệp vụ vẫn chứa UPDATE cho thao tác runtime; đó không phải lệnh vá dữ liệu seed. Ngày lịch/đợt OJT được tính theo ngày chạy, không đóng băng theo ngày tạo file.
+
+Toàn bộ schema, hàm, trigger, quyền truy cập và dữ liệu khởi tạo chỉ nằm trong `backend/DB`. Không có migration hoặc seed SQL riêng; không cần chạy thêm script nào sau file này.
+
 ## Cách chạy
 
 Mở toàn bộ `backend/DB` trong pgAdmin/DBeaver/SQL Editor và chạy từ `BEGIN` đến `COMMIT`, hoặc từ thư mục gốc dự án:
@@ -17,7 +27,7 @@ Backend cần trỏ tới database đó qua `.env`. Không cần chạy seed ri�
 - 20 tài khoản sinh viên và 20 hồ sơ, tất cả ACTIVE; họ tên tiếng Việt, email, điện thoại mẫu, mã sinh viên, lớp, khóa và nhóm A–D đầy đủ. Mỗi nhóm có 5 sinh viên.
 - Giữ nguyên ba tài khoản nhân viên `admin01`, `academic01`, `ojt.coord01` và hash mật khẩu đã có; giữ doanh nghiệp TECHVIET cùng tài khoản `enterprise01` và tin/vị trí tuyển dụng mẫu.
 - Tất cả sinh viên thuộc chương trình **DEMO-SE-FULL**, tên hiển thị ghi rõ chương trình minh họa. Chương trình có **39 môn cụ thể, 114 tín chỉ**, lấy từ các môn không phải slot của danh mục `BIT_SE_K18D_19A`; có cấu hình tiên quyết riêng, GPA thang 10 và chính sách lấy lần có điểm gần nhất.
-- Theo cập nhật mới, 40 chương trình danh mục được công bố PUBLISHED trong khối `20261024_publish_seeded_programs`, kèm metadata, xác nhận cấu hình môn/combo và chính sách GPA. Bộ 20 sinh viên vẫn dùng DEMO-SE-FULL; không tính tín chỉ từ slot chưa chọn.
+- Theo cập nhật mới, 40 chương trình danh mục được công bố PUBLISHED ngay khi INSERT, kèm metadata và chính sách GPA; cờ review chỉ giữ giá trị đã cấu hình. Bộ 20 sinh viên vẫn dùng DEMO-SE-FULL; không tính tín chỉ từ slot chưa chọn.
 - Phân biệt **kỳ chương trình 0–9** với **học kỳ lịch Spring/Summer/Fall**. Kỳ 0 giữ nguyên các môn định hướng; kỳ 1–9 giữ đúng môn theo RecommendedSemester. AcademicYears là năm dương lịch; Spring tháng 1–4, Summer tháng 5–8, Fall tháng 9–12 là lịch mẫu của seed. Ngày cụ thể của trường có thể được cấu hình lại.
 - Bảng điểm có kết quả các học phần đã học ở kỳ chương trình 0–5, giữ nguyên kỳ 0, không dồn sang kỳ 1. Mỗi kết quả liên kết học kỳ lịch và năm học thực tế. Sinh viên đang ở nấc 5; OJT202 và ENW493c ở nấc 6 chưa có kết quả.
 - Mỗi sinh viên có một snapshot GPA/tín chỉ/số môn nợ, **tính từ từng lần học thực tế**. Điểm chữ F/D/C/B/A được tính từ đúng điểm số tương ứng theo các ngưỡng 5/6/7/8; môn rút học không có điểm. Thi lại giữ cả hai lần và chỉ cộng tín chỉ một lần.
@@ -66,7 +76,7 @@ Sau reset, Phòng Đào tạo chạy xét theo kỳ `DEMO-OJT-S6`, xác nhận k
 
 Theo hợp đồng REST, sinh viên dùng `GET /api/auth/me` để lấy tài khoản và studentId, `GET /api/students/:id` để lấy hồ sơ của mình và `GET /api/students/me/dashboard?ojtSemesterId=...` cho dashboard. GET không gửi body; POST/PATCH dùng JSON khi có dữ liệu nghiệp vụ. Xem student-portal-api.md.
 
-Script reset chỉ xóa đối tượng ứng dụng trong `public`, giữ schema khác và đối tượng thuộc extension. Gặp phụ thuộc ngoài phạm vi thì dừng để đối soát. Hai script migration Admin/Student Portal vẫn có transaction riêng khi được chạy độc lập; không dùng chúng thay cho full reset và bộ seed này.
+Script reset chỉ xóa đối tượng ứng dụng trong `public`, giữ schema khác và đối tượng thuộc extension. Gặp phụ thuộc ngoài phạm vi thì dừng để đối soát. Chạy nguyên file từ BEGIN đến COMMIT để tạo đủ schema và dữ liệu; không chạy riêng từng đoạn.
 
 Khi chưa có đăng ký OJT, API hồ sơ xác định kỳ OJT mục tiêu bằng ánh xạ nấc chương trình 6 của nhóm khóa tới học kỳ lịch. Vì vậy hồ sơ vẫn trả được `ojtSemesterId` khi sinh viên đang ở kỳ 5.
 

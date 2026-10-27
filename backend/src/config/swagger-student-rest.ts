@@ -102,6 +102,8 @@ export function describeStudentRest(spec: Schema): Schema {
   set('/api/students/me/roadmap-recommendations', object({modelVersion: text, recommendations: array(text), isAiRecommendation: {type: 'boolean', enum: [true]}}));
   profile.properties.courseResults.properties.items.items = courseResult;
   profile.properties.currentSemester = {type: 'integer', minimum: 0, maximum: 9, nullable: true};
+  profile.properties.courseSemesterTag = {type: 'integer', minimum: 0, maximum: 9, nullable: true, description:'Tag kỳ: số kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình được gán, gồm môn combo đã duyệt. Không có môn đang học thì null. Khác currentSemester theo lộ trình khóa.'};
+  profile.properties.latestOjtCheck={type:'object',nullable:true,description:'Kết quả tính toán gần nhất cho kỳ OJT 6 theo lộ trình; riêng với kết quả xác nhận chính thức.',properties:{status:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']},checkedAt:{type:'string',format:'date-time'},ojtSemesterId:{type:'integer'},isStale:{type:'boolean'}}};
   profile.properties.semester = context('semester');
   Object.assign(profile.properties, {eligibility: {type: 'object', additionalProperties: true},
     eligibilityChecks: page({type: 'object', additionalProperties: true}), comboHistory: page({type: 'object', additionalProperties: true}),

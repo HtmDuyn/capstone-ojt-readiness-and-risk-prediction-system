@@ -1,3 +1,4 @@
+import { personalAccountView } from './account.dto';
 import type {
   NextFunction,
   Request,
@@ -9,17 +10,11 @@ import {
   parseCreateAccountInput,
   parseUpdateAccountInput,
   parseUpdateOwnProfileInput,
-  parseUpdateRoleInput,
-  parseUpdateStatusInput,
 } from "./account.schema";
 
 import {
-  changeAccountRole,
-  changeAccountStatus,
   createNewAccount,
-  getAccountById,
   getAccounts,
-  getOwnProfile,
   updateAccount,
   updateProfile,
 } from "./account.service";
@@ -45,28 +40,6 @@ export const listAccounts = async (
     res.status(200).json({
       success: true,
       ...result,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getAccount = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const account =
-      await getAccountById(
-        req.params.userId,
-        req.user!.userId,
-        req.user!.roleCode,
-      );
-
-    res.status(200).json({
-      success: true,
-      account,
     });
   } catch (error) {
     next(error);
@@ -129,78 +102,6 @@ export const updateAccountById = async (
   }
 };
 
-export const updateStatus = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const account =
-      await changeAccountStatus(
-        req.params.userId,
-        parseUpdateStatusInput(
-          req.body,
-        ),
-        req.user!.userId,
-      );
-
-    res.status(200).json({
-      success: true,
-      message:
-        "Account status updated successfully.",
-      account,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateRole = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const account =
-      await changeAccountRole(
-        req.params.userId,
-        parseUpdateRoleInput(
-          req.body,
-        ),
-        req.user!.userId,
-      );
-
-    res.status(200).json({
-      success: true,
-      message:
-        "Account role updated successfully.",
-      account,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getMyProfile = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const account =
-      await getOwnProfile(
-        req.user!.userId,
-      );
-
-    res.status(200).json({
-      success: true,
-      account,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const updateMyProfile = async (
   req: Request,
   res: Response,
@@ -219,7 +120,7 @@ export const updateMyProfile = async (
       success: true,
       message:
         "Profile updated successfully.",
-      account,
+      user: personalAccountView(account),
     });
   } catch (error) {
     next(error);

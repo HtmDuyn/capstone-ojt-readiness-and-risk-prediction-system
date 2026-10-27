@@ -21,8 +21,8 @@ const meanings: Record<string, string> = {
   idempotencyKey: 'Khóa chống trùng yêu cầu; dùng lại cùng khóa và dữ liệu khi gửi lại.',
   studentCode: 'Mã sinh viên.', courseCode: 'Mã môn học.', reason: 'Lý do thực hiện.',
   resultsFinalized: 'Xác nhận đã hoàn tất cập nhật điểm.', assessmentDeadline: 'Hạn xét điều kiện, gồm múi giờ.',
-  relativeSemester: 'Kỳ chuyên ngành tương đối.', requiredRelativeSemester: 'Kỳ chuyên ngành cho phép đăng ký; mặc định 5.',
-  currentSemester: 'Kỳ chuyên ngành hiện tại, tính từ lộ trình thực tế.', attemptNumber: 'Lần học, từ 1 đến 100.',
+  relativeSemester: 'Kỳ chuyên ngành tương đối.', requiredRelativeSemester: 'Kỳ chương trình yêu cầu: chuẩn bị/xét ở kỳ 5; đăng ký OJT ở kỳ 6.',
+  currentSemester: 'Kỳ chương trình hiện tại từ 0 đến 9, lấy từ lộ trình khóa/nhóm; khác tag môn đang học.', attemptNumber: 'Lần học, từ 1 đến 100.',
   gradeBands: 'Mức quy đổi điểm; bắt đầu từ 0, không trùng mốc.', gradePoints: 'Điểm quy đổi theo thang 4.',
   isRequired: 'Môn bắt buộc.', scope: 'Phạm vi áp dụng; các bộ lọc kết hợp đồng thời.',
   page: 'Trang, bắt đầu từ 1.', limit: 'Số bản ghi mỗi trang.'

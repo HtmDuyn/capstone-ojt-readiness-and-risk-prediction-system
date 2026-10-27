@@ -385,7 +385,6 @@ describeStudentWorkflow(describedSpec);
 describeListResponses(describedSpec);
 describeMergedDetailLists(describedSpec);
 describeImportWorkflow(describedSpec);
-describeOfficialResults(describedSpec);
 describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
