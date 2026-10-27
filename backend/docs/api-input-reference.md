@@ -1248,7 +1248,7 @@ Không có request body.
 
 Bàn giao sinh viên đủ điều kiện
 
-ACADEMIC chọn studentIds có kết quả ELIGIBLE đã xác nhận và còn hiệu lực cho kỳ OJT. Không yêu cầu hồ sơ đăng ký; không đổi trạng thái hồ sơ lịch sử. registrationIds không còn là đầu vào. Dữ liệu đầu vào dùng JSON body với Content-Type: application/json; không truyền trường dữ liệu qua query hoặc form-data.
+ADMIN/ACADEMIC bàn giao sinh viên đang học kỳ 5, tài khoản hoạt động, có kết quả FE ELIGIBLE đã lưu trong DB và còn hiệu lực. Kỳ nhận phải là kỳ OJT thứ 6 theo lộ trình khóa/nhóm. Không tính lại điều kiện, không yêu cầu xác nhận EligibilityChecks hay hồ sơ đăng ký. Lưu snapshot kết quả và batch nguồn; toàn bộ danh sách cùng thành công hoặc rollback. Gửi lại cùng idempotencyKey và payload trả kết quả cũ. Lỗi 409: SAVED_ELIGIBILITY_REQUIRED, ELIGIBILITY_RESULT_STALE, HANDOFF_SEMESTER_5_REQUIRED, OJT_FIXED_SEMESTER_REQUIRED, HANDOFF_STUDENT_INACTIVE, HANDOFF_SEMESTER_CLOSED, STUDENT_ALREADY_HANDED_OFF, IDEMPOTENCY_CONFLICT. Dữ liệu đầu vào dùng JSON body với Content-Type: application/json; không truyền trường dữ liệu qua query hoặc form-data.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1259,6 +1259,9 @@ Body: application/json — bắt buộc.
 | Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
 | --- | --- | --- | --- | --- |
 | ojtSemesterId | integer | Có | minimum=1 |  |
+| studentIds | array<integer> | Có | minItems=1; maxItems=1000; uniqueItems=true |  |
+| idempotencyKey | string | Có | minLength=1; maxLength=100 |  |
+| reason | string | Có | minLength=1; maxLength=2000 |  |
 
 ## GET /api/enterprise/candidates
 
