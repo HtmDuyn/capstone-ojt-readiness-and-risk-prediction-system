@@ -7836,4 +7836,65 @@ BEGIN
 END $security$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261027_frontend_ojt_results') ON CONFLICT DO NOTHING;
 -- END INCREMENTAL UPDATE: 20261027_frontend_ojt_results
+
+-- BEGIN INCREMENTAL UPDATE: 20261027_frontend_ojt_handoff
+ALTER TABLE public."EligibleStudentHandoffItems" ALTER COLUMN "CheckID" DROP NOT NULL;
+ALTER TABLE public."EligibleStudentHandoffItems" ADD COLUMN IF NOT EXISTS "CalculatedBatchID" int
+  REFERENCES public."OJTEligibilityResultBatches"("BatchID");
+DO $handoff_constraint$
+BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public."EligibleStudentHandoffItems"'::regclass AND conname='CK_Handoff_EligibilitySource') THEN
+  ALTER TABLE public."EligibleStudentHandoffItems" ADD CONSTRAINT "CK_Handoff_EligibilitySource"
+    CHECK (("CheckID" IS NOT NULL) <> ("CalculatedBatchID" IS NOT NULL));
+ END IF;
+END $handoff_constraint$;
+CREATE OR REPLACE FUNCTION public."GuardAcademicHandoff"()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+DECLARE saved record; student record; expected jsonb;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF NEW."CalculatedBatchID" IS NOT NULL THEN
+  SELECT s."ProgramID",s."Status",s."DeletedAt",s."CurrentSemester",u."Status" AS account_status,
+    p."CurrentAcademicPeriodID",p."UpdatedAt" AS placement_updated,
+    "StudentCurriculumSemester"(s."StudentID",p."CurrentAcademicPeriodID") AS stage
+  INTO student FROM "Students" s JOIN "Users" u USING("UserID")
+    LEFT JOIN "StudentAcademicPlacements" p USING("StudentID")
+  WHERE s."StudentID"=NEW."StudentID" FOR UPDATE OF s FOR SHARE OF u;
+  IF NOT FOUND OR student."DeletedAt" IS NOT NULL OR student."Status"<>'ACTIVE' OR student.account_status<>'ACTIVE'
+    OR student."CurrentSemester" IS DISTINCT FROM 5 OR student.stage IS DISTINCT FROM 5 THEN
+   RAISE EXCEPTION 'Handoff requires an active semester 5 student' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO saved FROM "StudentOJTCalculatedResults" WHERE "StudentID"=NEW."StudentID" FOR SHARE;
+  IF NOT FOUND OR saved."BatchID" IS DISTINCT FROM NEW."CalculatedBatchID" OR saved."Status"<>'ELIGIBLE'
+    OR saved."ProgramID" IS DISTINCT FROM student."ProgramID" OR student.placement_updated>saved."CheckedAt"
+    OR EXISTS (SELECT 1 FROM "StudentCourseResults" h WHERE h."StudentID"=NEW."StudentID" AND COALESCE(h."UpdatedAt",h."CreatedAt")>saved."CheckedAt") THEN
+   RAISE EXCEPTION 'Handoff requires a current saved eligible frontend result' USING ERRCODE='23514';
+  END IF;
+  IF EXISTS (SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=NEW."OJTSemesterID" AND "Status" IN ('CLOSED','ARCHIVED')) THEN
+   RAISE EXCEPTION 'Target OJT semester is closed' USING ERRCODE='23514';
+  END IF;
+  PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",NEW."OJTSemesterID");
+  expected := saved."Result" || jsonb_build_object('source','FRONTEND','batchId',saved."BatchID",'savedAt',saved."SavedAt",'savedBy',saved."SavedBy",'isStale',false);
+  IF NEW."Snapshot"->'calculatedEligibility' IS DISTINCT FROM expected
+    OR NEW."Snapshot"->'studentId' IS DISTINCT FROM to_jsonb(NEW."StudentID")
+    OR NEW."Snapshot"->'currentSemester' IS DISTINCT FROM '5'::jsonb
+    OR NEW."Snapshot"->'targetSemester' IS DISTINCT FROM '6'::jsonb THEN
+   RAISE EXCEPTION 'Handoff snapshot must match the saved eligibility result' USING ERRCODE='23514';
+  END IF;
+ ELSE
+  IF NOT EXISTS (SELECT 1 FROM "EligibilityChecks" e JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID"
+    WHERE e."CheckID"=NEW."CheckID" AND e."StudentID"=NEW."StudentID" AND e."OJTSemesterID"=NEW."OJTSemesterID" AND e."Status"='ELIGIBLE') THEN
+   RAISE EXCEPTION 'Handoff requires a confirmed eligible check for this student and semester' USING ERRCODE='23514';
+  END IF;
+ END IF;
+ IF EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" i WHERE i."StudentID"=NEW."StudentID" AND i."OJTSemesterID"=NEW."OJTSemesterID") THEN
+  RAISE EXCEPTION 'Student already handed off for this semester' USING ERRCODE='23505';
+ END IF;
+ RETURN NEW;
+END $function$;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261027_frontend_ojt_handoff') ON CONFLICT DO NOTHING;
+-- END INCREMENTAL UPDATE: 20261027_frontend_ojt_handoff
 COMMIT;
