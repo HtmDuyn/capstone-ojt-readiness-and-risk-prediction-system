@@ -210,14 +210,56 @@ export const EnterpriseInterns: React.FC = () => {
     setShowAddTaskModal(true);
   };
 
+  const selectedTaskInterns = useMemo(
+    () => interns.filter((intern) => modalSelectedInternIds.includes(intern.id)),
+    [interns, modalSelectedInternIds]
+  );
+
+  const taskDeadlineRange = useMemo(() => {
+    if (!selectedTaskInterns.length) {
+      return { minDate: '', maxDate: '', valid: false };
+    }
+
+    const startDates = selectedTaskInterns.map((intern) => intern.assignmentStartDate?.slice(0, 10));
+    const endDates = selectedTaskInterns.map((intern) => intern.assignmentEndDate?.slice(0, 10));
+    if (startDates.some((date) => !date) || endDates.some((date) => !date)) {
+      return { minDate: '', maxDate: '', valid: false };
+    }
+
+    const availableStartDates = startDates.filter((date): date is string => date !== undefined);
+    const availableEndDates = endDates.filter((date): date is string => date !== undefined);
+    const latestStartDate = availableStartDates.reduce((latest, date) => date > latest ? date : latest);
+    const earliestEndDate = availableEndDates.reduce((earliest, date) => date < earliest ? date : earliest);
+    const today = localDateString(new Date());
+    const minDate = today > latestStartDate ? today : latestStartDate;
+
+    return {
+      minDate,
+      maxDate: earliestEndDate,
+      valid: minDate <= earliestEndDate,
+    };
+  }, [selectedTaskInterns]);
+
+  const taskDeadlineInvalid = modalSelectedInternIds.length > 0 && (
+    !taskDeadlineRange.valid ||
+    !newTask.deadline ||
+    newTask.deadline < taskDeadlineRange.minDate ||
+    newTask.deadline > taskDeadlineRange.maxDate
+  );
+
   // Quick deadline helper
   const setQuickDeadline = (daysAhead: number) => {
-    const targetDate = new Date();
+    if (!taskDeadlineRange.valid) return;
+
+    const targetDate = new Date(`${taskDeadlineRange.minDate}T00:00:00`);
     targetDate.setDate(targetDate.getDate() + daysAhead);
+    let deadline = localDateString(targetDate);
+    if (deadline > taskDeadlineRange.maxDate) deadline = taskDeadlineRange.maxDate;
     setNewTask((prev) => ({
       ...prev,
-      deadline: localDateString(targetDate),
+      deadline,
     }));
+    setTaskSubmitError(null);
   };
 
   // Filtered interns for modal checkbox list
@@ -935,35 +977,55 @@ export const EnterpriseInterns: React.FC = () => {
                     <input
                       type="date"
                       required
+                      min={taskDeadlineRange.valid ? taskDeadlineRange.minDate : undefined}
+                      max={taskDeadlineRange.valid ? taskDeadlineRange.maxDate : undefined}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all"
                       value={newTask.deadline}
-                      onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
+                      onChange={(e) => {
+                        setNewTask({ ...newTask, deadline: e.target.value });
+                        setTaskSubmitError(null);
+                      }}
                     />
                     {/* Quick shortcuts */}
                     <div className="flex items-center space-x-1.5 mt-2">
                       <span className="text-[10px] text-slate-400">Chọn nhanh:</span>
                       <button
                         type="button"
+                        disabled={!taskDeadlineRange.valid}
                         onClick={() => setQuickDeadline(3)}
-                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-orange-100 hover:text-orange-700 text-[10px] font-medium text-slate-600 transition-colors"
+                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-orange-100 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium text-slate-600 transition-colors"
                       >
                         +3 ngày
                       </button>
                       <button
                         type="button"
+                        disabled={!taskDeadlineRange.valid}
                         onClick={() => setQuickDeadline(7)}
-                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-orange-100 hover:text-orange-700 text-[10px] font-medium text-slate-600 transition-colors"
+                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-orange-100 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium text-slate-600 transition-colors"
                       >
                         +1 tuần
                       </button>
                       <button
                         type="button"
+                        disabled={!taskDeadlineRange.valid}
                         onClick={() => setQuickDeadline(14)}
-                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-orange-100 hover:text-orange-700 text-[10px] font-medium text-slate-600 transition-colors"
+                        className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-orange-100 hover:text-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-medium text-slate-600 transition-colors"
                       >
                         +2 tuần
                       </button>
                     </div>
+                    {modalSelectedInternIds.length > 0 && (
+                      <p className={`mt-1 text-[10px] ${taskDeadlineRange.valid ? 'text-slate-500' : 'text-rose-600'}`}>
+                        {taskDeadlineRange.valid
+                          ? `Hạn task hợp lệ cho tất cả sinh viên: ${taskDeadlineRange.minDate} đến ${taskDeadlineRange.maxDate}.`
+                          : 'Các sinh viên đã chọn không có khoảng thời gian thực tập hợp lệ chung để giao task.'}
+                      </p>
+                    )}
+                    {taskDeadlineRange.valid && newTask.deadline && taskDeadlineInvalid && (
+                      <p className="mt-1 text-[10px] text-rose-600">
+                        Hạn hoàn thành phải nằm trong khoảng ngày thực tập áp dụng cho tất cả sinh viên đã chọn.
+                      </p>
+                    )}
                   </div>
 
                   {/* Người giao nhiệm vụ */}
@@ -1014,6 +1076,11 @@ export const EnterpriseInterns: React.FC = () => {
                     )}
                   </button>
                 </div>
+
+                <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-800">
+                  Danh sách này chỉ gồm sinh viên đã có phân công thực tập. Sau khi doanh nghiệp chấp nhận hồ sơ,
+                  QHDN/Admin cần tạo phân công thực tập; hồ sơ chưa được phân công sẽ chưa xuất hiện ở đây.
+                </p>
 
                 {/* Search & dropdown filter (No tabs) */}
                 <div className="flex items-center space-x-2">
@@ -1147,7 +1214,8 @@ export const EnterpriseInterns: React.FC = () => {
                       taskSubmitting ||
                       modalSelectedInternIds.length === 0 ||
                       !newTask.title.trim() ||
-                      !newTask.deadline
+                      !newTask.deadline ||
+                      taskDeadlineInvalid
                     }
                     className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all"
                   >
