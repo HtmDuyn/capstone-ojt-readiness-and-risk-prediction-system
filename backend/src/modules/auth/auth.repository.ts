@@ -16,7 +16,9 @@ const selectUser = `
     u."TemporaryPasswordExpiresAt" AS temporary_password_expires_at,
     u."AuthVersion" AS auth_version,
     r."RoleCode" AS role_code,
-    r."RoleName" AS role_name
+    r."RoleName" AS role_name,
+    (SELECT s."StudentID" FROM "Students" s
+      WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL) AS "studentId"
   FROM "Users" u
   LEFT JOIN "Roles" r
     ON r."RoleID" = u."RoleID"

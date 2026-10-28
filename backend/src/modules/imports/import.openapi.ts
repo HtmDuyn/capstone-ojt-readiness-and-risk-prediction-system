@@ -104,11 +104,11 @@
  * /api/imports/archive:
  *   post:
  *     tags: [Imports]
- *     summary: ADMIN or OJT_COORD archives recruitment after two semesters
+ *     summary: ADMIN archives recruitment after two semesters
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: Number of newly archived posts }
- *       403: { description: ADMIN or OJT_COORD required }
+ *       403: { description: ADMIN required }
  * /api/auth/change-password:
  *   post:
  *     tags: [Auth]

@@ -8,23 +8,24 @@ Sinh viên và các nhóm nghiệp vụ dùng REST. GET không có body; POST/PU
 
 Dùng `POST /api/imports/preview` hoặc `POST /api/imports/commit`:
 
-- `kind: ENTERPRISE`: chỉ `OJT_COORD`; bắt buộc `windowId` của đợt tuyển dụng đang mở và ít nhất một vị trí. Không nhận `semesterId` thay cho `windowId`.
-- `kind: STUDENT`: chỉ `ADMIN` hoặc `ACADEMIC`; nhận tài khoản, hồ sơ học vụ, placement và toàn bộ `courseResults` trong cùng giao dịch.
+- `kind: ENTERPRISE`: chỉ `OJT_COORD`; chọn `ojtSemesterId` của kỳ có sẵn và ít nhất một vị trí. Không tạo đợt tuyển dụng hoặc nhận `windowId`. `semesterId` cũ là alias và phải khớp nếu gửi cùng `ojtSemesterId`.
+- Import sinh viên tiếp tục dùng các API học vụ của `ADMIN`/`ACADEMIC`; không thay đổi trong nhánh QHDN này.
 - Nhận `application/json` hoặc `multipart/form-data` với `file` `.xlsx`/`.csv`, tối đa 8 MiB. Mỗi batch tối đa 500 doanh nghiệp/sinh viên; file tối đa 5000 dòng dữ liệu.
-- `idempotencyKey` dùng lại với cùng payload và người import sẽ trả batch cũ. Dùng key mới cho lần bổ sung tin mới. Preview không lưu tài khoản, bài đăng hoặc email.
-- Email được trim và chuyển chữ thường. Trùng email doanh nghiệp: giữ nguyên tài khoản, mật khẩu, mã doanh nghiệp và thông tin cũ; chỉ INSERT vị trí/bài tuyển dụng mới. Mã đầu vào khác nhưng cùng email không tạo doanh nghiệp thứ hai.
+- `idempotencyKey` dùng lại với cùng payload, kỳ và người import sẽ trả batch cũ. DB hiện chỉ cho một lô ENTERPRISE mỗi kỳ; lô khác cùng kỳ trả 409 `SEMESTER_ALREADY_IMPORTED`. Preview không lưu tài khoản, bài đăng hoặc email.
+- Email được trim và chuyển chữ thường. Mã và email doanh nghiệp khớp: giữ nguyên tài khoản, mật khẩu và thông tin cũ; chỉ INSERT vị trí/bài tuyển dụng của kỳ mới. Mã đầu vào khác nhưng cùng email trả 409, không tạo doanh nghiệp thứ hai.
 - Mã doanh nghiệp và email trỏ tới hai doanh nghiệp khác nhau: 409 `IDENTITY_CONFLICT`. Mã đã tồn tại nhưng email khác: 409, không tự đổi email tài khoản.
 - Mỗi vị trí mới cần `positions[].code` mới trong cùng doanh nghiệp/kỳ. Trùng mã vị trí trả 409 `RECRUITMENT_CODE_EXISTS`, không ghi đè hoặc xóa bài cũ. Tin cũ có thể được worker đóng/lưu trữ theo vòng đời hiện có, vẫn giữ dữ liệu.
 - Doanh nghiệp mới: tạo mật khẩu ngẫu nhiên 24 ký tự bằng `randomBytes`, chỉ lưu hash bcrypt; email outbox lưu payload mã hóa. Email chứa tài khoản/email đăng nhập, mật khẩu tạm và link đăng nhập. Mật khẩu tạm hết hạn sau 72 giờ, bắt buộc đổi trước khi gọi API nghiệp vụ.
 - Không có API tạo tin tuyển dụng riêng. API sửa tin bắt buộc có positionId cho mỗi vị trí và chỉ sửa vị trí đã thuộc tin; không cho thêm vị trí mới qua PATCH. Tạo tin/vị trí mới phải qua import của QHDN.
-- Tin import ở trạng thái `PENDING_REVIEW`, vị trí `CLOSED` tới khi QHDN duyệt công bố qua API tuyển dụng hiện có.
+- Commit doanh nghiệp hợp lệ tự công bố tin `PUBLISHED`, vị trí `OPEN` trong cùng giao dịch. QHDN không dùng API duyệt/đóng tin riêng. Xem [luồng QHDN theo kỳ](qhdn-semester-workflow.md) về cấu hình đăng ký, hạn và phạm vi tương thích.
+- Tin/vị trí của lô ENTERPRISE mới có thời hạn 5 tháng lịch từ commit; sau đó chuyển `ARCHIVED`, giữ tài khoản, lịch sử, đánh giá và điểm. Hạn ứng tuyển lấy theo kỳ, không vượt mốc 5 tháng dù gia hạn. Response có trạng thái tài khoản mới/dùng lại, vị trí và chỉ tiêu để giao diện hiển thị.
 
 Ví dụ JSON doanh nghiệp:
 
 ```json
 {
   "kind": "ENTERPRISE",
-  "windowId": 1,
+  "ojtSemesterId": 1,
   "idempotencyKey": "enterprise-intake-001",
   "rows": [{
     "code": "DN001",
@@ -38,7 +39,7 @@ Ví dụ JSON doanh nghiệp:
 
 ## Cột Excel
 
-Multipart có `kind`, `idempotencyKey`, `file`; doanh nghiệp thêm `windowId`. Trường `mapping` tùy chọn là JSON map tên trường chuẩn sang tiêu đề cột, ví dụ `{"code":"Mã SV","email":"Email"}`. Cột không map dùng tên chuẩn bên dưới. Không nhận định dạng `.xls` cũ.
+Multipart có `kind`, `idempotencyKey`, `file`; doanh nghiệp thêm `ojtSemesterId`. Trường `mapping` tùy chọn là JSON map tên trường chuẩn sang tiêu đề cột, ví dụ `{"code":"Mã DN","email":"Email"}`. Cột không map dùng tên chuẩn bên dưới. Không nhận định dạng `.xls` cũ.
 
 **Doanh nghiệp:** `code`, `email`, `fullName`, `name`, `address` (tùy chọn), `positionCode`, `title`, `description`, `requirements`, `capacity`. Mỗi dòng là một vị trí; nhiều dòng cùng email được gom thành một doanh nghiệp. Thông tin định danh trên các dòng phải nhất quán.
 

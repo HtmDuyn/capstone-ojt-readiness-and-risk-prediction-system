@@ -19,6 +19,7 @@ export interface AuthUserRecord {
   auth_version: number;
   role_code: RoleCode | null;
   role_name: string | null;
+  studentId: number | null;
 }
 
 export interface LoginInput {

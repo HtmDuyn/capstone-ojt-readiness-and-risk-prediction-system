@@ -11,6 +11,7 @@ export async function posts(params:Row,actor:Actor,id?:number) {
   requireStaff(actor);return academicTransaction(async c=>{const data=await page(c,postSelect+' WHERE ($1::int IS NULL OR p."PostID"=$1) AND ($2::int IS NULL OR p."EnterpriseID"=$2) AND ($3::int IS NULL OR p."OJTSemesterID"=$3) AND ($4::text IS NULL OR p."Status"=$4)',[id??null,params.enterpriseId===undefined?null:positiveId(params.enterpriseId,'enterpriseId'),params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId'),params.status===undefined?null:enumValue(params.status,['DRAFT','PENDING_REVIEW','PUBLISHED','CLOSED','ARCHIVED'],'status')],params,['enterpriseId','ojtSemesterId','status']);if(id&&!data.items.length)throw invalid('Recruitment publication not found.',404);return id?data.items[0]:data;});
 }
 export async function changePost(id:number,body:unknown,actor:Actor,action?:'publish'|'close') {
+  if(actor.roleCode==='OJT_COORD')throw invalid('QHDN publishes recruitment through semester imports.',403,'FORBIDDEN');
   requireStaff(actor);const b=inputObject(body,action?['reason']:['title','content','benefits','applicationInstructions','deadlineAt','reason']),reason=requiredText(b.reason,'reason',2000);
   return academicTransaction(async c=>{
     const before=(await c.query('SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1 FOR UPDATE',[id])).rows[0];if(!before)throw invalid('Recruitment publication not found.',404);

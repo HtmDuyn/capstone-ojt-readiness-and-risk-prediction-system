@@ -7,6 +7,7 @@ import { dashboard,internships } from './overview.service';
 import { applyToPosition, studentOpportunities } from '../students/job-application.service';
 import { notifications, readNotification } from './academic.service';
 import { roadmap } from './cv.service';
+import { analyseStudentCV, studentCVAnalysis } from '../students/cv-analysis.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -14,6 +15,8 @@ const read = own;
 const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHandler => async (req, res, next) => {
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
+router.post('/students/me/cv-analysis',...own,requireJsonBody,handle(r=>analyseStudentCV(r.body,r.user)));
+router.get('/students/me/cv-analysis',...own,handle(r=>studentCVAnalysis(r.query,r.user)));
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
 router.get('/students/me/roadmap-recommendations', ...read, handle(r => {
   inputObject(r.query, ['ojtSemesterId']);

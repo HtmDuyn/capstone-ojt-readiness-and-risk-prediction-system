@@ -2,20 +2,21 @@ import { Router } from 'express';
 import { archiveRecruitment } from '../../jobs/provisioning';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
-import { importAccounts } from './import.service';
+import { importEnterprises } from '../qhdn/enterprise-import.service';
+import { receiveEnterpriseImport } from '../qhdn/enterprise-import-input';
 import { query } from '../../config/database';
 import { fail } from './import.validation';
 const router = Router();
 router.use(authenticate, authorizeRoles('ADMIN', 'ACADEMIC', 'OJT_COORD'));
 for (const path of ['/preview', '/commit']) {
-  router.post(path, async (req, res, next) => {
+  router.post(path, authorizeRoles('OJT_COORD'), receiveEnterpriseImport, async (req, res, next) => {
     try {
       const role = req.user!.roleCode;
       const kind = req.body?.kind;
       if (!(role === 'OJT_COORD' && kind === 'ENTERPRISE')) {
         throw fail('Use student-imports for students; this endpoint imports enterprises for QHDN.', 403, 'FORBIDDEN');
       }
-      res.json({success: true, ...await importAccounts(req.body, req.user!.userId, path === '/preview')});
+      res.json({success: true, ...await importEnterprises(req.body, req.user!.userId, path === '/preview', req.file)});
     } catch (error) { next(error); }
   });
 }
@@ -33,7 +34,7 @@ router.post('/emails/resend', authorizeRoles('ADMIN'), async (req, res, next) =>
     res.json({ success: true, emailId: result.rows[0].EmailID, email });
   } catch (error) { next(error); }
 });
-router.post('/archive', authorizeRoles('ADMIN', 'OJT_COORD'), async (_req, res, next) => {
+router.post('/archive', authorizeRoles('ADMIN'), async (_req, res, next) => {
   try { res.json({ success: true, archivedCount: await archiveRecruitment() }); }
   catch (error) { next(error); }
 });

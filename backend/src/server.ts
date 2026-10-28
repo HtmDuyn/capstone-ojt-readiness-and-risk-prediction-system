@@ -28,7 +28,7 @@ const startServer =
   async (): Promise<void> => {
     try {
       await testDatabaseConnection();
-      const stopRecruitment = startRecruitmentWorker();
+      const stopRecruitment = process.env.RECRUITMENT_WORKER_ENABLED !== 'false' ? startRecruitmentWorker() : () => {};
       const stopAdvisories = process.env.ADVISORY_WORKER_ENABLED !== 'false' ? startAdvisoryWorker() : () => {};
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
       const stopJobs = process.env.PROVISIONING_JOBS_ENABLED !== 'false' ? startProvisioningJobs() : () => {};

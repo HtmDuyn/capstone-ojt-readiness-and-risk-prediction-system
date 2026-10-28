@@ -3,9 +3,11 @@ import { readTransaction } from './read.repository';
 import { registrationApi, registrationSelect } from '../ojt-registration/registration.service';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { registrationProgress } from './registration-progress.service';
 
 // QHDN manages registrations only after an academic handoff for the same student/semester.
 export async function registeredStudents(params:Row,actor:Actor) {
+  if(actor.roleCode==='OJT_COORD')return registrationProgress(params,actor);
   if(!['ADMIN','OJT_COORD'].includes(actor.roleCode))throw invalid('Only QHDN staff can view registered students.',403,'FORBIDDEN');
   const p=pagination(params,['registrationId','studentId','ojtSemesterId','academicPeriodId','windowId','status','programId','cohortId','groupCode','search','handoffStatus']);
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');

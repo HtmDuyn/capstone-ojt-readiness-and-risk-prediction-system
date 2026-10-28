@@ -127,11 +127,11 @@ describe('/companies', { get: ['Danh sách và hồ sơ doanh nghiệp', 'Lọc 
 describe('/companies/{id}', { patch: ['Cập nhật doanh nghiệp', sharedWrite] });
 describe('/positions', { get: ['Danh sách và hồ sơ vị trí thực tập', 'Lọc positionId để lấy một vị trí kèm lịch sử; có mã, địa điểm và hình thức làm việc.'] });
 describe('/positions', { delete: ['Xóa vị trí thực tập', 'Xóa mềm vị trí theo điều kiện dữ liệu liên quan.'] });
-describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; lọc assignmentId để xem lịch sử.'], post: ['Phân công sinh viên thực tập', sharedWrite] });
-describe('/assignments/{id}', { patch: ['Cập nhật thông tin và trạng thái thực tập', sharedWrite] });
+describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; lọc assignmentId để xem lịch sử.'], post: ['Phân công sinh viên thực tập', 'Chỉ ADMIN được tạo phân công thực tập. QHDN chỉ được xem.'] });
+describe('/assignments/{id}', { patch: ['Cập nhật thông tin và trạng thái thực tập', 'Chỉ ADMIN được cập nhật phân công thực tập. QHDN chỉ được xem.'] });
 describe('/admin/audit-logs/list', { post: ['Danh sách nhật ký hoạt động chi tiết', 'Nhập bộ lọc JSON. Trả toàn bộ detail và bản ghi rawLog nguyên gốc, không che dữ liệu trong bản demo.'] });
 describe('/ojt-coordinations', { get: ['Danh sách và hồ sơ điều phối', 'Lọc coordinationId để xem hồ sơ, lịch sử và chuỗi điều phối phân trang.'], post: ['Giới thiệu sinh viên cho doanh nghiệp', 'Áp dụng cho hồ sơ đã bàn giao; cần lý do và lưu nhật ký.'] });
-describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định tiếp nhận sinh viên', 'Admin hoặc Phòng QHDN ghi nhận thay doanh nghiệp; cần lý do.'] });
+describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định tiếp nhận sinh viên', 'Chỉ ADMIN ghi nhận thay doanh nghiệp qua API này; cần lý do. Doanh nghiệp sử dụng API quyết định của mình.'] });
 describe('/ojt-coordinations/{id}/reassign', { post: ['Điều phối lại sinh viên', 'Chuyển hồ sơ bị từ chối sang vị trí khác; cần lý do.'] });
 describe('/internship-evaluations', { get: ['Danh sách đánh giá thực tập', 'Lọc evaluationId để xem hồ sơ và lịch sử; giữ lọc templateId.'] });
 describe('/assignments/{id}/internship-evaluation', { put: ['Ghi nhận đánh giá thực tập', 'Admin hoặc Phòng QHDN nhập thay doanh nghiệp; cần lý do.'] });

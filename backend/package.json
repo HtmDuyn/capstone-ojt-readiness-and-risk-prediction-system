@@ -11,6 +11,10 @@
     "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
+    "pretest:qhdn": "npm run build",
+    "test:qhdn": "node --test tests/qhdn-*.test.cjs tests/enterprise-import-entrypoints.test.cjs",
+    "pretest:qhdn:local:readonly": "npm run build",
+    "test:qhdn:local:readonly": "node scripts/test-qhdn-local-readonly.cjs",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
     "db:migrate:student-portal": "npm run build && node scripts/migrate-student-portal.cjs",
     "db:migrate:training-program-metadata": "npm run build && node scripts/migrate-training-program-metadata.cjs"
@@ -43,6 +47,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",

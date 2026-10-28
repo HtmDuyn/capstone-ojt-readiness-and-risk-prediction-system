@@ -9,6 +9,8 @@ const roleNames: Record<RoleCode, string> = {
 };
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
+  {roles:['STUDENT'],operations:['POST /api/students/me/cv-analysis','GET /api/students/me/cv-analysis']},
+  {roles:['ENTERPRISE'],operations:['GET /api/enterprise/candidates/{id}/cv']},
   {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},
   {roles:["STUDENT"],operations:["GET /api/students/me/academic-summary","GET /api/students/me/supplementary-course-options","GET /api/students/me/curriculum","GET /api/students/me/notifications","PATCH /api/students/me/notifications/{id}","GET /api/students/me/assignments/current","GET /api/students/me/ojt-results","GET /api/students/me/ojt-results/{id}","GET /api/students/me/dashboard","GET /api/students/me/roadmap-recommendations"]},
   {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
@@ -68,6 +70,14 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PUT /api/ojt-semesters/{id}/assessment-window",
   ] },
   { roles: ["ADMIN"], operations: [
+    "POST /api/recruitment/posts/{id}/review",
+    "POST /api/recruitment/posts/{id}/close",
+    "POST /api/recruitment/windows",
+    "PATCH /api/recruitment/windows/{id}",
+    "POST /api/assignments",
+    "PATCH /api/assignments/{id}",
+    "POST /api/imports/archive",
+    "POST /api/ojt-coordinations/{id}/decision",
     "DELETE /api/companies",
     "DELETE /api/positions",
     "DELETE /api/students",
@@ -92,6 +102,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PATCH /api/accounts/me/profile",
     "POST /api/auth/change-password",
     "POST /api/auth/login",
+    "POST /api/auth/logout",
   ] },
   { roles: ["ADMIN","ACADEMIC","OJT_COORD"], operations: [
     "GET /api/academic-periods",
@@ -112,18 +123,11 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/qhdn/eligible-students",
     "GET /api/qhdn/reports",
     "GET /api/qhdn/reports/export",
-    "PATCH /api/assignments/{id}",
     "PATCH /api/companies/{id}",
-    "PATCH /api/recruitment/windows/{id}",
-    "POST /api/assignments",
-    "POST /api/imports/archive",
     "POST /api/ojt-coordinations",
-    "POST /api/ojt-coordinations/{id}/decision",
     "POST /api/ojt-coordinations/{id}/reassign",
-    "POST /api/recruitment/posts/{id}/close",
-    "POST /api/recruitment/posts/{id}/review",
-    "POST /api/recruitment/windows",
   ] },
+  { roles: ["OJT_COORD"], operations: ["PUT /api/qhdn/ojt-semesters/{id}/registration-settings"] },
   { roles: ["ADMIN","ACADEMIC","STUDENT"], operations: [
     "GET /api/ojt-registration-windows",
     "GET /api/combo-registration-windows",
@@ -134,15 +138,14 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/students/{id}/eligibility-checks",
     "POST /api/combo-registration-windows/{id}/preview",
     "POST /api/combo-registration-windows/{id}/selections",
-    "POST /api/ojt-registrations",
   ] },
+  { roles: ["ADMIN","STUDENT"], operations: ["POST /api/ojt-registrations"] },
   { roles: [], operations: [
   ] },
   { roles: ["ENTERPRISE"], operations: [
     "GET /api/enterprise/candidates",
     "GET /api/enterprise/internships",
     "GET /api/enterprise/profile",
-    "PATCH /api/enterprise/profile",
     "PATCH /api/enterprise/candidates/{id}/decision",
     "PUT /api/enterprise/internships/{id}/evaluation",
   ] },
@@ -155,26 +158,56 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/recruitment/posts",
 
   ] },
+  { roles: ["ADMIN","ENTERPRISE"], operations: [
+    "GET /api/recruitment/windows",
+    "PATCH /api/recruitment/posts/{id}",
+  ] },
 ];
 
 export function groupSwaggerByRole(spec: Spec): Spec {
+  // Old annotation files still contain retired operations. These have no
+  // mounted handler; do not expose them or assign permissions to them.
+  const retired = [
+    'GET /api/academic/eligibility-statistics',
+    'POST /api/combo-registration-windows/{id}/open',
+    'POST /api/combo-registration-windows/{id}/close',
+    'POST /api/curricula', 'PATCH /api/curricula/{id}',
+    'PUT /api/curricula/{id}/courses', 'PUT /api/curricula/{id}/prerequisites',
+    'PUT /api/curricula/{id}/course-equivalences',
+    'GET /api/curricula/{id}/combos', 'POST /api/curricula/{id}/combos',
+    'PUT /api/combos/{id}/courses', 'POST /api/curricula/{id}/publish',
+    'GET /api/students/{id}/academic-progress', 'GET /api/academic-imports/{id}',
+    'GET /api/ojt-results/{id}', 'PATCH /api/ojt-results/{id}',
+    'POST /api/ojt-results/{id}/revision-requests', 'POST /api/ojt-results/{id}/transfer',
+  ];
+  for (const key of retired) {
+    const [method, path] = key.split(' ');
+    if (spec.paths?.[path]) {
+      delete spec.paths[path][method.toLowerCase()];
+      if (!Object.keys(spec.paths[path]).length) delete spec.paths[path];
+    }
+  }
   const access = new Map<string, RoleCode[]>();
   for (const group of accessGroups) for (const key of group.operations) {
     if (access.has(key)) throw new Error('Duplicate Swagger access entry: ' + key);
     access.set(key, group.roles);
   }
   for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
-  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
-  for(const key of ['GET /api/ojt-registration-windows','POST /api/ojt-registrations','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
+  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}'])access.set(key,['ADMIN']);
+  for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
+  access.set('GET /api/ojt-registration-windows',['ADMIN','OJT_COORD','STUDENT']);
+  access.set('GET /api/ojt-registrations',['ADMIN','STUDENT']);
+  access.set('GET /api/ojt-semesters/{id}/students',['ADMIN','ACADEMIC','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);
   const used = new Set<string>();
+  const missing: string[] = [];
   for (const [path, item] of Object.entries(spec.paths ?? {}) as [string, Spec][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
       const operation = item[method];
       if (!operation) continue;
       const key = method.toUpperCase() + ' ' + path;
       const roles = access.get(key);
-      if (!roles) throw new Error('Missing Swagger role assignment: ' + key);
+      if (!roles) { missing.push(key); continue; }
       used.add(key);
       operation['x-roles'] = operation.security?.length ? [...roles] : [];
       // Tags organize primary functions, while x-roles retains every authorized role.
@@ -185,7 +218,8 @@ export function groupSwaggerByRole(spec: Spec): Spec {
         ? ['Auth'] : displayRoles.length ? displayRoles.map(role => roleNames[role]) : ['Admin'];
     }
   }
-  for (const key of access.keys()) if (!used.has(key)) throw new Error('Stale Swagger role assignment: ' + key);
+  const stale = [...access.keys()].filter(key => !used.has(key));
+  if (missing.length || stale.length) throw new Error('Swagger role assignments do not match: ' + JSON.stringify({missing, stale}));
   spec.tags = [
     { name: 'Admin', description: 'Chức năng quản trị và theo dõi hệ thống. API nghiệp vụ dùng chung hiển thị ở nhóm phụ trách; quyền Admin vẫn giữ nguyên.' },
     { name: 'Phòng đào tạo', description: 'Quản lý học vụ và xét điều kiện OJT.' },

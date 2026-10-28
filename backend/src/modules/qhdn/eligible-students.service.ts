@@ -2,7 +2,7 @@ import { readTransaction } from './read.repository';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
-// This is the received academic roster, independent of OJT registration.
+// This is the handed-off academic roster, independent of OJT registration.
 // Eligibility belongs to the confirmed check used for handoff, not a new decision.
 export async function eligibleStudents(params: Row, actor: Actor) {
   if (!['ADMIN', 'OJT_COORD'].includes(actor.roleCode)) {

@@ -10,9 +10,9 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
  handoff.responses={...responses,201:{description:'Danh sách đủ điều kiện đã bàn giao',content:{'application/json':{example:{success:true,data:{handoffId:1,ojtSemesterId:1,studentIds:[1],total:1,recipientRole:'OJT_COORD',replayed:false}}}}}};
  const descriptions:Record<string,string>={
   '/api/ojt-semesters/{id}/eligible-student-handoffs':'Lịch sử các đợt bàn giao danh sách đủ điều kiện. studentIds và studentCount lấy từ các mục bàn giao; registrationIds chỉ phục vụ lịch sử cũ.',
-  '/api/ojt-semesters/{id}/students':'Danh sách theo kỳ: QHDN chỉ thấy sinh viên được bàn giao, kể cả chưa đăng ký. registration, handoff, officialEligibility, assignment là các quy trình độc lập.',
-  '/api/qhdn/registered-students':'Danh sách sinh viên đã đăng ký và có bản ghi bàn giao thật cùng kỳ. Mỗi sinh viên một dòng; đăng ký trong registrations. Dùng ojt-semesters/students để nhận danh sách bàn giao trước đăng ký. Không suy ra bàn giao từ trạng thái HANDED_OFF cũ.',
-  '/api/ojt-registrations':'Hồ sơ đăng ký: QHDN xem các hồ sơ thuộc danh sách được bàn giao, STUDENT chỉ xem hồ sơ của mình. status/registrationStatus trả LEGACY_REVIEW_REQUIRED cho HANDED_OFF cũ; legacyStatus giữ nguyên giá trị lịch sử. handoffStatus luôn lấy từ bảng bàn giao.',
+  '/api/ojt-semesters/{id}/students':'Danh sách theo kỳ dành cho Admin/Đào tạo/Sinh viên theo quyền hiện có. QHDN dùng GET /api/qhdn/registered-students với ojtSemesterId và studentId để xem tiến độ và chi tiết.',
+  '/api/qhdn/registered-students':'QHDN xem tiến độ hồ sơ theo kỳ từ toàn bộ sinh viên đã bàn giao, gồm NOT_REGISTERED/SUBMITTED/APPROVED và trạng thái bổ sung/đối soát. Chưa nộp có registration=null, registrations=[]. Kèm ứng tuyển và điều phối độc lập. Admin giữ danh sách đã đăng ký hiện có. Không có bước xác nhận nhận bàn giao.',
+  '/api/ojt-registrations':'Hồ sơ đăng ký dành cho Admin/Sinh viên; STUDENT chỉ xem hồ sơ của mình. QHDN dùng GET /api/qhdn/registered-students. status/registrationStatus trả LEGACY_REVIEW_REQUIRED cho HANDED_OFF cũ; legacyStatus giữ nguyên giá trị lịch sử. handoffStatus luôn lấy từ bảng bàn giao.',
   '/api/students/{id}/cv':'QHDN được xem CV sinh viên đã có bàn giao; không yêu cầu sinh viên phải đăng ký trước.'
  };
  for(const [path,description]of Object.entries(descriptions))if(spec.paths[path]?.get)spec.paths[path].get.description=description;
@@ -23,10 +23,10 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
    if(schema?.required)schema.required=schema.required.filter((name:string)=>name!=='academicPeriodId');
    if(schema?.properties?.academicPeriodId)schema.properties.academicPeriodId.description='Mặc định từ kỳ OJT; nếu truyền phải khớp kỳ đã chọn.';
    if(schema?.properties?.requiredRelativeSemester)schema.properties.requiredRelativeSemester.description='Metadata tương thích; quyền đăng ký dựa trên danh sách đã bàn giao.';
-   op.description='Chỉ ADMIN/OJT_COORD quản lý đợt đăng ký. Tạo ở DRAFT; PATCH status OPEN/CLOSED và reason để mở/đóng. Chỉ mở khi phạm vi có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là metadata tương thích, không thay thế điều kiện bàn giao.';
+   op.description='API quản lý đợt đăng ký của ADMIN. QHDN dùng PUT /api/qhdn/ojt-semesters/{id}/registration-settings. Tạo ở DRAFT; PATCH status OPEN/CLOSED và reason để mở/đóng. Chỉ mở khi phạm vi có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là metadata tương thích, không thay thế điều kiện bàn giao.';
   }
  }
- spec.paths['/api/ojt-registrations'].post.description='STUDENT nộp hồ sơ của mình; ADMIN/OJT_COORD có thể nhập thay với studentId. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN và trong thời hạn, đúng scope.';
+ spec.paths['/api/ojt-registrations'].post.description='STUDENT nộp hồ sơ của mình kèm postId/positionId, tạo hồ sơ OJT và ứng tuyển trong cùng transaction. Cần doanh nghiệp đã import theo kỳ, vị trí đang nhận còn chỉ tiêu, danh sách bàn giao cùng kỳ và đợt OPEN trong thời hạn, đúng scope. ADMIN giữ đầu vào nhập thay với studentId; QHDN không có quyền nộp hộ.';
  spec.paths['/api/ojt-registrations/{id}/review'].post.description='ADMIN/OJT_COORD duyệt hoặc từ chối hồ sơ đã nộp; không phải bước xét/bàn giao của ACADEMIC. Hồ sơ đã điều phối không được duyệt lại.';
  spec.paths['/api/ojt-results'].post={tags:['OJT results'],summary:'QHDN chốt và chuyển kết quả về Phòng đào tạo',security,requestBody:body({assignmentId:id,reason:text,idempotencyKey:text},['assignmentId','reason','idempotencyKey']),responses:{...responses,201:{description:'PENDING_ACADEMIC_CONFIRMATION'}}};
  spec.paths['/api/ojt-results/{id}/confirm']={post:{tags:['OJT results'],summary:'Phòng đào tạo xác nhận và ghi nhận điểm OJT',description:'Dùng bảng quy đổi điểm đã cấu hình; lưu StudentCourseResults và CONFIRMED trong cùng transaction. Không ghi đè điểm học vụ đang tồn tại.',security,parameters:[{name:'id',in:'path',required:true,schema:id}],requestBody:body({reason:text,idempotencyKey:text},['reason','idempotencyKey']),responses}};

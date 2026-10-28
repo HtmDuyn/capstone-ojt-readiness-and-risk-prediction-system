@@ -2,16 +2,16 @@
 
 Tạo từ OpenAPI hiện hành bằng `npm run docs:api` sau `npm run build`.
 
-Tổng 128 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
+Tổng 135 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
-| Admin | 12 |
+| Admin | 22 |
 | Phòng đào tạo | 65 |
-| Phòng QHDN | 39 |
-| Doanh nghiệp | 9 |
-| Sinh viên | 19 |
-| Auth | 3 |
+| Phòng QHDN | 28 |
+| Doanh nghiệp | 11 |
+| Sinh viên | 21 |
+| Auth | 4 |
 
 ## Admin
 
@@ -23,14 +23,24 @@ Chức năng quản trị và theo dõi hệ thống. API nghiệp vụ dùng ch
 | 2 | POST | `/api/accounts` | Tạo tài khoản | `POST /api/accounts` |
 | 3 | PATCH | `/api/accounts/update` | Update account | `PATCH /api/accounts/update` |
 | 4 | POST | `/api/imports/emails/resend` | Resend email | `POST /api/imports/emails/resend` |
-| 5 | DELETE | `/api/companies` | Xóa doanh nghiệp | `DELETE /api/companies` |
-| 6 | DELETE | `/api/positions` | Xóa vị trí thực tập | `DELETE /api/positions` |
-| 7 | DELETE | `/api/students` | Xóa hồ sơ sinh viên | `DELETE /api/students` |
-| 8 | POST | `/api/auth/users/password-reset` | Đặt lại mật khẩu | `POST /api/auth/users/password-reset` |
-| 9 | POST | `/api/admin/dashboard` | Tổng quan hệ thống | `POST /api/admin/dashboard` |
-| 10 | POST | `/api/students/export` | Xuất danh sách sinh viên | `POST /api/students/export` |
-| 11 | POST | `/api/admin/audit-logs/list` | Danh sách nhật ký hoạt động chi tiết | `POST /api/admin/audit-logs/list` |
-| 12 | POST | `/api/student-imports/{id}/email-retries` | Gửi lại email tài khoản sinh viên | `POST /api/student-imports/{id}/email-retries` |
+| 5 | POST | `/api/imports/archive` | Lưu trữ tuyển dụng sau hai học kỳ | `POST /api/imports/archive` |
+| 6 | POST | `/api/ojt-registration-windows` | Tạo đợt đăng ký OJT | `POST /api/ojt-registration-windows` |
+| 7 | PATCH | `/api/ojt-registration-windows/{id}` | Cập nhật hoặc mở/đóng đợt đăng ký OJT | `PATCH /api/ojt-registration-windows/{id}` |
+| 8 | DELETE | `/api/companies` | Xóa doanh nghiệp | `DELETE /api/companies` |
+| 9 | DELETE | `/api/positions` | Xóa vị trí thực tập | `DELETE /api/positions` |
+| 10 | POST | `/api/assignments` | Phân công sinh viên thực tập | `POST /api/assignments` |
+| 11 | PATCH | `/api/assignments/{id}` | Cập nhật thông tin và trạng thái thực tập | `PATCH /api/assignments/{id}` |
+| 12 | POST | `/api/ojt-coordinations/{id}/decision` | Ghi nhận quyết định tiếp nhận sinh viên | `POST /api/ojt-coordinations/{id}/decision` |
+| 13 | DELETE | `/api/students` | Xóa hồ sơ sinh viên | `DELETE /api/students` |
+| 14 | POST | `/api/auth/users/password-reset` | Đặt lại mật khẩu | `POST /api/auth/users/password-reset` |
+| 15 | POST | `/api/admin/dashboard` | Tổng quan hệ thống | `POST /api/admin/dashboard` |
+| 16 | POST | `/api/students/export` | Xuất danh sách sinh viên | `POST /api/students/export` |
+| 17 | POST | `/api/admin/audit-logs/list` | Danh sách nhật ký hoạt động chi tiết | `POST /api/admin/audit-logs/list` |
+| 18 | POST | `/api/recruitment/windows` | Tạo đợt nhận nhu cầu tuyển dụng | `POST /api/recruitment/windows` |
+| 19 | PATCH | `/api/recruitment/windows/{id}` | Cập nhật hoặc mở/đóng đợt tuyển dụng | `PATCH /api/recruitment/windows/{id}` |
+| 20 | POST | `/api/recruitment/posts/{id}/review` | Duyệt hoặc từ chối tin tuyển dụng | `POST /api/recruitment/posts/{id}/review` |
+| 21 | POST | `/api/recruitment/posts/{id}/close` | Đóng tin tuyển dụng | `POST /api/recruitment/posts/{id}/close` |
+| 22 | POST | `/api/student-imports/{id}/email-retries` | Gửi lại email tài khoản sinh viên | `POST /api/student-imports/{id}/email-retries` |
 
 ## Phòng đào tạo
 
@@ -78,9 +88,9 @@ Quản lý học vụ và xét điều kiện OJT.
 | 38 | PATCH | `/api/course-results/{id}` | Sửa kết quả học tập và ghi lý do | `PATCH /api/course-results/{id}` |
 | 39 | GET | `/api/academic-imports` | Lịch sử nhập dữ liệu học vụ | `GET /api/academic-imports` |
 | 40 | GET | `/api/ojt-results` | Danh sách kết quả OJT đã được QHDN chuyển | `GET /api/ojt-results` |
-| 41 | GET | `/api/ojt-semesters/{id}/results/export` | Xuất danh sách điểm OJT chính thức | `GET /api/ojt-semesters/{id}/results/export` |
-| 42 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
-| 43 | POST | `/api/ojt-results/{id}/confirm` | Phòng đào tạo xác nhận và ghi nhận điểm OJT | `POST /api/ojt-results/{id}/confirm` |
+| 41 | POST | `/api/ojt-results/{id}/confirm` | Phòng đào tạo xác nhận và ghi nhận điểm OJT | `POST /api/ojt-results/{id}/confirm` |
+| 42 | GET | `/api/ojt-semesters/{id}/results/export` | ACADEMIC / QHDN: export semester results (CSV default or JSON) | `GET /api/ojt-semesters/{id}/results/export` |
+| 43 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
 | 44 | GET | `/api/assessment-windows` | Danh sách đợt xét điều kiện | `GET /api/assessment-windows` |
 | 45 | POST | `/api/assessment-windows` | Tạo đợt xét điều kiện | `POST /api/assessment-windows` |
 | 46 | PATCH | `/api/assessment-windows` | Cập nhật đợt xét hoặc trạng thái mở/đóng | `PATCH /api/assessment-windows` |
@@ -112,43 +122,32 @@ Quản lý tuyển dụng, điều phối và thực tập.
 |---:|---|---|---|---|
 | 1 | GET | `/api/academic-periods` | Danh sách kỳ học và Block 3 | `GET /api/academic-periods` |
 | 2 | PATCH | `/api/accounts/me/profile` | Cập nhật hồ sơ cá nhân | `PATCH /api/accounts/me/profile` |
-| 3 | POST | `/api/imports/preview` | Kiểm tra import doanh nghiệp hoặc sinh viên | `POST /api/imports/preview` |
-| 4 | POST | `/api/imports/commit` | Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin) | `POST /api/imports/commit` |
-| 5 | POST | `/api/imports/archive` | Lưu trữ tuyển dụng sau hai học kỳ | `POST /api/imports/archive` |
-| 6 | GET | `/api/ojt-registration-windows` | Danh sách đợt đăng ký OJT | `GET /api/ojt-registration-windows` |
-| 7 | POST | `/api/ojt-registration-windows` | Tạo đợt đăng ký OJT | `POST /api/ojt-registration-windows` |
-| 8 | PATCH | `/api/ojt-registration-windows/{id}` | Cập nhật hoặc mở/đóng đợt đăng ký OJT | `PATCH /api/ojt-registration-windows/{id}` |
-| 9 | GET | `/api/ojt-registrations` | Danh sách hồ sơ đăng ký OJT | `GET /api/ojt-registrations` |
-| 10 | POST | `/api/ojt-registrations` | Nộp hồ sơ đăng ký OJT | `POST /api/ojt-registrations` |
-| 11 | POST | `/api/ojt-registrations/{id}/review` | Duyệt hoặc từ chối hồ sơ OJT | `POST /api/ojt-registrations/{id}/review` |
-| 12 | GET | `/api/ojt-semesters/{id}/eligible-student-handoffs` | Lịch sử bàn giao sinh viên cho QHDN | `GET /api/ojt-semesters/{id}/eligible-student-handoffs` |
-| 13 | GET | `/api/ojt-semesters/{id}/students` | Theo dõi trạng thái OJT theo kỳ | `GET /api/ojt-semesters/{id}/students` |
-| 14 | GET | `/api/companies` | Danh sách và hồ sơ doanh nghiệp | `GET /api/companies` |
-| 15 | PATCH | `/api/companies/{id}` | Cập nhật doanh nghiệp | `PATCH /api/companies/{id}` |
-| 16 | GET | `/api/positions` | Danh sách và hồ sơ vị trí thực tập | `GET /api/positions` |
-| 17 | GET | `/api/ojt-coordinations` | Danh sách và hồ sơ điều phối | `GET /api/ojt-coordinations` |
-| 18 | POST | `/api/ojt-coordinations` | Giới thiệu sinh viên cho doanh nghiệp | `POST /api/ojt-coordinations` |
-| 19 | GET | `/api/assignments` | Danh sách và hồ sơ phân công thực tập | `GET /api/assignments` |
-| 20 | POST | `/api/assignments` | Phân công sinh viên thực tập | `POST /api/assignments` |
-| 21 | PATCH | `/api/assignments/{id}` | Cập nhật thông tin và trạng thái thực tập | `PATCH /api/assignments/{id}` |
-| 22 | GET | `/api/internship-evaluations` | Danh sách đánh giá thực tập | `GET /api/internship-evaluations` |
-| 23 | POST | `/api/ojt-coordinations/{id}/decision` | Ghi nhận quyết định tiếp nhận sinh viên | `POST /api/ojt-coordinations/{id}/decision` |
-| 24 | POST | `/api/ojt-coordinations/{id}/reassign` | Điều phối lại sinh viên | `POST /api/ojt-coordinations/{id}/reassign` |
-| 25 | GET | `/api/qhdn/registered-students` | Xem sinh viên đã đăng ký OJT | `GET /api/qhdn/registered-students` |
-| 26 | GET | `/api/qhdn/dashboard` | Tổng quan QHDN | `GET /api/qhdn/dashboard` |
-| 27 | GET | `/api/qhdn/reports/export` | Xuất báo cáo QHDN | `GET /api/qhdn/reports/export` |
-| 28 | GET | `/api/qhdn/reports` | Báo cáo QHDN theo loại | `GET /api/qhdn/reports` |
-| 29 | POST | `/api/recruitment/windows` | Tạo đợt nhận nhu cầu tuyển dụng | `POST /api/recruitment/windows` |
-| 30 | PATCH | `/api/recruitment/windows/{id}` | Cập nhật hoặc mở/đóng đợt tuyển dụng | `PATCH /api/recruitment/windows/{id}` |
-| 31 | GET | `/api/recruitment/posts` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
-| 32 | POST | `/api/recruitment/posts/{id}/review` | Duyệt hoặc từ chối tin tuyển dụng | `POST /api/recruitment/posts/{id}/review` |
-| 33 | POST | `/api/recruitment/posts/{id}/close` | Đóng tin tuyển dụng | `POST /api/recruitment/posts/{id}/close` |
-| 34 | GET | `/api/ojt-results` | Danh sách kết quả OJT đã được QHDN chuyển | `GET /api/ojt-results` |
-| 35 | POST | `/api/ojt-results` | QHDN chốt và chuyển kết quả về Phòng đào tạo | `POST /api/ojt-results` |
-| 36 | GET | `/api/ojt-semesters/{id}/results/export` | Xuất danh sách điểm OJT chính thức | `GET /api/ojt-semesters/{id}/results/export` |
-| 37 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
-| 38 | GET | `/api/job-applications` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
-| 39 | GET | `/api/internship-tasks` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 3 | POST | `/api/imports/preview` | Kiểm tra import doanh nghiệp theo kỳ | `POST /api/imports/preview` |
+| 4 | POST | `/api/imports/commit` | Import và công bố tuyển dụng theo kỳ | `POST /api/imports/commit` |
+| 5 | GET | `/api/ojt-registration-windows` | Danh sách đợt đăng ký OJT | `GET /api/ojt-registration-windows` |
+| 6 | POST | `/api/ojt-registrations/{id}/review` | Duyệt hoặc từ chối hồ sơ OJT | `POST /api/ojt-registrations/{id}/review` |
+| 7 | GET | `/api/ojt-semesters/{id}/eligible-student-handoffs` | Lịch sử bàn giao sinh viên cho QHDN | `GET /api/ojt-semesters/{id}/eligible-student-handoffs` |
+| 8 | GET | `/api/qhdn/eligible-students` | Danh sách sinh viên đủ điều kiện OJT Đào tạo đã bàn giao | `GET /api/qhdn/eligible-students` |
+| 9 | GET | `/api/companies` | Danh sách và hồ sơ doanh nghiệp | `GET /api/companies` |
+| 10 | PATCH | `/api/companies/{id}` | Cập nhật doanh nghiệp | `PATCH /api/companies/{id}` |
+| 11 | GET | `/api/positions` | Danh sách và hồ sơ vị trí thực tập | `GET /api/positions` |
+| 12 | GET | `/api/ojt-coordinations` | Danh sách và hồ sơ điều phối | `GET /api/ojt-coordinations` |
+| 13 | POST | `/api/ojt-coordinations` | Giới thiệu sinh viên cho doanh nghiệp | `POST /api/ojt-coordinations` |
+| 14 | GET | `/api/assignments` | Danh sách và hồ sơ phân công thực tập | `GET /api/assignments` |
+| 15 | GET | `/api/internship-evaluations` | Danh sách đánh giá thực tập | `GET /api/internship-evaluations` |
+| 16 | POST | `/api/ojt-coordinations/{id}/reassign` | Điều phối lại sinh viên | `POST /api/ojt-coordinations/{id}/reassign` |
+| 17 | GET | `/api/qhdn/registered-students` | QHDN xem tiến độ nộp hồ sơ và điều phối theo kỳ | `GET /api/qhdn/registered-students` |
+| 18 | PUT | `/api/qhdn/ojt-semesters/{id}/registration-settings` | Cấu hình, mở, đóng hoặc gia hạn đăng ký OJT theo kỳ có sẵn | `PUT /api/qhdn/ojt-semesters/{id}/registration-settings` |
+| 19 | GET | `/api/qhdn/dashboard` | Tổng quan QHDN | `GET /api/qhdn/dashboard` |
+| 20 | GET | `/api/qhdn/reports/export` | Xuất báo cáo QHDN | `GET /api/qhdn/reports/export` |
+| 21 | GET | `/api/qhdn/reports` | Báo cáo QHDN theo loại | `GET /api/qhdn/reports` |
+| 22 | GET | `/api/recruitment/posts` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
+| 23 | GET | `/api/ojt-results` | Danh sách kết quả OJT đã được QHDN chuyển | `GET /api/ojt-results` |
+| 24 | POST | `/api/ojt-results` | QHDN chốt và chuyển kết quả về Phòng đào tạo | `POST /api/ojt-results` |
+| 25 | GET | `/api/ojt-semesters/{id}/results/export` | ACADEMIC / QHDN: export semester results (CSV default or JSON) | `GET /api/ojt-semesters/{id}/results/export` |
+| 26 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
+| 27 | GET | `/api/job-applications` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
+| 28 | GET | `/api/internship-tasks` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
 
 ## Doanh nghiệp
 
@@ -157,14 +156,16 @@ Quản lý hồ sơ, tuyển dụng và thực tập sinh.
 | # | Method | Đường dẫn Swagger | Chức năng | Route gốc |
 |---:|---|---|---|---|
 | 1 | GET | `/api/enterprise/profile` | Hồ sơ doanh nghiệp | `GET /api/enterprise/profile` |
-| 2 | PATCH | `/api/enterprise/profile` | Cập nhật hồ sơ doanh nghiệp đã được import | `PATCH /api/enterprise/profile` |
-| 3 | GET | `/api/enterprise/candidates` | Danh sách và hồ sơ ứng viên | `GET /api/enterprise/candidates` |
-| 4 | PATCH | `/api/enterprise/candidates/{id}/decision` | Tiếp nhận hoặc từ chối ứng viên | `PATCH /api/enterprise/candidates/{id}/decision` |
-| 5 | GET | `/api/enterprise/internships` | Danh sách sinh viên thực tập | `GET /api/enterprise/internships` |
-| 6 | PUT | `/api/enterprise/internships/{id}/evaluation` | Gửi hoặc cập nhật đánh giá thực tập | `PUT /api/enterprise/internships/{id}/evaluation` |
+| 2 | GET | `/api/enterprise/candidates` | Danh sách và hồ sơ ứng viên | `GET /api/enterprise/candidates` |
+| 3 | PATCH | `/api/enterprise/candidates/{id}/decision` | Tiếp nhận hoặc từ chối ứng viên | `PATCH /api/enterprise/candidates/{id}/decision` |
+| 4 | GET | `/api/enterprise/internships` | Danh sách sinh viên thực tập | `GET /api/enterprise/internships` |
+| 5 | PUT | `/api/enterprise/internships/{id}/evaluation` | Gửi hoặc cập nhật đánh giá thực tập | `PUT /api/enterprise/internships/{id}/evaluation` |
+| 6 | GET | `/api/recruitment/windows` | Đợt nhận nhu cầu tuyển dụng theo học kỳ | `GET /api/recruitment/windows` |
 | 7 | GET | `/api/recruitment/posts` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
-| 8 | POST | `/api/enterprise/tasks/bulk` | Giao nhiều task cho nhiều thực tập sinh | `POST /api/enterprise/tasks/bulk` |
-| 9 | GET | `/api/internship-tasks` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 8 | PATCH | `/api/recruitment/posts/{id}` | Sửa tin và vị trí tuyển dụng | `PATCH /api/recruitment/posts/{id}` |
+| 9 | POST | `/api/enterprise/tasks/bulk` | Giao nhiều task cho nhiều thực tập sinh | `POST /api/enterprise/tasks/bulk` |
+| 10 | GET | `/api/internship-tasks` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 11 | GET | `/api/enterprise/candidates/{id}/cv` | Tải CV của hồ sơ đã được giới thiệu cho doanh nghiệp | `GET /api/enterprise/candidates/{id}/cv` |
 
 ## Sinh viên
 
@@ -178,7 +179,7 @@ Xem học tập, chọn combo và đăng ký OJT.
 | 4 | POST | `/api/combo-registration-windows/{id}/selections` | Gửi lựa chọn combo | `POST /api/combo-registration-windows/{id}/selections` |
 | 5 | GET | `/api/ojt-registration-windows` | Danh sách đợt đăng ký OJT | `GET /api/ojt-registration-windows` |
 | 6 | GET | `/api/ojt-registrations` | Danh sách hồ sơ đăng ký OJT | `GET /api/ojt-registrations` |
-| 7 | POST | `/api/ojt-registrations` | Nộp hồ sơ đăng ký OJT | `POST /api/ojt-registrations` |
+| 7 | POST | `/api/ojt-registrations` | Sinh viên nộp hồ sơ OJT và chọn vị trí doanh nghiệp trong một lần | `POST /api/ojt-registrations` |
 | 8 | GET | `/api/ojt-semesters/{id}/students` | Theo dõi trạng thái OJT theo kỳ | `GET /api/ojt-semesters/{id}/students` |
 | 9 | GET | `/api/students/{id}` | Hồ sơ học vụ tổng hợp | `GET /api/students/{id}` |
 | 10 | GET | `/api/students/me/notifications` | thông báo/lọc unread/phân trang, trả unreadCount cùng response | `GET /api/students/me/notifications` |
@@ -190,7 +191,9 @@ Xem học tập, chọn combo và đăng ký OJT.
 | 16 | GET | `/api/job-applications` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
 | 17 | POST | `/api/job-applications` | Ứng tuyển vị trí doanh nghiệp | `POST /api/job-applications` |
 | 18 | GET | `/api/students/me/opportunities` | Vị trí tuyển dụng và quyền ứng tuyển | `GET /api/students/me/opportunities` |
-| 19 | GET | `/api/students/me/internships` | Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố | `GET /api/students/me/internships` |
+| 19 | GET | `/api/students/me/cv-analysis` | Xem kết quả phân tích CV của chính sinh viên | `GET /api/students/me/cv-analysis` |
+| 20 | POST | `/api/students/me/cv-analysis` | Phân tích CV đã upload; không yêu cầu kỳ đăng ký | `POST /api/students/me/cv-analysis` |
+| 21 | GET | `/api/students/me/internships` | Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố | `GET /api/students/me/internships` |
 
 ## Auth
 
@@ -200,4 +203,5 @@ Xem học tập, chọn combo và đăng ký OJT.
 |---:|---|---|---|---|
 | 1 | POST | `/api/auth/login` | Đăng nhập bằng email và mật khẩu | `POST /api/auth/login` |
 | 2 | GET | `/api/auth/me` | Xem tài khoản đang đăng nhập | `GET /api/auth/me` |
-| 3 | POST | `/api/auth/change-password` | Đổi mật khẩu | `POST /api/auth/change-password` |
+| 3 | POST | `/api/auth/logout` | Logout current user | `POST /api/auth/logout` |
+| 4 | POST | `/api/auth/change-password` | Đổi mật khẩu | `POST /api/auth/change-password` |

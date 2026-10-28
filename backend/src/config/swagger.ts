@@ -25,6 +25,9 @@ import { describeStudentWorkflow } from '../modules/students/student-workflow.op
 import { describeListResponses, describeAdditionalListResponses } from './swagger-list-contracts';
 import { describeMergedDetailLists } from './swagger-merged-details';
 import { describeImportWorkflow } from './import-workflow-contracts';
+import { describeQhdnImport } from './swagger-qhdn-import';
+import { describeQhdnDossiers } from './swagger-qhdn-dossiers';
+import { describeQhdnCompletion } from './swagger-qhdn-completion';
 
 const modulesDirectory =
   path.resolve(
@@ -390,4 +393,5 @@ describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
 describeAcademicContracts(describedSpec);
-export const swaggerSpec = describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec)))));
+describeQhdnCompletion(describedSpec);
+export const swaggerSpec = describeQhdnCompletion(describeQhdnDossiers(describeQhdnImport(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec))))))));

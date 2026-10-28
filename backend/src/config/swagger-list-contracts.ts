@@ -15,8 +15,8 @@ const contexts:Schema={
  entryAcademicPeriod:period,currentAcademicPeriod:period,course,sourceCourse:course,targetCourse:course,
  courses:{type:'array',items:course},courseChoices:{type:'array',items:course},registrations:{type:'array',items:registration},
  combo,combos:{type:'array',items:combo},major:obj({id,code:text,name:text,parentMajorId:id}),
- company:obj({id,code:text,name:text,address:text,industry:text,contactPersonName:text,contactEmail:text,contactPhone:text,status:text}),
- position:obj({id,code:text,title:text,description:text,requirements:text,location:text,workMode:text,companyId:id,ojtSemesterId:id,capacity:{type:'integer'},remainingSlots:{type:'integer',minimum:0},status:text}),
+ company:obj({id,code:{...text,nullable:true},name:text,address:{...text,nullable:true},industry:{...text,nullable:true},contactPersonName:{...text,nullable:true},contactEmail:{...text,nullable:true},contactPhone:{...text,nullable:true},status:{...text,nullable:true}}),
+ position:obj({id,code:{...text,nullable:true},title:text,description:{...text,nullable:true},requirements:{...text,nullable:true},location:{...text,nullable:true},workMode:{...text,nullable:true},companyId:id,ojtSemesterId:{...id,nullable:true},capacity:{type:'integer',nullable:true},remainingSlots:{type:'integer',minimum:0},status:{...text,nullable:true}}),
  model:obj({id,code:text,name:text,version:text,status:text}),ruleSet:obj({id,name:text,version:text,programId:id,ojtSemesterId:id,minCredits:{type:'number'},maxUnpassedCourses:{type:'integer'},status:text}),
 };
 for(const key of ['user','createdByUser','updatedByUser','submittedByUser','reviewedByUser','confirmedByUser','checkedByUser','assignedToUser','closedByUser','openedByUser','publishedByUser','coordinatedByUser','evaluatedByUser','transferredByUser','importedByUser','recordedByUser'])contexts[key]=user;

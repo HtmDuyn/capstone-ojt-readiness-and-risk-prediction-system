@@ -10,18 +10,28 @@ export async function archiveRecruitment() {
   try {
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(hashtext('recruitment-archive'))");
+    // Only the new ENTERPRISE importer opts into five calendar months.
+    // Existing/manual posts retain their previous semester-based policy.
+    const importScope = `EXISTS (SELECT 1 FROM "AccountImportBatches" b WHERE b."Kind"='ENTERPRISE'
+      AND b."OJTSemesterID"=p."OJTSemesterID" AND b."Summary"->>'publicationSource'='QHDN_SEMESTER_IMPORT'
+      AND b."Summary"->>'retentionMonths'='5' AND b."Summary"->'postIds' @> jsonb_build_array(p."PostID"))`;
     // Backfill retention for older/manual posts from the next chronological semester.
     await client.query(`UPDATE "RecruitmentPosts" p SET "RetentionSemesterID"=(
       SELECT n."OJTSemesterID" FROM "OJTSemesters" n JOIN "OJTSemesters" s ON s."OJTSemesterID"=p."OJTSemesterID"
       WHERE n."StartDate">s."StartDate" AND (s."AcademicPeriodID" IS NULL OR EXISTS (
         SELECT 1 FROM "AcademicPeriods" ap WHERE ap."AcademicPeriodID"=n."AcademicPeriodID" AND ap."Kind"='SEMESTER'))
       ORDER BY n."StartDate",n."OJTSemesterID" LIMIT 1
-    ) WHERE p."RetentionSemesterID" IS NULL`);
+    ) WHERE p."RetentionSemesterID" IS NULL AND NOT (${importScope})`);
     await client.query(`UPDATE "RecruitmentPosts" SET "Status"='CLOSED',"UpdatedAt"=now()
       WHERE "Status"='PUBLISHED' AND "DeadlineAt"<=now()`);
     const posts = await client.query(`UPDATE "RecruitmentPosts" p SET "Status"='ARCHIVED',"ArchivedAt"=now(),"UpdatedAt"=now()
-      FROM "OJTSemesters" s WHERE s."OJTSemesterID"=p."RetentionSemesterID"
-      AND s."EndDate" < (now() AT TIME ZONE 'Asia/Bangkok')::date AND p."Status"<>'ARCHIVED'
+      WHERE p."Status"<>'ARCHIVED' AND (
+        (NOT (${importScope}) AND EXISTS (SELECT 1 FROM "OJTSemesters" s WHERE s."OJTSemesterID"=p."RetentionSemesterID"
+          AND s."EndDate" < (now() AT TIME ZONE 'Asia/Bangkok')::date))
+        OR EXISTS (SELECT 1 FROM "AccountImportBatches" b WHERE b."Kind"='ENTERPRISE'
+          AND b."OJTSemesterID"=p."OJTSemesterID" AND b."Summary"->>'publicationSource'='QHDN_SEMESTER_IMPORT'
+          AND b."Summary"->>'retentionMonths'='5' AND b."Summary"->'postIds' @> jsonb_build_array(p."PostID")
+          AND ((b."CreatedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')+interval '5 months') AT TIME ZONE 'Asia/Ho_Chi_Minh' <= now()))
       RETURNING p."PostID"`);
     await client.query(`UPDATE "InternshipPositions" pos SET "Status"='ARCHIVED',"ArchivedAt"=now()
       WHERE pos."ArchivedAt" IS NULL AND EXISTS (SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" p ON p."PostID"=pp."PostID" WHERE pp."PositionID"=pos."PositionID" AND p."Status"='ARCHIVED')
@@ -29,7 +39,9 @@ export async function archiveRecruitment() {
     await client.query(`UPDATE "OJTMatchingProfiles" m SET "Status"='ARCHIVED',"UpdatedAt"=now()
       WHERE m."Status"<>'ARCHIVED' AND (
         EXISTS (SELECT 1 FROM "InternshipPositions" p WHERE p."PositionID"=m."PositionID" AND p."ArchivedAt" IS NOT NULL)
-        OR EXISTS (SELECT 1 FROM "OJTSemesters" n WHERE n."OJTSemesterID"=(SELECT n2."OJTSemesterID" FROM "OJTSemesters" n2 JOIN "OJTSemesters" s ON s."OJTSemesterID"=m."OJTSemesterID" WHERE n2."StartDate">s."StartDate" ORDER BY n2."StartDate",n2."OJTSemesterID" LIMIT 1) AND n."EndDate"<(now() AT TIME ZONE 'Asia/Bangkok')::date))`);
+        OR (NOT EXISTS (SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" p ON p."PostID"=pp."PostID"
+          WHERE pp."PositionID"=m."PositionID" AND (${importScope}))
+          AND EXISTS (SELECT 1 FROM "OJTSemesters" n WHERE n."OJTSemesterID"=(SELECT n2."OJTSemesterID" FROM "OJTSemesters" n2 JOIN "OJTSemesters" s ON s."OJTSemesterID"=m."OJTSemesterID" WHERE n2."StartDate">s."StartDate" ORDER BY n2."StartDate",n2."OJTSemesterID" LIMIT 1) AND n."EndDate"<(now() AT TIME ZONE 'Asia/Bangkok')::date)))`);
     if (posts.rowCount) await client.query('INSERT INTO "RecruitmentArchiveRuns" ("ArchivedCount") VALUES ($1)', [posts.rowCount]);
     await client.query('COMMIT');
     return posts.rowCount ?? 0;

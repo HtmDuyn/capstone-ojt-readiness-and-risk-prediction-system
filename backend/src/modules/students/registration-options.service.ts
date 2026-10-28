@@ -6,8 +6,10 @@ import { purpose } from '../combo-registration/combo.validation';
 import { activeChoice } from '../combo-registration/combo.repository';
 import { assertRosterContext } from '../combo-registration/selection.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { hasSemesterRecruitment } from '../qhdn/recruitment-readiness';
 
 const blockerLabels:Record<string,string>={
+  RECRUITMENT_NOT_READY:'Kỳ chưa có doanh nghiệp được import và vị trí tuyển dụng đang nhận hồ sơ còn chỉ tiêu.',
   STUDENT_OR_CURRICULUM_INACTIVE:'Hồ sơ sinh viên hoặc chương trình chưa sẵn sàng.',
   WINDOW_NOT_OPEN:'Đợt đăng ký chưa mở hoặc đã đóng.',WINDOW_NOT_STARTED:'Chưa đến thời gian đăng ký.',WINDOW_EXPIRED:'Đã hết hạn đăng ký.',
   COMBO_ROSTER_CHANGED:'Lộ trình hoặc hồ sơ đã thay đổi; cần Phòng đào tạo rà soát.',
@@ -64,12 +66,17 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     const options=kind==='combo'&&rows.length&&s.ProgramStatus==='PUBLISHED'?(await combos(c,s.ProgramID)).filter(b=>b.coursesReviewed&&b.choiceGroups.length&&purpose({ComboCode:b.code,SelectionGroup:b.selectionGroup})==='SPECIALIZATION'):[];
     const confirmed=kind==='combo'&&rows.length?(await activeChoice(c,s.StudentID,s.ProgramID))[0]??null:null;
     const items:Row[]=[];
+    const recruitmentReady=new Map<number,boolean>();
     for(const w of rows){
       const end=w.EffectiveEndsAt??w.EndsAt,reasons:string[]=[];
       if(s.Status!=='ACTIVE'||(s.ProgramStatus!=null&&s.ProgramStatus!=='PUBLISHED'))reasons.push('STUDENT_OR_CURRICULUM_INACTIVE');
       if(w.Status!=='OPEN')reasons.push('WINDOW_NOT_OPEN');
       if(now<new Date(w.StartsAt))reasons.push('WINDOW_NOT_STARTED');
       if(now>=new Date(end))reasons.push('WINDOW_EXPIRED');
+      if(kind==='ojt'){
+        if(!recruitmentReady.has(w.OJTSemesterID))recruitmentReady.set(w.OJTSemesterID,await hasSemesterRecruitment(c,w.OJTSemesterID));
+        if(!recruitmentReady.get(w.OJTSemesterID))reasons.push('RECRUITMENT_NOT_READY');
+      }
       let pathway:unknown=null;
       const contextIssue=await blocker(async()=>{
         if(kind==='combo')await assertRosterContext(c,{studentId:s.StudentID,programId:w.RosterProgramID,scopeSnapshot:w.RosterSnapshot});

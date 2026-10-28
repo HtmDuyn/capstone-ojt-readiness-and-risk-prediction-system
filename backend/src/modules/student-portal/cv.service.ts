@@ -21,8 +21,8 @@ export async function retireCv(actor:Actor) {return academicTransaction(async c=
 export async function applicationCv(id:number,actor:Actor) {
   return academicTransaction(async c=>{const scope=await applicationScope(c,actor),app=(await c.query(applicationSelect+` WHERE ${scope.sql} AND a."ApplicationID"=$2`,[scope.value,id])).rows[0];if(!app)throw invalid('Application not found.',404);if(!app.cvId)throw invalid('Application has no stored CV.',404);const r=(await c.query('SELECT * FROM "StudentCVVersions" WHERE "CVID"=$1 AND "StudentID"=$2',[app.cvId,app.studentId])).rows[0];if(!r)throw invalid('CV not found.',404);return {...meta(r),content:decryptCv(r.EncryptedContent)};});
 }
-function providerUrl(env:string) {let u:URL;try{u=new URL(process.env[env]??'');}catch{throw invalid(`Configure ${env} to enable this AI API.`,503,'AI_NOT_CONFIGURED');}if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw invalid('Invalid AI provider configuration.',503,'AI_NOT_CONFIGURED');return u;}
-async function provider(url:URL,body:Row):Promise<Row> {
+export function providerUrl(env:string) {let u:URL;try{u=new URL(process.env[env]??'');}catch{throw invalid(`Configure ${env} to enable this AI API.`,503,'AI_NOT_CONFIGURED');}if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw invalid('Invalid AI provider configuration.',503,'AI_NOT_CONFIGURED');return u;}
+export async function provider(url:URL,body:Row):Promise<Row> {
   try {
   let response:Response;try{response=await fetch(url,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',...(process.env.STUDENT_AI_API_KEY?{Authorization:`Bearer ${process.env.STUDENT_AI_API_KEY}`}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});}catch{throw invalid('AI provider is unavailable or timed out.',502,'AI_PROVIDER_FAILED');}
   if(!response.ok)throw invalid('AI provider failed.',502,'AI_PROVIDER_FAILED');const reader=response.body?.getReader();if(!reader)throw invalid('Empty AI response.',502);const chunks:Uint8Array[]=[];let size=0;for(;;){const v=await reader.read();if(v.done)break;size+=v.value.byteLength;if(size>1024*1024){await reader.cancel();throw invalid('AI response exceeds 1 MiB.',502);}chunks.push(v.value);}let result:Row;try{result=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw invalid('AI response is not valid JSON.',502);}return result;
@@ -30,7 +30,7 @@ async function provider(url:URL,body:Row):Promise<Row> {
 }
 function aiInput(value:unknown,keys:string[]){try{return inputObject(value,keys);}catch{throw invalid('Invalid AI response fields.',502,'INVALID_AI_RESPONSE');}}
 function aiText(value:unknown,field:string,max:number){try{return requiredText(value,field,max);}catch{throw invalid('Invalid AI response text.',502,'INVALID_AI_RESPONSE');}}
-function parsedCv(value:unknown) {
+export function parsedCv(value:unknown) {
   const b=inputObject(value,['summary','skills','education','experience','languages','modelVersion']);const r:Row={summary:requiredText(b.summary,'summary',5000),modelVersion:aiText(b.modelVersion,'modelVersion',100)};
   for(const field of ['skills','education','experience','languages']){if(!Array.isArray(b[field])||(b[field] as unknown[]).length>100)throw invalid('Invalid CV analysis array.',502,'INVALID_AI_RESPONSE');r[field]=(b[field] as unknown[]).map(v=>requiredText(v,field,1000));}return r;
 }
