@@ -21,7 +21,11 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
-import { enterpriseService, type EnterpriseInternshipItem } from '@/services/enterpriseService';
+import {
+  enterpriseService,
+  type EnterpriseInternshipItem,
+  type EnterpriseInternshipTask,
+} from '@/services/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -46,6 +50,25 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): Enterpri
   status: (['CANCELLED', 'CANCELED', 'FAILED'].includes(item.status?.toUpperCase() || '') ? 'RISK' : item.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'ONGOING') as 'ONGOING' | 'COMPLETED' | 'RISK',
 });
 
+const mapApiToTask = (item: EnterpriseInternshipTask): InternTask => {
+  const status = item.status.toUpperCase();
+  if (!['TODO', 'IN_PROGRESS', 'DONE', 'COMPLETED'].includes(status)) {
+    throw new Error(`Trạng thái task không được hỗ trợ: ${item.status}`);
+  }
+
+  return {
+    id: String(item.id),
+    internId: String(item.assignmentId),
+    internName: item.student?.fullName || item.fullName || 'Sinh viên',
+    title: item.name,
+    description: item.description || '',
+    deadline: item.dueDate?.slice(0, 10) || '',
+    status: status === 'COMPLETED' ? 'DONE' : status as InternTask['status'],
+    assignedBy: 'Mentor Doanh Nghiệp',
+    createdAt: item.assignedDate?.slice(0, 10),
+  };
+};
+
 const isTaskAssignable = (intern: EnterpriseIntern) =>
   ['ASSIGNED', 'ACTIVE', 'IN_PROGRESS'].includes(intern.assignmentStatus || '');
 
@@ -66,7 +89,7 @@ const getApiErrorMessage = (error: unknown): string | null => {
 };
 
 export const EnterpriseInterns: React.FC = () => {
-  const { loading: profileLoading } = useEnterprise();
+  const { loading: profileLoading, companyId } = useEnterprise();
   const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
   const [tasks, setTasks] = useState<InternTask[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
@@ -74,14 +97,56 @@ export const EnterpriseInterns: React.FC = () => {
 
   const fetchInternships = useCallback(async () => {
     if (profileLoading) return;
+    if (!companyId) {
+      setApiLoading(false);
+      setApiError('Không tìm thấy doanh nghiệp để tải danh sách task.');
+      return;
+    }
+
     setApiLoading(true);
     setApiError(null);
     try {
-      const res = await enterpriseService.listInternships();
-      if (res?.success && res.data) {
-        const mapped = (res.data.items || []).map(mapApiToIntern);
-        setInterns(mapped);
+      const [internshipResponse, firstTaskResponse] = await Promise.all([
+        enterpriseService.listInternships(),
+        enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 }),
+      ]);
+      if (!internshipResponse?.success || !internshipResponse.data) {
+        throw new Error('Không thể tải danh sách thực tập sinh.');
       }
+      if (!firstTaskResponse?.success || !firstTaskResponse.data) {
+        throw new Error('Không thể tải danh sách task đã giao.');
+      }
+
+      const taskItems = [...firstTaskResponse.data.items];
+      const totalPages = Math.ceil(firstTaskResponse.data.total / firstTaskResponse.data.limit);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const taskResponse = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 });
+        if (!taskResponse?.success || !taskResponse.data) {
+          throw new Error(`Không thể tải danh sách task ở trang ${page}.`);
+        }
+        taskItems.push(...taskResponse.data.items);
+      }
+
+      const mappedTasks = taskItems.map(mapApiToTask);
+      const taskCounts = new Map<string, { total: number; completed: number }>();
+      for (const task of mappedTasks) {
+        const counts = taskCounts.get(task.internId) || { total: 0, completed: 0 };
+        counts.total += 1;
+        if (task.status === 'DONE') counts.completed += 1;
+        taskCounts.set(task.internId, counts);
+      }
+
+      const mappedInterns = internshipResponse.data.items.map(mapApiToIntern);
+      setInterns(mappedInterns.map((intern) => {
+        const counts = taskCounts.get(intern.id) || { total: 0, completed: 0 };
+        return {
+          ...intern,
+          totalTasks: counts.total,
+          completedTasks: counts.completed,
+          progressPercent: counts.total ? Math.round((counts.completed / counts.total) * 100) : 0,
+        };
+      }));
+      setTasks(mappedTasks);
     } catch (err: unknown) {
       const message = getApiErrorMessage(err) ||
         (err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh');
@@ -90,7 +155,7 @@ export const EnterpriseInterns: React.FC = () => {
     } finally {
       setApiLoading(false);
     }
-  }, [profileLoading]);
+  }, [companyId, profileLoading]);
 
   useEffect(() => {
     fetchInternships();
@@ -191,6 +256,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Open task assignment modal
   const handleOpenAssignModal = (initialIds?: string[]) => {
+    setViewingIntern(null);
     const assignableInterns = interns.filter(isTaskAssignable);
     const assignableIds = new Set(assignableInterns.map((intern) => intern.id));
     const requestedIds = initialIds?.length
@@ -819,7 +885,7 @@ export const EnterpriseInterns: React.FC = () => {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
+                        <div className="flex items-center justify-center">
                           <button
                             onClick={() => setViewingIntern(intern)}
                             className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-[11px] inline-flex items-center space-x-1 transition-colors"
@@ -827,13 +893,6 @@ export const EnterpriseInterns: React.FC = () => {
                           >
                             <Eye className="w-3.5 h-3.5 text-slate-500" />
                             <span>Tasks</span>
-                          </button>
-                          <button
-                            onClick={() => handleOpenAssignModal([intern.id])}
-                            className="p-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-[11px] font-semibold transition-colors"
-                            title="Giao task riêng cho sinh viên này"
-                          >
-                            <Plus className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1243,9 +1302,9 @@ export const EnterpriseInterns: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8 max-h-[90vh]">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-orange-50/30">
-              <div>
-                <div className="flex items-center space-x-2">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between bg-gradient-to-r from-slate-50 via-white to-orange-50/30">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-extrabold text-slate-900 text-base">
                     {viewingIntern.fullName}
                   </h3>
@@ -1262,25 +1321,26 @@ export const EnterpriseInterns: React.FC = () => {
                     {viewingIntern.status === 'RISK' ? 'Chậm tiến độ' : 'Đúng tiến độ'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed break-words">
                   {viewingIntern.position} • Chuyên ngành: {viewingIntern.major} • Mentor:{' '}
                   <strong>{viewingIntern.mentorName}</strong>
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-end gap-2 self-end sm:self-auto flex-shrink-0">
                 <button
                   onClick={() => {
                     handleOpenAssignModal([viewingIntern.id]);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center space-x-1 shadow-xs transition-colors"
+                  className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Giao task</span>
                 </button>
                 <button
                   onClick={() => setViewingIntern(null)}
-                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
+                  aria-label="Đóng chi tiết sinh viên"
+                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0"
                 >
                   ✕
                 </button>
@@ -1290,7 +1350,7 @@ export const EnterpriseInterns: React.FC = () => {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {/* Stats Bar */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
                   <span className="text-[11px] text-slate-400 font-semibold block uppercase">
                     Tiến độ hoàn thành
@@ -1319,7 +1379,7 @@ export const EnterpriseInterns: React.FC = () => {
 
               {/* Tasks List */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2">
                   <div className="flex items-center space-x-2">
                     <ListTodo className="w-4 h-4 text-orange-600" />
                     <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
@@ -1331,7 +1391,7 @@ export const EnterpriseInterns: React.FC = () => {
                   <select
                     value={taskStatusFilter}
                     onChange={(e) => setTaskStatusFilter(e.target.value as any)}
-                    className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
+                    className="w-full sm:w-auto px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
                   >
                     <option value="ALL">Tất cả nhiệm vụ</option>
                     <option value="TODO">Cần làm</option>
@@ -1349,12 +1409,12 @@ export const EnterpriseInterns: React.FC = () => {
                     {viewedInternTasks.map((task) => (
                       <div
                         key={task.id}
-                        className="p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-2 text-xs"
+                        className="p-3 sm:p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-2 text-xs"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-bold text-slate-900 text-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-slate-900 text-xs break-words">
                                 {task.title}
                               </span>
                               <span
@@ -1379,7 +1439,7 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
 
                           {/* Quick Actions */}
-                          <div className="flex items-center space-x-1.5 flex-shrink-0">
+                          <div className="flex items-center justify-end gap-1.5 flex-shrink-0">
                             {task.status !== 'DONE' ? (
                               <button
                                 onClick={() => handleUpdateTaskStatus(task.id, 'DONE')}
@@ -1407,16 +1467,16 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-                          <div className="flex items-center space-x-3">
-                            <span>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="whitespace-nowrap">
                               Hạn chót: <strong className="text-slate-700">{task.deadline}</strong>
                             </span>
-                            <span>
+                            <span className="whitespace-nowrap">
                               Giao bởi: <strong className="text-slate-700">{task.assignedBy}</strong>
                             </span>
                           </div>
-                          {task.createdAt && <span>Ngày tạo: {task.createdAt}</span>}
+                          {task.createdAt && <span className="sm:text-right">Ngày tạo: {task.createdAt}</span>}
                         </div>
                       </div>
                     ))}
