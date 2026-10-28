@@ -14,7 +14,7 @@ type Candidate = { student: ImportedStudent; result: SavedOjtEligibility; blocke
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
 
 export default function EducationOjtHandoff() {
-  const { semesters, error: semesterError } = useEducationSemesters();
+  const { semesters, error: semesterError, reload: reloadSemesters } = useEducationSemesters();
   const [semesterId, setSemesterId] = useState('');
   const [students, setStudents] = useState<ImportedStudent[]>([]);
   const [results, setResults] = useState<Record<number, SavedOjtEligibility>>({});
@@ -98,7 +98,7 @@ export default function EducationOjtHandoff() {
       <div className="flex flex-wrap gap-3">
         <select aria-label="Kỳ bàn giao OJT" value={semesterId} disabled={saving} onChange={e => { setSemesterId(e.target.value); setSelected([]); setSuccess(''); }} className="rounded-xl border border-slate-200 p-3"><option value="">Chọn kỳ OJT</option>{semesters.map(s => <option key={s.id} value={s.id}>{s.name} ({s.semesterCode})</option>)}</select>
         <input aria-label="Tìm sinh viên bàn giao" placeholder="Tìm mã, tên sinh viên hoặc chương trình" value={search} onChange={e => setSearch(e.target.value)} className="min-w-64 flex-1 rounded-xl border border-slate-200 p-3" />
-        <button disabled={saving || loading} onClick={() => setRefresh(n => n + 1)} className="rounded-xl border px-4 py-2 disabled:opacity-50">Tải lại</button>
+        <button disabled={saving || loading} onClick={() => { reloadSemesters(); setRefresh(n => n + 1); }} className="rounded-xl border px-4 py-2 disabled:opacity-50">Tải lại</button>
         <Link to="/education/ojt-conditions" className="rounded-xl bg-orange-50 px-4 py-3 text-orange-700">Xét điều kiện OJT</Link>
       </div>
       {(error || semesterError) && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error || semesterError}</p>}

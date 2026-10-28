@@ -35,7 +35,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 );
 
 export const ErrorNotice: React.FC<{ message: string }> = ({ message }) => (
-  <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-600">
+  <div role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-600">
     <AlertTriangle size={15} className="mt-0.5 shrink-0" />
     <span>{message}</span>
   </div>

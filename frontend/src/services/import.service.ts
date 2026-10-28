@@ -84,7 +84,7 @@ interface StudentImportResource {
 
 export const importService = {
   listImportedStudents: (filters: ImportedStudentFilters, page: number, signal?: AbortSignal) =>
-    getPage<ImportedStudent>('/students', { ...filters, importedOnly: 'true', page, limit: 20 }, signal),
+    getPage<ImportedStudent>('/students', { ...filters, page, limit: 20 }, signal),
   listStudentImportBatches: (signal?: AbortSignal) =>
     getAllItems<StudentImportBatch>('/academic-imports', { kind: 'STUDENT', status: 'COMPLETED' }, signal),
   getImportedStudent: async (id: number, signal?: AbortSignal) =>

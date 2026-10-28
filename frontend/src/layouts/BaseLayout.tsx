@@ -45,6 +45,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [initialAiQuery, setInitialAiQuery] = useState("");
+  const isEducation = user?.role === 'education';
 
   const handleLogout = () => {
     logout();
@@ -57,14 +58,14 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   };
 
   const resolvedUserSummary: HeaderUserSummary = userSummary || {
-    fullName: user?.name || mockStudentProfile.fullName,
-    email: user?.email || mockStudentProfile.email,
-    code: user?.id || mockStudentProfile.studentCode,
+    fullName: user?.name || (isEducation ? 'Phòng Đào tạo' : mockStudentProfile.fullName),
+    email: user?.email || (isEducation ? '' : mockStudentProfile.email),
+    code: user?.id || (isEducation ? undefined : mockStudentProfile.studentCode),
     subtitle:
       user?.role === "student"
         ? `${mockStudentProfile.studentCode} - ${mockStudentProfile.semester}`
         : user?.role?.toUpperCase(),
-    avatar: user?.avatar || mockStudentProfile.avatar,
+    avatar: user?.avatar || (isEducation ? '' : mockStudentProfile.avatar),
     department: user?.role === "student" ? mockStudentProfile.major : undefined,
   };
 
@@ -99,8 +100,10 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
-            student={mockStudentProfile}
+            student={isEducation ? undefined : mockStudentProfile}
             user={resolvedUserSummary}
+            showNotifications={!isEducation}
+            showLanguage={!isEducation}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
             showSearch={
@@ -119,7 +122,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         </div>
 
         {/* Nút tư vấn AI nổi (Góc dưới bên phải) */}
-        {showAIConsult && (
+        {showAIConsult && !isEducation && (
           <div className="fixed bottom-6 right-6 z-40">
             <span className="absolute -inset-1 rounded-full bg-orange-500/30 blur-sm animate-pulse pointer-events-none" />
             <button
@@ -141,12 +144,12 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         )}
 
         {/* Modal tư vấn AI */}
-        <AIConsultModal
+        {!isEducation && <AIConsultModal
           isOpen={aiModalOpen}
           onClose={() => setAiModalOpen(false)}
           student={mockStudentProfile}
           initialQuery={initialAiQuery}
-        />
+        />}
       </div>
     </BaseLayoutContext.Provider>
   );

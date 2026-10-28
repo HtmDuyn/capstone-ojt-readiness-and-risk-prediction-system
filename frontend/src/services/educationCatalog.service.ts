@@ -71,6 +71,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
           positiveId(item.programId) ??
           positiveId(program?.id),
         [
+          [program?.code ?? item.code ?? item.programCode, program?.name ?? item.name ?? item.programName].map(text).filter(Boolean).join(' — '),
           program?.name,
           program?.code,
           item.name,

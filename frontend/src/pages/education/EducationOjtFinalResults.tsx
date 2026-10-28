@@ -1,7 +1,7 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
 import API from "@/services/api";
-import { getPage } from '@/services/educationApi';
+import { apiData, getPage } from '@/services/educationApi';
 import type { Page } from '@/types/education/api.types';
 import React from "react";
 type Result = {
@@ -34,7 +34,7 @@ const EducationOjtFinalResults: React.FC = () => {
   const [data, setData] = React.useState<Page<Result> | null>(null),
     [selected, setSelected] = React.useState<Result | null>(null);
   const [semesterId, setSemesterId] = React.useState('');
-  const { semesters, error: semesterError } = useEducationSemesters();
+  const { semesters, error: semesterError, reload: reloadSemesters } = useEducationSemesters();
   const [search, setSearch] = React.useState(""),
     [status, setStatus] = React.useState(""),
     [page, setPage] = React.useState(1),
@@ -78,10 +78,11 @@ const EducationOjtFinalResults: React.FC = () => {
     setError("");
     setNotice("");
     try {
-      await API.post(`/ojt-results/${id}/confirm`, {
+      const response = await API.post(`/ojt-results/${id}/confirm`, {
         reason: trimmed,
         idempotencyKey: attempt.key,
       });
+      apiData(response.data);
       setSelected(null);
       setReason("");
       setPage(1);
@@ -146,7 +147,7 @@ const EducationOjtFinalResults: React.FC = () => {
           </select>
           <button
             className="rounded border px-3"
-            onClick={() => setRefresh((v) => v + 1)}
+            onClick={() => { reloadSemesters(); setRefresh((v) => v + 1); }}
           >
             Tải lại
           </button>

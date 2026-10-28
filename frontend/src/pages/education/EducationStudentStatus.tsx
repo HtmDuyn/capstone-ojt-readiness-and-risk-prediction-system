@@ -1,6 +1,6 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
-import { apiData, getJson } from '@/services/educationApi';
+import { getPage } from '@/services/educationApi';
 import { ojtEligibilityService } from '@/services/ojtEligibility.service';
 import { loadSavedLocalOjtResults } from '@/services/localOjtEligibility.service';
 import { savedOjtLabel, type SavedOjtEligibility } from '@/utils/savedOjtEligibility';
@@ -29,11 +29,14 @@ const statusNames: Record<string, string> = {
   COORDINATING: "Đang điều phối",
   ENTERPRISE_ACCEPTED: "Doanh nghiệp tiếp nhận",
   ENTERPRISE_REJECTED: "Doanh nghiệp từ chối",
+  LEGACY_REVIEW_REQUIRED: "Cần đối soát dữ liệu cũ",
+  CANCELLED: "Đã hủy",
+  CANCELED: "Đã hủy",
 };
 const state = (value: unknown) => statusNames[String(value)] ?? label(value);
 const EducationStudentStatus: React.FC = () => {
   const [semesterId, setSemesterId] = React.useState('');
-  const { semesters, error: semesterError } = useEducationSemesters();
+  const { semesters, error: semesterError, reload: reloadSemesters } = useEducationSemesters();
   const [search, setSearch] = React.useState(""),
     [page, setPage] = React.useState(1),
     [refresh, setRefresh] = React.useState(0);
@@ -76,12 +79,12 @@ const EducationStudentStatus: React.FC = () => {
     setError("");
     setData(null);
     setSelected(null);
-    getJson(
-      `/ojt-semesters/${semesterId}`,
+    getPage<Row>(
+      `/ojt-semesters/${semesterId}/students`,
       { page, limit: 20, search },
       controller.signal,
     )
-      .then(response => { if (!controller.signal.aborted) setData(apiData<{ students: Page<Row> }>(response).students); })
+      .then(response => { if (!controller.signal.aborted) setData(response); })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
       })
@@ -126,7 +129,7 @@ const EducationStudentStatus: React.FC = () => {
             }}
           />
           <button
-            onClick={() => setRefresh((v) => v + 1)}
+            onClick={() => { reloadSemesters(); setRefresh((v) => v + 1); }}
             className="rounded border px-3"
           >
             Tải lại
