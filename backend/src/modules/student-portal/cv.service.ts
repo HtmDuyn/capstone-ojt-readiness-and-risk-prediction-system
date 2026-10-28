@@ -1,26 +1,12 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { academicTransaction, audit } from '../academic/academic.repository';
-import { invalid, positiveId, inputObject, requiredText } from '../students/student.validation';
-import { applicationScope, applicationSelect, publicPositionSelect } from '../recruitment/recruitment.service';
+import { createDecipheriv } from 'node:crypto';
+import { academicTransaction } from '../academic/academic.repository';
+import { invalid, inputObject, requiredText } from '../students/student.validation';
+import { publicPositionSelect } from '../recruitment/recruitment.service';
 import { summaryWithClient } from './academic.service';
 import { ownStudent, type Actor, type Row } from './shared';
 
 function key() {const value=process.env.CV_STORAGE_KEY;const k=Buffer.from(value??'','base64');if(k.length!==32)throw invalid('Configure CV_STORAGE_KEY as a base64 32-byte key.',503,'CV_STORAGE_NOT_CONFIGURED');return k;}
-function encrypt(content:Buffer) {const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key(),iv);return Buffer.concat([iv,cipher.update(content),cipher.final(),cipher.getAuthTag()]);}
 export function decryptCv(value:Buffer) {const d=createDecipheriv('aes-256-gcm',key(),value.subarray(0,12));d.setAuthTag(value.subarray(value.length-16));return Buffer.concat([d.update(value.subarray(12,value.length-16)),d.final()]);}
-const meta=(r:Row)=>({id:r.CVID,filename:r.Filename,mimeType:r.MimeType,sizeBytes:r.SizeBytes,sha256:r.Sha256,createdAt:r.CreatedAt});
-export async function uploadCv(file:Express.Multer.File|undefined,actor:Actor) {
-  if(!file||file.size>5*1024*1024||file.size<8||file.buffer.subarray(0,5).toString()!=='%PDF-')throw invalid('Upload a PDF CV of at most 5 MiB.',400,'INVALID_CV');
-  const filename=file.originalname.replace(/[^\p{L}\p{N} ._-]/gu,'_').slice(0,150)||'cv.pdf',bytes=encrypt(file.buffer),hash=createHash('sha256').update(file.buffer).digest('hex');
-  return academicTransaction(async c=>{const s=await ownStudent(c,actor);await c.query('UPDATE "StudentCVVersions" SET "RetiredAt"=now() WHERE "StudentID"=$1 AND "RetiredAt" IS NULL',[s.StudentID]);const r=(await c.query('INSERT INTO "StudentCVVersions" ("StudentID","Filename","MimeType","Sha256","EncryptedContent","SizeBytes","CreatedBy") VALUES ($1,$2,\'application/pdf\',$3,$4,$5,$6) RETURNING *',[s.StudentID,filename,hash,bytes,file.size,actor.userId])).rows[0];await audit(c,actor.userId,'StudentCVVersions',r.CVID,'UPLOAD',null,meta(r));return meta(r);});
-}
-export async function currentCv(actor:Actor,download=false) {
-  return academicTransaction(async c=>{const s=await ownStudent(c,actor),r=(await c.query('SELECT * FROM "StudentCVVersions" WHERE "StudentID"=$1 AND "RetiredAt" IS NULL',[s.StudentID])).rows[0];if(!r)throw invalid('Current CV not found.',404);return download?{...meta(r),content:decryptCv(r.EncryptedContent)}:meta(r);});
-}
-export async function retireCv(actor:Actor) {return academicTransaction(async c=>{const s=await ownStudent(c,actor),rows=(await c.query('UPDATE "StudentCVVersions" SET "RetiredAt"=now() WHERE "StudentID"=$1 AND "RetiredAt" IS NULL RETURNING "CVID"',[s.StudentID])).rows;for(const r of rows)await audit(c,actor.userId,'StudentCVVersions',r.CVID,'RETIRE',null,{retired:true});return {retired:true};});}
-export async function applicationCv(id:number,actor:Actor) {
-  return academicTransaction(async c=>{const scope=await applicationScope(c,actor),app=(await c.query(applicationSelect+` WHERE ${scope.sql} AND a."ApplicationID"=$2`,[scope.value,id])).rows[0];if(!app)throw invalid('Application not found.',404);if(!app.cvId)throw invalid('Application has no stored CV.',404);const r=(await c.query('SELECT * FROM "StudentCVVersions" WHERE "CVID"=$1 AND "StudentID"=$2',[app.cvId,app.studentId])).rows[0];if(!r)throw invalid('CV not found.',404);return {...meta(r),content:decryptCv(r.EncryptedContent)};});
-}
 function providerUrl(env:string) {let u:URL;try{u=new URL(process.env[env]??'');}catch{throw invalid(`Configure ${env} to enable this AI API.`,503,'AI_NOT_CONFIGURED');}if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw invalid('Invalid AI provider configuration.',503,'AI_NOT_CONFIGURED');return u;}
 async function provider(url:URL,body:Row):Promise<Row> {
   try {
@@ -30,17 +16,6 @@ async function provider(url:URL,body:Row):Promise<Row> {
 }
 function aiInput(value:unknown,keys:string[]){try{return inputObject(value,keys);}catch{throw invalid('Invalid AI response fields.',502,'INVALID_AI_RESPONSE');}}
 function aiText(value:unknown,field:string,max:number){try{return requiredText(value,field,max);}catch{throw invalid('Invalid AI response text.',502,'INVALID_AI_RESPONSE');}}
-function parsedCv(value:unknown) {
-  const b=inputObject(value,['summary','skills','education','experience','languages','modelVersion']);const r:Row={summary:requiredText(b.summary,'summary',5000),modelVersion:aiText(b.modelVersion,'modelVersion',100)};
-  for(const field of ['skills','education','experience','languages']){if(!Array.isArray(b[field])||(b[field] as unknown[]).length>100)throw invalid('Invalid CV analysis array.',502,'INVALID_AI_RESPONSE');r[field]=(b[field] as unknown[]).map(v=>requiredText(v,field,1000));}return r;
-}
-export async function analyseCv(body:unknown,actor:Actor) {
-  const b=inputObject(body,['cvId']),url=providerUrl('CV_ANALYSIS_SERVICE_URL');
-  const job=await academicTransaction(async c=>{const s=await ownStudent(c,actor);const r=(await c.query('SELECT * FROM "StudentCVVersions" WHERE "StudentID"=$1 AND "RetiredAt" IS NULL AND ($2::int IS NULL OR "CVID"=$2)',[s.StudentID,b.cvId===undefined?null:positiveId(b.cvId,'cvId')])).rows[0];if(!r)throw invalid('Current CV not found.',404);const pending=(await c.query('SELECT "AnalysisID" FROM "CVAnalysisJobs" WHERE "StudentID"=$1 AND "Status"=\'RUNNING\' AND "CreatedAt">now()-interval \'5 minutes\'',[s.StudentID])).rows[0];if(pending)throw invalid('A CV analysis is already running.',409);const j=(await c.query('INSERT INTO "CVAnalysisJobs" ("StudentID","CVID","Status") VALUES ($1,$2,\'RUNNING\') RETURNING "AnalysisID"',[s.StudentID,r.CVID])).rows[0];return {id:j.AnalysisID,cv:r};});
-  try{const result=parsedCv(await provider(url,{cvId:job.cv.CVID,mimeType:'application/pdf',contentBase64:decryptCv(job.cv.EncryptedContent).toString('base64')}));return await academicTransaction(async c=>{await c.query('UPDATE "CVAnalysisJobs" SET "Status"=\'COMPLETED\',"Result"=$2,"CompletedAt"=now() WHERE "AnalysisID"=$1',[job.id,JSON.stringify(result)]);return {id:job.id,status:'COMPLETED',result};});}
-  catch(e:any){await academicTransaction(c=>c.query('UPDATE "CVAnalysisJobs" SET "Status"=\'FAILED\',"ErrorCode"=$2,"CompletedAt"=now() WHERE "AnalysisID"=$1',[job.id,e.errorCode??'AI_PROVIDER_FAILED']));throw invalid('CV analysis failed; retry after checking the provider.',502,'AI_PROVIDER_FAILED');}
-}
-export async function analysis(id:number,actor:Actor) {return academicTransaction(async c=>{const s=await ownStudent(c,actor);await c.query('UPDATE "CVAnalysisJobs" SET "Status"=\'FAILED\',"ErrorCode"=\'ANALYSIS_INTERRUPTED\',"CompletedAt"=now() WHERE "StudentID"=$1 AND "Status"=\'RUNNING\' AND "CreatedAt"<now()-interval \'5 minutes\'',[s.StudentID]);const r=(await c.query('SELECT "AnalysisID" AS id,"CVID" AS "cvId","Status" AS status,"Result" AS result,"ErrorCode" AS "errorCode","CreatedAt" AS "createdAt" FROM "CVAnalysisJobs" WHERE "AnalysisID"=$1 AND "StudentID"=$2',[id,s.StudentID])).rows[0];if(!r)throw invalid('Analysis not found.',404);return r;});}
 export async function roadmap(semesterId:number,actor:Actor) {
   const url=providerUrl('ROADMAP_SERVICE_URL');const input=await academicTransaction(async c=>summaryWithClient(c,(await ownStudent(c,actor)).StudentID,semesterId));const result=await provider(url,{academicSummary:input});const b=aiInput(result,['recommendations','modelVersion']);if(!Array.isArray(b.recommendations)||b.recommendations.length>50)throw invalid('Invalid roadmap response.',502);return {modelVersion:requiredText(b.modelVersion,'modelVersion',100),recommendations:b.recommendations.map(v=>aiText(v,'recommendation',2000)),isAiRecommendation:true};
 }

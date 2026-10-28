@@ -33,10 +33,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Mở rộng nếu chuột đang hover (desktop) hoặc menu trên thiết bị di động được mở
   const isExpanded = isHovered || isOpenMobile;
-  const toggleGroup = (groupId: string) => {
+  const toggleGroup = (groupId: string, isOpen: boolean) => {
     setOpenGroups((prev) => ({
       ...prev,
-      [groupId]: !prev[groupId],
+      [groupId]: !isOpen,
     }));
   };
 
@@ -105,13 +105,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const currentPath = location.pathname;
             const hasChildren = Boolean(item.children?.length);
 
-            const isActive = currentPath === item.path;
+            const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
 
             const hasActiveChild = item.children?.some(
-              (child) => child.path === currentPath,
+              (child) => child.path === currentPath || currentPath.startsWith(`${child.path}/`),
             );
 
-            const isGroupOpen = openGroups[item.id] || Boolean(hasActiveChild);
+            const isGroupOpen = openGroups[item.id] ?? Boolean(hasActiveChild);
 
             // =========================
             // MENU CHA
@@ -122,7 +122,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     type="button"
                     title={!isExpanded ? item.label : undefined}
-                    onClick={() => toggleGroup(item.id)}
+                    onClick={() => {
+                      if (!isExpanded) {
+                        setIsHovered(true);
+                        setOpenGroups((prev) => ({ ...prev, [item.id]: true }));
+                        navigate(item.children![0].path);
+                      } else {
+                        toggleGroup(item.id, isGroupOpen);
+                      }
+                    }}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${
                       hasActiveChild
                         ? "text-white bg-white/10"
@@ -164,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {isGroupOpen && isExpanded && (
                     <div className="ml-4 mt-1 space-y-1 border-l border-white/10 pl-2">
                       {item.children?.map((child) => {
-                        const isChildActive = currentPath === child.path;
+                        const isChildActive = currentPath === child.path || currentPath.startsWith(`${child.path}/`);
 
                         return (
                           <button

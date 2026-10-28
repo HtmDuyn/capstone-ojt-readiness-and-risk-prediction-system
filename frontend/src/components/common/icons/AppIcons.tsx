@@ -1,5 +1,46 @@
 import React from 'react';
-import { LayoutDashboard, GraduationCap, Activity, Compass, ClipboardCheck, UserCheck, TrendingUp, Award, Bell, Sparkles, Search, Globe, Info, Zap, Check, Briefcase, ChevronDown, ChevronRight, ChevronLeft, Menu, X, LogOut, Star, Hourglass, BookOpen, Lock, Download, ArrowRight, ExternalLink, MoreVertical, LucideProps } from 'lucide-react';
+import {
+  LayoutDashboard,
+  GraduationCap,
+  Activity,
+  Compass,
+  ClipboardCheck,
+  UserCheck,
+  TrendingUp,
+  Award,
+  Bell,
+  Sparkles,
+  CircleHelp,
+  Search,
+  Globe,
+  Info,
+  Zap,
+  Check,
+  Briefcase,
+  Clock,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  Menu,
+  X,
+  LogOut,
+  Star,
+  Hourglass,
+  BookOpen,
+  Lock,
+  Download,
+  Filter,
+  ArrowRight,
+  ExternalLink,
+  MoreVertical,
+  CheckCircle2,
+  Building,
+  Users,
+  MapPin,
+  Plus,
+  FileText,
+  LucideProps,
+} from 'lucide-react';
 
 export interface IconProps extends LucideProps {
   size?: number | string;
@@ -78,6 +119,10 @@ export const BotSparkleIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1
   <Sparkles size={size} strokeWidth={strokeWidth} {...props} />
 );
 
+export const HelpCircleIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <CircleHelp size={size} strokeWidth={strokeWidth} {...props} />
+);
+
 export const SearchIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...props }) => (
   <Search size={size} strokeWidth={strokeWidth} {...props} />
 );
@@ -104,6 +149,10 @@ export const BriefcaseIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.
 
 export const TrendUpIcon: React.FC<IconProps> = ({ size = 14, strokeWidth = 2.5, ...props }) => (
   <TrendingUp size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const ClockIcon: React.FC<IconProps> = ({ size = 14, strokeWidth = 2, ...props }) => (
+  <Clock size={size} strokeWidth={strokeWidth} {...props} />
 );
 
 export const ChevronDownIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
@@ -144,6 +193,10 @@ export const DownloadIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, 
   <Download size={size} strokeWidth={strokeWidth} {...props} />
 );
 
+export const FilterIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...props }) => (
+  <Filter size={size} strokeWidth={strokeWidth} {...props} />
+);
+
 export const ArrowRightIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
   <ArrowRight size={size} strokeWidth={strokeWidth} {...props} />
 );
@@ -156,6 +209,10 @@ export const MoreVerticalIcon: React.FC<IconProps> = ({ size = 20, strokeWidth =
   <MoreVertical size={size} strokeWidth={strokeWidth} {...props} />
 );
 
+export const CheckCircleIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 2, ...props }) => (
+  <CheckCircle2 size={size} strokeWidth={strokeWidth} {...props} />
+);
+
 export const ChevronRightIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
   <ChevronRight size={size} strokeWidth={strokeWidth} {...props} />
 );
@@ -164,3 +221,22 @@ export const ChevronLeftIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 
   <ChevronLeft size={size} strokeWidth={strokeWidth} {...props} />
 );
 
+export const BuildingIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Building size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const UsersIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 1.8, ...props }) => (
+  <Users size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const LocationIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.8, ...props }) => (
+  <MapPin size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const PlusIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...props }) => (
+  <Plus size={size} strokeWidth={strokeWidth} {...props} />
+);
+
+export const FileTextIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.8, ...props }) => (
+  <FileText size={size} strokeWidth={strokeWidth} {...props} />
+);

@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { enrichListRows } from '../../shared/list-context';
-import { invalid, pagination, positiveId } from '../students/student.validation';
+import { invalid, pagination } from '../students/student.validation';
 export type Row = Record<string, any>;
 export type Actor = { userId:number; roleCode:string; studentId?:number|null };
 const requestProfiles = new WeakMap<Actor, Row>();
@@ -19,7 +19,6 @@ export async function page(c:PoolClient,sql:string,args:unknown[],params:Row,all
   const p=pagination(params,allowed);if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const row=(await c.query(`WITH filtered AS (${sql}), paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];return {...row,items:await enrichListRows(c,row.items),page:p.page,limit:p.limit};
 }
-export function optionalId(v:unknown,key:string){return v===undefined?null:positiveId(v,key);}
 export function publicEligibility(value:Row|null) {
   if(!value)return null;
   const {checkedBy,confirmation,rule,...data}=value;void checkedBy;

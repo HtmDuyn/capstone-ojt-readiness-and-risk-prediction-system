@@ -12,9 +12,9 @@
  *         idempotencyKey:
  *           type: string
  *           maxLength: 100
- *         windowId:
+ *         semesterId:
  *           type: integer
- *           description: Required for ENTERPRISE. Use an open recruitment intake linked to an academic semester. No separate OJT semester or following semester is required.
+ *           description: Required for enterprise imports; configure this and the next semester dates.
  *         rows:
  *           type: array
  *           minItems: 1

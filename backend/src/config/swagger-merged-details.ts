@@ -9,7 +9,6 @@ export function describeMergedDetailLists(spec:Schema) {
   const targets:[string,string,string[]][]=[
     ['/api/ojt-registrations','registrationId',['history','coordination','assignment']],
     ['/api/ojt-results','resultId',['history']],
-    ['/api/academic-imports','importId',['rows']],
   ];
   for(const [path,selector,prefixes]of targets){
     const operation=spec.paths[path]?.get;if(!operation)throw Error('Missing merged list: '+path);

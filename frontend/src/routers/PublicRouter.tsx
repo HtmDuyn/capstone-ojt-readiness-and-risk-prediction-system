@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 
 import { getMenuByRole } from "@/config";
+import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 
@@ -26,6 +27,18 @@ import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
 import AdminAiConfig from "@/pages/admin/AdminAiConfig";
 import AdminSettings from "@/pages/admin/AdminSettings";
+import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
+import EnterpriseDashboard from "@/pages/enterprise/EnterpriseDashboard";
+import EnterpriseJobs from "@/pages/enterprise/EnterpriseJobs";
+import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
+import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
+import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
+import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
+import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
+import QhdnEnterprise from "@/pages/qhdn/QhdnEnterprise";
+import QhdnOjtCoor from "@/pages/qhdn/QhdnOjtCoor";
+import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
+import QhdnEvaluations from "@/pages/qhdn/QhdnEvaluations";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -58,30 +71,6 @@ const RolePlaceholderPage: React.FC<{
     </p>
   </div>
 );
-
-/* =========================================================
-   ROLE ROUTES CHUNG
-   ========================================================= */
-
-const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
-  const navItems = getMenuByRole(role);
-
-  return {
-    element: (
-      <BaseLayout
-        navItems={navItems}
-        homePath={navItems[0]?.path || `/${role}/dashboard`}
-        brandSubtitle={ROLE_LABELS[role]}
-        showAIConsult={false}
-      />
-    ),
-
-    children: navItems.map((item) => ({
-      path: item.path,
-      element: <RolePlaceholderPage role={role} />,
-    })),
-  };
-};
 
 /* =========================================================
    STUDENT ROUTES
@@ -124,7 +113,7 @@ const studentRoutes: RouteObject = {
 
     {
       path: "/student/ojt-registration",
-      element: <StudentFeaturePage />,
+      element: <StudentOjtRegistration />,
     },
 
     {
@@ -388,8 +377,17 @@ export const router = createBrowserRouter([
 
   {
     element: <PrivateRoute allowedRoles={["qhdn"]} />,
-
-    children: [createRoleRoutes("qhdn")],
+    children: [{
+      element: <BaseLayout navItems={getMenuByRole("qhdn")} homePath="/qhdn/dashboard" brandSubtitle="Phòng Quan hệ Doanh nghiệp" showAIConsult={false} />,
+      children: [
+        { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
+        { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
+        { path: "/qhdn/enterprises", element: <QhdnEnterprise /> },
+        { path: "/qhdn/registration-windows", element: <QhdnRegistrationWindows /> },
+        { path: "/qhdn/coordination", element: <QhdnOjtCoor /> },
+        { path: "/qhdn/evaluations", element: <QhdnEvaluations /> },
+      ],
+    }],
   },
 
   /* =======================================================
@@ -398,8 +396,18 @@ export const router = createBrowserRouter([
 
   {
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
-
-    children: [createRoleRoutes("enterprise")],
+    children: [{
+      element: <EnterpriseProvider><BaseLayout navItems={getMenuByRole("enterprise")} homePath="/enterprise/dashboard" brandSubtitle="Đối tác Doanh nghiệp" showAIConsult={false} /></EnterpriseProvider>,
+      children: [
+        { path: "/enterprise", element: <Navigate to="/enterprise/dashboard" replace /> },
+        { path: "/enterprise/dashboard", element: <EnterpriseDashboard /> },
+        { path: "/enterprise/jobs", element: <EnterpriseJobs /> },
+        { path: "/enterprise/candidates", element: <EnterpriseCandidates /> },
+        { path: "/enterprise/interns", element: <EnterpriseInterns /> },
+        { path: "/enterprise/evaluation", element: <EnterpriseEvaluation /> },
+        { path: "/enterprise/profile", element: <EnterpriseProfile /> },
+      ],
+    }],
   },
 
   /* =======================================================

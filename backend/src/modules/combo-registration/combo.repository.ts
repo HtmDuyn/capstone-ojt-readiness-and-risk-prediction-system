@@ -1,16 +1,14 @@
-import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { query } from '../../config/database';
 import { pagination } from '../students/student.validation';
 import { invalid, positiveId, enumValue } from './combo.validation';
 export type Row=Record<string,any>;
-const comboWindowSelect=`SELECT w.*,jsonb_build_object('id',p."AcademicPeriodID",'code',p."PeriodCode",'name',p."Name",'kind',p."Kind",'startDate',p."StartDate",'endDate',p."EndDate") AS period,jsonb_build_object('id',o."OJTSemesterID",'code',o."SemesterCode",'name',o."Name") AS semester FROM "ComboRegistrationWindows" w JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=w."AcademicPeriodID" JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID"`;
 export async function windowRecord(client:PoolClient,id:number,lock=false):Promise<Row> {
-  const row=(await client.query(`${comboWindowSelect} WHERE w."WindowID"=$1${lock?' FOR UPDATE OF w':''}`,[id])).rows[0];
+  const row=(await client.query(`SELECT * FROM "ComboRegistrationWindows" WHERE "WindowID"=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];
   if(!row)throw invalid('Combo registration window not found.',404,'COMBO_WINDOW_NOT_FOUND');return row;
 }
 export function asWindow(w:Row) {
-  return {id:w.WindowID,period:w.period??null,semester:w.semester??null,name:w.Name,phase:w.Phase,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,initialWindowId:w.InitialWindowID,scope:w.Scope,startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status,createdBy:w.CreatedBy,createdAt:w.CreatedAt,openedAt:w.OpenedAt,closedAt:w.ClosedAt,finalizedAt:w.FinalizedAt,finalizeSummary:w.FinalizeSummary};
+  return {id:w.WindowID,name:w.Name,phase:w.Phase,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,initialWindowId:w.InitialWindowID,scope:w.Scope,startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status,createdBy:w.CreatedBy,createdAt:w.CreatedAt,openedAt:w.OpenedAt,closedAt:w.ClosedAt,finalizedAt:w.FinalizedAt,finalizeSummary:w.FinalizeSummary};
 }
 export async function roster(client:PoolClient,id:number):Promise<Row[]> {
   return (await client.query(`SELECT r."StudentID" AS "studentId",r."ProgramID" AS "programId",r."ScopeSnapshot" AS "scopeSnapshot",r."Outcome" AS outcome,r."FinalizedAt" AS "finalizedAt",s."StudentCode" AS "studentCode",u."FullName" AS "fullName",u."Email" AS email,u."UserID" AS "userId",s."Status" AS "studentStatus",u."Status" AS "accountStatus",GREATEST(w."EndsAt",COALESCE((SELECT max(e."EndsAt") FROM "ComboExtensionStudents" es JOIN "ComboWindowExtensions" e ON e."ExtensionID"=es."ExtensionID" WHERE es."WindowID"=r."WindowID" AND es."StudentID"=r."StudentID"),w."EndsAt")) AS "effectiveEndsAt",last."EventID" AS "eventId",last."ProgramComboID" AS "comboId",last."CourseIDs" AS "courseIds",last."CreatedAt" AS "submittedAt",last."ChoiceSnapshot" AS "choiceSnapshot" FROM "ComboWindowStudents" r JOIN "ComboRegistrationWindows" w ON w."WindowID"=r."WindowID" JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN LATERAL (SELECT * FROM "StudentComboSelectionEvents" e WHERE e."WindowID"=r."WindowID" AND e."StudentID"=r."StudentID" AND e."EventType"='SUBMITTED' ORDER BY e."EventID" DESC LIMIT 1) last ON true WHERE r."WindowID"=$1 ORDER BY r."StudentID"`,[id])).rows;
@@ -18,8 +16,8 @@ export async function roster(client:PoolClient,id:number):Promise<Row[]> {
 export async function listWindows(params:Record<string,unknown>) {
   const p=pagination(params,['phase','status','academicPeriodId']),args:unknown[]=[],where:string[]=[];
   for(const [key,col] of [['phase','Phase'],['status','Status'],['academicPeriodId','AcademicPeriodID']])if(params[key]!==undefined){args.push(key==='academicPeriodId'?positiveId(params[key],key):enumValue(params[key],key==='phase'?['INITIAL','CONFIRMATION']:['DRAFT','OPEN','CLOSED','FINALIZED'],key));where.push(`"${col}"=$${args.length}`);}
-  const row=(await query(`WITH filtered AS (SELECT * FROM (${comboWindowSelect}) enriched ${where.length?'WHERE '+where.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY "WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "WindowID" DESC) FILTER (WHERE "WindowID" IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
-  return {...row,items:await enrichListRows({query},row.items.map(asWindow)),page:p.page,limit:p.limit};
+  const row=(await query(`WITH filtered AS (SELECT * FROM "ComboRegistrationWindows" ${where.length?'WHERE '+where.join(' AND '):''}),paged AS (SELECT * FROM filtered ORDER BY "WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY "WindowID" DESC) FILTER (WHERE "WindowID" IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,p.limit,p.offset])).rows[0];
+  return {...row,items:row.items.map(asWindow),page:p.page,limit:p.limit};
 }
 export async function matchingStudents(client:PoolClient,w:Row) {
   const sc=w.Scope;

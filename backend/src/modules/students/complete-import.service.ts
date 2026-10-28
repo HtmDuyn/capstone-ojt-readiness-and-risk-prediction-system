@@ -33,7 +33,11 @@ export async function importAcademicProfile(c: PoolClient, studentId: number, ra
     const old = (await c.query('SELECT * FROM "StudentCourseResults" WHERE "StudentID"=$1 AND "CourseID"=$2 AND "AcademicPeriodID"=$3 AND "AttemptNumber"=$4',[studentId,course.CourseID,periodId,attempt])).rows[0];
     if (old) {
       const previous = {status:old.Status,score:old.Score===null?null:Number(old.Score),gradePoints:old.GradePoints===null?null:Number(old.GradePoints),grade:old.Grade,sourceReference:old.SourceReference};
-      if (JSON.stringify(previous)!==JSON.stringify(values)) throw invalid('Existing course result differs; use the correction API with a reason.',409,'RESULT_CONFLICT');
+      if (JSON.stringify(previous)!==JSON.stringify(values)) {
+        if (old.OJTResultID) throw invalid('Official OJT results must be corrected through the OJT result workflow.',409,'OFFICIAL_OJT_GRADE_IMMUTABLE');
+        const updated=(await c.query(`UPDATE "StudentCourseResults" SET "Status"=$2,"Score"=$3,"GradePoints"=$4,"Grade"=$5,"SourceReference"=$6,"RecordedBy"=$7,"UpdatedAt"=now() WHERE "ResultID"=$1 RETURNING *`,[old.ResultID,values.status,values.score,values.gradePoints,values.grade,values.sourceReference,actorId])).rows[0];
+        await audit(c,actorId,'StudentCourseResults',old.ResultID,'IMPORT_UPDATE_RESULT',old,updated,'Overwrite an existing course attempt from the student import file.');
+      }
       continue;
     }
     const result = (await c.query(`INSERT INTO "StudentCourseResults" ("StudentID","CourseID","AcademicPeriodID","AttemptNumber","Status","Score","GradePoints","Grade","SourceReference","AcademicYearID","SemesterTaken","RecordedBy") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,[studentId,course.CourseID,periodId,attempt,values.status,values.score,values.gradePoints,values.grade,values.sourceReference,period.academicYearId,period.semesterTaken,actorId])).rows[0];

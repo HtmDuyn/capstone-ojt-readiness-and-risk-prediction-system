@@ -50,6 +50,9 @@ app.use(
   corsMiddleware,
 );
 
+// Larger JSON is scoped to bulk FE eligibility results only.
+app.use('/api/ojt-eligibility-results', express.json({ limit: '10mb' }));
+
 app.use(
   express.json({
     limit: "1mb",
@@ -102,7 +105,7 @@ app.use(
     swaggerSpec,
     {
       customSiteTitle:
-        "API quản lý OJT",
+        "OJT Management API",
 
       customCssUrl:
         "/swagger-static/swagger-custom.css",

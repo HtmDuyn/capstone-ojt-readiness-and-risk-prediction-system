@@ -1,4 +1,3 @@
-import { personalAccountView } from './account.dto';
 import type {
   NextFunction,
   Request,
@@ -120,7 +119,7 @@ export const updateMyProfile = async (
       success: true,
       message:
         "Profile updated successfully.",
-      user: personalAccountView(account),
+      account,
     });
   } catch (error) {
     next(error);

@@ -28,7 +28,8 @@ export function describeAcademicRest(spec: Spec): Spec {
   add('/ojt-semesters','get','/ojt-semesters/{id}/students','get','Danh sách kỳ OJT');
   add('/ojt-semesters/{id}','get','/ojt-semesters/{id}/students','get','Chi tiết kỳ OJT, sinh viên, bàn giao và kết quả');
   add('/ojt-grade-mappings','put','/curricula/{id}/ojt-grade-mappings/{semesterId}','put','Thiết lập quy đổi điểm OJT',{...object,required:['programId','ojtSemesterId'],properties:{programId:id,ojtSemesterId:id}});
-  for (const method of ['get','post']) add('/eligible-student-handoffs',method,'/ojt-semesters/{id}/eligible-student-handoffs',method,method==='get'?'Lịch sử bàn giao sinh viên':'Bàn giao sinh viên đủ điều kiện',method==='post'?{...object,required:['ojtSemesterId'],properties:{ojtSemesterId:id}}:undefined);
+  const handoffBody=source['/api/ojt-semesters/{id}/eligible-student-handoffs'].post.requestBody.content['application/json'].schema;
+  for (const method of ['get','post']) add('/eligible-student-handoffs',method,'/ojt-semesters/{id}/eligible-student-handoffs',method,method==='get'?'Lịch sử bàn giao sinh viên':'Bàn giao sinh viên đủ điều kiện',method==='post'?{...handoffBody,required:['ojtSemesterId',...handoffBody.required],properties:{ojtSemesterId:id,...handoffBody.properties}}:undefined);
   add('/academic-notifications','get','/academic/advisory-runs','get','Lịch sử thông báo học vụ');
   add('/academic-notifications/{id}','get','/academic/advisory-runs/{id}','get','Chi tiết thông báo và trạng thái từng sinh viên');
   add('/academic-notifications','post','/academic/academic-summary-notifications','post','Tạo thông báo học vụ theo loại',{...object,required:['type'],properties:{type:{type:'string',enum:['ALERT','SUMMARY','ELIGIBILITY']}}});
@@ -43,6 +44,8 @@ export function describeAcademicRest(spec: Spec): Spec {
       delete schema.properties?.kind;
       if(schema.required) schema.required=schema.required.filter((name:string)=>name!=='kind');
       operation.requestBody.content={'application/json':{schema}};
+      operation.description='FE đọc hai sheet Danh sách sinh viên và Kết quả học tập thành rows JSON. Học kỳ thực tế được ánh xạ sang kỳ chương trình 0–9 theo khóa/nhóm. Bắt buộc chương trình PUBLISHED; sinh viên qua kỳ 0 phải có lịch sử kỳ trước (trong tệp hoặc đã lưu). Môn thuộc khung/combo được duyệt; được học vượt tag kỳ khi không có hoặc đã đạt đủ tiên quyết; nhóm tiên quyết phải đạt ở kỳ trước. Preview chạy cả ràng buộc deferred trước khi lưu yêu cầu VALIDATED. PATCH cùng tài nguyên với {id,status:"COMMITTED"} để nhập dữ liệu.';
+      operation.responses['422']={description:'Lịch sử học, kỳ chương trình hoặc môn tiên quyết không hợp lệ.'};
     }
     add('/'+path,'patch','/'+from+'/commit','post','Xác nhận nhập dữ liệu đã kiểm tra',commit);
   }
@@ -69,5 +72,7 @@ export function describeAcademicRest(spec: Spec): Spec {
     else delete item[method];
     if(!Object.keys(item).length)delete spec.paths['/api'+path];
   }
+  const eligibilitySchema=spec.paths['/api/eligibility-check-runs']?.post?.requestBody?.content?.['application/json']?.schema;
+  if(eligibilitySchema?.properties)eligibilitySchema.properties.confirmResults={type:'boolean',default:true,description:'false: chỉ tính và cập nhật StudentOJTEligibility, không xác nhận kết quả chính thức. FE dùng false cho lần xét nền sau import.'};
   return spec;
 }
