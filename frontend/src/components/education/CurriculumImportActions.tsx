@@ -2730,7 +2730,7 @@ export const CurriculumImportActions:
 
                         <div className="max-h-[320px] overflow-auto">
                           <table className="w-full min-w-[720px] text-left text-sm">
-                            <thead className="sticky top-0 bg-slate-50">
+                            <thead className="sticky top-0 border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]">
                               <tr>
                                 <th className="px-4 py-3 font-semibold text-slate-600">
                                   Mã môn
@@ -2754,7 +2754,7 @@ export const CurriculumImportActions:
                               </tr>
                             </thead>
 
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-[#E2E8F0]">
                               {payload.courses.map(
                                 (
                                   course,
@@ -2768,6 +2768,7 @@ export const CurriculumImportActions:
                                   return (
                                     <tr
                                       key={`${course.courseCode}-${index}`}
+                                      className="bg-white transition-colors duration-150 hover:bg-[#EAF2FF]"
                                     >
                                       <td className="px-4 py-3 font-semibold text-orange-600">
                                         {

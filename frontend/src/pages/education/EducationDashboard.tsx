@@ -468,11 +468,11 @@ export const EducationDashboard: React.FC = () => {
                   description="Chưa có dữ liệu học phần phù hợp từ Backend."
                 />
               ) : (
-                <div className="mt-5 divide-y divide-slate-100">
+                <div className="mt-5 divide-y divide-[#E2E8F0]">
                   {courseDemands.slice(0, 5).map((course) => (
                     <div
                       key={course.id}
-                      className="flex items-center justify-between gap-4 py-3"
+                      className="flex items-center justify-between gap-4 bg-white py-3 transition-colors duration-150 hover:bg-[#EAF2FF]"
                     >
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-800">
@@ -531,11 +531,11 @@ export const EducationDashboard: React.FC = () => {
                 description="Chưa có dữ liệu cảnh báo được trả về cho phạm vi đang chọn."
               />
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[#E2E8F0]">
                 {academicAlerts.map((alert) => (
                   <div
                     key={alert.id}
-                    className="flex items-start gap-3 px-5 py-4 transition hover:bg-slate-50"
+                    className="flex items-start gap-3 bg-white px-5 py-4 transition-colors duration-150 hover:bg-[#EAF2FF]"
                   >
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
                       <AlertTriangle size={17} />

@@ -151,7 +151,7 @@ const EducationCurriculumPlan: React.FC = () => {
                 </thead>
                 <tbody>
                   {detail.courses.map((c) => (
-                    <tr key={c.id} className="border-t">
+                    <tr key={c.id} className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]">
                       <td className="p-2">{c.courseCode}</td>
                       <td>{c.name}</td>
                       <td>{c.semester}</td>
@@ -190,7 +190,7 @@ const EducationCurriculumPlan: React.FC = () => {
                     </thead>
                     <tbody>
                       {combo.courses.map((c) => (
-                        <tr className="border-t" key={c.id}>
+                        <tr className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]" key={c.id}>
                           <td className="p-2">{c.courseCode}</td>
                           <td>{c.name}</td>
                           <td>{c.semester}</td>

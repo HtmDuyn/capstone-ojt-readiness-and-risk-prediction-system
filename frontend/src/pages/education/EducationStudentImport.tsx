@@ -271,7 +271,7 @@ const EducationStudentImport: React.FC = () => {
             <p className="text-sm text-slate-500">Hiển thị {visible.length}/{rows.length} sinh viên trong tệp. Cuộn ngang để xem đầy đủ thông tin; mở bảng điểm ngay tại từng sinh viên.</p>
             <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200" tabIndex={0} aria-label="Bảng xem trước sinh viên và bảng điểm">
               <table className="w-full min-w-[2200px] text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600">
+                <thead className="sticky top-0 z-10 border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]">
                   <tr>
                     {[
                       "STT",
@@ -301,7 +301,7 @@ const EducationStudentImport: React.FC = () => {
                 <tbody>
                   {visible.map((row) => (
                     <React.Fragment key={row.code}>
-                    <tr key={row.code} className={`border-t border-slate-100 ${rowErrors(row).length ? 'bg-red-50/70' : 'hover:bg-orange-50/30'} ${skipped.has(row.code) ? 'opacity-60' : ''}`}>
+                    <tr key={row.code} className={`border-t border-[#E2E8F0] transition-colors duration-150 ${rowErrors(row).length ? 'bg-red-50/70' : 'bg-white hover:bg-[#EAF2FF]'} ${skipped.has(row.code) ? 'opacity-60' : ''}`}>
                       <td className="px-4 py-3 text-slate-500">{rows.indexOf(row) + 1}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{row.code}</td>
                       <td className="px-4 py-3">{row.fullName}</td>
@@ -377,8 +377,8 @@ function StudentImportCourseResults({ student, catalogs }: { student: StudentImp
   return <div className="space-y-3">
     <h3 className="font-semibold text-slate-900">Bảng điểm trong tệp: {student.code} — {student.fullName}</h3>
     {!student.academic.courseResults.length ? <p className="text-slate-500">Chưa có kết quả học tập trong tệp.</p> : <table className="w-full max-w-6xl text-left text-sm">
-      <thead className="bg-white text-slate-600"><tr>{['Mã môn', 'Học kỳ ghi nhận', 'Lần học', 'Trạng thái', 'Điểm số', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu'].map(label => <th key={label} className="px-3 py-2 font-semibold">{label}</th>)}</tr></thead>
-      <tbody>{student.academic.courseResults.map((result, index) => <tr key={index} className="border-t border-slate-200">
+      <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]"><tr>{['Mã môn', 'Học kỳ ghi nhận', 'Lần học', 'Trạng thái', 'Điểm số', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu'].map(label => <th key={label} className="px-3 py-2 font-semibold">{label}</th>)}</tr></thead>
+      <tbody>{student.academic.courseResults.map((result, index) => <tr key={index} className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]">
         <td className="px-3 py-2 font-medium">{result.courseCode}</td>
         <td className="px-3 py-2">{catalogs?.periods.find(p => p.id === result.academicPeriodId)?.label ?? result.academicPeriodId}</td>
         <td className="px-3 py-2">{result.attemptNumber ?? 1}</td>

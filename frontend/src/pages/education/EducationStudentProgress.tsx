@@ -623,7 +623,7 @@ const EducationStudentProgress: React.FC = () => {
                     {unfinishedSubjects.map((subject) => (
                       <div
                         key={subject.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-[#E2E8F0] bg-white p-4 transition-colors duration-150 hover:bg-[#EAF2FF]"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>

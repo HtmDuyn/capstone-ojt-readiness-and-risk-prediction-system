@@ -168,7 +168,7 @@ const EducationOjtFinalResults: React.FC = () => {
             <p>Tổng: {data.total} kết quả</p>
             <div className="overflow-auto">
               <table className="w-full text-left text-sm">
-                <thead>
+                <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] font-semibold text-[#334155]">
                   <tr>
                     {[
                       "Sinh viên",
@@ -186,7 +186,7 @@ const EducationOjtFinalResults: React.FC = () => {
                 </thead>
                 <tbody>
                   {data.items.map((r) => (
-                    <tr key={r.id} className="border-t">
+                    <tr key={r.id} className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]">
                       <td className="p-3">
                         {r.studentCode}
                         <br />

@@ -116,15 +116,15 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
       </div>
       {warning && <p role="status" className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm text-amber-800">{warning}</p>}
       <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-left text-sm">
-        <thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Sinh viên', 'Khóa / Lớp', 'Khung chương trình', 'Học kỳ', 'GPA', 'Tín chỉ tích lũy', 'Môn chưa đạt', 'Điều kiện OJT', ''].map(title => <th key={title} scope="col" className="whitespace-nowrap px-4 py-3 font-semibold">{title}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-100">
+        <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-xs font-semibold text-[#334155]"><tr>{['Sinh viên', 'Khóa / Lớp', 'Khung chương trình', 'Học kỳ', 'GPA', 'Tín chỉ tích lũy', 'Môn chưa đạt', 'Điều kiện OJT', ''].map(title => <th key={title} scope="col" className="whitespace-nowrap px-4 py-3 font-semibold">{title}</th>)}</tr></thead>
+        <tbody className="divide-y divide-[#E2E8F0]">
           {loading ? <tr><td colSpan={9} role="status" className="px-5 py-14 text-center text-slate-500">Đang tải danh sách và hồ sơ học tập...</td></tr> : error ? <tr><td colSpan={9} role="alert" className="px-5 py-12 text-center text-red-700"><p>{error}</p><button onClick={onReload} className="mt-3 font-semibold underline">Thử tải lại</button></td></tr> : visible.length ? visible.map(student => {
             const complete = student.completedCredits;
             const total = student.totalCredits;
             const percent = complete !== null && total !== null && total > 0 ? Math.min(100, Math.max(0, complete / total * 100)) : null;
             const failed = student.subjects.filter(s => s.status === 'Not Passed').length;
             const statusStyle = student.eligibilityStatus === 'Đủ điều kiện' ? 'bg-emerald-50 text-emerald-700' : student.eligibilityStatus === 'Chưa đủ điều kiện' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600';
-            return <tr key={student.id} className="transition hover:bg-orange-50/30">
+            return <tr key={student.id} className="bg-white transition-colors duration-150 hover:bg-[#EAF2FF]">
               <td className="px-4 py-4"><button onClick={() => onSelect(student)} className="text-left font-semibold text-slate-900 hover:text-orange-700">{student.fullName}</button><p className="mt-1 font-mono text-xs text-orange-700">{student.studentCode}</p>{student.dataWarning && <p className="mt-1 text-xs text-amber-700" title={student.dataWarning}>Hồ sơ cần kiểm tra</p>}</td>
               <td className="px-4 py-4"><p className="font-medium text-slate-700">{student.cohort}</p><p className="mt-1 text-xs text-slate-500">{student.studentClass}</p></td>
               <td className="max-w-52 break-words px-4 py-4 text-xs font-medium text-slate-600">{student.curriculumCode}</td>
