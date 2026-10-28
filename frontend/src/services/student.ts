@@ -7,6 +7,7 @@ import type {
   CourseResult,
   Curriculum,
   Dashboard,
+  Internships,
   OjtResult,
   Opportunities,
   Page,
@@ -49,7 +50,7 @@ export async function allStudentPages<T>(
   const items: T[] = [];
   for (let page = 1; ; page++) {
     const result = await studentGet<Page<T>>(
-      path + studentQuery({ page, limit: 100 }),
+      path + (path.includes('?') ? '&' : '?') + new URLSearchParams({ page: String(page), limit: '100' }),
       signal,
     );
     items.push(...result.items);
@@ -60,7 +61,7 @@ export async function getOwnStudent(
   signal?: AbortSignal,
   expectedUser?: { id: string; email: string },
 ): Promise<Profile> {
-  const { user } = await apiRequest<{ user: { id: number; email: string; roleCode: string | null; studentId: number | null } }>(
+  const { user } = await apiRequest<{ user: { id: number; email: string; roleCode: string | null; studentId: number | null; mustChangePassword: boolean } }>(
     '/auth/me',
     { signal },
   );
@@ -70,33 +71,48 @@ export async function getOwnStudent(
   ))) {
     throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
   }
-  if (!user.studentId)
-    throw new Error('Tài khoản chưa được liên kết với hồ sơ sinh viên.');
+  if (user.studentId === undefined)
+    throw new ApiError('Backend chưa trả studentId trong /auth/me. Cần cập nhật backend và kiểm tra VITE_API_URL đang trỏ đúng máy chủ.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+  if (user.studentId === null)
+    throw new ApiError('Tài khoản chưa được liên kết với hồ sơ sinh viên. Liên hệ Phòng Đào tạo để kiểm tra liên kết tài khoản.', 409, 'STUDENT_NOT_LINKED');
+  if (user.mustChangePassword)
+    throw new ApiError('Bạn cần đổi mật khẩu tạm trước khi sử dụng cổng sinh viên.', 403, 'PASSWORD_CHANGE_REQUIRED');
   return getStudentProfile(user.studentId, signal);
 }
 export const getStudentProfile = (id: number, signal?: AbortSignal) =>
-  studentGet<Profile>(`/students/${id}`, signal);
+  studentGet<Profile>(
+    `/students/${id}` +
+      studentQuery({ include: 'academicProgress,comboSelections,ojtRegistrations' }),
+    signal,
+  );
 export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
   studentGet<Dashboard>(
-    '/student/dashboard' + studentQuery({ ojtSemesterId: semester }),
+    '/students/me/dashboard' + studentQuery({ ojtSemesterId: semester }),
     signal,
   );
-export const getAcademicSummary = (semester: number, signal?: AbortSignal) =>
-  studentGet<AcademicSummary>(
-    '/student/academic-summary' + studentQuery({ ojtSemesterId: semester }),
+export async function getAcademicSummary(
+  semester: number,
+  signal?: AbortSignal,
+) {
+  return (await getStudentDashboard(semester, signal)).academic;
+}
+export async function getSupplementary(
+  semester: number,
+  signal?: AbortSignal,
+) {
+  return (await getStudentDashboard(semester, signal)).academic
+    .supplementaryCourses;
+}
+export async function getCurriculum(id: number, signal?: AbortSignal) {
+  const response = await studentGet<{ curriculum: Curriculum | null }>(
+    `/students/${id}` + studentQuery({ include: 'curriculum' }),
     signal,
   );
-export const getSupplementary = (semester: number, signal?: AbortSignal) =>
-  studentGet<Supplementary>(
-    '/student/supplementary-course-options' +
-      studentQuery({ ojtSemesterId: semester }),
-    signal,
-  );
-export const getCurriculum = (signal?: AbortSignal) =>
-  studentGet<Curriculum>('/student/curriculum', signal);
+  return response.curriculum;
+}
 export const getRoadmap = (semester: number, signal?: AbortSignal) =>
   studentGet<Roadmap>(
-    '/student/roadmap-recommendations' +
+    '/students/me/roadmap-recommendations' +
       studentQuery({ ojtSemesterId: semester }),
     signal,
   );
@@ -105,10 +121,15 @@ export const getCourseResults = (
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Page<CourseResult>>(
-    `/students/${id}/course-results` + studentQuery({ page, limit: 20 }),
+  studentGet<{ courseResults: Page<CourseResult> }>(
+    `/students/${id}` +
+      studentQuery({
+        include: 'courseResults',
+        resultsPage: page,
+        resultsLimit: 20,
+      }),
     signal,
-  );
+  ).then((profile) => profile.courseResults);
 export const getRegistrationWindows = (
   semester: number,
   page: number,
@@ -130,13 +151,13 @@ export const getRegistrations = (
     signal,
   );
 export const getOpportunities = (
-  semester: number,
+  windowId: number,
   page: number,
   signal?: AbortSignal,
 ) =>
   studentGet<Opportunities>(
     '/students/me/opportunities' +
-      studentQuery({ ojtSemesterId: semester, page, limit: 20 }),
+      studentQuery({ windowId, page, limit: 20 }),
     signal,
   );
 export const getApplications = (
@@ -150,33 +171,48 @@ export const getApplications = (
     signal,
   );
 export const getAssignment = (semester: number, signal?: AbortSignal) =>
-  studentGet<Assignment | null>(
-    '/student/assignments/current' + studentQuery({ ojtSemesterId: semester }),
+  studentGet<Internships>(
+    '/students/me/internships' + studentQuery({ ojtSemesterId: semester }),
     signal,
-  );
+  ).then((result) => result.assignment);
 export const getTasks = (
-  studentId: number,
   semester: number,
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Page<Task>>(
-    '/internship-tasks' +
-      studentQuery({ studentId, ojtSemesterId: semester, page, limit: 20 }),
+  studentGet<Internships>(
+    '/students/me/internships' +
+      studentQuery({
+        ojtSemesterId: semester,
+        tasksPage: page,
+        tasksLimit: 20,
+      }),
     signal,
-  );
+  ).then((result) => result.tasks);
 export const getOjtResults = (
   semester: number,
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Page<OjtResult>>(
-    '/student/ojt-results' +
-      studentQuery({ ojtSemesterId: semester, page, limit: 20 }),
+  studentGet<Internships>(
+    '/students/me/internships' +
+      studentQuery({
+        ojtSemesterId: semester,
+        resultsPage: page,
+        resultsLimit: 20,
+      }),
     signal,
-  );
-export const getOjtResult = (id: number, signal?: AbortSignal) =>
-  studentGet<OjtResult>(`/student/ojt-results/${id}`, signal);
+  ).then((result) => result.results);
+export const getOjtResult = (
+  id: number,
+  semester: number,
+  signal?: AbortSignal,
+) =>
+  studentGet<Internships>(
+    '/students/me/internships' +
+      studentQuery({ ojtSemesterId: semester, resultId: id }),
+    signal,
+  ).then((result) => result.result);
 export const submitOjtRegistration = (
   windowId: number,
   application: { contactPhone: string; contactEmail: string; note: string },
@@ -244,14 +280,16 @@ export async function getStudentNotifications(
   unread?: boolean,
 ) {
   const response = await apiRequest<{ data: StudentNotificationPage }>(
-    '/student/notifications' + studentQuery({ page, limit: 20, unread }),
+    '/students/me/notifications' + studentQuery({ page, limit: 20, unread }),
     { signal },
   );
   return response.data;
 }
 export async function markStudentNotificationRead(id: string) {
-  return apiRequest<{ data: { id: number; isRead: boolean } }>(
-    `/student/notifications/${encodeURIComponent(id)}/read`,
-    { method: 'PATCH' },
+  return apiRequest<{
+    data: StudentNotification & { unreadCount: number };
+  }>(
+    `/students/me/notifications/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ isRead: true }) },
   );
 }

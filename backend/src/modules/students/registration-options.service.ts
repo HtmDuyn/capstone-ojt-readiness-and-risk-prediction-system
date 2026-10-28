@@ -5,6 +5,7 @@ import { combos } from '../curriculum/curriculum.repository';
 import { purpose } from '../combo-registration/combo.validation';
 import { activeChoice } from '../combo-registration/combo.repository';
 import { assertRosterContext } from '../combo-registration/selection.service';
+import { admissionEligibilityWithClient } from '../eligibility/admission.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
 const blockerLabels:Record<string,string>={
@@ -13,7 +14,9 @@ const blockerLabels:Record<string,string>={
   COMBO_ROSTER_CHANGED:'Lộ trình hoặc hồ sơ đã thay đổi; cần Phòng đào tạo rà soát.',
   COMBO_OPTIONS_UNAVAILABLE:'Chưa có combo hợp lệ để lựa chọn.',REGISTRATION_ALREADY_EXISTS:'Hồ sơ đã được nộp hoặc đang được xử lý.',
   ACTUAL_PATHWAY_REQUIRED:'Chưa có lộ trình phù hợp với kỳ đăng ký.',OJT_REGISTRATION_SEMESTER_MISMATCH:'Chưa đúng kỳ chuyên ngành được đăng ký.',
-  REGISTRATION_PERIOD_MISMATCH:'Kỳ đăng ký chưa khớp với kỳ OJT.'
+  REGISTRATION_PERIOD_MISMATCH:'Kỳ đăng ký chưa khớp với kỳ OJT.',
+  CONFIRMED_ELIGIBILITY_REQUIRED:'Chưa có kết quả đủ điều kiện đã được nhà trường bàn giao.',
+  ELIGIBILITY_HANDOFF_STALE:'Dữ liệu đã thay đổi sau bàn giao; liên hệ Phòng Đào tạo để rà soát.'
 };
 
 async function ownStudent(c:PoolClient,actor:Actor):Promise<Row> {
@@ -79,6 +82,11 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       });
       if(contextIssue)reasons.push(contextIssue);
       if(kind==='combo'&&!options.length)reasons.push('COMBO_OPTIONS_UNAVAILABLE');
+      if(kind==='ojt'){
+        const admission=await admissionEligibilityWithClient(c,s.StudentID,w.OJTSemesterID);
+        if(!admission||admission.status!=='ELIGIBLE')reasons.push('CONFIRMED_ELIGIBILITY_REQUIRED');
+        else if(admission.isStale)reasons.push('ELIGIBILITY_HANDOFF_STALE');
+      }
       if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');
       items.push({id:w.WindowID,name:w.Name,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,
         period:w.period,semester:w.semester,startsAt:w.StartsAt,endsAt:w.EndsAt,effectiveEndsAt:end,status:w.Status,

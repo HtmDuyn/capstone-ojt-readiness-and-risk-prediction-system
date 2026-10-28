@@ -17,6 +17,7 @@ import StudentAIRiskPrediction from "@/pages/student/StudentAIRisk";
 import StudentInternshipProgress from "@/pages/student/StudentOJTProgress";
 import StudentEvaluationResults from "@/pages/student/StudentResults";
 import StudentNotifications from "@/pages/student/StudentNotifications";
+import StudentAccount from '@/pages/student/StudentAccount';
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
@@ -96,6 +97,7 @@ const studentRoutes: RouteObject = {
     { path: "/student/internship-progress", element: <StudentInternshipProgress /> },
     { path: "/student/evaluation-results", element: <StudentEvaluationResults /> },
     { path: "/student/notifications", element: <StudentNotifications /> },
+    { path: "/student/profile", element: <StudentAccount /> },
 
     // Alias giữ tương thích với các đường dẫn cũ.
     {

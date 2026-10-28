@@ -35,7 +35,7 @@ function ResultsContent() {
   );
   const detail = useStudentResource(
     selected ? 'ojt-result:' + key + ':' + selected : null,
-    (signal) => getOjtResult(selected!, signal),
+    (signal) => getOjtResult(selected!, semesterId!, signal),
   );
   return (
     <>
@@ -125,6 +125,9 @@ function ResultsContent() {
                 Tải kết quả JSON
               </button>
             </>
+          )}
+          {detail.data === null && !detail.loading && !detail.error && (
+            <Empty>Không tìm thấy kết quả đã công bố.</Empty>
           )}
         </Card>
       )}

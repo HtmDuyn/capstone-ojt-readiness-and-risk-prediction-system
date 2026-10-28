@@ -182,6 +182,7 @@ router.post(
  *                 status: ACTIVE
  *                 roleCode: ADMIN
  *                 roleName: System Administrator
+ *                 studentId: null
  *
  *       401:
  *         description: Authentication token is missing, invalid or expired

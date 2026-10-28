@@ -39,7 +39,7 @@ interface PortalContext {
 }
 const Context = createContext<PortalContext | null>(null);
 export function StudentPortalProvider({ children }: { children: ReactNode }) {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, updateUser } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [windows, setWindows] = useState<Window[]>([]);
   const [comboWindows, setComboWindows] = useState<Window[]>([]);
@@ -62,13 +62,17 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
     setComboWindows([]);
     setRegistrations([]);
     setUnreadCount(null);
+    if (user?.mustChangePassword) {
+      setLoading(false);
+      return () => controller.abort();
+    }
     getOwnStudent(controller.signal, user ?? undefined)
       .then(async (own) => {
         if (controller.signal.aborted) return;
         setProfile(own);
         const results = await Promise.allSettled([
           allStudentPages<Window>(
-            '/student/ojt-registration-windows',
+            '/ojt-registration-windows',
             controller.signal,
           ),
           allStudentPages<Window>(
@@ -104,6 +108,10 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         );
       })
       .catch((err: unknown) => {
+        if (!controller.signal.aborted && err instanceof ApiError && err.code === 'PASSWORD_CHANGE_REQUIRED') {
+          updateUser({ mustChangePassword: true });
+          return;
+        }
         if (!controller.signal.aborted && err instanceof ApiError && err.status === 401) {
           logout();
           return;
@@ -119,7 +127,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [token, user?.id, user?.email, logout, revision]);
+  }, [token, user?.id, user?.email, user?.mustChangePassword, logout, updateUser, revision]);
 
   const semesters = useMemo(() => {
     const values = new Map<number, Named>();

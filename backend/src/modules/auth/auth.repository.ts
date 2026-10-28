@@ -9,6 +9,7 @@ const selectUser = `
     u."UserID" AS id,
     u."Username" AS username,
     u."Email" AS email,
+    u."Phone" AS phone,
     u."FullName" AS full_name,
     u."Status" AS status,
     u."PasswordHash" AS password_hash,

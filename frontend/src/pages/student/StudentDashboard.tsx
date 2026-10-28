@@ -25,10 +25,10 @@ export const StudentDashboard = () => {
   );
   const data = resource.data;
   const credits = profile?.academicProgress.credits;
-  const complete = !!data?.assignment;
-  const eligible =
-    data?.academic.officialEligibility?.status === 'ELIGIBLE' &&
-    !data.academic.officialEligibility.isStale;
+  const assignment = data?.internship.assignment ?? null;
+  const complete = !!assignment;
+  const admission = data?.academic.admissionEligibility;
+  const eligible = admission?.status === 'ELIGIBLE' && !admission.isStale;
   return (
     <StudentPage
       title={'Xin chào, ' + (profile?.fullName ?? 'bạn') + '!'}
@@ -94,16 +94,17 @@ export const StudentDashboard = () => {
                       status: complete ? 'current' : 'upcoming',
                       iconType: 'briefcase',
                       description:
-                        data.assignment?.enterpriseName ??
+                        assignment?.enterpriseName ??
                         'Chờ phân công doanh nghiệp',
                     },
                   ]}
                 />
               </Card>
-              <AssignmentCard assignment={data.assignment} />
+              <AssignmentCard assignment={assignment} />
             </div>
             <div className="space-y-6">
               <EligibilityCard
+                admission={data.academic.admissionEligibility}
                 official={data.academic.officialEligibility}
                 current={data.academic.currentEligibility}
               />

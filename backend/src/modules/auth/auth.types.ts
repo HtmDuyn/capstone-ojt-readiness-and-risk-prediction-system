@@ -13,6 +13,7 @@ export interface AuthUserRecord {
   id: number;
   username: string;
   email: string;
+  phone: string | null;
   full_name: string;
   status: string;
   password_hash: string;

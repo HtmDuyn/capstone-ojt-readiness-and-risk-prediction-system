@@ -240,6 +240,11 @@ const options: swaggerJSDoc.Options =
 
             properties: {
               mustChangePassword: { type: "boolean", example: false },
+              studentId: {
+                type: "integer",
+                nullable: true,
+                example: null,
+              },
               id: {
                 type:
                   "integer",

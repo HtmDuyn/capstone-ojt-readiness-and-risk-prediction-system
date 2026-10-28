@@ -35,7 +35,7 @@ export const currentCVSql=(student:string)=>`(SELECT ${cvMetadataSql('cv')} FROM
 export async function currentCV(c:PoolClient,studentId:number) {
  return (await c.query(`SELECT ${currentCVSql('$1')} AS cv`,[studentId])).rows[0].cv;
 }
-export async function uploadStudentCV(file:Express.Multer.File,actor:Actor) {
+export async function uploadStudentCV(file:Express.Multer.File,actor:Actor,existingClient?:PoolClient) {
  if(actor.roleCode!=='STUDENT')throw invalid('Chỉ sinh viên được tải CV của mình.',403,'FORBIDDEN');
  return academicTransaction(async c=>{
   const s=(await c.query(`SELECT s."StudentID" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."UserID"=$1 AND s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE' FOR UPDATE OF s`,[actor.userId])).rows[0];
@@ -44,9 +44,9 @@ export async function uploadStudentCV(file:Express.Multer.File,actor:Actor) {
   if(before?.sha256===hash&&before.fileName===file.originalname)return {...before,replayed:true};
   await c.query(`INSERT INTO "StudentCVFiles" ("StudentID","FileName","MimeType","Content","Sha256","UploadedBy") VALUES ($1,$2,'application/pdf',$3,$4,$5)`,[s.StudentID,file.originalname,file.buffer,hash,actor.userId]);
   const cv=await currentCV(c,s.StudentID);await audit(c,actor.userId,'StudentCVFiles',cv.id,'UPLOAD_CV',before,cv);return {...cv,replayed:false};
- });
+ },existingClient);
 }
-export async function readCV(studentId:number,actor:Actor,cvFileId?:number) {
+export async function readCV(studentId:number,actor:Actor,cvFileId?:number,existingClient?:PoolClient) {
  return readTransaction(async c=>{
   const s=(await c.query('SELECT "UserID" FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL',[studentId])).rows[0];
   if(!s)throw invalid('Không tìm thấy sinh viên.',404,'STUDENT_NOT_FOUND');
@@ -55,5 +55,5 @@ export async function readCV(studentId:number,actor:Actor,cvFileId?:number) {
   if(!own&&!['ADMIN','ACADEMIC'].includes(actor.roleCode)&&!coordinator)throw invalid('Không có quyền xem CV.',403,'FORBIDDEN');
   const file=(await c.query(`SELECT "FileName","MimeType","Content" FROM "StudentCVFiles" WHERE "StudentID"=$1 AND ($2::int IS NULL OR "CVFileID"=$2) ORDER BY "CVFileID" DESC LIMIT 1`,[studentId,cvFileId??null])).rows[0];
   if(!file)throw invalid('Sinh viên chưa có CV hoặc file không thuộc sinh viên.',404,'CV_NOT_FOUND');return file;
- });
+ },existingClient);
 }

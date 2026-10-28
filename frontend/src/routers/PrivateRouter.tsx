@@ -61,6 +61,9 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
     );
   }
 
+  if (user.role === 'student' && user.mustChangePassword && location.pathname !== '/student/profile') {
+    return <Navigate to="/student/profile" replace />;
+  }
   return <Outlet />;
 };
 

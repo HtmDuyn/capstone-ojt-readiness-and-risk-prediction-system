@@ -70,9 +70,9 @@ Mật khẩu chung của dữ liệu demo: **`Student@123`**. Đây là tài kho
 
 ## Luồng OJT
 
-Seed **không giả kết quả xét chính thức, bàn giao, đăng ký, ứng tuyển, tiếp nhận hoặc phân công thực tập**. Đã bỏ các bản ghi HANDED_OFF/ACCEPTED cũ thiếu xác nhận và không khớp chương trình học.
+Seed hiện có fixture luồng doanh nghiệp: 11 kết quả frontend đã lưu và bàn giao theo bảng điểm, 10 đăng ký/ứng tuyển/điều phối, 4 phân công và 12 nhiệm vụ. Không tạo EligibilityChecks/EligibilityConfirmations giả. `student01` đã được bàn giao nhưng chưa đăng ký/ứng tuyển để thử luồng trực tiếp. Xem [student-flow-audit.md](student-flow-audit.md).
 
-Sau reset, Phòng Đào tạo chạy xét theo kỳ `DEMO-OJT-S6`, xác nhận kết quả rồi bàn giao danh sách đủ điều kiện. Sinh viên sau đó đăng ký OJT và ứng tuyển qua API bình thường. CV được sinh viên tải lên; không tự tạo CV giả.
+Với hồ sơ ngoài fixture, Phòng Đào tạo tính và lưu kết quả rồi bàn giao danh sách đủ điều kiện theo kỳ `DEMO-OJT-S6`. Sinh viên sau đó đăng ký OJT và ứng tuyển qua API bình thường. CV được sinh viên tải lên; không tự tạo CV giả. Bằng chứng admission cần theo đúng nguồn đã bàn giao, không bắt hồ sơ của luồng frontend phải có EligibilityChecks cũ.
 
 Theo hợp đồng REST, sinh viên dùng `GET /api/auth/me` để lấy tài khoản và studentId, `GET /api/students/:id` để lấy hồ sơ của mình và `GET /api/students/me/dashboard?ojtSemesterId=...` cho dashboard. GET không gửi body; POST/PATCH dùng JSON khi có dữ liệu nghiệp vụ. Xem student-portal-api.md.
 

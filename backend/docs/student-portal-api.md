@@ -2,7 +2,7 @@
 
 Base URL `/api`, Bearer token STUDENT. GET không có body; ID tài nguyên nằm trong path, bộ lọc nằm trong query. POST/PATCH dùng JSON object với `Content-Type: application/json`. Upload CV dùng multipart/form-data.
 
-Sau khi gộp, Student có **21 operation: 13 GET, 6 POST, 2 PATCH**, tính cả Auth chung và upload CV. Swagger `/api-docs`, hợp đồng máy đọc `/api-docs/openapi.json`, đầu vào đầy đủ tại [api-input-reference.md](api-input-reference.md).
+Student có **22 operation cần xác thực: 13 GET, 7 POST, 2 PATCH**, cộng thêm `POST /auth/login` công khai. Swagger `/api-docs`, hợp đồng máy đọc `/api-docs/openapi.json`, đầu vào đầy đủ tại [api-input-reference.md](api-input-reference.md).
 
 ## 1. Hồ sơ và học vụ
 
@@ -102,7 +102,7 @@ Các danh sách trên dashboard lấy tối đa 5 bản ghi đầu và có total
 | Danh sách/lịch sử hồ sơ OJT | GET `/ojt-registrations` |
 | Gửi hồ sơ OJT | POST `/ojt-registrations` |
 | Theo dõi trạng thái của mình theo kỳ | GET `/ojt-semesters/:id/students` |
-| Cơ hội/vị trí thực tập | GET `/students/me/opportunities?ojtSemesterId=...` |
+| Cơ hội/vị trí thực tập | GET `/students/me/opportunities?windowId=...` |
 | Đơn ứng tuyển và điều phối | GET `/job-applications` |
 | Ứng tuyển | POST `/job-applications` |
 | Thông báo | GET `/students/me/notifications` |

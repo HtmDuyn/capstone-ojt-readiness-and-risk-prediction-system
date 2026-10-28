@@ -50,6 +50,12 @@ export interface Eligibility {
   academicIssues?: string[];
   rule?: { minCredits: number; maxUnpassedCourses: number } | null;
 }
+export interface AdmissionEligibility extends Eligibility {
+  source: 'FRONTEND_HANDOFF' | 'OFFICIAL_CHECK';
+  handoffId: number;
+  batchId?: number;
+  handedOffAt?: string;
+}
 export interface CourseResult {
   id: number;
   courseId: number;
@@ -95,6 +101,7 @@ export interface Profile {
   academicProgress: AcademicProgress;
   ojtSemesterId: number | null;
   officialEligibility: Eligibility | null;
+  admissionEligibility?: AdmissionEligibility | null;
   officialDecision: string;
   courseResults: Page<CourseResult>;
   ojtRegistrations: Page<Registration>;
@@ -157,6 +164,7 @@ export interface AcademicSummary {
   issues: string[];
   currentEligibility: Eligibility | null;
   officialEligibility: Eligibility | null;
+  admissionEligibility?: AdmissionEligibility | null;
   inProgressCredits: number | null;
   scenario: { potentialCredits: number | null; isAiPrediction: false };
   deadline: { assessmentDeadline: string | null } | null;
@@ -180,10 +188,20 @@ export interface PortalNotification {
   isRead: boolean | null;
 }
 export interface Dashboard {
-  academic: AcademicSummary;
+  academic: AcademicSummary & { supplementaryCourses: Supplementary };
   registrationWindows: Page<Window>;
-  assignment: Assignment | null;
+  comboWindows: Page<Window>;
+  internship: Internships;
   notifications: Page<PortalNotification> & { unreadCount: number };
+  jobApplications: Page<Application>;
+}
+export interface Internships {
+  studentId: number;
+  ojtSemesterId: number | null;
+  assignment: Assignment | null;
+  tasks: Page<Task>;
+  results: Page<OjtResult>;
+  result: OjtResult | null;
 }
 export interface Opportunity {
   id: number;

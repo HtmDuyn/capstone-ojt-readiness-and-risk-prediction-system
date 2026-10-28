@@ -5,6 +5,7 @@ import { readTransaction } from '../qhdn/read.repository';
 import { studentSelect, resultSelect } from './student.service';
 import { loadAcademicProgress,progressFromData } from './academic-progress';
 import { officialEligibilityWithClient,eligibility,history } from '../eligibility/eligibility.service';
+import { admissionEligibilityWithClient } from '../eligibility/admission.service';
 import { enrichListRows } from '../../shared/list-context';
 import { invalid, pagination, positiveId, enumValue } from './student.validation';
 import type { Actor } from '../ojt-registration/window.service';
@@ -89,7 +90,7 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
     output.ojtSemesterId=semesterId;
     const decision=semesterId&&(includes.has('eligibility')||includes.has('academic'))?await eligibility(id,{ojtSemesterId:semesterId},c,academicProgress,source):null;
     const official=decision?decision.official:(semesterId&&needsProgress?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null);
-    if(needsProgress){output.officialEligibility=official;output.officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;}
+    if(needsProgress){output.officialEligibility=official;output.officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;output.admissionEligibility=semesterId?await admissionEligibilityWithClient(c,id,semesterId):null;}
     if(includes.has('eligibility'))output.eligibility=decision;
     if(includes.has('eligibilityChecks'))output.eligibilityChecks=await history(id,{...(selected?{ojtSemesterId:selected}:{}),page:params.checksPage,limit:params.checksLimit},c);
     if(includes.has('academic')){

@@ -98,6 +98,7 @@ export const getCurrentUser = async (
 
       user: {
         mustChangePassword: user.must_change_password,
+        studentId: user.studentId,
         id:
           user.id,
 
@@ -106,6 +107,7 @@ export const getCurrentUser = async (
 
         email:
           user.email,
+        phone: user.phone,
 
         fullName:
           user.full_name,

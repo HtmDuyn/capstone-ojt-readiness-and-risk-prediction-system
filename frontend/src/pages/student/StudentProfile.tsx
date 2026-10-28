@@ -27,7 +27,7 @@ export const StudentAcademicProfile = () => {
   );
   const curriculum = useStudentResource(
     !loading && profile ? 'curriculum:' + profile.id + ':' + revision : null,
-    getCurriculum,
+    (signal) => getCurriculum(profile!.id, signal),
   );
   const progress = profile?.academicProgress;
   const visible = results.data?.items.filter((item) =>
@@ -199,6 +199,11 @@ export const StudentAcademicProfile = () => {
                 )}
               </>
             )}
+            {!curriculum.loading &&
+              !curriculum.error &&
+              curriculum.data === null && (
+                <Empty>Chương trình đào tạo chưa được công bố.</Empty>
+              )}
           </Card>
           <Card title="Combo đã xác nhận">
             {profile.comboSelections.length ? (

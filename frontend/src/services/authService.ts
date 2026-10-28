@@ -4,6 +4,7 @@ export interface LoginResponse {
   success: boolean;
   message: string;
   token: string;
+  mustChangePassword: boolean;
 }
 
 export interface CurrentUserResponse {
@@ -17,6 +18,9 @@ export interface CurrentUserResponse {
     status: string;
     roleCode: string | null;
     roleName: string | null;
+    studentId: number | null;
+    phone: string | null;
+    mustChangePassword: boolean;
   };
 }
 

@@ -40,6 +40,7 @@ export const statusText = (status?: string | null): string =>
     RECOGNIZED: 'Được công nhận',
     WITHDRAWN: 'Đã rút',
     ACCEPTED: 'Đã tiếp nhận',
+    PENDING: 'Chờ doanh nghiệp phản hồi',
     REVIEWING: 'Đang xét',
     INTERVIEW: 'Phỏng vấn',
     OFFERED: 'Đề nghị tiếp nhận',
@@ -59,6 +60,7 @@ const blockerLabels: Record<string, string> = {
     'Chưa có xác nhận đủ điều kiện OJT hiện hành.',
   OFFICIAL_ELIGIBILITY_REQUIRED: 'Chưa có xác nhận đủ điều kiện OJT hiện hành.',
   ELIGIBILITY_CHECK_STALE: 'Kết quả xét đã cũ, cần được xét lại.',
+  ELIGIBILITY_HANDOFF_STALE: 'Dữ liệu đã thay đổi sau bàn giao; liên hệ Phòng Đào tạo để rà soát.',
   REGISTRATION_REQUIRED: 'Cần nộp hồ sơ đăng ký OJT.',
   REGISTRATION_EXISTS: 'Đã có hồ sơ đăng ký.',
   OJT_REGISTRATION_WINDOW_UNAVAILABLE: 'Đợt đăng ký chưa mở hoặc đã hết hạn.',
@@ -261,12 +263,20 @@ export function AcademicMetrics({ data }: { data: AcademicSummary }) {
 export function EligibilityCard({
   official,
   current,
+  admission,
 }: {
   official: Eligibility | null;
   current?: Eligibility | null;
+  admission?: Eligibility | null;
 }) {
   return (
     <Card title="Điều kiện tham gia OJT">
+      {admission && (
+        <p className="font-semibold">
+          Kết quả bàn giao từ Phòng Đào tạo:{' '}
+          {admission.isStale ? 'Dữ liệu đã thay đổi, cần rà soát' : statusText(admission.status)}
+        </p>
+      )}
       <p className="font-semibold">
         Kết quả chính thức:{' '}
         {official?.isStale

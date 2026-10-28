@@ -47,13 +47,18 @@ export function describeStudentRest(spec: Schema): Schema {
   const notification = object({id, title: text, content: nullableText, sentAt: time, isRead: {type: 'boolean', nullable: true},
     channel: nullableText, templateId: nullable(id), relatedEntityType: nullableText, relatedEntityId: nullable(id)});
   const notifications = page(notification);
+  const admission = nullable({...eligibility, properties: {...eligibility.properties,
+    source: {type:'string',enum:['FRONTEND_HANDOFF','OFFICIAL_CHECK']}, handoffId:id, batchId:nullable(id), handedOffAt:time,
+  }});
+  profile.properties.admissionEligibility = admission;
+  data('/api/students/me/opportunities').properties.admissionEligibility = admission;
   notifications.properties.unreadCount = {type: 'integer', minimum: 0};
   const academic = object({studentId: id, programId: nullable(id), ojtSemesterId: id,
     student: context('student'), program: profile.properties.program,
     semester: context('semester'), academicProgress: progress,
     earnedCredits: number, missingCredits: number, failedCourseCount: {type: 'integer'},
     failedCourses: array({type: 'object', additionalProperties: true}), outstandingCourses: array(requirement),
-    inProgressCredits: number, currentEligibility: eligibility, officialEligibility: nullable(eligibility),
+    inProgressCredits: number, currentEligibility: eligibility, officialEligibility: nullable(eligibility), admissionEligibility: admission,
     scenario: object({assumption: {type: 'string', enum: ['ALL_CURRENT_COURSES_PASSED']}, potentialCredits: number, isAiPrediction: {type: 'boolean', enum: [false]}}),
     gpa: number, gpaScale: number, issues: array(text), computedAt: time,
     deadline: nullable(object({assessmentDeadline: time, assessmentAcademicPeriodId: nullable(id)})),

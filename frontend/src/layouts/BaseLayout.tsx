@@ -6,7 +6,7 @@ import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { AIConsultModal } from "@/components/common/AIConsultModal";
 import { BotSparkleIcon } from "@/components/common/icons/AppIcons";
-import { mockStudentProfile } from "@/data/student/mockStudentData";
+import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
 import type { NavItem } from "@/types/common.types";
 
 interface BaseLayoutContextType {
@@ -41,6 +41,8 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   children,
 }) => {
   const { user, logout } = useAuth();
+  const portal = useOptionalStudentPortal();
+  const profile = portal?.profile;
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -57,15 +59,15 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   };
 
   const resolvedUserSummary: HeaderUserSummary = userSummary || {
-    fullName: user?.name || mockStudentProfile.fullName,
-    email: user?.email || mockStudentProfile.email,
-    code: user?.id || mockStudentProfile.studentCode,
+    fullName: profile?.fullName || user?.name || 'Người dùng',
+    email: profile?.email || user?.email || '',
+    code: profile?.studentCode,
     subtitle:
       user?.role === "student"
-        ? `${mockStudentProfile.studentCode} - ${mockStudentProfile.semester}`
+        ? [profile?.studentCode, profile?.currentSemester != null ? `Kỳ ${profile.currentSemester}` : null].filter(Boolean).join(' - ') || 'Sinh viên'
         : user?.role?.toUpperCase(),
-    avatar: user?.avatar || mockStudentProfile.avatar,
-    department: user?.role === "student" ? mockStudentProfile.major : undefined,
+    avatar: user?.avatar || '',
+    department: profile?.program?.majorName,
   };
 
   return (
@@ -99,10 +101,11 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
-            student={user?.role === 'student' ? mockStudentProfile : undefined}
             user={resolvedUserSummary}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
+            onOpenNotifications={user?.role === 'student' ? () => navigate('/student/notifications') : undefined}
+            unreadCount={portal?.unreadCount ?? undefined}
             showSearch={
               brandSubtitle !== "Phòng Đào tạo" &&
               brandSubtitle !== "Quản trị viên"
@@ -144,7 +147,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <AIConsultModal
           isOpen={aiModalOpen}
           onClose={() => setAiModalOpen(false)}
-          student={mockStudentProfile}
+          student={{ fullName: resolvedUserSummary.fullName }}
           initialQuery={initialAiQuery}
         />
       </div>

@@ -1,11 +1,7 @@
 import { useState, useRef } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import {
-  getAcademicSummary,
-  getSupplementary,
-  getRoadmap,
-} from '@/services/student';
+import { getStudentDashboard, getRoadmap } from '@/services/student';
 import type { Roadmap } from '@/types/student/portal';
 import {
   AcademicMetrics,
@@ -91,12 +87,9 @@ export const StudentAIRiskPrediction = () => {
     !loading && profile && semesterId
       ? profile.id + ':' + semesterId + ':' + revision
       : null;
-  const summary = useStudentResource(key && 'summary:' + key, (signal) =>
-    getAcademicSummary(semesterId!, signal),
-  );
-  const supplementary = useStudentResource(
-    key && 'supplementary:' + key,
-    (signal) => getSupplementary(semesterId!, signal),
+  const dashboard = useStudentResource(
+    key && 'dashboard:' + key,
+    (signal) => getStudentDashboard(semesterId!, signal),
   );
   return (
     <StudentPage
@@ -104,22 +97,23 @@ export const StudentAIRiskPrediction = () => {
       description="Đối chiếu điều kiện OJT, các môn cần bổ sung và tư vấn AI dựa trên dữ liệu học tập."
     >
       <ResourceState
-        loading={summary.loading}
-        error={summary.error}
-        retry={summary.reload}
+        loading={dashboard.loading}
+        error={dashboard.error}
+        retry={dashboard.reload}
       />
-      {summary.data && (
+      {dashboard.data && (
         <>
-          <AcademicMetrics data={summary.data} />
+          <AcademicMetrics data={dashboard.data.academic} />
           <EligibilityCard
-            official={summary.data.officialEligibility}
-            current={summary.data.currentEligibility}
+            admission={dashboard.data.academic.admissionEligibility}
+            official={dashboard.data.academic.officialEligibility}
+            current={dashboard.data.academic.currentEligibility}
           />
           <Card title="Kịch bản hoàn thành các môn đang học">
             <p className="text-sm">
               Nếu tất cả môn đang học đều đạt, tổng tín chỉ có thể tích lũy:{' '}
               <strong>
-                {valueText(summary.data.scenario.potentialCredits)}
+                {valueText(dashboard.data.academic.scenario.potentialCredits)}
               </strong>
               .
             </p>
@@ -127,22 +121,17 @@ export const StudentAIRiskPrediction = () => {
               Đây là kịch bản tính theo chương trình đào tạo, không phải xác
               suất dự báo AI.
             </p>
-            {!!summary.data.issues.length && (
-              <Blockers values={summary.data.issues} />
+            {!!dashboard.data.academic.issues.length && (
+              <Blockers values={dashboard.data.academic.issues} />
             )}
           </Card>
         </>
       )}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card title="Môn cần học / học lại">
-          <ResourceState
-            loading={supplementary.loading}
-            error={supplementary.error}
-            retry={supplementary.reload}
-          />
-          {supplementary.data && (
+          {dashboard.data && (
             <>
-              {supplementary.data.items.map((course) => (
+              {dashboard.data.academic.supplementaryCourses.items.map((course) => (
                 <div
                   key={course.requirementId}
                   className="rounded-xl bg-slate-50 p-4 text-sm space-y-1"
@@ -164,7 +153,7 @@ export const StudentAIRiskPrediction = () => {
                   ))}
                 </div>
               ))}
-              {!supplementary.data.items.length && (
+              {!dashboard.data.academic.supplementaryCourses.items.length && (
                 <Empty>Không có môn cần bổ sung theo dữ liệu hiện tại.</Empty>
               )}
               <p className="text-xs text-slate-500">

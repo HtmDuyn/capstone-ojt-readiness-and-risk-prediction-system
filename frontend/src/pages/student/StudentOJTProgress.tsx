@@ -23,7 +23,7 @@ function ProgressContent() {
     getAssignment(semesterId!, signal),
   );
   const tasks = useStudentResource('tasks:' + key + ':' + page, (signal) =>
-    getTasks(profile!.id, semesterId!, page, signal),
+    getTasks(semesterId!, page, signal),
   );
   const visible = tasks.data?.items.filter((task) =>
     (task.name + ' ' + (task.description ?? ''))

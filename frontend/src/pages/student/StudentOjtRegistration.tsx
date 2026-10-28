@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, Building2, RefreshCw, Send } from "lucide-react";
 import API from "@/services/api";
+import { allStudentPages, studentGet, studentQuery } from '@/services/student';
+import { useStudentPortal } from '@/contexts/StudentPortalContext';
+import { StudentPage, statusText } from '@/components/student/PortalUI';
+import { StudentCvCard } from '@/components/student/StudentCvCard';
 
-type Envelope<T> = { success: true; data: T };
 type RegistrationWindow = {
   id: number;
   name: string;
@@ -38,7 +41,7 @@ type Application = {
   position: { title: string };
   coordination?: { decision: string; rejectReason?: string | null } | null;
 };
-type Page<T> = { items: T[] };
+type Page<T> = { items: T[]; total: number; page: number; limit: number };
 type OpportunityResults = Page<Opportunity> & {
   canApply: boolean;
   blockers: string[];
@@ -47,6 +50,7 @@ const blockerLabels: Record<string, string> = {
   ELIGIBLE_HANDOFF_REQUIRED: "Chưa được Phòng Đào tạo bàn giao danh sách đủ điều kiện.",
   CONFIRMED_ELIGIBILITY_REQUIRED: "Cần có kết quả eligibility chính thức còn hiệu lực.",
   ELIGIBILITY_CHECK_STALE: "Kết quả eligibility đã cũ; cần được cập nhật.",
+  ELIGIBILITY_HANDOFF_STALE: 'Dữ liệu đã thay đổi sau bàn giao; liên hệ Phòng Đào tạo để rà soát.',
   APPLICATION_ALREADY_IN_PROCESS: "Đã có hồ sơ đang chờ hoặc đã được doanh nghiệp tiếp nhận.",
   POSITION_FULL: "Vị trí đã đủ chỉ tiêu.",
   OJT_REGISTRATION_WINDOW_UNAVAILABLE: "Đợt đăng ký chưa mở hoặc đã hết hạn.",
@@ -65,7 +69,9 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : "Không thể hoàn tất yêu cầu.";
 }
 
-export default function StudentOjtRegistration() {
+function RegistrationContent() {
+  const { profile, semesterId } = useStudentPortal();
+  const submitLock = useRef(false);
   const [windows, setWindows] = useState<RegistrationWindow[]>([]);
   const [windowId, setWindowId] = useState("");
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -74,41 +80,38 @@ export default function StudentOjtRegistration() {
   const [selected, setSelected] = useState<Opportunity | null>(null);
   const [coverLetter, setCoverLetter] = useState("");
   const [note, setNote] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState(profile?.phone ?? '');
+  const [contactEmail, setContactEmail] = useState(profile?.email ?? '');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   const loadWindows = useCallback(async () => {
-    const response = await API.get<Envelope<Page<RegistrationWindow>>>("/ojt-registration-windows", {
-      params: { page: 1, limit: 100 },
-    });
-    const items = response.data.data.items;
+    const items = await allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }));
     setWindows(items);
     setWindowId((current) =>
       items.some((item) => String(item.id) === current)
         ? current
         : String(items.find((item) => item.canSubmit)?.id ?? items[0]?.id ?? ""),
     );
-  }, []);
+  }, [semesterId]);
 
   const loadApplications = useCallback(async () => {
-    const response = await API.get<Envelope<Page<Application>>>("/job-applications", {
-      params: { page: 1, limit: 100 },
-    });
-    setApplications(response.data.data.items);
-  }, []);
+    setApplications(await allStudentPages<Application>('/job-applications' + studentQuery({ ojtSemesterId: semesterId })));
+  }, [semesterId]);
 
-  const loadOpportunities = useCallback(async (selectedWindowId: string): Promise<OpportunityResults | null> => {
+  const loadOpportunities = useCallback(async (selectedWindowId: string, signal?: AbortSignal): Promise<OpportunityResults | null> => {
     if (!selectedWindowId) {
       return null;
     }
-    const response = await API.get<Envelope<OpportunityResults>>("/students/me/opportunities", {
-      params: { windowId: Number(selectedWindowId), page: 1, limit: 100 },
-    });
-    return response.data.data;
+    let result: OpportunityResults | null = null;
+    const items: Opportunity[] = [];
+    for (let page = 1; ; page++) {
+      result = await studentGet<OpportunityResults>('/students/me/opportunities' + studentQuery({ windowId: Number(selectedWindowId), page, limit: 100 }), signal);
+      items.push(...result.items);
+      if (items.length >= result.total || !result.items.length) return { ...result, items };
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -143,13 +146,17 @@ export default function StudentOjtRegistration() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    setOpportunities([]);
+    setOpportunityBlockers([]);
+    setSelected(null);
     if (!windowId) {
       setOpportunities([]);
       setOpportunityBlockers([]);
       return;
     }
     setLoading(true);
-    loadOpportunities(windowId)
+    loadOpportunities(windowId, controller.signal)
       .then((result) => {
         if (active && result) {
           setOpportunities(result.items);
@@ -164,12 +171,14 @@ export default function StudentOjtRegistration() {
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [loadOpportunities, windowId]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selected || !windowId || busy) return;
+    if (!selected || !windowId || submitLock.current || loading) return;
+    submitLock.current = true;
     setBusy(true);
     setError("");
     setMessage("");
@@ -193,6 +202,7 @@ export default function StudentOjtRegistration() {
     } catch (e) {
       setError(errorText(e));
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };
@@ -202,13 +212,8 @@ export default function StudentOjtRegistration() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 p-6 text-white shadow-lg">
-        <p className="text-sm font-semibold text-orange-100">Thực tập doanh nghiệp</p>
-        <h1 className="mt-1 text-2xl font-extrabold">Đăng ký OJT</h1>
-        <p className="mt-2 max-w-3xl text-sm text-orange-50">
-          Chọn đợt đăng ký và vị trí phù hợp. Hồ sơ sẽ được gửi thẳng đến doanh nghiệp; Phòng QHDN theo dõi trạng thái, không duyệt hoặc chuyển tiếp hồ sơ.
-        </p>
-      </header>
+      <p className="text-sm text-slate-600">Chọn đợt đăng ký và vị trí phù hợp. Hồ sơ được gửi trực tiếp đến doanh nghiệp; Phòng QHDN theo dõi trạng thái.</p>
+      <StudentCvCard />
 
       {error && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -229,7 +234,7 @@ export default function StudentOjtRegistration() {
                 setSelected(null);
                 setWindowId(event.target.value);
               }}
-              disabled={loading || !windows.length}
+              disabled={loading || busy || !windows.length}
             >
               {!windows.length && <option value="">Chưa có đợt đăng ký phù hợp</option>}
               {windows.map((item) => (
@@ -319,7 +324,7 @@ export default function StudentOjtRegistration() {
                 <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" />
               </label>
               <label className="text-sm font-semibold text-slate-700">Email liên hệ
-                <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} maxLength={254} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" />
+                <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} maxLength={100} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" />
               </label>
             </div>
             <label className="block text-sm font-semibold text-slate-700">Ghi chú
@@ -346,12 +351,21 @@ export default function StudentOjtRegistration() {
                   <p className="mt-1 text-xs text-slate-500">{application.company.name} · {new Date(application.appliedAt).toLocaleDateString("vi-VN")}</p>
                   {application.coordination?.rejectReason && <p className="mt-1 text-xs text-red-600">Lý do từ chối: {application.coordination.rejectReason}</p>}
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{application.coordination?.decision || application.status}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{statusText(application.coordination?.decision || application.status)}</span>
               </div>
             ))}
           </div>
         ) : <p className="mt-2 text-sm text-slate-500">Chưa có hồ sơ ứng tuyển.</p>}
       </section>
     </div>
+  );
+}
+
+export default function StudentOjtRegistration() {
+  const { profile, semesterId } = useStudentPortal();
+  return (
+    <StudentPage title="Đăng ký OJT" description="Chọn doanh nghiệp, nộp hồ sơ và theo dõi phản hồi trong đợt OJT của bạn.">
+      <RegistrationContent key={`${profile?.id}:${semesterId}`} />
+    </StudentPage>
   );
 }

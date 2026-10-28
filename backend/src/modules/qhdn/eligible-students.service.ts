@@ -3,7 +3,7 @@ import { invalid, pagination, positiveId, requiredText, enumValue } from '../stu
 import type { Actor, Row } from '../ojt-registration/window.service';
 
 // This is the received academic roster, independent of OJT registration.
-// Eligibility belongs to the confirmed check used for handoff, not a new decision.
+// Eligibility belongs to the saved frontend result or confirmed check used for handoff.
 export async function eligibleStudents(params: Row, actor: Actor) {
   if (!['ADMIN', 'OJT_COORD'].includes(actor.roleCode)) {
     throw invalid('Only QHDN staff can view the handed-off eligible roster.', 403, 'FORBIDDEN');
@@ -15,7 +15,9 @@ export async function eligibleStudents(params: Row, actor: Actor) {
   const semesterId = positiveId(params.ojtSemesterId, 'ojtSemesterId');
   if (p.offset > 2147483647) throw invalid('Pagination exceeds allowed range.');
   const args: unknown[] = [semesterId];
-  const where = ['s."DeletedAt" IS NULL'];
+  const where = ['s."DeletedAt" IS NULL', `(i."CalculatedBatchID" IS NOT NULL AND batch."BatchID" IS NOT NULL
+    AND i."Snapshot"->'calculatedEligibility'->>'status'='ELIGIBLE'
+    OR i."CalculatedBatchID" IS NULL AND e."CheckID" IS NOT NULL AND confirmed."CheckID" IS NOT NULL)`];
   const add = (column: string, value: unknown) => {
     args.push(value);
     where.push(`${column}=$${args.length}`);
@@ -54,9 +56,10 @@ export async function eligibleStudents(params: Row, actor: Actor) {
     ) i
     JOIN "EligibleStudentHandoffs" h ON h."HandoffID"=i."HandoffID"
       AND h."OJTSemesterID"=i."OJTSemesterID" AND h."RecipientRole"='OJT_COORD'
-    JOIN "EligibilityChecks" e ON e."CheckID"=i."CheckID"
+    LEFT JOIN "EligibilityChecks" e ON e."CheckID"=i."CheckID"
       AND e."StudentID"=i."StudentID" AND e."OJTSemesterID"=i."OJTSemesterID" AND e."Status"='ELIGIBLE'
-    JOIN "EligibilityConfirmations" confirmed ON confirmed."CheckID"=e."CheckID"
+    LEFT JOIN "EligibilityConfirmations" confirmed ON confirmed."CheckID"=e."CheckID"
+    LEFT JOIN "OJTEligibilityResultBatches" batch ON batch."BatchID"=i."CalculatedBatchID"
     JOIN "Students" s ON s."StudentID"=i."StudentID"
     JOIN "Users" u ON u."UserID"=s."UserID"
     LEFT JOIN "TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
@@ -74,11 +77,13 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       'HANDED_OFF'::text AS "handoffStatus",
       jsonb_build_object('id',h."HandoffID",'createdAt',h."CreatedAt",'createdBy',h."CreatedBy",
         'createdByName',sender."FullName",'reason',h."Reason") AS handoff,
-      jsonb_build_object('checkId',e."CheckID",'status',e."Status",'checkedAt',e."CheckedAt",
+      CASE WHEN i."CalculatedBatchID" IS NOT NULL THEN i."Snapshot"->'calculatedEligibility'
+        || jsonb_build_object('source','FRONTEND','batchId',i."CalculatedBatchID",'validity','AT_HANDOFF')
+      ELSE jsonb_build_object('checkId',e."CheckID",'status',e."Status",'checkedAt',e."CheckedAt",
         'confirmedAt',confirmed."ConfirmedAt",'confirmedBy',confirmed."ConfirmedBy",
         'ruleSetId',e."RuleSetID",'earnedCredits',e."Result"->'earnedCredits',
         'missingCredits',e."Result"->'missingCredits','unpassedCourseCount',e."Result"->'unpassedCourseCount',
-        'validity','AT_HANDOFF') AS "eligibilityAtHandoff",
+        'validity','AT_HANDOFF') END AS "eligibilityAtHandoff",
       r."RegistrationID" AS "registrationId",
       CASE WHEN r."Status"='HANDED_OFF' THEN 'LEGACY_REVIEW_REQUIRED'
         ELSE COALESCE(r."Status",'NOT_REGISTERED') END AS "registrationStatus",
