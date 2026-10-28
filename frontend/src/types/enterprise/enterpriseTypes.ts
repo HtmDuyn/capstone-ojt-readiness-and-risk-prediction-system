@@ -48,6 +48,15 @@ export interface EnterpriseProfileData {
   status: string;
   createdAt: string;
   summary: EnterpriseProfileSummary;
+  representative?: {
+    id: number;
+    userId: number;
+    username: string;
+    fullName: string;
+    email: string;
+    phone: string | null;
+    positionTitle: string | null;
+  };
 }
 
 export interface EnterpriseProfileResponse {

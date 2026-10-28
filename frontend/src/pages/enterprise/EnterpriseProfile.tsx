@@ -36,8 +36,13 @@ export const EnterpriseProfile: React.FC = () => {
 
   // Edit Profile Modal State
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [editCompanyName, setEditCompanyName] = useState<string>('');
+  const [editAddress, setEditAddress] = useState<string>('');
+  const [editIndustry, setEditIndustry] = useState<string>('');
   const [editFullName, setEditFullName] = useState<string>('');
   const [editPhone, setEditPhone] = useState<string>('');
+  const [editEmail, setEditEmail] = useState<string>('');
+  const [editPositionTitle, setEditPositionTitle] = useState<string>('');
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
@@ -50,8 +55,13 @@ export const EnterpriseProfile: React.FC = () => {
       setProfile(contextProfile);
       setLoading(false);
       if (contextProfile) {
+        setEditCompanyName(contextProfile.name);
+        setEditAddress(contextProfile.address || '');
+        setEditIndustry(contextProfile.industry || '');
         setEditFullName(authUser?.name || contextProfile.contactPersonName || 'Nguyen Van A');
-        setEditPhone(contextProfile.contactPhone || '0909123456');
+        setEditPhone(contextProfile.contactPhone || '');
+        setEditEmail(contextProfile.contactEmail || '');
+        setEditPositionTitle(contextProfile.representative?.positionTitle || '');
       }
     }
   }, [contextProfile, contextLoading, authUser]);
@@ -64,8 +74,13 @@ export const EnterpriseProfile: React.FC = () => {
       const response = await enterpriseService.getProfile();
       if (response && response.success && response.data) {
         setProfile(response.data);
+        setEditCompanyName(response.data.name);
+        setEditAddress(response.data.address || '');
+        setEditIndustry(response.data.industry || '');
         setEditFullName(authUser?.name || response.data.contactPersonName || 'Nguyen Van A');
-        setEditPhone(response.data.contactPhone || '0909123456');
+        setEditPhone(response.data.contactPhone || '');
+        setEditEmail(response.data.contactEmail || '');
+        setEditPositionTitle(response.data.representative?.positionTitle || '');
         // Cập nhật context để các component khác cũng dùng profile mới
         void reloadContext();
       } else {
@@ -89,8 +104,8 @@ export const EnterpriseProfile: React.FC = () => {
       setUpdateError('Không tìm thấy hồ sơ doanh nghiệp để cập nhật.');
       return;
     }
-    if (!editFullName.trim()) {
-      setUpdateError('Vui lòng nhập họ và tên.');
+    if (!editCompanyName.trim() || !editFullName.trim() || !editEmail.trim()) {
+      setUpdateError('Vui lòng nhập tên doanh nghiệp, người đại diện và email liên hệ.');
       return;
     }
 
@@ -98,19 +113,20 @@ export const EnterpriseProfile: React.FC = () => {
     setUpdateError(null);
 
     try {
-      const res = await enterpriseService.updateEnterpriseProfile(profile.id, {
+      const res = await enterpriseService.updateEnterpriseProfile({
+        companyId: profile.id,
+        name: editCompanyName.trim(),
+        address: editAddress.trim() || null,
+        industry: editIndustry.trim() || null,
         contactPersonName: editFullName.trim(),
         contactPhone: editPhone.trim() || null,
+        contactEmail: editEmail.trim(),
+        positionTitle: editPositionTitle.trim() || null,
       });
 
       if (res?.success && res.data) {
-        if (profile) {
-          setProfile({
-            ...profile,
-            contactPersonName: res.data.contactPersonName,
-            contactPhone: res.data.contactPhone,
-          });
-        }
+        setProfile({ ...profile, ...res.data });
+        setEditPositionTitle(res.data.representative.positionTitle || '');
         void reloadContext();
 
         setShowEditModal(false);
@@ -461,10 +477,10 @@ export const EnterpriseProfile: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-sm">
-                    Cập nhật Hồ sơ Cá nhân
+                    Cập nhật Hồ sơ Doanh nghiệp
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Cập nhật họ tên và số điện thoại người đại diện
+                    Cập nhật thông tin doanh nghiệp và người đại diện
                   </p>
                 </div>
               </div>
@@ -477,7 +493,7 @@ export const EnterpriseProfile: React.FC = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleUpdateProfile} className="p-6 space-y-4">
+            <form onSubmit={handleUpdateProfile} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               {updateError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-medium flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -485,18 +501,52 @@ export const EnterpriseProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Email (Read only) */}
+              {/* Company name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Email đăng nhập
+                  Tên doanh nghiệp <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editCompanyName}
+                  onChange={(e) => setEditCompanyName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Địa chỉ</label>
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Lĩnh vực</label>
+                <input
+                  type="text"
+                  value={editIndustry}
+                  onChange={(e) => setEditIndustry(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Contact email */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Email liên hệ <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="email"
-                  disabled
-                  value={profile?.contactEmail || authUser?.email || 'hr@techviet.example'}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-xs font-medium text-slate-500 cursor-not-allowed"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">Email dùng để đăng nhập hệ thống, không thể chỉnh sửa.</span>
               </div>
 
               {/* fullName */}
@@ -511,6 +561,18 @@ export const EnterpriseProfile: React.FC = () => {
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Chức vụ người đại diện
+                </label>
+                <input
+                  type="text"
+                  value={editPositionTitle}
+                  onChange={(e) => setEditPositionTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
                 />
               </div>
 

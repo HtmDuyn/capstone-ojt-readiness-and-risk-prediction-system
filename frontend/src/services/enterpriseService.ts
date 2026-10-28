@@ -3,8 +3,41 @@ import type { EnterpriseProfileData, EnterpriseProfileResponse } from '@/types/e
 
 export interface EnterpriseProfileUpdateResponse {
   success: boolean;
-  data: Pick<EnterpriseProfileData, 'id' | 'contactPersonName' | 'contactPhone'>;
+  data: Pick<
+    EnterpriseProfileData,
+    | 'id'
+    | 'code'
+    | 'name'
+    | 'address'
+    | 'industry'
+    | 'contactPersonName'
+    | 'contactPhone'
+    | 'contactEmail'
+    | 'status'
+    | 'createdAt'
+  > & {
+    representative: {
+      id: number;
+      userId: number;
+      username: string;
+      fullName: string;
+      email: string;
+      phone: string | null;
+      positionTitle: string | null;
+    };
+  };
   message?: string;
+}
+
+export interface EnterpriseProfileUpdateRequest {
+  companyId: number;
+  name: string;
+  address: string | null;
+  industry: string | null;
+  contactPersonName: string;
+  contactPhone: string | null;
+  contactEmail: string;
+  positionTitle: string | null;
 }
 
 export interface BulkTaskAssignmentResponse {
@@ -256,13 +289,9 @@ export const enterpriseService = {
   },
 
   updateEnterpriseProfile: async (
-    companyId: number,
-    data: Pick<EnterpriseProfileData, 'contactPersonName' | 'contactPhone'>
+    data: EnterpriseProfileUpdateRequest
   ): Promise<EnterpriseProfileUpdateResponse> => {
-    const response = await API.patch<EnterpriseProfileUpdateResponse>('/enterprise/profile', {
-      companyId,
-      ...data,
-    });
+    const response = await API.patch<EnterpriseProfileUpdateResponse>('/enterprise/profile', data);
     return response.data;
   },
 
