@@ -8165,6 +8165,9 @@ DECLARE
   v_existing_registration record;
   v_registration_id integer;
   v_coordination_id integer;
+  v_existing_assignment record;
+  v_start_date date;
+  v_end_date date;
   v_decision text;
   v_reject_reason text;
 BEGIN
@@ -8179,8 +8182,8 @@ BEGIN
   ORDER BY CASE WHEN u."Username"='ojt.coord01' THEN 0 ELSE 1 END,u."UserID"
   LIMIT 1;
 
-  SELECT s."OJTSemesterID",p."PositionID"
-    INTO STRICT v_semester_id,v_position_id
+  SELECT s."OJTSemesterID",p."PositionID",s."StartDate",s."EndDate"
+    INTO STRICT v_semester_id,v_position_id,v_start_date,v_end_date
   FROM public."OJTSemesters" s
   JOIN public."InternshipPositions" p ON p."OJTSemesterID"=s."OJTSemesterID"
   WHERE s."SemesterCode"='DEMO-OJT-S6'
@@ -8256,7 +8259,36 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'Existing demo coordination does not match TECHVIET demo position.';
     END IF;
+
+    IF v_decision='ACCEPTED' THEN
+      SELECT * INTO v_existing_assignment
+      FROM public."InternshipAssignments"
+      WHERE "CoordinationID"=v_coordination_id;
+      IF FOUND THEN
+        IF v_existing_assignment."StudentID"<>v_student."StudentID"
+          OR v_existing_assignment."EnterpriseID"<>v_enterprise_id
+          OR v_existing_assignment."PositionID"<>v_position_id THEN
+          RAISE EXCEPTION 'Existing accepted demo assignment does not match its coordination.';
+        END IF;
+      ELSE
+        INSERT INTO public."InternshipAssignments"
+          ("CoordinationID","StudentID","EnterpriseID","PositionID",
+           "EnterpriseSupervisorName","StartDate","EndDate","Status")
+        VALUES (
+          v_coordination_id,v_student."StudentID",v_enterprise_id,v_position_id,
+          'TechViet HR Demo',v_start_date,v_end_date,'ASSIGNED'
+        );
+      END IF;
+    END IF;
   END LOOP;
+
+  UPDATE public."InternshipPositions" p
+  SET "RemainingSlots"=GREATEST(0,p."Capacity"-(
+    SELECT count(*)::int FROM public."InternshipAssignments" a
+    WHERE a."PositionID"=p."PositionID"
+      AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
+  ))
+  WHERE p."PositionID"=v_position_id;
 
   IF (SELECT count(*) FROM public."StudentEnterpriseCoordination" co
       JOIN public."OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
@@ -8273,7 +8305,7 @@ BEGIN
     RAISE EXCEPTION 'Expected ten latest enterprise demo candidates for DEMO-OJT-S6.';
   END IF;
 
-  RAISE NOTICE 'Enterprise candidate list ready: 10 demo students (4 pending, 3 accepted, 3 rejected).';
+  RAISE NOTICE 'Enterprise demo ready: 10 candidates (4 pending, 3 accepted, 3 rejected); accepted candidates have internship assignments for task testing.';
 END $enterprise_candidate_status_demo$;
 
 COMMIT;
