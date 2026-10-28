@@ -14,7 +14,7 @@ import {
   Send,
   AlertTriangle,
 } from 'lucide-react';
-import { enterpriseService, type EnterpriseInternshipTask } from '@/service/enterpriseService';
+import { enterpriseService, type EnterpriseInternshipTask } from '@/services/enterpriseService';
 import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';

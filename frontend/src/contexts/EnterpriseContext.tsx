@@ -6,7 +6,7 @@ import React, {
   useContext,
   type ReactNode,
 } from 'react';
-import { enterpriseService } from '@/service/enterpriseService';
+import { enterpriseService } from '@/services/enterpriseService';
 import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 
 // ─── Enterprise Context ────────────────────────────────────────────────────────

@@ -20,14 +20,14 @@ import {
   Save,
   Check,
 } from 'lucide-react';
-import { enterpriseService } from '@/service/enterpriseService';
-import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
+import { enterpriseService } from '@/services/enterpriseService';
+import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseProfile: React.FC = () => {
-  const { user: authUser, updateUser } = useAuth();
+  const { user: authUser } = useAuth();
   // Dùng EnterpriseContext để lấy profile ban đầu — tránh gọi API lại khi vào trang
   const { profile: contextProfile, loading: contextLoading, reload: reloadContext } = useEnterprise();
   const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
@@ -82,9 +82,13 @@ export const EnterpriseProfile: React.FC = () => {
     }
   };
 
-  // Handle Patch: /api/accounts/me/profile
+  // Cập nhật thông tin liên hệ qua PATCH /api/enterprise/profile
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile) {
+      setUpdateError('Không tìm thấy hồ sơ doanh nghiệp để cập nhật.');
+      return;
+    }
     if (!editFullName.trim()) {
       setUpdateError('Vui lòng nhập họ và tên.');
       return;
@@ -94,37 +98,29 @@ export const EnterpriseProfile: React.FC = () => {
     setUpdateError(null);
 
     try {
-      const res = await enterpriseService.updateAccountProfile({
-        fullName: editFullName.trim(),
-        phone: editPhone.trim(),
+      const res = await enterpriseService.updateEnterpriseProfile(profile.id, {
+        contactPersonName: editFullName.trim(),
+        contactPhone: editPhone.trim() || null,
       });
 
-      if (res && res.success && res.user) {
-        // 1. Update AuthContext to update navbar/header user display
-        if (updateUser) {
-          updateUser({
-            name: res.user.fullName,
-          });
-        }
-
-        // 2. Update local profile state
+      if (res?.success && res.data) {
         if (profile) {
           setProfile({
             ...profile,
-            contactPersonName: res.user.fullName,
-            contactPhone: res.user.phone,
+            contactPersonName: res.data.contactPersonName,
+            contactPhone: res.data.contactPhone,
           });
         }
+        void reloadContext();
 
-        // 3. Close modal and show success toast
         setShowEditModal(false);
         setToastMessage(res.message || 'Cập nhật hồ sơ thành công!');
         setTimeout(() => setToastMessage(null), 4000);
       } else {
-        setUpdateError(res?.message || 'Không thể cập nhật hồ sơ. Vui lòng thử lại.');
+        setUpdateError(res.message || 'Không thể cập nhật hồ sơ. Vui lòng thử lại.');
       }
     } catch (err: any) {
-      console.error('Error updating account profile:', err);
+      console.error('Error updating enterprise profile:', err);
       setUpdateError(
         err?.response?.data?.message ||
           err?.message ||
@@ -453,7 +449,7 @@ export const EnterpriseProfile: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL CẬP NHẬT HỒ SƠ: PATCH /api/accounts/me/profile */}
+      {/* MODAL CẬP NHẬT HỒ SƠ: PATCH /api/enterprise/profile */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8">

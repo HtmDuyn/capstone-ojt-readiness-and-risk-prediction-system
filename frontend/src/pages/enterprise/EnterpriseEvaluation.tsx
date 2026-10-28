@@ -4,7 +4,7 @@ import { Award, CheckCircle2, ClipboardCheck, Loader2, AlertCircle, Send } from 
 import {
   enterpriseService,
   type EnterpriseInternshipItem,
-} from '@/service/enterpriseService';
+} from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 interface EvaluationRow {

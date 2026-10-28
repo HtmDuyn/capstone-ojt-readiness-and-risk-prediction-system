@@ -13,7 +13,7 @@ import {
   enterpriseService,
   type RecruitmentPost,
   type RecruitmentPostPosition,
-} from '@/service/enterpriseService';
+} from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 interface RecruitmentPositionInfo extends RecruitmentPostPosition {

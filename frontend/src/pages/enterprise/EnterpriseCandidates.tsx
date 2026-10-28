@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { Users, Search, CheckCircle2, XCircle, FileText, Calendar, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { enterpriseService, type EnterpriseCandidateItem } from '@/service/enterpriseService';
+import { enterpriseService, type EnterpriseCandidateItem } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseCandidates: React.FC = () => {

@@ -21,7 +21,7 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
-import { enterpriseService, type EnterpriseInternshipItem } from '@/service/enterpriseService';
+import { enterpriseService, type EnterpriseInternshipItem } from '@/services/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -91,6 +91,8 @@ export const EnterpriseInterns: React.FC = () => {
   const [modalSelectedInternIds, setModalSelectedInternIds] = useState<string[]>([]);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
   const [modalStatusFilter, setModalStatusFilter] = useState<'ALL' | 'ONGOING' | 'RISK'>('ALL');
+  const [taskSubmitting, setTaskSubmitting] = useState(false);
+  const [taskSubmitError, setTaskSubmitError] = useState<string | null>(null);
 
   // Form State (No priority field as requested)
   const [newTask, setNewTask] = useState<{
@@ -172,6 +174,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Open task assignment modal
   const handleOpenAssignModal = (initialIds?: string[]) => {
+    setTaskSubmitError(null);
     if (initialIds && initialIds.length > 0) {
       setModalSelectedInternIds(initialIds);
     } else if (tableSelectedIds.length > 0) {
@@ -231,26 +234,62 @@ export const EnterpriseInterns: React.FC = () => {
   };
 
   // Handle task submission (bulk or single)
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (modalSelectedInternIds.length === 0 || !newTask.title.trim() || !newTask.deadline) {
+    if (
+      !companyId ||
+      modalSelectedInternIds.length === 0 ||
+      !newTask.title.trim() ||
+      !newTask.deadline
+    ) {
       return;
     }
 
     const assignedStudents = interns.filter((i) => modalSelectedInternIds.includes(i.id));
+    const assignmentIds = assignedStudents.map((student) => Number(student.id));
+    if (assignedStudents.length !== modalSelectedInternIds.length || assignmentIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+      setTaskSubmitError('Danh sách thực tập sinh không hợp lệ. Vui lòng tải lại trang và thử lại.');
+      return;
+    }
 
-    // Create tasks for all selected students
-    const createdTasks: InternTask[] = assignedStudents.map((student, idx) => ({
-      id: `TASK-${Date.now()}-${idx + 1}`,
-      internId: student.id,
-      internName: student.fullName,
-      title: newTask.title.trim(),
-      description: newTask.description.trim(),
-      deadline: newTask.deadline,
-      status: 'TODO',
-      assignedBy: newTask.assignedBy || 'Mentor Doanh Nghiệp',
-      createdAt: new Date().toISOString().split('T')[0],
-    }));
+    setTaskSubmitting(true);
+    setTaskSubmitError(null);
+    let createdTasks: InternTask[];
+    try {
+      const response = await enterpriseService.assignTasksBulk(
+        assignmentIds,
+        [{
+          name: newTask.title.trim(),
+          description: newTask.description.trim() || undefined,
+          dueDate: newTask.deadline,
+        }],
+        `enterprise-task-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+      );
+      createdTasks = response.data.tasks.map((task) => {
+        const student = assignedStudents.find((item) => Number(item.id) === task.assignmentId);
+        if (!student) {
+          throw new Error('Backend trả về task không khớp với danh sách thực tập sinh đã chọn.');
+        }
+        return {
+          id: String(task.id),
+          internId: student.id,
+          internName: student.fullName,
+          title: newTask.title.trim(),
+          description: newTask.description.trim(),
+          deadline: newTask.deadline,
+          status: 'TODO',
+          assignedBy: newTask.assignedBy || 'Mentor Doanh Nghiệp',
+          createdAt: new Date().toISOString().split('T')[0],
+        };
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể giao task. Vui lòng thử lại.';
+      setTaskSubmitError(message);
+      console.error('Failed to assign enterprise tasks:', err);
+      return;
+    } finally {
+      setTaskSubmitting(false);
+    }
 
     // Update tasks state
     setTasks((prev) => [...createdTasks, ...prev]);
@@ -783,6 +822,11 @@ export const EnterpriseInterns: React.FC = () => {
 
             {/* Modal Body */}
             <form onSubmit={handleCreateTask} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {taskSubmitError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+                  {taskSubmitError}
+                </div>
+              )}
               {/* PHẦN 1: THÔNG TIN NHIỆM VỤ & HẠN GIAO (BỎ MỨC ĐỘ ƯU TIÊN THEO YÊU CẦU) */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 pb-1 border-b border-slate-100">
@@ -1040,14 +1084,24 @@ export const EnterpriseInterns: React.FC = () => {
                   <button
                     type="submit"
                     disabled={
+                      taskSubmitting ||
                       modalSelectedInternIds.length === 0 ||
                       !newTask.title.trim() ||
                       !newTask.deadline
                     }
                     className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all"
                   >
-                    <CheckSquare className="w-4 h-4" />
-                    <span>Xác nhận giao Task ({modalSelectedInternIds.length} SV)</span>
+                    {taskSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Đang giao task...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="w-4 h-4" />
+                        <span>Xác nhận giao Task ({modalSelectedInternIds.length} SV)</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
