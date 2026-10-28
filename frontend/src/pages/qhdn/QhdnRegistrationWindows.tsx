@@ -9,7 +9,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Send,
   SlidersHorizontal,
   Users,
 } from "lucide-react";
@@ -27,7 +26,6 @@ import {
   workflowPrimary,
   workflowSecondary,
 } from "@/components/qhdn/StudentWorkflowUi";
-import { StudentReviewModal } from "@/components/qhdn/StudentReviewModal";
 import { useQhdnRoster, useQhdnSemesters } from "@/hooks/useQhdnRoster";
 import {
   closeRegistrationWindow,
@@ -43,7 +41,6 @@ import {
   receptionLabels,
   receptionNote,
   receptionStatus,
-  registrationStatus,
   studentMatches,
   type ReceptionStatus,
 } from "@/utils/qhdnStudentStatus";
@@ -71,8 +68,7 @@ export default function QhdnRegistrationWindows() {
   const [page, setPage] = useState(1),
     [windowPage, setWindowPage] = useState(1),
     [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [student, setStudent] = useState<HandoffStudentItem | null>(null),
-    [message, setMessage] = useState("");
+  const [message, setMessage] = useState("");
   const [windows, setWindows] = useState<RegistrationWindowItem[]>([]),
     [windowLoading, setWindowLoading] = useState(false),
     [windowError, setWindowError] = useState(""),
@@ -122,7 +118,6 @@ export default function QhdnRegistrationWindows() {
   }, [search, status, program, cohort, semester.semesterId]);
   useEffect(() => {
     setSelectedIds([]);
-    setStudent(null);
     setWindowTask(null);
     setWindowPage(1);
     setMessage("");
@@ -243,8 +238,8 @@ export default function QhdnRegistrationWindows() {
   return (
     <div className="space-y-5 pb-10">
       <PageBanner
-        title="Tiếp nhận & Duyệt hồ sơ OJT"
-        description="Tiếp nhận danh sách từ Phòng Đào tạo, mở đăng ký và kiểm tra hồ sơ OJT."
+        title="Mở đợt & Theo dõi đăng ký OJT"
+        description="Mở đợt đăng ký cho sinh viên đã được bàn giao và theo dõi trạng thái hồ sơ gửi trực tiếp đến doanh nghiệp."
         badge="Phòng QHDN"
       />
       <WorkflowSteps current="reception" />
@@ -258,8 +253,8 @@ export default function QhdnRegistrationWindows() {
               s === "NOT_REGISTERED"
                 ? "Đã bàn giao, chưa nộp hồ sơ"
                 : s === "SUBMITTED"
-                  ? "Kiểm tra hồ sơ trước khi gửi"
-                  : "Theo dõi phản hồi tại mục Điều phối"
+                  ? "Đơn đã được gửi trực tiếp đến doanh nghiệp"
+                  : "Trạng thái hồ sơ OJT cũ"
             }
             status={s}
             selected={status === s}
@@ -491,10 +486,7 @@ export default function QhdnRegistrationWindows() {
                 {!loading &&
                   visible.map((s) => {
                     const state = receptionStatus(s),
-                      sent = !!coordinationId(s),
-                      process =
-                        registrationStatus(s) === "SUBMITTED" ||
-                        (state === "APPROVED" && !sent);
+                      sent = !!coordinationId(s);
                     return (
                       <tr
                         key={s.studentId}
@@ -558,27 +550,14 @@ export default function QhdnRegistrationWindows() {
                           )}
                         </td>
                         <td className={cell}>
-                          <div className="flex justify-end">
-                            <button
-                              className={
-                                process ? workflowPrimary : workflowSecondary
-                              }
-                              onClick={() => setStudent(s)}
-                            >
-                              {process ? (
-                                <>
-                                  <Send size={15} />
-                                    {state === "APPROVED"
-                                      ? "Xem hồ sơ"
-                                      : "Duyệt hồ sơ"}
-                                </>
-                              ) : (
-                                <>
-                                  <FileCheck2 size={15} />
-                                  Xem hồ sơ
-                                </>
-                              )}
-                            </button>
+                          <div className="text-right text-xs font-semibold text-slate-600">
+                            {state === "SUBMITTED"
+                              ? sent
+                                ? "Đã gửi doanh nghiệp"
+                                : "Đã nộp trực tiếp"
+                              : state === "APPROVED"
+                                ? "Hồ sơ cũ — theo dõi"
+                                : "Chưa đăng ký"}
                           </div>
                         </td>
                       </tr>
@@ -699,18 +678,6 @@ export default function QhdnRegistrationWindows() {
             onChange={setWindowPage}
           />
         </div>
-      )}
-      {student && (
-        <StudentReviewModal
-          key={student.studentId + ":" + semester.semesterId}
-          student={student}
-          semesterId={Number(semester.semesterId)}
-          onClose={() => setStudent(null)}
-          onUpdated={(text) => {
-            setMessage(text);
-            roster.reload();
-          }}
-        />
       )}
       {windowTask && (
         <WorkflowModal

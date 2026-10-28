@@ -7908,19 +7908,19 @@ DECLARE
   v_enterprise_id integer;
   v_enterprise_user_id integer;
   v_academic_user_id integer;
-  v_coordinator_id integer;
   v_semester_id integer;
+  v_window_id integer;
   v_position_id integer;
-  v_pending_student_id integer;
+  v_post_id integer;
   v_active_student_id integer;
-  v_pending_registration_id integer;
+  v_active_user_id integer;
   v_active_registration_id integer;
+  v_active_application_id integer;
   v_result_batch_id integer;
   v_result_saved_at timestamptz;
   v_result_checked_at timestamptz;
   v_results jsonb;
   v_handoff_id integer;
-  v_pending_coordination_id integer;
   v_active_coordination_id integer;
   v_assignment_id integer;
   v_start_date date;
@@ -7934,13 +7934,6 @@ BEGIN
   JOIN public."Users" u ON u."UserID"=eu."UserID"
   WHERE e."EnterpriseCode"='TECHVIET' AND u."Username"='enterprise01'
     AND u."Status"='ACTIVE' AND e."Status"='ACTIVE';
-
-  SELECT u."UserID" INTO STRICT v_coordinator_id
-  FROM public."Users" u
-  JOIN public."Roles" r ON r."RoleID"=u."RoleID"
-  WHERE r."RoleCode"='OJT_COORD' AND u."Status"='ACTIVE'
-  ORDER BY CASE WHEN u."Username"='ojt.coord01' THEN 0 ELSE 1 END,u."UserID"
-  LIMIT 1;
 
   SELECT u."UserID" INTO STRICT v_academic_user_id
   FROM public."Users" u
@@ -7958,34 +7951,20 @@ BEGIN
     AND p."RecruitmentCode"='DEMO-TV-WEB-01'
     AND p."Status"='OPEN';
 
-  SELECT s."StudentID" INTO STRICT v_pending_student_id
-  FROM public."Students" s
-  JOIN public."Users" u ON u."UserID"=s."UserID"
-  WHERE u."Username"='student01' AND u."Status"='ACTIVE' AND s."Status"='ACTIVE';
-  SELECT s."StudentID" INTO STRICT v_active_student_id
+  SELECT "WindowID" INTO STRICT v_window_id
+  FROM public."OJTRegistrationWindows"
+  WHERE "OJTSemesterID"=v_semester_id AND "Status"='OPEN'
+    AND "StartsAt"<=clock_timestamp() AND "EndsAt">clock_timestamp()
+  ORDER BY "WindowID" DESC LIMIT 1;
+  SELECT "PostID" INTO STRICT v_post_id
+  FROM public."RecruitmentPostPositions"
+  WHERE "PositionID"=v_position_id AND "OJTSemesterID"=v_semester_id
+  ORDER BY "PostID" DESC LIMIT 1;
+
+  SELECT s."StudentID",s."UserID" INTO STRICT v_active_student_id,v_active_user_id
   FROM public."Students" s
   JOIN public."Users" u ON u."UserID"=s."UserID"
   WHERE u."Username"='student02' AND u."Status"='ACTIVE' AND s."Status"='ACTIVE';
-
-  SELECT "RegistrationID","Application" INTO v_existing
-  FROM public."OJTRegistrations"
-  WHERE "StudentID"=v_pending_student_id AND "OJTSemesterID"=v_semester_id;
-  IF FOUND THEN
-    IF v_existing."Application"->>'demoFixture'<>'enterprise-flow'
-      OR v_existing."Application"->>'fixtureStage'<>'PENDING_CANDIDATE' THEN
-      RAISE EXCEPTION 'student01 already has a non-demo OJT registration for DEMO-OJT-S6.';
-    END IF;
-    v_pending_registration_id:=v_existing."RegistrationID";
-  ELSE
-    INSERT INTO public."OJTRegistrations"
-      ("StudentID","OJTSemesterID","Status","ProgramID","Application")
-    SELECT s."StudentID",v_semester_id,'APPROVED',s."ProgramID",
-      jsonb_build_object('demoFixture','enterprise-flow','fixtureStage','PENDING_CANDIDATE',
-        'contactPhone',u."Phone",'contactEmail',u."Email",'note','Đăng ký thực tập OJT kỳ 6.')
-    FROM public."Students" s JOIN public."Users" u ON u."UserID"=s."UserID"
-    WHERE s."StudentID"=v_pending_student_id
-    RETURNING "RegistrationID" INTO v_pending_registration_id;
-  END IF;
 
   SELECT "RegistrationID","Application" INTO v_existing
   FROM public."OJTRegistrations"
@@ -7998,10 +7977,11 @@ BEGIN
     v_active_registration_id:=v_existing."RegistrationID";
   ELSE
     INSERT INTO public."OJTRegistrations"
-      ("StudentID","OJTSemesterID","Status","ProgramID","Application")
-    SELECT s."StudentID",v_semester_id,'APPROVED',s."ProgramID",
+      ("StudentID","OJTSemesterID","WindowID","Status","ProgramID","Application","SubmittedBy")
+    SELECT s."StudentID",v_semester_id,v_window_id,'SUBMITTED',s."ProgramID",
       jsonb_build_object('demoFixture','enterprise-flow','fixtureStage','ACTIVE_INTERNSHIP',
-        'contactPhone',u."Phone",'contactEmail',u."Email",'note','Đăng ký thực tập OJT kỳ 6.')
+        'contactPhone',u."Phone",'contactEmail',u."Email",'note','Hồ sơ demo gửi trực tiếp đến doanh nghiệp.'),
+      s."UserID"
     FROM public."Students" s JOIN public."Users" u ON u."UserID"=s."UserID"
     WHERE s."StudentID"=v_active_student_id
     RETURNING "RegistrationID" INTO v_active_registration_id;
@@ -8039,12 +8019,12 @@ BEGIN
     JOIN public."ProgramCourses" pc ON pc."ProgramID"=s."ProgramID"
       AND pc."RecommendedSemester"<=5 AND pc."EntryKind"='COURSE'
     WHERE u."Username" IN ('student01','student02','student03','student04','student09',
-      'student11','student12','student13','student14','student18')
+      'student11','student12','student13','student14','student18','student20')
       AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
     GROUP BY s."StudentID"
   ) eligible;
 
-  IF v_results IS NULL OR jsonb_array_length(v_results)<>10 OR EXISTS (
+  IF v_results IS NULL OR jsonb_array_length(v_results)<>11 OR EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_results) result
     WHERE result->>'status'<>'ELIGIBLE'
   ) THEN
@@ -8082,21 +8062,18 @@ BEGIN
   WHERE calculated."BatchID"=v_result_batch_id
   ORDER BY calculated."StudentID";
 
-  SELECT "CoordinationID" INTO v_pending_coordination_id
-  FROM public."StudentEnterpriseCoordination"
-  WHERE "RegistrationID"=v_pending_registration_id
-  ORDER BY "CoordinationID" DESC LIMIT 1;
-  IF v_pending_coordination_id IS NULL THEN
-    INSERT INTO public."StudentEnterpriseCoordination"
-      ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","Decision","OJTSemesterID")
-    VALUES (v_pending_registration_id,v_enterprise_id,v_position_id,v_coordinator_id,'PENDING',v_semester_id)
-    RETURNING "CoordinationID" INTO v_pending_coordination_id;
-  ELSIF NOT EXISTS (
-    SELECT 1 FROM public."StudentEnterpriseCoordination"
-    WHERE "CoordinationID"=v_pending_coordination_id
-      AND "EnterpriseID"=v_enterprise_id AND "PositionID"=v_position_id
-  ) THEN
-    RAISE EXCEPTION 'student01 demo registration has a coordination for another enterprise or position.';
+  SELECT "ApplicationID" INTO v_active_application_id
+  FROM public."JobApplications"
+  WHERE "RegistrationID"=v_active_registration_id AND "PostID"=v_post_id
+    AND "PositionID"=v_position_id;
+  IF v_active_application_id IS NULL THEN
+    INSERT INTO public."JobApplications"
+      ("RegistrationID","OJTSemesterID","PostID","PositionID","StudentID","EnterpriseID",
+       "CoverLetter","Status","ReviewedBy","ReviewNote")
+    VALUES (v_active_registration_id,v_semester_id,v_post_id,v_position_id,
+      v_active_student_id,v_enterprise_id,'Hồ sơ demo gửi trực tiếp đến doanh nghiệp.',
+      'ACCEPTED',v_enterprise_user_id,'Hồ sơ demo được doanh nghiệp tiếp nhận.')
+    RETURNING "ApplicationID" INTO v_active_application_id;
   END IF;
 
   SELECT "CoordinationID" INTO v_active_coordination_id
@@ -8105,14 +8082,15 @@ BEGIN
   ORDER BY "CoordinationID" DESC LIMIT 1;
   IF v_active_coordination_id IS NULL THEN
     INSERT INTO public."StudentEnterpriseCoordination"
-      ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","CoordinatedAt","Decision","DecisionAt","OJTSemesterID")
-    VALUES (v_active_registration_id,v_enterprise_id,v_position_id,v_coordinator_id,now(),
-      'ACCEPTED',now(),v_semester_id)
+      ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","CoordinatedAt","Decision","DecisionAt","OJTSemesterID","ApplicationID")
+    VALUES (v_active_registration_id,v_enterprise_id,v_position_id,v_active_user_id,now(),
+      'ACCEPTED',now(),v_semester_id,v_active_application_id)
     RETURNING "CoordinationID" INTO v_active_coordination_id;
   ELSIF NOT EXISTS (
     SELECT 1 FROM public."StudentEnterpriseCoordination"
     WHERE "CoordinationID"=v_active_coordination_id
       AND "EnterpriseID"=v_enterprise_id AND "PositionID"=v_position_id
+      AND "ApplicationID"=v_active_application_id
   ) THEN
     RAISE EXCEPTION 'student02 demo registration has a coordination for another enterprise or position.';
   END IF;
@@ -8149,21 +8127,23 @@ BEGIN
     WHERE existing."AssignmentID"=v_assignment_id AND existing."TaskName"=t.name
   );
 
-  RAISE NOTICE 'Enterprise demo fixture ready: PENDING CoordinationID %, ACTIVE AssignmentID %, OJT semester %.',
-    v_pending_coordination_id,v_assignment_id,v_semester_id;
+  RAISE NOTICE 'Enterprise demo fixture ready: student01 is eligible and unregistered for direct-application testing; an accepted sample has assignment % for task/evaluation testing (OJT semester %).',
+    v_assignment_id,v_semester_id;
 END $enterprise_flow_demo$;
 
--- Add eight more transcript-eligible candidates so all three enterprise decision
--- filters contain applicants with a current saved eligibility result and handoff.
+-- Seed direct-application examples for all enterprise decision states.
 DO $enterprise_candidate_status_demo$
 DECLARE
   v_enterprise_id integer;
-  v_coordinator_id integer;
+  v_enterprise_user_id integer;
   v_semester_id integer;
+  v_window_id integer;
+  v_post_id integer;
   v_position_id integer;
   v_student record;
   v_existing_registration record;
   v_registration_id integer;
+  v_application_id integer;
   v_coordination_id integer;
   v_existing_assignment record;
   v_start_date date;
@@ -8175,12 +8155,11 @@ BEGIN
   FROM public."Enterprises" e
   WHERE e."EnterpriseCode"='TECHVIET' AND e."Status"='ACTIVE';
 
-  SELECT u."UserID" INTO STRICT v_coordinator_id
-  FROM public."Users" u
-  JOIN public."Roles" r ON r."RoleID"=u."RoleID"
-  WHERE r."RoleCode"='OJT_COORD' AND u."Status"='ACTIVE'
-  ORDER BY CASE WHEN u."Username"='ojt.coord01' THEN 0 ELSE 1 END,u."UserID"
-  LIMIT 1;
+  SELECT eu."UserID" INTO STRICT v_enterprise_user_id
+  FROM public."EnterpriseUsers" eu
+  JOIN public."Users" u ON u."UserID"=eu."UserID"
+  WHERE eu."EnterpriseID"=v_enterprise_id AND u."Username"='enterprise01'
+    AND u."Status"='ACTIVE';
 
   SELECT s."OJTSemesterID",p."PositionID",s."StartDate",s."EndDate"
     INTO STRICT v_semester_id,v_position_id,v_start_date,v_end_date
@@ -8191,12 +8170,23 @@ BEGIN
     AND p."RecruitmentCode"='DEMO-TV-WEB-01'
     AND p."Status"='OPEN';
 
+  SELECT "WindowID" INTO STRICT v_window_id
+  FROM public."OJTRegistrationWindows"
+  WHERE "OJTSemesterID"=v_semester_id AND "Status"='OPEN'
+    AND "StartsAt"<=clock_timestamp() AND "EndsAt">clock_timestamp()
+  ORDER BY "WindowID" DESC LIMIT 1;
+
+  SELECT "PostID" INTO STRICT v_post_id
+  FROM public."RecruitmentPostPositions"
+  WHERE "PositionID"=v_position_id AND "OJTSemesterID"=v_semester_id
+  ORDER BY "PostID" DESC LIMIT 1;
+
   FOR v_student IN
-    SELECT s."StudentID",s."ProgramID",u."Username",u."Email",u."Phone"
+    SELECT s."StudentID",s."ProgramID",s."UserID",u."Username",u."Email",u."Phone"
     FROM public."Students" s
     JOIN public."Users" u ON u."UserID"=s."UserID"
     WHERE u."Username" IN ('student03','student04','student09','student11',
-                           'student12','student13','student14','student18')
+                           'student12','student13','student14','student18','student20')
       AND u."Status"='ACTIVE'
       AND s."Status"='ACTIVE'
     ORDER BY u."Username"
@@ -8205,6 +8195,7 @@ BEGIN
       WHEN 'student03' THEN 'PENDING'
       WHEN 'student04' THEN 'PENDING'
       WHEN 'student09' THEN 'PENDING'
+      WHEN 'student20' THEN 'PENDING'
       WHEN 'student11' THEN 'ACCEPTED'
       WHEN 'student12' THEN 'ACCEPTED'
       ELSE 'REJECTED'
@@ -8226,14 +8217,36 @@ BEGIN
       v_registration_id:=v_existing_registration."RegistrationID";
     ELSE
       INSERT INTO public."OJTRegistrations"
-        ("StudentID","OJTSemesterID","Status","ProgramID","Application")
+        ("StudentID","OJTSemesterID","WindowID","Status","ProgramID","Application","SubmittedBy")
       VALUES (
-        v_student."StudentID",v_semester_id,'APPROVED',v_student."ProgramID",
+        v_student."StudentID",v_semester_id,v_window_id,'SUBMITTED',v_student."ProgramID",
         jsonb_build_object('demoFixture','enterprise-flow','fixtureStage','STATUS_CANDIDATE',
           'contactPhone',v_student."Phone",'contactEmail',v_student."Email",
-          'note','Đăng ký thực tập OJT kỳ 6.')
+          'note','Hồ sơ demo gửi trực tiếp đến doanh nghiệp.'),
+        v_student."UserID"
       )
       RETURNING "RegistrationID" INTO v_registration_id;
+    END IF;
+
+    SELECT app."ApplicationID" INTO v_application_id
+    FROM public."JobApplications" app
+    WHERE app."RegistrationID"=v_registration_id
+      AND app."PostID"=v_post_id AND app."PositionID"=v_position_id;
+    IF v_application_id IS NULL THEN
+      INSERT INTO public."JobApplications"
+        ("RegistrationID","OJTSemesterID","PostID","PositionID","StudentID","EnterpriseID",
+         "CoverLetter","Status","ReviewedBy","ReviewNote")
+      VALUES (
+        v_registration_id,v_semester_id,v_post_id,v_position_id,
+        v_student."StudentID",v_enterprise_id,
+        'Hồ sơ demo gửi trực tiếp đến doanh nghiệp.',
+        CASE WHEN v_decision='PENDING' THEN 'SUBMITTED' ELSE v_decision END,
+        CASE WHEN v_decision='PENDING' THEN NULL ELSE v_enterprise_user_id END,
+        CASE WHEN v_decision='REJECTED' THEN v_reject_reason
+          WHEN v_decision='ACCEPTED' THEN 'Hồ sơ demo được doanh nghiệp tiếp nhận.'
+          ELSE NULL END
+      )
+      RETURNING "ApplicationID" INTO v_application_id;
     END IF;
 
     SELECT co."CoordinationID" INTO v_coordination_id
@@ -8244,11 +8257,11 @@ BEGIN
     IF v_coordination_id IS NULL THEN
       INSERT INTO public."StudentEnterpriseCoordination"
         ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy",
-         "CoordinatedAt","Decision","DecisionAt","RejectReason","OJTSemesterID")
+         "CoordinatedAt","Decision","DecisionAt","RejectReason","OJTSemesterID","ApplicationID")
       VALUES (
-        v_registration_id,v_enterprise_id,v_position_id,v_coordinator_id,now(),
+        v_registration_id,v_enterprise_id,v_position_id,v_student."UserID",now(),
         v_decision,CASE WHEN v_decision='PENDING' THEN NULL ELSE now() END,
-        v_reject_reason,v_semester_id
+        v_reject_reason,v_semester_id,v_application_id
       )
       RETURNING "CoordinationID" INTO v_coordination_id;
     ELSIF NOT EXISTS (
@@ -8256,6 +8269,7 @@ BEGIN
       WHERE co."CoordinationID"=v_coordination_id
         AND co."EnterpriseID"=v_enterprise_id
         AND co."PositionID"=v_position_id
+        AND co."ApplicationID"=v_application_id
     ) THEN
       RAISE EXCEPTION 'Existing demo coordination does not match TECHVIET demo position.';
     END IF;
@@ -8295,7 +8309,7 @@ BEGIN
       WHERE co."EnterpriseID"=v_enterprise_id
         AND co."OJTSemesterID"=v_semester_id
         AND r."Application"->>'demoFixture'='enterprise-flow'
-        AND r."Application"->>'fixtureStage' IN ('PENDING_CANDIDATE','ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
+        AND r."Application"->>'fixtureStage' IN ('ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
         AND NOT EXISTS (
           SELECT 1 FROM public."StudentEnterpriseCoordination" newer
           WHERE newer."RegistrationID"=co."RegistrationID"
@@ -8305,7 +8319,40 @@ BEGIN
     RAISE EXCEPTION 'Expected ten latest enterprise demo candidates for DEMO-OJT-S6.';
   END IF;
 
-  RAISE NOTICE 'Enterprise demo ready: 10 candidates (4 pending, 3 accepted, 3 rejected); accepted candidates have internship assignments for task testing.';
+  IF EXISTS (
+    SELECT 1
+    FROM public."StudentEnterpriseCoordination" co
+    JOIN public."OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
+    WHERE co."EnterpriseID"=v_enterprise_id
+      AND co."OJTSemesterID"=v_semester_id
+      AND r."Application"->>'demoFixture'='enterprise-flow'
+      AND r."Application"->>'fixtureStage' IN ('ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
+      AND (co."ApplicationID" IS NULL OR NOT EXISTS (
+        SELECT 1 FROM public."JobApplications" app
+        WHERE app."ApplicationID"=co."ApplicationID"
+          AND app."RegistrationID"=co."RegistrationID"
+          AND app."PositionID"=co."PositionID"
+          AND app."EnterpriseID"=co."EnterpriseID"
+          AND app."Status"=CASE WHEN co."Decision"='PENDING' THEN 'SUBMITTED' ELSE co."Decision" END
+      ))
+  ) THEN
+    RAISE EXCEPTION 'Every enterprise demo coordination must reference its matching direct job application.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public."Students" student
+    JOIN public."Users" account ON account."UserID"=student."UserID"
+    WHERE account."Username"='student01'
+      AND (EXISTS (SELECT 1 FROM public."OJTRegistrations" r
+        WHERE r."StudentID"=student."StudentID" AND r."OJTSemesterID"=v_semester_id)
+        OR EXISTS (SELECT 1 FROM public."EligibleStudentHandoffItems" h
+          JOIN public."StudentEnterpriseCoordination" co ON co."RegistrationID"=h."RegistrationID"
+          WHERE h."StudentID"=student."StudentID" AND h."OJTSemesterID"=v_semester_id))
+  ) THEN
+    RAISE EXCEPTION 'student01 must remain handed off but without an OJT registration or enterprise coordination.';
+  END IF;
+
+  RAISE NOTICE 'Enterprise demo ready: 10 direct applications (4 pending, 3 accepted, 3 rejected); student01 is eligible and unregistered for direct-application testing.';
 END $enterprise_candidate_status_demo$;
 
 COMMIT;

@@ -38,13 +38,13 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     children: [
       {
         id: "registration-windows",
-        label: "Tiếp nhận & Duyệt hồ sơ",
+        label: "Mở đợt đăng ký",
         path: "/qhdn/registration-windows",
         icon: <UserCheck size={16} />,
       },
       {
         id: "coordination",
-        label: "Theo dõi & Điều phối",
+        label: "Theo dõi doanh nghiệp",
         path: "/qhdn/coordination",
         icon: <Handshake size={16} />,
       },
@@ -52,7 +52,7 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     banner: {
       title: "Quản lý & Điều phối OJT",
       description:
-        "Tiếp nhận bàn giao từ PĐT, mở đợt đăng ký và điều phối ghép cặp sinh viên vào doanh nghiệp tiếp nhận.",
+        "Mở đợt đăng ký cho sinh viên đã được bàn giao và theo dõi hồ sơ sinh viên gửi trực tiếp đến doanh nghiệp.",
       badge: "Quản lý OJT",
       primaryActionLabel: "Mở đợt đăng ký OJT",
     },

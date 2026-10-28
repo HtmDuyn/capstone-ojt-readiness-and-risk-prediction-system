@@ -107,6 +107,11 @@ describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT'
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
 describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post: 'Nộp hồ sơ đăng ký OJT' });
 describe('/ojt-registrations/{id}/review', { post: 'Duyệt hoặc từ chối hồ sơ OJT' });
+describe('/students/me/opportunities', { get: ['Danh sách vị trí OJT có thể ứng tuyển', 'Bắt buộc truyền windowId của đợt đăng ký; kết quả kèm canApply và blockers.'] });
+describe('/job-applications', {
+  get: 'Sinh viên xem lịch sử hồ sơ đã nộp; QHDN xem danh sách hồ sơ theo quyền.',
+  post: ['Sinh viên nộp hồ sơ trực tiếp đến doanh nghiệp', 'Gửi windowId, postId và positionId; hồ sơ và trạng thái chờ doanh nghiệp được tạo nguyên tử.']
+});
 describe('/ojt-semesters/{id}/eligible-student-handoffs', { get: 'Lịch sử bàn giao sinh viên cho QHDN', post: 'Bàn giao sinh viên đủ điều kiện cho QHDN' });
 describe('/ojt-semesters/{id}/students', { get: 'Theo dõi trạng thái OJT theo kỳ' });
 describe('/ojt-results', { get: 'Danh sách điểm OJT chính thức do doanh nghiệp đánh giá' });
@@ -127,12 +132,12 @@ describe('/companies', { get: ['Danh sách và hồ sơ doanh nghiệp', 'Lọc 
 describe('/companies/{id}', { patch: ['Cập nhật doanh nghiệp', sharedWrite] });
 describe('/positions', { get: ['Danh sách và hồ sơ vị trí thực tập', 'Lọc positionId để lấy một vị trí kèm lịch sử; có mã, địa điểm và hình thức làm việc.'] });
 describe('/positions', { delete: ['Xóa vị trí thực tập', 'Xóa mềm vị trí theo điều kiện dữ liệu liên quan.'] });
-describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; lọc assignmentId để xem lịch sử.'], post: ['Phân công sinh viên thực tập', sharedWrite] });
-describe('/assignments/{id}', { patch: ['Cập nhật thông tin và trạng thái thực tập', sharedWrite] });
+describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; assignment được tạo tự động khi doanh nghiệp chấp nhận.'], post: ['Phân công dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát; luồng thường tự tạo assignment khi doanh nghiệp chấp nhận.'] });
+describe('/assignments/{id}', { patch: ['Cập nhật assignment dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát assignment đã tồn tại.'] });
 describe('/admin/audit-logs/list', { post: ['Danh sách nhật ký hoạt động chi tiết', 'Nhập bộ lọc JSON. Trả toàn bộ detail và bản ghi rawLog nguyên gốc, không che dữ liệu trong bản demo.'] });
-describe('/ojt-coordinations', { get: ['Danh sách và hồ sơ điều phối', 'Lọc coordinationId để xem hồ sơ, lịch sử và chuỗi điều phối phân trang.'], post: ['Giới thiệu sinh viên cho doanh nghiệp', 'Áp dụng cho hồ sơ đã bàn giao; cần lý do và lưu nhật ký.'] });
-describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định tiếp nhận sinh viên', 'Admin hoặc Phòng QHDN ghi nhận thay doanh nghiệp; cần lý do.'] });
-describe('/ojt-coordinations/{id}/reassign', { post: ['Điều phối lại sinh viên', 'Chuyển hồ sơ bị từ chối sang vị trí khác; cần lý do.'] });
+describe('/ojt-coordinations', { get: ['Danh sách hồ sơ doanh nghiệp đang xử lý', 'Lọc coordinationId để xem hồ sơ, lịch sử và chuỗi điều phối phân trang.'], post: ['Tạo điều phối tương thích dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát; sinh viên hiện gửi hồ sơ trực tiếp đến doanh nghiệp.'] });
+describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định cho dữ liệu cũ', 'Chỉ ADMIN xử lý đối soát; doanh nghiệp quyết định hồ sơ mới qua API candidates.'] });
+describe('/ojt-coordinations/{id}/reassign', { post: ['Điều phối lại dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát; khi bị từ chối, sinh viên tự chọn vị trí khác và nộp lại.'] });
 describe('/internship-evaluations', { get: ['Danh sách đánh giá thực tập', 'Lọc evaluationId để xem hồ sơ và lịch sử; giữ lọc templateId.'] });
 describe('/assignments/{id}/internship-evaluation', { put: ['Ghi nhận đánh giá thực tập', 'Admin hoặc Phòng QHDN nhập thay doanh nghiệp; cần lý do.'] });
 describe('/qhdn/dashboard', { get: ['Tổng quan QHDN', 'Tổng hợp bàn giao, tiếp nhận và sức chứa; dùng lần điều phối mới nhất.'] });
