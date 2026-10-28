@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   CheckSquare,
@@ -40,41 +40,57 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): Enterpri
   completedTasks: 0,
   totalTasks: 0,
   attendanceDays: 0,
+  assignmentStatus: item.status?.toUpperCase(),
+  assignmentStartDate: item.startDate,
+  assignmentEndDate: item.endDate,
   status: (['CANCELLED', 'CANCELED', 'FAILED'].includes(item.status?.toUpperCase() || '') ? 'RISK' : item.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'ONGOING') as 'ONGOING' | 'COMPLETED' | 'RISK',
 });
 
+const isTaskAssignable = (intern: EnterpriseIntern) =>
+  ['ASSIGNED', 'ACTIVE', 'IN_PROGRESS'].includes(intern.assignmentStatus || '');
+
+const localDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getApiErrorMessage = (error: unknown): string | null => {
+  if (typeof error !== 'object' || error === null || !('response' in error)) return null;
+  const response = error.response;
+  if (typeof response !== 'object' || response === null || !('data' in response)) return null;
+  const data = response.data;
+  if (typeof data !== 'object' || data === null || !('message' in data)) return null;
+  return typeof data.message === 'string' ? data.message : null;
+};
+
 export const EnterpriseInterns: React.FC = () => {
-  // Lấy companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
-  const { companyId, loading: profileLoading } = useEnterprise();
+  const { loading: profileLoading } = useEnterprise();
   const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
   const [tasks, setTasks] = useState<InternTask[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [apiTotal, setApiTotal] = useState(0);
-  const [apiPage, setApiPage] = useState(1);
-  const apiLimit = 20;
 
   const fetchInternships = useCallback(async () => {
-    // Chờ companyId được load từ profile trước khi gọi API
-    if (!companyId) return;
+    if (profileLoading) return;
     setApiLoading(true);
     setApiError(null);
     try {
-      // Truyền companyId vào API — bắt buộc để backend xác định phạm vi doanh nghiệp
-      const res = await enterpriseService.listInternships(companyId, { page: apiPage, limit: apiLimit });
+      const res = await enterpriseService.listInternships();
       if (res?.success && res.data) {
         const mapped = (res.data.items || []).map(mapApiToIntern);
         setInterns(mapped);
-        setApiTotal(res.data.total || 0);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh';
+      const message = getApiErrorMessage(err) ||
+        (err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh');
       setApiError(message);
       console.error('Failed to load internships:', err);
     } finally {
       setApiLoading(false);
     }
-  }, [apiPage, companyId]);
+  }, [profileLoading]);
 
   useEffect(() => {
     fetchInternships();
@@ -93,6 +109,7 @@ export const EnterpriseInterns: React.FC = () => {
   const [modalStatusFilter, setModalStatusFilter] = useState<'ALL' | 'ONGOING' | 'RISK'>('ALL');
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [taskSubmitError, setTaskSubmitError] = useState<string | null>(null);
+  const taskRequestRef = useRef<{ signature: string; idempotencyKey: string } | null>(null);
 
   // Form State (No priority field as requested)
   const [newTask, setNewTask] = useState<{
@@ -174,15 +191,20 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Open task assignment modal
   const handleOpenAssignModal = (initialIds?: string[]) => {
-    setTaskSubmitError(null);
-    if (initialIds && initialIds.length > 0) {
-      setModalSelectedInternIds(initialIds);
-    } else if (tableSelectedIds.length > 0) {
-      setModalSelectedInternIds([...tableSelectedIds]);
-    } else {
-      // By default select all interns for convenient bulk assignment
-      setModalSelectedInternIds(interns.map((i) => i.id));
-    }
+    const assignableInterns = interns.filter(isTaskAssignable);
+    const assignableIds = new Set(assignableInterns.map((intern) => intern.id));
+    const requestedIds = initialIds?.length
+      ? initialIds
+      : tableSelectedIds.length
+        ? tableSelectedIds
+        : assignableInterns.map((intern) => intern.id);
+    const selectedIds = requestedIds.filter((id) => assignableIds.has(id));
+    setModalSelectedInternIds(selectedIds);
+    setTaskSubmitError(
+      selectedIds.length
+        ? null
+        : 'Không có sinh viên đang được phân công hoặc thực tập để nhận task.'
+    );
     setModalSearchTerm('');
     setModalStatusFilter('ALL');
     setShowAddTaskModal(true);
@@ -194,13 +216,14 @@ export const EnterpriseInterns: React.FC = () => {
     targetDate.setDate(targetDate.getDate() + daysAhead);
     setNewTask((prev) => ({
       ...prev,
-      deadline: targetDate.toISOString().split('T')[0],
+      deadline: localDateString(targetDate),
     }));
   };
 
   // Filtered interns for modal checkbox list
   const filteredModalInterns = useMemo(() => {
     return interns.filter((intern) => {
+      if (!isTaskAssignable(intern)) return false;
       const matchSearch =
         intern.fullName.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
         intern.studentCode.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
@@ -237,7 +260,6 @@ export const EnterpriseInterns: React.FC = () => {
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
-      !companyId ||
       modalSelectedInternIds.length === 0 ||
       !newTask.title.trim() ||
       !newTask.deadline
@@ -251,20 +273,56 @@ export const EnterpriseInterns: React.FC = () => {
       setTaskSubmitError('Danh sách thực tập sinh không hợp lệ. Vui lòng tải lại trang và thử lại.');
       return;
     }
+    if (assignmentIds.length > 500) {
+      setTaskSubmitError('Mỗi lần chỉ có thể giao task cho tối đa 500 sinh viên.');
+      return;
+    }
+    if (assignedStudents.some((student) => !isTaskAssignable(student))) {
+      setTaskSubmitError('Chỉ có thể giao task cho sinh viên đang được phân công hoặc thực tập.');
+      return;
+    }
+
+    const today = localDateString(new Date());
+    if (newTask.deadline < today) {
+      setTaskSubmitError('Hạn hoàn thành không được ở trong quá khứ.');
+      return;
+    }
+    const invalidDeadlineStudents = assignedStudents.filter((student) => {
+      const startDate = student.assignmentStartDate?.slice(0, 10);
+      const endDate = student.assignmentEndDate?.slice(0, 10);
+      return !startDate || !endDate || newTask.deadline < startDate || newTask.deadline > endDate;
+    });
+    if (invalidDeadlineStudents.length) {
+      setTaskSubmitError(
+        `Hạn hoàn thành phải nằm trong thời gian thực tập của tất cả sinh viên được chọn. Kiểm tra: ${invalidDeadlineStudents.map((student) => student.fullName).join(', ')}.`
+      );
+      return;
+    }
 
     setTaskSubmitting(true);
     setTaskSubmitError(null);
     let createdTasks: InternTask[];
     try {
+      const tasksPayload = [{
+        name: newTask.title.trim(),
+        description: newTask.description.trim() || undefined,
+        dueDate: newTask.deadline,
+      }];
+      const signature = JSON.stringify({ assignmentIds, tasks: tasksPayload });
+      if (taskRequestRef.current?.signature !== signature) {
+        taskRequestRef.current = {
+          signature,
+          idempotencyKey: `enterprise-task-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        };
+      }
       const response = await enterpriseService.assignTasksBulk(
         assignmentIds,
-        [{
-          name: newTask.title.trim(),
-          description: newTask.description.trim() || undefined,
-          dueDate: newTask.deadline,
-        }],
-        `enterprise-task-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+        tasksPayload,
+        taskRequestRef.current.idempotencyKey
       );
+      if (!response.success || !response.data || response.data.created !== assignmentIds.length || response.data.tasks.length !== assignmentIds.length) {
+        throw new Error('Backend trả về số task không khớp với số sinh viên đã chọn.');
+      }
       createdTasks = response.data.tasks.map((task) => {
         const student = assignedStudents.find((item) => Number(item.id) === task.assignmentId);
         if (!student) {
@@ -282,8 +340,10 @@ export const EnterpriseInterns: React.FC = () => {
           createdAt: new Date().toISOString().split('T')[0],
         };
       });
+      taskRequestRef.current = null;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể giao task. Vui lòng thử lại.';
+      const message = getApiErrorMessage(err) ||
+        (err instanceof Error ? err.message : 'Không thể giao task. Vui lòng thử lại.');
       setTaskSubmitError(message);
       console.error('Failed to assign enterprise tasks:', err);
       return;

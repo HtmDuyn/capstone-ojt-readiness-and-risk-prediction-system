@@ -3,7 +3,7 @@ import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from './read.repository';
 import { templateField } from './context-fields';
-import { enterpriseScope, assertScope, api } from './catalog.service';
+import { enterpriseScope, api } from './catalog.service';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
@@ -65,11 +65,13 @@ const candidateFields = `co."CoordinationID" AS id,co."EnterpriseID" AS "company
   NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID") AS "isLatestCoordination"`;
 
 export async function enterpriseCandidates(params: Row, actor: Actor) {
-  const page = pagination(params,['companyId','studentId','candidateId','ojtSemesterId','positionId','decision','search']);
+  const hasPagination = params.page !== undefined || params.limit !== undefined;
+  const page = pagination(params,['studentId','candidateId','ojtSemesterId','positionId','decision','search']);
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const id=params.candidateId===undefined?undefined:positiveId(params.candidateId,'candidateId');
   return readTransaction(async c => {
-    const companyId = positiveId(params.companyId,'companyId');await assertScope(c,actor,companyId);
+    const companyId = await enterpriseScope(c,actor);
+    if(companyId===null)throw invalid('Enterprise role required.',403,'FORBIDDEN');
     const args: unknown[] = [companyId];
     const where = ['co."EnterpriseID"=$1'];
     const add = (sql: string, value: unknown) => { args.push(value); where.push(sql.replace('?', '$'+args.length)); };
@@ -81,20 +83,32 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
       if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
     const sql = `SELECT ${candidateFields},r."Application"-'cvUrl' AS application,(SELECT jsonb_build_object('id',ja."ApplicationID",'postId',ja."PostID",'coverLetter',ja."CoverLetter",'appliedAt',ja."AppliedAt",'status',ja."Status",'cv',CASE WHEN cv."CVID" IS NULL THEN NULL ELSE ${cvMetadata} END) FROM "JobApplications" ja LEFT JOIN "StudentCVVersions" cv ON cv."CVID"=ja."CVID" AND cv."StudentID"=r."StudentID" WHERE ja."ApplicationID"=co."ApplicationID") AS "jobApplication" ${candidateFrom} WHERE ${where.join(' AND ')}`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) candidates`,args)).rows[0].n;
-    const items = (await c.query(`${sql} ORDER BY co."CoordinationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
+    const items = (await c.query(
+      hasPagination
+        ? `${sql} ORDER BY co."CoordinationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`
+        : `${sql} ORDER BY co."CoordinationID" DESC`,
+      hasPagination ? [...args,page.limit,page.offset] : args
+    )).rows;
     const postIds=[...new Set(items.map(row=>row.jobApplication?.postId).filter(id=>Number.isSafeInteger(id)&&id>0))];
     const posts=postIds.length?(await c.query(postSelect+' WHERE p."PostID"=ANY($1::int[]) AND p."EnterpriseID"=$2',[postIds,companyId])).rows:[];
     const details=await enrichListRows(c,posts.map(postApi));
     const postMap=new Map(details.map(post=>[post.id,post]));
     const candidates=items.map(row=>({...row,recruitmentPost:postMap.get(row.jobApplication?.postId)??null}));
-    return {items:await enrichListRows(c,candidates),total,page:page.page,limit:page.limit};
+    return {
+      items:await enrichListRows(c,candidates),
+      total,
+      page:hasPagination?page.page:1,
+      limit:hasPagination?page.limit:Math.max(total,1),
+    };
   });
 }
 
 export async function enterpriseInternships(params: Row, actor: Actor) {
-  const page = pagination(params,['companyId','studentId','internshipId','ojtSemesterId','positionId','status','search']);
+  const hasPagination = params.page !== undefined || params.limit !== undefined;
+  const page = pagination(params,['studentId','internshipId','ojtSemesterId','positionId','status','search']);
   return readTransaction(async c => {
-    const companyId = positiveId(params.companyId,'companyId');await assertScope(c,actor,companyId);
+    const companyId = await enterpriseScope(c,actor);
+    if(companyId===null)throw invalid('Enterprise role required.',403,'FORBIDDEN');
     const args: unknown[] = [companyId], where = ['a."EnterpriseID"=$1'];
     const add = (sql: string,value: unknown) => { args.push(value); where.push(sql.replace('?', '$'+args.length)); };
     if(params.studentId!==undefined)add('a."StudentID"=?',positiveId(params.studentId,'studentId'));
@@ -124,8 +138,18 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       LEFT JOIN ${officialEvaluationRelation} result ON result."AssignmentID"=a."AssignmentID"
       LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=v."TemplateID"
       WHERE ${where.join(' AND ')}`;
+    const items = (await c.query(
+      hasPagination
+        ? `${sql} ORDER BY a."AssignmentID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`
+        : `${sql} ORDER BY a."AssignmentID" DESC`,
+      hasPagination ? [...args,page.limit,page.offset] : args
+    )).rows;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) internships`,args)).rows[0].n;
-    const items = (await c.query(`${sql} ORDER BY a."AssignmentID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
-    return {items:await enrichListRows(c,items),total,page:page.page,limit:page.limit};
+    return {
+      items:await enrichListRows(c,items),
+      total,
+      page:hasPagination?page.page:1,
+      limit:hasPagination?page.limit:Math.max(total,1),
+    };
   });
 }

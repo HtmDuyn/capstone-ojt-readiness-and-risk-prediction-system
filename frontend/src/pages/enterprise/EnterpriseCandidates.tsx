@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { Users, Search, CheckCircle2, XCircle, FileText, Calendar, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseCandidates: React.FC = () => {
-  // Lấy companyId từ EnterpriseContext (đã được load sẵn khi đăng nhập)
-  const { companyId, loading: profileLoading, error: profileError } = useEnterprise();
+  const { loading: profileLoading, error: profileError } = useEnterprise();
   const [candidates, setCandidates] = useState<EnterpriseCandidateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,24 +14,17 @@ export const EnterpriseCandidates: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const limit = 20;
 
   const fetchCandidates = useCallback(async () => {
-    // Chờ companyId được load từ profile trước khi gọi API
-    if (!companyId) return;
+    if (profileLoading) return;
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, unknown> = { page, limit };
-      if (filterStatus !== 'ALL') params.decision = filterStatus;
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      // Truyền companyId vào API — bắt buộc để backend xác định phạm vi doanh nghiệp
-      const res = await enterpriseService.listCandidates(companyId, params);
+      const res = await enterpriseService.listCandidates();
       if (res?.success && res.data) {
         setCandidates(res.data.items || []);
-        setTotal(res.data.total || 0);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Không thể tải danh sách ứng viên';
@@ -41,11 +33,27 @@ export const EnterpriseCandidates: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, filterStatus, searchTerm, companyId]);
+  }, [profileLoading]);
 
   useEffect(() => {
     fetchCandidates();
   }, [fetchCandidates]);
+
+  const filteredCandidates = useMemo(() => {
+    const query = searchTerm.trim().toLocaleLowerCase();
+    return candidates.filter((candidate) => {
+      const matchesStatus = filterStatus === 'ALL' || candidate.decision === filterStatus;
+      const matchesSearch = !query ||
+        candidate.student.fullName.toLocaleLowerCase().includes(query) ||
+        candidate.student.studentCode.toLocaleLowerCase().includes(query);
+      return matchesStatus && matchesSearch;
+    });
+  }, [candidates, filterStatus, searchTerm]);
+  const totalPages = Math.ceil(filteredCandidates.length / limit) || 1;
+  const visibleCandidates = useMemo(
+    () => filteredCandidates.slice((page - 1) * limit, page * limit),
+    [filteredCandidates, page]
+  );
 
   const handleDecision = async (candidateId: number, decision: 'ACCEPTED' | 'REJECTED') => {
     setActionLoading(candidateId);
@@ -91,8 +99,6 @@ export const EnterpriseCandidates: React.FC = () => {
     };
     return colors[decision] || 'bg-slate-100 text-slate-600';
   };
-
-  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="space-y-6 pb-12">
@@ -151,7 +157,7 @@ export const EnterpriseCandidates: React.FC = () => {
             <option value="REJECTED">Đã từ chối</option>
           </select>
           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
-            Tổng: <strong>{total}</strong>
+            Tổng: <strong>{filteredCandidates.length}</strong>
           </span>
         </div>
       </div>
@@ -183,7 +189,7 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!loading && !error && candidates.length === 0 && (
+      {!loading && !error && filteredCandidates.length === 0 && (
         <div className="p-12 bg-white rounded-2xl border border-slate-200/80 text-center">
           <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-500">
@@ -196,7 +202,7 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Candidates Table List */}
-      {!loading && !error && candidates.length > 0 && (
+      {!loading && !error && filteredCandidates.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -210,7 +216,7 @@ export const EnterpriseCandidates: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {candidates.map((c) => (
+                {visibleCandidates.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center space-x-3">

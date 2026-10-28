@@ -5,8 +5,6 @@ export function describeRestOperations(spec: Spec): Spec {
   const requiredQueries: Record<string, string[]> = {
     '/api/students/me/opportunities': ['ojtSemesterId'],
     '/api/recruitment/posts': ['companyId'],
-    '/api/enterprise/candidates': ['companyId'],
-    '/api/enterprise/internships': ['companyId'],
   };
   for (const [path, item] of Object.entries(spec.paths) as [string, Spec][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {

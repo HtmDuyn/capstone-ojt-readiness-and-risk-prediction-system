@@ -12,6 +12,9 @@ export interface EnterpriseIntern {
   totalTasks: number;
   attendanceDays: number;
   status: 'ONGOING' | 'COMPLETED' | 'RISK';
+  assignmentStatus?: string;
+  assignmentStartDate?: string | null;
+  assignmentEndDate?: string | null;
 }
 
 export interface InternTask {

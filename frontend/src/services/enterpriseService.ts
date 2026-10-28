@@ -315,22 +315,19 @@ export const enterpriseService = {
     return response.data;
   },
 
-  // ── Enterprise Candidates ─────────────────────────────────────────────────
-  // Gọi GET /api/enterprise/candidates
-  // companyId BẮT BUỘC — backend trả 400 nếu thiếu với vai trò ENTERPRISE
-  listCandidates: async (companyId: number, params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
+  // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
+  listCandidates: async (params: PaginatedRequest = {}): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
     const response = await API.get<PaginatedResponse<EnterpriseCandidateItem>>('/enterprise/candidates', {
-      params: { ...params, page: params.page ?? 1, limit: params.limit ?? 20, companyId },
+      params,
     });
     return response.data;
   },
 
   // ── Enterprise Internships ────────────────────────────────────────────────
-  // Gọi GET /api/enterprise/internships
-  // companyId BẮT BUỘC — backend trả 400 nếu thiếu với vai trò ENTERPRISE
-  listInternships: async (companyId: number, params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
+  // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
+  listInternships: async (params: PaginatedRequest = {}): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
     const response = await API.get<PaginatedResponse<EnterpriseInternshipItem>>('/enterprise/internships', {
-      params: { ...params, page: params.page ?? 1, limit: params.limit ?? 20, companyId },
+      params,
     });
     return response.data;
   },

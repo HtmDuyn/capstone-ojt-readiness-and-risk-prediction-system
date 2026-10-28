@@ -140,9 +140,9 @@ describe('/qhdn/reports', {get:['Báo cáo QHDN theo loại', 'type: acceptance,
 describe('/qhdn/reports/export', { get: ['Xuất báo cáo QHDN', 'Định dạng CSV hoặc JSON; tối đa 10.000 dòng, không phân trang.'] });
 const ownEnterprise = 'Chỉ xem dữ liệu của doanh nghiệp đang đăng nhập.';
 describe('/enterprise/profile', { get: ['Hồ sơ doanh nghiệp', ownEnterprise+' Kèm số liệu tuyển dụng và thực tập.'] });
-describe('/enterprise/candidates', { get: ['Danh sách và hồ sơ ứng viên', 'Lọc candidateId để xem một lần giới thiệu, kể cả lịch sử thuộc doanh nghiệp đăng nhập.'] });
+describe('/enterprise/candidates', { get: ['Danh sách và hồ sơ ứng viên', 'Tự giới hạn theo doanh nghiệp trong token. Không cần nhập companyId; bỏ page và limit để lấy toàn bộ danh sách. Các bộ lọc studentId, candidateId, kỳ OJT, vị trí, decision và search đều tùy chọn. Lọc candidateId để xem một lần giới thiệu, kể cả lịch sử thuộc doanh nghiệp đăng nhập.'] });
 describe('/enterprise/candidates/{id}/decision', { patch: ['Tiếp nhận hoặc từ chối ứng viên', 'Chỉ xử lý ứng viên được giới thiệu cho doanh nghiệp đang đăng nhập.'] });
-describe('/enterprise/internships', { get: ['Danh sách sinh viên thực tập', 'Kèm người hướng dẫn, vị trí, đánh giá và kết quả; điểm chính thức chỉ hiển thị sau xác nhận.'] });
+describe('/enterprise/internships', { get: ['Danh sách sinh viên thực tập', 'Tự giới hạn theo doanh nghiệp trong token. Không cần nhập companyId; bỏ page và limit để lấy toàn bộ danh sách. Các bộ lọc studentId, internshipId, kỳ OJT, vị trí, status và search đều tùy chọn. Kèm người hướng dẫn, vị trí, đánh giá và kết quả; điểm chính thức chỉ hiển thị sau xác nhận.'] });
 describe('/enterprise/internships/{id}/evaluation', { put: ['Gửi hoặc cập nhật đánh giá thực tập', 'Chỉ đánh giá sinh viên của doanh nghiệp; internshipId là ID phân công.'] });
 describe('/recruitment/windows', { post: ['Tạo đợt nhận nhu cầu tuyển dụng', 'Chọn học kỳ có sẵn và thời hạn nhận đơn; không tạo kỳ OJT riêng.'] });
 describe('/recruitment/windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt tuyển dụng', 'Chọn học kỳ có sẵn; status OPEN/CLOSED cần reason.'] });

@@ -69,8 +69,7 @@ const toEvaluationRow = (item: EnterpriseInternshipItem): EvaluationRow => {
 };
 
 export const EnterpriseEvaluation: React.FC = () => {
-  // Lấy companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
-  const { companyId, loading: profileLoading } = useEnterprise();
+  const { loading: profileLoading } = useEnterprise();
   const [evaluations, setEvaluations] = useState<EvaluationRow[]>([]);
   const [selectedEval, setSelectedEval] = useState<EvaluationRow | null>(null);
   const [scores, setScores] = useState<EvaluationForm>(emptyForm);
@@ -81,30 +80,17 @@ export const EnterpriseEvaluation: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchEvaluations = useCallback(async () => {
-    // Chờ companyId được load từ profile trước khi gọi API
-    if (!companyId) return;
+    if (profileLoading) return;
     setLoading(true);
     setError(null);
     try {
-      // Truyền companyId vào API — bắt buộc để backend scope đúng doanh nghiệp
-      const firstPage = await enterpriseService.listInternships(companyId, { page: 1, limit: 100 });
-      if (!firstPage?.success || !firstPage.data) {
+      const response = await enterpriseService.listInternships();
+      if (!response?.success || !response.data) {
         throw new Error('Không thể tải danh sách sinh viên thực tập');
       }
 
-      const items = [...firstPage.data.items];
-      const total = firstPage.data.total;
-      const totalPages = Math.ceil(total / firstPage.data.limit);
-      for (let page = 2; page <= totalPages; page += 1) {
-        const response = await enterpriseService.listInternships(companyId, { page, limit: 100 });
-        if (!response?.success || !response.data) {
-          throw new Error(`Không thể tải danh sách thực tập ở trang ${page}`);
-        }
-        items.push(...response.data.items);
-      }
-
       setEvaluations(
-        items
+        response.data.items
           .filter((item) =>
             ['ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status?.toUpperCase() || '')
           )
@@ -117,7 +103,7 @@ export const EnterpriseEvaluation: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [profileLoading]);
 
   useEffect(() => {
     void fetchEvaluations();
