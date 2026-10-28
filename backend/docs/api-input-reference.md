@@ -1290,6 +1290,7 @@ Không có request body.
 Tiếp nhận hoặc từ chối ứng viên
 
 Chỉ xử lý ứng viên được giới thiệu cho doanh nghiệp đang đăng nhập.
+Đăng ký phải ở trạng thái APPROVED hoặc HANDED_OFF và có handoff cho đúng sinh viên/kỳ OJT. Với handoff theo kết quả FRONTEND, handoff có thể chưa gắn RegistrationID vì được tạo trước đơn đăng ký; backend đối chiếu CalculatedBatchID với kết quả ELIGIBLE hiện tại, chưa stale. Handoff theo EligibilityChecks vẫn cần kết quả ELIGIBLE đã được xác nhận.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
