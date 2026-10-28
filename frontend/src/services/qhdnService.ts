@@ -7,9 +7,6 @@ import type {
 import { normalizeEnterpriseImportPreview } from "@/utils/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type {
-  Application,
-  AssignmentInput,
-  AssignmentUpdate,
   Page,
   PageQuery,
   RecruitmentPost,
@@ -22,11 +19,8 @@ import type {
   OjtSemesterItem,
   CompanyListResponse,
   PositionListResponse,
-  ReassignCoordinationRequest,
-  EnterpriseDecisionRequest,
   TransferOjtResultRequest,
   CoordinationListResponse,
-  AssignmentListResponse,
   InternshipEvaluationListResponse,
   OjtResultListResponse,
   HandoffStudentListResponse,
@@ -277,56 +271,6 @@ export const listCoordinations = async (
   return response.data;
 };
 
-/**
- * POST /api/ojt-coordinations/:id/reassign
- * Điều phối lại cho sinh viên bị doanh nghiệp từ chối sang vị trí/doanh nghiệp khác.
- */
-export const reassignStudent = async (
-  coordinationId: number,
-  payload: ReassignCoordinationRequest,
-): Promise<{ success: boolean; data: any }> => {
-  const response = await API.post<{ success: boolean; data: any }>(
-    `/ojt-coordinations/${coordinationId}/reassign`,
-    payload,
-  );
-  return response.data;
-};
-
-/**
- * POST /api/ojt-coordinations/:id/decision
- * Ghi nhận quyết định tiếp nhận sinh viên (ACCEPTED hoặc REJECTED) thay doanh nghiệp nếu cần.
- */
-export const recordEnterpriseDecision = async (
-  coordinationId: number,
-  payload: EnterpriseDecisionRequest,
-): Promise<{ success: boolean; data: any }> => {
-  const response = await API.post<{ success: boolean; data: any }>(
-    `/ojt-coordinations/${coordinationId}/decision`,
-    payload,
-  );
-  return response.data;
-};
-
-/**
- * GET /api/assignments
- * Danh sách phân công thực tập chính thức (sau khi doanh nghiệp ACCEPTED).
- */
-export const listAssignments = async (
-  params: {
-    page?: number;
-    limit?: number;
-    companyId?: number;
-    ojtSemesterId?: number;
-    status?: string;
-    search?: string;
-  } = { page: 1, limit: 100 },
-): Promise<AssignmentListResponse> => {
-  const response = await API.get<AssignmentListResponse>("/assignments", {
-    params,
-  });
-  return response.data;
-};
-
 // =========================================================================
 // 3. LUỒNG NHẬN KẾT QUẢ TỪ DOANH NGHIỆP & GỬI LẠI PHÒNG ĐÀO TẠO (TRANSFER)
 // =========================================================================
@@ -393,17 +337,6 @@ export const archiveRecruitment = async () =>
     )
   ).data;
 
-export const listApplications = async (params: PageQuery) =>
-  (await API.get<Result<Page<Application>>>("/job-applications", { params }))
-    .data.data;
-export const reviewRegistration = async (
-  id: number,
-  payload: {
-    decision: "APPROVE" | "REJECT";
-    reason: string;
-    idempotencyKey: string;
-  },
-) => (await API.post(`/ojt-registrations/${id}/review`, payload)).data;
 export const updateCompany = async (
   id: number,
   payload: Partial<
@@ -435,11 +368,6 @@ export const reviewRecruitmentPost = async (
     deadlineAt?: string;
   },
 ) => (await API.post(`/recruitment/posts/${id}/review`, payload)).data;
-export const assignInternship = async (payload: AssignmentInput) =>
-  (await API.post("/assignments", payload)).data;
-export const editInternship = async (id: number, payload: AssignmentUpdate) =>
-  (await API.patch(`/assignments/${id}`, payload)).data;
-
 // API trả Blob; utils/downloadFile phụ trách lưu file trên trình duyệt.
 export const getCvFile = async (
   studentId: number,

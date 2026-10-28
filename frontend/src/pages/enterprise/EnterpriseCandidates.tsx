@@ -146,9 +146,9 @@ export const EnterpriseCandidates: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       <PageBanner
-        title="Nhận & Duyệt Danh sách Sinh viên Thực tập"
-        description="Xem hồ sơ sinh viên được giới thiệu bởi phòng QHDN, xác nhận hoặc từ chối tiếp nhận thực tập."
-        badge="Duyệt Hồ sơ OJT"
+        title="Hồ sơ sinh viên ứng tuyển"
+        description="Xem hồ sơ sinh viên gửi trực tiếp đến doanh nghiệp, sau đó xác nhận hoặc từ chối tiếp nhận thực tập."
+        badge="Ứng tuyển OJT"
       />
 
       {/* Hiển thị lỗi load profile nếu có */}
@@ -276,10 +276,10 @@ export const EnterpriseCandidates: React.FC = () => {
         <div className="p-12 bg-white rounded-2xl border border-slate-200/80 text-center">
           <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-500">
-            {searchTerm || filterStatus !== 'ALL' ? 'Không tìm thấy ứng viên phù hợp.' : 'Chưa có ứng viên nào được giới thiệu.'}
+            {searchTerm || filterStatus !== 'ALL' ? 'Không tìm thấy ứng viên phù hợp.' : 'Chưa có hồ sơ ứng tuyển trực tiếp nào.'}
           </p>
           <p className="text-xs text-slate-400 mt-1">
-            Sinh viên được phòng QHDN giới thiệu sẽ hiển thị tại đây.
+            Hồ sơ sinh viên gửi đến doanh nghiệp sẽ hiển thị tại đây.
           </p>
         </div>
       )}
@@ -293,7 +293,7 @@ export const EnterpriseCandidates: React.FC = () => {
                 <tr>
                   <th className="px-5 py-3.5">Sinh viên</th>
                   <th className="px-5 py-3.5">Vị trí</th>
-                  <th className="px-5 py-3.5">Ngày giới thiệu</th>
+                  <th className="px-5 py-3.5">Ngày nhận hồ sơ</th>
                   <th className="px-5 py-3.5">Trạng thái</th>
                   <th className="px-5 py-3.5 text-right">Thao tác</th>
                 </tr>
@@ -431,7 +431,7 @@ export const EnterpriseCandidates: React.FC = () => {
                 <p className="font-bold text-slate-900">{selectedCandidate.student.email}</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-slate-400">Ngày giới thiệu</span>
+                <span className="text-slate-400">Ngày ứng tuyển</span>
                 <p className="font-bold text-slate-900">
                   {selectedCandidate.introducedAt ? new Date(selectedCandidate.introducedAt).toLocaleDateString('vi-VN') : '—'}
                 </p>

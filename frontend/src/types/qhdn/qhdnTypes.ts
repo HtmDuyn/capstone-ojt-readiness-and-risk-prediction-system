@@ -142,12 +142,6 @@ export interface OjtSemesterItem {
 /**
  * Payload cho POST /api/ojt-coordinations/:id/reassign (Điều phối lại sau khi bị từ chối)
  */
-export interface ReassignCoordinationRequest {
-  positionId: number;
-  reason: string;
-  idempotencyKey: string;
-}
-
 /**
  * Payload cho POST /api/ojt-coordinations/:id/decision (Ghi nhận quyết định Doanh nghiệp)
  */

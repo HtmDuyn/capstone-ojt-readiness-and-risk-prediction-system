@@ -426,7 +426,7 @@ export const EnterpriseDashboard: React.FC = () => {
                 to="/enterprise/candidates"
                 className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/10 p-3 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                <span className="flex items-center gap-2"><Users className="h-4 w-4 text-blue-300" />Duyệt hồ sơ ứng viên</span>
+                <span className="flex items-center gap-2"><Users className="h-4 w-4 text-blue-300" />Phản hồi hồ sơ ứng tuyển</span>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
               </Link>
 
