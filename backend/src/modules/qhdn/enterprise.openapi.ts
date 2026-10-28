@@ -28,7 +28,20 @@ export function addEnterpriseOperations(spec: Spec) {
   profileUpdate.description='Chỉ sửa hồ sơ doanh nghiệp đã có từ import. companyId bắt buộc cùng ít nhất một trường cần sửa. Trường bỏ qua giữ nguyên; null hoặc chuỗi rỗng xóa trường tùy chọn. name không được rỗng. Không sửa mã, trạng thái, tài khoản đăng nhập và không tạo/sửa tin hay vị trí tuyển dụng. positionTitle thuộc tài khoản hiện tại; fullName/phone cá nhân sửa qua /api/accounts/me/profile.';
   profileUpdate.responses['200']={description:'Hồ sơ doanh nghiệp sau cập nhật, không kèm tin tuyển dụng.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:{type:'object',properties:{id,code:{type:'string'},name:{type:'string'},address:optionalText(300),industry:optionalText(100),contactPersonName:optionalText(100),contactPhone:optionalText(20),contactEmail:optionalText(100),status:{type:'string'},createdAt:{type:'string',format:'date-time',nullable:true},representative:{type:'object',properties:{id,userId:id,username:{type:'string'},fullName:{type:'string'},email:{type:'string'},phone:optionalText(20),positionTitle:optionalText(100)}}}}}}}}};
 
-  add('get','/api/enterprise/candidates','Danh sách đầy đủ sinh viên được giới thiệu cho doanh nghiệp đang đăng nhập, kèm vị trí và trạng thái tiếp nhận',parameters({...page,candidateId:{...id,description:'Lọc theo ID lần giới thiệu, tùy chọn.'},decision:{type:'string',enum:['PENDING','ACCEPTED','REJECTED'],description:'Lọc theo trạng thái tiếp nhận, tùy chọn.'}}));
+  add('get','/api/enterprise/candidate-periods','Danh sách năm học và kỳ OJT có hồ sơ được giới thiệu cho doanh nghiệp đang đăng nhập',[]);
+  spec.paths['/api/enterprise/candidate-periods'].get.responses['200']={
+    description:'Năm học và kỳ OJT có hồ sơ mới nhất được giới thiệu cho doanh nghiệp đang đăng nhập.',
+    content:{'application/json':{schema:{type:'object',properties:{
+      success:{type:'boolean'},
+      data:{type:'object',properties:{items:{type:'array',items:{type:'object',properties:{
+        academicYearId:id,academicYearCode:{type:'string'},ojtSemesterId:id,semesterCode:{type:'string'},
+        semesterName:{type:'string'},academicPeriodId:{...id,nullable:true},
+        academicPeriodName:{type:'string',nullable:true},startDate:{type:'string',format:'date',nullable:true},
+        endDate:{type:'string',format:'date',nullable:true},
+      }}}}},
+    }}}},
+  };
+  add('get','/api/enterprise/candidates','Danh sách sinh viên được giới thiệu cho doanh nghiệp đang đăng nhập, kèm vị trí và trạng thái tiếp nhận',parameters({...page,academicYearId:{...id,description:'Lọc theo năm học của kỳ OJT, tùy chọn.'},candidateId:{...id,description:'Lọc theo ID lần giới thiệu, tùy chọn.'},decision:{type:'string',enum:['PENDING','ACCEPTED','REJECTED'],description:'Lọc theo trạng thái tiếp nhận, tùy chọn.'}}));
   add('patch','/api/enterprise/candidates/{id}/decision','Tiếp nhận hoặc từ chối ứng viên',candidateId,spec.paths['/api/ojt-coordinations/{id}/decision'].post.requestBody);
   add('get','/api/enterprise/internships','Danh sách đầy đủ sinh viên thực tập thuộc doanh nghiệp đang đăng nhập, kèm phân công, vị trí và đánh giá',parameters({...page,internshipId:{...id,description:'Lọc theo ID phân công thực tập, tùy chọn.'},status:{type:'string',enum:['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED'],description:'Lọc theo trạng thái thực tập, tùy chọn.'}}));
   add('put','/api/enterprise/internships/{id}/evaluation','Gửi hoặc cập nhật đánh giá thực tập',candidateId,spec.paths['/api/assignments/{id}/internship-evaluation'].put.requestBody);

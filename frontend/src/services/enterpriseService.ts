@@ -158,6 +158,18 @@ export interface EnterpriseCandidateItem {
   jobApplication?: Record<string, unknown> | null;
 }
 
+export interface EnterpriseCandidatePeriod {
+  academicYearId: number;
+  academicYearCode: string;
+  ojtSemesterId: number;
+  semesterCode: string;
+  semesterName: string;
+  academicPeriodId: number | null;
+  academicPeriodName: string | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
 // ─── Enterprise Internship Types ─────────────────────────────────────────────
 export interface EnterpriseInternshipItem {
   id: number; // AssignmentID
@@ -189,6 +201,15 @@ export interface InternshipEvaluationData {
   comments?: string | null;
   status?: string;
   evaluatedAt?: string | null;
+}
+
+export interface EnterpriseInternshipEvaluationRequest {
+  completionScore: number;
+  attitudeScore: number;
+  skillScore: number;
+  overallScore: number;
+  comments: string | null;
+  reason: string;
 }
 
 export interface EnterpriseInternshipTask {
@@ -316,6 +337,11 @@ export const enterpriseService = {
   },
 
   // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
+  listCandidatePeriods: async (): Promise<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }> => {
+    const response = await API.get<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }>('/enterprise/candidate-periods');
+    return response.data;
+  },
+
   listCandidates: async (params: PaginatedRequest = {}): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
     const response = await API.get<PaginatedResponse<EnterpriseCandidateItem>>('/enterprise/candidates', {
       params,
@@ -374,7 +400,10 @@ export const enterpriseService = {
   // ── Internship Evaluation ─────────────────────────────────────────────────
   // Gọi PUT /api/enterprise/internships/{id}/evaluation
   // internshipId = AssignmentID
-  evaluateInternship: async (internshipId: number, evaluationData: Record<string, unknown>): Promise<unknown> => {
+  evaluateInternship: async (
+    internshipId: number,
+    evaluationData: EnterpriseInternshipEvaluationRequest
+  ): Promise<unknown> => {
     const response = await API.put(`/enterprise/internships/${internshipId}/evaluation`, evaluationData);
     return response.data;
   },

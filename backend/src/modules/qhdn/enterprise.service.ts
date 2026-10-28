@@ -66,7 +66,7 @@ const candidateFields = `co."CoordinationID" AS id,co."EnterpriseID" AS "company
 
 export async function enterpriseCandidates(params: Row, actor: Actor) {
   const hasPagination = params.page !== undefined || params.limit !== undefined;
-  const page = pagination(params,['studentId','candidateId','ojtSemesterId','positionId','decision','search']);
+  const page = pagination(params,['studentId','candidateId','academicYearId','ojtSemesterId','positionId','decision','search']);
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const id=params.candidateId===undefined?undefined:positiveId(params.candidateId,'candidateId');
   return readTransaction(async c => {
@@ -78,7 +78,8 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
     if (id) add('co."CoordinationID"=?', id);
     if(params.studentId!==undefined)add('r."StudentID"=?',positiveId(params.studentId,'studentId'));
     if(!id)where.push(`NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."EnterpriseID"=co."EnterpriseID" AND newer."CoordinationID">co."CoordinationID")`);
-      for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','co."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
+    if(params.academicYearId!==undefined)add('EXISTS(SELECT 1 FROM "OJTSemesters" o WHERE o."OJTSemesterID"=r."OJTSemesterID" AND o."AcademicYearID"=?)',positiveId(params.academicYearId,'academicYearId'));
+    for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','co."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
       if (params.decision!==undefined) add(`COALESCE(co."Decision",'PENDING')=?`,enumValue(params.decision,['PENDING','ACCEPTED','REJECTED'],'decision'));
       if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
     const sql = `SELECT ${candidateFields},r."Application"-'cvUrl' AS application,(SELECT jsonb_build_object('id',ja."ApplicationID",'postId',ja."PostID",'coverLetter',ja."CoverLetter",'appliedAt',ja."AppliedAt",'status',ja."Status",'cv',CASE WHEN cv."CVID" IS NULL THEN NULL ELSE ${cvMetadata} END) FROM "JobApplications" ja LEFT JOIN "StudentCVVersions" cv ON cv."CVID"=ja."CVID" AND cv."StudentID"=r."StudentID" WHERE ja."ApplicationID"=co."ApplicationID") AS "jobApplication" ${candidateFrom} WHERE ${where.join(' AND ')}`;
@@ -100,6 +101,30 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
       page:hasPagination?page.page:1,
       limit:hasPagination?page.limit:Math.max(total,1),
     };
+  });
+}
+
+export async function enterpriseCandidatePeriods(actor: Actor) {
+  return readTransaction(async c => {
+    const companyId = await enterpriseScope(c,actor);
+    if(companyId===null)throw invalid('Enterprise role required.',403,'FORBIDDEN');
+    const items=(await c.query(`SELECT DISTINCT
+        ay."AcademicYearID" AS "academicYearId",ay."YearCode" AS "academicYearCode",
+        o."OJTSemesterID" AS "ojtSemesterId",o."SemesterCode" AS "semesterCode",o."Name" AS "semesterName",
+        o."AcademicPeriodID" AS "academicPeriodId",ap."Name" AS "academicPeriodName",
+        o."StartDate" AS "startDate",o."EndDate" AS "endDate"
+      FROM "StudentEnterpriseCoordination" co
+      JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
+      JOIN "OJTSemesters" o ON o."OJTSemesterID"=r."OJTSemesterID"
+      JOIN "AcademicYears" ay ON ay."AcademicYearID"=o."AcademicYearID"
+      LEFT JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=o."AcademicPeriodID"
+      WHERE co."EnterpriseID"=$1
+        AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer
+          WHERE newer."RegistrationID"=co."RegistrationID"
+            AND newer."EnterpriseID"=co."EnterpriseID"
+            AND newer."CoordinationID">co."CoordinationID")
+      ORDER BY ay."YearCode" DESC,o."StartDate" DESC,o."OJTSemesterID" DESC`,[companyId])).rows;
+    return {items};
   });
 }
 

@@ -126,6 +126,12 @@ export const EnterpriseEvaluation: React.FC = () => {
     e.preventDefault();
     if (!selectedEval) return;
 
+    const reason = scores.reason.trim();
+    if (!reason) {
+      setActionError('Vui lòng nhập lý do nộp hoặc cập nhật đánh giá.');
+      return;
+    }
+
     const scoreValues = {
       completionScore: Number(scores.completionScore),
       attitudeScore: Number(scores.attitudeScore),
@@ -146,8 +152,8 @@ export const EnterpriseEvaluation: React.FC = () => {
     try {
       await enterpriseService.evaluateInternship(selectedEval.id, {
         ...scoreValues,
-        comments: scores.comments,
-        reason: scores.reason,
+        comments: scores.comments.trim() || null,
+        reason,
       });
 
       setEvaluations((current) =>
@@ -159,7 +165,7 @@ export const EnterpriseEvaluation: React.FC = () => {
                 attitudeScore: scoreValues.attitudeScore,
                 skillScore: scoreValues.skillScore,
                 overallScore: scoreValues.overallScore,
-                comments: scores.comments,
+                comments: scores.comments.trim(),
                 status: 'SUBMITTED',
               }
             : item

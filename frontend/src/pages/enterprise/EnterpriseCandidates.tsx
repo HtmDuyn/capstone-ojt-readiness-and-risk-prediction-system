@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { Users, Search, CheckCircle2, XCircle, FileText, Calendar, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { enterpriseService, type EnterpriseCandidateItem } from '@/services/enterpriseService';
+import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandidatePeriod } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseCandidates: React.FC = () => {
   const { loading: profileLoading, error: profileError } = useEnterprise();
   const [candidates, setCandidates] = useState<EnterpriseCandidateItem[]>([]);
+  const [candidatePeriods, setCandidatePeriods] = useState<EnterpriseCandidatePeriod[]>([]);
+  const [periodsLoading, setPeriodsLoading] = useState(true);
+  const [periodsError, setPeriodsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<EnterpriseCandidateItem | null>(null);
+  const [selectedYearId, setSelectedYearId] = useState('');
+  const [selectedOjtSemesterId, setSelectedOjtSemesterId] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -17,12 +22,50 @@ export const EnterpriseCandidates: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const limit = 20;
 
+  const years = useMemo(() => {
+    const uniqueYears = new Map<number, string>();
+    for (const period of candidatePeriods) {
+      uniqueYears.set(period.academicYearId, period.academicYearCode);
+    }
+    return [...uniqueYears].map(([id, code]) => ({ id, code }));
+  }, [candidatePeriods]);
+
+  const availablePeriods = useMemo(
+    () => candidatePeriods.filter((period) =>
+      !selectedYearId || String(period.academicYearId) === selectedYearId
+    ),
+    [candidatePeriods, selectedYearId]
+  );
+
+  useEffect(() => {
+    if (profileLoading) return;
+    let active = true;
+    setPeriodsLoading(true);
+    setPeriodsError(null);
+    enterpriseService.listCandidatePeriods()
+      .then((response) => {
+        if (active) setCandidatePeriods(response.data.items);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Không thể tải danh sách năm học và kỳ OJT';
+        if (active) setPeriodsError(message);
+        console.error('Failed to load enterprise candidate periods:', err);
+      })
+      .finally(() => {
+        if (active) setPeriodsLoading(false);
+      });
+    return () => { active = false; };
+  }, [profileLoading]);
+
   const fetchCandidates = useCallback(async () => {
     if (profileLoading) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await enterpriseService.listCandidates();
+      const res = await enterpriseService.listCandidates({
+        ...(selectedYearId ? { academicYearId: Number(selectedYearId) } : {}),
+        ...(selectedOjtSemesterId ? { ojtSemesterId: Number(selectedOjtSemesterId) } : {}),
+      });
       if (res?.success && res.data) {
         setCandidates(res.data.items || []);
       }
@@ -33,7 +76,7 @@ export const EnterpriseCandidates: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [profileLoading]);
+  }, [profileLoading, selectedYearId, selectedOjtSemesterId]);
 
   useEffect(() => {
     fetchCandidates();
@@ -144,7 +187,44 @@ export const EnterpriseCandidates: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <label className="sr-only" htmlFor="candidate-academic-year">Năm học</label>
+          <select
+            id="candidate-academic-year"
+            className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
+            value={selectedYearId}
+            disabled={periodsLoading}
+            onChange={(e) => {
+              setSelectedYearId(e.target.value);
+              setSelectedOjtSemesterId('');
+              setPage(1);
+            }}
+          >
+            <option value="">{periodsLoading ? 'Đang tải năm học...' : 'Tất cả năm học'}</option>
+            {years.map((year) => (
+              <option key={year.id} value={year.id}>{year.code}</option>
+            ))}
+          </select>
+
+          <label className="sr-only" htmlFor="candidate-ojt-semester">Kỳ OJT</label>
+          <select
+            id="candidate-ojt-semester"
+            className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
+            value={selectedOjtSemesterId}
+            disabled={periodsLoading}
+            onChange={(e) => {
+              setSelectedOjtSemesterId(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Tất cả kỳ OJT</option>
+            {availablePeriods.map((period) => (
+              <option key={period.ojtSemesterId} value={period.ojtSemesterId}>
+                {period.semesterCode || period.semesterName}
+              </option>
+            ))}
+          </select>
+
           <Filter className="w-4 h-4 text-slate-400" />
           <select
             className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
@@ -161,6 +241,9 @@ export const EnterpriseCandidates: React.FC = () => {
           </span>
         </div>
       </div>
+      {periodsError && (
+        <p role="alert" className="text-xs text-rose-700">{periodsError}</p>
+      )}
 
       {/* Loading State — hiển thị khi đang tải profile hoặc dữ liệu ứng viên */}
       {(loading || profileLoading) && (
