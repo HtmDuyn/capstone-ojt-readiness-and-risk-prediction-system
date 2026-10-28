@@ -203,9 +203,9 @@
  *                   },
  *                   "requiredRelativeSemester": {
  *                     "type": "integer",
- *                     "minimum": 1,
- *                     "maximum": 20,
- *                     "default": 5
+ *                     "minimum": 6,
+ *                     "maximum": 6,
+ *                     "default": 6
  *                   }
  *                 },
  *                 "required": [
@@ -220,7 +220,7 @@
  *             }
  *           }
  *         },
- *         "description": "Target academic period is mandatory for new windows. Relative semester defaults to 5, calculated from actual student entry; Block 3 uses its parent. Nonstandard relative semester requires a reason. Target/scope cannot change after opening."
+ *         "description": "Target academic period is mandatory for new windows. OJT is fixed at relative semester 6, calculated from the actual student entry period; requiredRelativeSemester is always 6. Eligibility assessment uses semester 5 and its Block 3. Target/scope cannot change after opening."
  *       }
  *     },
  *     "/api/ojt-registration-windows/{id}": {
@@ -358,9 +358,9 @@
  *                   },
  *                   "requiredRelativeSemester": {
  *                     "type": "integer",
- *                     "minimum": 1,
- *                     "maximum": 20,
- *                     "default": 5
+ *                     "minimum": 6,
+ *                     "maximum": 6,
+ *                     "default": 6
  *                   },
  *                   "status": {
  *                     "type": "string",
@@ -376,7 +376,7 @@
  *             }
  *           }
  *         },
- *         "description": "Target academic period is mandatory for new windows. Relative semester defaults to 5, calculated from actual student entry; Block 3 uses its parent. Nonstandard relative semester requires a reason. Target/scope cannot change after opening."
+ *         "description": "Target academic period is mandatory for new windows. OJT is fixed at relative semester 6, calculated from the actual student entry period; requiredRelativeSemester is always 6. Eligibility assessment uses semester 5 and its Block 3. Target/scope cannot change after opening."
  *       }
  *     },
  *     "/api/ojt-registrations": {

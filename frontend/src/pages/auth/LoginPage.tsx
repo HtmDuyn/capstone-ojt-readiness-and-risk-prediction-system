@@ -4,7 +4,7 @@ import RightPanel from "@/components/auth/RightPanel";
 import type { UserRole } from "@/types/auth.types";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoleRedirect } from "@/hooks/useRoleRedirect";
-import { authService } from "@/service/authService";
+import { authService } from "@/services/authService";
 
 const roleByCode: Record<string, UserRole> = {
   ADMIN: "admin",

@@ -1,11 +1,12 @@
+import { requireJsonBody } from '../../middleware/json-body';
+import { studentWindows } from '../students/registration-options.service';
 import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from './combo.validation';
-import { studentWindows } from '../students/registration-options.service';
 import { listWindows } from './combo.repository';
-import { saveWindow, extendWindow, selectionReport } from './window.service';
-import { submitChoice, finalizeWindow, studentComboHistory } from './selection.service';
+import { saveWindow, extendWindow } from './window.service';
+import { submitChoice, finalizeWindow } from './selection.service';
 import { sendReminders } from './reminder.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')],own=[authenticate,authorizeRoles('ADMIN','ACADEMIC','STUDENT')];
 const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(req,res,next)=>{try{res.status(code).json({success:true,data:await work(req)});}catch(error){next(error);}};
@@ -13,10 +14,8 @@ router.get('/combo-registration-windows',...own,handle(req=>req.user.roleCode===
 router.post('/combo-registration-windows',...staff,handle(req=>saveWindow(req.body,req.user.userId),201));
 router.patch('/combo-registration-windows/:id',...staff,handle(req=>saveWindow(req.body,req.user.userId,positiveId(req.params.id))));
 router.post('/combo-registration-windows/:id/extensions',...staff,handle(req=>extendWindow(positiveId(req.params.id),req.body,req.user.userId),201));
-router.get('/combo-registration-windows/:id/selections',...staff,handle(req=>selectionReport(positiveId(req.params.id),req.query)));
-router.post('/combo-registration-windows/:id/selections',...own,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user),201));
-router.post('/combo-registration-windows/:id/preview',...own,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user,true)));
+router.post('/combo-registration-windows/:id/selections',...own,requireJsonBody,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user),201));
+router.post('/combo-registration-windows/:id/preview',...own,requireJsonBody,handle(req=>submitChoice(positiveId(req.params.id),req.body,req.user,true)));
 router.post('/combo-registration-windows/:id/reminders',...staff,handle(req=>sendReminders(positiveId(req.params.id),req.body,req.user.userId)));
-router.get('/students/:id/combo-selections',...own,handle(req=>studentComboHistory(positiveId(req.params.id),req.query,req.user)));
 router.post('/combo-registration-windows/:id/finalize',...staff,handle(req=>finalizeWindow(positiveId(req.params.id),req.body,req.user.userId)));
 export default router;

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { invalid, inputObject, positiveId, requiredText, pagination, enumValue } from '../students/student.validation';
-import { academicProgressWithClient } from '../students/academic-progress';
+import { academicProgressWithClient, type AcademicProgressData } from '../students/academic-progress';
 import { resultSelect } from '../students/student.service';
 import { assertOfficialAssessment } from '../academic/workflow-policy';
 type Row=Record<string,any>;
@@ -17,7 +17,7 @@ export async function listRules(params:Row) {
  for(const [key,col] of Object.entries({programId:'ProgramID',ojtSemesterId:'OJTSemesterID',status:'Status'}))if(params[key]!==undefined){args.push(key==='status'?enumValue(params[key],['DRAFT','PUBLISHED'],'status'):positiveId(params[key],key));where.push(`r."${col}"=$${args.length}`);}
  return academicTransaction(async c=>{const filter=where.length?'WHERE '+where.join(' AND '):'';const total=(await c.query(`SELECT count(*)::int AS n FROM "OJTRuleSets" r ${filter}`,args)).rows[0].n;const rows=(await c.query(`SELECT r.*,EXISTS(SELECT 1 FROM "OJTActiveRuleSets" a WHERE a."RuleSetID"=r."RuleSetID") AS active FROM "OJTRuleSets" r ${filter} ORDER BY r."RuleSetID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;return {items:await enrichListRows(c,rows.map(r=>({...ruleApi(r),active:r.active}))),total,page:p.page,limit:p.limit};});
 }
-export async function saveRule(body:unknown,actorId:number,id?:number) {
+export async function saveRule(body:unknown,actorId:number,id?:number,existingClient?:PoolClient) {
  const b=inputObject(body,['programId','ojtSemesterId','version','name','minCredits','maxUnpassedCourses','debtBasis']);
  const fields:Row={};if('programId'in b)fields.ProgramID=positiveId(b.programId,'programId');if('ojtSemesterId'in b)fields.OJTSemesterID=b.ojtSemesterId===null?null:positiveId(b.ojtSemesterId,'ojtSemesterId');
  if('version'in b)fields.Version=positiveId(b.version,'version');if('name'in b)fields.Name=requiredText(b.name,'name',200);
@@ -28,21 +28,21 @@ export async function saveRule(body:unknown,actorId:number,id?:number) {
  return academicTransaction(async c=>{let before:Row|undefined;if(id){before=(await c.query('SELECT * FROM "OJTRuleSets" WHERE "RuleSetID"=$1 FOR UPDATE',[id])).rows[0];if(!before)throw invalid('Rule set not found.',404);if(before.Status!=='DRAFT')throw invalid('Published rules cannot be edited. Create a new version.',409,'RULE_IMMUTABLE');}
  const program=(await c.query('SELECT "ProgramID" FROM "TrainingPrograms" WHERE "ProgramID"=$1',[fields.ProgramID??before?.ProgramID])).rows[0];if(!program)throw invalid('Curriculum not found.',404);
  const sid=fields.OJTSemesterID===undefined?before?.OJTSemesterID:fields.OJTSemesterID;if(sid)await semester(c,sid);
- const keys=Object.keys(fields),values=Object.values(fields);const r=id?(await c.query(`UPDATE "OJTRuleSets" SET ${keys.map((k,i)=>`"${k}"=$${i+1}`).join(',')} WHERE "RuleSetID"=$${keys.length+1} RETURNING *`,[...values,id])).rows[0]:(await c.query(`INSERT INTO "OJTRuleSets" (${keys.map(k=>`"${k}"`).join(',')}) VALUES (${keys.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,values)).rows[0];await audit(c,actorId,'OJTRuleSets',r.RuleSetID,id?'UPDATE':'CREATE',before,ruleApi(r));return ruleApi(r);});
+ const keys=Object.keys(fields),values=Object.values(fields);const r=id?(await c.query(`UPDATE "OJTRuleSets" SET ${keys.map((k,i)=>`"${k}"=$${i+1}`).join(',')} WHERE "RuleSetID"=$${keys.length+1} RETURNING *`,[...values,id])).rows[0]:(await c.query(`INSERT INTO "OJTRuleSets" (${keys.map(k=>`"${k}"`).join(',')}) VALUES (${keys.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,values)).rows[0];await audit(c,actorId,'OJTRuleSets',r.RuleSetID,id?'UPDATE':'CREATE',before,ruleApi(r));return ruleApi(r);},existingClient);
 }
-export async function publishRule(id:number,actorId:number) {return academicTransaction(async c=>{const r=(await c.query('SELECT * FROM "OJTRuleSets" WHERE "RuleSetID"=$1 FOR UPDATE',[id])).rows[0];if(!r)throw invalid('Rule set not found.',404);
+export async function publishRule(id:number,actorId:number,existingClient?:PoolClient) {return academicTransaction(async c=>{const r=(await c.query('SELECT * FROM "OJTRuleSets" WHERE "RuleSetID"=$1 FOR UPDATE',[id])).rows[0];if(!r)throw invalid('Rule set not found.',404);
  if(r.Status==='PUBLISHED')return ruleApi(r);
  const program=(await c.query(`SELECT to_jsonb(p)->>'Status' AS "Status" FROM "TrainingPrograms" p WHERE "ProgramID"=$1`,[r.ProgramID])).rows[0];if(program.Status!=null&&program.Status!=='PUBLISHED')throw invalid('Publish the curriculum before publishing OJT rules.',409,'CURRICULUM_NOT_PUBLISHED');
  const previous=(await c.query('SELECT r."Version" FROM "OJTActiveRuleSets" a JOIN "OJTRuleSets" r ON r."RuleSetID"=a."RuleSetID" WHERE a."ProgramID"=$1 AND a."ScopeSemesterID"=$2',[r.ProgramID,r.OJTSemesterID??0])).rows[0];if(previous&&previous.Version>=r.Version)throw invalid('A new active rule must have a greater version.',409,'RULE_VERSION_CONFLICT');
- const saved=(await c.query(`UPDATE "OJTRuleSets" SET "Status"='PUBLISHED',"PublishedBy"=$2,"PublishedAt"=now() WHERE "RuleSetID"=$1 RETURNING *`,[id,actorId])).rows[0];await c.query(`INSERT INTO "OJTActiveRuleSets" VALUES ($1,$2,$3) ON CONFLICT ("ProgramID","ScopeSemesterID") DO UPDATE SET "RuleSetID"=EXCLUDED."RuleSetID"`,[r.ProgramID,r.OJTSemesterID??0,id]);await audit(c,actorId,'OJTRuleSets',id,'PUBLISH',ruleApi(r),ruleApi(saved));return ruleApi(saved);});}
+ const saved=(await c.query(`UPDATE "OJTRuleSets" SET "Status"='PUBLISHED',"PublishedBy"=$2,"PublishedAt"=now() WHERE "RuleSetID"=$1 RETURNING *`,[id,actorId])).rows[0];await c.query(`INSERT INTO "OJTActiveRuleSets" VALUES ($1,$2,$3) ON CONFLICT ("ProgramID","ScopeSemesterID") DO UPDATE SET "RuleSetID"=EXCLUDED."RuleSetID"`,[r.ProgramID,r.OJTSemesterID??0,id]);await audit(c,actorId,'OJTRuleSets',id,'PUBLISH',ruleApi(r),ruleApi(saved));return ruleApi(saved);},existingClient);}
 // The source snapshot contains academic data only; no account credentials or personal contact details.
-async function inputSnapshot(c:PoolClient,studentId:number,semesterId:number,pinnedRule?:Row|null,prospectiveProgress?:Row,lockSource=true) {
+async function inputSnapshot(c:PoolClient,studentId:number,semesterId:number,pinnedRule?:Row|null,prospectiveProgress?:Row,lockSource=true,loaded?:AcademicProgressData) {
  const s=(await c.query(`SELECT s."StudentID",s."ProgramID",s."Status",u."Status" AS "AccountStatus" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."StudentID"=$1${lockSource?' FOR UPDATE OF s,u':''}`,[studentId])).rows[0];if(!s)throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
  const term=await semester(c,semesterId);const rule=pinnedRule===undefined?await activeRule(c,s.ProgramID,semesterId):pinnedRule;
  if(rule&&(rule.ProgramID!==s.ProgramID||(rule.OJTSemesterID!==null&&rule.OJTSemesterID!==semesterId)||rule.Status!=='PUBLISHED'))throw invalid('Rule does not match the student curriculum and semester.',409,'RULE_SCOPE_CHANGED');
  const progress=prospectiveProgress??await academicProgressWithClient(c,studentId);const {computedAt,...stableProgress}=progress as Row;
- const attempts=(await c.query(`${resultSelect} WHERE r."StudentID"=$1 ORDER BY r."ResultID"`,[studentId])).rows;
- const aliases=(await c.query('SELECT "SourceCourseID","TargetCourseID" FROM "ProgramCourseEquivalences" WHERE "ProgramID"=$1 ORDER BY "SourceCourseID"',[s.ProgramID])).rows;
+ const attempts=loaded?.attempts??(await c.query(`${resultSelect} WHERE r."StudentID"=$1 ORDER BY r."ResultID"`,[studentId])).rows;
+ const aliases=loaded?loaded.aliases.map(row=>({SourceCourseID:row.SourceCourseID,TargetCourseID:row.TargetCourseID})):(await c.query('SELECT "SourceCourseID","TargetCourseID" FROM "ProgramCourseEquivalences" WHERE "ProgramID"=$1 ORDER BY "SourceCourseID"',[s.ProgramID])).rows;
  const placement=(await c.query('SELECT * FROM "StudentAcademicPlacements" WHERE "StudentID"=$1',[studentId])).rows[0]??null;
  const selections=(await c.query(`SELECT sc.*,COALESCE((SELECT jsonb_agg(choice."ComboCourseID" ORDER BY choice."ComboCourseID") FROM "StudentComboCourseSelections" choice WHERE choice."SelectionID"=sc."SelectionID"),'[]'::jsonb) AS choices FROM "StudentComboSelections" sc WHERE sc."StudentID"=$1 ORDER BY sc."SelectionID"`,[studentId])).rows;
  return {student:s,semester:term,rule,progress:stableProgress,attempts,aliases,placement,selections};
@@ -70,13 +70,30 @@ export async function performEligibilityCheck(c:PoolClient,studentId:number,seme
 }
 const checkApi=(r:Row)=>({checkId:r.CheckID,source:r.Source,runId:r.RunID,checkedBy:r.CheckedBy,checkedAt:r.CheckedAt,...r.Result,confirmation:r.ConfirmedAt?{confirmedBy:r.ConfirmedBy,confirmedAt:r.ConfirmedAt,reason:r.Reason,assessment:r.AssessmentSnapshot}:null});
 const checkSelect=`SELECT e.*,f."ConfirmedBy",f."ConfirmedAt",f."Reason",f."AssessmentSnapshot" FROM "EligibilityChecks" e LEFT JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID"`;
-export async function history(id:number,params:Row) {const p=pagination(params,['ojtSemesterId']);const sid=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');return academicTransaction(async c=>{if(!(await c.query('SELECT 1 FROM "Students" WHERE "StudentID"=$1',[id])).rowCount)throw invalid('Student not found.',404);const where='WHERE e."StudentID"=$1 AND ($2::int IS NULL OR e."OJTSemesterID"=$2)';const total=(await c.query(`SELECT count(*)::int AS n FROM "EligibilityChecks" e ${where}`,[id,sid])).rows[0].n;const rows=(await c.query(`${checkSelect} ${where} ORDER BY e."CheckID" DESC LIMIT $3 OFFSET $4`,[id,sid,p.limit,p.offset])).rows;return {items:await enrichListRows(c,rows.map(checkApi)),total,page:p.page,limit:p.limit};});}
+export async function history(id:number,params:Row,existingClient?:PoolClient) {const p=pagination(params,['ojtSemesterId']);const sid=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');return academicTransaction(async c=>{if(!(await c.query('SELECT 1 FROM "Students" WHERE "StudentID"=$1',[id])).rowCount)throw invalid('Student not found.',404);const where='WHERE e."StudentID"=$1 AND ($2::int IS NULL OR e."OJTSemesterID"=$2)';const total=(await c.query(`SELECT count(*)::int AS n FROM "EligibilityChecks" e ${where}`,[id,sid])).rows[0].n;const rows=(await c.query(`${checkSelect} ${where} ORDER BY e."CheckID" DESC LIMIT $3 OFFSET $4`,[id,sid,p.limit,p.offset])).rows;return {items:await enrichListRows(c,rows.map(checkApi)),total,page:p.page,limit:p.limit};},existingClient);}
 async function assessmentCurrent(c:PoolClient,row:Row){
  const w=(await c.query('SELECT "Revision" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[row.OJTSemesterID])).rows[0];
  return !!w&&!!row.AssessmentSnapshot?.ResultsFinalizedAt&&(row.AssessmentSnapshot?.Revision??1)===w.Revision;
 }
 
-export async function eligibility(id:number,params:Row) {for(const key of Object.keys(params))if(key!=='ojtSemesterId')throw invalid(`Unknown query parameter: ${key}.`);const sid=positiveId(params.ojtSemesterId,'ojtSemesterId');return academicTransaction(async c=>{const input=await inputSnapshot(c,id,sid),hash=fingerprint(input);const latest=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 ORDER BY e."CheckID" DESC LIMIT 1`,[id,sid])).rows[0];const official=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 AND f."CheckID" IS NOT NULL ORDER BY f."ConfirmedAt" DESC,e."CheckID" DESC LIMIT 1`,[id,sid])).rows[0];return {studentId:id,ojtSemesterId:sid,current:evaluateEligibility(input),latest:latest?{...checkApi(latest),isStale:latest.SourceHash!==hash}:null,official:official?{...checkApi(official),isStale:official.SourceHash!==hash||!await assessmentCurrent(c,official)}:null};});}
+export async function eligibility(id:number,params:Row,existingClient?:PoolClient,progress?:Row,loaded?:AcademicProgressData) {
+ for(const key of Object.keys(params))if(key!=='ojtSemesterId')throw invalid(`Unknown query parameter: ${key}.`);
+ const selected=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
+ return academicTransaction(async c=>{
+  if(!(await c.query('SELECT 1 FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL',[id])).rowCount)throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
+  const semesters=(await c.query('SELECT "OJTSemesterID" FROM "OJTSemesters" WHERE ($1::int IS NULL OR "OJTSemesterID"=$1) ORDER BY "OJTSemesterID" DESC',[selected])).rows;
+  if(selected&&!semesters.length)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
+  const items:Row[]=[];
+  for(const term of semesters){
+   const sid=term.OJTSemesterID,input=await inputSnapshot(c,id,sid,undefined,progress,!existingClient,loaded),hash=fingerprint(input);
+   const latest=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 ORDER BY e."CheckID" DESC LIMIT 1`,[id,sid])).rows[0];
+   const official=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 AND f."CheckID" IS NOT NULL ORDER BY f."ConfirmedAt" DESC,e."CheckID" DESC LIMIT 1`,[id,sid])).rows[0];
+   items.push({studentId:id,ojtSemesterId:sid,current:evaluateEligibility(input),latest:latest?{...checkApi(latest),isStale:latest.SourceHash!==hash}:null,official:official?{...checkApi(official),isStale:official.SourceHash!==hash||!await assessmentCurrent(c,official)}:null});
+  }
+  const enriched=await enrichListRows(c,items);
+  return selected?enriched[0]:{studentId:id,total:enriched.length,items:enriched};
+ },existingClient);
+}
 export async function confirmEligibilityWithClient(c:PoolClient,id:number,actor:number,reason:string) {const r=(await c.query(`${checkSelect} WHERE e."CheckID"=$1`,[id])).rows[0];if(!r)throw invalid('Eligibility check not found.',404);if(r.Status==='REVIEW_REQUIRED')throw invalid('Resolve missing configuration before official confirmation.',409,'ELIGIBILITY_REVIEW_REQUIRED');const input=await inputSnapshot(c,r.StudentID,r.OJTSemesterID);if(fingerprint(input)!==r.SourceHash)throw invalid('Academic data or active rules changed. Run a new check.',409,'ELIGIBILITY_CHECK_STALE');if(r.ConfirmedAt){if(r.ConfirmedBy===actor&&r.Reason===reason)return checkApi(r);throw invalid('This check has already been confirmed.',409,'ELIGIBILITY_ALREADY_CONFIRMED');}
  const assessment=await assertOfficialAssessment(c,r);
  const newer=(await c.query(`SELECT 1 FROM "EligibilityChecks" e JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID" WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 AND e."CheckID">$3`,[r.StudentID,r.OJTSemesterID,id])).rowCount;if(newer)throw invalid('A newer check is already official.',409,'NEWER_OFFICIAL_CHECK');

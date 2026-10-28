@@ -39,9 +39,9 @@ function fieldRows(raw, prefix='', depth=0) {
 const doc=[
   '# Đầu vào API dành cho FE và test thủ công','',
   'Nguồn: OpenAPI hiện tại của backend. Tạo lại bằng `npm run docs:api` sau `npm run build`.','',
-  'API dùng route REST gốc. GET truyền bộ lọc và phân trang qua query parameters, ID bản ghi qua path; không gửi GET body. POST tạo mới/thực hiện nghiệp vụ, PUT/PATCH cập nhật, DELETE xóa theo quy tắc nghiệp vụ. Các route /api/json/ đã bị xóa. Token, quyền và trạng thái nghiệp vụ vẫn bắt buộc.','',
+  'Tất cả nhóm dùng REST: GET đọc dữ liệu, ID trong path, bộ lọc/phân trang trong query; GET không có body. POST tạo/gửi hồ sơ hoặc xem trước nghiệp vụ, PUT/PATCH cập nhật. Body nghiệp vụ dùng application/json; upload CV dùng multipart/form-data. Sinh viên dùng các tài nguyên /students/:id, /students/me/* và các route dùng chung; các adapter /api/student/*/search, /detail, /create, /update đã gỡ. Token, quyền sở hữu và trạng thái nghiệp vụ vẫn bắt buộc.','',
   'Bạn tự insert dữ liệu mẫu: dùng đúng bảng/ID, FK, trạng thái, snapshot và fingerprint nguồn theo schema. Ví dụ confirm eligibility hoặc điểm OJT sẽ trả 409 nếu dữ liệu mẫu thiếu liên kết, snapshot hoặc không còn khớp nguồn. Không chỉ đổi một cột Status để giả lập hoàn tất nghiệp vụ.','',
-  '- Swagger: `/api-docs`. Nhấn Try it out rồi nhập path/query parameters và request body theo từng API. GET không có request body. Schema hiển thị các trường và ràng buộc.','- OpenAPI JSON cho FE: `/api-docs/openapi.json`.','- `studentId` = StudentID; `programId` = ProgramID; `majorId` = SpecializationID; `courseId` = CourseID. Các loại ID không thay thế cho nhau.','- Mọi ID trong ví dụ là minh họa; thay bằng ID thực tế trong dữ liệu mẫu. Không tự gọi các API tạo dữ liệu từ ví dụ.','- Import commit nhận đủ JSON và tự kiểm tra, không bắt buộc chạy preview trước.','- Các thao tác mở/đóng/chốt/duyệt/xác nhận kiểm tra trạng thái đang lưu trong DB; không yêu cầu lịch sử gọi API của trình duyệt.','- Các ví dụ không tạo bản ghi mẫu, không thay đổi quy chế và không làm frontend tự gọi thêm API.',''
+  '- Swagger: `/api-docs`. Nhấn Try it out: GET nhập ID trong path và bộ lọc trong query; POST/PUT/PATCH sửa JSON request body khi cần. Upload dùng ô chọn file. GET không có body. Schema mô tả các trường và ràng buộc.','- OpenAPI JSON cho FE: `/api-docs/openapi.json`.','- `studentId` = StudentID; `programId` = ProgramID; `majorId` = SpecializationID; `courseId` = CourseID. Các loại ID không thay thế cho nhau.','- Mọi ID trong ví dụ là minh họa; thay bằng ID thực tế trong dữ liệu mẫu. Không tự gọi các API tạo dữ liệu từ ví dụ.','- Import commit nhận đủ JSON và tự kiểm tra, không bắt buộc chạy preview trước.','- Các thao tác mở/đóng/chốt/duyệt/xác nhận kiểm tra trạng thái đang lưu trong DB; không yêu cầu lịch sử gọi API của trình duyệt.','- Các ví dụ không tạo bản ghi mẫu, không thay đổi quy chế và không làm frontend tự gọi thêm API.',''
 ];
 let operations=0,pathCount=0,queryCount=0,bodyCount=0;
 for(const [url,item]of Object.entries(spec.paths).sort(([a],[b])=>a.localeCompare(b))){
@@ -88,24 +88,6 @@ for(const tag of spec.tags){
   grouped.push('');
 }
 fs.writeFileSync(path.resolve(__dirname,'../docs/swagger-api-by-role.md'),grouped.join('\n'));
-function listItem(op) { const root=resolve(op.responses?.['200'])?.content?.['application/json']?.schema; const data=resolve(root?.properties?.data); return resolve(data?.type==='array'?data.items:data?.properties?.items?.items)??resolve(root?.properties?.items?.items)??(root?.type==='array'?resolve(root.items):undefined); }
-const lists=inventory.filter(row=>row.method==='get' && !!listItem(row.operation));
-const responseDoc=['# Rà soát response API list','','Phạm vi: '+lists.length+' API GET danh sách từ Swagger hiện hành. Bảng dưới mô tả các trường trong OpenAPI; không phải dữ liệu lấy từ production.','',
-  'Đã đối chiếu SQL/serializer của các danh sách. Ngoài các API danh sách, danh sách vai trò và email vẫn có mã/tên hoặc người nhận/trạng thái đầy đủ.','',
-  '- Giữ nguyên ID, cấu trúc envelope và phân trang; bổ sung object mô tả để FE không phải gọi chi tiết chỉ để lấy tên.',
-  '- Task: student, company, position, semester, assignment và tên hiển thị. Điểm OJT: thêm chương trình, doanh nghiệp, vị trí, kỳ và người đánh giá.',
-  '- Môn học và các mảng ID môn/hồ sơ/combo có thông tin liên quan; các ID gốc vẫn giữ nguyên. Quan hệ bị thiếu trả null, không dựng tên giả.',
-  '- Thông tin chỉ được bổ sung cho các bản ghi đã qua lọc quyền; không đưa hash mật khẩu, token, payload email hoặc nội dung file vào lookup.',
-  '- Lookup gộp theo các ID trên trang, không phát sinh một truy vấn cho từng dòng.',
-  '- Kiểm thử tích hợp tập trung vào task/điểm OJT/lịch sử thông báo, scope sinh viên, phân trang, lookup và HTTP. Các danh sách còn lại được rà source và schema; chưa gọi toàn bộ trên DB production.','',
-  '| API Swagger | Các trường item được mô tả |','|---|---|'];
-for(const {url,method,operation}of lists){
-  const root=resolve(operation.responses?.['200'])?.content?.['application/json']?.schema;
-  const data=resolve(root?.properties?.data);
-  const item=resolve(data?.type==='array'?data.items:data?.properties?.items?.items)??resolve(root?.properties?.items?.items);
-  responseDoc.push('| '+escape(method.toUpperCase()+' '+url)+' | '+escape(Object.keys(item?.properties??{}).join(', '))+' |');
-}
-fs.writeFileSync(path.resolve(__dirname,'../docs/api-list-response-review.md'),responseDoc.join('\n')+'\n');
 fs.writeFileSync(path.resolve(__dirname,'../docs/swagger-role-groups.md'),['# Nhóm API trên Swagger','','Swagger `/api-docs`; tài liệu máy đọc `/api-docs/openapi.json`.','',
   '| Nhóm | Số API hiển thị |','|---|---:|',...groupRows,'','Tổng '+inventory.length+' API duy nhất. Nhóm Admin chỉ hiển thị chức năng quản trị riêng; API nghiệp vụ đã có nhóm phụ trách không lặp lại trong Admin. Middleware/service và x-roles vẫn giữ nguyên quyền Admin. Tag không thay thế phân quyền và quyền sở hữu. Health công khai được đặt trong Admin.',
   '', '`src/config/swagger-role-groups.ts` kiểm tra thiếu/trùng/dư operation. Các API dùng route REST gốc; ID trên path, bộ lọc trên query. Xem `swagger-api-by-role.md` và `backend-workflow.md` để biết chức năng và luồng import/điểm chính thức.',''].join('\n'));

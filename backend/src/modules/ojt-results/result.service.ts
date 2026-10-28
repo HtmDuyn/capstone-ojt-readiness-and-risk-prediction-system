@@ -1,15 +1,18 @@
+import type { PoolClient } from 'pg';
 import { readTransaction } from '../qhdn/read.repository';
 import { enrichListRows } from '../../shared/list-context';
 import { invalid, positiveId, requiredText, enumValue, pagination } from '../students/student.validation';
 
 type Row = Record<string, any>;
-// Submitted enterprise evaluations are official; academic staff do not re-enter/approve scores.
+// Join official academic results to enterprise evaluations; Student reads require CONFIRMED.
 export const officialResultSelect = `SELECT ev.*,res.*,a."AssignmentID",a."StudentID",a."EnterpriseID",a."PositionID",
-  co."OJTSemesterID",s."ProgramID",s."StudentCode",u."FullName",e."Name" AS "EnterpriseName",t."SemesterCode"
+  co."OJTSemesterID",s."ProgramID",s."StudentCode",u."FullName",e."Name" AS "EnterpriseName",t."SemesterCode",
+  CASE WHEN template."TemplateID" IS NULL THEN NULL ELSE jsonb_build_object('id',template."TemplateID",'code',template."Code",'name',template."Name",'version',template."Version",'criteria',template."Criteria") END AS "EvaluationTemplate"
   FROM "OJTResults" res JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=res."AssignmentID" JOIN "InternshipAssignments" a ON a."AssignmentID"=ev."AssignmentID"
   JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
   JOIN "Students" s ON s."StudentID"=a."StudentID" JOIN "Users" u ON u."UserID"=s."UserID"
-  JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "OJTSemesters" t ON t."OJTSemesterID"=co."OJTSemesterID"`;
+  JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "OJTSemesters" t ON t."OJTSemesterID"=co."OJTSemesterID"
+  LEFT JOIN "AssessmentTemplates" template ON template."TemplateID"=ev."TemplateID"`;
 export const officialResultCondition = `res."Status" IN ('PENDING_ACADEMIC_CONFIRMATION','REVISION_REQUESTED','CONFIRMED')`;
 export function resultApi(r: Row) {
   return {id:r.ResultID,evaluationId:r.EvaluationID,assignmentId:r.AssignmentID,studentId:r.StudentID,
@@ -17,10 +20,14 @@ export function resultApi(r: Row) {
     enterpriseName:r.EnterpriseName,ojtSemesterId:r.OJTSemesterID,semesterCode:r.SemesterCode,status:r.Status,
     officialScore:r.OfficialScore==null?null:Number(r.OfficialScore),completionScore:r.CompletionScore==null?null:Number(r.CompletionScore),
     attitudeScore:r.AttitudeScore==null?null:Number(r.AttitudeScore),skillScore:r.SkillScore==null?null:Number(r.SkillScore),
-    comments:r.Comments,evaluatedBy:r.EvaluatedBy,confirmedBy:r.ConfirmedBy,confirmedAt:r.ConfirmedAt,transferredBy:r.TransferredBy,transferredAt:r.TransferredAt,
-    source:'ACADEMIC_CONFIRMATION',outcome:r.Outcome};
+    comments:r.Comments,templateId:r.TemplateID??null,template:r.EvaluationTemplate??null,scoreDetails:r.ScoreDetails??null,evaluatedAt:r.EvaluatedAt,
+    overallScore:r.OverallScore==null?null:Number(r.OverallScore),
+    evaluatedBy:r.EvaluatedBy,confirmedBy:r.ConfirmedBy,confirmedAt:r.ConfirmedAt,transferredBy:r.TransferredBy,transferredAt:r.TransferredAt,
+    source:'ACADEMIC_CONFIRMATION',outcome:r.Outcome,version:r.Version,
+    courseResultId:r.CourseResultID??null,gradeMappingId:r.GradeMappingID??null,
+    gradeMappingSnapshot:r.GradeMappingSnapshot??null,confirmationReason:r.ConfirmationReason??null};
 }
-export async function list(params:Row,semesterId?:number,exportAll=false,studentUserId?:number) {
+export async function list(params:Row,semesterId?:number,exportAll=false,studentUserId?:number,existingClient?:PoolClient) {
   const p=pagination(params,['status','ojtSemesterId','studentId','search','resultId',...(exportAll?['format']:[])]);
   const args:unknown[]=[],filters=[officialResultCondition];
   const add=(column:string,value:unknown)=>{args.push(value);filters.push(`${column}=$${args.length}`);};
@@ -41,7 +48,7 @@ export async function list(params:Row,semesterId?:number,exportAll=false,student
     if(exportAll&&total>10000)throw invalid('Narrow exports to at most 10000 results.',422);
     const rows=(await c.query(sql+' ORDER BY res."ResultID" DESC'+(exportAll?'':` LIMIT $${args.length+1} OFFSET $${args.length+2}`),exportAll?args:[...args,p.limit,p.offset])).rows;
     return {items:await enrichListRows(c,rows.map(resultApi)),total,...(exportAll?{ojtSemesterId:semesterId}:{page:p.page,limit:p.limit})};
-  });
+  },existingClient);
 }
 export function resultCsv(items:ReturnType<typeof resultApi>[]) {
   const cell=(v:unknown)=>{let s=v==null?'':String(v);if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};

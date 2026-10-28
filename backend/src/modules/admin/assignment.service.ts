@@ -1,14 +1,19 @@
-import { assertPublishedPosition } from '../recruitment/recruitment.repository';
+import { query } from '../../config/database';
 import { academicTransaction, audit } from '../academic/academic.repository';
-import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue } from '../students/student.validation';
+import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
 import { dateInput, dateRange } from '../academic/academic.schema';
+import { pageSql, type Row } from './admin.repository';
 
 const assignmentSelect=`SELECT a."AssignmentID" AS id,a."CoordinationID" AS "coordinationId",a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",p."OJTSemesterID" AS "ojtSemesterId",a."AcademicSupervisorID" AS "academicSupervisorId",a."EnterpriseSupervisorName" AS "enterpriseSupervisorName",a."StartDate" AS "startDate",a."EndDate" AS "endDate",a."Status" AS status FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"`;
-export async function saveAssignment(body:unknown,actor:number,id?:number) {
- const b=inputObject(body,id?['status','positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate','reason']:['registrationId','positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate']);
+export async function assignments(params:Row) {
+ const p=pagination(params,['studentId','companyId','positionId','ojtSemesterId','status']),args:unknown[]=[],where:string[]=[];
+ for(const [key,col]of Object.entries({studentId:'a."StudentID"',companyId:'a."EnterpriseID"',positionId:'a."PositionID"',ojtSemesterId:'p."OJTSemesterID"',status:'a."Status"'}))if(params[key]!==undefined){args.push(key==='status'?enumValue(params[key],['ASSIGNED','ACTIVE','COMPLETED','CANCELLED'],'status'):positiveId(params[key],key));where.push(`${col}=$${args.length}`);}
+ return pageSql(assignmentSelect+(where.length?' WHERE '+where.join(' AND '):''),args,p);
+}
+export async function assignmentDetail(id:number) {const r=(await query(assignmentSelect+' WHERE a."AssignmentID"=$1',[id])).rows[0];if(!r)throw invalid('Assignment not found.',404);return r;}
+export async function saveAssignment(body:unknown,actor:number,id?:number,statusOnly=false) {
+ const b=inputObject(body,statusOnly?['status','reason']:id?['positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate','reason']:['registrationId','positionId','academicSupervisorId','enterpriseSupervisorName','startDate','endDate']);
  if(id)requiredText(b.reason,'reason',2000);
- const statusOnly=id!==undefined&&b.status!==undefined&&!Object.keys(b).some(key=>!['status','reason'].includes(key));
- if(id&&!Object.keys(b).some(key=>key!=='reason'))throw invalid('Provide a field or status to update.');
  return academicTransaction(async c=>{
   const old=id?(await c.query('SELECT * FROM "InternshipAssignments" WHERE "AssignmentID"=$1 FOR UPDATE',[id])).rows[0]:null;
   if(id&&!old)throw invalid('Assignment not found.',404);
@@ -25,18 +30,17 @@ export async function saveAssignment(body:unknown,actor:number,id?:number) {
   // Lock both old and new positions in stable order; capacity updates are atomic.
   const locked=(await c.query('SELECT * FROM "InternshipPositions" WHERE "PositionID"=ANY($1::int[]) ORDER BY "PositionID" FOR UPDATE',[[...new Set([positionId,...(old?[old.PositionID]:[])])]])).rows;
   const pos=locked.find(p=>p.PositionID===positionId);
-  const cancelling=b.status==='CANCELLED';
+  const cancelling=statusOnly&&b.status==='CANCELLED';
   const allocating=!old||positionId!==old.PositionID;
-  if(allocating)await assertPublishedPosition(c,positionId);
   if(!pos||(!cancelling&&pos.DeletedAt)||(allocating&&pos.Status!=='OPEN')||pos.OJTSemesterID!==reg.OJTSemesterID)throw invalid('Position must belong to the registration semester and be open for new assignments.',409);
   const company=(await c.query('SELECT "Status","DeletedAt" FROM "Enterprises" WHERE "EnterpriseID"=$1 FOR UPDATE',[pos.EnterpriseID])).rows[0];
   if(!cancelling&&(!company||company.DeletedAt||(allocating&&company.Status!=='ACTIVE')))throw invalid('Company is inactive.',409);
   if((await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" WHERE a."StudentID"=$1 AND p."OJTSemesterID"=$2 AND COALESCE(a."Status",'ACTIVE')<>'CANCELLED' AND ($3::int IS NULL OR a."AssignmentID"<>$3) LIMIT 1`,[reg.StudentID,reg.OJTSemesterID,id??null])).rowCount)throw invalid('Student already has an assignment in this semester.',409,'DUPLICATE_ASSIGNMENT');
   const used=(await c.query(`SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "PositionID"=$1 AND COALESCE("Status",'ACTIVE')<>'CANCELLED' AND ($2::int IS NULL OR "AssignmentID"<>$2)`,[positionId,id??null])).rows[0].n;
   if(!cancelling&&(pos.Capacity==null||used>=pos.Capacity))throw invalid('Position has no remaining capacity.',409,'POSITION_FULL');
-  const status=b.status!==undefined?enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'):old?.Status??'ASSIGNED';
+  const status=statusOnly?enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'):old?.Status??'ASSIGNED';
   const transitions:Record<string,string[]>={ASSIGNED:['ACTIVE','CANCELLED'],ACTIVE:['COMPLETED','CANCELLED']};
-  if(b.status!==undefined&&status!==old.Status&&!(transitions[old.Status]??[]).includes(status))throw invalid('Invalid assignment status transition.',409);
+  if(statusOnly&&!(transitions[old.Status]??[]).includes(status))throw invalid('Invalid assignment status transition.',409);
   const start=dateInput(b.startDate??(old?.StartDate instanceof Date?old.StartDate.toISOString().slice(0,10):old?.StartDate),'startDate'),end=dateInput(b.endDate??(old?.EndDate instanceof Date?old.EndDate.toISOString().slice(0,10):old?.EndDate),'endDate');dateRange(start,end);
   const supervisor=b.academicSupervisorId===null?null:b.academicSupervisorId===undefined?old?.AcademicSupervisorID??null:positiveId(b.academicSupervisorId,'academicSupervisorId');
   if(supervisor){const user=(await c.query(`SELECT 1 FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE u."UserID"=$1 AND u."Status"='ACTIVE' AND r."RoleCode"='ACADEMIC'`,[supervisor])).rowCount;if(!user)throw invalid('Academic supervisor must be an active ACADEMIC user.');}

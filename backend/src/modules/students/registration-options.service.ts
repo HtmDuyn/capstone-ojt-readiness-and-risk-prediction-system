@@ -16,10 +16,10 @@ const blockerLabels:Record<string,string>={
   REGISTRATION_PERIOD_MISMATCH:'Kỳ đăng ký chưa khớp với kỳ OJT.'
 };
 
-async function ownStudent(c:PoolClient,userId:number):Promise<Row> {
+async function ownStudent(c:PoolClient,actor:Actor):Promise<Row> {
   const s=(await c.query(`SELECT s.*,u."FullName",u."Email",u."Phone",p."CohortID",p."GroupCode",p."EntryAcademicPeriodID",to_jsonb(tp)->>'Status' AS "ProgramStatus",tp."SpecializationID"
     FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
-    LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" WHERE s."UserID"=$1 AND s."DeletedAt" IS NULL`,[userId])).rows[0];
+    LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID" WHERE ${actor.studentId!=null?'s."StudentID"=$1 AND s."UserID"=$2':'s."UserID"=$1'} AND s."DeletedAt" IS NULL`,actor.studentId!=null?[actor.studentId,actor.userId]:[actor.userId])).rows[0];
   if(!s)throw invalid('Student profile not found.',404,'STUDENT_NOT_FOUND');return s;
 }
 async function blocker(work:()=>Promise<unknown>):Promise<string|null> {
@@ -29,13 +29,13 @@ const periodFields=`jsonb_build_object('id',p."AcademicPeriodID",'code',p."Perio
   jsonb_build_object('id',o."OJTSemesterID",'code',o."SemesterCode",'name',o."Name") AS semester`;
 
 // Student projections deliberately omit cohort rosters, raw Scope and staff summaries.
-export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) {
+export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,existingClient?:PoolClient) {
   if(actor.roleCode!=='STUDENT')throw invalid('Student role required.',403,'FORBIDDEN');
   const page=pagination(params,kind==='combo'?['phase','status','academicPeriodId']:['status','ojtSemesterId']);
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const status=params.status===undefined?null:enumValue(params.status,kind==='combo'?['DRAFT','OPEN','CLOSED','FINALIZED']:['DRAFT','OPEN','CLOSED'],'status');
   return readTransaction(async c=>{
-    const s=await ownStudent(c,actor.userId),args:unknown[]=[s.StudentID];
+    const s=await ownStudent(c,actor),args:unknown[]=[s.StudentID];
     const where=[`w."Status"<>'DRAFT'`];
     const add=(condition:string,value:unknown)=>{args.push(value);where.push(condition.replace('?',`$${args.length}`));};
     if(status)add('w."Status"=?',status);
@@ -58,7 +58,9 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
     const extra=kind==='combo'?`,own."ProgramID" AS "RosterProgramID",own."ScopeSnapshot" AS "RosterSnapshot",
       GREATEST(w."EndsAt",COALESCE((SELECT max(ext."EndsAt") FROM "ComboExtensionStudents" es JOIN "ComboWindowExtensions" ext ON ext."ExtensionID"=es."ExtensionID" WHERE es."WindowID"=w."WindowID" AND es."StudentID"=$1),w."EndsAt")) AS "EffectiveEndsAt",
       (SELECT jsonb_build_object('comboId',ev."ProgramComboID",'courseIds',ev."CourseIDs",'choice',ev."ChoiceSnapshot",'submittedAt',ev."CreatedAt") FROM "StudentComboSelectionEvents" ev WHERE ev."WindowID"=w."WindowID" AND ev."StudentID"=$1 AND ev."EventType"='SUBMITTED' ORDER BY ev."EventID" DESC LIMIT 1) AS selection`:
-      `,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",'hasCoordination',EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID")) FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
+      `,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",
+        'latestDecision',(SELECT co."Decision" FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1))
+        FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
     const rows=(await c.query(`SELECT w.*,${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
     const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const options=kind==='combo'&&rows.length&&s.ProgramStatus==='PUBLISHED'?(await combos(c,s.ProgramID)).filter(b=>b.coursesReviewed&&b.choiceGroups.length&&purpose({ComboCode:b.code,SelectionGroup:b.selectionGroup})==='SPECIALIZATION'):[];
@@ -77,7 +79,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
       });
       if(contextIssue)reasons.push(contextIssue);
       if(kind==='combo'&&!options.length)reasons.push('COMBO_OPTIONS_UNAVAILABLE');
-      if(kind==='ojt'&&w.registration&&(w.registration.status!=='REJECTED'||w.registration.hasCoordination))reasons.push('REGISTRATION_ALREADY_EXISTS');
+      if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');
       items.push({id:w.WindowID,name:w.Name,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,
         period:w.period,semester:w.semester,startsAt:w.StartsAt,endsAt:w.EndsAt,effectiveEndsAt:end,status:w.Status,
         canSubmit:reasons.length===0,blockingReasons:reasons,blockingMessages:reasons.map(code=>blockerLabels[code]??'Lộ trình hoặc cấu hình đợt đăng ký chưa phù hợp.'),
@@ -86,5 +88,5 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor) 
           {requiredRelativeSemester:w.RequiredRelativeSemester,pathway,registration:w.registration})});
     }
     return {studentId:s.StudentID,student:{id:s.StudentID,studentCode:s.StudentCode,fullName:s.FullName,email:s.Email,phone:s.Phone},items,total,page:page.page,limit:page.limit};
-  });
+  },existingClient);
 }

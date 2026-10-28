@@ -6,41 +6,18 @@
  *       "AcademicYearCreate": {
  *         "type": "object",
  *         "additionalProperties": false,
+ *         "required": [
+ *           "yearCode"
+ *         ],
  *         "properties": {
  *           "yearCode": {
  *             "type": "string",
- *             "maxLength": 20
- *           },
- *           "startDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "endDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "status": {
- *             "type": "string",
- *             "enum": [
- *               "PLANNED",
- *               "ACTIVE",
- *               "CLOSED",
- *               "ARCHIVED"
- *             ]
+ *             "pattern": "^\\d{4}-\\d{4}$",
+ *             "example": "2026-2027"
  *           }
  *         },
- *         "required": [
- *           "yearCode",
- *           "startDate",
- *           "endDate"
- *         ],
  *         "example": {
- *           "yearCode": "2026-2027",
- *           "startDate": "2026-09-01",
- *           "endDate": "2027-08-31",
- *           "status": "PLANNED"
+ *           "yearCode": "2026-2027"
  *         }
  *       },
  *       "AcademicYearPatch": {
@@ -177,94 +154,6 @@
  *           "status": "PLANNED"
  *         }
  *       },
- *       "AcademicPeriodPatch": {
- *         "type": "object",
- *         "minProperties": 1,
- *         "additionalProperties": false,
- *         "properties": {
- *           "academicYearId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647
- *           },
- *           "periodCode": {
- *             "type": "string",
- *             "maxLength": 30
- *           },
- *           "name": {
- *             "type": "string",
- *             "maxLength": 100
- *           },
- *           "kind": {
- *             "type": "string",
- *             "enum": [
- *               "SEMESTER",
- *               "BLOCK3"
- *             ]
- *           },
- *           "parentPeriodId": {
- *             "type": "integer",
- *             "minimum": 1,
- *             "maximum": 2147483647,
- *             "nullable": true,
- *             "description": "Required for BLOCK3; null for SEMESTER. Block 3 follows its parent in the same academic year."
- *           },
- *           "startDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "endDate": {
- *             "type": "string",
- *             "format": "date",
- *             "example": "2026-09-01"
- *           },
- *           "status": {
- *             "type": "string",
- *             "enum": [
- *               "PLANNED",
- *               "ACTIVE",
- *               "CLOSED",
- *               "ARCHIVED"
- *             ]
- *           },
- *           "ojt": {
- *             "type": "object",
- *             "minProperties": 1,
- *             "additionalProperties": false,
- *             "description": "Chỉ SEMESTER; thông tin vận hành OJT gắn với học kỳ, không tạo kỳ OJT riêng.",
- *             "properties": {
- *               "startDate": {
- *                 "type": "string",
- *                 "format": "date"
- *               },
- *               "endDate": {
- *                 "type": "string",
- *                 "format": "date"
- *               },
- *               "regStartDate": {
- *                 "type": "string",
- *                 "format": "date",
- *                 "nullable": true
- *               },
- *               "regEndDate": {
- *                 "type": "string",
- *                 "format": "date",
- *                 "nullable": true
- *               },
- *               "status": {
- *                 "type": "string",
- *                 "enum": [
- *                   "PLANNED",
- *                   "ACTIVE",
- *                   "CLOSED",
- *                   "ARCHIVED"
- *                 ]
- *               }
- *             }
- *           }
- *         }
- *       },
  *       "CohortCreate": {
  *         "type": "object",
  *         "additionalProperties": false,
@@ -316,6 +205,20 @@
  *                   "type": "integer",
  *                   "minimum": 1,
  *                   "maximum": 2147483647
+ *                 },
+ *                 "curriculumPeriods": {
+ *                   "type": "array",
+ *                   "minItems": 10,
+ *                   "maxItems": 10,
+ *                   "description": "Explicit mapping of curriculum stages 0–9 to Spring/Summer/Fall calendar periods. Stage 0 must match entryAcademicPeriodId.",
+ *                   "items": {
+ *                     "type": "object",
+ *                     "required": ["semester", "academicPeriodId"],
+ *                     "properties": {
+ *                       "semester": {"type": "integer", "minimum": 0, "maximum": 9},
+ *                       "academicPeriodId": {"type": "integer", "minimum": 1}
+ *                     }
+ *                   }
  *                 }
  *               }
  *             }
@@ -404,6 +307,20 @@
  *                   "type": "integer",
  *                   "minimum": 1,
  *                   "maximum": 2147483647
+ *                 },
+ *                 "curriculumPeriods": {
+ *                   "type": "array",
+ *                   "minItems": 10,
+ *                   "maxItems": 10,
+ *                   "description": "Explicit mapping of curriculum stages 0–9 to Spring/Summer/Fall calendar periods. Stage 0 must match entryAcademicPeriodId.",
+ *                   "items": {
+ *                     "type": "object",
+ *                     "required": ["semester", "academicPeriodId"],
+ *                     "properties": {
+ *                       "semester": {"type": "integer", "minimum": 0, "maximum": 9},
+ *                       "academicPeriodId": {"type": "integer", "minimum": 1}
+ *                     }
+ *                   }
  *                 }
  *               }
  *             }
@@ -541,7 +458,7 @@
  *         "tags": [
  *           "Academic Management"
  *         ],
- *         "summary": "Create AcademicYear",
+ *         "summary": "Create academic year and Spring, Summer, Fall semesters together",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -559,7 +476,45 @@
  *         },
  *         "responses": {
  *           "201": {
- *             "description": "Created record in data"
+ *             "description": "data contains year, semesters in chronological order, and revision.",
+ *             "content": {
+ *               "application/json": {
+ *                 "schema": {
+ *                   "type": "object",
+ *                   "properties": {
+ *                     "success": {
+ *                       "type": "boolean"
+ *                     },
+ *                     "data": {
+ *                       "type": "object",
+ *                       "required": [
+ *                         "year",
+ *                         "semesters",
+ *                         "revision"
+ *                       ],
+ *                       "properties": {
+ *                         "year": {
+ *                           "type": "object",
+ *                           "additionalProperties": true
+ *                         },
+ *                         "semesters": {
+ *                           "type": "array",
+ *                           "minItems": 3,
+ *                           "maxItems": 3,
+ *                           "items": {
+ *                             "type": "object",
+ *                             "additionalProperties": true
+ *                           }
+ *                         },
+ *                         "revision": {
+ *                           "type": "string"
+ *                         }
+ *                       }
+ *                     }
+ *                   }
+ *                 }
+ *               }
+ *             }
  *           },
  *           "400": {
  *             "description": "Invalid JSON, date, identifier or enum"
@@ -576,7 +531,8 @@
  *           "409": {
  *             "description": "Duplicate code, invalid calendar, or existing history conflict"
  *           }
- *         }
+ *         },
+ *         "description": "ACADEMIC/ADMIN. Send yearCode only. 2026-2027 creates SPRING2026 (Jan-Apr), SUMMER2026 (May-Aug), FALL2026 (Sep-Dec). One transaction: any failure rolls back the year and all semesters. startDate, endDate and status are generated by the server."
  *       }
  *     },
  *     "/api/academic-years/{id}": {
@@ -761,61 +717,6 @@
  *         "responses": {
  *           "201": {
  *             "description": "Created record in data"
- *           },
- *           "400": {
- *             "description": "Invalid JSON, date, identifier or enum"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN or ACADEMIC required; change temporary password first"
- *           },
- *           "404": {
- *             "description": "Record or referenced cohort/group not found"
- *           },
- *           "409": {
- *             "description": "Duplicate code, invalid calendar, or existing history conflict"
- *           }
- *         }
- *       }
- *     },
- *     "/api/academic-periods/{id}": {
- *       "patch": {
- *         "tags": [
- *           "Academic Management"
- *         ],
- *         "summary": "Partially update AcademicPeriod",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "in": "path",
- *             "name": "id",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 2147483647
- *             }
- *           }
- *         ],
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/AcademicPeriodPatch"
- *               }
- *             }
- *           }
- *         },
- *         "responses": {
- *           "200": {
- *             "description": "Updated record in data"
  *           },
  *           "400": {
  *             "description": "Invalid JSON, date, identifier or enum"

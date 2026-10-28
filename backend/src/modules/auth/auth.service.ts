@@ -9,10 +9,7 @@ import {
   findById,
 } from "./auth.repository";
 
-import type {
-  AuthError,
-  AuthUserRecord,
-} from "./auth.types";
+import type { AuthError, AuthUserRecord } from "./auth.types";
 
 const createAuthError = (
   message: string,
@@ -63,12 +60,6 @@ export const getUserById = async (
 
   return findById(id);
 };
-
-export async function actorProfileIds(userId: number, roleCode: string | null) {
-  if (roleCode === 'STUDENT') return { studentId: (await query('SELECT "StudentID" FROM "Students" WHERE "UserID"=$1 AND "DeletedAt" IS NULL',[userId])).rows[0]?.StudentID ?? null };
-  if (roleCode === 'ENTERPRISE') return { enterpriseId: (await query('SELECT "EnterpriseID" FROM "EnterpriseUsers" WHERE "UserID"=$1',[userId])).rows[0]?.EnterpriseID ?? null };
-  return {};
-}
 
 export const loginUser = async (
   email: unknown,

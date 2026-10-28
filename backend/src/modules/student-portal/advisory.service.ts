@@ -1,4 +1,6 @@
 import { academicTransaction, audit } from '../academic/academic.repository';
+import type { PoolClient } from 'pg';
+import { enrichListRows } from '../../shared/list-context';
 import { actualPeriod, relativeSemester, periodBounds } from '../academic/workflow-policy';
 import { inputObject, invalid, positiveId, requiredText } from '../students/student.validation';
 import { timestamp, ids } from '../combo-registration/combo.validation';
@@ -8,15 +10,15 @@ import { summaryWithClient } from './academic.service';
 import { inScope, page, type Actor, type Row } from './shared';
 
 function staff(actor:Actor) {if(!['ADMIN','ACADEMIC'].includes(actor.roleCode))throw invalid('Academic access required.',403,'FORBIDDEN');}
-export async function schedule(periodId:number,actor:Actor,body?:unknown) {
+export async function schedule(periodId:number,actor:Actor,body?:unknown,existingClient?:PoolClient) {
   staff(actor);return academicTransaction(async c=>{
     const period=await actualPeriod(c,periodId);if(period.Kind!=='SEMESTER')throw invalid('Advisory schedules must reference a parent semester.');
-    if(body===undefined){const row=(await c.query('SELECT * FROM "OJTAdvisorySchedules" WHERE "AcademicPeriodID"=$1',[periodId])).rows[0];if(!row)throw invalid('Advisory schedule not found.',404);return row;}
+    if(body===undefined){const row=(await c.query('SELECT * FROM "OJTAdvisorySchedules" WHERE "AcademicPeriodID"=$1',[periodId])).rows[0];if(!row)throw invalid('Advisory schedule not found.',404);return (await enrichListRows(c,[{...row,academicPeriodId:row.AcademicPeriodID,ojtSemesterId:row.OJTSemesterID,updatedBy:row.UpdatedBy}]))[0];}
     const b=inputObject(body,['ojtSemesterId','sendAt','assessmentDeadline','scope','enabled','reason']);const sid=positiveId(b.ojtSemesterId,'ojtSemesterId'),sendAt=timestamp(b.sendAt,'sendAt'),deadline=timestamp(b.assessmentDeadline,'assessmentDeadline'),scope=registrationScope(b.scope),reason=requiredText(b.reason,'reason',2000);
     await semester(c,sid);await validateScope(c,scope);if(b.enabled!==undefined&&typeof b.enabled!=='boolean')throw invalid('enabled must be boolean.');
     const bounds=periodBounds(period);if(new Date(sendAt)<bounds.start||new Date(sendAt)>=bounds.end||new Date(deadline)<bounds.end||new Date(sendAt)>=new Date(deadline))throw invalid('Send time must be within the preparation semester; deadline must be after its end.');
     const row=(await c.query('INSERT INTO "OJTAdvisorySchedules" ("AcademicPeriodID","OJTSemesterID","SendAt","AssessmentDeadline","Scope","Enabled","UpdatedBy") VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT ("AcademicPeriodID") DO UPDATE SET "OJTSemesterID"=$2,"SendAt"=$3,"AssessmentDeadline"=$4,"Scope"=$5,"Enabled"=$6,"UpdatedBy"=$7,"Version"="OJTAdvisorySchedules"."Version"+1,"UpdatedAt"=now() RETURNING *',[periodId,sid,sendAt,deadline,JSON.stringify(scope),b.enabled??true,actor.userId])).rows[0];await audit(c,actor.userId,'OJTAdvisorySchedules',periodId,'CONFIGURE',null,row,reason);return row;
-  });
+  },existingClient);
 }
 export async function createAdvisoryRun(body:unknown,actor:Actor,kind:'SUMMARY'|'ELIGIBILITY') {
   staff(actor);const b=inputObject(body,['ojtSemesterId','academicPeriodId','scope','studentIds','idempotencyKey','reason']);const sid=positiveId(b.ojtSemesterId,'ojtSemesterId'),periodId=positiveId(b.academicPeriodId,'academicPeriodId'),key=requiredText(b.idempotencyKey,'idempotencyKey',100),reason=requiredText(b.reason,'reason',2000);
@@ -36,6 +38,10 @@ export async function advisoryRuns(params:Row,actor:Actor,id?:number) {
   staff(actor);return academicTransaction(async c=>{
     const data=await page(c,`SELECT "RunID" AS id,"Kind" AS kind,"Status" AS status,"CreatedBy" AS "createdBy",
       ("Request"->>'ojtSemesterId')::int AS "ojtSemesterId",("Request"->>'academicPeriodId')::int AS "academicPeriodId",
+      "Request" AS request,("Request"->>'reason') AS reason,
+      (SELECT count(*)::int FROM "OJTAdvisoryRunItems" i WHERE i."RunID"="OJTAdvisoryRuns"."RunID") AS "studentCount",
+      (SELECT count(*)::int FROM "OJTAdvisoryRunItems" i WHERE i."RunID"="OJTAdvisoryRuns"."RunID" AND i."Status"='COMPLETED') AS "completedCount",
+      (SELECT count(*)::int FROM "OJTAdvisoryRunItems" i WHERE i."RunID"="OJTAdvisoryRuns"."RunID" AND i."Status"='FAILED') AS "failedCount",
       "CreatedAt" AS "createdAt","CompletedAt" AS "completedAt" FROM "OJTAdvisoryRuns" WHERE ($1::int IS NULL OR "RunID"=$1)`,[id??null],id?{}:params,[]);
     if(id){
       if(!data.items.length)throw invalid('Advisory run not found.',404);

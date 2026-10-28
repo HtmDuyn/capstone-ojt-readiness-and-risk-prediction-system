@@ -18,8 +18,10 @@ const combo=obj({id,comboId:id,...fields('code','name','purpose'),confirmedAt:ti
 const template=nil(obj({id,...fields('code','name','status'),version:id,criteria:arr({type:'object',additionalProperties:true})}));
 const evaluation=nil(obj({id,templateId:nil(id),scoreDetails:{type:'object',nullable:true,additionalProperties:true},completionScore:num,attitudeScore:num,skillScore:num,overallScore:num,...fields('comments','status'),evaluatedAt:time,evaluatedBy:id}));
 const result=nil(obj({id,status:text,version:id,officialScore:num,outcome:nil(text),confirmedAt:time}));
-const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','className','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:id,
+const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','className','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},
   entryAcademicPeriodId:nil(id),currentAcademicPeriodId:nil(id),enrollmentYear:id,
+  courseSemesterTag:{type:'integer',minimum:0,maximum:9,nullable:true,description:'Kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình; null khi không có môn đang học.'},
+  latestOjtCheck:nil(obj({status:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']},checkedAt:time,ojtSemesterId:id,isStale:{type:'boolean'}})),
   program:nil(obj({id,...fields('code','name','version','status','majorName','majorCode'),totalCredits:num,majorId:nil(id)})),
   cohort:nil(obj({id,...fields('code','name')})),entryAcademicPeriod:nil(period),currentAcademicPeriod:nil(period)};
 const profile=obj({...coreStudent,
@@ -36,6 +38,11 @@ export function describeFeResponses(spec:Schema):void {
   const set=(path:string,schema:Schema,envelope='data',method='get')=>{
     const operation=spec.paths?.[path]?.[method];if(!operation)throw new Error('Missing FE response operation: '+method+' '+path);
     operation.responses['200']={description:'Dữ liệu hiển thị đầy đủ theo quyền truy cập.',content:{'application/json':{schema:obj({success:{type:'boolean'},[envelope]:schema})}}};
+  };
+  const enterpriseListPage=(item:Schema)=>{
+    const schema=page(item);
+    delete schema.properties.limit.maximum;
+    return schema;
   };
   set('/api/students/{id}',profile);
   set('/api/students',page(obj(coreStudent)));
@@ -65,8 +72,8 @@ export function describeFeResponses(spec:Schema):void {
     set(path,page(item));
   }
   const candidate=obj({id,student:person,position,application:{type:'object',additionalProperties:true},decision:text,introducedAt:time,decisionAt:time,rejectReason:nil(text),isLatestCoordination:{type:'boolean'}});
-  set('/api/enterprise/candidates',page(candidate));
-  set('/api/enterprise/internships',page(obj({id,student:person,position,application:{type:'object',additionalProperties:true},academicSupervisor:nil(person),coordinationId:id,...fields('enterpriseSupervisorName','startDate','endDate','status','resultStatus'),evaluation,template,result,evaluationLocked:{type:'boolean'}})));
+  set('/api/enterprise/candidates',enterpriseListPage(candidate));
+  set('/api/enterprise/internships',enterpriseListPage(obj({id,student:person,position,application:{type:'object',additionalProperties:true},academicSupervisor:nil(person),coordinationId:id,...fields('enterpriseSupervisorName','startDate','endDate','status','resultStatus'),evaluation,template,result,evaluationLocked:{type:'boolean'}})));
   set('/api/enterprise/profile',obj({...company.properties,...fields('address','industry','status','contactPersonName'),createdAt:time,
     summary:obj({scope:text,publishedPosts:{type:'integer'},pendingPosts:{type:'integer'},pendingCandidates:{type:'integer'},activeInterns:{type:'integer'},pendingEvaluations:{type:'integer'}})}));
   Object.assign(spec.components.schemas.UserResponse.properties,personalUser.properties);

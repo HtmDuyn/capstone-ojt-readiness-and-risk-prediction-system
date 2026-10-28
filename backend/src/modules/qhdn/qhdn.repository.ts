@@ -38,13 +38,6 @@ export async function enterpriseScope(c: PoolClient, actor: Actor): Promise<numb
   if (!row) throw invalid('An active enterprise membership is required.',403,'ENTERPRISE_SCOPE_REQUIRED');
   return row.EnterpriseID;
 }
-export async function assertAccess(c: PoolClient, resource: Resource, row: Row, actor: Actor) {
-  const scope = await enterpriseScope(c,actor);
-  if (scope === null) return;
-  const enterpriseId = resource === 'evaluations'
-    ? (await record(c,'assignments',row.AssignmentID)).EnterpriseID : row.EnterpriseID;
-  if (enterpriseId !== scope) throw invalid('This record belongs to another enterprise.',403,'FORBIDDEN');
-}
 // An acceptance reserves a seat. Cancelled assignments and superseded coordinations release it.
 export const reservedSeats = (alias: string) => `((SELECT count(*)::int FROM "InternshipAssignments" a
   WHERE a."PositionID"=${alias}."PositionID" AND COALESCE(UPPER(a."Status"),'') NOT IN ('CANCELLED','CANCELED'))
@@ -56,11 +49,6 @@ export async function remaining(c: PoolClient, positionId: number): Promise<{ ca
   const row = (await c.query(`SELECT p."Capacity" AS capacity,${reservedSeats('p')} AS used FROM "InternshipPositions" p WHERE p."PositionID"=$1`,[positionId])).rows[0];
   if (!row || !Number.isInteger(row.capacity) || row.capacity < 0) throw invalid('Position capacity must be configured.',409,'POSITION_CAPACITY_REQUIRED');
   return { ...row, remainingSlots: Math.max(0,row.capacity-row.used) };
-}
-export async function syncSlots(c: PoolClient, positionId: number) {
-  const slots = await remaining(c,positionId);
-  await c.query('UPDATE "InternshipPositions" SET "RemainingSlots"=$2 WHERE "PositionID"=$1',[positionId,slots.remainingSlots]);
-  return slots;
 }
 export async function history(c: PoolClient, resource: Resource, id: number) {
   return (await c.query('SELECT "UserID" AS "actorId","Action" AS action,"ActionAt" AS "createdAt","Detail" AS detail FROM "AuditLogs" WHERE "EntityType"=$1 AND "EntityID"=$2 ORDER BY "LogID"',[resources[resource].table,id])).rows;

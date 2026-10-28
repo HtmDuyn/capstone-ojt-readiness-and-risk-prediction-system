@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
 import {
   FptLogoIcon,
   CloseIcon,
@@ -29,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [isHovered, setIsHovered] = React.useState(false);
+  const [expandedMenus, setExpandedMenus] = React.useState<Record<string, boolean>>({});
 
   // Mở rộng nếu chuột đang hover (desktop) hoặc menu trên thiết bị di động được mở
   const isExpanded = isHovered || isOpenMobile;
@@ -93,7 +95,92 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1.5 custom-scrollbar overflow-x-hidden">
           {navItems.map((item) => {
             const currentPath = location.pathname;
-            const isActive = currentPath === item.path;
+            const hasChildren = Boolean(item.children && item.children.length > 0);
+            const isChildActive = hasChildren && item.children!.some((c) => currentPath === c.path || currentPath.startsWith(c.path));
+            const isActive = currentPath === item.path || isChildActive;
+            const isMenuOpen = expandedMenus[item.id] ?? isChildActive;
+
+            if (hasChildren) {
+              return (
+                <div key={item.id} className="space-y-1">
+                  <button
+                    type="button"
+                    title={!isExpanded ? item.label : undefined}
+                    onClick={() => {
+                      if (!isExpanded) {
+                        setIsHovered(true);
+                        setExpandedMenus((prev) => ({ ...prev, [item.id]: true }));
+                        navigate(item.children![0].path);
+                      } else {
+                        setExpandedMenus((prev) => ({ ...prev, [item.id]: !isMenuOpen }));
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${
+                      isActive && !isMenuOpen
+                        ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-600/30 font-semibold'
+                        : isMenuOpen
+                        ? 'bg-white/10 text-white font-semibold'
+                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-200 group-hover/item:scale-110 ${
+                          isActive ? 'text-white' : 'text-slate-400'
+                        }`}
+                      >
+                        {item.icon}
+                      </span>
+
+                      <span
+                        className={`truncate transition-all duration-300 whitespace-nowrap ${
+                          isExpanded
+                            ? 'opacity-100 max-w-[150px] translate-x-0'
+                            : 'opacity-0 max-w-0 -translate-x-2 pointer-events-none'
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+
+                    {isExpanded && (
+                      <ChevronDown
+                        size={16}
+                        className={`text-slate-400 transition-transform duration-200 shrink-0 ${
+                          isMenuOpen ? 'rotate-180 text-orange-400' : ''
+                        }`}
+                      />
+                    )}
+                  </button>
+
+                  {/* Submenu items list */}
+                  {isExpanded && isMenuOpen && (
+                    <div className="pl-4 pr-1 py-1 space-y-1 transition-all">
+                      {item.children!.map((child) => {
+                        const isSubActive = currentPath === child.path;
+                        return (
+                          <button
+                            key={child.id}
+                            type="button"
+                            onClick={() => {
+                              if (onCloseMobile) onCloseMobile();
+                              navigate(child.path);
+                            }}
+                            className={`w-full flex items-center gap-2 pl-6 pr-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 text-left cursor-pointer ${
+                              isSubActive
+                                ? 'bg-[#ea580c] text-white font-semibold shadow-xs'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            <span className="truncate">{child.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
             return (
               <button
@@ -104,22 +191,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   if (onCloseMobile) onCloseMobile();
                   navigate(item.path);
                 }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${isActive
-                  ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-600/30 font-semibold'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group/item cursor-pointer ${
+                  isActive
+                    ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-600/30 font-semibold'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
                 }`}
               >
                 <span
-                  className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-200 group-hover/item:scale-110 ${isActive ? 'text-white' : 'text-slate-400'
+                  className={`flex-shrink-0 w-6 h-6 flex items-center justify-center transition-transform duration-200 group-hover/item:scale-110 ${
+                    isActive ? 'text-white' : 'text-slate-400'
                   }`}
                 >
                   {item.icon}
                 </span>
 
                 <span
-                  className={`truncate transition-all duration-300 whitespace-nowrap ${isExpanded
-                    ? 'opacity-100 max-w-[180px] translate-x-0'
-                    : 'opacity-0 max-w-0 -translate-x-2 pointer-events-none'
+                  className={`truncate transition-all duration-300 whitespace-nowrap ${
+                    isExpanded
+                      ? 'opacity-100 max-w-[180px] translate-x-0'
+                      : 'opacity-0 max-w-0 -translate-x-2 pointer-events-none'
                   }`}
                 >
                   {item.label}
@@ -128,9 +218,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* Chấm đỏ thông báo */}
                 {item.hasBadge && (
                   <span
-                    className={`rounded-full bg-red-500 ring-2 ring-[#111827] animate-pulse transition-all duration-200 ${isExpanded
-                      ? 'w-2 h-2 ml-auto relative'
-                      : 'w-2 h-2 absolute top-2 right-2'
+                    className={`rounded-full bg-red-500 ring-2 ring-[#111827] animate-pulse transition-all duration-200 ${
+                      isExpanded
+                        ? 'w-2 h-2 ml-auto relative'
+                        : 'w-2 h-2 absolute top-2 right-2'
                     }`}
                   />
                 )}

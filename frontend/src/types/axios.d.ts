@@ -1,4 +1,4 @@
-declare module 'axios' {
+declare module "axios" {
   export type AxiosError<T = unknown> = Error & {
     response?: {
       status?: number;
@@ -34,19 +34,32 @@ declare module 'axios' {
     interceptors: {
       request: {
         use: (
-          onFulfilled?: (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig>,
-          onRejected?: (error: AxiosError) => any
+          onFulfilled?: (
+            config: InternalAxiosRequestConfig,
+          ) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig>,
+          onRejected?: (error: AxiosError) => any,
         ) => void;
       };
       response: {
         use: (
-          onFulfilled?: (response: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>,
-          onRejected?: (error: AxiosError) => any
+          onFulfilled?: (
+            response: AxiosResponse,
+          ) => AxiosResponse | Promise<AxiosResponse>,
+          onRejected?: (error: AxiosError) => any,
         ) => void;
       };
     };
     get<T = any>(url: string, config?: any): Promise<AxiosResponse<T>>;
-    post<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>>;
+    patch<T = unknown>(
+      url: string,
+      data?: unknown,
+      config?: unknown,
+    ): Promise<AxiosResponse<T>>;
+    post<T = any>(
+      url: string,
+      data?: any,
+      config?: any,
+    ): Promise<AxiosResponse<T>>;
     [key: string]: any;
   }
 

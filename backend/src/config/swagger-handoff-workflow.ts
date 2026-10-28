@@ -5,8 +5,8 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
  const responses={200:{description:'Thành công'},400:{description:'Dữ liệu không hợp lệ'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không tìm thấy'},409:{description:'Trạng thái hoặc dữ liệu không đáp ứng quy trình'}};
  const handoff=spec.paths['/api/ojt-semesters/{id}/eligible-student-handoffs'].post;
  handoff.summary='Bàn giao sinh viên đủ điều kiện cho QHDN trước đăng ký';
- handoff.description='ACADEMIC chọn studentIds có kết quả ELIGIBLE đã xác nhận và còn hiệu lực cho kỳ OJT. Không yêu cầu hồ sơ đăng ký; không đổi trạng thái hồ sơ lịch sử. registrationIds không còn là đầu vào.';
- handoff.requestBody=body({studentIds:{type:'array',items:id,minItems:1,maxItems:1000,uniqueItems:true},idempotencyKey:text,reason:text},['studentIds','idempotencyKey','reason']);
+ handoff.description='ADMIN/ACADEMIC bàn giao sinh viên đang học kỳ 5, tài khoản hoạt động, có kết quả FE ELIGIBLE đã lưu trong DB và còn hiệu lực. Kỳ nhận phải là kỳ OJT thứ 6 theo lộ trình khóa/nhóm. Không tính lại điều kiện, không yêu cầu xác nhận EligibilityChecks hay hồ sơ đăng ký. Lưu snapshot kết quả và batch nguồn; toàn bộ danh sách cùng thành công hoặc rollback. Gửi lại cùng idempotencyKey và payload trả kết quả cũ. Lỗi 409: SAVED_ELIGIBILITY_REQUIRED, ELIGIBILITY_RESULT_STALE, HANDOFF_SEMESTER_5_REQUIRED, OJT_FIXED_SEMESTER_REQUIRED, HANDOFF_STUDENT_INACTIVE, HANDOFF_SEMESTER_CLOSED, STUDENT_ALREADY_HANDED_OFF, IDEMPOTENCY_CONFLICT.';
+ handoff.requestBody=body({studentIds:{type:'array',items:id,minItems:1,maxItems:1000,uniqueItems:true},idempotencyKey:{type:'string',minLength:1,maxLength:100},reason:{type:'string',minLength:1,maxLength:2000}},['studentIds','idempotencyKey','reason']);
  handoff.responses={...responses,201:{description:'Danh sách đủ điều kiện đã bàn giao',content:{'application/json':{example:{success:true,data:{handoffId:1,ojtSemesterId:1,studentIds:[1],total:1,recipientRole:'OJT_COORD',replayed:false}}}}}};
  const descriptions:Record<string,string>={
   '/api/ojt-semesters/{id}/eligible-student-handoffs':'Lịch sử các đợt bàn giao danh sách đủ điều kiện. studentIds và studentCount lấy từ các mục bàn giao; registrationIds chỉ phục vụ lịch sử cũ.',
@@ -26,8 +26,23 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
    op.description='Chỉ ADMIN/OJT_COORD quản lý đợt đăng ký. Tạo ở DRAFT; PATCH status OPEN/CLOSED và reason để mở/đóng. Chỉ mở khi phạm vi có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là metadata tương thích, không thay thế điều kiện bàn giao.';
   }
  }
- spec.paths['/api/ojt-registrations'].post.description='STUDENT nộp hồ sơ của mình; ADMIN/OJT_COORD có thể nhập thay với studentId. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN và trong thời hạn, đúng scope.';
- spec.paths['/api/ojt-registrations/{id}/review'].post.description='ADMIN/OJT_COORD duyệt hoặc từ chối hồ sơ đã nộp; không phải bước xét/bàn giao của ACADEMIC. Hồ sơ đã điều phối không được duyệt lại.';
+ spec.paths['/api/ojt-registrations'].post.description='Endpoint tương thích cho hồ sơ đăng ký OJT cũ; luồng mới STUDENT chọn vị trí và gửi trực tiếp bằng POST /api/job-applications. STUDENT chỉ nộp hồ sơ của mình; ADMIN có thể nhập thay. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN, trong thời hạn và đúng scope.';
+ spec.paths['/api/ojt-registrations/{id}/review'].post.description='Chỉ ADMIN xử lý dữ liệu hồ sơ cũ. Đây không còn là bước duyệt của Phòng QHDN trong luồng đăng ký trực tiếp.';
+ if(spec.paths['/api/students/me/opportunities']?.get){
+  spec.paths['/api/students/me/opportunities'].get.summary='Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp';
+  spec.paths['/api/students/me/opportunities'].get.description='Bắt buộc windowId của đợt đăng ký đang mở. Chỉ trả về vị trí phù hợp kỳ OJT; canApply và blockers phản ánh kết quả bàn giao, eligibility, scope, trạng thái hồ sơ và chỉ tiêu.';
+ }
+ if(spec.paths['/api/job-applications']?.post){
+  spec.paths['/api/job-applications'].post.summary='Sinh viên gửi hồ sơ trực tiếp đến doanh nghiệp';
+  spec.paths['/api/job-applications'].post.description='POST tạo JobApplication và StudentEnterpriseCoordination PENDING trong cùng transaction. QHDN không duyệt hoặc chuyển tiếp; khi doanh nghiệp chấp nhận, assignment được tạo tự động.';
+  spec.paths['/api/job-applications'].post.requestBody=body({
+   windowId:id,postId:id,positionId:id,coverLetter:{type:'string',maxLength:5000},
+   application:{type:'object',additionalProperties:false,properties:{
+    contactPhone:{type:'string',maxLength:30},contactEmail:{type:'string',maxLength:100},
+    note:{type:'string',maxLength:2000}
+   }}
+  },['windowId','postId','positionId']);
+ }
  spec.paths['/api/ojt-results'].post={tags:['OJT results'],summary:'QHDN chốt và chuyển kết quả về Phòng đào tạo',security,requestBody:body({assignmentId:id,reason:text,idempotencyKey:text},['assignmentId','reason','idempotencyKey']),responses:{...responses,201:{description:'PENDING_ACADEMIC_CONFIRMATION'}}};
  spec.paths['/api/ojt-results/{id}/confirm']={post:{tags:['OJT results'],summary:'Phòng đào tạo xác nhận và ghi nhận điểm OJT',description:'Dùng bảng quy đổi điểm đã cấu hình; lưu StudentCourseResults và CONFIRMED trong cùng transaction. Không ghi đè điểm học vụ đang tồn tại.',security,parameters:[{name:'id',in:'path',required:true,schema:id}],requestBody:body({reason:text,idempotencyKey:text},['reason','idempotencyKey']),responses}};
  const describeStates=(node:any):void=>{
@@ -43,7 +58,7 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
  for(const path of ['/api/qhdn/registered-students','/api/ojt-registrations','/api/ojt-semesters/{id}/students'])describeStates(spec.paths[path]?.get?.responses);
  const result=spec.paths['/api/ojt-results'].get;
  result.summary='Danh sách kết quả OJT đã được QHDN chuyển';result.description='resultId là OJTResults.ResultID. Chỉ kết quả được ACADEMIC xác nhận mới chính thức. Sinh viên chỉ xem CONFIRMED.';
- for(const path of ['/api/ojt-results','/api/ojt-semesters/{id}/results/export','/api/student/ojt-results']){
+ for(const path of ['/api/ojt-results','/api/ojt-semesters/{id}/results/export','/api/students/me/ojt-results']){
   const op=spec.paths[path]?.get;if(!op)continue;
   const status=op.parameters?.find((p:any)=>p.name==='status');if(status)status.schema.enum=['PENDING_ACADEMIC_CONFIRMATION','REVISION_REQUESTED','CONFIRMED'];
   const item=op.responses?.[200]?.content?.['application/json']?.schema?.properties?.data?.properties?.items?.items;

@@ -1,3 +1,4 @@
+import { requireJsonBody } from '../../middleware/json-body';
 import { Router } from "express";
 import { changePassword } from './auth.service';
 import { requestPasswordReset } from './password-reset.service';
@@ -11,6 +12,7 @@ import {
 import {
   getCurrentUser,
   login,
+  logout,
 } from "./auth.controller";
 
 const router = Router();
@@ -22,7 +24,7 @@ router.post('/users/password-reset', authenticate, authorizeRoles('ADMIN'), asyn
   }
   catch(error) { next(error); }
 });
-router.post('/change-password', authenticate, async (req, res, next) => {
+router.post('/change-password', authenticate, requireJsonBody, async (req, res, next) => {
   try {
     await changePassword(req.user!.userId, req.body?.currentPassword, req.body?.newPassword);
     res.json({ success: true, message: 'Password changed. Please login again.' });
@@ -146,6 +148,7 @@ router.post('/change-password', authenticate, async (req, res, next) => {
  */
 router.post(
   "/login",
+  requireJsonBody,
   login,
 );
 
@@ -227,6 +230,60 @@ router.get(
   "/me",
   authenticate,
   getCurrentUser,
+);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout current user
+ *     description: >
+ *       Acknowledge logout. The client should discard its JWT.
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LogoutResponse'
+ *             example:
+ *               success: true
+ *               message: Logout successful
+ *
+ *       401:
+ *         description: Authentication token is missing, invalid or expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               authRequired:
+ *                 value:
+ *                   success: false
+ *                   errorCode: AUTH_REQUIRED
+ *                   message: Authentication required.
+ *
+ *               expiredToken:
+ *                 value:
+ *                   success: false
+ *                   errorCode: TOKEN_EXPIRED
+ *                   message: Token expired. Please login again.
+ *
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post(
+  "/logout",
+  authenticate,
+  logout,
 );
 
 export default router;

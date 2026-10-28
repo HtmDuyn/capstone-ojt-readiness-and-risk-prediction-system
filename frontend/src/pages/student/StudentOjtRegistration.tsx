@@ -1,445 +1,357 @@
-import { useRef, useState, type FormEvent } from 'react';
-import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
-import {
-  applyForPosition,
-  getApplications,
-  getOpportunities,
-  getRegistrations,
-  getRegistrationWindows,
-  submitOjtRegistration,
-} from '@/services/student';
-import type { Opportunity } from '@/types/student/portal';
-import { StudentCvCard } from '@/components/student/StudentCvCard';
-import {
-  Blockers,
-  buttonClass,
-  Card,
-  dateText,
-  Empty,
-  inputClass,
-  Pagination,
-  ResourceState,
-  statusText,
-  StudentPage,
-} from '@/components/student/PortalUI';
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { AlertCircle, Building2, RefreshCw, Send } from "lucide-react";
+import API from "@/services/api";
 
-function RegistrationContent() {
-  const { profile, semesterId, revision } = useStudentPortal();
-  const [windowPage, setWindowPage] = useState(1);
-  const [registrationPage, setRegistrationPage] = useState(1);
-  const [opportunityPage, setOpportunityPage] = useState(1);
-  const [applicationPage, setApplicationPage] = useState(1);
-  const [phone, setPhone] = useState(profile?.phone ?? '');
-  const [email, setEmail] = useState(profile?.email ?? '');
-  const [note, setNote] = useState('');
-  const [coverLetter, setCoverLetter] = useState('');
+type Envelope<T> = { success: true; data: T };
+type RegistrationWindow = {
+  id: number;
+  name: string;
+  ojtSemesterId: number;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  canSubmit: boolean;
+  blockingReasons: string[];
+  blockingMessages: string[];
+  registration?: { id: number; status: string; latestDecision?: string | null } | null;
+};
+type Opportunity = {
+  id: number;
+  postId: number;
+  ojtSemesterId: number;
+  title: string;
+  description?: string | null;
+  requirements?: string | null;
+  location?: string | null;
+  workMode?: string | null;
+  remainingSlots: number;
+  canApply: boolean;
+  blockers: string[];
+  company: { id: number; name: string; address?: string | null };
+  post: { title: string; deadlineAt?: string | null; content?: string | null; benefits?: string | null };
+};
+type Application = {
+  id: number;
+  status: string;
+  appliedAt: string;
+  company: { name: string };
+  position: { title: string };
+  coordination?: { decision: string; rejectReason?: string | null } | null;
+};
+type Page<T> = { items: T[] };
+type OpportunityResults = Page<Opportunity> & {
+  canApply: boolean;
+  blockers: string[];
+};
+const blockerLabels: Record<string, string> = {
+  ELIGIBLE_HANDOFF_REQUIRED: "Chưa được Phòng Đào tạo bàn giao danh sách đủ điều kiện.",
+  CONFIRMED_ELIGIBILITY_REQUIRED: "Cần có kết quả eligibility chính thức còn hiệu lực.",
+  ELIGIBILITY_CHECK_STALE: "Kết quả eligibility đã cũ; cần được cập nhật.",
+  APPLICATION_ALREADY_IN_PROCESS: "Đã có hồ sơ đang chờ hoặc đã được doanh nghiệp tiếp nhận.",
+  POSITION_FULL: "Vị trí đã đủ chỉ tiêu.",
+  OJT_REGISTRATION_WINDOW_UNAVAILABLE: "Đợt đăng ký chưa mở hoặc đã hết hạn.",
+  REGISTRATION_OUT_OF_SCOPE: "Sinh viên không thuộc phạm vi của đợt đăng ký.",
+  ASSIGNMENT_EXISTS: "Đã có phân công thực tập trong kỳ này.",
+  REGISTRATION_PROGRAM_CHANGED: "Chương trình đào tạo đã thay đổi; cần được rà soát.",
+};
+const explainBlockers = (blockers: string[]) =>
+  blockers.map((blocker) => blockerLabels[blocker] || blocker).join(" ");
+
+function errorText(error: unknown) {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+    if (response?.data?.message) return response.data.message;
+  }
+  return error instanceof Error ? error.message : "Không thể hoàn tất yêu cầu.";
+}
+
+export default function StudentOjtRegistration() {
+  const [windows, setWindows] = useState<RegistrationWindow[]>([]);
+  const [windowId, setWindowId] = useState("");
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [opportunityBlockers, setOpportunityBlockers] = useState<string[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [selected, setSelected] = useState<Opportunity | null>(null);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [note, setNote] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const lock = useRef(false);
-  const key = profile!.id + ':' + semesterId + ':' + revision;
-  const windows = useStudentResource(
-    'registration-windows:' + key + ':' + windowPage,
-    (signal) => getRegistrationWindows(semesterId!, windowPage, signal),
-  );
-  const registrations = useStudentResource(
-    'registrations:' + key + ':' + registrationPage,
-    (signal) => getRegistrations(semesterId!, registrationPage, signal),
-  );
-  const opportunities = useStudentResource(
-    'opportunities:' + key + ':' + opportunityPage,
-    (signal) => getOpportunities(semesterId!, opportunityPage, signal),
-  );
-  const applications = useStudentResource(
-    'applications:' + key + ':' + applicationPage,
-    (signal) => getApplications(semesterId!, applicationPage, signal),
-  );
-  const mutate = async (work: () => Promise<unknown>, success: string) => {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError('');
-    setMessage('');
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const loadWindows = useCallback(async () => {
+    const response = await API.get<Envelope<Page<RegistrationWindow>>>("/ojt-registration-windows", {
+      params: { page: 1, limit: 100 },
+    });
+    const items = response.data.data.items;
+    setWindows(items);
+    setWindowId((current) =>
+      items.some((item) => String(item.id) === current)
+        ? current
+        : String(items.find((item) => item.canSubmit)?.id ?? items[0]?.id ?? ""),
+    );
+  }, []);
+
+  const loadApplications = useCallback(async () => {
+    const response = await API.get<Envelope<Page<Application>>>("/job-applications", {
+      params: { page: 1, limit: 100 },
+    });
+    setApplications(response.data.data.items);
+  }, []);
+
+  const loadOpportunities = useCallback(async (selectedWindowId: string): Promise<OpportunityResults | null> => {
+    if (!selectedWindowId) {
+      return null;
+    }
+    const response = await API.get<Envelope<OpportunityResults>>("/students/me/opportunities", {
+      params: { windowId: Number(selectedWindowId), page: 1, limit: 100 },
+    });
+    return response.data.data;
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setError("");
+    setLoading(true);
     try {
-      await work();
-      setMessage(success);
-      setSelected(null);
-      setCoverLetter('');
-      windows.reload();
-      registrations.reload();
-      opportunities.reload();
-      applications.reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không gửi được yêu cầu.');
+      await Promise.all([loadWindows(), loadApplications()]);
+    } catch (e) {
+      setError(errorText(e));
     } finally {
-      lock.current = false;
+      setLoading(false);
+    }
+  }, [loadApplications, loadWindows]);
+
+  const refreshAll = useCallback(async () => {
+    await refresh();
+    if (!windowId) return;
+    try {
+      const result = await loadOpportunities(windowId);
+      if (result) {
+        setOpportunities(result.items);
+        setOpportunityBlockers(result.blockers);
+      }
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }, [loadOpportunities, refresh, windowId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    let active = true;
+    if (!windowId) {
+      setOpportunities([]);
+      setOpportunityBlockers([]);
+      return;
+    }
+    setLoading(true);
+    loadOpportunities(windowId)
+      .then((result) => {
+        if (active && result) {
+          setOpportunities(result.items);
+          setOpportunityBlockers(result.blockers);
+        }
+      })
+      .catch((e) => {
+        if (active) setError(errorText(e));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadOpportunities, windowId]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selected || !windowId || busy) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await API.post("/job-applications", {
+        windowId: Number(windowId),
+        postId: selected.postId,
+        positionId: selected.id,
+        coverLetter,
+        application: { contactPhone, contactEmail, note },
+      });
+      setMessage("Đã gửi hồ sơ trực tiếp đến doanh nghiệp. Bạn có thể theo dõi phản hồi phía dưới.");
+      setSelected(null);
+      setCoverLetter("");
+      setNote("");
+      const [, , result] = await Promise.all([loadWindows(), loadApplications(), loadOpportunities(windowId)]);
+      if (result) {
+        setOpportunities(result.items);
+        setOpportunityBlockers(result.blockers);
+      }
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
       setBusy(false);
     }
   };
+
+  const chosenWindow = windows.find((item) => String(item.id) === windowId);
+  const actionableOpportunities = opportunities.filter((item) => item.canApply);
+
   return (
-    <>
-      {message && (
-        <p
-          role="status"
-          className="rounded-xl bg-emerald-50 p-4 text-emerald-800"
-        >
-          {message}
+    <div className="space-y-6">
+      <header className="rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 p-6 text-white shadow-lg">
+        <p className="text-sm font-semibold text-orange-100">Thực tập doanh nghiệp</p>
+        <h1 className="mt-1 text-2xl font-extrabold">Đăng ký OJT</h1>
+        <p className="mt-2 max-w-3xl text-sm text-orange-50">
+          Chọn đợt đăng ký và vị trí phù hợp. Hồ sơ sẽ được gửi thẳng đến doanh nghiệp; Phòng QHDN theo dõi trạng thái, không duyệt hoặc chuyển tiếp hồ sơ.
         </p>
-      )}
+      </header>
+
       {error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <AlertCircle size={18} className="mt-0.5 shrink-0" />
           {error}
-        </p>
+        </div>
       )}
-      <div className="grid xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 space-y-6">
-          <Card title="Đợt đăng ký OJT">
-            <ResourceState
-              loading={windows.loading}
-              error={windows.error}
-              retry={windows.reload}
-            />
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="text-sm">
-                Số điện thoại liên hệ
-                <input
-                  className={inputClass}
-                  value={phone}
-                  maxLength={30}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={busy}
-                />
-              </label>
-              <label className="text-sm">
-                Email liên hệ
-                <input
-                  className={inputClass}
-                  type="email"
-                  value={email}
-                  maxLength={100}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={busy}
-                />
-              </label>
-            </div>
-            <label className="block text-sm">
-              Ghi chú hồ sơ
-              <textarea
-                className={inputClass}
-                value={note}
-                maxLength={2000}
-                onChange={(e) => setNote(e.target.value)}
-                disabled={busy}
-              />
-            </label>
-            {windows.data && (
-              <>
-                {windows.data.items.map((window) => (
-                  <form
-                    key={window.id}
-                    className="rounded-2xl border border-slate-200 p-4 space-y-3"
-                    onSubmit={(e: FormEvent) => {
-                      e.preventDefault();
-                      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                        setError('Email liên hệ không hợp lệ.');
-                        return;
-                      }
-                      if (window.canSubmit)
-                        void mutate(
-                          () =>
-                            submitOjtRegistration(window.id, {
-                              contactPhone: phone,
-                              contactEmail: email,
-                              note,
-                            }),
-                          'Đã nộp hồ sơ đăng ký OJT.',
-                        );
-                    }}
-                  >
-                    <h3 className="font-bold">{window.name}</h3>
-                    <p className="text-sm">
-                      {statusText(window.status)} · {dateText(window.startsAt)}{' '}
-                      – {dateText(window.endsAt)}
-                    </p>
-                    {window.registration && (
-                      <p className="text-sm">
-                        Hồ sơ #{window.registration.id}:{' '}
-                        {statusText(window.registration.status)}
-                      </p>
-                    )}
-                    <Blockers
-                      values={
-                        window.blockingMessages?.length
-                          ? window.blockingMessages
-                          : window.blockingReasons
-                      }
-                    />
-                    <button
-                      type="submit"
-                      className={buttonClass}
-                      disabled={busy || !window.canSubmit}
-                    >
-                      {busy
-                        ? 'Đang gửi...'
-                        : window.registration?.status === 'REJECTED'
-                          ? 'Nộp lại hồ sơ'
-                          : 'Nộp hồ sơ OJT'}
-                    </button>
-                  </form>
-                ))}
-                {!windows.data.items.length && (
-                  <Empty>
-                    Chưa có đợt đăng ký dành cho bạn. Đợt đăng ký chỉ hiển thị
-                    sau khi được nhà trường bàn giao danh sách đủ điều kiện.
-                  </Empty>
-                )}
-                <Pagination
-                  page={windowPage}
-                  total={windows.data.total}
-                  onChange={setWindowPage}
-                  disabled={busy}
-                />
-              </>
-            )}
-          </Card>
-          <Card title="Doanh nghiệp & vị trí thực tập">
-            <ResourceState
-              loading={opportunities.loading}
-              error={opportunities.error}
-              retry={opportunities.reload}
-            />
-            {opportunities.data && (
-              <>
-                <Blockers values={opportunities.data.blockers} />
-                {opportunities.data.items.map((opportunity) => (
-                  <article
-                    key={opportunity.id + ':' + opportunity.post.id}
-                    className="rounded-2xl border border-slate-200 p-5 space-y-3"
-                  >
-                    <h3 className="text-lg font-bold">{opportunity.title}</h3>
-                    <p className="font-semibold text-orange-600">
-                      {opportunity.company.name}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                      {opportunity.location ||
-                        opportunity.company.address ||
-                        'Chưa cập nhật địa điểm'}{' '}
-                      · Còn {opportunity.remainingSlots}/{opportunity.capacity}{' '}
-                      chỗ · Hạn: {dateText(opportunity.post.deadlineAt)}
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {opportunity.description || opportunity.post.content}
-                    </p>
-                    {opportunity.requirements && (
-                      <div className="text-sm whitespace-pre-wrap">
-                        <strong>Yêu cầu:</strong> {opportunity.requirements}
-                      </div>
-                    )}
-                    {opportunity.post.benefits && (
-                      <div className="text-sm whitespace-pre-wrap">
-                        <strong>Quyền lợi:</strong> {opportunity.post.benefits}
-                      </div>
-                    )}
-                    <Blockers values={opportunity.blockers} />
-                    <button
-                      type="button"
-                      className={buttonClass}
-                      disabled={
-                        busy ||
-                        !opportunity.canApply ||
-                        !opportunities.data?.registrationId
-                      }
-                      onClick={() => {
-                        setSelected(opportunity);
-                        setCoverLetter('');
-                        setError('');
-                      }}
-                    >
-                      Ứng tuyển
-                    </button>
-                  </article>
-                ))}
-                {!opportunities.data.items.length && (
-                  <Empty>Chưa có vị trí đang tuyển trong đợt này.</Empty>
-                )}
-                <Pagination
-                  page={opportunityPage}
-                  total={opportunities.data.total}
-                  onChange={setOpportunityPage}
-                  disabled={busy}
-                />
-              </>
-            )}
-          </Card>
+      {message && <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">{message}</div>}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <label className="min-w-[260px] flex-1 text-sm font-semibold text-slate-700">
+            Đợt đăng ký
+            <select
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+              value={windowId}
+              onChange={(event) => {
+                setSelected(null);
+                setWindowId(event.target.value);
+              }}
+              disabled={loading || !windows.length}
+            >
+              {!windows.length && <option value="">Chưa có đợt đăng ký phù hợp</option>}
+              {windows.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {item.status === "OPEN" ? "Đang mở" : item.status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={() => void refreshAll()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50">
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            Làm mới
+          </button>
         </div>
-        <div className="space-y-6">
-          <StudentCvCard />
-          <Card title="Hồ sơ đăng ký của bạn">
-            <ResourceState
-              loading={registrations.loading}
-              error={registrations.error}
-              retry={registrations.reload}
-            />
-            {registrations.data && (
-              <>
-                {registrations.data.items.map((registration) => (
-                  <div
-                    key={registration.id}
-                    className="text-sm rounded-xl bg-slate-50 p-4 space-y-2"
-                  >
-                    <h3 className="font-bold">
-                      Hồ sơ #{registration.id} ·{' '}
-                      {statusText(registration.status)}
-                    </h3>
-                    <p>{registration.window?.name}</p>
-                    <p>Nộp lúc: {dateText(registration.registeredAt)}</p>
-                    {registration.review?.reason && (
-                      <p>Nhận xét: {registration.review.reason}</p>
-                    )}
-                    {registration.application?.note && (
-                      <p>Ghi chú: {registration.application.note}</p>
-                    )}
-                  </div>
-                ))}
-                {!registrations.data.items.length && (
-                  <Empty>Bạn chưa có hồ sơ đăng ký trong đợt này.</Empty>
-                )}
-                <Pagination
-                  page={registrationPage}
-                  total={registrations.data.total}
-                  onChange={setRegistrationPage}
-                  disabled={busy}
-                />
-              </>
+        {chosenWindow && (
+          <div className="mt-3 text-xs text-slate-500">
+            Thời gian: {new Date(chosenWindow.startsAt).toLocaleString("vi-VN")} – {new Date(chosenWindow.endsAt).toLocaleString("vi-VN")}
+            {chosenWindow.registration?.latestDecision === "REJECTED" && (
+              <span className="ml-2 font-semibold text-amber-700">Hồ sơ trước đã bị từ chối — bạn có thể nộp lại.</span>
             )}
-          </Card>
+          </div>
+        )}
+        {chosenWindow?.blockingMessages?.length ? (
+          <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            {chosenWindow.blockingMessages.join(" ")}
+          </div>
+        ) : null}
+        {opportunityBlockers.length > 0 && (
+          <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            Không thể nộp hồ sơ: {explainBlockers(opportunityBlockers)}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Vị trí đang tuyển</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {actionableOpportunities.length} vị trí đủ điều kiện để nộp hồ sơ trong đợt này.
+          </p>
         </div>
-      </div>
-      <Card title="Lịch sử ứng tuyển">
-        <ResourceState
-          loading={applications.loading}
-          error={applications.error}
-          retry={applications.reload}
-        />
-        {applications.data && (
-          <>
-            {applications.data.items.map((application) => (
-              <div
-                key={application.id}
-                className="rounded-xl bg-slate-50 p-4 text-sm space-y-1"
-              >
-                <h3 className="font-bold">
-                  {application.company.name} · {application.position.title}
-                </h3>
-                <p>
-                  {statusText(application.status)} ·{' '}
-                  {dateText(application.appliedAt)}
-                </p>
-                {application.coverLetter && (
-                  <p className="whitespace-pre-wrap">
-                    {application.coverLetter}
-                  </p>
-                )}
-                {application.reviewNote && (
-                  <p>Nhận xét: {application.reviewNote}</p>
-                )}
-                {application.coordination?.decision && (
-                  <p>
-                    Điều phối: {statusText(application.coordination.decision)}
-                  </p>
-                )}
-                {application.coordination?.rejectReason && (
-                  <p>Lý do từ chối: {application.coordination.rejectReason}</p>
+        {!loading && !opportunities.length && (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            Không có vị trí tuyển dụng phù hợp hoặc bạn chưa đáp ứng điều kiện OJT của đợt này.
+          </div>
+        )}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {opportunities.map((item) => (
+            <article key={`${item.postId}-${item.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-slate-900">{item.title}</h3>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><Building2 size={15} />{item.company.name}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">{item.remainingSlots} chỗ</span>
+              </div>
+              {item.location && <p className="mt-3 text-xs text-slate-500">{item.location}{item.workMode ? ` · ${item.workMode}` : ""}</p>}
+              {(item.description || item.post.content) && <p className="mt-3 line-clamp-3 text-sm text-slate-600">{item.description || item.post.content}</p>}
+              {item.requirements && <p className="mt-2 text-sm text-slate-600"><strong>Yêu cầu:</strong> {item.requirements}</p>}
+              <div className="mt-4">
+                {item.canApply ? (
+                  <button type="button" onClick={() => setSelected(item)} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700">
+                    <Send size={16} /> Nộp hồ sơ
+                  </button>
+                ) : (
+                  <p className="text-xs text-amber-700">{explainBlockers(item.blockers)}</p>
                 )}
               </div>
-            ))}
-            {!applications.data.items.length && (
-              <Empty>Bạn chưa ứng tuyển vị trí nào.</Empty>
-            )}
-            <Pagination
-              page={applicationPage}
-              total={applications.data.total}
-              onChange={setApplicationPage}
-              disabled={busy}
-            />
-          </>
-        )}
-      </Card>
+            </article>
+          ))}
+        </div>
+      </section>
+
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <form
-            role="dialog"
-            aria-modal="true"
-            aria-label="Nộp đơn ứng tuyển"
-            className="w-full max-w-xl space-y-4 rounded-3xl bg-white p-6"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const registrationId = opportunities.data?.registrationId;
-              if (registrationId && selected.canApply)
-                void mutate(
-                  () =>
-                    applyForPosition(
-                      registrationId,
-                      selected.post.id,
-                      selected.id,
-                      coverLetter,
-                    ),
-                  'Đã gửi đơn ứng tuyển.',
-                );
-            }}
-          >
-            <h2 className="text-xl font-bold">Ứng tuyển {selected.title}</h2>
-            <p>{selected.company.name}</p>
-            <label className="block text-sm">
-              Thư giới thiệu
-              <textarea
-                className={inputClass + ' min-h-32'}
-                maxLength={5000}
-                value={coverLetter}
-                onChange={(e) => setCoverLetter(e.target.value)}
-                disabled={busy}
-              />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="application-title">
+          <form onSubmit={submit} className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div>
+              <h2 id="application-title" className="text-xl font-bold text-slate-900">Nộp hồ sơ đến {selected.company.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">{selected.title}</p>
+            </div>
+            <label className="block text-sm font-semibold text-slate-700">
+              Thư giới thiệu / nội dung ứng tuyển
+              <textarea value={coverLetter} onChange={(event) => setCoverLetter(event.target.value)} rows={4} maxLength={5000} className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-normal" placeholder="Giới thiệu ngắn về bản thân và lý do ứng tuyển..." />
             </label>
-            <p className="text-sm text-slate-500">
-              CV hiện tại: {profile?.cv?.fileName ?? 'Chưa có CV'}
-            </p>
-            {error && (
-              <p role="alert" className="text-red-700">
-                {error}
-              </p>
-            )}
-            <div className="flex gap-3">
-              <button disabled={busy} type="submit" className={buttonClass}>
-                {busy ? 'Đang gửi...' : 'Gửi đơn ứng tuyển'}
-              </button>
-              <button
-                disabled={busy}
-                type="button"
-                className="text-sm underline"
-                onClick={() => setSelected(null)}
-              >
-                Đóng
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700">Số điện thoại
+                <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Email liên hệ
+                <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} maxLength={254} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" />
+              </label>
+            </div>
+            <label className="block text-sm font-semibold text-slate-700">Ghi chú
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} maxLength={1000} className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-normal" />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" disabled={busy} onClick={() => setSelected(null)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Hủy</button>
+              <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                <Send size={16} />{busy ? "Đang gửi..." : "Gửi trực tiếp"}
               </button>
             </div>
           </form>
         </div>
       )}
-    </>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-bold text-slate-900">Hồ sơ đã nộp</h2>
+        {applications.length ? (
+          <div className="mt-3 divide-y divide-slate-100">
+            {applications.map((application) => (
+              <div key={application.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div>
+                  <p className="font-semibold text-slate-800">{application.position.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{application.company.name} · {new Date(application.appliedAt).toLocaleDateString("vi-VN")}</p>
+                  {application.coordination?.rejectReason && <p className="mt-1 text-xs text-red-600">Lý do từ chối: {application.coordination.rejectReason}</p>}
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{application.coordination?.decision || application.status}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="mt-2 text-sm text-slate-500">Chưa có hồ sơ ứng tuyển.</p>}
+      </section>
+    </div>
   );
 }
-export const StudentOjtRegistration = () => {
-  const { profile, semesterId, loading } = useStudentPortal();
-  return (
-    <StudentPage
-      title="Đăng ký thực tập doanh nghiệp"
-      description="Nộp hồ sơ OJT, cập nhật CV, lựa chọn vị trí và theo dõi kết quả ứng tuyển."
-    >
-      {!loading && profile && semesterId && (
-        <RegistrationContent key={profile.id + ':' + semesterId} />
-      )}
-    </StudentPage>
-  );
-};
-export default StudentOjtRegistration;

@@ -4,7 +4,7 @@ import { academicTransaction,audit } from '../academic/academic.repository';
 import { inputObject,invalid,positiveId,requiredText,pagination,enumValue,optionalText } from '../students/student.validation';
 import { timestamp,ids } from '../combo-registration/combo.validation';
 export type Row=Record<string,any>;
-export type Actor={userId:number;roleCode:string};
+export type Actor={userId:number;roleCode:string;studentId?:number|null};
 export function registrationScope(value:unknown) {
  const b=inputObject(value,['programIds','cohortIds','majorIds','studentIds','groupCodes']);const scope:Row={};
  for(const key of ['programIds','cohortIds','majorIds','studentIds'])if(b[key]!==undefined){scope[key]=ids(b[key],key,1000);if(!scope[key].length)throw invalid(`${key} must be nonempty.`);}
@@ -27,9 +27,8 @@ async function saveWindowFields(body:unknown,actor:number,id:number|undefined,cl
  const term=await semester(c,w.OJTSemesterID);
  w.AcademicPeriodID=positiveId(b.academicPeriodId??before?.AcademicPeriodID??term.AcademicPeriodID,'academicPeriodId');
  if(w.AcademicPeriodID!==term.AcademicPeriodID)throw invalid('academicPeriodId must match the selected OJT semester.',409,'REGISTRATION_PERIOD_MISMATCH');
- w.RequiredRelativeSemester=positiveId(b.requiredRelativeSemester??before?.RequiredRelativeSemester??5,'requiredRelativeSemester');
- if(w.RequiredRelativeSemester>20)throw invalid('requiredRelativeSemester must not exceed 20.');
- if(w.RequiredRelativeSemester!==5)requiredText(b.reason,'reason',2000);
+ w.RequiredRelativeSemester=positiveId(b.requiredRelativeSemester??6,'requiredRelativeSemester');
+ if(w.RequiredRelativeSemester!==6)throw invalid('OJT is fixed in relative semester 6.',409,'OJT_FIXED_SEMESTER_REQUIRED');
  if(new Date(w.EndsAt)<=new Date(w.StartsAt))throw invalid('endsAt must be after startsAt.');await semester(c,w.OJTSemesterID);await validateScope(c,w.Scope);
  if(w.Status==='OPEN'&&new Date(w.EndsAt)<=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now)throw invalid('An open window deadline must be in the future.',409);
  const args=[w.OJTSemesterID,w.Name,JSON.stringify(w.Scope),w.StartsAt,w.EndsAt,w.AcademicPeriodID,w.RequiredRelativeSemester];const after=id?(await c.query(`UPDATE "OJTRegistrationWindows" SET "OJTSemesterID"=$1,"Name"=$2,"Scope"=$3,"StartsAt"=$4,"EndsAt"=$5,"AcademicPeriodID"=$6,"RequiredRelativeSemester"=$7,"UpdatedAt"=now() WHERE "WindowID"=$8 RETURNING *`,[...args,id])).rows[0]:(await c.query(`INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","Name","Scope","StartsAt","EndsAt","AcademicPeriodID","RequiredRelativeSemester","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,[...args,actor])).rows[0];await audit(c,actor,'OJTRegistrationWindows',after.WindowID,id?'UPDATE':'CREATE',before,after,optionalText(b.reason,'reason',2000)??undefined);return windowApi(await windowRecord(c,after.WindowID));
