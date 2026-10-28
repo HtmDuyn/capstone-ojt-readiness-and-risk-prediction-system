@@ -3,6 +3,17 @@ import { API_BASE_URL } from '../config/api';
 
 export { API_BASE_URL };
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 export const API = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -20,7 +31,7 @@ API.interceptors.request.use(
       config.headers &&
       !config.headers.Authorization
     ) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = 'Bearer ' + token;
     }
     return config;
   },
@@ -61,10 +72,17 @@ export async function apiRequest<T>(
   }
   const body = await response.json().catch(() => null);
   if ([502, 503, 504].includes(response.status)) {
-    throw new Error('Máy chủ hoặc proxy API không khả dụng (HTTP ' + response.status + '). Kiểm tra backend tại ' + API_BASE_URL + '.');
+    throw new ApiError(
+      'Máy chủ hoặc proxy API không khả dụng (HTTP ' + response.status + '). Kiểm tra backend tại ' + API_BASE_URL + '.',
+      response.status,
+    );
   }
   if (!response.ok || body?.success === false) {
-    throw new Error(body?.message || 'Yêu cầu API thất bại (HTTP ' + response.status + ').');
+    throw new ApiError(
+      body?.message || 'Yêu cầu API thất bại (HTTP ' + response.status + ').',
+      response.status,
+      body?.code,
+    );
   }
   if (!body) {
     throw new Error('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.');

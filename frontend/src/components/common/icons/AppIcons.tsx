@@ -19,6 +19,7 @@ import {
   Briefcase,
   Clock,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   ChevronLeft,
   Menu,
@@ -159,6 +160,10 @@ export const ChevronDownIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 
   <ChevronDown size={size} strokeWidth={strokeWidth} {...props} />
 );
 
+export const ChevronUpIcon: React.FC<IconProps> = ({ size = 16, strokeWidth = 2, ...props }) => (
+  <ChevronUp size={size} strokeWidth={strokeWidth} {...props} />
+);
+
 export const MenuIcon: React.FC<IconProps> = ({ size = 20, strokeWidth = 2, ...props }) => (
   <Menu size={size} strokeWidth={strokeWidth} {...props} />
 );
@@ -240,5 +245,4 @@ export const PlusIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...p
 export const FileTextIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.8, ...props }) => (
   <FileText size={size} strokeWidth={strokeWidth} {...props} />
 );
-
 
