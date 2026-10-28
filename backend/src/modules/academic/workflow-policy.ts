@@ -1,4 +1,3 @@
-import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from './academic.repository';
 import { invalid,inputObject,positiveId,requiredText,enumValue,score,optionalText } from '../students/student.validation';
@@ -11,29 +10,32 @@ export async function actualPeriod(c:PoolClient,id:number) {
  if(!p)throw invalid('Academic period not found.',404);return p;
 }
 export async function relativeSemester(c:PoolClient,studentId:number,targetId:number) {
- const p=await actualPeriod(c,targetId),base=p.Kind==='BLOCK3'?await actualPeriod(c,p.ParentPeriodID):p;
- const entry=(await c.query(`SELECT e.* FROM "StudentAcademicPlacements" sp JOIN "AcademicPeriods" e ON e."AcademicPeriodID"=sp."EntryAcademicPeriodID" WHERE sp."StudentID"=$1`,[studentId])).rows[0];
- if(!entry||entry.Kind!=='SEMESTER'||new Date(entry.StartDate)>new Date(base.StartDate))throw invalid('Actual student placement is missing or starts after the target period.',409,'ACTUAL_PATHWAY_REQUIRED');
- return (await c.query(`SELECT count(*)::int AS n FROM "AcademicPeriods" WHERE "Kind"='SEMESTER' AND "StartDate">=$1 AND "StartDate"<=$2`,[entry.StartDate,base.StartDate])).rows[0].n as number;
+ await actualPeriod(c,targetId);
+ const stage=(await c.query('SELECT "StudentCurriculumSemester"($1,$2) AS stage',[studentId,targetId])).rows[0]?.stage;
+ if(stage===null||stage===undefined)throw invalid('Map this cohort curriculum stage (0–9) to the selected calendar semester first.',409,'ACTUAL_PATHWAY_REQUIRED');
+ return stage as number;
+}
+// OJT is a fixed curriculum stage; cohort placement determines the calendar target.
+export async function assertOjtSemesterSix(c:PoolClient,studentId:number,semesterId:number) {
+ const term=(await c.query('SELECT "AcademicPeriodID" FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0];
+ if(!term?.AcademicPeriodID)throw invalid('OJT semester must reference an actual academic period.',409,'OJT_PERIOD_REQUIRED');
+ const target=await actualPeriod(c,term.AcademicPeriodID);
+ if(target.Kind!=='SEMESTER')throw invalid('OJT must use a regular semester.',409,'OJT_PERIOD_REQUIRED');
+ const relative=await relativeSemester(c,studentId,target.AcademicPeriodID);
+ if(relative!==6)throw invalid('OJT is fixed in relative semester 6; the selected target is semester '+relative+'.',409,'OJT_FIXED_SEMESTER_REQUIRED');
+ return {relativeSemester:6};
 }
 export async function registrationPeriod(c:PoolClient,w:Row) {
- if(!w.AcademicPeriodID)throw invalid('Configure the registration target academic period before opening this window.',409,'REGISTRATION_PERIOD_REQUIRED');
- const target=await actualPeriod(c,w.AcademicPeriodID),base=target.Kind==='BLOCK3'?await actualPeriod(c,target.ParentPeriodID):target;
- const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rows[0];if(!term)throw invalid('OJT semester not found.',404);
- // The preparation/registration semester may precede the OJT semester, including across academic years.
- if(term.StartDate && periodBounds(base).start >= new Date(dayString(term.StartDate)+'T00:00:00+07:00'))throw invalid('The preparation period must begin before OJT starts.',409,'REGISTRATION_PERIOD_MISMATCH');
-}
-export async function assertRegistrationSemester(c:PoolClient,w:Row,studentId:number) {
- await registrationPeriod(c,w);const relative=await relativeSemester(c,studentId,w.AcademicPeriodID);
- if(relative===w.RequiredRelativeSemester)return {relativeSemester:relative,exceptionId:null};
- const exception=(await c.query(`SELECT * FROM "OJTRegistrationExceptions" WHERE "WindowID"=$1 AND "StudentID"=$2
-  AND "RelativeSemester"=$3 AND "RevokedAt" IS NULL AND "ExpiresAt">clock_timestamp() ORDER BY "ExceptionID" DESC LIMIT 1`,[w.WindowID,studentId,relative])).rows[0];
- if(!exception)throw invalid(`Registration requires relative semester ${w.RequiredRelativeSemester}; this student is in ${relative} at the target period.`,409,'OJT_REGISTRATION_SEMESTER_MISMATCH');
- return {relativeSemester:relative,exceptionId:exception.ExceptionID};
+ if(!w.AcademicPeriodID)throw invalid('Configure the OJT target academic period before opening this window.',409,'REGISTRATION_PERIOD_REQUIRED');
+ const target=await actualPeriod(c,w.AcademicPeriodID);
+ const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rows[0];
+ if(!term)throw invalid('OJT semester not found.',404);
+ if(target.Kind!=='SEMESTER'||term.AcademicPeriodID!==target.AcademicPeriodID||w.RequiredRelativeSemester!==6)throw invalid('The registration window must target OJT semester 6 and its linked academic period.',409,'REGISTRATION_PERIOD_MISMATCH');
 }
 export async function saveRegistrationExceptions(windowId:number,body:unknown,actor:number) {
  const b=inputObject(body,['studentIds','relativeSemester','expiresAt','reason']),students=ids(b.studentIds,'studentIds'),relative=positiveId(b.relativeSemester,'relativeSemester');
- if(!students.length||relative>20)throw invalid('Select students and relativeSemester from 1 to 20.');
+ if(!students.length)throw invalid('Select students.');
+ if(relative!==6)throw invalid('OJT is fixed in semester 6; a semester exception cannot change this stage.',409,'OJT_FIXED_SEMESTER_REQUIRED');
  const expires=timestamp(b.expiresAt,'expiresAt'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
   const w=(await c.query('SELECT * FROM "OJTRegistrationWindows" WHERE "WindowID"=$1 FOR UPDATE',[windowId])).rows[0];if(!w)throw invalid('Registration window not found.',404);
@@ -62,7 +64,7 @@ export async function comboSchedule(c:PoolClient,periodId:number,phase:string) {
  if(!row)throw invalid('Configure the explicit combo phase schedule first.',409,'COMBO_PHASE_SCHEDULE_REQUIRED');
  const bounds=periodBounds(p);if(new Date(row.StartsAt)<bounds.start||new Date(row.EndsAt)>bounds.end)throw invalid('Combo schedule no longer fits its academic period.',409,'COMBO_PHASE_SCHEDULE_STALE');return row;
 }
-export async function saveComboSchedule(periodId:number,body:unknown,actor:number) {
+export async function saveComboSchedule(periodId:number,body:unknown,actor:number,existingClient?:PoolClient) {
  const b=inputObject(body,['phase','startsAt','endsAt','reason']),phase=enumValue(b.phase,['INITIAL','CONFIRMATION'],'phase'),start=timestamp(b.startsAt,'startsAt'),end=timestamp(b.endsAt,'endsAt'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
  const p=await actualPeriod(c,periodId),bounds=periodBounds(p);
@@ -72,9 +74,8 @@ export async function saveComboSchedule(periodId:number,body:unknown,actor:numbe
  const before=(await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 AND "Phase"=$2',[periodId,phase])).rows[0];
  const after=(await c.query(`INSERT INTO "ComboPhaseSchedules" ("AcademicPeriodID","Phase","StartsAt","EndsAt","Reason","ConfirmedBy") VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT ("AcademicPeriodID","Phase") DO UPDATE SET "StartsAt"=EXCLUDED."StartsAt","EndsAt"=EXCLUDED."EndsAt","Reason"=EXCLUDED."Reason","ConfirmedBy"=EXCLUDED."ConfirmedBy","ConfirmedAt"=now() RETURNING *`,[periodId,phase,start,end,reason,actor])).rows[0];
  await audit(c,actor,'AcademicPeriods',periodId,'SET_COMBO_PHASE_SCHEDULE',before,after,reason);return after;
- });
+ },existingClient);
 }
-export async function getComboSchedules(periodId:number) {return academicTransaction(async c=>{await actualPeriod(c,periodId);const rows=(await c.query('SELECT * FROM "ComboPhaseSchedules" WHERE "AcademicPeriodID"=$1 ORDER BY "Phase"',[periodId])).rows;return enrichListRows(c,rows.map(row=>({...row,academicPeriodId:row.AcademicPeriodID,confirmedBy:row.ConfirmedBy})));});}
 export async function getAssessment(c:PoolClient,semesterId:number) {
  const w=(await c.query('SELECT * FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1 FOR UPDATE',[semesterId])).rows[0];
  if(!w)throw invalid('Configure the post-Block-3 assessment window first.',409,'OJT_ASSESSMENT_NOT_CONFIGURED');return w;
@@ -88,7 +89,7 @@ async function assessmentBounds(c:PoolClient,w:Row) {
  const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rows[0];if(!term)throw invalid('OJT semester not found.',404);
  if(term.StartDate&&periodBounds(p).end>new Date(dayString(term.StartDate)+'T00:00:00+07:00'))throw invalid('Assessment Block 3 must finish on or before the OJT start date.');return p;
 }
-export async function saveAssessment(semesterId:number,body:unknown,actor:number) {
+export async function saveAssessment(semesterId:number,body:unknown,actor:number,existingClient?:PoolClient) {
  const b=inputObject(body,['blockPeriodId','assessmentAcademicPeriodId','requiredRelativeSemester','opensAt','closesAt','reason']);const w={OJTSemesterID:semesterId,BlockPeriodID:positiveId(b.blockPeriodId,'blockPeriodId'),OpensAt:timestamp(b.opensAt,'opensAt'),ClosesAt:timestamp(b.closesAt,'closesAt')},reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
  const block=await actualPeriod(c,w.BlockPeriodID);
@@ -100,9 +101,8 @@ export async function saveAssessment(semesterId:number,body:unknown,actor:number
  await c.query('UPDATE "OJTAssessmentWindows" SET "AssessmentAcademicPeriodID"=$2,"RequiredRelativeSemester"=$3 WHERE "OJTSemesterID"=$1',[semesterId,(w as Row).AssessmentAcademicPeriodID,(w as Row).RequiredRelativeSemester]);
  Object.assign(after,{AssessmentAcademicPeriodID:(w as Row).AssessmentAcademicPeriodID,RequiredRelativeSemester:(w as Row).RequiredRelativeSemester});
  await audit(c,actor,'OJTSemesters',semesterId,'CONFIGURE_ASSESSMENT',before,after,reason);return after;
- });
+ },existingClient);
 }
-export async function assessmentDetails(id:number) {return academicTransaction(c=>getAssessment(c,id));}
 export async function changeAssessment(id:number,action:'open'|'close',body:unknown,actor:number) {
  const b=inputObject(body,action==='open'?['reason','resultsFinalized','reopen','closesAt']:['reason']),reason=requiredText(b.reason,'reason',2000);
  if(action==='open'&&b.resultsFinalized!==true)throw invalid('Explicitly acknowledge resultsFinalized: true after completing Block 3 result updates.');
@@ -118,6 +118,7 @@ export async function changeAssessment(id:number,action:'open'|'close',body:unkn
  });
 }
 export async function assertOfficialAssessment(c:PoolClient,check:Row) {
+ await assertOjtSemesterSix(c,check.StudentID,check.OJTSemesterID);
  const w=await getAssessment(c,check.OJTSemesterID);await assessmentBounds(c,w);const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
  if(w.Status!=='OPEN'||!w.ResultsFinalizedAt||now<new Date(w.OpensAt)||now>=new Date(w.ClosesAt))throw invalid('Official assessment is not open.',409,'OJT_ASSESSMENT_NOT_OPEN');
  const relative=await relativeSemester(c,check.StudentID,w.BlockPeriodID);
@@ -132,10 +133,10 @@ function gradeBands(value:unknown,scale:number) {
 export async function saveGradeMapping(programId:number,semesterId:number,body:unknown,actor:number) {
  const b=inputObject(body,['courseId','academicPeriodId','gradeBands','reason']),courseId=positiveId(b.courseId,'courseId'),periodId=positiveId(b.academicPeriodId,'academicPeriodId'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
- const program=(await c.query(`SELECT p."Status",g."GpaScale" FROM "TrainingPrograms" p LEFT JOIN "AcademicGradingPolicies" g ON g."ProgramID"=p."ProgramID" WHERE p."ProgramID"=$1`,[programId])).rows[0];if(!program)throw invalid('Curriculum not found.',404);
- if(program.Status!=='PUBLISHED'||!program.GpaScale)throw invalid('A published curriculum with an explicit GPA scale is required.',409);
+ const program=(await c.query(`SELECT to_jsonb(p)->>'Status' AS "Status",g."GpaScale" FROM "TrainingPrograms" p LEFT JOIN "AcademicGradingPolicies" g ON g."ProgramID"=p."ProgramID" WHERE p."ProgramID"=$1`,[programId])).rows[0];if(!program)throw invalid('Curriculum not found.',404);
+ if((program.Status!=null&&program.Status!=='PUBLISHED')||!program.GpaScale)throw invalid('A published curriculum with an explicit GPA scale is required.',409);
  const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0];if(!term)throw invalid('OJT semester not found.',404);
- if(!(await c.query(`SELECT 1 FROM "ProgramCourses" WHERE "ProgramID"=$1 AND "CourseID"=$2 AND "EntryKind"='COURSE'`,[programId,courseId])).rowCount)throw invalid('OJT course must be an actual course in this curriculum.');
+ if(!(await c.query(`SELECT 1 FROM "ProgramCourses" pc JOIN "Courses" c USING("CourseID") WHERE pc."ProgramID"=$1 AND pc."CourseID"=$2 AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6 AND upper(c."CourseCode")='OJT202'`,[programId,courseId])).rowCount)throw invalid('The grade mapping must use curriculum course OJT202 in semester 6.');
  const period=await actualPeriod(c,periodId);if(period.AcademicYearID!==term.AcademicYearID||(term.StartDate&&periodBounds(period).end<=new Date(dayString(term.StartDate)+'T00:00:00+07:00')))throw invalid('Grade period must belong to the OJT academic year and must not end before OJT starts.');
  const bands=gradeBands(b.gradeBands,program.GpaScale),before=(await c.query('SELECT * FROM "ProgramOJTGradeMappings" WHERE "ProgramID"=$1 AND "OJTSemesterID"=$2 FOR UPDATE',[programId,semesterId])).rows[0];
  if(before&&(await c.query('SELECT 1 FROM "OJTResults" WHERE "GradeMappingID"=$1',[before.MappingID])).rowCount)throw invalid('A mapping used by an official OJT result is immutable.',409,'OJT_GRADE_MAPPING_IN_USE');
@@ -143,4 +144,3 @@ export async function saveGradeMapping(programId:number,semesterId:number,body:u
  await audit(c,actor,'ProgramOJTGradeMappings',after.MappingID,'SET_OJT_GRADE_MAPPING',before,after,reason);return after;
  });
 }
-export async function gradeMappingDetails(programId:number,semesterId:number) {return academicTransaction(async c=>{const m=(await c.query('SELECT * FROM "ProgramOJTGradeMappings" WHERE "ProgramID"=$1 AND "OJTSemesterID"=$2',[programId,semesterId])).rows[0];if(!m)throw invalid('OJT grade mapping not found.',404);return m;});}

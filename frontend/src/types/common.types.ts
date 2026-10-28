@@ -17,6 +17,7 @@ export interface NavItem {
   badgeDot?: boolean;
   badgeText?: string;
   banner?: BannerPreset;
+  children?: NavItem[];
 }
 
 export interface ActionButtonConfig {

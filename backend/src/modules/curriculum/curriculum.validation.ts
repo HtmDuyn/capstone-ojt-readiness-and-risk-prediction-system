@@ -13,14 +13,14 @@ export async function courseId(client:PoolClient,row:Record<string,unknown>) {
   if (('courseId' in row)===('courseCode' in row)) throw invalid('Provide exactly one of courseId or courseCode.');
   const byId='courseId' in row;
   const value=byId?positiveId(row.courseId,'courseId'):requiredText(row.courseCode,'courseCode',20).toUpperCase();
-  const found=(await client.query(`SELECT "CourseID","CourseName" FROM "Courses" WHERE ${byId?'"CourseID"':'upper("CourseCode")'}=$1`,[value])).rows[0];
+  const found=(await client.query(`SELECT "CourseID","CourseCode","CourseName" FROM "Courses" WHERE ${byId?'"CourseID"':'upper("CourseCode")'}=$1`,[value])).rows[0];
   if(!found)throw invalid(`Unknown course: ${value}.`,400,'COURSE_NOT_FOUND');
-  return found as {CourseID:number;CourseName:string};
+  return found as {CourseID:number;CourseCode:string;CourseName:string};
 }
 export function metadata(body:unknown,patch=false) {
   const b=inputObject(body,['code','name','version','majorId','totalCredits','effectiveYear','gpaScale']);
   const out:Record<string,unknown>={};
-  for(const [key,col,max] of [['code','ProgramCode',100],['name','ProgramName',200],['version','Version',10]] as const) if(!patch||key in b)out[col]=requiredText(b[key],key,max);
+  for(const [key,col,max] of [['code','ProgramCode',100],['name','ProgramName',200]] as const) if(!patch||key in b)out[col]=requiredText(b[key],key,max);
   if(!patch||'majorId' in b)out.SpecializationID=positiveId(b.majorId,'majorId');
   if(!patch||'totalCredits' in b){out.TotalCredits=credits(b.totalCredits);if(Number(out.TotalCredits)<=0)throw invalid('totalCredits must be positive.');}
   if(!patch||'effectiveYear' in b)out.EffectiveYear=integer(b.effectiveYear,'effectiveYear',1900,2200);

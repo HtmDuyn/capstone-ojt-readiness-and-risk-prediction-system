@@ -1,72 +1,73 @@
-import React from 'react';
-import {
-  DashboardGridIcon,
-  OjtRegisterIcon,
-  RoadmapConsultingIcon,
-  EvaluationResultsIcon,
-} from '@/components/common/icons/AppIcons';
-import { Building2, Handshake, BarChart3, MailCheck } from 'lucide-react';
-import type { NavItem } from '@/types/common.types';
+import React from "react";
+import { DashboardGridIcon } from "@/components/common/icons/AppIcons";
+import { Building2, Handshake, Award, UserCheck } from "lucide-react";
+import type { NavItem } from "@/types/common.types";
 
 export const QHDN_NAV_ITEMS: NavItem[] = [
   {
-    id: 'dashboard',
-    label: 'Tổng quan QHDN',
-    path: '/qhdn/dashboard',
+    id: "dashboard",
+    label: "Tổng quan",
+    path: "/qhdn/dashboard",
     icon: <DashboardGridIcon size={20} />,
     banner: {
-      title: 'Cổng Quản lý Quan hệ Doanh nghiệp',
-      description: 'Điều phối kết nối hợp tác doanh nghiệp, phân bổ sinh viên OJT và quản lý mạng lưới đối tác.',
-      badge: 'Phòng QHDN',
-      primaryActionLabel: 'Thêm doanh nghiệp đối tác',
+      title: "Cổng Quan hệ Doanh nghiệp",
+      description:
+        "Theo dõi chỉ số tiếp nhận OJT, phản hồi của doanh nghiệp đối tác và thống kê theo từng học kỳ.",
+      badge: "Phòng QHDN",
+      primaryActionLabel: "Xuất báo cáo OJT",
     },
   },
   {
-    id: 'partner-enterprises',
-    label: 'Mạng lưới đối tác',
-    path: '/qhdn/partners',
+    id: "enterprises",
+    label: "Doanh nghiệp & Tuyển dụng",
+    path: "/qhdn/enterprises",
     icon: <Building2 size={20} />,
     banner: {
-      title: 'Danh bạ Doanh nghiệp Đối tác Chiến lược',
-      description: 'Quản lý thỏa thuận hợp tác MOU, chỉ tiêu tiếp nhận OJT và thông tin liên hệ đầu mối.',
-      badge: 'Tier-1 & Tier-2',
-      primaryActionLabel: 'Ký kết hợp tác mới',
+      title: "Quản lý Doanh nghiệp & Vị trí Thực tập",
+      description:
+        "Quản lý danh sách doanh nghiệp liên kết, vị trí thực tập tuyển dụng và chỉ tiêu số lượng tiếp nhận (quota).",
+      badge: "Đối tác & Quota",
+      primaryActionLabel: "Import doanh nghiệp",
     },
   },
   {
-    id: 'ojt-matching',
-    label: 'Điều phối & Ghép cặp OJT',
-    path: '/qhdn/matching',
+    id: "ojt-management",
+    label: "Quản lý OJT",
+    path: "/qhdn/registration-windows",
     icon: <Handshake size={20} />,
+    children: [
+      {
+        id: "registration-windows",
+        label: "Tiếp nhận & Duyệt hồ sơ",
+        path: "/qhdn/registration-windows",
+        icon: <UserCheck size={16} />,
+      },
+      {
+        id: "coordination",
+        label: "Theo dõi & Điều phối",
+        path: "/qhdn/coordination",
+        icon: <Handshake size={16} />,
+      },
+    ],
     banner: {
-      title: 'AI Ghép cặp Nguyện vọng Sinh viên & Doanh nghiệp',
-      description: 'Hệ thống gợi ý phân bổ sinh viên vào các vị trí thực tập phù hợp với năng lực kỹ thuật.',
-      badge: 'AI Matching Engine',
-      primaryActionLabel: 'Chạy phân bổ tự động',
+      title: "Quản lý & Điều phối OJT",
+      description:
+        "Tiếp nhận bàn giao từ PĐT, mở đợt đăng ký và điều phối ghép cặp sinh viên vào doanh nghiệp tiếp nhận.",
+      badge: "Quản lý OJT",
+      primaryActionLabel: "Mở đợt đăng ký OJT",
     },
   },
   {
-    id: 'interview-schedules',
-    label: 'Lịch phỏng vấn OJT',
-    path: '/qhdn/interviews',
-    icon: <MailCheck size={20} />,
+    id: "evaluations",
+    label: "Báo cáo OJT",
+    path: "/qhdn/evaluations",
+    icon: <Award size={20} />,
     banner: {
-      title: 'Điều phối Lịch Phỏng vấn & Tiếp nhận',
-      description: 'Theo dõi tiến trình phỏng vấn giữa nhà tuyển dụng và sinh viên kỳ này.',
-      badge: 'Lịch tuần này',
-      primaryActionLabel: 'Tạo ca phỏng vấn',
-    },
-  },
-  {
-    id: 'internship-analytics',
-    label: 'Báo cáo thống kê OJT',
-    path: '/qhdn/analytics',
-    icon: <BarChart3 size={20} />,
-    banner: {
-      title: 'Thống kê Hiệu quả Thực tập Doanh nghiệp',
-      description: 'Tỷ lệ sinh viên có việc làm sau OJT, mức độ hài lòng của doanh nghiệp đối tác.',
-      badge: 'Báo cáo Thường niên',
-      primaryActionLabel: 'Xuất báo cáo PDF',
+      title: "Báo cáo OJT",
+      description:
+        "Tổng hợp kết quả đánh giá kỹ năng chuyên môn, thái độ và điểm thực tập OJT từ người hướng dẫn doanh nghiệp.",
+      badge: "Kết quả OJT",
+      primaryActionLabel: "Tải bảng đánh giá",
     },
   },
 ];

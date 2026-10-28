@@ -12,9 +12,9 @@
  *         idempotencyKey:
  *           type: string
  *           maxLength: 100
- *         windowId:
+ *         semesterId:
  *           type: integer
- *           description: Required for ENTERPRISE. Use an open recruitment intake linked to an academic semester. No separate OJT semester or following semester is required.
+ *           description: Required for enterprise imports; configure this and the next semester dates.
  *         rows:
  *           type: array
  *           minItems: 1
@@ -80,26 +80,26 @@
  *       400: { description: Invalid request }
  *       403: { description: Actor cannot import this account type }
  *       409: { description: Duplicate identity or completed semester }
- * /api/imports/emails:
- *   get:
- *     tags: [Imports]
- *     summary: ADMIN views latest 100 delivery statuses without credentials
- *     security: [{ bearerAuth: [] }]
- *     responses:
- *       200: { description: Email status list }
- *       403: { description: ADMIN required }
- * /api/imports/emails/{emailId}/retry:
+ * /api/imports/emails/resend:
  *   post:
  *     tags: [Imports]
- *     summary: ADMIN retries an unexpired failed email
+ *     summary: Resend email
  *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: emailId
- *         required: true
- *         schema: { type: integer }
+ *     description: Retry the latest account email for this address only when it failed, is unexpired and the account still needs its temporary password.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email, maxLength: 100 }
+ *           example: { email: "user@example.com" }
  *     responses:
  *       200: { description: Email queued again }
+ *       400: { description: Invalid JSON or email }
  *       409: { description: Email cannot be retried }
  * /api/imports/archive:
  *   post:

@@ -6,9 +6,12 @@ import { fail, validateImport } from './import.validation';
 import { saveHistory, recordRejected, safeRow } from '../students/academic-import.service';
 import { windowRecord, assertOpen } from '../recruitment/recruitment.repository';
 import { importAcademicProfile } from '../students/complete-import.service';
+import { audit } from '../academic/academic.repository';
+import type { PoolClient } from 'pg';
+export type ImportCommitHook=(client:PoolClient,result:Record<string,any>)=>Promise<void>;
 
-export async function importAccounts(body: unknown, actorId: number, preview = false) {
-  try { return await performAccountImport(body,actorId,preview); }
+export async function importAccounts(body: unknown, actorId: number, preview = false,onCommit?:ImportCommitHook) {
+  try { return await performAccountImport(body,actorId,preview,onCommit); }
   catch(error:any) {
     if (!preview && (body as any)?.kind==='STUDENT') {
       try { error.importBatchId=await recordRejected(body,actorId,'STUDENT',error); }
@@ -17,7 +20,7 @@ export async function importAccounts(body: unknown, actorId: number, preview = f
     throw error;
   }
 }
-async function performAccountImport(body: unknown, actorId: number, preview = false) {
+async function performAccountImport(body: unknown, actorId: number, preview = false,onCommit?:ImportCommitHook) {
   const input = validateImport(body);
   const payloadHash = createHash('sha256').update(JSON.stringify({ kind: input.kind, windowId: input.windowId, rows: input.rows })).digest('hex');
   if (!pool) throw fail('Database is not configured.', 503);
@@ -33,8 +36,9 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     if (old.rows.length) {
       if (old.rows[0].PayloadHash !== payloadHash || old.rows[0].ImportedBy !== actorId) throw fail('Idempotency key already used for a different import.', 409);
       const academicImportId=input.kind==='STUDENT' ? (await client.query('SELECT "BatchID" FROM "AcademicImportBatches" WHERE "SourceAccountBatchID"=$1',[old.rows[0].BatchID])).rows[0]?.BatchID : undefined;
-      await client.query('ROLLBACK');
-      return { ...old.rows[0].Summary, batchId: old.rows[0].BatchID, academicImportId, replayed: true };
+      const result={ ...old.rows[0].Summary, batchId: old.rows[0].BatchID, academicImportId, replayed: true };
+      if(onCommit&&!preview){await onCommit(client,result);await client.query('COMMIT');}else await client.query('ROLLBACK');
+      return result;
     }
     let recruitmentDeadline: Date | undefined;
     if (input.kind === 'ENTERPRISE') {
@@ -42,12 +46,25 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       input.semesterId = window.OJTSemesterID;
       recruitmentDeadline = window.EndsAt;
     }
-    const plans: { row: typeof input.rows[number]; userId?: number; entityId?: number; action: string }[] = [];
+    const plans: { row: typeof input.rows[number]; userId?: number; entityId?: number; previousCode?: string; action: string }[] = [];
     for (let i = 0; i < input.rows.length; i++) {
       const row = input.rows[i];
-      const existing = input.kind === 'STUDENT'
-        ? await client.query('SELECT s."StudentID" AS entity_id,u."UserID",u."Email",r."RoleCode" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(s."StudentCode")=$1', [row.code])
-        : await client.query('SELECT e."EnterpriseID" AS entity_id,e."EnterpriseCode",e."DeletedAt",e."Status" AS "EnterpriseStatus",u."UserID",u."Email",u."Status" AS "UserStatus",r."RoleCode" FROM "Enterprises" e LEFT JOIN "EnterpriseUsers" eu ON eu."EnterpriseID"=e."EnterpriseID" LEFT JOIN "Users" u ON u."UserID"=eu."UserID" LEFT JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(e."EnterpriseCode")=$1 OR lower(u."Email")=$2 ORDER BY u."UserID"', [row.code,row.email]);
+      if (input.kind === 'STUDENT') {
+        // Email identifies the account; a changed student code must not provision it again.
+        const identities = (await client.query(`SELECT s."StudentID" AS entity_id,s."StudentCode",s."DeletedAt",u."UserID",u."Email",r."RoleCode"
+          FROM "Users" u JOIN "Roles" r ON r."RoleID"=u."RoleID" LEFT JOIN "Students" s ON s."UserID"=u."UserID"
+          WHERE upper(s."StudentCode")=$1 OR lower(u."Email")=$2`, [row.code,row.email])).rows;
+        if (new Set(identities.map(identity=>identity.UserID)).size > 1)
+          throw fail(`Row ${i+1}: student code and email identify different accounts.`,409,'IDENTITY_CONFLICT');
+        const match=identities[0];
+        if (match && (match.RoleCode!=='STUDENT' || match.Email.toLowerCase()!==row.email || match.DeletedAt))
+          throw fail(`Row ${i+1}: existing account is not a matching student identity.`,409,'IDENTITY_CONFLICT');
+        if (!match && (await client.query('SELECT 1 FROM "Users" WHERE "Username"=$1',[`student_${row.code}`])).rowCount)
+          throw fail(`Row ${i+1}: username already exists.`,409,'IDENTITY_CONFLICT');
+        plans.push({row,userId:match?.UserID,entityId:match?.entity_id,previousCode:match?.StudentCode,action:match?'UPDATED':'CREATED'});
+        continue;
+      }
+      const existing = await client.query('SELECT e."EnterpriseID" AS entity_id,e."EnterpriseCode",e."DeletedAt",e."Status" AS "EnterpriseStatus",u."UserID",u."Email",u."Status" AS "UserStatus",r."RoleCode" FROM "Enterprises" e LEFT JOIN "EnterpriseUsers" eu ON eu."EnterpriseID"=e."EnterpriseID" LEFT JOIN "Users" u ON u."UserID"=eu."UserID" LEFT JOIN "Roles" r ON r."RoleID"=u."RoleID" WHERE upper(e."EnterpriseCode")=$1 OR lower(u."Email")=$2 ORDER BY u."UserID"', [row.code,row.email]);
       if (input.kind === 'ENTERPRISE' && new Set(existing.rows.map(r=>r.entity_id)).size>1) throw fail(`Row ${i+1}: enterprise code and email identify different enterprises.`,409,'IDENTITY_CONFLICT');
       const match = existing.rows.find(r => r.Email?.toLowerCase() === row.email) ?? existing.rows[0];
       if (input.kind === 'ENTERPRISE' && match) {
@@ -94,7 +111,11 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       }
       if (input.kind === 'STUDENT') {
         if (!p.entityId) p.entityId = (await client.query('INSERT INTO "Students" ("UserID","StudentCode","Status") VALUES ($1,$2,\'ACTIVE\') RETURNING "StudentID"', [p.userId, row.code])).rows[0].StudentID;
-        else await client.query('UPDATE "Users" SET "FullName"=$2,"UpdatedAt"=now() WHERE "UserID"=$1', [p.userId, row.fullName]);
+        else if (p.previousCode !== row.code) {
+          await client.query('UPDATE "Students" SET "StudentCode"=$2 WHERE "StudentID"=$1',[p.entityId,row.code]);
+          await audit(client,actorId,'Students',p.entityId,'IMPORT_UPDATE_CODE',{studentCode:p.previousCode},{studentCode:row.code},'Student import matched the existing email.');
+        }
+        await client.query('UPDATE "Users" SET "FullName"=$2,"UpdatedAt"=now() WHERE "UserID"=$1', [p.userId, row.fullName]);
         await importAcademicProfile(client,p.entityId!,row.academic,actorId);
       } else {
         if (!p.entityId) {
@@ -112,16 +133,22 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       await client.query('INSERT INTO "AccountImportRows" ("BatchID","RowNumber","SourceCode","UserID","Action") VALUES ($1,$2,$3,$4,$5)', [batchId, i + 1, row.code, p.userId, p.action]);
     }
     let academicImportId:string|undefined;
+    // Deferred history/prerequisite triggers must run for previews as well as commits.
+    // All profiles and attempts are present now, so file row order does not matter.
+    if (input.kind === 'STUDENT') await client.query('SET CONSTRAINTS ALL IMMEDIATE');
     if (preview) {
       await client.query('ROLLBACK');
       return {...summary,preview:true,rows:plans.map((p,i)=>({rowNumber:i+1,code:p.row.code,action:p.action}))};
     }
     if (input.kind==='STUDENT') academicImportId=await saveHistory(client,{kind:'STUDENT',key:input.idempotencyKey,hash:payloadHash,status:'COMPLETED',summary,sourceAccountBatchId:batchId},actorId,plans.map(p=>({raw:safeRow(p.row,'STUDENT'),normalized:{userId:p.userId,action:p.action},status:'IMPORTED'})));
+    const result={ ...summary, batchId, academicImportId, replayed: false };
+    if(onCommit)await onCommit(client,result);
     await client.query('COMMIT');
-    return { ...summary, batchId, academicImportId, replayed: false };
+    return result;
   } catch (error) {
     await client.query('ROLLBACK');
     if ((error as { code?: string }).code === '23505') throw fail('Duplicate account, import or recruitment code.', 409, 'IMPORT_CONFLICT');
+    if ((error as { code?: string }).code === '23514') throw fail((error as Error).message, 422, 'INVALID_STUDY_HISTORY');
     throw error;
   } finally { client.release(); }
 }

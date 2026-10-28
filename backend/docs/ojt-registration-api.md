@@ -1,5 +1,3 @@
-> Cập nhật kỳ 5: Student nộp hồ sơ khi đã có official ELIGIBLE còn hiệu lực; academicPeriodId là kỳ chuẩn bị/đăng ký, khác đợt OJT mục tiêu. Đợt xét có revision và mở lại có audit. Xem [student-portal-api.md](student-portal-api.md).
-
 # API đăng ký OJT và bàn giao cho QHDN
 
 > Cập nhật G01–G05: xem [cấu hình kỳ đăng ký, lịch combo, preview, mốc xét và đồng bộ điểm OJT](academic-workflow-gaps.md). Các ràng buộc mới này được áp dụng cùng các API bên dưới.
@@ -130,16 +128,3 @@ Trả `registrationStatus` (NOT_REGISTERED/SUBMITTED/APPROVED/REJECTED/HANDED_OF
 Schema duy nhất trong `backend/DB`, phần `20261008 OJT registration and academic handoffs`, version `20261008_ojt_registration`. Tận dụng OJTRegistrations, StudentEnterpriseCoordination, InternshipAssignments; thêm bảng đợt, lịch sử và snapshot bàn giao. Không có DDL/seed trong runtime API. File DB đầy đủ là script reset; với DB đã có dữ liệu chỉ áp dụng phần mới trong transaction.
 
 Swagger: `/api-docs`, nhóm `OJT registration and handoff`. Nhóm API không phụ thuộc SMTP hoặc worker.
-
-## API dùng lại cho QHDN (OJT_COORD)
-
-- GET /api/ojt-semesters: mở quyền đọc OJT_COORD; tạo/sửa vẫn chỉ ADMIN/ACADEMIC.
-- GET /api/ojt-semesters/:id/students: QHDN chỉ thấy hồ sơ đã bàn giao. Thêm enterpriseId, coordinationStatus, assignmentStatus; kết hợp AND trước phân trang và tính tổng.
-- enterpriseId: doanh nghiệp phân công gần nhất thuộc điều phối gần nhất, nếu chưa phân công dùng doanh nghiệp điều phối.
-- coordinationStatus: quyết định doanh nghiệp của điều phối gần nhất, không phân biệt hoa/thường; null là PENDING. NOT_COORDINATED chọn hồ sơ chưa điều phối.
-- assignmentStatus: trạng thái phân công gần nhất thuộc điều phối gần nhất, không phân biệt hoa/thường. NOT_ASSIGNED chọn hồ sơ chưa phân công. Hai trạng thái nhận chuỗi tối đa 30 ký tự để hỗ trợ dữ liệu hiện có.
-- GET /api/ojt-registrations/:id: dùng làm nguồn hồ sơ điều phối; giữ kiểm tra đã bàn giao cho QHDN.
-- GET /api/ojt-semesters/:id/results/export?format=csv|json: dùng lại cho báo cáo; PDF chưa được hỗ trợ.
-- POST /api/ojt-semesters/:id/eligible-student-handoffs: vẫn chỉ ADMIN/ACADEMIC.
-
-Ví dụ: GET /api/ojt-semesters/1/students?enterpriseId=2&coordinationStatus=ACCEPTED&assignmentStatus=IN_PROGRESS (ID minh họa).

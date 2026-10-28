@@ -13,7 +13,7 @@ const rejected=(value:unknown)=>['REJECTED','REJECT'].includes(String(value).toU
 async function registration(c:PoolClient,id:number){
   const r=await registrationRecord(c,id);
   if(!r)throw invalid('Registration not found.',404);
-  if(r.Status!=='HANDED_OFF'||!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "RegistrationID"=$1 AND "OJTSemesterID"=$2 AND "StudentID"=$3',[id,r.OJTSemesterID,r.StudentID])).rowCount)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
+  if(!['APPROVED','HANDED_OFF'].includes(r.Status)||!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$3 AND "OJTSemesterID"=$2 AND $1::int IS NOT NULL',[id,r.OJTSemesterID,r.StudentID])).rowCount)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
   await eligibleOfficial(c,r);
   return r;
 }
@@ -33,7 +33,7 @@ async function noAssignment(c:PoolClient,r:Row){
   if((await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID" WHERE a."StudentID"=$1 AND r."OJTSemesterID"=$2 AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') LIMIT 1`,[r.StudentID,r.OJTSemesterID])).rowCount)throw invalid('Student already has an assignment in this semester.',409,'ASSIGNMENT_EXISTS');
 }
 async function mutableAssignment(c:PoolClient,id:number){
-  if((await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1 AND "Status"=\'CONFIRMED\'',[id])).rowCount)throw invalid('Confirmed results lock the assignment and evaluation.',409,'OJT_RESULT_CONFIRMED');
+  if((await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1',[id])).rowCount)throw invalid('Transferred results lock the assignment and evaluation.',409,'OJT_RESULT_CONFIRMED');
 }
 // The existing transaction helper serializes all academic/OJT writes, including idempotency checks.
 async function replay(c:PoolClient,key:string,hash:string,actor:Actor){

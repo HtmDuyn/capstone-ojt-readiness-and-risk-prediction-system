@@ -5,11 +5,13 @@ type Client = { query: (sql:string, args?:any[])=>Promise<{rows:Row[]}> };
 // read credentials/file bytes, or calculate a new eligibility decision here.
 const entities = {
   student: `SELECT s."StudentID" AS id,s."StudentCode" AS code,s."StudentCode" AS "studentCode",u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,s."Status" AS status,s."ProgramID" AS "programId",p."ProgramCode" AS "programCode",p."ProgramName" AS "programName",place."CohortID" AS "cohortId",cohort."Name" AS "cohortName",place."GroupCode" AS "groupCode" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID" LEFT JOIN "StudentAcademicPlacements" place ON place."StudentID"=s."StudentID" LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=place."CohortID" WHERE s."StudentID"=ANY($1::int[])`,
-  program: `SELECT "ProgramID" AS id,"ProgramCode" AS code,"ProgramName" AS name,"Version" AS version,"TotalCredits"::float8 AS "totalCredits","Status" AS status FROM "TrainingPrograms" WHERE "ProgramID"=ANY($1::int[])`,
+  // Some deployed curricula have no Version/Status columns; optional metadata stays null.
+  program: `SELECT "ProgramID" AS id,"ProgramCode" AS code,"ProgramName" AS name,to_jsonb(p)->>'Version' AS version,"TotalCredits"::float8 AS "totalCredits",to_jsonb(p)->>'Status' AS status FROM "TrainingPrograms" p WHERE "ProgramID"=ANY($1::int[])`,
   cohort: `SELECT "CohortID" AS id,"CohortCode" AS code,"Name" AS name,"EnrollmentYear" AS "enrollmentYear","Status" AS status FROM "Cohorts" WHERE "CohortID"=ANY($1::int[])`,
   semester: `SELECT o."OJTSemesterID" AS id,o."SemesterCode" AS code,o."Name" AS name,o."AcademicPeriodID" AS "academicPeriodId",o."AcademicYearID" AS "academicYearId",o."StartDate" AS "startDate",o."EndDate" AS "endDate",o."Status" AS status,CASE WHEN p."AcademicPeriodID" IS NULL THEN NULL ELSE jsonb_build_object('id',p."AcademicPeriodID",'code',p."PeriodCode",'name',p."Name",'kind',p."Kind",'startDate',p."StartDate",'endDate',p."EndDate",'status',p."Status") END AS "academicPeriod" FROM "OJTSemesters" o LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=o."AcademicPeriodID" WHERE o."OJTSemesterID"=ANY($1::int[])`,
   academicPeriod: `SELECT "AcademicPeriodID" AS id,"PeriodCode" AS code,"Name" AS name,"Kind" AS kind,"AcademicYearID" AS "academicYearId","ParentPeriodID" AS "parentPeriodId","StartDate" AS "startDate","EndDate" AS "endDate","Status" AS status FROM "AcademicPeriods" WHERE "AcademicPeriodID"=ANY($1::int[])`,
   academicYear: `SELECT "AcademicYearID" AS id,"YearCode" AS code,"StartDate" AS "startDate","EndDate" AS "endDate","Status" AS status FROM "AcademicYears" WHERE "AcademicYearID"=ANY($1::int[])`,
+  parentMajor: `SELECT "MajorID" AS id,"MajorCode" AS code,"MajorName" AS name FROM "AcademicMajors" WHERE "MajorID"=ANY($1::int[])`,
   company: `SELECT "EnterpriseID" AS id,"EnterpriseCode" AS code,"Name" AS name,"Address" AS address,"Industry" AS industry,"ContactPersonName" AS "contactPersonName","ContactEmail" AS "contactEmail","ContactPhone" AS "contactPhone","Status" AS status FROM "Enterprises" WHERE "EnterpriseID"=ANY($1::int[])`,
   position: `SELECT p."PositionID" AS id,p."RecruitmentCode" AS code,p."Title" AS title,p."Description" AS description,p."Requirements" AS requirements,p."Location" AS location,p."WorkMode" AS "workMode",p."EnterpriseID" AS "companyId",p."OJTSemesterID" AS "ojtSemesterId",p."Capacity" AS capacity,p."Status" AS status,GREATEST(0,p."Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=p."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))) AS "remainingSlots" FROM "InternshipPositions" p WHERE p."PositionID"=ANY($1::int[])`,
   model: `SELECT "ModelID" AS id,"Code" AS code,"Version" AS version,"Name" AS name,"Status" AS status FROM "PredictionModels" WHERE "ModelID"=ANY($1::int[])`,
@@ -24,19 +26,22 @@ const entities = {
 const references: [string, keyof typeof entities, string][] = [
   ['studentId','student','student'],['programId','program','program'],['currentProgramId','program','currentProgram'],
   ['cohortId','cohort','cohort'],['ojtSemesterId','semester','semester'],['academicPeriodId','academicPeriod','academicPeriod'],
+  ['parentPeriodId','academicPeriod','parentPeriod'],
+  ['blockPeriodId','academicPeriod','blockPeriod'],['assessmentAcademicPeriodId','academicPeriod','assessmentAcademicPeriod'],
+  ['parentMajorId','parentMajor','parentMajor'],
   ['academicYearId','academicYear','academicYear'],['companyId','company','company'],['enterpriseId','company','company'],
   ['positionId','position','position'],['modelId','model','model'],['ruleSetId','ruleSet','ruleSet'],
   ['courseId','course','course'],['sourceCourseId','course','sourceCourse'],['targetCourseId','course','targetCourse'],
   ['comboId','combo','combo'],['programComboId','combo','combo'],['majorId','major','major'],
   ['entryAcademicPeriodId','academicPeriod','entryAcademicPeriod'],['currentAcademicPeriodId','academicPeriod','currentAcademicPeriod'],
-  ...['userId','createdBy','updatedBy','submittedBy','reviewedBy','confirmedBy','checkedBy','assignedTo','acknowledgedBy','closedBy','openedBy','publishedBy','coordinatedBy','evaluatedBy','transferredBy','importedBy','recordedBy'].map(key=>[key,'user',key==='userId'?'user':key+'User'] as [string,'user',string]),
+  ...['userId','createdBy','updatedBy','submittedBy','reviewedBy','confirmedBy','configuredBy','resultsFinalizedBy','checkedBy','assignedTo','acknowledgedBy','closedBy','openedBy','publishedBy','coordinatedBy','evaluatedBy','transferredBy','importedBy','recordedBy'].map(key=>[key,'user',key==='userId'?'user':key+'User'] as [string,'user',string]),
 ];
 // Only explicitly named relation arrays are expanded. Never inspect arbitrary snapshots or audit payloads.
 const arrayReferences: [string, keyof typeof entities, string][] = [
   ['registrationIds','registration','registrations'],['courseIds','course','courses'],['choices','course','courseChoices'],['comboIds','combo','combos'],
 ];
 
-export async function enrichListRows<T extends Row>(client:Client,rows:T[]):Promise<T[]> {
+async function enrichRows<T extends Row>(client:Client,rows:T[]):Promise<T[]> {
   if(!rows.length)return rows;
   const maps=new Map<string,Map<number,Row>>();
   const columns:string[]=[],args:number[][]=[];
@@ -76,4 +81,22 @@ export async function enrichListRows<T extends Row>(client:Client,rows:T[]):Prom
     }
     return item as T;
   });
+}
+
+// Expand only known business relations, never arbitrary snapshots, audit data or file payloads.
+export async function enrichListRows<T extends Row>(client:Client,rows:T[]):Promise<T[]> {
+  const nested = new Set(['groups','periods','comboPhaseSchedules','advisorySchedule','prerequisites','equivalences','missingRequiredCourses','alternativeRequirements','unpassedCourses','students','requirements','evaluation','confirmation','current']);
+  const nodes:Row[]=[];
+  const copy=(row:Row):Row=>{
+    const value={...row};nodes.push(value);
+    for(const key of nested){
+      if(Array.isArray(row[key]))value[key]=row[key].map((item:any)=>item&&typeof item==='object'&&!Array.isArray(item)?copy(item):item);
+      else if(row[key]&&typeof row[key]==='object')value[key]=copy(row[key]);
+    }
+    return value;
+  };
+  const output=rows.map(copy);
+  const enriched=await enrichRows(client,nodes);
+  nodes.forEach((node,index)=>Object.assign(node,enriched[index]));
+  return output as T[];
 }

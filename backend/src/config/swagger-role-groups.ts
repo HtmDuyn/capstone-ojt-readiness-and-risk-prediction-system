@@ -9,8 +9,9 @@ const roleNames: Record<RoleCode, string> = {
 };
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
+  { roles: ['ADMIN','ACADEMIC'], operations: ['GET /api/ojt-eligibility-results','POST /api/ojt-eligibility-results'] },
   {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},
-  {roles:["STUDENT"],operations:["GET /api/student/academic-summary","GET /api/student/supplementary-course-options","GET /api/student/ojt-registration-windows","GET /api/student/curriculum","GET /api/student/notifications","PATCH /api/student/notifications/{id}/read","GET /api/student/combo-registration-windows","GET /api/student/assignments/current","GET /api/student/ojt-results","GET /api/student/ojt-results/{id}","GET /api/student/dashboard","GET /api/student/risk-prediction","GET /api/student/roadmap-recommendations"]},
+  {roles:["STUDENT"],operations:["GET /api/students/me/academic-summary","GET /api/students/me/supplementary-course-options","GET /api/students/me/curriculum","GET /api/students/me/notifications","PATCH /api/students/me/notifications/{id}","GET /api/students/me/assignments/current","GET /api/students/me/ojt-results","GET /api/students/me/ojt-results/{id}","GET /api/students/me/dashboard","GET /api/students/me/roadmap-recommendations"]},
   {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
   {roles:['ADMIN','OJT_COORD','ENTERPRISE','STUDENT'],operations:['GET /api/internship-tasks']},
   {roles:['STUDENT'],operations:['POST /api/students/me/cv','POST /api/job-applications','GET /api/students/me/opportunities']},
@@ -29,12 +30,10 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/curricula",
     "GET /api/curricula/{id}",
     "GET /api/curricula/{id}/ojt-grade-mappings/{semesterId}",
-    "GET /api/eligibility-check-runs/{id}",
     "GET /api/majors",
     "GET /api/ojt-rule-sets",
     "GET /api/ojt-semesters/{id}/assessment-window",
     "GET /api/students",
-    "PATCH /api/academic-periods/{id}",
     "PATCH /api/academic-years/{id}",
     "PATCH /api/cohorts/{id}",
     "PATCH /api/combo-registration-windows/{id}",
@@ -55,7 +54,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/curriculum-imports/commit",
     "POST /api/curriculum-imports/preview",
     "POST /api/eligibility-check-runs",
-    "POST /api/eligibility-checks/{id}/confirm",
     "POST /api/majors",
     "POST /api/ojt-registration-windows",
     "POST /api/ojt-registration-windows/{id}/semester-exceptions",
@@ -66,40 +64,29 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/ojt-semesters/{id}/assessment-window/close",
     "POST /api/ojt-semesters/{id}/assessment-window/open",
     "POST /api/ojt-semesters/{id}/eligible-student-handoffs",
-    "POST /api/students/{id}/eligibility-checks",
     "PUT /api/academic-periods/{id}/combo-phase-schedules",
     "PUT /api/curricula/{id}/ojt-grade-mappings/{semesterId}",
     "PUT /api/ojt-semesters/{id}/assessment-window",
   ] },
   { roles: ["ADMIN"], operations: [
-    "DELETE /api/companies/{id}",
-    "DELETE /api/positions/{id}",
-    "DELETE /api/students/{id}",
+    "DELETE /api/companies",
+    "DELETE /api/positions",
+    "DELETE /api/students",
     "GET /api/accounts",
-    "GET /api/admin/audit-logs",
-    "GET /api/admin/dashboard",
-    "GET /api/admin/models",
-    "GET /api/admin/prediction-jobs/{id}",
-    "GET /api/admin/reports/export",
-    "GET /api/admin/reports/readiness",
-    "GET /api/alerts",
-    "GET /api/assessment-templates",
-    "GET /api/imports/emails",
-    "GET /api/predictions",
-    "GET /api/roles",
-    "GET /api/students/export",
-    "GET /api/students/{id}/interventions",
-    "PATCH /api/alerts/{id}/status",
-    "PATCH /api/assessment-templates/{id}",
-    "PATCH /api/interventions/{id}",
+    "POST /api/admin/audit-logs/list",
+    "POST /api/admin/dashboard",
+
+
+
+    "POST /api/students/export",
+
+
+
     "POST /api/accounts",
-    "POST /api/admin/prediction-jobs",
-    "POST /api/alerts/{id}/interventions",
-    "POST /api/assessment-templates",
-    "POST /api/assessment-templates/{id}/publish",
-    "POST /api/auth/users/{userId}/password-reset",
-    "POST /api/imports/emails/{emailId}/retry",
-    "PATCH /api/accounts/{userId}",
+
+    "POST /api/auth/users/password-reset",
+    "POST /api/imports/emails/resend",
+    "PATCH /api/accounts/update",
   ] },
   { roles: ["ADMIN","ACADEMIC","OJT_COORD","ENTERPRISE","STUDENT"], operations: [
     "GET /api/auth/me",
@@ -123,6 +110,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/positions",
     "GET /api/qhdn/dashboard",
     "GET /api/qhdn/registered-students",
+    "GET /api/qhdn/eligible-students",
     "GET /api/qhdn/reports",
     "GET /api/qhdn/reports/export",
     "PATCH /api/assignments/{id}",
@@ -150,7 +138,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/ojt-registrations",
   ] },
   { roles: [], operations: [
-    "GET /api/health",
   ] },
   { roles: ["ENTERPRISE"], operations: [
     "GET /api/enterprise/candidates",
@@ -177,6 +164,11 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     if (access.has(key)) throw new Error('Duplicate Swagger access entry: ' + key);
     access.set(key, group.roles);
   }
+  for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
+  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
+  for(const key of ['GET /api/ojt-registration-windows','POST /api/ojt-registrations','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
+  access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);
+  access.set('POST /api/auth/logout', ['ADMIN', 'ACADEMIC', 'OJT_COORD', 'ENTERPRISE', 'STUDENT']);
   const used = new Set<string>();
   for (const [path, item] of Object.entries(spec.paths ?? {}) as [string, Spec][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {

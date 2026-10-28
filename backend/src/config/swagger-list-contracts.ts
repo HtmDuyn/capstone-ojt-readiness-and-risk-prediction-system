@@ -39,7 +39,6 @@ const listContexts:Record<string,string[]>={
  '/api/students/{id}/combo-selections':['createdByUser'], '/api/curricula':['createdByUser','publishedByUser'],
  '/api/ojt-rule-sets':['program','semester','createdByUser','publishedByUser'],
  '/api/students/{id}/eligibility-checks':['student','semester','ruleSet','checkedByUser'],
- '/api/eligibility-check-runs/{id}':['student','program','ruleSet'],
  '/api/ojt-registration-windows':['semester','academicPeriod','createdByUser'],
  '/api/ojt-registrations':['student','program','currentProgram','cohort','semester','submittedByUser'],
  '/api/ojt-semesters/{id}/eligible-student-handoffs':['semester','createdByUser'],
@@ -47,10 +46,8 @@ const listContexts:Record<string,string[]>={
  '/api/ojt-results':['student','program','company','position','semester','transferredByUser','confirmedByUser'],
  '/api/positions':['company','semester'], '/api/ojt-coordinations':['student','company','position','semester','coordinatedByUser'],
  '/api/assignments':['student','company','position','semester'], '/api/internship-evaluations':['student','company','position','semester','evaluatedByUser'],
- '/api/qhdn/registered-students':['student','program','cohort'], '/api/academic-imports':['importedByUser'],
- '/api/admin/prediction-jobs/{id}':['student'], '/api/predictions':['student','semester','model'],
- '/api/alerts':['student','semester','updatedByUser'], '/api/students/{id}/interventions':['student','assignedToUser','createdByUser'],
- '/api/admin/reports/readiness':['student','semester','model'], '/api/admin/audit-logs':['user'],
+ '/api/qhdn/registered-students':['student','program','cohort'],
+
  '/api/enterprise/candidates':['student','company','position','semester'], '/api/enterprise/internships':['student','company','position','semester'],
  '/api/recruitment/posts':['company','semester','academicPeriod'],
  '/api/job-applications':['student','company','position','semester'],
@@ -99,8 +96,6 @@ export function describeListResponses(spec:Schema):void {
  }
  const candidateFields=spec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
  Object.assign(candidateFields,{companyId:id,company:contexts.company,coordinatedBy:{...id,nullable:true},coordinatedByUser:user,registration:contexts.registration,application:{type:'object',additionalProperties:true},decision:text,introducedAt:time,decisionAt:{...time,nullable:true},rejectReason:{...text,nullable:true},isLatestCoordination:{type:'boolean'},recruitmentPost:{type:'object',nullable:true,properties:{...spec.paths['/api/recruitment/posts'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties}}});
- const emails=spec.paths['/api/imports/emails'].get;
- emails.responses['200']={description:'Tối đa 100 email mới nhất; kèm tổng số và quyền gửi lại, không có nội dung mã hóa.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},emails:{type:'array',items:{type:'object',properties:{EmailID:id,UserID:id,Recipient:text,Status:text,Attempts:{type:'integer'},SentAt:time,ExpiresAt:time,LastError:{...text,nullable:true},user:obj({id,fullName:text,email:text}),canRetry:{type:'boolean'}}}},total:{type:'integer'},limit:{type:'integer',enum:[100]},hasMore:{type:'boolean'}}}}}};
  const schedules=spec.paths['/api/academic-periods/{id}/combo-phase-schedules'].get;
  schedules.responses['200']={description:'Lịch chọn combo theo học kỳ, kèm tên kỳ và người xác nhận.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:{type:'array',items:{type:'object',additionalProperties:true,properties:{academicPeriodId:id,academicPeriod:period,confirmedBy:id,confirmedByUser:user}}}}}}}};
 }
@@ -115,13 +110,11 @@ export function describeAdditionalListResponses(spec:Schema) {
   '/api/ojt-semesters/{id}/eligible-student-handoffs':['registrations'],
   '/api/students/me/opportunities':['semester'],
   '/api/ojt-results':['student','program','company','position','semester','evaluatedByUser','confirmedByUser'],
-  '/api/student/ojt-results':['student','program','company','position','semester','evaluatedByUser','confirmedByUser'],
-  '/api/student/ojt-registration-windows':['academicPeriod','semester'],
-  '/api/student/combo-registration-windows':['academicPeriod','semester'],
+  '/api/students/me/ojt-results':['student','program','company','position','semester','evaluatedByUser','confirmedByUser'],
   '/api/academic/advisory-runs':['academicPeriod','semester','createdByUser'],
   '/api/academic/advisory-runs/{id}':['student'],
   '/api/internship-tasks':['student','company','position','semester'],
-  '/api/student/notifications':[],
+  '/api/students/me/notifications':[],
  };
  for(const [path,keys]of Object.entries(paths)){
   const op=spec.paths[path]?.get;if(!op)throw Error('Missing display list: '+path);
@@ -131,7 +124,7 @@ export function describeAdditionalListResponses(spec:Schema) {
   const root=media.schema;root.properties??={};const page=root.properties.data??={type:'object',properties:{}};page.properties??={};
   Object.assign(page.properties,{total:{type:'integer'},page:id,limit:id});
   const list=page.properties.items??={type:'array',items:{type:'object',properties:{}}};
-  if(path==='/api/student/ojt-results')list.items=structuredClone(spec.paths['/api/ojt-results'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items);
+  if(path==='/api/students/me/ojt-results')list.items=structuredClone(spec.paths['/api/ojt-results'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items);
   describeListDisplayFields(list.items,keys);
   if(path==='/api/internship-tasks')Object.assign(list.items.properties,{
     id,assignmentId:id,studentId:id,companyId:id,positionId:id,ojtSemesterId:id,name:text,description:{...text,nullable:true},status:text,assignedDate:date,dueDate:date,
@@ -139,7 +132,7 @@ export function describeAdditionalListResponses(spec:Schema) {
   });
   if(path==='/api/academic/advisory-runs')Object.assign(list.items.properties,{id,kind:text,status:text,createdBy:id,ojtSemesterId:id,academicPeriodId:id,createdAt:time,completedAt:{...time,nullable:true}});
   if(path==='/api/academic/advisory-runs/{id}')Object.assign(list.items.properties,{id,studentId:id,status:text,notificationId:{...id,nullable:true},errorCode:{...text,nullable:true},snapshot:{type:'object',nullable:true,additionalProperties:true}});
-  if(path==='/api/student/notifications')Object.assign(list.items.properties,{id,title:text,content:text,sentAt:time,isRead:{type:'boolean',nullable:true}});
+  if(path==='/api/students/me/notifications')Object.assign(list.items.properties,{id,title:text,content:text,sentAt:time,isRead:{type:'boolean',nullable:true}});
   op.description=[op.description,'Mỗi bản ghi giữ ID và bổ sung thông tin liên quan để hiển thị; quan hệ không tồn tại trả null.'].filter(Boolean).join(' ');
  }
 }

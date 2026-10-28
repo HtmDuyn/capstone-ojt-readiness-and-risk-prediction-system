@@ -108,9 +108,3 @@ API chuyển/nộp lại có `idempotencyKey` bắt buộc, tối đa 100 ký t�
 Schema tập trung ở `backend/DB`, section `20261008 official OJT results`; hai bảng `OJTResults`, `OJTResultEvents`, migration version `20261008_ojt_results`. Các bảng có RLS và thu hồi quyền truy cập trực tiếp của `anon`/`authenticated`; backend kiểm tra vai trò và điều kiện nghiệp vụ. Không chạy toàn bộ `DB` trên dữ liệu cần giữ vì phần đầu là reset schema.
 
 Lỗi nghiệp vụ thường gặp: `OJT_RESULT_VERSION_CONFLICT`, `OJT_EVALUATION_REQUIRED`, `OJT_RESULT_CONTEXT_MISMATCH`, `OJT_RESULT_SOURCE_CHANGED`, `OJT_RESULT_REVISION_PENDING`, `OJT_OFFICIAL_RESULT_REQUIRED`, `OJT_RESULT_CONFIRMED` (409); dữ liệu không hợp lệ (400), sai vai trò (403), bản ghi không tồn tại (404).
-
-## Xuất PDF (12/10/2026)
-
-`GET /api/ojt-semesters/:id/results/export?format=pdf` trả `application/pdf` và attachment `ojt-results-<id>.pdf`. ADMIN/ACADEMIC/OJT_COORD dùng được, cùng các bộ lọc `status`, `studentId`, `search`, `ojtSemesterId` và giới hạn 10.000 kết quả như CSV/JSON; không nhận page/limit. Không có dữ liệu vẫn xuất PDF có thông báo danh sách rỗng.
-
-PDF gồm mã SV, họ tên, doanh nghiệp, kỳ, mã kết quả, trạng thái, điểm chính thức và kết luận; hỗ trợ tiếng Việt, tự ngắt trang và đánh số trang. Trạng thái/kết luận giữ mã backend; điểm chưa nhập hiển thị dấu `-`. Font Noto Sans và giấy phép OFL nằm trong `src/assets/fonts`, được copy sang `dist/assets` khi `npm run build`. CSV vẫn là mặc định.

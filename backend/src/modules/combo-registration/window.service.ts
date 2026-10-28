@@ -1,4 +1,3 @@
-import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { pagination } from '../students/student.validation';
@@ -25,9 +24,9 @@ async function validateWindow(client:PoolClient,w:Row) {
     if(count!==values.length)throw invalid(`Scope contains unknown ${table} IDs.`);
   }
 }
-async function saveWindowFields(body:unknown,actor:number,id:number|undefined,client:PoolClient) {
+export async function saveWindow(body:unknown,actorId:number,id?:number) {
   const b=inputObject(body,['name','phase','academicPeriodId','ojtSemesterId','initialWindowId','scope','startsAt','endsAt']);
-
+  return academicTransaction(async client=>{
     const before=id?await windowRecord(client,id,true):null;
     if(before && before.Status!=='DRAFT')throw invalid('Scope and base dates can only be edited in DRAFT. Use scoped extensions after opening.',409,'WINDOW_NOT_DRAFT');
     const w:Row={...before};
@@ -36,13 +35,13 @@ async function saveWindowFields(body:unknown,actor:number,id:number|undefined,cl
     }
     await validateWindow(client,w);
     const args=[w.Name,w.Phase,w.AcademicPeriodID,w.OJTSemesterID,w.InitialWindowID,JSON.stringify(w.Scope),w.StartsAt,w.EndsAt];
-    const after=id?(await client.query(`UPDATE "ComboRegistrationWindows" SET "Name"=$1,"Phase"=$2,"AcademicPeriodID"=$3,"OJTSemesterID"=$4,"InitialWindowID"=$5,"Scope"=$6,"StartsAt"=$7,"EndsAt"=$8,"UpdatedAt"=now() WHERE "WindowID"=$9 RETURNING *`,[...args,id])).rows[0]:(await client.query(`INSERT INTO "ComboRegistrationWindows" ("Name","Phase","AcademicPeriodID","OJTSemesterID","InitialWindowID","Scope","StartsAt","EndsAt","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[...args,actor])).rows[0];
-    await audit(client,actor,'ComboRegistrationWindows',after.WindowID,id?'UPDATE_COMBO_WINDOW':'CREATE_COMBO_WINDOW',before,after);return asWindow(await windowRecord(client,after.WindowID));
-
+    const after=id?(await client.query(`UPDATE "ComboRegistrationWindows" SET "Name"=$1,"Phase"=$2,"AcademicPeriodID"=$3,"OJTSemesterID"=$4,"InitialWindowID"=$5,"Scope"=$6,"StartsAt"=$7,"EndsAt"=$8,"UpdatedAt"=now() WHERE "WindowID"=$9 RETURNING *`,[...args,id])).rows[0]:(await client.query(`INSERT INTO "ComboRegistrationWindows" ("Name","Phase","AcademicPeriodID","OJTSemesterID","InitialWindowID","Scope","StartsAt","EndsAt","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[...args,actorId])).rows[0];
+    await audit(client,actorId,'ComboRegistrationWindows',after.WindowID,id?'UPDATE_COMBO_WINDOW':'CREATE_COMBO_WINDOW',before,after);return asWindow(after);
+  });
 }
-async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:number,client:PoolClient) {
+export async function changeWindow(id:number,action:'open'|'close',body:unknown,actorId:number) {
   const b=inputObject(body,['reason']),reason=requiredText(b.reason,'reason',2000);
-
+  return academicTransaction(async client=>{
     const before=await windowRecord(client,id,true);
     if(before.Status==='FINALIZED')throw invalid('A finalized window cannot be reopened or closed.',409,'WINDOW_FINALIZED');
     if(action==='close') {
@@ -69,21 +68,21 @@ async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:n
       }
       const time=await now(client);if(!students.some(r=>new Date(r.effectiveEndsAt)>time))throw invalid('All deadlines have expired. Create a scoped extension before reopening.',409,'WINDOW_EXPIRED');
     }
-    const after=(await client.query(`UPDATE "ComboRegistrationWindows" SET "Status"=$2,"${action==='open'?'OpenedBy':'ClosedBy'}"=$3,"${action==='open'?'OpenedAt':'ClosedAt'}"=now(),"UpdatedAt"=now() WHERE "WindowID"=$1 RETURNING *`,[id,action==='open'?'OPEN':'CLOSED',actor])).rows[0];
+    const after=(await client.query(`UPDATE "ComboRegistrationWindows" SET "Status"=$2,"${action==='open'?'OpenedBy':'ClosedBy'}"=$3,"${action==='open'?'OpenedAt':'ClosedAt'}"=now(),"UpdatedAt"=now() WHERE "WindowID"=$1 RETURNING *`,[id,action==='open'?'OPEN':'CLOSED',actorId])).rows[0];
     if(action==='close')await cancelQueuedReminders(client,id);
-    await audit(client,actor,'ComboRegistrationWindows',id,action==='open'?'OPEN_COMBO_WINDOW':'CLOSE_COMBO_WINDOW',before,after,reason);return asWindow(await windowRecord(client,id));
-
+    await audit(client,actorId,'ComboRegistrationWindows',id,action==='open'?'OPEN_COMBO_WINDOW':'CLOSE_COMBO_WINDOW',before,after,reason);return asWindow(after);
+  });
 }
-export async function extendWindow(id:number,body:unknown,actor:number) {
+export async function extendWindow(id:number,body:unknown,actorId:number) {
   const b=inputObject(body,['studentIds','endsAt','reason']),students=ids(b.studentIds,'studentIds'),endsAt=timestamp(b.endsAt,'endsAt'),reason=requiredText(b.reason,'reason',2000);
   if(!students.length)throw invalid('Select at least one student for extension.');
   return academicTransaction(async client=>{
     const w=await windowRecord(client,id,true);if(!['OPEN','CLOSED'].includes(w.Status))throw invalid('Only open/closed windows can be extended.',409);
     const rows=await roster(client,id),time=await now(client);if(new Date(endsAt)<=time)throw invalid('Extension deadline must be in the future.');
     for(const studentId of students){const r=rows.find(r=>r.studentId===studentId);if(!r)throw invalid(`Student ${studentId} is outside the frozen scope.`);if(new Date(endsAt)<=new Date(r.effectiveEndsAt))throw invalid(`Extension must increase student ${studentId}'s current deadline.`);}
-    const extension=(await client.query(`INSERT INTO "ComboWindowExtensions" ("WindowID","EndsAt","Reason","CreatedBy") VALUES ($1,$2,$3,$4) RETURNING "ExtensionID"`,[id,endsAt,reason,actor])).rows[0].ExtensionID;
+    const extension=(await client.query(`INSERT INTO "ComboWindowExtensions" ("WindowID","EndsAt","Reason","CreatedBy") VALUES ($1,$2,$3,$4) RETURNING "ExtensionID"`,[id,endsAt,reason,actorId])).rows[0].ExtensionID;
     for(const studentId of students)await client.query(`INSERT INTO "ComboExtensionStudents" ("ExtensionID","WindowID","StudentID") VALUES ($1,$2,$3)`,[extension,id,studentId]);
-    const result={id:extension,windowId:id,studentIds:students,endsAt,reason};await audit(client,actor,'ComboRegistrationWindows',id,'EXTEND_COMBO_WINDOW',null,result,reason);return result;
+    const result={id:extension,windowId:id,studentIds:students,endsAt,reason};await audit(client,actorId,'ComboRegistrationWindows',id,'EXTEND_COMBO_WINDOW',null,result,reason);return result;
   });
 }
 export async function selectionReport(id:number,params:Record<string,unknown>) {
@@ -91,20 +90,6 @@ export async function selectionReport(id:number,params:Record<string,unknown>) {
   return academicTransaction(async client=>{
     const w=await windowRecord(client,id),all=await roster(client,id);const rows=all.map(r=>({...r,status:r.outcome??(r.eventId?'SUBMITTED':'MISSING')}));
     const filtered=filter?rows.filter(r=>r.status===filter):rows;
-    return {window:asWindow(w),summary:{total:all.length,submitted:all.filter(r=>r.eventId).length,missing:all.filter(r=>!r.eventId).length,applied:all.filter(r=>r.outcome==='APPLIED').length,unselected:all.filter(r=>r.outcome==='UNSELECTED').length},items:await enrichListRows(client,filtered.slice(p.offset,p.offset+p.limit)),total:filtered.length,page:p.page,limit:p.limit};
+    return {window:asWindow(w),summary:{total:all.length,submitted:all.filter(r=>r.eventId).length,missing:all.filter(r=>!r.eventId).length,applied:all.filter(r=>r.outcome==='APPLIED').length,unselected:all.filter(r=>r.outcome==='UNSELECTED').length},items:filtered.slice(p.offset,p.offset+p.limit),total:filtered.length,page:p.page,limit:p.limit};
   });
-}
-
-export async function saveWindow(body:unknown,actor:number,id?:number) {
- const b=inputObject(body,["name","phase","academicPeriodId","ojtSemesterId","initialWindowId","scope","startsAt","endsAt","reason"].concat(id?['status']:[]));
- const {status,...fields}=b;
- const hasFields=Object.keys(fields).some(key=>key!=='reason');
- if(id&&!hasFields&&status===undefined)throw invalid('Provide a field or status to update.');
- const target=status===undefined?undefined:enumValue(status,['OPEN','CLOSED'],'status');
- return academicTransaction(async client=>{
-  let result;
-  if(!id||hasFields)result=await saveWindowFields(Object.fromEntries(Object.entries(fields).filter(([key])=>key!=='reason')),actor,id,client);
-  if(target!==undefined)result=await changeWindow(id!,target==='OPEN'?'open':'close',{reason:b.reason},actor,client);
-  return result;
- });
 }

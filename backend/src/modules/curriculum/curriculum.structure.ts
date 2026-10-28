@@ -6,6 +6,7 @@ export async function normalizeCourses(client:PoolClient,raw:unknown):Promise<Ro
   for(const value of array(raw,'courses')) {
     const b=inputObject(value,['courseId','courseCode','credits','semester','isRequired','entryKind','prerequisiteText']);
     const c=await courseId(client,b);
+    if(c.CourseCode.toUpperCase()==='OJT202' && (integer(b.semester,'semester')!==6 || (b.entryKind??'COURSE')!=='COURSE'))throw invalid('OJT202 must be a concrete curriculum course in semester 6.');
     rows.push({courseId:c.CourseID,name:c.CourseName,credits:credits(b.credits),semester:integer(b.semester,'semester'),isRequired:boolean(b.isRequired,'isRequired'),entryKind:enumValue(b.entryKind??'COURSE',['COURSE','COMBO_SLOT','ELECTIVE_SLOT'],'entryKind'),prerequisiteText:optionalText(b.prerequisiteText,'prerequisiteText',10000)});
   }
   unique(rows.map(c=>c.courseId),'curriculum course');return rows;
@@ -38,6 +39,11 @@ export async function normalizeCombo(client:PoolClient,raw:unknown,programCourse
   unique(groups.map(g=>g.code.toUpperCase()),'choice group code');unique(members,'choice membership across groups');
   if(courses.length!==members.length)throw invalid('Every combo course must belong to exactly one explicit choice group.');
   return {courses,choiceGroups:groups};
+}
+export async function scopeCourses(client:PoolClient,id:number) {
+  const program=(await client.query(`SELECT "ProgramCourseID" AS id,"CourseID" AS "courseId","Credits"::float8 AS credits,"RecommendedSemester" AS semester,"IsRequired" AS "isRequired","EntryKind" AS "entryKind" FROM "ProgramCourses" WHERE "ProgramID"=$1`,[id])).rows;
+  const combo=(await client.query(`SELECT c."CourseID" AS "courseId",c."Semester" AS semester FROM "ComboCourses" c JOIN "ProgramCombos" b ON b."ProgramComboID"=c."ProgramComboID" WHERE b."ProgramID"=$1`,[id])).rows;
+  return {program,combo};
 }
 export function normalizePrerequisites(raw:unknown,program:Row[],combo:Row[]):Row[] {
   const rows:Row[]=[],keys:string[]=[],edges=new Map<number,Set<number>>();

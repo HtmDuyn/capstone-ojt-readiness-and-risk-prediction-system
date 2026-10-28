@@ -69,15 +69,9 @@ export const parseAccountListQuery = (
 
   return {
     userId: query.userId,
-    page:
-      query.page,
-    limit:
-      query.limit,
     search:
       query.search,
     roleCode:
       query.roleCode,
-    status:
-      query.status,
   };
 };

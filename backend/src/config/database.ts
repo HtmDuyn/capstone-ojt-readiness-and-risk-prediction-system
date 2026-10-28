@@ -1,4 +1,3 @@
-import path from "node:path";
 import {
   Pool,
   type QueryResult,
@@ -53,12 +52,19 @@ export const databaseConfig: DatabaseConfig = {
       : false,
 };
 
+// Keep headroom for API tools and other clients on small session poolers.
+const poolMax = Number(process.env.DB_POOL_MAX ?? 4);
+if (!Number.isInteger(poolMax) || poolMax < 1 || poolMax > 100) {
+  throw new Error('DB_POOL_MAX must be an integer between 1 and 100.');
+}
+
 export const pool = databaseConfig.url
   ? new Pool({
       connectionString: databaseConfig.url,
       ssl: databaseConfig.ssl,
 
-      max: 10,
+      max: poolMax,
+      application_name: "ojt-backend",
 
       idleTimeoutMillis: 30_000,
 
@@ -114,8 +120,3 @@ export const closeDatabaseConnection =
       "PostgreSQL database connection closed",
     );
   };
-
-export const databasePath = path.resolve(
-  __dirname,
-  "../../",
-);

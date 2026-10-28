@@ -21,8 +21,8 @@ const meanings: Record<string, string> = {
   idempotencyKey: 'Khóa chống trùng yêu cầu; dùng lại cùng khóa và dữ liệu khi gửi lại.',
   studentCode: 'Mã sinh viên.', courseCode: 'Mã môn học.', reason: 'Lý do thực hiện.',
   resultsFinalized: 'Xác nhận đã hoàn tất cập nhật điểm.', assessmentDeadline: 'Hạn xét điều kiện, gồm múi giờ.',
-  relativeSemester: 'Kỳ chuyên ngành tương đối.', requiredRelativeSemester: 'Kỳ chuyên ngành cho phép đăng ký; mặc định 5.',
-  currentSemester: 'Kỳ chuyên ngành hiện tại, tính từ lộ trình thực tế.', attemptNumber: 'Lần học, từ 1 đến 100.',
+  relativeSemester: 'Kỳ chuyên ngành tương đối.', requiredRelativeSemester: 'Kỳ chương trình yêu cầu: chuẩn bị/xét ở kỳ 5; đăng ký OJT ở kỳ 6.',
+  currentSemester: 'Kỳ chương trình hiện tại từ 0 đến 9, lấy từ lộ trình khóa/nhóm; khác tag môn đang học.', attemptNumber: 'Lần học, từ 1 đến 100.',
   gradeBands: 'Mức quy đổi điểm; bắt đầu từ 0, không trùng mốc.', gradePoints: 'Điểm quy đổi theo thang 4.',
   isRequired: 'Môn bắt buộc.', scope: 'Phạm vi áp dụng; các bộ lọc kết hợp đồng thời.',
   page: 'Trang, bắt đầu từ 1.', limit: 'Số bản ghi mỗi trang.'
@@ -73,9 +73,9 @@ describe('/academic/alerts', { get: 'Danh sách cảnh báo thiếu điều ki�
 describe('/academic/alerts/notifications', { post: 'Gửi cảnh báo học vụ' });
 describe('/academic/course-demand', { get: 'Thống kê nhu cầu học môn còn thiếu' });
 describe('/academic/course-demand/export', { get: 'Xuất nhu cầu học theo môn, kỳ và Block' });
-describe('/accounts', { get: 'Danh sách tài khoản', post: 'Tạo tài khoản' });
+describe('/accounts', { get: ['Danh sách tài khoản', 'Không cần nhập tham số hoặc request body. Trả toàn bộ tài khoản ở mọi trạng thái; chỉ cần xác thực ADMIN và bấm Execute.'], post: 'Tạo tài khoản' });
 describe('/accounts/me/profile', { patch: 'Cập nhật hồ sơ cá nhân' });
-describe('/accounts/{userId}', { patch: ['Cập nhật tài khoản', 'Admin sửa thông tin, trạng thái và vai trò trong một lần; chỉ gửi trường cần thay đổi.'] });
+describe('/accounts/update', { patch: ['Update account', 'Admin sửa thông tin, trạng thái và vai trò trong một lần; chỉ gửi trường cần thay đổi.'] });
 describe('/auth/login', { post: 'Đăng nhập bằng email và mật khẩu' });
 describe('/auth/me', { get: ['Xem tài khoản đang đăng nhập', 'Kèm ID hồ sơ sinh viên hoặc doanh nghiệp liên kết.'] });
 describe('/auth/change-password', { post: ['Đổi mật khẩu', 'Token cũ bị thu hồi; cần đăng nhập lại.'] });
@@ -98,13 +98,10 @@ for (const [resource, name] of Object.entries({ 'curriculum-imports': 'khung ch�
 describe('/ojt-rule-sets', { get: 'Danh sách bộ quy tắc OJT', post: ['Tạo bộ quy tắc OJT', 'Điều kiện: tối thiểu 70 tín chỉ và tối đa 2 môn còn nợ.'] });
 describe('/ojt-rule-sets/{id}', { patch: 'Sửa bộ quy tắc chưa ban hành' });
 describe('/ojt-rule-sets/{id}/publish', { post: 'Ban hành bộ quy tắc OJT' });
-describe('/students/{id}/eligibility-checks', { get: 'Lịch sử kiểm tra điều kiện OJT', post: 'Kiểm tra điều kiện OJT của sinh viên' });
+describe('/students/{id}/eligibility-checks', { get: 'Lịch sử kiểm tra điều kiện OJT' });
 describe('/students/{id}/eligibility', { get: 'Kết quả OJT và điều kiện còn thiếu' });
-describe('/eligibility-checks/{id}/confirm', { post: 'Xác nhận kết quả xét điều kiện OJT' });
-describe('/eligibility-check-runs', { post: 'Kiểm tra điều kiện OJT hàng loạt' });
-describe('/eligibility-check-runs/{id}', { get: 'Tiến độ và kết quả kiểm tra hàng loạt' });
-describe('/imports/emails', { get: 'Trạng thái gửi email tài khoản' });
-describe('/imports/emails/{emailId}/retry', { post: 'Gửi lại email bị lỗi' });
+describe('/eligibility-check-runs', { post: ['Xét điều kiện OJT hàng loạt và cập nhật trạng thái', 'Truyền phạm vi sinh viên bằng JSON body. Trả kết quả ngay và ghi nhận kết quả chính thức trong cùng lần gọi; không cần xác nhận riêng.'] });
+describe('/imports/emails/resend', { post: 'Resend email' });
 describe('/imports/archive', { post: 'Lưu trữ tuyển dụng sau hai học kỳ' });
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
@@ -119,36 +116,20 @@ describe('/students/{id}', { get: ['Hồ sơ học vụ tổng hợp', 'Kèm GPA
 describe('/students/{id}/course-results', { get: 'Điểm, lần học và trạng thái môn' });
 describe('/course-results/{id}', { patch: 'Sửa kết quả học tập và ghi lý do' });
 describe('/academic-imports', { get: 'Lịch sử nhập dữ liệu học vụ' });
-describe('/health', { get: 'Kiểm tra backend và cơ sở dữ liệu' });
-describe('/roles', { get: 'Danh sách vai trò' });
 
-describe('/auth/users/{userId}/password-reset', { post: ['Đặt lại mật khẩu', 'Gửi mật khẩu tạm qua email và thu hồi phiên cũ.'] });
-describe('/admin/dashboard', { get: ['Tổng quan hệ thống và thống kê dự đoán', 'section: summary/readiness/risks/trends/all. Summary luôn là tổng toàn hệ thống.'] });
+describe('/auth/users/password-reset', { post: ['Đặt lại mật khẩu', 'Gửi mật khẩu tạm qua email và thu hồi phiên cũ.'] });
+describe('/admin/dashboard', { post: ['Tổng quan hệ thống', 'Thống kê tài khoản, sinh viên, doanh nghiệp và kỳ OJT. Gửi {} hoặc section=summary/all.'] });
 describe('/students', { post: ['Tạo hồ sơ sinh viên', 'Liên kết với tài khoản sinh viên đang hoạt động.'] });
-describe('/students/{id}', { delete: ['Xóa hồ sơ sinh viên', 'Xóa mềm hồ sơ và vô hiệu hóa tài khoản.'] });
-describe('/students/export', { get: 'Xuất danh sách sinh viên' });
+describe('/students', { delete: ['Xóa hồ sơ sinh viên', 'Xóa mềm hồ sơ và vô hiệu hóa tài khoản.'] });
+describe('/students/export', { post: 'Xuất danh sách sinh viên' });
 const sharedWrite = 'Admin và Phòng QHDN dùng chung URL; chọn mẫu dữ liệu theo vai trò trong anyOf.';
 describe('/companies', { get: ['Danh sách và hồ sơ doanh nghiệp', 'Lọc companyId để lấy một hồ sơ kèm lịch sử phân trang.'], post: ['Tạo doanh nghiệp', sharedWrite] });
-describe('/companies/{id}', { patch: ['Cập nhật doanh nghiệp', sharedWrite], delete: ['Xóa doanh nghiệp', 'Xóa mềm doanh nghiệp theo điều kiện dữ liệu liên quan.'] });
+describe('/companies/{id}', { patch: ['Cập nhật doanh nghiệp', sharedWrite] });
 describe('/positions', { get: ['Danh sách và hồ sơ vị trí thực tập', 'Lọc positionId để lấy một vị trí kèm lịch sử; có mã, địa điểm và hình thức làm việc.'] });
-describe('/positions/{id}', { delete: ['Xóa vị trí thực tập', 'Xóa mềm vị trí theo điều kiện dữ liệu liên quan.'] });
+describe('/positions', { delete: ['Xóa vị trí thực tập', 'Xóa mềm vị trí theo điều kiện dữ liệu liên quan.'] });
 describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; lọc assignmentId để xem lịch sử.'], post: ['Phân công sinh viên thực tập', sharedWrite] });
 describe('/assignments/{id}', { patch: ['Cập nhật thông tin và trạng thái thực tập', sharedWrite] });
-describe('/assessment-templates', { get: ['Danh sách và hồ sơ bộ tiêu chí đánh giá', 'Lọc templateId để lấy một bộ tiêu chí đầy đủ.'], post: ['Tạo bộ tiêu chí đánh giá', 'Tổng trọng số tiêu chí phải bằng 100.'] });
-describe('/assessment-templates/{id}', { patch: ['Sửa bộ tiêu chí đánh giá', 'Chỉ sửa phiên bản còn nháp.'] });
-describe('/assessment-templates/{id}/publish', { post: ['Ban hành bộ tiêu chí đánh giá', 'Phiên bản đã ban hành không được sửa.'] });
-describe('/admin/prediction-jobs', { post: ['Tạo tác vụ dự đoán', 'Sử dụng mô hình dự đoán đã cấu hình.'] });
-describe('/admin/prediction-jobs/{id}', { get: 'Tiến độ dự đoán và lỗi theo sinh viên' });
-describe('/predictions', { get: 'Lịch sử dự đoán' });
-describe('/admin/models', { get: ['Danh sách và hồ sơ phiên bản mô hình', 'Lọc modelId; kết quả kèm thông số và cấu trúc đầu vào.'] });
-describe('/alerts', { get: ['Danh sách và hồ sơ cảnh báo rủi ro', 'Lọc alertId để lấy cảnh báo kèm hoạt động hỗ trợ phân trang.'] });
-describe('/alerts/{id}/status', { patch: 'Tiếp nhận hoặc đóng cảnh báo' });
-describe('/alerts/{id}/interventions', { post: 'Tạo hoạt động hỗ trợ sinh viên' });
-describe('/students/{id}/interventions', { get: 'Lịch sử hỗ trợ sinh viên' });
-describe('/interventions/{id}', { patch: 'Cập nhật hoạt động hỗ trợ' });
-describe('/admin/reports/readiness', { get: ['Báo cáo mức sẵn sàng và rủi ro', 'Lấy dự đoán mới nhất của từng sinh viên trong mỗi kỳ.'] });
-describe('/admin/reports/export', { get: ['Xuất báo cáo dự đoán', 'Tối đa 10.000 bản ghi dự đoán mới nhất.'] });
-describe('/admin/audit-logs', { get: ['Nhật ký hoạt động hệ thống', 'Ẩn các trường dữ liệu nhạy cảm.'] });
+describe('/admin/audit-logs/list', { post: ['Danh sách nhật ký hoạt động chi tiết', 'Nhập bộ lọc JSON. Trả toàn bộ detail và bản ghi rawLog nguyên gốc, không che dữ liệu trong bản demo.'] });
 describe('/ojt-coordinations', { get: ['Danh sách và hồ sơ điều phối', 'Lọc coordinationId để xem hồ sơ, lịch sử và chuỗi điều phối phân trang.'], post: ['Giới thiệu sinh viên cho doanh nghiệp', 'Áp dụng cho hồ sơ đã bàn giao; cần lý do và lưu nhật ký.'] });
 describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định tiếp nhận sinh viên', 'Admin hoặc Phòng QHDN ghi nhận thay doanh nghiệp; cần lý do.'] });
 describe('/ojt-coordinations/{id}/reassign', { post: ['Điều phối lại sinh viên', 'Chuyển hồ sơ bị từ chối sang vị trí khác; cần lý do.'] });
@@ -222,3 +203,5 @@ export function describeManualInputs(spec: Spec): Spec {
   }
   return spec;
 }
+
+describe('/companies', { delete: ['Xóa doanh nghiệp', 'Truyền companyId trong JSON body. Xóa mềm doanh nghiệp theo điều kiện dữ liệu liên quan.'] });

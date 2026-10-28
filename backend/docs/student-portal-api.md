@@ -1,130 +1,160 @@
-# Triển khai API kỳ 5 → OJT
+# API Sinh viên — REST và các nhóm đã gộp
 
-Đã triển khai 48 operation mới trong checklist và sửa/đối chiếu 24 operation hiện có được đánh dấu cần sửa. Các API `/student/...` chỉ nhận STUDENT; API Đào tạo nhận ADMIN/ACADEMIC; import/công bố nhận ADMIN/OJT_COORD; doanh nghiệp chỉ đọc đơn/CV đã được gửi đến doanh nghiệp mình và ghi decision/evaluation trong phạm vi.
+Base URL `/api`, Bearer token STUDENT. GET không có body; ID tài nguyên nằm trong path, bộ lọc nằm trong query. POST/PATCH dùng JSON object với `Content-Type: application/json`. Upload CV dùng multipart/form-data.
 
-## Khởi tạo schema và chạy
+Sau khi gộp, Student có **21 operation: 13 GET, 6 POST, 2 PATCH**, tính cả Auth chung và upload CV. Swagger `/api-docs`, hợp đồng máy đọc `/api-docs/openapi.json`, đầu vào đầy đủ tại [api-input-reference.md](api-input-reference.md).
 
-Không chạy toàn bộ `backend/DB` để cập nhật database đang có dữ liệu: phần đầu là script reset. Section mới là `Semester 5 student portal APIs`, version `20261013_student_portal`.
+## 1. Hồ sơ và học vụ
 
-Trong thư mục backend:
+`GET /api/students/:id` là API đọc tổng hợp thay cho các API riêng về bảng điểm, chương trình, tổng hợp học vụ, môn cần học, điều kiện/lịch sử xét và lịch sử combo.
 
-```sh
-npm install
-npm run db:migrate:admin
-npm run db:migrate:student-portal
-npm run build
-npm start
+`id` là StudentID, không phải UserID. Student chỉ đọc hồ sơ của mình; Admin/Đào tạo vẫn có quyền đọc theo nghiệp vụ. Không đổi thuật toán GPA, tín chỉ hoặc ràng buộc OJT kỳ chương trình 6.
+
+### Chọn phần cần tải
+
+Query `include` là danh sách phân cách bằng dấu phẩy. Không truyền thì lấy tất cả phần bên dưới; truyền `include` giúp bỏ truy vấn và dữ liệu không cần cho màn hình.
+
+| Phần | Dữ liệu |
+| --- | --- |
+| `academicProgress` | GPA, thang điểm, tín chỉ, yêu cầu môn, môn dùng tính GPA, lỗi cấu hình |
+| `courseResults` | Bảng điểm từng lần học, điểm số/điểm chữ, kỳ chương trình và học kỳ lịch/năm học |
+| `comboSelections` | Các combo đã xác nhận và môn đã chọn |
+| `ojtRegistrations` | Hồ sơ đăng ký và thông tin điều phối/phân công; đánh giá chỉ hiển thị cho Student sau khi kết quả CONFIRMED |
+| `eligibility` | Kết quả hiện tại, lần xét gần nhất và quyết định chính thức cho kỳ đã chọn/suy ra |
+| `eligibilityChecks` | Lịch sử xét/xác nhận, có phân trang |
+| `comboHistory` | Lịch sử lựa chọn, lần thay đổi, ảnh hưởng học vụ, có phân trang |
+| `academic` | Tổng hợp học vụ, điều kiện OJT, deadline, kịch bản tín chỉ và `supplementaryCourses` (môn cần học/học lại, tiên quyết, lý do) |
+| `curriculum` | Chương trình đã ban hành: metadata, môn theo kỳ, combo/nhóm lựa chọn, tiên quyết, tương đương, chính sách GPA |
+
+Thông tin cơ bản, CV và kỳ OJT mục tiêu vẫn được trả. `officialEligibility`/`officialDecision` kèm khi tải academicProgress/academic/eligibility. Nếu chưa có kỳ OJT, `academic`/`eligibility` là null. Chương trình chưa gán hoặc chưa công bố trả `curriculum=null`, kèm `curriculumStatus`; không làm mất các phần khác của hồ sơ.
+
+`section=academicProgress` còn dùng được để tương thích cách lọc cũ; không dùng cùng `include`.
+
+### Bộ lọc và phân trang
+
+| Query | Áp dụng |
+| --- | --- |
+| `ojtSemesterId` | Chọn kỳ OJT cho học vụ, điều kiện và hồ sơ đăng ký; bỏ trống suy ra kỳ từ đăng ký gần nhất hoặc ánh xạ nấc 6 |
+| `resultsPage`, `resultsLimit` | Phân trang courseResults |
+| `courseId`, `academicPeriodId`, `courseStatus` | Lọc courseResults; status thuộc PASSED/FAILED/IN_PROGRESS/WITHDRAWN/RECOGNIZED |
+| `ojtPage`, `ojtLimit` | Phân trang ojtRegistrations |
+| `checksPage`, `checksLimit` | Phân trang eligibilityChecks; không truyền ojtSemesterId thì lịch sử gồm các kỳ |
+| `comboPage`, `comboLimit` | Phân trang comboHistory |
+
+Mỗi trang mặc định 1/20, limit tối đa 100. Mỗi phần danh sách trả `{items,total,page,limit}` độc lập. Lịch sử combo giữ đủ trường phase, previous, sourceEventId, progress và eligibility của API cũ.
+
+```http
+GET /api/students/1?include=academic,curriculum&ojtSemesterId=1
+GET /api/students/1?include=courseResults&resultsPage=2&resultsLimit=20&courseStatus=FAILED
+GET /api/students/1?include=eligibilityChecks,comboHistory&checksPage=2&comboPage=1
 ```
 
-Hai script migration chỉ chạy section bổ sung tương ứng và bỏ qua version đã cài. Migration mới giữ lịch sử enterprise import cũ, thêm metadata/CV/đơn/thông báo; không reset các bảng. Phần Admin migration là prerequisite vì API dùng DeletedAt và AcademicSupervisorID. Đã kiểm thử schema trong PostgreSQL cô lập; chưa chạy migration vào DB thật của người dùng.
+## 2. Hồ sơ thực tập, nhiệm vụ và kết quả
 
-## Cấu hình
-
-Tham khảo `.env.student-portal.example` và gộp vào cấu hình backend hiện có, không ghi đè `.env` đang dùng.
-
-| Biến | Yêu cầu |
-|---|---|
-| CV_STORAGE_KEY | Base64 của đúng 32 byte, dùng AES-256-GCM cho CV. Giữ ổn định và sao lưu cùng dữ liệu; đổi key không có migration sẽ không đọc được CV cũ |
-| EMAIL_OUTBOX_KEY | Key hex 32 byte hiện có cho email cấp tài khoản doanh nghiệp |
-| FRONTEND_LOGIN_URL | URL đăng nhập trong email cấp tài khoản |
-| ADVISORY_WORKER_ENABLED | Mặc định bật; `false` tắt xử lý batch/thông báo tự động. Không cần SMTP để tạo thông báo IN_APP |
-| CV_ANALYSIS_SERVICE_URL | URL dịch vụ đọc PDF CV; thiếu thì API phân tích trả 503 AI_NOT_CONFIGURED |
-| ROADMAP_SERVICE_URL | URL dịch vụ tư vấn AI; không dùng thay API đề xuất môn theo quy tắc |
-| MATCHING_SERVICE_URL | URL dịch vụ matching CV với danh sách vị trí được công bố |
-| STUDENT_AI_API_KEY | Bearer token tùy chọn cho ba dịch vụ AI |
-
-Không thêm model giả hoặc dự báo ngẫu nhiên. API risk đọc Predictions của chính sinh viên; chưa có dữ liệu trả NOT_AVAILABLE. Việc huấn luyện/vận hành model thực tế nằm ngoài thay đổi này.
-
-## Hợp đồng chung
-
-Base URL `/api`, Bearer JWT. Các API mới trả `{success:true,data:...}`. Riêng imports giữ response tương thích ở root như trước; lô bị từ chối trả 422, success:false, rejectedBatch:true và batchId.
-
-Danh sách dùng page/limit (1/20 mặc định, limit tối đa 100). Các endpoint học vụ theo kỳ (`academic-summary`, `supplementary-course-options`, `dashboard`, `risk-prediction`, `roadmap-recommendations`, `company-recommendations`, báo cáo QHDN) yêu cầu `ojtSemesterId`.
-
-Swagger `/api-docs` duy trì cơ chế JSON wrapper hiện có: GET có query/path được tài liệu hóa thành POST `/api/json/.../search|detail`. Route REST gốc vẫn hoạt động. Upload CV/import file là multipart/form-data, không đưa tệp vào JSON wrapper.
-
-## Import sheet đối tác — QHDN
-
-`POST /imports/preview`, `/imports/commit` nhận cả JSON hiện có và multipart.
-
-Multipart fields:
-
-- kind: ENTERPRISE.
-- semesterId: đợt thực tập mục tiêu, không phải kỳ học xét điều kiện.
-- idempotencyKey: khóa chống nhập lặp.
-- file: CSV/XLSX, tối đa 8 MiB, tối đa 5000 dòng và 100 cột.
-- mode: UPSERT (mặc định) hoặc CREATE_ONLY.
-- mapping: tùy chọn chuỗi JSON ánh xạ trường chuẩn sang tên cột sheet.
-
-Header chuẩn: `code,name,email,fullName,address,positionCode,title,description,requirements,capacity`. address không bắt buộc. Một dòng là một vị trí; những dòng cùng mã doanh nghiệp được nhóm lại, tối đa 500 doanh nghiệp/lô và 50 vị trí/doanh nghiệp. Nhóm phải thống nhất tên/email/người liên hệ.
-
-Ví dụ mapping:
-
-```json
-{"code":"Mã DN","name":"Tên DN","email":"Email","fullName":"Người liên hệ","positionCode":"Mã vị trí","title":"Vị trí","description":"Mô tả","requirements":"Yêu cầu","capacity":"Chỉ tiêu"}
-```
-
-Preview kiểm tra toàn bộ lô, không ghi tài khoản/doanh nghiệp. Errors có rowNumber theo danh sách doanh nghiệp chuẩn hóa; với sheet có thêm sheetRows để đối chiếu số dòng vật lý. Commit có lỗi không ghi bất kỳ doanh nghiệp/vị trí nào, vẫn ghi lịch sử rejected và các dòng NOT_IMPORTED/REJECTED. Dùng GET `/company-imports` và `/:id` để tra lịch sử.
-
-UPSERT nhận nhiều lô trong cùng kỳ, tìm đối tác theo mã, vị trí theo doanh nghiệp+kỳ+mã vị trí. Không giảm chỉ tiêu xuống dưới chỗ đã giữ/phân công. Không hồi sinh bản ghi deleted/archived hoặc thay danh tính tài khoản khác; cần Admin xử lý các xung đột đó. Tài khoản mới được cấp mật khẩu tạm qua outbox, không trả/lưu mật khẩu rõ trong lịch sử API. Khóa idempotency của lô đã hoàn thành không được dùng cho payload khác.
-
-Import tạo `RecruitmentPosts` PENDING_REVIEW liên kết vị trí. QHDN sửa deadline qua PATCH `/recruitment-posts/:id`, sau đó POST `/:id/publish` với reason. DN không có quyền tạo/sửa/công bố tin. Sửa nội dung đã công bố chuyển về PENDING_REVIEW; đơn cũ giữ snapshot. POST `/:id/close` đóng nhận đơn mới.
-
-## Học vụ, mốc xét và thông báo
-
-- academicPeriodId của OJTRegistrationWindows là kỳ học chuẩn bị/đăng ký; ojtSemesterId là đợt thực tập mục tiêu. Hai kỳ có thể khác nhau, kể cả khác năm học.
-- PUT `/ojt-semesters/:id/assessment-window` nhận blockPeriodId, assessmentAcademicPeriodId, requiredRelativeSemester=5, opensAt, closesAt, reason. BL3W/BLOCK3 phải thuộc kỳ cha đó; mốc mở xét sau khi cả kỳ cha và BLOCK3 kết thúc.
-- POST assessment-window/open yêu cầu resultsFinalized:true. Check được dùng để confirm phải tạo sau mốc finalized và đúng kỳ tương đối 5 hoặc có ngoại lệ hợp lệ. Mở lại CLOSED phải gửi reopen:true, reason và resultsFinalized:true; có thể gửi closesAt mới. Mỗi lần mở lại tăng Revision và làm các xác nhận thuộc revision cũ stale, cần chạy xét/xác nhận lại. Mọi lần mở lại được audit.
-- POST `/ojt-registrations` yêu cầu official ELIGIBLE còn hiện hành. Duyệt/bàn giao vẫn chỉ Đào tạo. QHDN kiểm tra lại hiệu lực official trước khi điều phối/tiếp nhận/phân công.
-- academic-summary trả earnedCredits, missingCredits, failedCourseCount, outstandingCourses, inProgressCredits, currentEligibility, officialEligibility và scenario. Scenario chỉ là giả định các môn đang học đều đạt, dùng lại thuật toán đối chiếu tín chỉ để không đếm trùng môn/slot; không phải dự đoán AI.
-- supplementary-course-options trả môn cần học/học lại, lý do, tín chỉ, tiên quyết, availability:NOT_MANAGED. Không có API quản lý lớp/đăng ký học.
-- `/academic/alerts` đã có thêm EXCESS_FAILED_COURSES; endpoint notifications cũ bổ sung số tín chỉ và môn nợ, vẫn chỉ gửi sinh viên có alert.
-
-POST `/academic/academic-summary-notifications` và `/academic/eligibility-notifications` nhận:
+`GET /api/students/me/internships` trả:
 
 ```json
 {
-  "ojtSemesterId": 1,
-  "academicPeriodId": 5,
-  "studentIds": [123],
-  "idempotencyKey": "midterm-2026-v1",
-  "reason": "Thông báo giữa kỳ 5"
+  "success": true,
+  "data": {
+    "studentId": 1,
+    "ojtSemesterId": 1,
+    "assignment": null,
+    "tasks": {"items": [], "total": 0, "page": 1, "limit": 20},
+    "results": {"items": [], "total": 0, "page": 1, "limit": 20},
+    "result": null
+  }
 }
 ```
 
-ID trên chỉ minh họa. Có thể dùng scope tương tự đợt OJT thay studentIds. Tối đa 1000 sinh viên, đúng kỳ tương đối 5. Response 202 có runId; worker xử lý tối đa 10 dòng/lượt, lưu snapshot + notification cùng transaction. Gửi lại cùng key/payload/người tạo trả run cũ; muốn chạy lại với dữ liệu mới dùng key mới. Kết quả chính thức stale/chưa có được thông báo chờ đối soát, không giả kết luận không đủ.
+- `ojtSemesterId`: lọc kỳ OJT. Bỏ trống thì assignment là phân công chưa hủy mới nhất; results là lịch sử kết quả của mình.
+- `assignmentId`: chọn đúng phân công lịch sử, kể cả đã hủy. Nhiệm vụ luôn thuộc phân công được chọn, không lẫn sang lần phân công mới.
+- `resultId`: chọn kết quả CONFIRMED của mình, trả trong `result`, đồng thời chọn đúng phân công gắn kết quả và nhiệm vụ tương ứng. Không có, chưa công bố hoặc thuộc người khác đều trả 404.
+- `tasksPage/tasksLimit`, `resultsPage/resultsLimit`: phân trang độc lập. Không dùng page/limit chung.
+- Chọn assignmentId cùng resultId phải cùng phân công. results là danh sách kết quả theo kỳ được chọn; result là bản ghi chi tiết được chọn.
 
-GET `/academic/advisory-runs`, `/:id` theo dõi tiến trình/lỗi. GET/PUT `/academic-periods/:id/ojt-advisory-schedule` cấu hình sendAt trong kỳ chuẩn bị, assessmentDeadline sau kỳ, ojtSemesterId, scope, enabled, reason. Worker chống gửi trùng theo kỳ+version cấu hình. Thay đổi version lịch là một lần gửi mới có chủ đích.
+Assignment giữ thông tin doanh nghiệp/vị trí/học kỳ/hồ sơ đăng ký và người hướng dẫn. Kết quả giữ điểm chính thức/thành phần, nhận xét, tiêu chí/mẫu đánh giá và scoreDetails. Chưa có phân công thì assignment=null, tasks rỗng; lịch sử results vẫn hoạt động.
 
-## CV và ứng tuyển
+```http
+GET /api/students/me/internships?ojtSemesterId=1&tasksPage=2&tasksLimit=20
+GET /api/students/me/internships?assignmentId=5
+GET /api/students/me/internships?resultId=7
+```
 
-- POST `/student/cv`: multipart field file, PDF tối đa 5 MiB, kiểm tra chữ ký PDF. Mỗi upload tạo phiên bản mới được mã hóa, không ghi bytes vào audit.
-- GET `/student/cv`: metadata; `?download=true` tải PDF riêng tư với Cache-Control:no-store và Content-Disposition:attachment.
-- DELETE `/student/cv`: ngừng dùng phiên bản hiện tại; không xóa bản đã gắn vào đơn. Những bản đã nghỉ vẫn giữ để bảo toàn hồ sơ.
-- POST `/student/applications`: postId, positionId; cvId (tùy chọn, phải là CV hiện tại của mình), coverLetter. Backend xác định Student/Registration/Enterprise từ token/dữ liệu DB.
-- Yêu cầu official ELIGIBLE còn hiện hành, hồ sơ OJT hợp lệ, chương trình khớp, đợt mở, vị trí công bố chưa hết hạn, còn chỉ tiêu, đã upload CV và chưa có tiếp nhận/phân công khác trong kỳ.
-- Được nộp đơn trước bàn giao; response waitingForHandoff:true. QHDN không được đọc/điều phối trước bàn giao; ADMIN được tra cứu toàn bộ đơn để quản trị.
-- GET `/student/applications`, `/:id` xem đơn/timeline của mình. POST `/:id/withdraw` với reason chỉ trước tiếp nhận/phân công; hủy pending coordination tương ứng. Hồ sơ từng được điều phối không được ghi đè bằng lần nộp lại sau rút; liên hệ QHDN để điều phối lại, giữ nguyên lịch sử.
-- GET `/job-applications`, `/:id`, `/:id/cv`: QHDN chỉ hồ sơ đã bàn giao; DN chỉ đơn đã gửi đến DN mình. CV lấy đúng phiên bản gắn vào đơn; upload CV mới không đổi bản DN đã nhận.
-- POST `/ojt-coordinations` nhận applicationId + reason (có thể đối chiếu thêm registrationId/positionId). Luồng dữ liệu cũ chưa có application được giữ tương thích; khi hồ sơ đã có đơn phải chọn applicationId.
-- Decision là nguồn duy nhất ghi ACCEPTED/REJECTED, đồng bộ đơn và giữ chỗ cùng transaction; không giữ chỗ lần hai lúc tạo phân công. Nhập thay DN vẫn bắt buộc reason và người nhập thực.
-- Một sinh viên chỉ có một lượt tiếp nhận/phân công chưa hủy trong kỳ. Reassign yêu cầu đơn phù hợp vị trí mới, giữ lịch sử và giải phóng chỗ cũ. Hủy phân công đồng bộ đơn sang WITHDRAWN.
+## 3. Dashboard
 
-## Kết quả, báo cáo và dashboard
+`GET /api/students/me/dashboard?ojtSemesterId=1` trả `academic` (kèm supplementaryCourses), `registrationWindows`, `comboWindows`, `internship`, `notifications`, `jobApplications`.
 
-Student đọc `/student/assignments/current` theo kỳ nếu có, `/student/ojt-results`, `/:id` chỉ CONFIRMED. Xác nhận của Đào tạo là mốc công bố, không cần thêm endpoint publish riêng. DTO Student không trả raw handoff snapshot/audit; Enterprise history không trả snapshot audit nội bộ.
+Các danh sách trên dashboard lấy tối đa 5 bản ghi đầu và có total/page/limit. Đọc tiếp qua API hồ sơ/nhóm tương ứng. Toàn bộ dashboard dùng một transaction REPEATABLE READ READ ONLY; không lấy khóa ghi academic-calendar. Hồ sơ học vụ tải dữ liệu điểm/chương trình/combo một lần để tính hiện tại và kịch bản, tái dùng cho đối chiếu điều kiện trong cùng request. Không cache dữ liệu giữa các request.
 
-GET `/qhdn/dashboard` và `/qhdn/reports/acceptance|internships|enterprise-feedback` yêu cầu ojtSemesterId, hỗ trợ enterpriseId ở báo cáo. GET `/qhdn/reports/export?type=acceptance&ojtSemesterId=1&format=csv|json`, không page/limit, tối đa 10000 dòng. Không hỗ trợ PDF trong thay đổi này. GET `/student/dashboard` tổng hợp học vụ, đợt, phân công và thông báo của mình.
+## 4. Các API được giữ
 
-## Hợp đồng dịch vụ AI
+| Chức năng | API |
+| --- | --- |
+| Tài khoản hiện tại | GET `/auth/me` |
+| Hồ sơ/học vụ | GET `/students/:id` |
+| Dashboard | GET `/students/me/dashboard` |
+| Hồ sơ thực tập | GET `/students/me/internships` |
+| Đợt chọn combo, có combo khả dụng/lựa chọn hiện tại | GET `/combo-registration-windows` |
+| Xem trước tác động combo | POST `/combo-registration-windows/:id/preview` |
+| Gửi lựa chọn combo | POST `/combo-registration-windows/:id/selections` |
+| Đợt đăng ký OJT, có hồ sơ đã nộp và lý do chặn | GET `/ojt-registration-windows` |
+| Danh sách/lịch sử hồ sơ OJT | GET `/ojt-registrations` |
+| Gửi hồ sơ OJT | POST `/ojt-registrations` |
+| Theo dõi trạng thái của mình theo kỳ | GET `/ojt-semesters/:id/students` |
+| Cơ hội/vị trí thực tập | GET `/students/me/opportunities?ojtSemesterId=...` |
+| Đơn ứng tuyển và điều phối | GET `/job-applications` |
+| Ứng tuyển | POST `/job-applications` |
+| Thông báo | GET `/students/me/notifications` |
+| Đánh dấu đã đọc/chưa đọc | PATCH `/students/me/notifications/:id` |
+| Upload CV PDF | POST `/students/me/cv` — multipart field `cv`, tối đa 10 MiB |
+| Download CV PDF | GET `/students/:id/cv?cvFileId=...` |
+| Tư vấn AI | GET `/students/me/roadmap-recommendations?ojtSemesterId=...` |
+| Cập nhật liên hệ cá nhân | PATCH `/accounts/me/profile` |
+| Đổi mật khẩu | POST `/auth/change-password` |
 
-Provider URL chỉ đọc từ cấu hình server, không nhận URL từ client. Request POST JSON, Bearer STUDENT_AI_API_KEY nếu có, timeout 20 giây, redirect bị chặn và response tối đa 1 MiB.
+Các API dùng chung còn cần cho nhân sự không bị xóa. GET `/internship-tasks` giữ cho ADMIN/OJT_COORD/ENTERPRISE; Student lấy nhiệm vụ trong internships. Upload/download CV và tư vấn AI giữ riêng vì khác định dạng/luồng xử lý. Auth giữ envelope user; nghiệp vụ dùng data, CV download trả PDF.
 
-- CV_ANALYSIS_SERVICE_URL nhận `{cvId,mimeType,contentBase64}`. Trả `{summary,skills:string[],education:string[],experience:string[],languages:string[],modelVersion}`. POST `/student/cv/analyses` nhận cvId; lưu job RUNNING/COMPLETED/FAILED; GET `/student/cv/analyses/:id` chỉ chủ hồ sơ đọc. Không chạy model trong repository này.
-- ROADMAP_SERVICE_URL nhận `{academicSummary}`. Trả `{recommendations:string[],modelVersion}`.
-- MATCHING_SERVICE_URL nhận `{cv,positions}` với kết quả phân tích CV hiện tại và tối đa 500 vị trí được công bố trong kỳ. Trả `{matches:[{positionId,score,reason}],modelVersion}`; score 0–100, không được trả ID ngoài danh sách ứng viên hoặc trùng ID.
-- API ghi rõ isAiRecommendation; thiếu provider trả 503, không có kết quả mẫu thay thế.
+## 5. Các API đã gỡ và thay thế
 
-## Danh sách endpoint
+| API GET đã gỡ | API/thành phần thay thế |
+| --- | --- |
+| `/students/:id/course-results` | `/students/:id?include=courseResults` |
+| `/students/:id/eligibility` | `/students/:id?include=eligibility&ojtSemesterId=...` |
+| `/students/:id/eligibility-checks` | `/students/:id?include=eligibilityChecks` |
+| `/students/:id/combo-selections` | `/students/:id?include=comboHistory,comboSelections` |
+| `/students/me/academic-summary` | `/students/:id?include=academic` |
+| `/students/me/supplementary-course-options` | `/students/:id?include=academic` → academic.supplementaryCourses |
+| `/students/me/curriculum` | `/students/:id?include=curriculum` |
+| `/students/me/assignments/current` | `/students/me/internships` → assignment |
+| `/students/me/ojt-results` | `/students/me/internships` → results |
+| `/students/me/ojt-results/:id` | `/students/me/internships?resultId=...` → result |
 
-Danh sách đầy đủ theo role tại [api-inventory-by-role.md](api-inventory-by-role.md).
+Các route trên không còn được đăng ký hoặc hiển thị trong Swagger; không chuyển tiếp và không giữ alias. Các adapter POST `/student/*/search`, `/detail`, `/create`, `/update` cũ cũng đã gỡ từ đợt REST trước. FE cần đổi URL và đọc đúng phần response theo bảng, cùng các tên phân trang mới.
+
+## JSON body nghiệp vụ
+
+```http
+POST /api/ojt-registrations
+Content-Type: application/json
+
+{"windowId":1,"application":{"contactPhone":"0901234567","contactEmail":"student@example.com","note":"Đăng ký OJT"}}
+```
+
+```http
+POST /api/job-applications
+Content-Type: application/json
+
+{"registrationId":1,"postId":1,"positionId":1,"coverLetter":"Nguyện vọng ứng tuyển"}
+```
+
+```http
+PATCH /api/students/me/notifications/1
+Content-Type: application/json
+
+{"isRead":true}
+```
+
+Combo gửi JSON `{comboId,courseIds,reason?}`; preview không cần reason. Cập nhật tài khoản nhận `{fullName?,phone?}`; đổi mật khẩu nhận `{currentPassword,newPassword}`. ID ví dụ phải thay bằng dữ liệu thật. Không gửi body cho GET, không đặt Content-Type JSON cho FormData.
+
+Bản gộp này không thêm bảng/cột, không cần migration. Không đổi quy tắc GPA, 70 tín chỉ/tối đa 2 môn nợ, quyền bàn giao hoặc kỳ OJT cố định ở nấc chương trình 6. Không trả mật khẩu, khóa hoặc bytes CV trong JSON. AI chưa cấu hình vẫn trả 503 AI_NOT_CONFIGURED.

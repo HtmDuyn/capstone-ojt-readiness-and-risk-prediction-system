@@ -18,8 +18,10 @@ const combo=obj({id,comboId:id,...fields('code','name','purpose'),confirmedAt:ti
 const template=nil(obj({id,...fields('code','name','status'),version:id,criteria:arr({type:'object',additionalProperties:true})}));
 const evaluation=nil(obj({id,templateId:nil(id),scoreDetails:{type:'object',nullable:true,additionalProperties:true},completionScore:num,attitudeScore:num,skillScore:num,overallScore:num,...fields('comments','status'),evaluatedAt:time,evaluatedBy:id}));
 const result=nil(obj({id,status:text,version:id,officialScore:num,outcome:nil(text),confirmedAt:time}));
-const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','className','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:id,
+const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','className','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},
   entryAcademicPeriodId:nil(id),currentAcademicPeriodId:nil(id),enrollmentYear:id,
+  courseSemesterTag:{type:'integer',minimum:0,maximum:9,nullable:true,description:'Kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình; null khi không có môn đang học.'},
+  latestOjtCheck:nil(obj({status:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']},checkedAt:time,ojtSemesterId:id,isStale:{type:'boolean'}})),
   program:nil(obj({id,...fields('code','name','version','status','majorName','majorCode'),totalCredits:num,majorId:nil(id)})),
   cohort:nil(obj({id,...fields('code','name')})),entryAcademicPeriod:nil(period),currentAcademicPeriod:nil(period)};
 const profile=obj({...coreStudent,
@@ -47,11 +49,10 @@ export function describeFeResponses(spec:Schema):void {
   personalUpdate.description='Chỉ cập nhật fullName và phone của tài khoản đăng nhập. Hồ sơ doanh nghiệp dùng PATCH /api/enterprise/profile riêng.';
   personalUpdate.requestBody={required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,minProperties:1,properties:{fullName:{type:'string',minLength:1,maxLength:150},phone:{type:'string',nullable:true,maxLength:20}}}}}};
 
-  set('/api/accounts/{userId}',account,'account','patch');
-  spec.paths['/api/accounts'].get.responses['200']={description:'Danh sách hoặc tài khoản theo userId; giữ envelope hiện có.',content:{'application/json':{schema:obj({success:{type:'boolean'},data:arr(account),total:{type:'integer'},page:id,limit:id})}}};
+  set('/api/accounts/update',account,'account','patch');
+  spec.paths['/api/accounts'].get.responses['200']={description:'Danh sách hoặc tài khoản theo userId; giữ envelope hiện có.',content:{'application/json':{schema:obj({success:{type:'boolean'},data:arr(account),total:{type:'integer'}})}}};
   const count={type:'integer',minimum:0},scope={type:'object',additionalProperties:true};
-  const distribution=obj({scope,basis:text,total:count,groups:arr(obj({level:text,count,averageScore:num}))});
-  set('/api/admin/dashboard',obj({summary:obj({scope:{type:'string',enum:['ALL_SYSTEM']},accounts:count,activeAccounts:count,students:count,companies:count,ojtSemesters:count,openAlerts:count}),readiness:distribution,risks:distribution,trends:obj({scope,basis:text,items:arr(obj({month:time,predictionCount:count,averageReadiness:num,averageRisk:num,highRiskCount:count}))})}));
+  set('/api/admin/dashboard',obj({summary:obj({scope:{type:'string',enum:['ALL_SYSTEM']},accounts:count,activeAccounts:count,students:count,companies:count,ojtSemesters:count})}),'data','post');
   const academicCounts={total:count,eligible:count,notEligible:count,insufficientData:count,awaitingConfirmation:count};
   set('/api/academic/dashboard',obj({scope,computedAt:time,summary:obj({...academicCounts,currentEvaluation:obj({eligible:count,notEligible:count,reviewRequired:count}),staleConfirmations:count}),statistics:obj({groupBy:text,overall:obj(academicCounts),groups:arr(obj({id:{oneOf:[{type:'integer'},{type:'string'}],nullable:true},name:nil(text),...academicCounts})),membershipCountsMayOverlap:{type:'boolean'}})}));
 

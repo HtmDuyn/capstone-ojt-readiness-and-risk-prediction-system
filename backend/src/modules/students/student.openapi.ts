@@ -125,35 +125,6 @@
  *           "reason": {
  *             "type": "string",
  *             "maxLength": 2000
- *           },
- *           "placement": {
- *             "type": "object",
- *             "additionalProperties": false,
- *             "minProperties": 1,
- *             "properties": {
- *               "cohortId": {
- *                 "type": "integer",
- *                 "minimum": 1
- *               },
- *               "groupCode": {
- *                 "type": "string",
- *                 "enum": [
- *                   "A",
- *                   "B",
- *                   "C",
- *                   "D"
- *                 ]
- *               },
- *               "entryAcademicPeriodId": {
- *                 "type": "integer",
- *                 "minimum": 1
- *               },
- *               "currentAcademicPeriodId": {
- *                 "type": "integer",
- *                 "minimum": 1
- *               }
- *             },
- *             "description": "Chỉ gửi trường lộ trình cần sửa. Lần đầu cần khóa, nhóm và kỳ hiện tại."
  *           }
  *         },
  *         "required": [
@@ -303,7 +274,26 @@
  *             "in": "query",
  *             "schema": {
  *               "type": "integer",
- *               "minimum": 1
+ *               "minimum": 0,
+ *               "maximum": 9
+ *             }
+ *           },
+ *           {
+ *             "name": "importedOnly",
+ *             "in": "query",
+ *             "description": "Only students included in a successful student account import.",
+ *             "schema": {
+ *               "type": "boolean",
+ *               "default": false
+ *             }
+ *           },
+ *           {
+ *             "name": "importBatchId",
+ *             "in": "query",
+ *             "description": "Filter by the source account import batch ID (positive bigint string).",
+ *             "schema": {
+ *               "type": "string",
+ *               "pattern": "^[1-9][0-9]*$"
  *             }
  *           }
  *         ],
@@ -352,71 +342,6 @@
  *               "type": "integer",
  *               "minimum": 1
  *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "resultsPage",
- *             "required": false,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "default": 1
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "resultsLimit",
- *             "required": false,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 100,
- *               "default": 20
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "ojtPage",
- *             "required": false,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "default": 1
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "ojtLimit",
- *             "required": false,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1,
- *               "maximum": 100,
- *               "default": 20
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "ojtSemesterId",
- *             "required": false,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           },
- *           {
- *             "in": "query",
- *             "name": "section",
- *             "required": false,
- *             "schema": {
- *               "type": "string",
- *               "enum": [
- *                 "all",
- *                 "academicProgress"
- *               ],
- *               "default": "all"
- *             },
- *             "description": "all: hồ sơ đầy đủ; academicProgress: thông tin sinh viên và tiến độ học tập."
  *           }
  *         ],
  *         "responses": {
@@ -830,3 +755,4 @@
  *   }
  * }
  */
+export const studentApiDocumentation = true;
