@@ -21,7 +21,11 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
-import { enterpriseService, type EnterpriseInternshipItem } from '@/services/enterpriseService';
+import {
+  enterpriseService,
+  type EnterpriseInternshipItem,
+  type EnterpriseInternshipTask,
+} from '@/services/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -46,6 +50,25 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): Enterpri
   status: (['CANCELLED', 'CANCELED', 'FAILED'].includes(item.status?.toUpperCase() || '') ? 'RISK' : item.status?.toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'ONGOING') as 'ONGOING' | 'COMPLETED' | 'RISK',
 });
 
+const mapApiToTask = (item: EnterpriseInternshipTask): InternTask => {
+  const status = item.status.toUpperCase();
+  if (!['TODO', 'IN_PROGRESS', 'DONE', 'COMPLETED'].includes(status)) {
+    throw new Error(`Trạng thái task không được hỗ trợ: ${item.status}`);
+  }
+
+  return {
+    id: String(item.id),
+    internId: String(item.assignmentId),
+    internName: item.student?.fullName || item.fullName || 'Sinh viên',
+    title: item.name,
+    description: item.description || '',
+    deadline: item.dueDate?.slice(0, 10) || '',
+    status: status === 'COMPLETED' ? 'DONE' : status as InternTask['status'],
+    assignedBy: 'Mentor Doanh Nghiệp',
+    createdAt: item.assignedDate?.slice(0, 10),
+  };
+};
+
 const isTaskAssignable = (intern: EnterpriseIntern) =>
   ['ASSIGNED', 'ACTIVE', 'IN_PROGRESS'].includes(intern.assignmentStatus || '');
 
@@ -66,7 +89,7 @@ const getApiErrorMessage = (error: unknown): string | null => {
 };
 
 export const EnterpriseInterns: React.FC = () => {
-  const { loading: profileLoading } = useEnterprise();
+  const { loading: profileLoading, companyId } = useEnterprise();
   const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
   const [tasks, setTasks] = useState<InternTask[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
@@ -74,14 +97,56 @@ export const EnterpriseInterns: React.FC = () => {
 
   const fetchInternships = useCallback(async () => {
     if (profileLoading) return;
+    if (!companyId) {
+      setApiLoading(false);
+      setApiError('Không tìm thấy doanh nghiệp để tải danh sách task.');
+      return;
+    }
+
     setApiLoading(true);
     setApiError(null);
     try {
-      const res = await enterpriseService.listInternships();
-      if (res?.success && res.data) {
-        const mapped = (res.data.items || []).map(mapApiToIntern);
-        setInterns(mapped);
+      const [internshipResponse, firstTaskResponse] = await Promise.all([
+        enterpriseService.listInternships(),
+        enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 }),
+      ]);
+      if (!internshipResponse?.success || !internshipResponse.data) {
+        throw new Error('Không thể tải danh sách thực tập sinh.');
       }
+      if (!firstTaskResponse?.success || !firstTaskResponse.data) {
+        throw new Error('Không thể tải danh sách task đã giao.');
+      }
+
+      const taskItems = [...firstTaskResponse.data.items];
+      const totalPages = Math.ceil(firstTaskResponse.data.total / firstTaskResponse.data.limit);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const taskResponse = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 });
+        if (!taskResponse?.success || !taskResponse.data) {
+          throw new Error(`Không thể tải danh sách task ở trang ${page}.`);
+        }
+        taskItems.push(...taskResponse.data.items);
+      }
+
+      const mappedTasks = taskItems.map(mapApiToTask);
+      const taskCounts = new Map<string, { total: number; completed: number }>();
+      for (const task of mappedTasks) {
+        const counts = taskCounts.get(task.internId) || { total: 0, completed: 0 };
+        counts.total += 1;
+        if (task.status === 'DONE') counts.completed += 1;
+        taskCounts.set(task.internId, counts);
+      }
+
+      const mappedInterns = internshipResponse.data.items.map(mapApiToIntern);
+      setInterns(mappedInterns.map((intern) => {
+        const counts = taskCounts.get(intern.id) || { total: 0, completed: 0 };
+        return {
+          ...intern,
+          totalTasks: counts.total,
+          completedTasks: counts.completed,
+          progressPercent: counts.total ? Math.round((counts.completed / counts.total) * 100) : 0,
+        };
+      }));
+      setTasks(mappedTasks);
     } catch (err: unknown) {
       const message = getApiErrorMessage(err) ||
         (err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh');
@@ -90,7 +155,7 @@ export const EnterpriseInterns: React.FC = () => {
     } finally {
       setApiLoading(false);
     }
-  }, [profileLoading]);
+  }, [companyId, profileLoading]);
 
   useEffect(() => {
     fetchInternships();
