@@ -64,12 +64,12 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       `,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",
         'latestDecision',(SELECT co."Decision" FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1))
         FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
-    const rows=(await c.query(`SELECT w.*,${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
-    const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
+    const rows=(await c.query(`SELECT w.*,clock_timestamp() AS "ReadAt",${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
     const options=kind==='combo'&&rows.length&&s.ProgramStatus==='PUBLISHED'?(await combos(c,s.ProgramID)).filter(b=>b.coursesReviewed&&b.choiceGroups.length&&purpose({ComboCode:b.code,SelectionGroup:b.selectionGroup})==='SPECIALIZATION'):[];
     const confirmed=kind==='combo'&&rows.length?(await activeChoice(c,s.StudentID,s.ProgramID))[0]??null:null;
     const items:Row[]=[];
     for(const w of rows){
+      const now=w.ReadAt;
       const end=w.EffectiveEndsAt??w.EndsAt,reasons:string[]=[];
       if(s.Status!=='ACTIVE'||(s.ProgramStatus!=null&&s.ProgramStatus!=='PUBLISHED'))reasons.push('STUDENT_OR_CURRICULUM_INACTIVE');
       if(w.Status!=='OPEN')reasons.push('WINDOW_NOT_OPEN');

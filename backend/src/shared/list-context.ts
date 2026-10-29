@@ -1,5 +1,15 @@
 type Row = Record<string, any>;
 type Client = { query: (sql:string, args?:any[])=>Promise<{rows:Row[]}> };
+type ContextMaps = Map<string,Map<number,Row|null>>;
+const readContexts = new WeakMap<Client,ContextMaps>();
+
+// Reuse reference metadata only inside one immutable READ ONLY snapshot.
+// A pooled connection must never retain metadata for its next request.
+export async function withReadListContext<T>(client:Client,work:()=>Promise<T>):Promise<T> {
+  if(readContexts.has(client))return work();
+  readContexts.set(client,new Map());
+  try{return await work();}finally{readContexts.delete(client);}
+}
 
 // Read only the IDs on an already authorized page. Never enumerate related tables,
 // read credentials/file bytes, or calculate a new eligibility decision here.
@@ -43,23 +53,30 @@ const arrayReferences: [string, keyof typeof entities, string][] = [
 
 async function enrichRows<T extends Row>(client:Client,rows:T[]):Promise<T[]> {
   if(!rows.length)return rows;
-  const maps=new Map<string,Map<number,Row>>();
+  const maps=readContexts.get(client)??new Map<string,Map<number,Row|null>>();
   const columns:string[]=[],args:number[][]=[];
+  const requested=new Map<string,number[]>();
   for(const entity of Object.keys(entities) as (keyof typeof entities)[]) {
     const keys=references.filter(([,type])=>type===entity).map(([key])=>key);
     const arrays=arrayReferences.filter(([,type])=>type===entity).map(([key])=>key);
     const ids=[...new Set(rows.flatMap(row=>[
       ...keys.map(key=>row[key]),
       ...arrays.flatMap(key=>Array.isArray(row[key])?row[key]:[]),
-    ]).filter(value=>Number.isSafeInteger(value)&&value>0))];
+    ]).filter(value=>Number.isSafeInteger(value)&&value>0))].filter(id=>!maps.get(entity)?.has(id));
     if(!ids.length)continue;
+    requested.set(entity,ids);
     args.push(ids);
     const sql=entities[entity].replace(/\$1\b/g,()=>'$'+args.length);
     columns.push(`(SELECT COALESCE(jsonb_agg(to_jsonb(context)),'[]'::jsonb) FROM (${sql}) context) AS "${entity}"`);
   }
   if(columns.length){
     const contexts=(await client.query('SELECT '+columns.join(','),args)).rows[0];
-    for(const [entity,related]of Object.entries(contexts) as [string,Row[]][])maps.set(entity,new Map(related.map(row=>[row.id,row])));
+    for(const [entity,related]of Object.entries(contexts) as [string,Row[]][]){
+      const known=maps.get(entity)??new Map<number,Row|null>();
+      for(const id of requested.get(entity)??[])known.set(id,null);
+      for(const row of related)known.set(row.id,row);
+      maps.set(entity,known);
+    }
   }
   return rows.map(row=>{
     const item:Row={...row};

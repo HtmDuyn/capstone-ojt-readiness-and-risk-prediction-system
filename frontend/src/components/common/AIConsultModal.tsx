@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BotSparkleIcon, CloseIcon } from './icons/AppIcons';
 import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
-import { getRoadmap } from '@/services/student';
+import { getRoadmap } from '@/services/studentService';
 import type { Roadmap } from '@/types/student/portal';
 import { buttonClass } from '@/components/student/PortalUI';
 

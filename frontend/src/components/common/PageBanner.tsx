@@ -28,9 +28,9 @@ export interface PageBannerProps {
   primaryAction?: BannerAction;
   /** Nút hành động phụ. */
   secondaryAction?: BannerAction;
-  /** Khu vực mở rộng hiển thị bên phải banner. */
+  /** Bộ lọc hoặc nội dung mở rộng trong thanh thao tác dưới banner. */
   extra?: React.ReactNode;
-  /** Nội dung bổ sung bên trong banner. */
+  /** Nội dung bổ sung trong thanh thao tác dưới banner. */
   children?: React.ReactNode;
   /** Class CSS bổ sung cho banner. */
   className?: string;
@@ -123,20 +123,16 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   }
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300 ${className}`}
-    >
-      {/* Hiệu ứng phát sáng trang trí ở hai góc banner. */}
-      <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
-      <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
+    <div className="space-y-4">
+      <div
+        className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300 ${className}`}
+      >
+        <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
 
-      {/* Khối nội dung chính. */}
-      <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="max-w-3xl space-y-3">
-          {/* Breadcrumb nếu được truyền vào. */}
+        <div className="relative z-10 max-w-3xl space-y-3">
           {breadcrumb && <div className="mb-2">{breadcrumb}</div>}
 
-          {/* Tiêu đề và badge. */}
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight text-white flex items-center gap-2">
               {renderedTitle}
@@ -144,21 +140,27 @@ export const PageBanner: React.FC<PageBannerProps> = ({
             {renderedBadge}
           </div>
 
-          {/* Mô tả banner. */}
           {renderedDescription && (
             <div className="text-xs sm:text-sm text-purple-100 leading-relaxed font-normal">
               {renderedDescription}
             </div>
           )}
+        </div>
+      </div>
 
-          {/* Các nút hành động. */}
+      {(resolvedPrimary || resolvedSecondary || extra || children) && (
+        <div
+          role="group"
+          aria-label="Thao tác trang"
+          className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-4 text-slate-800 shadow-sm sm:flex-row sm:flex-wrap sm:items-end sm:justify-between"
+        >
           {(resolvedPrimary || resolvedSecondary) && (
-            <div className="pt-2 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {resolvedPrimary && (
                 <button
                   type="button"
                   onClick={resolvedPrimary.onClick}
-                  className={`btn-login px-5 py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm shadow-lg shadow-orange-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2 ${resolvedPrimary.className || ''}`}
+                  className={`btn-login px-5 py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm shadow-lg shadow-orange-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 ${resolvedPrimary.className || ''}`}
                 >
                   {resolvedPrimary.icon}
                   <span>{resolvedPrimary.label}</span>
@@ -169,7 +171,7 @@ export const PageBanner: React.FC<PageBannerProps> = ({
                 <button
                   type="button"
                   onClick={resolvedSecondary.onClick}
-                  className={`px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs sm:text-sm font-semibold border border-white/15 backdrop-blur-xs transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2 ${resolvedSecondary.className || ''}`}
+                  className={`px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold border border-slate-200 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer inline-flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 ${resolvedSecondary.className || ''}`}
                 >
                   {resolvedSecondary.icon}
                   <span>{resolvedSecondary.label}</span>
@@ -178,16 +180,10 @@ export const PageBanner: React.FC<PageBannerProps> = ({
             </div>
           )}
 
-          {children}
+          {extra && <div className="w-full sm:ml-auto sm:w-auto">{extra}</div>}
+          {children && <div className="w-full">{children}</div>}
         </div>
-
-        {/* Khu vực mở rộng bên phải. */}
-        {extra && (
-          <div className="flex-shrink-0 flex items-center self-start lg:self-center">
-            {extra}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };

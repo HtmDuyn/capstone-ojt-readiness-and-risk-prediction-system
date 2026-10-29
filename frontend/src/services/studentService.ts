@@ -1,5 +1,6 @@
-import { ApiError, apiRequest } from './api';
-import { API_BASE_URL } from '@/config/api';
+import API, { ApiError, apiRequest } from './api';
+import { downloadFile } from '@/utils/downloadFile';
+import type { CurrentUserResponse } from './authService';
 import type {
   AcademicSummary,
   Application,
@@ -39,7 +40,7 @@ export async function studentPost<T>(path: string, body: unknown): Promise<T> {
   return (
     await apiRequest<{ data: T }>(path, {
       method: 'POST',
-      body: JSON.stringify(body),
+      data: body,
     })
   ).data;
 }
@@ -61,7 +62,7 @@ export async function getOwnStudent(
   signal?: AbortSignal,
   expectedUser?: { id: string; email: string },
 ): Promise<Profile> {
-  const { user } = await apiRequest<{ user: { id: number; email: string; roleCode: string | null; studentId: number | null; mustChangePassword: boolean } }>(
+  const { user } = await apiRequest<CurrentUserResponse>(
     '/auth/me',
     { signal },
   );
@@ -71,13 +72,23 @@ export async function getOwnStudent(
   ))) {
     throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
   }
-  if (user.studentId === undefined)
-    throw new ApiError('Backend chưa trả studentId trong /auth/me. Cần cập nhật backend và kiểm tra VITE_API_URL đang trỏ đúng máy chủ.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-  if (user.studentId === null)
-    throw new ApiError('Tài khoản chưa được liên kết với hồ sơ sinh viên. Liên hệ Phòng Đào tạo để kiểm tra liên kết tài khoản.', 409, 'STUDENT_NOT_LINKED');
   if (user.mustChangePassword)
     throw new ApiError('Bạn cần đổi mật khẩu tạm trước khi sử dụng cổng sinh viên.', 403, 'PASSWORD_CHANGE_REQUIRED');
-  return getStudentProfile(user.studentId, signal);
+  let studentId = user.studentId;
+  if (studentId === null)
+    throw new ApiError('Tài khoản chưa được liên kết với hồ sơ sinh viên. Liên hệ Phòng Đào tạo để kiểm tra liên kết tài khoản.', 409, 'STUDENT_NOT_LINKED');
+  // Older deployed /auth/me responses omit studentId. This authenticated
+  // endpoint resolves the owner on the server even before an assignment exists.
+  if (studentId === undefined) {
+    const own = await studentGet<Pick<Internships, 'studentId'>>('/students/me/internships', signal);
+    studentId = own.studentId;
+  }
+  if (!Number.isSafeInteger(studentId) || studentId <= 0)
+    throw new ApiError('Máy chủ chưa xác định được hồ sơ sinh viên của tài khoản. Liên hệ Phòng Đào tạo để kiểm tra liên kết.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+  const profile = await getStudentProfile(studentId, signal);
+  if (profile.id !== studentId || profile.userId !== user.id)
+    throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
+  return profile;
 }
 export const getStudentProfile = (id: number, signal?: AbortSignal) =>
   studentGet<Profile>(
@@ -235,29 +246,16 @@ export async function uploadStudentCv(file: File) {
   const body = new FormData();
   body.append('cv', file);
   return (
-    await apiRequest<{ data: CV }>('/students/me/cv', { method: 'POST', body })
+    await apiRequest<{ data: CV }>('/students/me/cv', { method: 'POST', data: body })
   ).data;
 }
 export async function downloadStudentCv(studentId: number, cv: CV) {
-  const token = localStorage.getItem('ojt_auth_token');
-  const response = await fetch(
-    API_BASE_URL +
-      `/students/${studentId}/cv` +
-      studentQuery({ cvFileId: cv.id }),
-    { headers: token ? { Authorization: 'Bearer ' + token } : {} },
-  );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(
-      body?.message || 'Không tải được CV (HTTP ' + response.status + ').',
-    );
-  }
-  const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = cv.fileName;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  await downloadFile(async () => (
+    await API.get<Blob>(`/students/${studentId}/cv`, {
+      params: { cvFileId: cv.id },
+      responseType: 'blob',
+    })
+  ).data, cv.fileName);
 }
 
 export interface StudentNotification {
@@ -290,6 +288,6 @@ export async function markStudentNotificationRead(id: string) {
     data: StudentNotification & { unreadCount: number };
   }>(
     `/students/me/notifications/${encodeURIComponent(id)}`,
-    { method: 'PATCH', body: JSON.stringify({ isRead: true }) },
+    { method: 'PATCH', data: { isRead: true } },
   );
 }

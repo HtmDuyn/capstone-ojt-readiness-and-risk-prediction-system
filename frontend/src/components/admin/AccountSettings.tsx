@@ -21,7 +21,7 @@ export default function AccountSettings({ onProfileSaved }: { onProfileSaved?: (
     event.preventDefault(); if (busy || user?.mustChangePassword) return;
     setBusy(true); setError(''); setMessage('');
     try {
-      const result = await apiRequest<{account: {full_name: string; phone: string | null}}>('/accounts/me/profile', { method: 'PATCH', body: JSON.stringify({fullName: profile.fullName.trim(), phone: profile.phone.trim() || null}) });
+      const result = await apiRequest<{account: {full_name: string; phone: string | null}}>('/accounts/me/profile', { method: 'PATCH', data: {fullName: profile.fullName.trim(), phone: profile.phone.trim() || null} });
       updateUser({name: result.account.full_name}); setMessage('Đã cập nhật hồ sơ cá nhân.');
       onProfileSaved?.();
     } catch (e) { setError(e instanceof Error ? e.message : 'Không lưu được hồ sơ.'); }
@@ -34,7 +34,7 @@ export default function AccountSettings({ onProfileSaved }: { onProfileSaved?: (
     if (passwords.newPassword.length < 12 || new TextEncoder().encode(passwords.newPassword).length > 72) { setError('Mật khẩu mới cần ít nhất 12 ký tự và tối đa 72 byte UTF-8.'); return; }
     setBusy(true);
     try {
-      await apiRequest('/auth/change-password', {method:'POST',body:JSON.stringify({currentPassword:passwords.currentPassword,newPassword:passwords.newPassword})});
+      await apiRequest('/auth/change-password', {method:'POST',data:{currentPassword:passwords.currentPassword,newPassword:passwords.newPassword}});
       logout(); navigate('/login', { replace: true, state: { message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' } });
     } catch (e) { setError(e instanceof Error ? e.message : 'Đổi mật khẩu thất bại.'); }
     finally { setBusy(false); }

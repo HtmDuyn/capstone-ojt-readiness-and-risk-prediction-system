@@ -22,8 +22,13 @@ export function useStudentResource<T>(
       return;
     }
     setState({ key, data: null, loading: true, error: '' });
-    loader
-      .current(controller.signal)
+    // StrictMode replays setup/cleanup in development. Skip a read whose
+    // effect was already disposed before dispatching the network request.
+    Promise.resolve()
+      .then(() => {
+        controller.signal.throwIfAborted();
+        return loader.current(controller.signal);
+      })
       .then((data) => {
         if (!controller.signal.aborted)
           setState({ key, data, loading: false, error: '' });

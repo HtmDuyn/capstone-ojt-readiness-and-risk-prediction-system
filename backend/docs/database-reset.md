@@ -12,6 +12,10 @@ Hàm nghiệp vụ vẫn chứa UPDATE cho thao tác runtime; đó không phải
 
 Toàn bộ schema, hàm, trigger, quyền truy cập và dữ liệu khởi tạo chỉ nằm trong `backend/DB`. Không có migration hoặc seed SQL riêng; không cần chạy thêm script nào sau file này.
 
+Đã kiểm chứng ngày 29/10/2026: file chạy được trên PostgreSQL trống và chạy lại lần hai để reset chính schema của nó. Khóa ngoại `FK_AccountImportRecruitmentWindow` được validate đầy đủ; bước acceptance cuối kiểm tra liên kết tài khoản sinh viên và bàn giao OJT của student01. Các file `.cjs` trong `scripts` là công cụ kiểm thử, không phải migration/seed bắt buộc để chạy hệ thống.
+
+Để kiểm chứng script mà không reset DB đang dùng, chạy `npm.cmd run build` rồi `node scripts/check-db-bootstrap.cjs` tại backend. Công cụ này tạo PostgreSQL tạm trên loopback, chạy đúng nội dung file `DB`, kiểm tra API/nghiệp vụ rồi dừng DB tạm. Cần PostgreSQL 18 cài local hoặc đặt `PG_BIN` tới thư mục bin phù hợp.
+
 ## Cách chạy
 
 Mở toàn bộ `backend/DB` trong pgAdmin/DBeaver/SQL Editor và chạy từ `BEGIN` đến `COMMIT`, hoặc từ thư mục gốc dự án:
@@ -70,7 +74,7 @@ Mật khẩu chung của dữ liệu demo: **`Student@123`**. Đây là tài kho
 
 ## Luồng OJT
 
-Seed hiện có fixture luồng doanh nghiệp: 11 kết quả frontend đã lưu và bàn giao theo bảng điểm, 10 đăng ký/ứng tuyển/điều phối, 4 phân công và 12 nhiệm vụ. Không tạo EligibilityChecks/EligibilityConfirmations giả. `student01` đã được bàn giao nhưng chưa đăng ký/ứng tuyển để thử luồng trực tiếp. Xem [student-flow-audit.md](student-flow-audit.md).
+Seed hiện có fixture luồng doanh nghiệp: 11 kết quả frontend đã lưu và bàn giao theo bảng điểm, 10 đăng ký/ứng tuyển/điều phối, 3 phân công được tiếp nhận và 3 nhiệm vụ. Không tạo EligibilityChecks/EligibilityConfirmations giả. `student01` đã được bàn giao nhưng chưa đăng ký/ứng tuyển để thử luồng trực tiếp. Xem [student-flow-audit.md](student-flow-audit.md).
 
 Với hồ sơ ngoài fixture, Phòng Đào tạo tính và lưu kết quả rồi bàn giao danh sách đủ điều kiện theo kỳ `DEMO-OJT-S6`. Sinh viên sau đó đăng ký OJT và ứng tuyển qua API bình thường. CV được sinh viên tải lên; không tự tạo CV giả. Bằng chứng admission cần theo đúng nguồn đã bàn giao, không bắt hồ sơ của luồng frontend phải có EligibilityChecks cũ.
 

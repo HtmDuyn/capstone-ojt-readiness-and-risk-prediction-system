@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, Building2, RefreshCw, Send } from "lucide-react";
-import API from "@/services/api";
-import { allStudentPages, studentGet, studentQuery } from '@/services/student';
+import API, { isRequestCanceled } from "@/services/api";
+import { allStudentPages, studentGet, studentQuery } from '@/services/studentService';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { StudentPage, statusText } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';
@@ -87,8 +87,9 @@ function RegistrationContent() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const loadWindows = useCallback(async () => {
-    const items = await allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }));
+  const loadWindows = useCallback(async (signal?: AbortSignal) => {
+    const items = await allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }), signal);
+    if (signal?.aborted) return;
     setWindows(items);
     setWindowId((current) =>
       items.some((item) => String(item.id) === current)
@@ -97,8 +98,9 @@ function RegistrationContent() {
     );
   }, [semesterId]);
 
-  const loadApplications = useCallback(async () => {
-    setApplications(await allStudentPages<Application>('/job-applications' + studentQuery({ ojtSemesterId: semesterId })));
+  const loadApplications = useCallback(async (signal?: AbortSignal) => {
+    const items = await allStudentPages<Application>('/job-applications' + studentQuery({ ojtSemesterId: semesterId }), signal);
+    if (!signal?.aborted) setApplications(items);
   }, [semesterId]);
 
   const loadOpportunities = useCallback(async (selectedWindowId: string, signal?: AbortSignal): Promise<OpportunityResults | null> => {
@@ -114,15 +116,15 @@ function RegistrationContent() {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     setError("");
     setLoading(true);
     try {
-      await Promise.all([loadWindows(), loadApplications()]);
+      await Promise.all([loadWindows(signal), loadApplications(signal)]);
     } catch (e) {
-      setError(errorText(e));
+      if (!signal?.aborted && !isRequestCanceled(e)) setError(errorText(e));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [loadApplications, loadWindows]);
 
@@ -141,7 +143,9 @@ function RegistrationContent() {
   }, [loadOpportunities, refresh, windowId]);
 
   useEffect(() => {
-    void refresh();
+    const controller = new AbortController();
+    void refresh(controller.signal);
+    return () => controller.abort();
   }, [refresh]);
 
   useEffect(() => {

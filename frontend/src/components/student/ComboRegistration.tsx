@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { studentPost } from '@/services/student';
+import { studentPost } from '@/services/studentService';
 import type {
   AcademicProgress,
   Eligibility,

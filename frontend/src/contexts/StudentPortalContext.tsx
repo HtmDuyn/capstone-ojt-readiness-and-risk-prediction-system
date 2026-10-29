@@ -13,7 +13,7 @@ import {
   allStudentPages,
   getOwnStudent,
   getStudentNotifications,
-} from '@/services/student';
+} from '@/services/studentService';
 import type {
   Named,
   Profile,
@@ -66,7 +66,11 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return () => controller.abort();
     }
-    getOwnStudent(controller.signal, user ?? undefined)
+    Promise.resolve()
+      .then(() => {
+        controller.signal.throwIfAborted();
+        return getOwnStudent(controller.signal, user ?? undefined);
+      })
       .then(async (own) => {
         if (controller.signal.aborted) return;
         setProfile(own);

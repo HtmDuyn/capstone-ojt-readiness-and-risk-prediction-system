@@ -1,6 +1,12 @@
 # Cổng sinh viên — kết nối API
 
-Frontend dùng `VITE_API_URL` (gồm `/api`) và JWT `ojt_auth_token`. Lấy `studentId` từ `GET /auth/me`; không dùng UserID làm StudentID. Backend chưa trả trường này là lỗi phiên bản API; `studentId: null` mới là tài khoản chưa liên kết hồ sơ.
+Frontend dùng `VITE_API_URL` (gồm `/api`) và JWT `ojt_auth_token`. Ưu tiên lấy `studentId` từ `GET /auth/me`; không dùng UserID làm StudentID. Với phiên bản backend bỏ sót trường này, frontend lấy liên kết từ `GET /students/me/internships` không có bộ lọc, do máy chủ tự xác định sinh viên đang đăng nhập. Sau khi tải hồ sơ, kiểm tra lại `profile.id` và `profile.userId` khớp phiên hiện tại. `studentId: null` rõ ràng vẫn là lỗi chưa liên kết; không tự gán ID.
+
+Toàn bộ HTTP của ứng dụng dùng Axios instance trong `src/services/api.ts`, adapter `xhr`, timeout 60 giây. `apiRequest` chỉ là wrapper Axios giữ envelope và mã lỗi backend; không dùng Fetch. Các hàm sinh viên nằm trong `studentService.ts`. JSON truyền bằng `data`, query bằng `params` hoặc `studentQuery`, PDF tải bằng `responseType: 'blob'`; FormData giữ boundary do trình duyệt tạo.
+
+Network DevTools có thể hiển thị request đỏ với status trống/0 B khi đổi trang, đổi kỳ hoặc cleanup effect: đó là cancellation, không phải HTTP 4xx/5xx. React StrictMode chạy lại effect trong development; request đã bị hủy trước dispatch được bỏ qua. HTTP 304 là sử dụng cache hợp lệ. Trang tiến độ lấy phân công và nhiệm vụ bằng một request internships. Không tắt StrictMode hoặc bỏ cơ chế hủy request để che màu đỏ.
+
+Kiểm thử transport trong Chrome headless bằng `node scripts/check-axios-browser.cjs` tại frontend. Script tự khởi động Vite tạm và API fixture local; không truy cập DB hoặc Render. Cần Chrome tại đường dẫn mặc định Windows hoặc đặt `CHROME_PATH`.
 
 Khi phát triển local, tạo `.env.development.local` trong `frontend`:
 

@@ -1,6 +1,6 @@
 import { useState, useRef, type FormEvent } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { uploadStudentCv, downloadStudentCv } from '@/services/student';
+import { uploadStudentCv, downloadStudentCv } from '@/services/studentService';
 import { buttonClass, Card, dateText, Empty, inputClass } from './PortalUI';
 
 export function StudentCvCard() {

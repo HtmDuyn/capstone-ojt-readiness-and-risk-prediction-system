@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getCourseResults, getCurriculum } from '@/services/student';
+import { getCourseResults, getCurriculum } from '@/services/studentService';
 import {
   Card,
   Empty,

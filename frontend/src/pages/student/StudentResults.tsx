@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getOjtResult, getOjtResults } from '@/services/student';
+import { getOjtResult, getOjtResults } from '@/services/studentService';
 import {
   buttonClass,
   Card,

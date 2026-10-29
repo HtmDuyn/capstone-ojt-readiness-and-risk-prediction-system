@@ -160,7 +160,7 @@ export function StudentPage({
         badge={null}
         primaryAction={{ label: 'Làm mới dữ liệu', onClick: portal.refresh }}
         extra={
-          <label className="block space-y-2 text-sm text-white">
+          <label className="block space-y-2 text-sm font-medium text-slate-600 sm:min-w-60">
             Đợt OJT
             <select
               aria-label="Chọn đợt OJT"

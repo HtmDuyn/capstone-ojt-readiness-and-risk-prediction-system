@@ -5,7 +5,7 @@ import {
   getStudentNotifications,
   markStudentNotificationRead,
   type StudentNotification,
-} from '@/services/student';
+} from '@/services/studentService';
 import {
   buttonClass,
   Card,

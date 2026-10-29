@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getStudentDashboard } from '@/services/student';
+import { getStudentDashboard } from '@/services/studentService';
 import {
   AcademicMetrics,
   AssignmentCard,

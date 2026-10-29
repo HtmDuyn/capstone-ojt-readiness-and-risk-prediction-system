@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosHeaders, type AxiosRequestConfig, type RawAxiosHeaders } from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 export { API_BASE_URL };
@@ -14,82 +14,79 @@ export class ApiError extends Error {
   }
 }
 
+// Every browser API call shares authentication, timeout and the XHR transport.
 export const API = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  adapter: 'xhr',
+  timeout: 60_000,
+  headers: { Accept: 'application/json' },
 });
 
-// Request Interceptor: Chạy trước khi gửi request (ví dụ: đính kèm token)
-API.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('ojt_auth_token');
-    if (
-      config.url !== '/auth/login' &&
-      token &&
-      config.headers &&
-      !config.headers.Authorization
-    ) {
-      config.headers.Authorization = 'Bearer ' + token;
-    }
-    return config;
-  },
-  (error: AxiosError) => {
-    return Promise.reject(error);
+API.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ojt_auth_token');
+  if (config.url !== '/auth/login' && token && !config.headers.has('Authorization')) {
+    config.headers.set('Authorization', 'Bearer ' + token);
   }
-);
+  // Let the browser add the multipart boundary; Axios sets JSON for object data.
+  if (config.data instanceof FormData) config.headers.delete('Content-Type');
+  return config;
+});
 
-// Response Interceptor: Chạy khi nhận được response (ví dụ: xử lý lỗi 401 chung)
-API.interceptors.response.use(
-  (response: AxiosResponse) => {
-    return response;
-  },
-  (error: AxiosError) => {
-    if (error.response && error.response.status === 401) {
-      console.error('Unauthorized, please login again.');
-      // Xóa token hoặc chuyển hướng về trang login nếu cần
-      // localStorage.removeItem('token');
-      // window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+interface ErrorBody {
+  success?: boolean;
+  message?: string;
+  errorCode?: string;
+  code?: string;
+}
 
+export function isRequestCanceled(error: unknown): boolean {
+  return axios.isCancel(error)
+    || (error instanceof DOMException && error.name === 'AbortError');
+}
+
+// Return the backend envelope unchanged; services choose user/account/data.
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {},
-  token = localStorage.getItem('ojt_auth_token')
+  options: AxiosRequestConfig = {},
+  token?: string | null,
 ): Promise<T> {
-  const headers = new Headers(options.headers);
-  if (typeof options.body === 'string')
-    headers.set('Content-Type', 'application/json');
-  if (token) headers.set('Authorization', 'Bearer ' + token);
-  let response: Response;
+  const headers = AxiosHeaders.from(options.headers as RawAxiosHeaders | AxiosHeaders | undefined);
+  if (token !== undefined) headers.set('Authorization', token ? 'Bearer ' + token : false);
   try {
-    response = await fetch(API_BASE_URL + path, { ...options, headers });
+    const response = await API.request<T>({ ...options, url: path, headers, responseType: 'json' });
+    const body = response.data;
+    if (!body || typeof body !== 'object') {
+      throw new ApiError('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.', response.status, 'INVALID_API_RESPONSE');
+    }
+    const result = body as ErrorBody;
+    if (result.success === false) {
+      throw new ApiError(result.message || 'Yêu cầu API thất bại.', response.status, result.errorCode ?? result.code);
+    }
+    return body;
   } catch (error) {
-    if (options.signal?.aborted) throw error;
-    throw new Error('Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.');
-  }
-  const body = await response.json().catch(() => null);
-  if ([502, 503, 504].includes(response.status) && !body?.errorCode) {
+    // Route changes and effect cleanup are cancellation, not backend failures.
+    if (isRequestCanceled(error) || error instanceof ApiError) throw error;
+    if (!axios.isAxiosError<ErrorBody>(error)) throw error;
+    if (!error.response) {
+      throw new ApiError(
+        error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+          ? 'Yêu cầu API hết thời gian chờ. Vui lòng thử lại.'
+          : 'Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.',
+        0,
+        error.code,
+      );
+    }
+    const { status, data } = error.response;
+    const code = data?.errorCode ?? data?.code;
     throw new ApiError(
-      'Máy chủ hoặc proxy API không khả dụng (HTTP ' + response.status + '). Kiểm tra backend tại ' + API_BASE_URL + '.',
-      response.status,
+      (typeof data?.message === 'string' && data.message)
+        || ([502, 503, 504].includes(status)
+          ? `Máy chủ hoặc proxy API không khả dụng (HTTP ${status}). Kiểm tra backend tại ${API_BASE_URL}.`
+          : `Yêu cầu API thất bại (HTTP ${status}).`),
+      status,
+      code,
     );
   }
-  if (!response.ok || body?.success === false) {
-    throw new ApiError(
-      body?.message || 'Yêu cầu API thất bại (HTTP ' + response.status + ').',
-      response.status,
-      body?.errorCode ?? body?.code,
-    );
-  }
-  if (!body) {
-    throw new Error('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.');
-  }
-  return body as T;
 }
 
 export default API;

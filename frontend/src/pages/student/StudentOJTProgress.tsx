@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getAssignment, getTasks } from '@/services/student';
+import { studentGet, studentQuery } from '@/services/studentService';
+import type { Internships } from '@/types/student/portal';
 import {
   AssignmentCard,
   Card,
@@ -19,13 +20,18 @@ function ProgressContent() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const key = profile!.id + ':' + semesterId + ':' + revision;
-  const assignment = useStudentResource('assignment:' + key, (signal) =>
-    getAssignment(semesterId!, signal),
+  const internship = useStudentResource('internship:' + key + ':' + page, (signal) =>
+    studentGet<Internships>(
+      '/students/me/internships' + studentQuery({
+        ojtSemesterId: semesterId,
+        tasksPage: page,
+        tasksLimit: 20,
+      }),
+      signal,
+    ),
   );
-  const tasks = useStudentResource('tasks:' + key + ':' + page, (signal) =>
-    getTasks(semesterId!, page, signal),
-  );
-  const visible = tasks.data?.items.filter((task) =>
+  const tasks = internship.data?.tasks;
+  const visible = tasks?.items.filter((task) =>
     (task.name + ' ' + (task.description ?? ''))
       .toLocaleLowerCase()
       .includes(search.toLocaleLowerCase()),
@@ -33,22 +39,14 @@ function ProgressContent() {
   return (
     <>
       <ResourceState
-        loading={assignment.loading}
-        error={assignment.error}
-        retry={assignment.reload}
+        loading={internship.loading}
+        error={internship.error}
+        retry={internship.reload}
       />
-      {assignment.data !== null && (
-        <AssignmentCard assignment={assignment.data} />
-      )}
-      {!assignment.loading && !assignment.error && !assignment.data && (
-        <AssignmentCard assignment={null} />
+      {internship.data && (
+        <AssignmentCard assignment={internship.data.assignment} />
       )}
       <Card title="Nhiệm vụ thực tập">
-        <ResourceState
-          loading={tasks.loading}
-          error={tasks.error}
-          retry={tasks.reload}
-        />
         <input
           className={inputClass}
           aria-label="Tìm nhiệm vụ trong trang"
@@ -56,7 +54,7 @@ function ProgressContent() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {tasks.data && (
+        {tasks && (
           <>
             <div className="grid lg:grid-cols-3 gap-4">
               {['TODO', 'IN_PROGRESS', 'DONE'].map((status) => {
@@ -118,8 +116,9 @@ function ProgressContent() {
             )}
             <Pagination
               page={page}
-              total={tasks.data.total}
+              total={tasks.total}
               onChange={setPage}
+              disabled={internship.loading}
             />
           </>
         )}

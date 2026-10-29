@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getAssignment } from '@/services/student';
+import { getAssignment } from '@/services/studentService';
 import {
   AssignmentCard,
   Card,

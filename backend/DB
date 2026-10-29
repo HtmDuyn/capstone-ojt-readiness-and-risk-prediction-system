@@ -6748,7 +6748,7 @@ ALTER TABLE public."AcademicPeriods" ADD CONSTRAINT "AcademicPeriods_AcademicYea
 ALTER TABLE public."AcademicPeriods" ADD CONSTRAINT "AcademicPeriods_ParentPeriodID_fkey" FOREIGN KEY ("ParentPeriodID") REFERENCES "AcademicPeriods"("AcademicPeriodID");
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_ImportedBy_fkey" FOREIGN KEY ("ImportedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "FK_AccountImportRecruitmentWindow" FOREIGN KEY ("RecruitmentWindowID") REFERENCES "RecruitmentWindows"("WindowID") NOT VALID;
+ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "FK_AccountImportRecruitmentWindow" FOREIGN KEY ("RecruitmentWindowID") REFERENCES "RecruitmentWindows"("WindowID");
 ALTER TABLE public."AccountImportRows" ADD CONSTRAINT "AccountImportRows_BatchID_fkey" FOREIGN KEY ("BatchID") REFERENCES "AccountImportBatches"("BatchID");
 ALTER TABLE public."AccountImportRows" ADD CONSTRAINT "AccountImportRows_UserID_fkey" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID");
 ALTER TABLE public."ApplicationEvents" ADD CONSTRAINT "ApplicationEvents_ActorID_fkey" FOREIGN KEY ("ActorID") REFERENCES "Users"("UserID");
@@ -8354,5 +8354,33 @@ BEGIN
 
   RAISE NOTICE 'Enterprise demo ready: 10 direct applications (4 pending, 3 accepted, 3 rejected); student01 is eligible and unregistered for direct-application testing.';
 END $enterprise_candidate_status_demo$;
+
+-- The single bootstrap must leave a usable Student identity and no unvalidated FKs.
+DO $accept_student_portal$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public."Users" u JOIN public."Roles" r USING ("RoleID")
+    LEFT JOIN public."Students" s ON s."UserID"=u."UserID" AND s."DeletedAt" IS NULL
+    WHERE r."RoleCode"='STUDENT' AND u."Status"='ACTIVE' AND s."StudentID" IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Every active student account must link to a student profile.';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public."Users" u JOIN public."Students" s USING ("UserID")
+    JOIN public."StudentAcademicPlacements" p USING ("StudentID")
+    JOIN public."CohortCurriculumPeriods" target
+      ON target."CohortID"=p."CohortID" AND target."GroupCode"=p."GroupCode" AND target."CurriculumSemester"=6
+    JOIN public."OJTSemesters" o ON o."AcademicPeriodID"=target."AcademicPeriodID"
+    JOIN public."EligibleStudentHandoffItems" h ON h."StudentID"=s."StudentID" AND h."OJTSemesterID"=o."OJTSemesterID"
+    JOIN public."StudentOJTCalculatedResults" result ON result."StudentID"=s."StudentID" AND result."BatchID"=h."CalculatedBatchID"
+    WHERE u."Username"='student01' AND u."Status"='ACTIVE' AND s."Status"='ACTIVE'
+      AND s."CurrentSemester"=5 AND s."DeletedAt" IS NULL AND result."Status"='ELIGIBLE'
+  ) THEN
+    RAISE EXCEPTION 'student01 requires an active profile, mapped OJT semester 6 and a saved eligible handoff.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE contype='f' AND connamespace='public'::regnamespace AND NOT convalidated) THEN
+    RAISE EXCEPTION 'The application schema must not contain unvalidated foreign keys.';
+  END IF;
+END $accept_student_portal$;
 
 COMMIT;

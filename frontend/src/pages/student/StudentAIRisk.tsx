@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getStudentDashboard, getRoadmap } from '@/services/student';
+import { getStudentDashboard, getRoadmap } from '@/services/studentService';
 import type { Roadmap } from '@/types/student/portal';
 import {
   AcademicMetrics,

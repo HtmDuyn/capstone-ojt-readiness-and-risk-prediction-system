@@ -2,6 +2,8 @@
 
 Base URL `/api`, Bearer token STUDENT. GET không có body; ID tài nguyên nằm trong path, bộ lọc nằm trong query. POST/PATCH dùng JSON object với `Content-Type: application/json`. Upload CV dùng multipart/form-data.
 
+Frontend dùng Axios instance chung (`adapter: xhr`). Request bị hủy khi rời trang không phải lỗi HTTP; 304 là cache hợp lệ. Chi tiết kiểm chứng DB duy nhất và luồng tới kết quả OJT chính thức: [student-flow-audit.md](student-flow-audit.md).
+
 Student có **22 operation cần xác thực: 13 GET, 7 POST, 2 PATCH**, cộng thêm `POST /auth/login` công khai. Swagger `/api-docs`, hợp đồng máy đọc `/api-docs/openapi.json`, đầu vào đầy đủ tại [api-input-reference.md](api-input-reference.md).
 
 ## 1. Hồ sơ và học vụ

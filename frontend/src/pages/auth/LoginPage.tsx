@@ -97,7 +97,7 @@ const LoginPage: React.FC = () => {
         name: profile.fullName || profile.username,
         email: profile.email,
         role,
-        mustChangePassword: profile.mustChangePassword,
+        mustChangePassword: profile.mustChangePassword ?? loginResponse.mustChangePassword ?? false,
       });
       redirectToDashboard(role);
     } catch (error) {
