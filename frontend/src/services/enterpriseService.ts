@@ -218,6 +218,8 @@ export interface EnterpriseInternshipTask {
   studentId: number;
   name: string;
   status: string;
+  submissionCount?: number;
+  latestSubmission?: import('@/types/student/portal').TaskSubmission | null;
   dueDate?: string | null;
   companyId?: number;
   positionId?: number;
@@ -383,6 +385,16 @@ export const enterpriseService = {
       tasks,
       idempotencyKey,
     });
+    return response.data;
+  },
+
+  getTaskSubmissions: async (taskId: number, page = 1, signal?: AbortSignal) => {
+    const response = await API.get<{ data: import('@/types/student/portal').Page<import('@/types/student/portal').TaskSubmission> }>(`/enterprise/tasks/${taskId}/submissions`, { params: { page, limit: 20 }, signal });
+    return response.data.data;
+  },
+
+  updateTaskStatus: async (taskId: number, status: 'TODO' | 'IN_PROGRESS' | 'DONE') => {
+    const response = await API.patch(`/enterprise/tasks/${taskId}/status`, { status });
     return response.data;
   },
 

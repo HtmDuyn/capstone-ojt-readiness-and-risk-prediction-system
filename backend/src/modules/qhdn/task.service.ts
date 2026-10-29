@@ -67,7 +67,11 @@ export async function listTasks(params:Record<string,unknown>, actor:Actor,exist
     const semesterId=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
     const rows=await c.query(`WITH filtered AS (SELECT t."TaskID" AS id,t."AssignmentID" AS "assignmentId",t."TaskName" AS name,t."Description" AS description,t."AssignedDate" AS "assignedDate",t."DueDate" AS "dueDate",t."Status" AS status,
       a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",co."OJTSemesterID" AS "ojtSemesterId",
-      jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate") AS assignment
+      jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate") AS assignment,
+      (COALESCE(upper(a."Status"),'') IN ('ASSIGNED','ACTIVE','IN_PROGRESS') AND COALESCE(upper(t."Status"),'') NOT IN ('DONE','COMPLETED')) AS "canSubmit",
+      (SELECT count(*)::int FROM "TaskProgressUpdates" submitted WHERE submitted."TaskID"=t."TaskID" AND submitted."UpdatedByStudentID"=a."StudentID" AND submitted."PercentComplete"=100) AS "submissionCount",
+      (SELECT jsonb_build_object('id',submitted."UpdateID",'taskId',submitted."TaskID",'studentId',submitted."UpdatedByStudentID",'content',submitted."ProgressDescription",'submittedAt',submitted."UpdateDate" AT TIME ZONE 'UTC','isLate',COALESCE((submitted."UpdateDate" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh')::date>t."DueDate",false))
+        FROM "TaskProgressUpdates" submitted WHERE submitted."TaskID"=t."TaskID" AND submitted."UpdatedByStudentID"=a."StudentID" AND submitted."PercentComplete"=100 ORDER BY submitted."UpdateID" DESC LIMIT 1) AS "latestSubmission"
       FROM "InternshipTasks" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "Students" s ON s."StudentID"=a."StudentID"
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
       WHERE ($1::int IS NULL OR a."AssignmentID"=$1) AND ($2::int IS NULL OR a."EnterpriseID"=$2) AND ($3::int IS NULL OR a."StudentID"=$3) AND ($4::int IS NULL OR a."PositionID"=$4) AND ($7::int IS NULL OR co."OJTSemesterID"=$7)

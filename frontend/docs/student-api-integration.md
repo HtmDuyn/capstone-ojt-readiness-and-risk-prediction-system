@@ -30,6 +30,8 @@ Khởi động backend và Vite, rồi đăng nhập lại. Cấu hình này ch�
 | CV | `POST /students/me/cv`, `GET /students/:id/cv?cvFileId=…` |
 | Vị trí và ứng tuyển | `GET /students/me/opportunities?windowId=…`, `GET /job-applications`, `POST /job-applications` |
 | Phân công, nhiệm vụ, kết quả đã công bố | `GET /students/me/internships?ojtSemesterId=…` |
+| Nhiệm vụ sinh viên được giao | `GET /students/me/tasks?ojtSemesterId=…&page=…&limit=20` |
+| Lịch sử và nộp nhiệm vụ | `GET`, `POST /students/me/tasks/:id/submissions`; JSON POST `{content}` |
 | Chi tiết kết quả của mình | `GET /students/me/internships?ojtSemesterId=…&resultId=…` |
 | Thông báo | `GET /students/me/notifications`, `PATCH /students/me/notifications/:id` với `{isRead:true}` |
 | Thông tin cá nhân `/student/profile` | `PATCH /accounts/me/profile` — envelope `account`, tên trường `full_name`, `phone` |
@@ -41,7 +43,7 @@ Danh sách thường dùng trang 20 bản ghi. `allStudentPages` đọc đủ c�
 
 ## Điều kiện và ứng tuyển
 
-Menu duy nhất **OJT & hồ sơ ứng tuyển** trỏ tới `/student/ojt-registration`; `/student/ojt-profile` cũ chuyển hướng về trang này. Trang gộp danh sách doanh nghiệp theo đợt OJT, thông tin liên hệ/vị trí tuyển dụng trong cửa sổ chi tiết, CV cá nhân, lịch sử đơn và phân công thực tập. Danh sách doanh nghiệp được nhóm theo `company.id` từ các vị trí đã công bố trong kỳ đã chọn, không phụ thuộc sinh viên đã đủ điều kiện nộp đơn hay chưa.
+Menu duy nhất **OJT & hồ sơ ứng tuyển** trỏ tới `/student/ojt-registration`; `/student/ojt-profile` cũ chuyển hướng về trang này. Trang gộp danh sách doanh nghiệp theo đợt OJT, thông tin liên hệ/vị trí tuyển dụng trong cửa sổ chi tiết, CV cá nhân và lịch sử đơn. Thẻ phân công thực tập đã bỏ khỏi giao diện sinh viên; dữ liệu liên kết nội bộ vẫn giữ để xác định người được giao task. Danh sách doanh nghiệp được nhóm theo `company.id` từ các vị trí đã công bố trong kỳ đã chọn, không phụ thuộc sinh viên đã đủ điều kiện nộp đơn hay chưa.
 
 Nút **Nộp đơn đăng ký OJT** mở popup chọn doanh nghiệp/vị trí, thông tin liên hệ và CV PDF. Có thể dùng CV đã lưu hoặc upload mới; upload hoàn tất trước khi gửi đơn để backend gắn phiên bản CV hiện tại vào đơn. CV mới cũng được lưu riêng trong hồ sơ; thay CV sau này không thay file đã gắn ở đơn cũ. Khóa gửi ngăn click lặp; nếu nộp đơn lỗi sau upload, CV vẫn được giữ để thử lại. Mục **CV của tôi** cho tải CV độc lập để chuẩn bị tích hợp AI gợi ý doanh nghiệp sau này, chưa tự chạy AI.
 
@@ -56,7 +58,7 @@ Nút **Nộp đơn đăng ký OJT** mở popup chọn doanh nghiệp/vị trí, 
 Tài khoản có `mustChangePassword` được đưa tới `/student/profile` để đổi mật khẩu trước. Không tải nghiệp vụ sinh viên bằng mật khẩu tạm.
 
 - Chưa cấu hình `ROADMAP_SERVICE_URL`: AI trả `503 AI_NOT_CONFIGURED`. Giao diện giữ lỗi nghiệp vụ, không báo nhầm proxy hỏng.
-- Chưa có API sinh viên cập nhật nhiệm vụ hoặc nộp báo cáo tuần. Trang tiến độ hiện xem nhiệm vụ do doanh nghiệp giao.
+- Trang **Nhiệm vụ thực tập** nhận task của chính tài khoản, tự cập nhật mỗi 30 giây khi tab đang hiển thị hoặc khi quay lại tab. Sinh viên nộp nội dung/link bài làm qua popup, xem lịch sử, không tự xác nhận DONE. Doanh nghiệp xem lịch sử và xác nhận/làm lại qua `PATCH /enterprise/tasks/:id/status`. Chưa upload file task trực tiếp và chưa có báo cáo tuần. Chi tiết: [student-task-submissions.md](../../backend/docs/student-task-submissions.md).
 - Chỉ kết quả OJT đã CONFIRMED được công bố. Chưa công bố thì danh sách rỗng.
 - Chưa có thao tác rút đơn/xóa CV trong các API sinh viên hiện hành.
 

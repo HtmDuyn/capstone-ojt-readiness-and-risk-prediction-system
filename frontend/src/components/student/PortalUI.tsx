@@ -4,7 +4,6 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import type {
   AcademicSummary,
-  Assignment,
   Eligibility,
 } from '@/types/student/portal';
 
@@ -294,46 +293,6 @@ export function EligibilityCard({
           Ngưỡng theo quy định: {current.rule.minCredits} tín chỉ, tối đa{' '}
           {current.rule.maxUnpassedCourses} môn nợ.
         </p>
-      )}
-    </Card>
-  );
-}
-export function AssignmentCard({
-  assignment,
-}: {
-  assignment: Assignment | null;
-}) {
-  return (
-    <Card title="Phân công thực tập">
-      {assignment ? (
-        <dl className="grid sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt className="text-slate-500">Doanh nghiệp</dt>
-            <dd className="font-bold">{assignment.enterpriseName}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Vị trí</dt>
-            <dd>{assignment.title}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Người hướng dẫn</dt>
-            <dd>{assignment.enterpriseSupervisorName || 'Chưa cập nhật'}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Trạng thái</dt>
-            <dd>{statusText(assignment.status)}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Bắt đầu</dt>
-            <dd>{dateText(assignment.startDate)}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Kết thúc</dt>
-            <dd>{dateText(assignment.endDate)}</dd>
-          </div>
-        </dl>
-      ) : (
-        <Empty>Chưa có phân công thực tập trong đợt này.</Empty>
       )}
     </Card>
   );

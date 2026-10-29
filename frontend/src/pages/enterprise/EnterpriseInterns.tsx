@@ -29,6 +29,7 @@ import {
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
+import { TaskSubmissionsDialog } from '@/components/common/TaskSubmissionsDialog';
 
 // Adapter: map API data to existing UI's expected format
 const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): EnterpriseIntern => ({
@@ -66,6 +67,8 @@ const mapApiToTask = (item: EnterpriseInternshipTask): InternTask => {
     status: status === 'COMPLETED' ? 'DONE' : status as InternTask['status'],
     assignedBy: 'Mentor Doanh Nghiệp',
     createdAt: item.assignedDate?.slice(0, 10),
+    submissionCount: item.submissionCount,
+    latestSubmission: item.latestSubmission,
   };
 };
 
@@ -92,6 +95,10 @@ export const EnterpriseInterns: React.FC = () => {
   const { loading: profileLoading, companyId } = useEnterprise();
   const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
   const [tasks, setTasks] = useState<InternTask[]>([]);
+  const [viewingSubmissions, setViewingSubmissions] = useState<InternTask | null>(null);
+  const [taskStatusBusy, setTaskStatusBusy] = useState(false);
+  const [taskActionError, setTaskActionError] = useState('');
+  const taskStatusLock = useRef(false);
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -509,64 +516,29 @@ export const EnterpriseInterns: React.FC = () => {
     });
   };
 
-  // Change task status (TODO -> IN_PROGRESS -> DONE)
-  const handleUpdateTaskStatus = (taskId: string, newStatus: 'TODO' | 'IN_PROGRESS' | 'DONE') => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const oldStatus = task.status;
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-
-    if (oldStatus !== 'DONE' && newStatus === 'DONE') {
-      setInterns((prev) =>
-        prev.map((i) => {
-          if (i.id === task.internId) {
-            const newCompleted = i.completedTasks + 1;
-            return {
-              ...i,
-              completedTasks: newCompleted,
-              progressPercent: Math.round((newCompleted / i.totalTasks) * 100),
-            };
-          }
-          return i;
-        })
-      );
-      if (viewingIntern && viewingIntern.id === task.internId) {
-        setViewingIntern((prev) =>
-          prev
-            ? {
-                ...prev,
-                completedTasks: prev.completedTasks + 1,
-                progressPercent: Math.round(((prev.completedTasks + 1) / prev.totalTasks) * 100),
-              }
-            : null
-        );
-      }
-    } else if (oldStatus === 'DONE' && newStatus !== 'DONE') {
-      setInterns((prev) =>
-        prev.map((i) => {
-          if (i.id === task.internId) {
-            const newCompleted = Math.max(0, i.completedTasks - 1);
-            return {
-              ...i,
-              completedTasks: newCompleted,
-              progressPercent: Math.round((newCompleted / i.totalTasks) * 100),
-            };
-          }
-          return i;
-        })
-      );
-      if (viewingIntern && viewingIntern.id === task.internId) {
-        setViewingIntern((prev) =>
-          prev
-            ? {
-                ...prev,
-                completedTasks: Math.max(0, prev.completedTasks - 1),
-                progressPercent: Math.round((Math.max(0, prev.completedTasks - 1) / prev.totalTasks) * 100),
-              }
-            : null
-        );
-      }
+  // Save the enterprise decision before updating the displayed task state.
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: 'TODO' | 'IN_PROGRESS' | 'DONE') => {
+    const task = tasks.find(item => item.id === taskId);
+    if (!task || taskStatusLock.current) return;
+    taskStatusLock.current = true;
+    setTaskStatusBusy(true);
+    setTaskActionError('');
+    try {
+      await enterpriseService.updateTaskStatus(Number(taskId), newStatus);
+      setTasks(previous => previous.map(item => item.id === taskId ? { ...item, status: newStatus } : item));
+      const difference = Number(newStatus === 'DONE') - Number(task.status === 'DONE');
+      const updateProgress = (intern: EnterpriseIntern): EnterpriseIntern => {
+        if (intern.id !== task.internId) return intern;
+        const completedTasks = Math.max(0, intern.completedTasks + difference);
+        return { ...intern, completedTasks, progressPercent: intern.totalTasks ? Math.round(completedTasks / intern.totalTasks * 100) : 0 };
+      };
+      setInterns(previous => previous.map(updateProgress));
+      setViewingIntern(previous => previous ? updateProgress(previous) : null);
+    } catch (error) {
+      setTaskActionError(getApiErrorMessage(error) || (error instanceof Error ? error.message : 'Không cập nhật được trạng thái nhiệm vụ.'));
+    } finally {
+      taskStatusLock.current = false;
+      setTaskStatusBusy(false);
     }
   };
 
@@ -1400,6 +1372,7 @@ export const EnterpriseInterns: React.FC = () => {
                   </select>
                 </div>
 
+                {taskActionError && <p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{taskActionError}</p>}
                 {viewedInternTasks.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
                     Chưa có nhiệm vụ nào trong danh mục này.
@@ -1442,7 +1415,8 @@ export const EnterpriseInterns: React.FC = () => {
                           <div className="flex items-center justify-end gap-1.5 flex-shrink-0">
                             {task.status !== 'DONE' ? (
                               <button
-                                onClick={() => handleUpdateTaskStatus(task.id, 'DONE')}
+                                disabled={taskStatusBusy}
+                                onClick={() => void handleUpdateTaskStatus(task.id, 'DONE')}
                                 className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold flex items-center space-x-1 border border-emerald-200"
                               >
                                 <Check className="w-3 h-3" />
@@ -1450,7 +1424,8 @@ export const EnterpriseInterns: React.FC = () => {
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
+                                disabled={taskStatusBusy}
+                                onClick={() => void handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
                                 className="px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-semibold flex items-center space-x-1 border border-amber-200"
                               >
                                 <Clock className="w-3 h-3" />
@@ -1467,6 +1442,11 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
                         </div>
 
+                        <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+                          <p className="font-semibold text-slate-700">{task.submissionCount ?? 0} bài nộp</p>
+                          {task.latestSubmission && <p className="whitespace-pre-wrap break-words text-slate-600">{task.latestSubmission.content}</p>}
+                          <button type="button" onClick={() => setViewingSubmissions(task)} className="font-semibold text-orange-600 underline">Xem lịch sử bài nộp</button>
+                        </div>
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 text-[11px] text-slate-400 pt-2 border-t border-slate-100">
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span className="whitespace-nowrap">
@@ -1499,6 +1479,9 @@ export const EnterpriseInterns: React.FC = () => {
       )}
       </>
       )}
+      {viewingSubmissions && <TaskSubmissionsDialog taskId={Number(viewingSubmissions.id)} name={viewingSubmissions.title}
+        load={(page, signal) => enterpriseService.getTaskSubmissions(Number(viewingSubmissions.id), page, signal)}
+        onClose={() => setViewingSubmissions(null)} />}
     </div>
   );
 };

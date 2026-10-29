@@ -249,6 +249,18 @@ export interface Task {
   assignedDate: string | null;
   dueDate: string | null;
   status: string;
+  canSubmit: boolean;
+  submissionCount: number;
+  latestSubmission: TaskSubmission | null;
+  company?: { id: number; name: string };
+}
+export interface TaskSubmission {
+  id: number;
+  taskId: number;
+  studentId: number;
+  content: string;
+  submittedAt: string;
+  isLate: boolean;
 }
 export interface OjtResult {
   id: number;

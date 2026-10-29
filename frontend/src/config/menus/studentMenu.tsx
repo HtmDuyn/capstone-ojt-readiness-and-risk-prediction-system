@@ -80,14 +80,14 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
 
   {
     id: 'internship-progress',
-    label: 'Tiến độ thực tập',
+    label: 'Nhiệm vụ thực tập',
     path: '/student/internship-progress',
     icon: <InternshipProgressIcon size={20} />,
     banner: {
       title: 'Theo dõi tiến độ thực tập doanh nghiệp',
       description: (
         <>
-          Theo dõi nhiệm vụ, người hướng dẫn và thời gian thực tập tại doanh nghiệp.
+          Nhận nhiệm vụ từ doanh nghiệp, nộp bài làm và theo dõi trạng thái xử lý.
         </>
       ),
       primaryActionLabel: 'Xem nhiệm vụ',

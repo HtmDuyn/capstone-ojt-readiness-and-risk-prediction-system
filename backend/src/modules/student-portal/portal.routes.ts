@@ -7,6 +7,7 @@ import { dashboard,internships } from './overview.service';
 import { applyToPosition, studentOpportunities } from '../students/job-application.service';
 import { notifications, readNotification } from './academic.service';
 import { roadmap } from './cv.service';
+import { ownTasks, submitTask, taskSubmissions } from './task-submission.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -26,6 +27,9 @@ router.patch('/students/me/notifications/:id', ...own, requireJsonBody, handle(r
   return readNotification(positiveId(r.params.id), r.user, body.isRead);
 }));
 router.get('/students/me/internships', ...read, handle(r => internships(r.query,r.user)));
+router.get('/students/me/tasks', ...read, handle(r => ownTasks(r.query, r.user)));
+router.get('/students/me/tasks/:id/submissions', ...read, handle(r => taskSubmissions(positiveId(r.params.id), r.query, r.user)));
+router.post('/students/me/tasks/:id/submissions', ...own, requireJsonBody, handle(r => submitTask(positiveId(r.params.id), r.body, r.user), 201));
 router.get('/students/me/opportunities', ...read, handle(r => studentOpportunities(r.query, r.user)));
 router.get('/students/me/dashboard', ...read, handle(r => dashboard(r.query,r.user)));
 router.post('/job-applications', ...own, requireJsonBody, handle(r => applyToPosition(r.body, r.user), 201));

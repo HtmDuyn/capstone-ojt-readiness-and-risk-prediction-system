@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { Building2, ChevronRight, FileText, MapPin, Search, Send } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { allStudentPages, getAssignment, studentGet, studentQuery } from '@/services/studentService';
-import { AssignmentCard, buttonClass, Card, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
+import { allStudentPages, studentGet, studentQuery } from '@/services/studentService';
+import { buttonClass, Card, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import { OjtApplicationDialog } from '@/components/student/OjtApplicationDialog';
@@ -37,8 +37,6 @@ function RegistrationContent() {
     (signal) => allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }), signal));
   const applications = useStudentResource('ojt-applications:' + scope,
     (signal) => allStudentPages<Application>('/job-applications' + studentQuery({ ojtSemesterId: semesterId }), signal));
-  const assignment = useStudentResource('ojt-assignment:' + scope,
-    (signal) => getAssignment(semesterId!, signal));
   const chosenWindow = windows.data?.find((item) => String(item.id) === windowChoice)
     ?? windows.data?.find((item) => item.status === 'OPEN') ?? windows.data?.[0];
   const opportunities = useStudentResource(chosenWindow ? 'ojt-opportunities:' + scope + ':' + chosenWindow.id : null,
@@ -61,7 +59,7 @@ function RegistrationContent() {
   const cv = savedCv ?? profile?.cv ?? null;
   const blockers = opportunities.data?.blockers ?? [];
   const canApply = !!chosenWindow && !windows.loading && !opportunities.loading && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
-  const refreshRecruitment = () => { windows.reload(); opportunities.reload(); applications.reload(); assignment.reload(); };
+  const refreshRecruitment = () => { windows.reload(); opportunities.reload(); applications.reload(); };
   const openApplication = (position?: Opportunity) => {
     setInitialPosition(position); setDetailCompany(null); setMessage(''); setApplying(true);
   };
@@ -120,8 +118,6 @@ function RegistrationContent() {
           {applicationItems.length > 20 && <Pagination page={currentApplicationPage} total={applicationItems.length} onChange={setApplicationPage} />}
         </Card>
       </div>
-      <ResourceState loading={assignment.loading} error={assignment.error} retry={assignment.reload} />
-      {!assignment.loading && !assignment.error && <AssignmentCard assignment={assignment.data} />}
 
       {detailCompany && <StudentDialog title={detailCompany.name} onClose={() => setDetailCompany(null)}>
         <div className="space-y-6">

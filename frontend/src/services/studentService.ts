@@ -17,6 +17,7 @@ import type {
   Roadmap,
   Supplementary,
   Task,
+  TaskSubmission,
   Window,
   CV,
 } from '@/types/student/portal';
@@ -212,6 +213,12 @@ export const getTasks = (
       }),
     signal,
   ).then((result) => result.tasks);
+export const getAssignedTasks = (semester: number, page: number, signal?: AbortSignal) =>
+  studentGet<Page<Task>>('/students/me/tasks' + studentQuery({ ojtSemesterId: semester, page, limit: 20 }), signal);
+export const getTaskSubmissions = (taskId: number, page: number, signal?: AbortSignal) =>
+  studentGet<Page<TaskSubmission>>(`/students/me/tasks/${taskId}/submissions` + studentQuery({ page, limit: 20 }), signal);
+export const submitAssignedTask = (taskId: number, content: string) =>
+  studentPost<TaskSubmission & { replayed: boolean }>(`/students/me/tasks/${taskId}/submissions`, { content });
 export const getOjtResults = (
   semester: number,
   page: number,

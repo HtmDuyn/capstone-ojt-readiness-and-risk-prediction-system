@@ -4,7 +4,6 @@ import { useStudentResource } from '@/hooks/useStudentResource';
 import { getStudentDashboard } from '@/services/studentService';
 import {
   AcademicMetrics,
-  AssignmentCard,
   Card,
   dateText,
   EligibilityCard,
@@ -32,7 +31,7 @@ export const StudentDashboard = () => {
   return (
     <StudentPage
       title={'Xin chào, ' + (profile?.fullName ?? 'bạn') + '!'}
-      description="Tổng quan học tập, điều kiện OJT, phân công thực tập và thông báo của bạn."
+      description="Tổng quan học tập, điều kiện OJT, nhiệm vụ thực tập và thông báo của bạn."
     >
       <ResourceState
         loading={resource.loading}
@@ -95,12 +94,15 @@ export const StudentDashboard = () => {
                       iconType: 'briefcase',
                       description:
                         assignment?.enterpriseName ??
-                        'Chờ phân công doanh nghiệp',
+                        'Chờ doanh nghiệp tiếp nhận',
                     },
                   ]}
                 />
               </Card>
-              <AssignmentCard assignment={assignment} />
+              <Card title="Nhiệm vụ thực tập">
+                <p className="text-sm text-slate-600">Xem nhiệm vụ được doanh nghiệp giao và gửi bài làm của bạn.</p>
+                <Link to="/student/internship-progress" className="font-semibold text-orange-600">Xem nhiệm vụ →</Link>
+              </Card>
             </div>
             <div className="space-y-6">
               <EligibilityCard

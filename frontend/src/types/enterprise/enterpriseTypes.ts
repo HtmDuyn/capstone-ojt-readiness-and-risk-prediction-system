@@ -18,6 +18,8 @@ export interface EnterpriseIntern {
 }
 
 export interface InternTask {
+  submissionCount?: number;
+  latestSubmission?: import('@/types/student/portal').TaskSubmission | null;
   id: string;
   internId: string;
   internName: string;

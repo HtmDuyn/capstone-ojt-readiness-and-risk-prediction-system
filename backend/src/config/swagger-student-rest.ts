@@ -21,6 +21,9 @@ export function describeStudentRest(spec: Schema): Schema {
   const window = data('/api/ojt-registration-windows').properties.items.items;
   const context = (name: string) => data('/api/internship-tasks').properties.items.items.properties[name];
   const publishedResult = data('/api/students/me/ojt-results').properties.items.items;
+  const submission = object({id, taskId:id, studentId:id, content:text, submittedAt:time, isLate:{type:'boolean'}});
+  const task = data('/api/internship-tasks').properties.items.items;
+  Object.assign(task.properties, {canSubmit:{type:'boolean'}, submissionCount:{type:'integer',minimum:0}, latestSubmission:nullable(submission)});
   Object.assign(publishedResult.properties, {
     source: {type: 'string', enum: ['ACADEMIC_CONFIRMATION']},
     templateId: nullable(id), scoreDetails: {type: 'object', nullable: true, additionalProperties: true},
@@ -133,6 +136,33 @@ export function describeStudentRest(spec: Schema): Schema {
     description:'Gộp phân công hiện tại, nhiệm vụ và kết quả OJT. Bỏ bộ lọc kỳ: phân công đang hiệu lực mới nhất và lịch sử kết quả của mình. assignmentId chọn phân công lịch sử, resultId chọn kết quả CONFIRMED kèm đúng phân công. Không tìm thấy hoặc không thuộc mình trả 404. Các danh sách có phân trang độc lập.',
     parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
+
+  const taskOperation = (role: string, summary: string, schema: Schema, created = false): Schema => ({
+    tags:[role === 'STUDENT' ? 'Sinh viên' : 'Doanh nghiệp'], 'x-roles':[role], summary,
+    security:[{bearerAuth:[]}], parameters:[], responses:{[created ? '201' : '200']:envelope(schema),
+      400:{description:'Sai nội dung hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai vai trò'},
+      404:{description:'Nhiệm vụ không tồn tại hoặc không thuộc tài khoản'},409:{description:'Nhiệm vụ đã hoàn thành hoặc đợt thực tập đã kết thúc/hủy'}},
+  });
+  const pageParameters = ['page','limit'].map(name => ({in:'query',name,schema:{...id,...(name==='limit'?{maximum:100,default:20}:{default:1})}}));
+  const taskParameter = {in:'path',name:'id',required:true,schema:id};
+  const ownTasks = taskOperation('STUDENT','Nhiệm vụ được doanh nghiệp giao cho chính sinh viên',page(task));
+  ownTasks.parameters = [...pageParameters,{in:'query',name:'ojtSemesterId',schema:id}];
+  spec.paths['/api/students/me/tasks'] = {get:ownTasks};
+  for (const [prefix, role] of [['/api/students/me/tasks','STUDENT'],['/api/enterprise/tasks','ENTERPRISE']]) {
+    const history = taskOperation(role,'Lịch sử bài nộp của nhiệm vụ trong phạm vi tài khoản',object({taskId:id,...page(submission).properties}));
+    history.parameters = [taskParameter,...pageParameters];
+    spec.paths[prefix+'/{id}/submissions'] = {get:history};
+  }
+  const submit = taskOperation('STUDENT','Nộp nội dung/đường dẫn bài làm cho doanh nghiệp',object({...submission.properties,replayed:{type:'boolean'}}),true);
+  submit.parameters = [taskParameter];
+  submit.description = 'Lưu bài nộp vào TaskProgressUpdates, giữ lịch sử. Gửi lặp nội dung mới nhất trả replayed=true. Cho phép nộp muộn và trả isLate; không tự đổi nhiệm vụ thành DONE.';
+  submit.requestBody = {required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['content'],properties:{content:{type:'string',minLength:1,maxLength:10000}}}}}};
+  spec.paths['/api/students/me/tasks/{id}/submissions'].post = submit;
+  const taskStatus = taskOperation('ENTERPRISE','Xác nhận hoàn thành hoặc yêu cầu làm lại nhiệm vụ',object({id,status:text}));
+  taskStatus.parameters = [taskParameter];
+  taskStatus.requestBody = {required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['status'],properties:{status:{type:'string',enum:['TODO','IN_PROGRESS','DONE']}}}}}};
+  taskStatus.responses['415'] = {description:'Body phải là application/json.'};
+  spec.paths['/api/enterprise/tasks/{id}/status'] = {patch:taskStatus};
 
   for (const [path, item] of Object.entries(spec.paths) as [string, Schema][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
