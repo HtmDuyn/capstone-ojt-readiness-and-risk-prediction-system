@@ -1,3 +1,4 @@
+import React from "react";
 import { DashboardGridIcon } from "@/components/common/icons/AppIcons";
 import { Building2, Handshake, Award, UserCheck } from "lucide-react";
 import type { NavItem } from "@/types/common.types";

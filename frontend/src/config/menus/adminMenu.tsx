@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   DashboardGridIcon,
 } from '@/components/common/icons/AppIcons';

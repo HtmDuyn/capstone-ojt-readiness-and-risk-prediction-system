@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { EducationSidebar } from "@/components/education/EducationSidebar";
 import { Sidebar } from "@/components/common/Sidebar";
 import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
@@ -46,6 +47,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [initialAiQuery, setInitialAiQuery] = useState("");
   const isEducation = user?.role === 'education';
+  const RoleSidebar = isEducation ? EducationSidebar : Sidebar;
 
   const handleLogout = () => {
     logout();
@@ -86,7 +88,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         </div>
 
         {/* Điều hướng Sidebar */}
-        <Sidebar
+        <RoleSidebar
           navItems={navItems}
           title={brandTitle}
           subtitle={brandSubtitle}
@@ -100,7 +102,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
-            student={user?.role === "student" ? mockStudentProfile : undefined}
+            student={isEducation || user?.role === "enterprise" ? undefined : mockStudentProfile}
             user={resolvedUserSummary}
             showNotifications={!isEducation}
             showLanguage={!isEducation}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { Users, Search, CheckCircle2, XCircle, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Search, CheckCircle2, XCircle, FileText, Calendar, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandidatePeriod } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 

@@ -10,7 +10,10 @@ export function downloadCourseDemand(blob: Blob) {
 }
 
 // Nhận Blob từ service; chỉ xử lý lưu file trên trình duyệt.
-export async function downloadFile(load: () => Promise<Blob>, filename: string) {
+export async function downloadFile(
+  load: () => Promise<Blob>,
+  filename: string,
+) {
   try {
     const blob = await load();
     const objectUrl = URL.createObjectURL(blob);

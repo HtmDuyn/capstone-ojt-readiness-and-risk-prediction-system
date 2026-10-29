@@ -39,8 +39,6 @@ API.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    const body = error.response?.data as { message?: string } | undefined;
-    if (body?.message) error.message = body.message;
     if (error.response && error.response.status === 401) {
       console.error('Unauthorized, please login again.');
       // Xóa token hoặc chuyển hướng về trang login nếu cần

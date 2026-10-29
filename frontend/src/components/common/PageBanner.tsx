@@ -191,4 +191,6 @@ export const PageBanner: React.FC<PageBannerProps> = ({
     </div>
   );
 };
+
+export const WelcomeBanner = PageBanner;
 export default PageBanner;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Building2, User } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import {
   SearchIcon,
   NotificationBellIcon,
@@ -142,11 +142,11 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="relative">
-              {currentUser.avatar ? <img
+              <img
                 src={currentUser.avatar}
                 alt={currentUser.fullName}
                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/40 shadow-xs"
-              /> : <span aria-label={currentUser.fullName} className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 font-semibold text-orange-800">{currentUser.fullName.split(/\s+/).filter(Boolean).slice(-2).map(word => word[0]).join('').toUpperCase()}</span>}
+              />
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
             </div>
           </button>
@@ -181,23 +181,21 @@ export const Header: React.FC<HeaderProps> = ({
 
 
               {/* Profile Link Option */}
+              {isEnterprise && (
               <div className="p-1 border-b border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
                     setProfileOpen(false);
-                    navigate(isEnterprise ? '/enterprise/profile' : '/student/profile');
+                    navigate('/enterprise/profile');
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-600 rounded-xl transition-colors cursor-pointer text-left"
                 >
-                  {isEnterprise ? (
-                    <Building2 size={16} className="text-orange-500" />
-                  ) : (
-                    <User size={16} className="text-orange-500" />
-                  )}
-                  <span>{isEnterprise ? 'Hồ sơ Doanh nghiệp' : 'Hồ sơ cá nhân'}</span>
+                  <Building2 size={16} className="text-orange-500" />
+                  <span>Hồ sơ Doanh nghiệp</span>
                 </button>
               </div>
+              )}
 
               {onLogout && (
                 <div className="p-1">

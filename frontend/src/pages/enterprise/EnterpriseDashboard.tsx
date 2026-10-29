@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { enterpriseService, type EnterpriseInternshipTask } from '@/services/enterpriseService';
+import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -60,7 +61,7 @@ const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgre
 
 export const EnterpriseDashboard: React.FC = () => {
   // Lấy profile và companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
-  const { profile, companyId, loading } = useEnterprise();
+  const { profile, companyId, loading, error: profileError } = useEnterprise();
   const [taskProgress, setTaskProgress] = useState<StudentTaskProgress[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);

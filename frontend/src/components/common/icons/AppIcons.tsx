@@ -240,3 +240,5 @@ export const PlusIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 2, ...p
 export const FileTextIcon: React.FC<IconProps> = ({ size = 18, strokeWidth = 1.8, ...props }) => (
   <FileText size={size} strokeWidth={strokeWidth} {...props} />
 );
+
+

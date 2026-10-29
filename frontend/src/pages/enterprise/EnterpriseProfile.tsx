@@ -16,7 +16,9 @@ import {
   Layers,
   FileCheck2,
   Edit3,
+  X,
   Save,
+  Check,
 } from 'lucide-react';
 import { enterpriseService } from '@/services/enterpriseService';
 import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';

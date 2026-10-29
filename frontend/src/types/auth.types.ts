@@ -1,5 +1,10 @@
+import React from 'react';
+
 // ─── 5 Roles across the system ───────────────────────────────────────────────
 export type UserRole = 'student' | 'education' | 'qhdn' | 'enterprise' | 'admin';
+
+// Backward compatibility alias if needed
+export type Role = UserRole;
 
 export interface AuthUser {
   id: string;
@@ -17,6 +22,12 @@ export interface AuthContextValue {
   login: (token: string, user: AuthUser) => void;
   logout: () => void;
   updateUser: (partial: Partial<AuthUser>) => void;
+}
+
+export interface RoleOption {
+  id: UserRole;
+  label: string;
+  icon: React.ReactNode;
 }
 
 export interface FloatingParticleProps {

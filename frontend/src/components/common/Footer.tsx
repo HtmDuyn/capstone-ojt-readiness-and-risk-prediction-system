@@ -18,4 +18,6 @@ export const Footer: React.FC = () => {
     </footer>
   );
 };
+
+export const DashboardFooter = Footer;
 export default Footer;

@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   DashboardGridIcon,
   AcademicCapIcon,
@@ -9,7 +10,7 @@ import {
   EvaluationResultsIcon,
   NotificationBellIcon,
 } from '@/components/common/icons/AppIcons';
-import type { NavItem } from '@/types/common.types';
+import type { NavItem, BannerPreset } from '@/types/common.types';
 
 export type StudentMenuItem = NavItem;
 

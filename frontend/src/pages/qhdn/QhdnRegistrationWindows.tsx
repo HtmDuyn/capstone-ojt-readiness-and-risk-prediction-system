@@ -45,6 +45,7 @@ import {
   type ReceptionStatus,
 } from "@/utils/qhdnStudentStatus";
 import type {
+  HandoffStudentItem,
   RegistrationWindowItem,
 } from "@/types/qhdn/qhdnTypes";
 const head =
