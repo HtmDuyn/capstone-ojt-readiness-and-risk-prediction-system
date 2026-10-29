@@ -37,7 +37,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   brandTitle = "FPT University",
   brandSubtitle = "Hệ thống quản lý",
   userSummary,
-  showAIConsult = true,
+  showAIConsult = false,
   children,
 }) => {
   const { user, logout } = useAuth();
@@ -54,6 +54,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   };
 
   const handleOpenAIConsult = (query = "") => {
+    if (!showAIConsult) return;
     setInitialAiQuery(query);
     setAiModalOpen(true);
   };
@@ -144,12 +145,12 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         )}
 
         {/* Modal tư vấn AI */}
-        <AIConsultModal
+        {showAIConsult && <AIConsultModal
           isOpen={aiModalOpen}
           onClose={() => setAiModalOpen(false)}
           student={{ fullName: resolvedUserSummary.fullName }}
           initialQuery={initialAiQuery}
-        />
+        />}
       </div>
     </BaseLayoutContext.Provider>
   );

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getCourseResults, getCurriculum } from '@/services/studentService';
+import { getAllCourseResults, getCurriculum } from '@/services/studentService';
 import {
   Card,
   Empty,
@@ -13,32 +13,37 @@ import {
   valueText,
   inputClass,
 } from '@/components/student/PortalUI';
-import { ComboRegistration } from '@/components/student/ComboRegistration';
 
 export const StudentAcademicProfile = () => {
   const { profile, revision, loading } = useStudentPortal();
   const [page, setPage] = useState(1);
   const [courseSearch, setCourseSearch] = useState('');
+  const [studySemester, setStudySemester] = useState('');
+  const [curriculumPage, setCurriculumPage] = useState(1);
   const results = useStudentResource(
     !loading && profile
-      ? 'courses:' + profile.id + ':' + page + ':' + revision
+      ? 'courses:' + profile.id + ':' + revision
       : null,
-    (signal) => getCourseResults(profile!.id, page, signal),
+    (signal) => getAllCourseResults(profile!.id, signal),
   );
   const curriculum = useStudentResource(
     !loading && profile ? 'curriculum:' + profile.id + ':' + revision : null,
     (signal) => getCurriculum(profile!.id, signal),
   );
   const progress = profile?.academicProgress;
-  const visible = results.data?.items.filter((item) =>
-    (item.courseCode + ' ' + item.courseName)
-      .toLocaleLowerCase()
-      .includes(courseSearch.toLocaleLowerCase()),
+  const semesters = [...new Set((results.data ?? []).flatMap((item) => item.semesterTaken == null ? [] : [item.semesterTaken]))].sort((a, b) => a - b);
+  const filtered = (results.data ?? []).filter((item) =>
+    (studySemester === '' || String(item.semesterTaken) === studySemester) &&
+    (item.courseCode + ' ' + item.courseName).toLocaleLowerCase().includes(courseSearch.trim().toLocaleLowerCase()),
   );
+  const resultPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / 20)));
+  const visible = filtered.slice((resultPage - 1) * 20, resultPage * 20);
+  const courses = curriculum.data?.courses ?? [];
+  const roadmapPage = Math.min(curriculumPage, Math.max(1, Math.ceil(courses.length / 20)));
   return (
     <StudentPage
       title="Hồ sơ học tập & tiến độ"
-      description="Bảng điểm, chương trình đào tạo và đăng ký combo từ dữ liệu học vụ của bạn."
+      description="Theo dõi bảng điểm theo kỳ và lộ trình chương trình đào tạo của bạn."
       needsSemester={false}
     >
       {profile && progress && (
@@ -57,7 +62,7 @@ export const StudentAcademicProfile = () => {
                 Chuyên ngành: {profile.program?.majorName || 'Chưa cập nhật'}
               </div>
               <div>
-                Kỳ học:{' '}
+                Học kỳ hiện tại:{' '}
                 {profile.currentAcademicPeriod?.name ||
                   profile.currentSemester ||
                   'Chưa cập nhật'}
@@ -97,21 +102,34 @@ export const StudentAcademicProfile = () => {
               error={results.error}
               retry={results.reload}
             />
-            <input
-              className={inputClass}
-              aria-label="Tìm môn trong trang bảng điểm"
-              value={courseSearch}
-              onChange={(e) => setCourseSearch(e.target.value)}
-              placeholder="Tìm mã hoặc tên môn trong trang hiện tại..."
-            />
+            <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+              <label className="space-y-1 text-sm text-slate-600">
+                <span>Kỳ</span>
+                <select className={inputClass} aria-label="Lọc bảng điểm theo kỳ" value={studySemester} onChange={(event) => { setStudySemester(event.target.value); setPage(1); }}>
+                  <option value="">Tất cả các kỳ</option>
+                  {semesters.map((semester) => <option key={semester} value={semester}>{semester === 0 ? 'Kỳ 0 (dự bị)' : `Kỳ ${semester}`}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-sm text-slate-600">
+                <span>Tìm môn học</span>
+                <input
+                  className={inputClass}
+                  aria-label="Tìm môn trong bảng điểm"
+                  value={courseSearch}
+                  onChange={(e) => { setCourseSearch(e.target.value); setPage(1); }}
+                  placeholder="Tìm mã hoặc tên môn trong toàn bộ bảng điểm..."
+                />
+              </label>
+            </div>
             {results.data && (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full min-w-[760px] text-sm text-left">
                     <thead>
                       <tr className="border-b text-slate-500">
                         <th className="p-3">Môn học</th>
-                        <th>Kỳ học</th>
+                        <th className="px-3 whitespace-nowrap">Kỳ</th>
+                        <th className="px-3 whitespace-nowrap">Học kỳ</th>
                         <th>Lần học</th>
                         <th>Điểm</th>
                         <th>Điểm GPA</th>
@@ -119,13 +137,14 @@ export const StudentAcademicProfile = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {visible?.map((item) => (
+                      {visible.map((item) => (
                         <tr key={item.id} className="border-b">
                           <td className="p-3">
                             <strong>{item.courseCode}</strong>
                             <p>{item.courseName}</p>
                           </td>
-                          <td>{item.periodCode || 'Chưa cập nhật'}</td>
+                          <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
+                          <td className="px-3 whitespace-nowrap">{item.periodCode || 'Chưa cập nhật'}</td>
                           <td>{item.attemptNumber}</td>
                           <td>{item.score ?? '—'}</td>
                           <td>{item.gradePoints ?? '—'}</td>
@@ -137,8 +156,8 @@ export const StudentAcademicProfile = () => {
                 </div>
                 {!visible?.length && <Empty>Không có môn học phù hợp.</Empty>}
                 <Pagination
-                  page={page}
-                  total={results.data.total}
+                  page={resultPage}
+                  total={filtered.length}
                   onChange={setPage}
                 />
               </>
@@ -156,8 +175,8 @@ export const StudentAcademicProfile = () => {
                   {curriculum.data.name} · {curriculum.data.code} · Phiên bản{' '}
                   {curriculum.data.version}
                 </p>
-                <div className="overflow-x-auto max-h-[520px]">
-                  <table className="w-full text-left text-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-sm">
                     <thead>
                       <tr className="border-b">
                         <th className="p-3">Môn học</th>
@@ -168,7 +187,7 @@ export const StudentAcademicProfile = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {curriculum.data.courses.map((course) => {
+                      {courses.slice((roadmapPage - 1) * 20, roadmapPage * 20).map((course) => {
                         const requirement = progress.requirements.find(
                           (item) => item.id === course.id,
                         );
@@ -197,6 +216,7 @@ export const StudentAcademicProfile = () => {
                 {!curriculum.data.courses.length && (
                   <Empty>Chưa có môn học được công bố.</Empty>
                 )}
+                <Pagination page={roadmapPage} total={courses.length} onChange={setCurriculumPage} />
               </>
             )}
             {!curriculum.loading &&
@@ -205,28 +225,6 @@ export const StudentAcademicProfile = () => {
                 <Empty>Chương trình đào tạo chưa được công bố.</Empty>
               )}
           </Card>
-          <Card title="Combo đã xác nhận">
-            {profile.comboSelections.length ? (
-              profile.comboSelections.map((combo) => (
-                <div key={combo.id}>
-                  <h3 className="font-bold">
-                    {combo.code} · {combo.name}
-                  </h3>
-                  <ul className="text-sm text-slate-600">
-                    {combo.courses.map((course) => (
-                      <li key={course.id}>
-                        {course.code} · {course.name} · {course.credits ?? '—'}{' '}
-                        tín chỉ
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            ) : (
-              <Empty>Chưa có combo được xác nhận.</Empty>
-            )}
-          </Card>
-          <ComboRegistration />
         </>
       )}
     </StudentPage>

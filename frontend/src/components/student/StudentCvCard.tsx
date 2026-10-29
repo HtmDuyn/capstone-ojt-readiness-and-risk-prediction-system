@@ -2,13 +2,16 @@ import { useState, useRef, type FormEvent } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { uploadStudentCv, downloadStudentCv } from '@/services/studentService';
 import { buttonClass, Card, dateText, Empty, inputClass } from './PortalUI';
+import type { CV } from '@/types/student/portal';
 
-export function StudentCvCard() {
+export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; onUploaded?: (cv: CV) => void } = {}) {
   const { profile, refresh } = useStudentPortal();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const lock = useRef(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const cv = providedCv === undefined ? profile?.cv : providedCv;
   const run = async (work: () => Promise<unknown>) => {
     if (lock.current) return;
     lock.current = true;
@@ -24,20 +27,21 @@ export function StudentCvCard() {
     }
   };
   return (
-    <Card title="CV ứng tuyển">
-      {profile?.cv ? (
+    <Card title="CV của tôi">
+      <p className="text-sm text-slate-500">Lưu CV để sử dụng khi ứng tuyển. Hồ sơ này sẽ được dùng để gợi ý doanh nghiệp phù hợp khi tính năng AI được tích hợp.</p>
+      {cv ? (
         <div className="text-sm space-y-2">
-          <p className="font-bold">{profile.cv.fileName}</p>
+          <p className="font-bold break-all">{cv.fileName}</p>
           <p>
-            {(profile.cv.size / 1024).toFixed(1)} KB ·{' '}
-            {dateText(profile.cv.uploadedAt)}
+            {(cv.size / 1024).toFixed(1)} KB ·{' '}
+            {dateText(cv.uploadedAt)}
           </p>
           <button
             disabled={busy}
             type="button"
             className={buttonClass}
             onClick={() =>
-              void run(() => downloadStudentCv(profile.id, profile.cv!))
+              profile && void run(() => downloadStudentCv(profile.id, cv))
             }
           >
             Tải CV hiện tại
@@ -52,14 +56,17 @@ export function StudentCvCard() {
           event.preventDefault();
           if (file)
             void run(async () => {
-              await uploadStudentCv(file);
-              refresh();
+              const uploaded = await uploadStudentCv(file);
+              setFile(null);
+              if (fileInput.current) fileInput.current.value = '';
+              if (onUploaded) onUploaded(uploaded); else refresh();
             });
         }}
       >
         <label className="block text-sm">
           Tải CV PDF (tối đa 10 MB)
           <input
+            ref={fileInput}
             disabled={busy}
             className={inputClass + ' mt-2'}
             type="file"

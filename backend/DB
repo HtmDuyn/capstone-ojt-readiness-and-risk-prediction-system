@@ -8383,4 +8383,116 @@ BEGIN
   END IF;
 END $accept_student_portal$;
 
+-- BEGIN DEMO PARTNER CATALOG: safe to run this DO block alone on an existing DB.
+-- Fictional enterprises, reserved .example emails; demo password Enterprise@123.
+-- Does not reset data, change existing accounts, open windows or alter eligibility.
+DO $seed_partner_catalog$
+DECLARE
+  partner record;
+  recruitment record;
+  job record;
+  enterprise_id integer;
+  account_id integer;
+  enterprise_role_id integer;
+  reviewer_id integer;
+  position_id integer;
+  post_id integer;
+  role_id integer;
+  account_name text;
+  account_email text;
+  position_code text;
+  submission_key text;
+BEGIN
+  PERFORM pg_advisory_xact_lock(20261029, 10);
+  SELECT "RoleID" INTO enterprise_role_id FROM public."Roles" WHERE "RoleCode"='ENTERPRISE';
+  SELECT u."UserID" INTO reviewer_id FROM public."Users" u JOIN public."Roles" r USING ("RoleID")
+    WHERE r."RoleCode"='OJT_COORD' AND u."Status"='ACTIVE' ORDER BY u."UserID" LIMIT 1;
+  IF enterprise_role_id IS NULL OR reviewer_id IS NULL THEN
+    RAISE EXCEPTION 'An ENTERPRISE role and active OJT coordinator are required.';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public."RecruitmentWindows" rw JOIN public."OJTRegistrationWindows" sw USING ("OJTSemesterID")
+    WHERE rw."Status"='OPEN' AND sw."Status"='OPEN'
+      AND clock_timestamp()>=rw."StartsAt" AND clock_timestamp()<rw."EndsAt"
+      AND clock_timestamp()>=sw."StartsAt" AND clock_timestamp()<sw."EndsAt"
+  ) THEN
+    RAISE EXCEPTION 'No OJT semester currently has both recruitment and student registration open. No demo data added.';
+  END IF;
+  FOR partner IN SELECT * FROM (VALUES
+    (2, 'Công nghệ Sao Việt (Demo)', 'Phát triển phần mềm', 'Thủ Đức, TP. Hồ Chí Minh', 'Nguyễn Hà Anh', 'WEB_DEV', 'Thực tập React / Frontend', 'Xây dựng giao diện web, kết nối REST API và tối ưu trải nghiệm người dùng.', 'Biết JavaScript, React, HTML/CSS và Git.', 'HYBRID'),
+    (3, 'Giải pháp Mây Xanh (Demo)', 'Điện toán đám mây', 'Hải Châu, Đà Nẵng', 'Trần Minh Khôi', 'WEB_DEV', 'Thực tập Backend / Cloud', 'Phát triển dịch vụ Node.js và hỗ trợ triển khai ứng dụng trên nền tảng cloud.', 'Biết Node.js, SQL, REST API; hiểu Linux là lợi thế.', 'HYBRID'),
+    (4, 'Dữ liệu Nam Việt (Demo)', 'Phân tích dữ liệu', 'Cầu Giấy, Hà Nội', 'Lê Thảo Vy', 'DATA_ANALYST', 'Thực tập Data Analyst', 'Làm sạch dữ liệu, truy vấn SQL và xây dựng báo cáo phục vụ kinh doanh.', 'Biết SQL, Excel; có Python hoặc Power BI là lợi thế.', 'ONSITE'),
+    (5, 'An ninh Số Việt (Demo)', 'An toàn thông tin', 'Quận 7, TP. Hồ Chí Minh', 'Phạm Quốc Huy', 'SECURITY_INTERN', 'Thực tập An toàn thông tin', 'Hỗ trợ giám sát hệ thống, phân tích log và kiểm tra cấu hình bảo mật.', 'Hiểu mạng máy tính, Linux và nguyên tắc bảo mật cơ bản.', 'ONSITE'),
+    (6, 'Kiểm thử Ánh Dương (Demo)', 'Kiểm thử phần mềm', 'Biên Hòa, Đồng Nai', 'Hoàng Minh Tâm', 'QA_TESTER', 'Thực tập QA / Automation', 'Thiết kế test case, kiểm thử API và xây dựng kịch bản kiểm thử tự động.', 'Biết kiểm thử chức năng, Postman; có Playwright là lợi thế.', 'HYBRID'),
+    (7, 'Giải pháp Lạc Việt (Demo)', 'Tư vấn hệ thống thông tin', 'Bình Thạnh, TP. Hồ Chí Minh', 'Võ Ngọc Mai', 'BUSINESS_ANALYST', 'Thực tập Business Analyst', 'Phân tích yêu cầu, mô hình hóa quy trình và viết tài liệu đặc tả phần mềm.', 'Giao tiếp tốt, biết user story, UML và SQL cơ bản.', 'ONSITE'),
+    (8, 'Sản phẩm Sen Việt (Demo)', 'Sản phẩm công nghệ', 'Ninh Kiều, Cần Thơ', 'Đặng Thanh Phong', 'WEB_DEV', 'Thực tập Fullstack', 'Tham gia phát triển sản phẩm web bằng React, Node.js và PostgreSQL.', 'Biết JavaScript/TypeScript, SQL và quy trình làm việc với Git.', 'REMOTE'),
+    (9, 'Công nghệ Hải Đăng (Demo)', 'Phần mềm doanh nghiệp', 'Thanh Khê, Đà Nẵng', 'Bùi Gia Hân', 'WEB_DEV', 'Thực tập Java Backend', 'Xây dựng API và nghiệp vụ cho hệ thống quản trị doanh nghiệp.', 'Nắm Java, OOP, SQL; biết Spring Boot là lợi thế.', 'HYBRID'),
+    (10, 'Phân tích Tre Việt (Demo)', 'Dữ liệu và báo cáo', 'Nam Từ Liêm, Hà Nội', 'Đỗ Đức Minh', 'DATA_ANALYST', 'Thực tập BI / Reporting', 'Xây dựng dashboard, đối soát dữ liệu và hỗ trợ phân tích chỉ số vận hành.', 'Biết SQL, Excel và công cụ trực quan hóa dữ liệu.', 'REMOTE'),
+    (11, 'Số hóa Bình Minh (Demo)', 'Chuyển đổi số', 'Thủ Đức, TP. Hồ Chí Minh', 'Ngô Khánh Linh', 'BUSINESS_ANALYST', 'Thực tập Phân tích nghiệp vụ', 'Khảo sát quy trình, viết yêu cầu và hỗ trợ nghiệm thu ứng dụng nội bộ.', 'Có tư duy phân tích, kỹ năng viết tài liệu và làm việc nhóm.', 'ONSITE')
+  ) AS p(number, name, industry, address, contact, role_code, title, description, requirements, mode)
+  LOOP
+    account_name:='enterprise'||lpad(partner.number::text,2,'0');
+    account_email:=account_name||'@ojt-demo.example';
+    INSERT INTO public."Enterprises" ("EnterpriseCode","Name","Address","Industry","ContactPersonName","ContactPhone","ContactEmail","Status")
+      VALUES ('DEMO-PARTNER-'||lpad(partner.number::text,2,'0'),partner.name,partner.address,partner.industry,partner.contact,
+        '09000000'||lpad(partner.number::text,2,'0'),account_email,'ACTIVE')
+      ON CONFLICT ("EnterpriseCode") DO NOTHING;
+    SELECT "EnterpriseID" INTO enterprise_id FROM public."Enterprises"
+      WHERE "EnterpriseCode"='DEMO-PARTNER-'||lpad(partner.number::text,2,'0') AND "ContactEmail"=account_email AND "DeletedAt" IS NULL AND "Status"='ACTIVE';
+    IF enterprise_id IS NULL THEN RAISE EXCEPTION 'Demo enterprise code conflicts with existing data: %',account_name; END IF;
+    INSERT INTO public."Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status","MustChangePassword")
+      VALUES (account_name,'$2b$12$Kt4rc0wXGrrDWiIfragd1eDv20.RS.IJ4YFr4y3f0PPm.kP2dK9Gq',account_email,
+        '09000000'||lpad(partner.number::text,2,'0'),partner.contact,enterprise_role_id,'ACTIVE',false)
+      ON CONFLICT ("Username") DO NOTHING;
+    SELECT "UserID" INTO account_id FROM public."Users" WHERE "Username"=account_name AND "Email"=account_email AND "RoleID"=enterprise_role_id;
+    IF account_id IS NULL THEN RAISE EXCEPTION 'Demo username conflicts with an existing account: %',account_name; END IF;
+    INSERT INTO public."EnterpriseUsers" ("UserID","EnterpriseID","PositionTitle") VALUES (account_id,enterprise_id,'Nhân sự tuyển dụng OJT (Demo)') ON CONFLICT ("UserID") DO NOTHING;
+    IF NOT EXISTS (SELECT 1 FROM public."EnterpriseUsers" WHERE "UserID"=account_id AND "EnterpriseID"=enterprise_id) THEN
+      RAISE EXCEPTION 'Demo account belongs to a different enterprise: %',account_name;
+    END IF;
+    FOR recruitment IN
+      SELECT DISTINCT ON (rw."OJTSemesterID") rw."WindowID",rw."OJTSemesterID",o."Name",
+        least(rw."EndsAt",sw."EndsAt") AS deadline
+      FROM public."RecruitmentWindows" rw JOIN public."OJTRegistrationWindows" sw USING ("OJTSemesterID")
+      JOIN public."OJTSemesters" o USING ("OJTSemesterID")
+      WHERE rw."Status"='OPEN' AND sw."Status"='OPEN'
+        AND clock_timestamp()>=rw."StartsAt" AND clock_timestamp()<rw."EndsAt"
+        AND clock_timestamp()>=sw."StartsAt" AND clock_timestamp()<sw."EndsAt"
+      ORDER BY rw."OJTSemesterID",rw."WindowID" DESC,sw."EndsAt" DESC
+    LOOP
+      FOR job IN SELECT * FROM (VALUES
+        ('MAIN',partner.role_code,partner.title,partner.description,partner.requirements,5),
+        ('TEAM','QA_TESTER','Thực tập Kiểm thử sản phẩm','Tham gia kiểm thử sản phẩm, viết test case và báo cáo lỗi cùng nhóm phát triển.','Biết quy trình kiểm thử, SQL cơ bản và làm việc nhóm.',3)
+      ) AS j(suffix,role_code,title,description,requirements,capacity)
+      LOOP
+        SELECT "JobRoleID" INTO role_id FROM public."JobRoles" WHERE "RoleCode"=job.role_code;
+        IF role_id IS NULL THEN RAISE EXCEPTION 'Missing job role: %',job.role_code; END IF;
+        position_code:='DEMO-P'||partner.number||'-S'||recruitment."OJTSemesterID"||'-'||job.suffix;
+        SELECT "PositionID" INTO position_id FROM public."InternshipPositions"
+          WHERE "EnterpriseID"=enterprise_id AND "OJTSemesterID"=recruitment."OJTSemesterID" AND "RecruitmentCode"=position_code;
+        IF position_id IS NULL THEN
+          INSERT INTO public."InternshipPositions" ("EnterpriseID","OJTSemesterID","RecruitmentCode","Title","Description","Requirements","Capacity","RemainingSlots","Status","JobRoleID","Location","WorkMode")
+            VALUES (enterprise_id,recruitment."OJTSemesterID",position_code,job.title,job.description,job.requirements,job.capacity,job.capacity,'OPEN',role_id,partner.address,partner.mode)
+            RETURNING "PositionID" INTO position_id;
+        END IF;
+        submission_key:='demo-partner-20261029:'||partner.number||':'||recruitment."OJTSemesterID"||':'||job.suffix;
+        SELECT "PostID" INTO post_id FROM public."RecruitmentPosts" WHERE "SubmissionKey"=submission_key;
+        IF post_id IS NULL THEN
+          INSERT INTO public."RecruitmentPosts" ("EnterpriseID","OJTSemesterID","WindowID","Title","Content","Benefits","ApplicationInstructions","Status","PublishedAt","DeadlineAt","CreatedBy","ReviewedBy","ReviewedAt","ReviewReason","SubmissionKey")
+            VALUES (enterprise_id,recruitment."OJTSemesterID",recruitment."WindowID",job.title||' · '||partner.name,
+              job.description||E'\n'||'Kỳ OJT: '||recruitment."Name"||E'\nDữ liệu minh họa phục vụ kiểm thử hệ thống.',
+              'Có người hướng dẫn, tham gia dự án và được đánh giá cuối kỳ (thông tin minh họa).',
+              'Nộp đơn và CV PDF trực tiếp trên cổng sinh viên.','PUBLISHED',now(),recruitment.deadline,account_id,reviewer_id,now(),'Dữ liệu tuyển dụng demo theo yêu cầu kiểm thử.',submission_key)
+            RETURNING "PostID" INTO post_id;
+        END IF;
+        INSERT INTO public."RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID")
+          VALUES (post_id,position_id,enterprise_id,recruitment."OJTSemesterID") ON CONFLICT ("PostID","PositionID") DO NOTHING;
+        INSERT INTO public."PositionSpecializations" ("PositionID","SpecializationID")
+          SELECT position_id,"SpecializationID" FROM public."Specializations" WHERE "SpecializationCode"='SE' ON CONFLICT DO NOTHING;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+END $seed_partner_catalog$;
+-- END DEMO PARTNER CATALOG
+
 COMMIT;

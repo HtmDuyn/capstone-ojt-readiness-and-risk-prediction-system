@@ -93,7 +93,7 @@ export async function getOwnStudent(
 export const getStudentProfile = (id: number, signal?: AbortSignal) =>
   studentGet<Profile>(
     `/students/${id}` +
-      studentQuery({ include: 'academicProgress,comboSelections,ojtRegistrations' }),
+      studentQuery({ include: 'academicProgress,ojtRegistrations' }),
     signal,
   );
 export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
@@ -141,6 +141,18 @@ export const getCourseResults = (
       }),
     signal,
   ).then((profile) => profile.courseResults);
+// Load every server page before filtering and paginating the transcript locally.
+// A semester filter must include matching courses beyond the current API page.
+export async function getAllCourseResults(id: number, signal?: AbortSignal) {
+  const items: CourseResult[] = [];
+  for (let page = 1; ; page++) {
+    const { courseResults } = await studentGet<{ courseResults: Page<CourseResult> }>(
+      `/students/${id}` + studentQuery({ include: 'courseResults', resultsPage: page, resultsLimit: 100 }), signal,
+    );
+    items.push(...courseResults.items);
+    if (items.length >= courseResults.total || !courseResults.items.length) return items;
+  }
+}
 export const getRegistrationWindows = (
   semester: number,
   page: number,

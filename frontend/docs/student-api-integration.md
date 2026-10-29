@@ -17,14 +17,13 @@ API_PROXY_TARGET=http://localhost:3000
 
 Khởi động backend và Vite, rồi đăng nhập lại. Cấu hình này chỉ áp dụng development; production cần `VITE_API_URL` trỏ tới backend đã triển khai cùng phiên bản. Restart Vite sau khi đổi biến môi trường.
 
-`StudentPortalProvider` chia sẻ hồ sơ, đợt OJT, đợt combo và số thông báo chưa đọc. Kỳ mục tiêu lấy từ lộ trình khóa ở nấc 6, nên sinh viên kỳ 5 vẫn có kỳ OJT dù chưa đăng ký. Request được giới hạn theo tài khoản; phản hồi cũ bị bỏ qua khi đổi phiên hoặc bộ lọc.
+`StudentPortalProvider` chia sẻ hồ sơ, đợt OJT và số thông báo chưa đọc. Cổng sinh viên đã bỏ chatbot nổi, combo đã xác nhận và đăng ký/xác nhận combo; provider không gọi API đợt combo. Dữ liệu và API combo của phân hệ Đào tạo vẫn giữ nguyên. Kỳ mục tiêu lấy từ lộ trình khóa ở nấc 6, nên sinh viên kỳ 5 vẫn có kỳ OJT dù chưa đăng ký. Request được giới hạn theo tài khoản; phản hồi cũ bị bỏ qua khi đổi phiên hoặc bộ lọc.
 
 | Màn hình / thao tác | API hiện tại, tương đối với `/api` |
 | --- | --- |
 | Tài khoản đang đăng nhập | `GET /auth/me` — envelope `user` |
 | Dashboard, học vụ, điều kiện, môn bổ sung | `GET /students/me/dashboard?ojtSemesterId=…` |
 | Hồ sơ, bảng điểm, chương trình học | `GET /students/:id?include=academicProgress,courseResults,curriculum,…` |
-| Combo | `GET /combo-registration-windows`, `POST /combo-registration-windows/:id/preview`, `POST /combo-registration-windows/:id/selections` |
 | Tư vấn AI | `GET /students/me/roadmap-recommendations?ojtSemesterId=…` |
 | Đợt và đăng ký OJT | `GET /ojt-registration-windows`, `GET /ojt-registrations`, `POST /ojt-registrations` |
 | Trạng thái theo kỳ | `GET /ojt-semesters/:id/students` |
@@ -38,9 +37,13 @@ Khởi động backend và Vite, rồi đăng nhập lại. Cấu hình này ch�
 
 GET không có body; JSON có `Content-Type: application/json`; upload PDF dùng FormData field `cv`, tối đa 10 MiB. Không tự đặt Content-Type JSON cho FormData. API nghiệp vụ trả `data`, trừ Auth (`user`), cập nhật tài khoản (`account`), và tải CV (PDF).
 
-Danh sách thường dùng trang 20 bản ghi. `allStudentPages` đọc đủ các trang khi tải danh sách đợt/đơn ứng tuyển. Bảng điểm dùng `resultsPage/resultsLimit`; internships có `tasksPage/tasksLimit` và `resultsPage/resultsLimit` độc lập. Tìm kiếm giao diện trên bảng điểm, nhiệm vụ và thông báo áp dụng trong trang đang xem.
+Danh sách thường dùng trang 20 bản ghi. `allStudentPages` đọc đủ các trang khi tải danh sách đợt/đơn ứng tuyển. Bảng điểm tải đủ các trang bằng `resultsPage/resultsLimit=100`, sau đó lọc và phân trang 20 dòng trên giao diện. Cột **Kỳ** dùng `semesterTaken` (0, 1, 2, ...); cột **Học kỳ** dùng `periodCode` (Spring/Summer/Fall). Bộ lọc kỳ và tìm môn áp dụng trên toàn bộ bảng điểm, không chỉ trang hiện tại. Chương trình/lộ trình cũng phân trang 20 môn. Internships có `tasksPage/tasksLimit` và `resultsPage/resultsLimit` độc lập; tìm nhiệm vụ và thông báo vẫn áp dụng trong trang đang xem.
 
 ## Điều kiện và ứng tuyển
+
+Menu duy nhất **OJT & hồ sơ ứng tuyển** trỏ tới `/student/ojt-registration`; `/student/ojt-profile` cũ chuyển hướng về trang này. Trang gộp danh sách doanh nghiệp theo đợt OJT, thông tin liên hệ/vị trí tuyển dụng trong cửa sổ chi tiết, CV cá nhân, lịch sử đơn và phân công thực tập. Danh sách doanh nghiệp được nhóm theo `company.id` từ các vị trí đã công bố trong kỳ đã chọn, không phụ thuộc sinh viên đã đủ điều kiện nộp đơn hay chưa.
+
+Nút **Nộp đơn đăng ký OJT** mở popup chọn doanh nghiệp/vị trí, thông tin liên hệ và CV PDF. Có thể dùng CV đã lưu hoặc upload mới; upload hoàn tất trước khi gửi đơn để backend gắn phiên bản CV hiện tại vào đơn. CV mới cũng được lưu riêng trong hồ sơ; thay CV sau này không thay file đã gắn ở đơn cũ. Khóa gửi ngăn click lặp; nếu nộp đơn lỗi sau upload, CV vẫn được giữ để thử lại. Mục **CV của tôi** cho tải CV độc lập để chuẩn bị tích hợp AI gợi ý doanh nghiệp sau này, chưa tự chạy AI.
 
 `officialEligibility` là xác nhận từ `EligibilityChecks` cũ. `admissionEligibility` phản ánh bằng chứng Đào tạo đã bàn giao: kết quả frontend được lưu hoặc xác nhận cũ. Hai trường giữ ý nghĩa riêng.
 
@@ -53,7 +56,6 @@ Danh sách thường dùng trang 20 bản ghi. `allStudentPages` đọc đủ c�
 Tài khoản có `mustChangePassword` được đưa tới `/student/profile` để đổi mật khẩu trước. Không tải nghiệp vụ sinh viên bằng mật khẩu tạm.
 
 - Chưa cấu hình `ROADMAP_SERVICE_URL`: AI trả `503 AI_NOT_CONFIGURED`. Giao diện giữ lỗi nghiệp vụ, không báo nhầm proxy hỏng.
-- DB chưa có đợt combo: danh sách rỗng hợp lệ; cần Đào tạo tạo đợt/roster để kiểm thử gửi lựa chọn thực tế.
 - Chưa có API sinh viên cập nhật nhiệm vụ hoặc nộp báo cáo tuần. Trang tiến độ hiện xem nhiệm vụ do doanh nghiệp giao.
 - Chỉ kết quả OJT đã CONFIRMED được công bố. Chưa công bố thì danh sách rỗng.
 - Chưa có thao tác rút đơn/xóa CV trong các API sinh viên hiện hành.

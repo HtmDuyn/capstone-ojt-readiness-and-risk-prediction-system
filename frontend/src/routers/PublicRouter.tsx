@@ -82,6 +82,7 @@ const studentRoutes: RouteObject = {
       navItems={getMenuByRole("student")}
       homePath="/student/dashboard"
       brandSubtitle="Cổng Sinh viên"
+      showAIConsult={false}
     />
     </StudentPortalProvider>
   ),
@@ -93,7 +94,7 @@ const studentRoutes: RouteObject = {
     { path: "/student/risk-prediction", element: <StudentAIRiskPrediction /> },
     { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
     { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
-    { path: "/student/ojt-profile", element: <StudentFeaturePage /> },
+    { path: "/student/ojt-profile", element: <Navigate to="/student/ojt-registration" replace /> },
     { path: "/student/internship-progress", element: <StudentInternshipProgress /> },
     { path: "/student/evaluation-results", element: <StudentEvaluationResults /> },
     { path: "/student/notifications", element: <StudentNotifications /> },

@@ -4,7 +4,6 @@ import {
   AcademicCapIcon,
   RiskAnalyticsIcon,
   OjtRegisterIcon,
-  OjtProfileIcon,
   InternshipProgressIcon,
   EvaluationResultsIcon,
   NotificationBellIcon,
@@ -64,7 +63,7 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
   },
   {
     id: 'ojt-registration',
-    label: 'Đăng ký OJT',
+    label: 'OJT & hồ sơ ứng tuyển',
     path: '/student/ojt-registration',
     icon: <OjtRegisterIcon size={20} />,
     banner: {
@@ -79,12 +78,6 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
     },
   },
 
-  {
-    id: 'ojt-profile',
-    label: 'Hồ sơ OJT & CV',
-    path: '/student/ojt-profile',
-    icon: <OjtProfileIcon size={20} />,
-  },
   {
     id: 'internship-progress',
     label: 'Tiến độ thực tập',

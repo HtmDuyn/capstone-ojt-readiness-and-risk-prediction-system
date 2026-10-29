@@ -4,6 +4,10 @@ Base URL `/api`, Bearer token STUDENT. GET không có body; ID tài nguyên nằ
 
 Frontend dùng Axios instance chung (`adapter: xhr`). Request bị hủy khi rời trang không phải lỗi HTTP; 304 là cache hợp lệ. Chi tiết kiểm chứng DB duy nhất và luồng tới kết quả OJT chính thức: [student-flow-audit.md](student-flow-audit.md).
 
+Giao diện sinh viên đã gộp đăng ký OJT và hồ sơ/CV vào một trang; bỏ chatbot nổi và phần đăng ký/xác nhận combo. API học vụ/combo vẫn giữ để các phân hệ khác sử dụng. `courseResults.items[].semesterTaken` là số kỳ học theo lộ trình, tách biệt với `periodCode` là học kỳ lịch.
+
+`GET /students/me/opportunities?windowId=…` trả thêm `company.code`, `industry`, `contactPersonName`, `contactEmail`, `contactPhone` và `post.applicationInstructions` để xem chi tiết doanh nghiệp/tin tuyển dụng. Chỉ trả các vị trí/doanh nghiệp chưa xóa, chưa lưu trữ và tin đã công bố còn hạn trong đúng kỳ. Sinh viên chưa đủ điều kiện vẫn xem được danh sách; `canApply`/`blockers` kiểm soát nộp đơn.
+
 Student có **22 operation cần xác thực: 13 GET, 7 POST, 2 PATCH**, cộng thêm `POST /auth/login` công khai. Swagger `/api-docs`, hợp đồng máy đọc `/api-docs/openapi.json`, đầu vào đầy đủ tại [api-input-reference.md](api-input-reference.md).
 
 ## 1. Hồ sơ và học vụ

@@ -29,7 +29,6 @@ interface PortalContext {
   semesters: Named[];
   semesterId: number | null;
   selectSemester: (id: number) => void;
-  comboWindows: Window[];
   refresh: () => void;
   revision: number;
   unreadCount: number | null;
@@ -42,7 +41,6 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const { user, token, logout, updateUser } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [windows, setWindows] = useState<Window[]>([]);
-  const [comboWindows, setComboWindows] = useState<Window[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,7 +57,6 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
     setWarnings([]);
     setProfile(null);
     setWindows([]);
-    setComboWindows([]);
     setRegistrations([]);
     setUnreadCount(null);
     if (user?.mustChangePassword) {
@@ -79,10 +76,6 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
             '/ojt-registration-windows',
             controller.signal,
           ),
-          allStudentPages<Window>(
-            '/combo-registration-windows',
-            controller.signal,
-          ),
           allStudentPages<Registration>(
             '/ojt-registrations',
             controller.signal,
@@ -92,16 +85,14 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         if (controller.signal.aborted) return;
         if (results[0].status === 'fulfilled') setWindows(results[0].value);
         if (results[1].status === 'fulfilled')
-          setComboWindows(results[1].value);
+          setRegistrations(results[1].value);
         if (results[2].status === 'fulfilled')
-          setRegistrations(results[2].value);
-        if (results[3].status === 'fulfilled')
-          setUnreadCount(results[3].value.unreadCount);
+          setUnreadCount(results[2].value.unreadCount);
         setWarnings(
           results.flatMap((result, index) =>
             result.status === 'rejected'
               ? [
-                  ['Đợt OJT', 'Đợt combo', 'Hồ sơ OJT', 'Thông báo'][index] +
+                  ['Đợt OJT', 'Hồ sơ OJT', 'Thông báo'][index] +
                     ': ' +
                     (result.reason instanceof Error
                       ? result.reason.message
@@ -143,7 +134,6 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
     for (const row of [
       ...registrations,
       ...(profile?.ojtRegistrations.items ?? []),
-      ...comboWindows,
       ...windows,
     ]) {
       if (!row.ojtSemesterId) continue;
@@ -155,7 +145,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         });
     }
     return [...values.values()];
-  }, [profile, registrations, windows, comboWindows]);
+  }, [profile, registrations, windows]);
   useEffect(() => {
     if (loading) return;
     setSemesterId((previous) =>
@@ -175,7 +165,6 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         semesters,
         semesterId,
         selectSemester: setSemesterId,
-        comboWindows,
         refresh,
         revision,
         unreadCount,

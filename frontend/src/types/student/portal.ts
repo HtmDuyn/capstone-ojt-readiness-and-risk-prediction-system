@@ -65,6 +65,7 @@ export interface CourseResult {
   gradePoints: number | null;
   status: string;
   attemptNumber: number;
+  semesterTaken: number | null;
   periodName?: string;
   periodCode?: string;
 }

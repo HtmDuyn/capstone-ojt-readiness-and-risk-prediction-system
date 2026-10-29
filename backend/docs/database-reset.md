@@ -30,6 +30,7 @@ Backend cần trỏ tới database đó qua `.env`. Không cần chạy seed ri�
 
 - 20 tài khoản sinh viên và 20 hồ sơ, tất cả ACTIVE; họ tên tiếng Việt, email, điện thoại mẫu, mã sinh viên, lớp, khóa và nhóm A–D đầy đủ. Mỗi nhóm có 5 sinh viên.
 - Giữ nguyên ba tài khoản nhân viên `admin01`, `academic01`, `ojt.coord01` và hash mật khẩu đã có; giữ doanh nghiệp TECHVIET cùng tài khoản `enterprise01` và tin/vị trí tuyển dụng mẫu.
+- Thêm **10 doanh nghiệp giả lập** `DEMO-PARTNER-02`–`DEMO-PARTNER-11`, 10 tài khoản ENTERPRISE liên kết và **20 vị trí/20 tin tuyển dụng** cho mỗi kỳ đang mở cả cửa sổ tuyển dụng và đăng ký sinh viên. Mỗi doanh nghiệp có hai vị trí, đầy đủ địa chỉ, lĩnh vực và liên hệ mẫu. Tin được công bố, hạn nộp nằm trong cửa sổ đang mở. Không tự mở kỳ hoặc sửa điều kiện OJT.
 - Tất cả sinh viên thuộc chương trình **DEMO-SE-FULL**, tên hiển thị ghi rõ chương trình minh họa. Chương trình có **39 môn cụ thể, 114 tín chỉ**, lấy từ các môn không phải slot của danh mục `BIT_SE_K18D_19A`; có cấu hình tiên quyết riêng, GPA thang 10 và chính sách lấy lần có điểm gần nhất.
 - Theo cập nhật mới, 40 chương trình danh mục được công bố PUBLISHED ngay khi INSERT, kèm metadata và chính sách GPA; cờ review chỉ giữ giá trị đã cấu hình. Bộ 20 sinh viên vẫn dùng DEMO-SE-FULL; không tính tín chỉ từ slot chưa chọn.
 - Phân biệt **kỳ chương trình 0–9** với **học kỳ lịch Spring/Summer/Fall**. Kỳ 0 giữ nguyên các môn định hướng; kỳ 1–9 giữ đúng môn theo RecommendedSemester. AcademicYears là năm dương lịch; Spring tháng 1–4, Summer tháng 5–8, Fall tháng 9–12 là lịch mẫu của seed. Ngày cụ thể của trường có thể được cấu hình lại.
@@ -46,6 +47,16 @@ Mã sinh viên có dạng `SEYY0001`–`SEYY0020`, trong đó `YY` lấy từ n�
 Email: **`student01@student.edu.vn` đến `student20@student.edu.vn`**.
 
 Mật khẩu chung của dữ liệu demo: **`Student@123`**. Đây là tài khoản minh họa; email/điện thoại không dùng để liên hệ thật.
+
+## Doanh nghiệp mẫu bổ sung
+
+Tài khoản **`enterprise02`–`enterprise11`**, email **`enterprise02@ojt-demo.example`–`enterprise11@ojt-demo.example`**, mật khẩu **`Enterprise@123`**. Đây là dữ liệu giả lập, không phải doanh nghiệp đối tác thật.
+
+Các doanh nghiệp: Công nghệ Sao Việt, Giải pháp Mây Xanh, Dữ liệu Nam Việt, An ninh Số Việt, Kiểm thử Ánh Dương, Giải pháp Lạc Việt, Sản phẩm Sen Việt, Công nghệ Hải Đăng, Phân tích Tre Việt, Số hóa Bình Minh. Tên trong DB đều có hậu tố `(Demo)`.
+
+Với Supabase đã có dữ liệu, chỉ chạy block `DO $seed_partner_catalog$ ... END $seed_partner_catalog$;` giữa hai marker `BEGIN DEMO PARTNER CATALOG` / `END DEMO PARTNER CATALOG` ở cuối file `backend/DB`. Block này chỉ thêm dữ liệu mẫu, chạy lại không tạo trùng, không thay mật khẩu/nội dung tài khoản đã có và dừng nếu gặp mã/tài khoản xung đột. **Không chạy toàn bộ file DB trên dữ liệu cần giữ**, vì toàn bộ file vẫn là reset schema. Hệ thống không cần script `.cjs` để đọc các dữ liệu này.
+
+## Hồ sơ sinh viên mẫu
 
 | Tài khoản | Họ tên | GPA / 10 | Tín chỉ đã đạt | Môn nợ | Đối chiếu OJT hiện tại |
 | --- | --- | ---: | ---: | ---: | --- |
