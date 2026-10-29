@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { readTransaction } from './read.repository';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { enrichListRows } from '../../shared/list-context';
-import { enterpriseScope, assertScope, record } from './catalog.service';
+import { enterpriseScope, assertScope } from './catalog.service';
 import { inputObject, requiredText, optionalText, positiveId, invalid, pagination } from '../students/student.validation';
 import { dateInput } from '../academic/academic.schema';
 import { fingerprint } from '../eligibility/eligibility.service';
@@ -24,16 +24,27 @@ export async function assignTasks(body: unknown, actor: Actor) {
   return academicTransaction(async c=>{
     const old=(await c.query(`SELECT "UserID","Detail"::jsonb->'after' AS data FROM "AuditLogs" WHERE "EntityType"='InternshipTaskBatch' AND "Detail"::jsonb->'after'->>'key'=$1 LIMIT 1`,[key])).rows[0];
     if(old){if(old.UserID!==actor.userId||old.data.hash!==hash)throw invalid('Idempotency key conflict.',409);return {...old.data.result,replayed:true};}
-    for (const id of ids) {
-      const a=await record(c,'assignments',id);await assertScope(c,actor,a.EnterpriseID);
-      if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(a.Status).toUpperCase()))throw invalid('Tasks require an accepted, ongoing internship.',409);
-      for(const t of tasks){
-        const valid=(await c.query(`SELECT $1::date >= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AND $1::date BETWEEN "StartDate" AND "EndDate" AS valid FROM "InternshipAssignments" WHERE "AssignmentID"=$2`,[t.dueDate,id])).rows[0];
-        if(!valid?.valid)throw invalid('Task due date must be within the internship and not in the past.');
-      }
+    const companyId=await enterpriseScope(c,actor);
+    if(companyId===null)throw invalid('Enterprise role required.',403);
+    const assignments=await c.query(`SELECT "AssignmentID","EnterpriseID","Status" FROM "InternshipAssignments" WHERE "AssignmentID"=ANY($1::int[]) FOR UPDATE`,[ids]);
+    if(assignments.rows.length!==ids.length)throw invalid('Internship assignment not found.',404,'QHDN_RECORD_NOT_FOUND');
+    for(const assignment of assignments.rows){
+      if(assignment.EnterpriseID!==companyId)throw invalid('This internship belongs to another enterprise.',403,'FORBIDDEN');
+      if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(assignment.Status).toUpperCase()))throw invalid('Tasks require an accepted, ongoing internship.',409);
     }
-    const created=[];
-    for(const id of ids)for(const t of tasks)created.push((await c.query(`INSERT INTO "InternshipTasks" ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status") VALUES ($1,$2,$3,(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,$4,'TODO') RETURNING "TaskID" AS id,"AssignmentID" AS "assignmentId"`,[id,t.name,t.description,t.dueDate])).rows[0]);
+    const invalidDeadline=await c.query(`SELECT a."AssignmentID" AS "assignmentId"
+      FROM "InternshipAssignments" a CROSS JOIN unnest($2::date[]) AS due_dates("dueDate")
+      WHERE a."AssignmentID"=ANY($1::int[])
+        AND (due_dates."dueDate" < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+          OR NOT COALESCE(due_dates."dueDate" BETWEEN a."StartDate" AND a."EndDate",false))
+      LIMIT 1`,[ids,tasks.map(task=>task.dueDate)]);
+    if(invalidDeadline.rowCount)throw invalid('Task due date must be within the internship and not in the past.');
+    const created=(await c.query(`INSERT INTO "InternshipTasks" ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status")
+      SELECT selected."assignmentId",task."name",task."description",(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,task."dueDate",'TODO'
+      FROM unnest($1::int[]) AS selected("assignmentId")
+      CROSS JOIN unnest($2::text[],$3::text[],$4::date[]) AS task("name","description","dueDate")
+      RETURNING "TaskID" AS id,"AssignmentID" AS "assignmentId"`,
+      [ids,tasks.map(task=>task.name),tasks.map(task=>task.description),tasks.map(task=>task.dueDate)])).rows;
     const result={created:created.length,tasks:created};
     await audit(c,actor.userId,'InternshipTaskBatch',created[0].id,'ASSIGN_TASKS',null,{key,hash,result});
     return {...result,replayed:false};

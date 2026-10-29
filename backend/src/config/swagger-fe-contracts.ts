@@ -39,6 +39,11 @@ export function describeFeResponses(spec:Schema):void {
     const operation=spec.paths?.[path]?.[method];if(!operation)throw new Error('Missing FE response operation: '+method+' '+path);
     operation.responses['200']={description:'Dữ liệu hiển thị đầy đủ theo quyền truy cập.',content:{'application/json':{schema:obj({success:{type:'boolean'},[envelope]:schema})}}};
   };
+  const enterpriseListPage=(item:Schema)=>{
+    const schema=page(item);
+    delete schema.properties.limit.maximum;
+    return schema;
+  };
   set('/api/students/{id}',profile);
   set('/api/students',page(obj(coreStudent)));
 
@@ -67,8 +72,8 @@ export function describeFeResponses(spec:Schema):void {
     set(path,page(item));
   }
   const candidate=obj({id,student:person,position,application:{type:'object',additionalProperties:true},decision:text,introducedAt:time,decisionAt:time,rejectReason:nil(text),isLatestCoordination:{type:'boolean'}});
-  set('/api/enterprise/candidates',page(candidate));
-  set('/api/enterprise/internships',page(obj({id,student:person,position,application:{type:'object',additionalProperties:true},academicSupervisor:nil(person),coordinationId:id,...fields('enterpriseSupervisorName','startDate','endDate','status','resultStatus'),evaluation,template,result,evaluationLocked:{type:'boolean'}})));
+  set('/api/enterprise/candidates',enterpriseListPage(candidate));
+  set('/api/enterprise/internships',enterpriseListPage(obj({id,student:person,position,application:{type:'object',additionalProperties:true},academicSupervisor:nil(person),coordinationId:id,...fields('enterpriseSupervisorName','startDate','endDate','status','resultStatus'),evaluation,template,result,evaluationLocked:{type:'boolean'}})));
   set('/api/enterprise/profile',obj({...company.properties,...fields('address','industry','status','contactPersonName'),createdAt:time,
     summary:obj({scope:text,publishedPosts:{type:'integer'},pendingPosts:{type:'integer'},pendingCandidates:{type:'integer'},activeInterns:{type:'integer'},pendingEvaluations:{type:'integer'}})}));
   Object.assign(spec.components.schemas.UserResponse.properties,personalUser.properties);

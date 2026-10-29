@@ -9,6 +9,7 @@ import { registeredStudents } from './registered-students.service';
 import { eligibleStudents } from './eligible-students.service';
 const router=Router();
 const staff=[authenticate,authorizeRoles('ADMIN','OJT_COORD')];
+const admin=[authenticate,authorizeRoles('ADMIN')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
 router.get('/qhdn/registered-students',...staff,handle(req=>registeredStudents(req.query,req.user)));
 router.get('/qhdn/eligible-students',...staff,handle(req=>eligibleStudents(req.query,req.user)));
@@ -16,11 +17,11 @@ for(const [path,resource] of [['companies','companies'],['positions','positions'
   router.get(`/${path}`,...staff,handle(req=>list(resource,req.query,req.user)));
 }
 router.patch('/companies/:id',...staff,handle(req=>saveCompany(req.body,req.user,positiveId(req.params.id))));
-router.post('/ojt-coordinations',...staff,handle(req=>coordinate(req.body,req.user),201));
-router.post('/ojt-coordinations/:id/decision',...staff,handle(req=>decision(positiveId(req.params.id),req.body,req.user)));
-router.post('/ojt-coordinations/:id/reassign',...staff,handle(req=>coordinate(req.body,req.user,positiveId(req.params.id)),201));
-router.post('/assignments',...staff,handle(req=>assign(req.body,req.user),201));
-router.patch('/assignments/:id',...staff,handle(req=>updateAssignment(positiveId(req.params.id),req.body,req.user)));
+router.post('/ojt-coordinations',...admin,handle(req=>coordinate(req.body,req.user),201));
+router.post('/ojt-coordinations/:id/decision',...admin,handle(req=>decision(positiveId(req.params.id),req.body,req.user)));
+router.post('/ojt-coordinations/:id/reassign',...admin,handle(req=>coordinate(req.body,req.user,positiveId(req.params.id)),201));
+router.post('/assignments',...admin,handle(req=>assign(req.body,req.user),201));
+router.patch('/assignments/:id',...admin,handle(req=>updateAssignment(positiveId(req.params.id),req.body,req.user)));
 router.get('/qhdn/dashboard',...staff,handle(req=>dashboard(req.query,req.user)));
 router.get('/qhdn/reports',...staff,handle(req=>{
  const {type}=reportQuery(req.query,'report');return report(type!,req.query,req.user);

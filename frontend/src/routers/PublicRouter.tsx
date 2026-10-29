@@ -7,6 +7,14 @@ import {
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import { getMenuByRole } from "@/config";
+import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
+import EnterpriseDashboard from "@/pages/enterprise/EnterpriseDashboard";
+import EnterpriseJobs from "@/pages/enterprise/EnterpriseJobs";
+import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
+import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
+import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
+import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
+import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
@@ -53,26 +61,6 @@ const RolePlaceholderPage: React.FC<{ role: UserRole }> = ({ role }) => (
   </div>
 );
 
-// Tạo route dùng chung cho các role chưa có dashboard nghiệp vụ hoàn chỉnh.
-const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
-  const navItems = getMenuByRole(role);
-
-  return {
-    element: (
-      <BaseLayout
-        navItems={navItems}
-        homePath={navItems[0]?.path || `/${role}/dashboard`}
-        brandSubtitle={ROLE_LABELS[role]}
-        showAIConsult={false}
-      />
-    ),
-    children: navItems.map((item) => ({
-      path: item.path,
-      element: <RolePlaceholderPage role={role} />,
-    })),
-  };
-};
-
 // Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
 const studentRoutes: RouteObject = {
   element: (
@@ -89,7 +77,7 @@ const studentRoutes: RouteObject = {
     { path: "/student/academic-profile", element: <StudentAcademicProfile /> },
     { path: "/student/risk-prediction", element: <StudentFeaturePage /> },
     { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
-    { path: "/student/ojt-registration", element: <StudentFeaturePage /> },
+    { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
     { path: "/student/ojt-profile", element: <StudentFeaturePage /> },
     { path: "/student/internship-progress", element: <StudentFeaturePage /> },
     { path: "/student/evaluation-results", element: <StudentFeaturePage /> },
@@ -268,8 +256,52 @@ export const router = createBrowserRouter([
     ],
   },
   {
+    // EnterpriseProvider load profile một lần, cung cấp companyId cho toàn bộ luồng doanh nghiệp
     element: <PrivateRoute allowedRoles={["enterprise"]} />,
-    children: [createRoleRoutes("enterprise")],
+    children: [
+      {
+        element: (
+          <EnterpriseProvider>
+            <BaseLayout
+              navItems={getMenuByRole("enterprise")}
+              homePath="/enterprise/dashboard"
+              brandSubtitle="Đối tác Doanh nghiệp"
+              showAIConsult={false}
+            />
+          </EnterpriseProvider>
+        ),
+        children: [
+          {
+            path: "/enterprise",
+            element: <Navigate to="/enterprise/dashboard" replace />,
+          },
+          {
+            path: "/enterprise/dashboard",
+            element: <EnterpriseDashboard />,
+          },
+          {
+            path: "/enterprise/jobs",
+            element: <EnterpriseJobs />,
+          },
+          {
+            path: "/enterprise/candidates",
+            element: <EnterpriseCandidates />,
+          },
+          {
+            path: "/enterprise/interns",
+            element: <EnterpriseInterns />,
+          },
+          {
+            path: "/enterprise/evaluation",
+            element: <EnterpriseEvaluation />,
+          },
+          {
+            path: "/enterprise/profile",
+            element: <EnterpriseProfile />,
+          },
+        ],
+      },
+    ],
   },
 
   // URL không tồn tại luôn quay về login thay vì hiển thị trang 404 mặc định.

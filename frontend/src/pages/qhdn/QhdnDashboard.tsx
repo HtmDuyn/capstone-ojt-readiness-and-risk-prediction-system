@@ -531,14 +531,14 @@ export const QhdnDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* KPI 5: Bị từ chối cần điều phối lại */}
+        {/* KPI 5: Hồ sơ bị doanh nghiệp từ chối */}
         <div
           onClick={() => navigate("/qhdn/coordination")}
           className="card-glass border border-slate-200/80 p-5 cursor-pointer hover:border-rose-300 hover:shadow-md transition-all group"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">
-              Cần điều phối lại
+              Bị doanh nghiệp từ chối
             </span>
             <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 group-hover:text-rose-700 transition-colors">
               <AlertTriangle size={18} />
@@ -754,7 +754,7 @@ export const QhdnDashboard: React.FC = () => {
 
       {/* Bottom Widgets */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Widget 1: Sinh viên bị từ chối cần điều phối lại */}
+        {/* Widget 1: Sinh viên bị doanh nghiệp từ chối */}
         <div className="card-glass border border-slate-200/80 p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -763,10 +763,10 @@ export const QhdnDashboard: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  Sinh viên bị từ chối cần Điều phối lại
+                  Hồ sơ bị doanh nghiệp từ chối
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Ưu tiên ghép cặp sang doanh nghiệp khác còn chỉ tiêu
+                  Sinh viên có thể chọn vị trí khác và nộp lại hồ sơ trực tiếp
                 </p>
               </div>
             </div>
@@ -775,7 +775,7 @@ export const QhdnDashboard: React.FC = () => {
               onClick={() => navigate("/qhdn/coordination")}
               className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
             >
-              Mở trang điều phối
+              Theo dõi hồ sơ
               <ArrowRight size={14} />
             </button>
           </div>
@@ -783,7 +783,7 @@ export const QhdnDashboard: React.FC = () => {
           <div className="space-y-2.5">
             {rejectedCoordinations.length === 0 ? (
               <p className="text-center text-slate-400 py-6 text-xs">
-                Hiện không có sinh viên nào bị từ chối cần điều phối lại.
+                Hiện không có hồ sơ nào bị doanh nghiệp từ chối.
               </p>
             ) : (
               rejectedCoordinations.slice(0, 4).map((coor) => (
@@ -816,7 +816,7 @@ export const QhdnDashboard: React.FC = () => {
                     onClick={() => navigate("/qhdn/coordination")}
                     className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors"
                   >
-                    Điều phối lại
+                    Xem trạng thái
                   </button>
                 </div>
               ))
