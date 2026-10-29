@@ -8,22 +8,33 @@ import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import { getMenuByRole } from "@/config";
 import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
-import LoginPage from "@/pages/auth/LoginPage";
-import StudentDashboard from "@/pages/student/StudentDashboard";
-import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
-import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
-import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
-import EducationDashboard from "@/pages/education/EducationDashboard";
-import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
-import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
-import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
-import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
 import EnterpriseDashboard from "@/pages/enterprise/EnterpriseDashboard";
 import EnterpriseJobs from "@/pages/enterprise/EnterpriseJobs";
 import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
 import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
 import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
 import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
+import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
+import LoginPage from "@/pages/auth/LoginPage";
+import StudentDashboard from "@/pages/student/StudentDashboard";
+import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
+import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
+import EducationDashboard from "@/pages/education/EducationDashboard";
+import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
+import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
+import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
+import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
+import AdminAiConfig from "@/pages/admin/AdminAiConfig";
+import AdminSettings from "@/pages/admin/AdminSettings";
+
+import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
+import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
+import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
+import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
+import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -49,26 +60,6 @@ const RolePlaceholderPage: React.FC<{ role: UserRole }> = ({ role }) => (
     </p>
   </div>
 );
-
-// Tạo route dùng chung cho các role chưa có dashboard nghiệp vụ hoàn chỉnh.
-const createRoleRoutes = (role: Exclude<UserRole, "student">): RouteObject => {
-  const navItems = getMenuByRole(role);
-
-  return {
-    element: (
-      <BaseLayout
-        navItems={navItems}
-        homePath={navItems[0]?.path || `/${role}/dashboard`}
-        brandSubtitle={ROLE_LABELS[role]}
-        showAIConsult={false}
-      />
-    ),
-    children: navItems.map((item) => ({
-      path: item.path,
-      element: <RolePlaceholderPage role={role} />,
-    })),
-  };
-};
 
 // Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
 const studentRoutes: RouteObject = {
@@ -159,7 +150,41 @@ export const router = createBrowserRouter([
   // Các role còn lại dùng layout chung và trang tạm trong khi chờ nghiệp vụ.
   {
     element: <PrivateRoute allowedRoles={["admin"]} />,
-    children: [createRoleRoutes("admin")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("admin")}
+            homePath="/admin/dashboard"
+            brandSubtitle="Quản trị viên"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          {
+            path: "/admin/dashboard",
+            element: <AdminDashboard />,
+          },
+          ...getMenuByRole("admin")
+            .filter((item) => item.path !== "/admin/dashboard")
+            .map((item) => ({
+              path: item.path,
+              element:
+                item.path === "/admin/users" ? (
+                  <AdminUsers />
+                ) : item.path === "/admin/metrics" ? (
+                  <AdminSystemMetrics />
+                ) : item.path === "/admin/ai-config" ? (
+                  <AdminAiConfig />
+                ) : item.path === "/admin/settings" ? (
+                  <AdminSettings />
+                ) : (
+                  <RolePlaceholderPage role="admin" />
+                ),
+            })),
+        ],
+      },
+    ],
   },
   {
     element: <PrivateRoute allowedRoles={["education"]} />,
@@ -199,9 +224,36 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  {
+    {
     element: <PrivateRoute allowedRoles={["qhdn"]} />,
-    children: [createRoleRoutes("qhdn")],
+    children: [
+      {
+        element: (
+          <BaseLayout
+            navItems={getMenuByRole("qhdn")}
+            homePath="/qhdn/dashboard"
+            brandSubtitle="Phòng Quan hệ Doanh nghiệp"
+            showAIConsult={false}
+          />
+        ),
+        children: [
+          { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
+          { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
+          { path: "/qhdn/registration-windows", element: <QhdnRegistrationWindows /> },
+          { path: "/qhdn/eligible-students", element: <Navigate to="/qhdn/registration-windows" replace /> },
+          { path: "/qhdn/handoff", element: <Navigate to="/qhdn/registration-windows" replace /> },
+          { path: "/qhdn/enterprises", element: <QhdnEnterpriseManagement /> },
+          { path: "/qhdn/enterprises/import", element: <Navigate to="/qhdn/enterprises" replace /> },
+          { path: "/qhdn/enterprises/list", element: <Navigate to="/qhdn/enterprises" replace /> },
+          { path: "/qhdn/partners", element: <Navigate to="/qhdn/enterprises" replace /> },
+          { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
+          { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
+          { path: "/qhdn/evaluations", element: <QhdnEnterpriseEvaluations /> },
+          { path: "/qhdn/analytics", element: <Navigate to="/qhdn/dashboard" replace /> },
+          { path: "/qhdn/interviews", element: <Navigate to="/qhdn/coordination" replace /> },
+        ],
+      },
+    ],
   },
   {
     // EnterpriseProvider load profile một lần, cung cấp companyId cho toàn bộ luồng doanh nghiệp
