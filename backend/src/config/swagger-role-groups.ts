@@ -140,7 +140,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   { roles: [], operations: [
   ] },
   { roles: ["ENTERPRISE"], operations: [
-    "GET /api/enterprise/candidate-periods",
     "GET /api/enterprise/candidates",
     "GET /api/enterprise/internships",
     "GET /api/enterprise/profile",
@@ -166,10 +165,8 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     access.set(key, group.roles);
   }
   for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
-  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
-  for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign','POST /api/assignments','PATCH /api/assignments/{id}'])access.set(key,['ADMIN']);
-  access.set('POST /api/ojt-registrations',['ADMIN','STUDENT']);
-  for(const key of ['GET /api/ojt-registration-windows','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
+  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-registrations/{id}/review','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
+  for(const key of ['GET /api/ojt-registration-windows','POST /api/ojt-registrations','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);
   access.set('POST /api/auth/logout', ['ADMIN', 'ACADEMIC', 'OJT_COORD', 'ENTERPRISE', 'STUDENT']);
   const used = new Set<string>();
@@ -194,7 +191,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
   spec.tags = [
     { name: 'Admin', description: 'Chức năng quản trị và theo dõi hệ thống. API nghiệp vụ dùng chung hiển thị ở nhóm phụ trách; quyền Admin vẫn giữ nguyên.' },
     { name: 'Phòng đào tạo', description: 'Quản lý học vụ và xét điều kiện OJT.' },
-    { name: 'Phòng QHDN', description: 'Quản lý doanh nghiệp và đợt đăng ký; theo dõi hồ sơ sinh viên gửi trực tiếp và kết quả OJT.' },
+    { name: 'Phòng QHDN', description: 'Quản lý tuyển dụng, điều phối và thực tập.' },
     { name: 'Doanh nghiệp', description: 'Quản lý hồ sơ, tuyển dụng và thực tập sinh.' },
     { name: 'Sinh viên', description: 'Xem học tập, chọn combo và đăng ký OJT.' },
     { name: 'Auth', description: 'Đăng nhập, thông tin phiên và đổi mật khẩu.' },

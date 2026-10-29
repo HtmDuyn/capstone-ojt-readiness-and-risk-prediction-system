@@ -58,9 +58,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     const extra=kind==='combo'?`,own."ProgramID" AS "RosterProgramID",own."ScopeSnapshot" AS "RosterSnapshot",
       GREATEST(w."EndsAt",COALESCE((SELECT max(ext."EndsAt") FROM "ComboExtensionStudents" es JOIN "ComboWindowExtensions" ext ON ext."ExtensionID"=es."ExtensionID" WHERE es."WindowID"=w."WindowID" AND es."StudentID"=$1),w."EndsAt")) AS "EffectiveEndsAt",
       (SELECT jsonb_build_object('comboId',ev."ProgramComboID",'courseIds',ev."CourseIDs",'choice',ev."ChoiceSnapshot",'submittedAt',ev."CreatedAt") FROM "StudentComboSelectionEvents" ev WHERE ev."WindowID"=w."WindowID" AND ev."StudentID"=$1 AND ev."EventType"='SUBMITTED' ORDER BY ev."EventID" DESC LIMIT 1) AS selection`:
-      `,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",
-        'latestDecision',(SELECT co."Decision" FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1))
-        FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
+      `,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",'hasCoordination',EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID")) FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
     const rows=(await c.query(`SELECT w.*,${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
     const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const options=kind==='combo'&&rows.length&&s.ProgramStatus==='PUBLISHED'?(await combos(c,s.ProgramID)).filter(b=>b.coursesReviewed&&b.choiceGroups.length&&purpose({ComboCode:b.code,SelectionGroup:b.selectionGroup})==='SPECIALIZATION'):[];
@@ -79,7 +77,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       });
       if(contextIssue)reasons.push(contextIssue);
       if(kind==='combo'&&!options.length)reasons.push('COMBO_OPTIONS_UNAVAILABLE');
-      if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');
+      if(kind==='ojt'&&w.registration&&(w.registration.status!=='REJECTED'||w.registration.hasCoordination))reasons.push('REGISTRATION_ALREADY_EXISTS');
       items.push({id:w.WindowID,name:w.Name,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,
         period:w.period,semester:w.semester,startsAt:w.StartsAt,endsAt:w.EndsAt,effectiveEndsAt:end,status:w.Status,
         canSubmit:reasons.length===0,blockingReasons:reasons,blockingMessages:reasons.map(code=>blockerLabels[code]??'Lộ trình hoặc cấu hình đợt đăng ký chưa phù hợp.'),

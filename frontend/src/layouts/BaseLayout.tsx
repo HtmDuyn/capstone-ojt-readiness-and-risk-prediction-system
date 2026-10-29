@@ -99,7 +99,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
-            student={user?.role === 'student' ? mockStudentProfile : undefined}
+            student={mockStudentProfile}
             user={resolvedUserSummary}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}

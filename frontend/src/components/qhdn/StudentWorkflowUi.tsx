@@ -99,7 +99,7 @@ export function WorkflowSteps({
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-white/90 px-5 py-3 text-xs font-medium text-slate-500">
       {[
         "Đào tạo bàn giao",
-        "Sinh viên gửi trực tiếp",
+        "QHDN duyệt & gửi hồ sơ",
         "Doanh nghiệp phản hồi",
         "Theo dõi thực tập",
       ].map((label, i) => (

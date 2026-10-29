@@ -26,23 +26,8 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
    op.description='Chỉ ADMIN/OJT_COORD quản lý đợt đăng ký. Tạo ở DRAFT; PATCH status OPEN/CLOSED và reason để mở/đóng. Chỉ mở khi phạm vi có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là metadata tương thích, không thay thế điều kiện bàn giao.';
   }
  }
- spec.paths['/api/ojt-registrations'].post.description='Endpoint tương thích cho hồ sơ đăng ký OJT cũ; luồng mới STUDENT chọn vị trí và gửi trực tiếp bằng POST /api/job-applications. STUDENT chỉ nộp hồ sơ của mình; ADMIN có thể nhập thay. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN, trong thời hạn và đúng scope.';
- spec.paths['/api/ojt-registrations/{id}/review'].post.description='Chỉ ADMIN xử lý dữ liệu hồ sơ cũ. Đây không còn là bước duyệt của Phòng QHDN trong luồng đăng ký trực tiếp.';
- if(spec.paths['/api/students/me/opportunities']?.get){
-  spec.paths['/api/students/me/opportunities'].get.summary='Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp';
-  spec.paths['/api/students/me/opportunities'].get.description='Bắt buộc windowId của đợt đăng ký đang mở. Chỉ trả về vị trí phù hợp kỳ OJT; canApply và blockers phản ánh kết quả bàn giao, eligibility, scope, trạng thái hồ sơ và chỉ tiêu.';
- }
- if(spec.paths['/api/job-applications']?.post){
-  spec.paths['/api/job-applications'].post.summary='Sinh viên gửi hồ sơ trực tiếp đến doanh nghiệp';
-  spec.paths['/api/job-applications'].post.description='POST tạo JobApplication và StudentEnterpriseCoordination PENDING trong cùng transaction. QHDN không duyệt hoặc chuyển tiếp; khi doanh nghiệp chấp nhận, assignment được tạo tự động.';
-  spec.paths['/api/job-applications'].post.requestBody=body({
-   windowId:id,postId:id,positionId:id,coverLetter:{type:'string',maxLength:5000},
-   application:{type:'object',additionalProperties:false,properties:{
-    contactPhone:{type:'string',maxLength:30},contactEmail:{type:'string',maxLength:100},
-    note:{type:'string',maxLength:2000}
-   }}
-  },['windowId','postId','positionId']);
- }
+ spec.paths['/api/ojt-registrations'].post.description='STUDENT nộp hồ sơ của mình; ADMIN/OJT_COORD có thể nhập thay với studentId. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN và trong thời hạn, đúng scope.';
+ spec.paths['/api/ojt-registrations/{id}/review'].post.description='ADMIN/OJT_COORD duyệt hoặc từ chối hồ sơ đã nộp; không phải bước xét/bàn giao của ACADEMIC. Hồ sơ đã điều phối không được duyệt lại.';
  spec.paths['/api/ojt-results'].post={tags:['OJT results'],summary:'QHDN chốt và chuyển kết quả về Phòng đào tạo',security,requestBody:body({assignmentId:id,reason:text,idempotencyKey:text},['assignmentId','reason','idempotencyKey']),responses:{...responses,201:{description:'PENDING_ACADEMIC_CONFIRMATION'}}};
  spec.paths['/api/ojt-results/{id}/confirm']={post:{tags:['OJT results'],summary:'Phòng đào tạo xác nhận và ghi nhận điểm OJT',description:'Dùng bảng quy đổi điểm đã cấu hình; lưu StudentCourseResults và CONFIRMED trong cùng transaction. Không ghi đè điểm học vụ đang tồn tại.',security,parameters:[{name:'id',in:'path',required:true,schema:id}],requestBody:body({reason:text,idempotencyKey:text},['reason','idempotencyKey']),responses}};
  const describeStates=(node:any):void=>{

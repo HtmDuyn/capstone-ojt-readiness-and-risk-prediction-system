@@ -25,7 +25,7 @@ export function receptionStatus(s: HandoffStudentItem): ReceptionStatus {
 }
 export function receptionNote(s: HandoffStudentItem): string | undefined {
   if (registrationStatus(s) === "REJECTED")
-    return "Hồ sơ đăng ký cũ bị từ chối; sinh viên có thể nộp lại trực tiếp khi đợt mở.";
+    return "Hồ sơ cần bổ sung và nộp lại trước khi duyệt.";
   if (
     ["HANDED_OFF", "LEGACY_REVIEW_REQUIRED"].includes(
       registrationStatus(s) || "",

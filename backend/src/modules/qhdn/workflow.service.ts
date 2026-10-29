@@ -5,7 +5,6 @@ import { academicTransaction } from '../academic/academic.repository';
 import { dateInput, dateRange } from '../academic/academic.schema';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, score } from '../students/student.validation';
 import { fingerprint } from '../eligibility/eligibility.service';
-import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { api, record, staff, assertScope, persist, occupied, refreshSlots, log } from './catalog.service';
 
@@ -14,22 +13,8 @@ const rejected=(value:unknown)=>['REJECTED','REJECT'].includes(String(value).toU
 async function registration(c:PoolClient,id:number){
   const r=await registrationRecord(c,id);
   if(!r)throw invalid('Registration not found.',404);
-  const handoff=(await c.query(`SELECT "RegistrationID","CheckID","CalculatedBatchID" FROM "EligibleStudentHandoffItems"
-    WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 AND ("RegistrationID" IS NULL OR "RegistrationID"=$3)
-    ORDER BY ("RegistrationID"=$3) DESC LIMIT 1`,[r.StudentID,r.OJTSemesterID,r.RegistrationID])).rows[0];
-  const activeDirectApplication=(await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co
-    JOIN "JobApplications" app ON app."ApplicationID"=co."ApplicationID"
-    WHERE co."RegistrationID"=$1 AND app."Status" NOT IN ('REJECTED','WITHDRAWN') LIMIT 1`,[r.RegistrationID])).rowCount??0;
-  const directApplication=r.Status==='SUBMITTED'&&activeDirectApplication>0;
-  if((!['APPROVED','HANDED_OFF'].includes(r.Status)&&!directApplication)||!handoff)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
-  if(handoff.CalculatedBatchID!==null){
-    if(r.ProgramID!==r.CurrentProgramID)throw invalid(`Registration ${r.RegistrationID}: curriculum changed; reject and resubmit the application.`,409,'REGISTRATION_PROGRAM_CHANGED');
-    const eligibility=(await c.query(`SELECT ${calculatedEligibilitySql()} AS result FROM "Students" s WHERE s."StudentID"=$1`,[r.StudentID])).rows[0]?.result;
-    if(!eligibility||eligibility.batchId!==handoff.CalculatedBatchID)throw invalid('The saved eligibility result no longer matches the academic handoff.',409,'ELIGIBILITY_HANDOFF_STALE');
-    if(eligibility.status!=='ELIGIBLE'||eligibility.isStale)throw invalid('A current saved ELIGIBLE result is required for the academic handoff.',409,eligibility.isStale?'ELIGIBILITY_RESULT_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
-  }else{
-    await eligibleOfficial(c,r);
-  }
+  if(!['APPROVED','HANDED_OFF'].includes(r.Status)||!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$3 AND "OJTSemesterID"=$2 AND $1::int IS NOT NULL',[id,r.OJTSemesterID,r.StudentID])).rowCount)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
+  await eligibleOfficial(c,r);
   return r;
 }
 async function latest(c:PoolClient,r:Row,coordinationId:number){
@@ -85,44 +70,18 @@ export async function decision(id:number,body:unknown,actor:Actor){
   return academicTransaction(async c=>{
     const before=await record(c,'coordinations',id);await assertScope(c,actor,before.EnterpriseID);
     const r=await registration(c,before.RegistrationID);await latest(c,r,id);
-    if(before.Decision===value&&before.RejectReason===(value==='REJECTED'?reason:null)){
-      if(value==='ACCEPTED'&&!(await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)
-        await createAcceptedAssignment(c,before,r,actor,reason);
-      return {...api('coordinations',before),replayed:true};
-    }
+    if(before.Decision===value&&before.RejectReason===(value==='REJECTED'?reason:null))return {...api('coordinations',before),replayed:true};
     if(accepted(before.Decision)||rejected(before.Decision))throw invalid('The enterprise decision is already final.',409,'DECISION_FINAL');
     if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)throw invalid('Coordination already has an assignment.',409);
-    if(value==='ACCEPTED'){
-      const position=await availablePosition(c,before.PositionID,r.OJTSemesterID);
-      await noAssignment(c,r);
-      if(position.EnterpriseID!==before.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
-    }
+    if(value==='ACCEPTED')await availablePosition(c,before.PositionID,r.OJTSemesterID);
     const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];
     if(before.ApplicationID)await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4 WHERE "ApplicationID"=$1',[before.ApplicationID,value,actor.userId,reason]);
-    if(value==='ACCEPTED')await createAcceptedAssignment(c,after,r,actor,reason);
     await log(c,'coordinations',before,after,actor,'ENTERPRISE_DECISION',reason);return {...api('coordinations',after),replayed:false};
   });
 }
-async function createAcceptedAssignment(c:PoolClient,coordination:Row,r:Row,actor:Actor,reason:string){
-  await noAssignment(c,r);
-  const position=await availablePosition(c,coordination.PositionID,r.OJTSemesterID);
-  if(position.EnterpriseID!==coordination.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
-  const semester=(await c.query(`SELECT "StartDate","EndDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=$1`,[r.OJTSemesterID])).rows[0];
-  if(!semester)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
-  const dates=assignmentDates({startDate:dateOnly(semester.StartDate),endDate:dateOnly(semester.EndDate)});
-  const assignment=await persist(c,'assignments',{CoordinationID:coordination.CoordinationID,StudentID:r.StudentID,
-    EnterpriseID:coordination.EnterpriseID,PositionID:coordination.PositionID,EnterpriseSupervisorName:null,...dates,Status:'ASSIGNED'});
-  await refreshSlots(c,position.PositionID);
-  await log(c,'assignments',null,assignment,actor,'AUTO_ASSIGN_AFTER_ACCEPTANCE',reason);
-  return assignment;
-}
-function dateOnly(value:unknown):string{
-  return value instanceof Date
-    ? `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`
-    : String(value).slice(0,10);
-}
 function assignmentDates(b:Row,before?:Row){
-  const start=dateInput(b.startDate??dateOnly(before?.StartDate),'startDate'),end=dateInput(b.endDate??dateOnly(before?.EndDate),'endDate');dateRange(start,end);return {StartDate:start,EndDate:end};
+  const day=(v:any)=>v instanceof Date?`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`:v;
+  const start=dateInput(b.startDate??day(before?.StartDate),'startDate'),end=dateInput(b.endDate??day(before?.EndDate),'endDate');dateRange(start,end);return {StartDate:start,EndDate:end};
 }
 export async function assign(body:unknown,actor:Actor){staff(actor);const b=inputObject(body,['coordinationId','enterpriseSupervisorName','startDate','endDate','reason']);
   const coordinationId=positiveId(b.coordinationId,'coordinationId'),reason=requiredText(b.reason,'reason',2000),dates=assignmentDates(b);

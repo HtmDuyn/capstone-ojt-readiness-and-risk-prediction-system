@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Building2, User } from 'lucide-react';
 import {
   SearchIcon,
   NotificationBellIcon,
@@ -38,9 +36,6 @@ export const Header: React.FC<HeaderProps> = ({
   const [lang, setLang] = useState<'VI' | 'EN'>('VI');
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isEnterprise = location.pathname.startsWith('/enterprise');
 
   // Fallback user display
   const currentUser: HeaderUserSummary = user || (student ? {
@@ -160,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
 
-              {!isEnterprise && student && (
+              {student && (
                 <div className="px-2 py-1 border-b border-slate-100">
                   <div className="px-3 py-2 text-xs text-slate-600">
                     <div className="flex justify-between py-0.5">
@@ -174,26 +169,6 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </div>
               )}
-
-
-              {/* Profile Link Option */}
-              <div className="p-1 border-b border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileOpen(false);
-                    navigate(isEnterprise ? '/enterprise/profile' : '/student/profile');
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-600 rounded-xl transition-colors cursor-pointer text-left"
-                >
-                  {isEnterprise ? (
-                    <Building2 size={16} className="text-orange-500" />
-                  ) : (
-                    <User size={16} className="text-orange-500" />
-                  )}
-                  <span>{isEnterprise ? 'Hồ sơ Doanh nghiệp' : 'Hồ sơ cá nhân'}</span>
-                </button>
-              </div>
 
               {onLogout && (
                 <div className="p-1">
