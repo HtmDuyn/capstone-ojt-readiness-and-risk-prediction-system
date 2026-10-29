@@ -1,0 +1,27 @@
+$kind: http-request
+name: Create Curriculum
+order: 3000
+method: POST
+url: '{{baseUrl}}/curricula'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "code": "SE-2026",
+      "name": "Software Engineering 2026",
+      "version": "1.0",
+      "majorId": 1,
+      "totalCredits": 120,
+      "effectiveYear": 2026,
+      "gpaScale": 10
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Curriculum created', () => pm.expect(pm.response.code).to.eql(201));
+      const json = pm.response.json();
+      if (json.data && json.data.id) pm.collectionVariables.set('curriculumId', String(json.data.id));

@@ -15,6 +15,12 @@ import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
 import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
 import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
 import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
+import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
+import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
+import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
+import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
+import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
+import EducationSupportClassDemand from "@/pages/education/EducationSupportClassDemand";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
@@ -22,7 +28,6 @@ import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
-import EducationCurriculumPlan from "@/pages/education/EducationCurriculumPlan";
 import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
@@ -188,6 +193,7 @@ export const router = createBrowserRouter([
   },
   {
     element: <PrivateRoute allowedRoles={["education"]} />,
+
     children: [
       {
         element: (
@@ -198,28 +204,84 @@ export const router = createBrowserRouter([
             showAIConsult={false}
           />
         ),
+
         children: [
+          { path: "/education/ojt-eligibility", element: <EducationOjtEligibility /> },
+          { path: "/education/academic-alerts", element: <EducationAcademicAlerts /> },
+          { path: "/education/graduation-review", element: <EducationGraduationReview /> },
+
+          /* =========================
+             DASHBOARD
+             ========================= */
+
+          {
+            path: "/education",
+            element: <Navigate to="/education/dashboard" replace />,
+          },
+
           {
             path: "/education/dashboard",
             element: <EducationDashboard />,
           },
-          ...getMenuByRole("education")
-            .filter((item) => item.path !== "/education/dashboard")
-            .map((item) => ({
-              path: item.path,
-              element:
-                item.path === "/education/ojt-eligibility" ? (
-                  <EducationOjtEligibility />
-                ) : item.path === "/education/academic-alerts" ? (
-                  <EducationAcademicAlerts />
-                ) : item.path === "/education/curriculum-plan" ? (
-                  <EducationCurriculumPlan />
-                ) : item.path === "/education/graduation-review" ? (
-                  <EducationGraduationReview />
-                ) : (
-                  <RolePlaceholderPage role="education" />
-                ),
-            })),
+
+          /* =========================
+             QUẢN LÝ DỮ LIỆU
+             ========================= */
+
+          {
+            path: "/education/academic-year",
+            element: <EducationAcademicYear />,
+          },
+
+          {
+            path: "/education/student-import",
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentImport")).default }),
+          },
+          {
+            path: "/education/student-import/students/:studentId",
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentDetail")).default }),
+          },
+
+          {
+            path: "/education/curriculum-plan",
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationCurriculumPlan")).default }),
+          },
+
+          {
+            path: "/education/ojt-conditions",
+            element: <EducationOjtConditions />,
+          },
+          {
+            path: "/education/ojt-handoff",
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtHandoff")).default }),
+          },
+
+          /* =========================
+             QUẢN LÝ SINH VIÊN
+             ========================= */
+
+          {
+            path: "/education/student-progress",
+            element: <EducationStudentProgress />,
+          },
+
+          {
+            path: "/education/student-status",
+            element: <EducationStudentStatus />,
+          },
+          {
+            path: "/education/ojt-final-results",
+            element: <EducationOjtFinalResults />,
+          },
+
+          /* =========================
+             ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
+             ========================= */
+
+          {
+            path: "/education/ai-class-proposals",
+            element: <EducationSupportClassDemand />,
+          },
         ],
       },
     ],

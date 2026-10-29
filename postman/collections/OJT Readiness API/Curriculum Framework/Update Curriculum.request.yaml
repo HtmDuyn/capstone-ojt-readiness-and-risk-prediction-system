@@ -1,0 +1,23 @@
+$kind: http-request
+name: Update Curriculum
+order: 4000
+method: PATCH
+url: '{{baseUrl}}/curricula/:id'
+pathVariables:
+  - key: id
+    value: '{{curriculumId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Software Engineering 2026 - Updated",
+      "totalCredits": 120
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Curriculum updated', () => pm.expect(pm.response.code).to.eql(200));

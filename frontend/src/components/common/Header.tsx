@@ -25,6 +25,8 @@ interface HeaderProps {
   onOpenMobileMenu: () => void;
   onLogout?: () => void;
   showSearch?: boolean;
+  showNotifications?: boolean;
+  showLanguage?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileMenu,
   onLogout,
   showSearch = true,
+  showNotifications = true,
+  showLanguage = true,
 }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [lang, setLang] = useState<'VI' | 'EN'>('VI');
@@ -99,17 +103,17 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right: Notification, Language, User profile */}
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Notification Bell */}
-        <button
+        {showNotifications && <button
           type="button"
           className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors cursor-pointer"
           title="Thông báo"
         >
           <NotificationBellIcon size={20} />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full ring-2 ring-white animate-pulse" />
-        </button>
+        </button>}
 
         {/* Language selector */}
-        <button
+        {showLanguage && <button
           type="button"
           onClick={() => setLang((prev) => (prev === 'VI' ? 'EN' : 'VI'))}
           className="p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
@@ -117,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <GlobeIcon size={18} />
           <span className="hidden sm:inline">{lang}</span>
-        </button>
+        </button>}
 
         <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />
 

@@ -1,0 +1,22 @@
+$kind: http-request
+name: Publish Curriculum
+order: 6000
+method: POST
+url: '{{baseUrl}}/curricula/:id/publish'
+pathVariables:
+  - key: id
+    value: '{{curriculumId}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "reason": "Curriculum reviewed and approved for publication."
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('Publish validation completed', () => pm.expect([200, 422]).to.include(pm.response.code));

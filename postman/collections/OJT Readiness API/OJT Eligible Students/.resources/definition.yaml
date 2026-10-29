@@ -1,0 +1,4 @@
+$kind: collection
+name: OJT Eligible Students
+description: 'The backend exposes eligibility batch creation and run details rather than a standalone eligible-students route. Filter completed run items by result in the response.'
+order: 4000
