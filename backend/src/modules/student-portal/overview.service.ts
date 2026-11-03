@@ -7,6 +7,8 @@ import { list as listResults } from '../ojt-results/result.service';
 import { currentAssignment, notifications, summaryWithClient, supplementaryWithClient } from './academic.service';
 import { ownStudent, type Actor, type Row } from './shared';
 import { pagination, positiveId, invalid } from '../students/student.validation';
+import { enrichStudentTasks, studentTaskProgress } from './task.service';
+import { studentAdmission } from './admission.service';
 
 export async function internships(params:Row,actor:Actor,existingClient?:PoolClient) {
   const allowed=['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'];
@@ -40,7 +42,9 @@ export async function internships(params:Row,actor:Actor,existingClient?:PoolCli
     const assignment=await currentAssignment({ojtSemesterId:selectedTerm,assignmentId:assignmentId??result?.assignmentId},actor,c);
     const tasks=assignment?await listTasks({studentId:student.StudentID,assignmentId:assignment.id,page:tasksPage.page,limit:tasksPage.limit},actor,c)
       :{items:[],total:0,page:tasksPage.page,limit:tasksPage.limit};
-    return {studentId:student.StudentID,ojtSemesterId:selectedTerm??null,assignment,tasks,results,result};
+    return {studentId:student.StudentID,ojtSemesterId:selectedTerm??null,assignment,
+      tasks:{...tasks,items:await enrichStudentTasks(c,tasks.items,student.StudentID),
+        progress:await studentTaskProgress(c,assignment?.id??null,student.StudentID)},results,result};
   },existingClient);
 }
 
@@ -52,7 +56,8 @@ export async function dashboard(params:Row,actor:Actor) {
     const academic=await summaryWithClient(c,s.StudentID,term);
     const supplementary=await supplementaryWithClient(c,s.StudentID,s.ProgramID,academic);
     return {
-      academic:{...academic,supplementaryCourses:supplementary},
+      academic:{...academic,supplementaryCourses:supplementary,
+        admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:academic.officialEligibility})},
       registrationWindows:await studentWindows('ojt',{ojtSemesterId:term,limit:5},actor,c),
       comboWindows:await studentWindows('combo',{limit:5},actor,c),
       internship:await internships({ojtSemesterId:term,tasksLimit:5,resultsLimit:5},actor,c),

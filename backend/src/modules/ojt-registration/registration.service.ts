@@ -1,3 +1,4 @@
+import { requireStudentAdmission } from '../student-portal/admission.service';
 import { assertOjtSemesterSix } from '../academic/workflow-policy';
 import { readTransaction } from '../qhdn/read.repository';
 import { detailPagination } from '../../shared/detail-pagination';
@@ -19,6 +20,7 @@ export async function event(c:PoolClient,r:Row,actor:number,action:string,reason
 export async function submit(body:unknown,actor:Actor) {const b=inputObject(body,['windowId','studentId','application']);const windowId=positiveId(b.windowId,'windowId'),form=application(b.application);return academicTransaction(async c=>{
  let studentId:number;if(actor.roleCode==='STUDENT'){const own=(await c.query('SELECT "StudentID" FROM "Students" WHERE "UserID"=$1',[actor.userId])).rows[0];if(!own)throw invalid('Student profile not found.',404);studentId=own.StudentID;if(b.studentId!==undefined&&positiveId(b.studentId,'studentId')!==studentId)throw invalid('You can only submit your own registration.',403,'FORBIDDEN');}else studentId=positiveId(b.studentId,'studentId');
  const w=await windowRecord(c,windowId),now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;if(w.Status!=='OPEN'||now<new Date(w.StartsAt)||now>=new Date(w.EndsAt))throw invalid('Registration window is closed or outside its deadline.',409,'OJT_REGISTRATION_WINDOW_UNAVAILABLE');
+ if(actor.roleCode==='STUDENT')await requireStudentAdmission(c,studentId,w.OJTSemesterID);
  if(!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2',[studentId,w.OJTSemesterID])).rowCount)throw invalid('Student must be handed off by ACADEMIC for this semester before registering.',403,'ELIGIBLE_HANDOFF_REQUIRED');
  const s=(await c.query(`SELECT s.*,u."Status" AS "AccountStatus",to_jsonb(t)->>'Status' AS "ProgramStatus",t."SpecializationID",p."CohortID",p."GroupCode" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" WHERE s."StudentID"=$1 FOR UPDATE OF s,u`,[studentId])).rows[0];if(!s)throw invalid('Student not found.',404);
  if(s.Status!=='ACTIVE'||s.AccountStatus!=='ACTIVE'||(s.ProgramStatus!=null&&s.ProgramStatus!=='PUBLISHED'))throw invalid('Registration requires an active student/account and a published curriculum.',409,'REGISTRATION_STUDENT_INACTIVE');
