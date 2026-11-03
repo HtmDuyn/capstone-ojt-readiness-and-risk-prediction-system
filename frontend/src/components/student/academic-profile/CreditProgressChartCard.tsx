@@ -1,9 +1,10 @@
 import React from 'react';
-import { mockSemesterCredits } from '@/data/student/mockAcademicProfileData';
 import { MoreVerticalIcon } from '@/components/common/icons/AppIcons';
 
-export const CreditProgressChartCard: React.FC = () => {
-  const maxCredits = 25;
+interface SemesterCredits { semester: string; credits: number; isCurrent?: boolean }
+
+export const CreditProgressChartCard: React.FC<{ semesters: SemesterCredits[] }> = ({ semesters }) => {
+  const maxCredits = Math.max(1, ...semesters.map(item => item.credits));
 
   return (
     <div className="card-glass p-5 sm:p-6 flex flex-col h-full min-h-[360px]">
@@ -23,10 +24,11 @@ export const CreditProgressChartCard: React.FC = () => {
 
       {/* Bar Chart Visualization */}
       <div className="flex-1 flex flex-col justify-end pt-2">
+        {!semesters.length && <p className="text-sm text-slate-500">Chưa có dữ liệu tín chỉ theo kỳ.</p>}
         <div className="h-44 sm:h-52 w-full flex items-end justify-between gap-1.5 sm:gap-2.5 px-1 sm:px-2 border-b border-slate-200/70 pb-2">
-          {mockSemesterCredits.map((item, idx) => {
+          {semesters.map((item) => {
             const heightPercent = Math.min(100, (item.credits / maxCredits) * 100);
-            const isCurrent = idx === mockSemesterCredits.length - 1;
+            const isCurrent = item.isCurrent === true;
 
             return (
               <div key={item.semester} className="flex-1 flex flex-col items-center group relative">
@@ -53,7 +55,7 @@ export const CreditProgressChartCard: React.FC = () => {
 
         {/* X-Axis Labels */}
         <div className="flex justify-between px-1 sm:px-2 pt-3 text-[10px] sm:text-xs font-semibold text-slate-400">
-          {mockSemesterCredits.map((item) => (
+          {semesters.map((item) => (
             <span key={item.semester} className="flex-1 text-center font-outfit truncate">
               {item.semester}
             </span>

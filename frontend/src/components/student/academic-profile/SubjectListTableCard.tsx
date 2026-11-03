@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { SubjectStatus } from '@/types/student/academicProfileTypes';
-import { mockSubjectList } from '@/data/student/mockAcademicProfileData';
+import type { SubjectStatus, SubjectItem } from '@/types/student/academicProfileTypes';
 import { DownloadIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/common/icons/AppIcons';
 import { useStudentAIConsult } from '../../../layouts/BaseLayout';
 
@@ -51,14 +50,14 @@ const ITEMS_PER_PAGE = 5;
 const MAX_PAGE_VISIBLE = 4;
 
 /* ─── Component ────────────────────────────────────────────── */
-export const SubjectListTableCard: React.FC = () => {
+export const SubjectListTableCard: React.FC<{ subjects: SubjectItem[] }> = ({ subjects }) => {
   const { openAIConsult } = useStudentAIConsult();
   const [filter, setFilter] = useState<string>('all');
   const [page, setPage] = useState<number>(1);
 
   const filtered = useMemo(
-    () => (filter === 'all' ? mockSubjectList : mockSubjectList.filter((s) => s.status === filter)),
-    [filter]
+    () => (filter === 'all' ? subjects : subjects.filter((s) => s.status === filter)),
+    [filter, subjects]
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
