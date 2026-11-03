@@ -1,12 +1,14 @@
 import React from 'react';
-import { mockAcademicRoadmap } from '@/data/student/mockAcademicProfileData';
+import type { AcademicSemesterStep } from '@/types/student/academicProfileTypes';
 import { TrendUpIcon, CheckIcon, LockIcon, ArrowRightIcon } from '@/components/common/icons/AppIcons';
 
 interface AcademicRoadmapTimelineProps {
+  steps: AcademicSemesterStep[];
   onViewDetailedRoadmap?: () => void;
 }
 
 export const AcademicRoadmapTimeline: React.FC<AcademicRoadmapTimelineProps> = ({
+  steps,
   onViewDetailedRoadmap,
 }) => {
   return (
@@ -21,7 +23,8 @@ export const AcademicRoadmapTimeline: React.FC<AcademicRoadmapTimelineProps> = (
 
       {/* Timeline Steps */}
       <div className="relative pl-6 flex-1 space-y-3 my-1 before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-        {mockAcademicRoadmap.map((step) => {
+        {!steps.length && <p className="text-sm text-slate-500">Chưa có dữ liệu lộ trình học tập.</p>}
+        {steps.map((step) => {
           if (step.status === 'completed') {
             return (
               <div key={step.id} className="relative flex items-start gap-3 text-xs sm:text-sm">
@@ -50,9 +53,7 @@ export const AcademicRoadmapTimeline: React.FC<AcademicRoadmapTimelineProps> = (
                 </span>
                 <p className="font-bold text-amber-900 font-outfit">{step.semesterName}</p>
                 <p className="text-amber-800 text-[11px] mt-0.5">{step.subjectCountText}</p>
-                <div className="w-full bg-amber-200/80 h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div className="bg-gradient-to-r from-orange-500 to-amber-500 h-full w-[60%]" />
-                </div>
+
               </div>
             );
           }

@@ -60,8 +60,8 @@ export const StudentHeader: React.FC<HeaderProps> = ({
     department: student.major,
   } : {
     fullName: 'Người dùng',
-    email: 'user@fpt.edu.vn',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&auto=format&fit=crop',
+    email: '',
+    avatar: '',
   });
 
   useEffect(() => {

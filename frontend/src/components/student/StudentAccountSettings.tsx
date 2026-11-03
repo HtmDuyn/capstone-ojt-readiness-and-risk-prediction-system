@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { apiRequest } from '@/services/studentApi';
+import { apiRequest } from '@/services/studentService';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 
 export default function StudentAccountSettings({ onProfileSaved, initialProfile }: { onProfileSaved?: () => void; initialProfile?: { fullName: string; phone: string | null } }) {

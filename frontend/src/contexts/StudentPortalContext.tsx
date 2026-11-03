@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { ApiError } from '@/services/studentApi';
+import { ApiError } from '@/services/studentService';
 import {
   allStudentPages,
   getOwnStudent,

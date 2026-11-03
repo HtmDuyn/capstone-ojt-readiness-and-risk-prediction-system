@@ -1,4 +1,6 @@
-import API, { ApiError, apiRequest } from './studentApi';
+import axios from 'axios';
+import { API_BASE_URL } from '@/config/api';
+
 import { downloadFile } from '@/utils/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
 import type {
@@ -22,6 +24,75 @@ import type {
   CV,
 } from '@/types/student/portal';
 
+export { API_BASE_URL };
+
+// Keep the student's transport independent of the shared API and legacy Axios
+// declarations used by the other roles. Axios normalizes headers at runtime.
+type HeaderValue = string | number | boolean | null | undefined;
+interface StudentHeaders {
+  has(name: string): boolean;
+  set(name: string, value: HeaderValue): void;
+  delete(name: string): void;
+}
+interface StudentRequestConfig {
+  method?: string;
+  data?: unknown;
+  params?: Record<string, unknown>;
+  headers?: Record<string, HeaderValue>;
+  signal?: AbortSignal;
+  timeout?: number;
+}
+interface ErrorBody { success?: boolean; message?: string; errorCode?: string; code?: string }
+interface HttpError { code?: string; response?: { status: number; data?: ErrorBody } }
+
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number, public readonly code?: string) {
+    super(message); this.name = 'ApiError';
+  }
+}
+
+export const API = axios.create({
+  baseURL: API_BASE_URL,
+  adapter: 'xhr',
+  timeout: 60_000,
+  headers: { Accept: 'application/json' },
+});
+
+API.interceptors.request.use(config => {
+  const headers = config.headers as unknown as StudentHeaders;
+  const token = localStorage.getItem('ojt_auth_token');
+  if (config.url !== '/auth/login' && token && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
+  if (config.data instanceof FormData) headers.delete('Content-Type');
+  return config;
+});
+
+export function isRequestCanceled(error: unknown): boolean {
+  return axios.isCancel(error) || (error instanceof DOMException && error.name === 'AbortError');
+}
+
+export async function apiRequest<T>(path: string, options: StudentRequestConfig = {}, token?: string | null): Promise<T> {
+  const headers = { ...options.headers };
+  if (token !== undefined) headers.Authorization = token ? 'Bearer ' + token : false;
+  try {
+    const response = await API.request({ ...options, url: path, headers, responseType: 'json' }) as { data: T; status: number };
+    const body = response.data;
+    if (!body || typeof body !== 'object') throw new ApiError('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.', response.status, 'INVALID_API_RESPONSE');
+    const result = body as ErrorBody;
+    if (result.success === false) throw new ApiError(result.message || 'Yêu cầu API thất bại.', response.status, result.errorCode ?? result.code);
+    return body;
+  } catch (error) {
+    if (isRequestCanceled(error) || error instanceof ApiError) throw error;
+    if (!axios.isAxiosError(error)) throw error;
+    const failure = error as HttpError;
+    if (!failure.response) throw new ApiError(
+      ['ECONNABORTED', 'ETIMEDOUT'].includes(failure.code ?? '') ? 'Yêu cầu API hết thời gian chờ. Vui lòng thử lại.' : 'Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.',
+      0, failure.code,
+    );
+    const { status, data } = failure.response;
+    throw new ApiError(data?.message || `Yêu cầu API thất bại (HTTP ${status}).`, status, data?.errorCode ?? data?.code);
+  }
+}
+
 export const studentQuery = (
   values: Record<string, string | number | boolean | undefined | null>,
 ) => {
@@ -35,7 +106,10 @@ export async function studentGet<T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  return (await apiRequest<{ data: T }>(path, { signal })).data;
+  const response = await apiRequest<{ data: T }>(path, { signal });
+  if (!Object.prototype.hasOwnProperty.call(response, 'data'))
+    throw new ApiError('API chưa trả dữ liệu theo hợp đồng. Vui lòng kiểm tra backend.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+  return response.data;
 }
 export async function studentPost<T>(path: string, body: unknown): Promise<T> {
   return (
@@ -56,7 +130,9 @@ export async function allStudentPages<T>(
       signal,
     );
     items.push(...result.items);
-    if (items.length >= result.total || !result.items.length) return items;
+    if (items.length >= result.total) return items;
+    if (!result.items.length)
+      throw new ApiError('API chưa trả đủ danh sách. Vui lòng tải lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
   }
 }
 export async function getOwnStudent(
@@ -155,7 +231,9 @@ export async function getAllCourseResults(id: number, signal?: AbortSignal) {
       `/students/${id}` + studentQuery({ include: 'courseResults', resultsPage: page, resultsLimit: 100 }), signal,
     );
     items.push(...courseResults.items);
-    if (items.length >= courseResults.total || !courseResults.items.length) return items;
+    if (items.length >= courseResults.total) return items;
+    if (!courseResults.items.length)
+      throw new ApiError('API chưa trả đủ bảng điểm. Vui lòng tải lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
   }
 }
 export const getRegistrationWindows = (
@@ -218,7 +296,7 @@ export const getTasks = (
     signal,
   ).then((result) => result.tasks);
 export const getAssignedTasks = (semester: number, page: number, signal?: AbortSignal) =>
-  studentGet<Page<Task>>('/students/me/tasks' + studentQuery({ ojtSemesterId: semester, page, limit: 20 }), signal);
+  getTasks(semester, page, signal);
 export const getTaskSubmissions = (taskId: number, page: number, signal?: AbortSignal) =>
   studentGet<Page<TaskSubmission>>(`/students/me/tasks/${taskId}/submissions` + studentQuery({ page, limit: 20 }), signal);
 export const submitAssignedTask = (taskId: number, content: string) =>

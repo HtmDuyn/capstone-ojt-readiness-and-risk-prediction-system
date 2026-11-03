@@ -111,9 +111,15 @@ async function startFixture(vite) {
       if(identityMode==='unlinked')user.studentId=null;
       json({success:true,user});
     } else if (url.pathname === '/api/students/me/internships') {
-      json({success:true,data:{studentId:identityMode==='invalid-link'?0:19}});
+      json({success:true,data:{studentId:identityMode==='invalid-link'?0:19,
+        tasks:{items:[{id:37,name:'Assigned task from API',status:'TODO'}],total:1,page:Number(url.searchParams.get('tasksPage')||1),limit:Number(url.searchParams.get('tasksLimit')||20)}}});
     } else if (url.pathname === '/api/students/19') {
-      json({success:true,data:{id:19,userId:identityMode==='wrong-owner'?8:7,studentCode:'FIXTURE19'}});
+      if (url.searchParams.get('include') === 'courseResults') {
+        const page = Number(url.searchParams.get('resultsPage'));
+        json({success:true,data:{courseResults:{items:page===1?[{id:1}]:[],total:2,page,limit:100}}});
+      } else json({success:true,data:{id:19,userId:identityMode==='wrong-owner'?8:7,studentCode:'FIXTURE19'}});
+    } else if (url.pathname === '/api/missing-data') {
+      json({success:true});
     } else if (url.pathname === '/api/echo' || url.pathname === '/api/auth/login') {
       let data = null;
       if (body.length) data = JSON.parse(body.toString('utf8'));
@@ -196,7 +202,7 @@ async function main() {
   await loaded;
   const expression = `
     (async () => {
-      const { API, apiRequest, ApiError, isRequestCanceled } = await import(${JSON.stringify(origin + '/src/services/studentApi.ts')});
+      const { API, apiRequest, ApiError, isRequestCanceled } = await import(${JSON.stringify(origin + '/src/services/studentService.ts')});
       const { API: sharedAPI } = await import(${JSON.stringify(origin + '/src/services/api.ts')});
       API.defaults.baseURL = ${JSON.stringify(origin + '/api')};
       localStorage.setItem('ojt_auth_token', 'fixture-session');
@@ -239,7 +245,7 @@ async function main() {
       const stopped = new AbortController(); stopped.abort();
       error = await rejects(() => apiRequest('/pre-cancel', { signal: stopped.signal }));
       check('already aborted signal rejects before dispatch', isRequestCanceled(error));
-      const { getOwnStudent } = await import(${JSON.stringify(origin + '/src/services/studentService.ts')});
+      const { getOwnStudent, getAssignedTasks, studentGet, getAllCourseResults } = await import(${JSON.stringify(origin + '/src/services/studentService.ts')});
       const expected={id:'7',email:'fixture@example.test'};
       const mode=value=>{API.defaults.headers.common['X-Fixture-Identity']=value;};
       mode('current');
@@ -263,6 +269,13 @@ async function main() {
       mode('wrong-role');
       error=await rejects(()=>getOwnStudent(undefined,expected));
       check('a non-student role cannot use the fallback',error instanceof ApiError&&error.code==='SESSION_IDENTITY_CHANGED');
+      mode('transport');
+      const tasks=await getAssignedTasks(5,2);
+      check('assigned tasks use the existing internships API and preserve server pagination',tasks.items[0].id===37&&tasks.page===2&&tasks.limit===20);
+      error=await rejects(()=>studentGet('/missing-data'));
+      check('missing server data is a contract error rather than fabricated data',error instanceof ApiError&&error.code==='STUDENT_API_CONTRACT_MISMATCH');
+      error=await rejects(()=>getAllCourseResults(19));
+      check('incomplete server course history is not displayed as a complete transcript',error instanceof ApiError&&error.code==='STUDENT_API_CONTRACT_MISMATCH');
       delete API.defaults.headers.common['X-Fixture-Identity'];
       localStorage.removeItem('ojt_auth_token');
       return checks;
@@ -272,7 +285,7 @@ async function main() {
   if (evaluated.exceptionDetails) throw new Error(evaluated.exceptionDetails.exception?.description || evaluated.exceptionDetails.text);
   for (const name of evaluated.result.value) console.log('PASS ' + name);
   await sleep(100);
-  assert.equal(records.length, 26, 'Only dispatched transport and identity fixture requests should reach the network.');
+  assert.equal(records.length, 30, 'Only dispatched transport and identity fixture requests should reach the network.');
   assert.ok(!records.some(record=>['current','unlinked','temporary','wrong-role'].includes(record.mode)&&record.path==='/api/students/me/internships'),'Only legacy responses may resolve the fallback owner.');
   assert.ok(records.every(record => record.type === 'XHR'), 'All browser API traffic must have CDP type XHR.');
   assert.ok(!records.some(record => record.path === '/api/pre-cancel'), 'Already aborted request must not reach the HTTP fixture.');

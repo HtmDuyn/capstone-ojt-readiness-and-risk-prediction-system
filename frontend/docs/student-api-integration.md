@@ -4,13 +4,12 @@ Nhánh `feature/FE-Student-update-Duyen` chỉ giữ frontend sinh viên. Backen
 
 ## Các phần riêng của sinh viên
 
-- `layouts/StudentLayout.tsx`: sidebar/menu sinh viên, header từ hồ sơ thật, điều hướng tài khoản/thông báo. Không dùng hoặc sửa `BaseLayout` của các role khác.
+- `layouts/StudentLayout.tsx`: sidebar/menu sinh viên, header từ hồ sơ thật, điều hướng tài khoản/thông báo. `BaseLayout` chỉ được dọn các tham chiếu hồ sơ sinh viên mẫu; không thay route hoặc gọi API của role khác.
 - `components/student/StudentHeader.tsx`, `StudentBanner.tsx`, `StudentAccountSettings.tsx`, `TaskSubmissionsDialog.tsx`: giữ giao diện đã cập nhật trong phạm vi sinh viên. Nút nằm dưới banner; không có chatbot nổi, combo hoặc thẻ phân công.
 - `contexts/StudentPortalContext.tsx`: hồ sơ, kỳ OJT, thông báo, trạng thái bắt buộc đổi mật khẩu. Trạng thái này thuộc cổng sinh viên, không đổi LoginPage, PrivateRouter hoặc AuthUser dùng chung.
-- `services/studentApi.ts`: Axios instance riêng, adapter XHR, timeout 60 giây, JWT từ phiên đăng nhập hiện có. Không thêm interceptor hoặc sửa cache của API chung.
-- `services/studentService.ts`, `types/student/portal.ts`: ánh xạ response và các thao tác API sinh viên.
+- `services/studentService.ts`: gom Axios instance riêng và các thao tác API sinh viên; dùng adapter XHR, timeout 60 giây, JWT từ phiên đăng nhập hiện có. Không thêm interceptor hoặc sửa cache của API chung. Kiểu dữ liệu API nằm trong `types/student/portal.ts`.
 
-`studentApi` trả nguyên envelope để service chọn `user`, `account` hoặc `data`; giữ status/errorCode và cancellation. JSON dùng `data`, CV dùng FormData field `cv` (PDF tối đa 10 MB), tải CV dùng blob. Không tự đặt Content-Type JSON cho FormData. File khai báo Axios chung `src/types/axios.d.ts` giữ nguyên để tránh ảnh hưởng role khác.
+Hàm `apiRequest` trong `studentService.ts` trả nguyên envelope để các hàm endpoint chọn `user`, `account` hoặc `data`; giữ status/errorCode và cancellation. JSON dùng `data`, CV dùng FormData field `cv` (PDF tối đa 10 MB), tải CV dùng blob. Không tự đặt Content-Type JSON cho FormData. File khai báo Axios chung `src/types/axios.d.ts` giữ nguyên để tránh ảnh hưởng role khác.
 
 ## Chức năng và hợp đồng API
 
@@ -25,7 +24,7 @@ Base URL lấy từ `VITE_API_URL`, cùng backend/issuer với trang đăng nh�
 | Doanh nghiệp/vị trí | `GET /students/me/opportunities?windowId=…` |
 | Nộp đơn | `POST /job-applications` với `{windowId,postId,positionId,coverLetter,application}` |
 | CV riêng và CV ứng tuyển | `POST /students/me/cv`, `GET /students/:id/cv?cvFileId=…` |
-| Nhiệm vụ được giao | `GET /students/me/tasks?ojtSemesterId=…&page=…&limit=20` |
+| Nhiệm vụ được giao | `GET /students/me/internships?ojtSemesterId=…&tasksPage=…&tasksLimit=20`, lấy `data.tasks` |
 | Lịch sử/nộp nhiệm vụ | `GET/POST /students/me/tasks/:id/submissions`; body POST `{content}` |
 | Kết quả OJT | `GET /students/me/internships?ojtSemesterId=…&resultId=…` |
 | Thông báo | `GET /students/me/notifications`, `PATCH /students/me/notifications/:id` với `{isRead:true}` |
@@ -40,6 +39,10 @@ Mật khẩu tạm được phát hiện từ `/auth/me` và đưa riêng sinh v
 Bảng điểm phân biệt **Kỳ** (`semesterTaken`) với **Học kỳ** (`periodCode`). Lọc và tìm kiếm áp dụng toàn bộ dữ liệu trước phân trang; chương trình/lộ trình phân trang 20 môn. Menu OJT/hồ sơ/CV gộp chung, URL hồ sơ cũ chuyển hướng về trang OJT. Popup chọn doanh nghiệp/vị trí, dùng CV hiện có hoặc upload mới trước khi gửi đơn.
 
 Nhiệm vụ tự cập nhật khi quay lại tab và mỗi 30 giây khi trang đang hiển thị, tạm dừng khi mở form. Nộp nội dung/link và giữ lịch sử; sinh viên không tự xác nhận DONE. UI không giả lập bài nộp hay trạng thái nếu API chưa sẵn sàng.
+
+Đã xóa hai file `data/student/mockStudentData.ts`, `mockAcademicProfileData.ts`. Các component học vụ cũ nhận dữ liệu bằng props, không tự nạp dữ liệu mẫu; các trang student đang dùng lấy hồ sơ, GPA, tín chỉ, bảng điểm, chương trình, thông báo và kết quả OJT qua API với JWT của phiên đăng nhập. API lỗi hiển thị lỗi; danh sách rỗng hiển thị trạng thái trống. Header không đặt email/ảnh đại diện giả khi thiếu dữ liệu.
+
+Hộp thoại AI cũ trong layout chung không còn tạo GPA, tín chỉ, điểm rủi ro hay câu trả lời giả; sinh viên dùng trang tư vấn riêng gọi API roadmap. Mã nguồn backend hiện chưa khai báo các endpoint `/students/me/tasks/:id/submissions`; frontend giữ thông báo lỗi API khi chức năng này chưa sẵn sàng. Không thay đổi backend/database trong lần dọn dữ liệu mẫu này.
 
 ## Công việc dành cho nhánh backend riêng
 
