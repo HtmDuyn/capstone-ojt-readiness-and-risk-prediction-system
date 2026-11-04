@@ -49,6 +49,11 @@ export function describeStudentRest(spec: Schema): Schema {
   const notifications = page(notification);
   notifications.properties.unreadCount = {type: 'integer', minimum: 0};
   const academic = object({studentId: id, programId: nullable(id), ojtSemesterId: id,
+    currentSemester: {type:'integer',minimum:0,maximum:9,nullable:true},
+    earlyWarning: object({available:{type:'boolean'},status:{type:'string',enum:['PROGRESS_ONLY','NOT_AVAILABLE']},
+      currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},reasons:array(text),
+      riskLevel:{type:'string',nullable:true,enum:[null]},riskScore:{type:'number',nullable:true,enum:[null]},
+      isAiPrediction:{type:'boolean',enum:[false]},message:text,recommendations:array(text)}),
     student: context('student'), program: profile.properties.program,
     semester: context('semester'), academicProgress: progress,
     earnedCredits: number, missingCredits: number, failedCourseCount: {type: 'integer'},
@@ -129,6 +134,16 @@ export function describeStudentRest(spec: Schema): Schema {
     parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
 
+  spec.paths['/api/students/me/ojt-advice']={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập',
+    description:'Chỉ dùng dữ liệu backend. Trước kỳ 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ trả NOT_AVAILABLE và không gọi Gemini. Mặc định AI tắt; thiếu cấu hình hoặc lỗi API trả FALLBACK. Không tạo xác suất rủi ro. Không lưu/cache tư vấn trong bước chuẩn bị này.',
+    requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['ojtSemesterId'],properties:{ojtSemesterId:id}}}}},
+    responses:{200:envelope(object({status:{type:'string',enum:['NOT_AVAILABLE','FALLBACK','READY']},source:{type:'string',enum:['RULES','GEMINI']},
+      academic:object({currentSemester:{type:'integer',nullable:true},earnedCredits:number,missingCredits:number,failedCourseCount:{type:'integer'},currentEligibilityStatus:text}),
+      explanation:text,recommendations:array(text),modelVersion:nullableText,fallbackReason:nullableText,
+      aiError:nullable(object({code:text,message:text,httpStatus:{type:'integer',nullable:true},phase:{type:'string',enum:['CONFIGURATION','REQUEST','READ_RESPONSE','VALIDATE_RESPONSE']},elapsedMs:{type:'integer'},timeoutMs:{type:'integer'}})),
+      riskLevel:{type:'string',nullable:true,enum:[null]},riskScore:{type:'number',nullable:true,enum:[null]},isAiPrediction:{type:'boolean',enum:[false]}})),
+      400:{description:'Dữ liệu không hợp lệ'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'},404:{description:'Không tìm thấy hồ sơ hoặc kỳ OJT'}}}};
   for (const [path, item] of Object.entries(spec.paths) as [string, Schema][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
       const op = item[method];

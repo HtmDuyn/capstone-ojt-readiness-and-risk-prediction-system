@@ -10,12 +10,18 @@ import { detail as curriculumDetail } from '../curriculum/curriculum.repository'
 
 import { invalid, positiveId, pagination } from '../students/student.validation';
 import { ownStudent, page, publicEligibility, type Row, type Actor } from './shared';
+import { earlyWarning } from './early-warning';
 
 export async function summaryWithClient(c:PoolClient,studentId:number,semesterId:number,loaded?:AcademicProgressData,eligibilityData?:Row) {
   const source=loaded??await loadAcademicProgress(c,studentId);
   const progress=progressFromData(source);
   const decision=eligibilityData??await eligibility(studentId,{ojtSemesterId:semesterId},c,progress,source);
   const current=decision.current,official=decision.official;
+  const placement=(await c.query(`SELECT "StudentCurriculumSemester"(p."StudentID",p."CurrentAcademicPeriodID") AS semester
+    FROM "StudentAcademicPlacements" p WHERE p."StudentID"=$1`,[studentId])).rows[0];
+  const warning=earlyWarning({currentSemester:placement?.semester??null,earnedCredits:current.earnedCredits,
+    completeConfiguration:!!progress.credits.completeConfiguration,issues:progress.issues,
+    eligibilityStatus:current.status,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount});
   const results=source.attempts;
   const outstanding=progress.requirements.filter((r:Row)=>!r.completed).map((r:Row)=>({...r,learningStatus:current.unpassedCourses.some((u:Row)=>r.choices.includes(u.courseId))?'FAILED':results.some(a=>r.choices.includes(a.courseId)&&a.status==='IN_PROGRESS')?'IN_PROGRESS':'NOT_STUDIED'}));
   // Requirements are unique curriculum slots; a scenario never counts a retake twice.
@@ -23,7 +29,7 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
   const potential=scenarioProgress?.credits.completeConfiguration?Math.max(0,scenarioProgress.credits.earned-current.earnedCredits):null;
   const deadline=(await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0]??null;
   const [data]=await enrichListRows(c,[{studentId,programId:progress.program?.id,ojtSemesterId:semesterId,earnedCredits:current.earnedCredits,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,failedCourses:current.unpassedCourses,outstandingCourses:outstanding,inProgressCredits:potential,currentEligibility:publicEligibility(current),officialEligibility:publicEligibility(official),academicProgress:progress,scenario:{assumption:'ALL_CURRENT_COURSES_PASSED',potentialCredits:potential===null?null:current.earnedCredits+potential,isAiPrediction:false},gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,deadline,computedAt:progress.computedAt}]);
-  return {...data,failedCourses:await enrichListRows(c,current.unpassedCourses),outstandingCourses:await enrichListRows(c,outstanding)};
+  return {...data,currentSemester:warning.currentSemester,earlyWarning:warning,failedCourses:await enrichListRows(c,current.unpassedCourses),outstandingCourses:await enrichListRows(c,outstanding)};
 }
 export async function supplementaryWithClient(c:PoolClient,studentId:number,programId:number,data:Row) {
     const prerequisites=(await c.query('SELECT pc."CourseID" AS "courseId",g."MinimumPassed" AS "minimumPassed",COALESCE(jsonb_agg(m."CourseID") FILTER(WHERE m."CourseID" IS NOT NULL),\'[]\'::jsonb) AS "courseIds" FROM "ProgramPrerequisiteGroups" g JOIN "ProgramCourses" pc ON pc."ProgramCourseID"=g."ProgramCourseID" LEFT JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID" WHERE g."ProgramID"=$1 GROUP BY pc."CourseID",g."GroupID"',[programId])).rows;
