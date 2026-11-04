@@ -9,6 +9,9 @@ import { notifications, readNotification } from './academic.service';
 import { roadmap } from './cv.service';
 import { ojtAdvice } from './ojt-advice.service';
 import { readiness } from './readiness.service';
+import { academicChat } from './academic-chat.service';
+import { courseAdvice } from './ojt-advice.service';
+import { courseScenario } from './course-scenario.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -17,6 +20,13 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.post('/students/me/course-impact', ...own, requireJsonBody, handle(r => courseScenario(r.body,r.user,'IMPACT')));
+router.post('/students/me/study-simulation', ...own, requireJsonBody, handle(r => courseScenario(r.body,r.user,'SIMULATION')));
+router.post('/students/me/course-advice', ...own, requireJsonBody, handle(r => {
+  if(Object.keys(r.body).length)throw invalid('Send an empty JSON object; course advice uses your academic records.');
+  return courseAdvice(r.user);
+}));
+router.post('/students/me/academic-chat', ...own, requireJsonBody, handle(r => academicChat(r.body,r.user)));
 router.get('/students/me/ojt-readiness', ...read, handle(r => {
   if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
   return readiness(r.user);
