@@ -7,6 +7,7 @@ function stub(path,exports){require.cache[require.resolve(path)]={exports};}
 stub('../dist/middleware/authenticate',{authenticate:(req,_res,next)=>{req.user={userId:5,roleCode:'STUDENT'};next();}});
 stub('../dist/middleware/authorize',{authorizeRoles:()=> (_req,_res,next)=>next()});
 stub('../dist/modules/student-portal/ojt-advice.service',{ojtAdvice:async(id)=>({status:'FALLBACK',ojtSemesterId:id})});
+stub('../dist/modules/student-portal/readiness.service',{readiness:async(actor)=>({studentUserId:actor.userId,ojtSemesterId:7})});
 
 test('advice HTTP accepts empty query and JSON body; rejects missing ID and extra query',async()=>{
   const app=express();app.use(express.json());
@@ -21,5 +22,9 @@ test('advice HTTP accepts empty query and JSON body; rejects missing ID and extr
     assert.deepEqual(await valid.json(),{success:true,data:{status:'FALLBACK',ojtSemesterId:1}});
     assert.equal((await post('',{})).status,400);
     assert.equal((await post('?x=1',{ojtSemesterId:1})).status,400);
+    const readiness=await fetch(url.replace('/ojt-advice','/ojt-readiness'));
+    assert.equal(readiness.status,200);
+    assert.deepEqual((await readiness.json()).data,{studentUserId:5,ojtSemesterId:7});
+    assert.equal((await fetch(url.replace('/ojt-advice','/ojt-readiness')+'?studentId=99')).status,400);
   }finally{await new Promise(resolve=>server.close(resolve));}
 });

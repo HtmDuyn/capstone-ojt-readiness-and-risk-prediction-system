@@ -134,6 +134,11 @@ export function describeStudentRest(spec: Schema): Schema {
     parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
 
+  spec.paths['/api/students/me/ojt-readiness']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ',
+    responses:{200:envelope(object({student:object({id,studentCode:text,fullName:text,currentSemester:{type:'integer',nullable:true},programName:nullableText}),
+      ojtSemesterId:nullable(id),academic:nullable(reference('StudentAcademicSummary')),academicProgress:progress})),
+      401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'},404:{description:'Không có hồ sơ sinh viên'}}}};
   spec.paths['/api/students/me/ojt-advice']={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
     summary:'Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập',
     description:'Chỉ dùng dữ liệu backend. Trước kỳ 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ trả NOT_AVAILABLE và không gọi Gemini. Mặc định AI tắt; thiếu cấu hình hoặc lỗi API trả FALLBACK. Không tạo xác suất rủi ro. Không lưu/cache tư vấn trong bước chuẩn bị này.',

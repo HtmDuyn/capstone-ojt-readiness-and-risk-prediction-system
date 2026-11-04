@@ -8,6 +8,7 @@ import { applyToPosition, studentOpportunities } from '../students/job-applicati
 import { notifications, readNotification } from './academic.service';
 import { roadmap } from './cv.service';
 import { ojtAdvice } from './ojt-advice.service';
+import { readiness } from './readiness.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -16,6 +17,10 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.get('/students/me/ojt-readiness', ...read, handle(r => {
+  if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
+  return readiness(r.user);
+}));
 router.post('/students/me/ojt-advice', ...own, requireJsonBody, handle(r => {
   if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters. Send ojtSemesterId in the JSON body.');
   const body=inputObject(r.body,['ojtSemesterId']);
