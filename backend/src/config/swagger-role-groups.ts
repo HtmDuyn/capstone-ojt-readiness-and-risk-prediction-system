@@ -141,6 +141,10 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   { roles: [], operations: [
   ] },
   { roles: ["ENTERPRISE"], operations: [
+    "GET /api/enterprise/recruitment/windows",
+    "GET /api/enterprise/recruitment/posts",
+    "POST /api/enterprise/recruitment/posts",
+    "PATCH /api/enterprise/recruitment/posts/{id}",
     "GET /api/enterprise/candidate-periods",
     "GET /api/enterprise/candidates",
     "GET /api/enterprise/internships",

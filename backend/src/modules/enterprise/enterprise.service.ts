@@ -1,9 +1,9 @@
 import { postSelect,postApi } from '../recruitment/recruitment.repository';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
-import { readTransaction } from './read.repository';
-import { templateField } from './context-fields';
-import { enterpriseScope, api } from './catalog.service';
+import { readTransaction } from '../qhdn/read.repository';
+import { templateField } from '../qhdn/context-fields';
+import { enterpriseScope, api } from '../qhdn/catalog.service';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 

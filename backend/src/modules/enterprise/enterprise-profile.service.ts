@@ -1,6 +1,6 @@
 import { academicTransaction,audit } from '../academic/academic.repository';
 import { inputObject,invalid,positiveId,requiredText } from '../students/student.validation';
-import type { Actor,Row } from './qhdn.repository';
+import type { Actor,Row } from '../qhdn/qhdn.repository';
 
 export async function updateEnterpriseProfile(body:unknown,actor:Actor){
  if(actor.roleCode!=='ENTERPRISE')throw invalid('Enterprise role required.',403,'FORBIDDEN');
