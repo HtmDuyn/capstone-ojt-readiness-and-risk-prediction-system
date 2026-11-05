@@ -2,15 +2,15 @@
 
 Tạo từ OpenAPI hiện hành bằng `npm run docs:api` sau `npm run build`.
 
-Tổng 133 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
+Tổng 147 API duy nhất. Nhóm hiển thị theo chức năng chính: API dùng chung với nhóm nghiệp vụ không lặp lại trong Admin. Quyền Admin vẫn giữ nguyên trong middleware/service và x-roles. Quyền nhập doanh nghiệp chỉ dành cho OJT_COORD; quyền nhập sinh viên dành cho ADMIN/ACADEMIC.
 
 | Nhóm | Số API hiển thị |
 |---|---:|
 | Admin | 18 |
 | Phòng đào tạo | 67 |
 | Phòng QHDN | 33 |
-| Doanh nghiệp | 10 |
-| Sinh viên | 19 |
+| Doanh nghiệp | 14 |
+| Sinh viên | 29 |
 | Auth | 4 |
 
 ## Admin
@@ -165,9 +165,13 @@ Quản lý hồ sơ, tuyển dụng và thực tập sinh.
 | 5 | PATCH | `/api/enterprise/candidates/{id}/decision` | Tiếp nhận hoặc từ chối ứng viên | `PATCH /api/enterprise/candidates/{id}/decision` |
 | 6 | GET | `/api/enterprise/internships` | Danh sách sinh viên thực tập | `GET /api/enterprise/internships` |
 | 7 | PUT | `/api/enterprise/internships/{id}/evaluation` | Gửi hoặc cập nhật đánh giá thực tập | `PUT /api/enterprise/internships/{id}/evaluation` |
-| 8 | GET | `/api/recruitment/posts` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
-| 9 | POST | `/api/enterprise/tasks/bulk` | Giao một hoặc nhiều task cho nhiều thực tập sinh | `POST /api/enterprise/tasks/bulk` |
-| 10 | GET | `/api/internship-tasks` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
+| 8 | GET | `/api/enterprise/recruitment/windows` | Xem đợt tuyển dụng và hạn doanh nghiệp được đăng tin | `GET /api/enterprise/recruitment/windows` |
+| 9 | GET | `/api/enterprise/recruitment/posts` | Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu | `GET /api/enterprise/recruitment/posts` |
+| 10 | POST | `/api/enterprise/recruitment/posts` | Tạo tin và tự động gửi QHDN duyệt | `POST /api/enterprise/recruitment/posts` |
+| 11 | PATCH | `/api/enterprise/recruitment/posts/{id}` | Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp | `PATCH /api/enterprise/recruitment/posts/{id}` |
+| 12 | GET | `/api/recruitment/posts` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
+| 13 | POST | `/api/enterprise/tasks/bulk` | Giao một hoặc nhiều task cho nhiều thực tập sinh | `POST /api/enterprise/tasks/bulk` |
+| 14 | GET | `/api/internship-tasks` | Danh sách task trong phạm vi tài khoản | `GET /api/internship-tasks` |
 
 ## Sinh viên
 
@@ -193,7 +197,17 @@ Xem học tập, chọn combo và đăng ký OJT.
 | 16 | GET | `/api/job-applications` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
 | 17 | POST | `/api/job-applications` | Sinh viên gửi hồ sơ trực tiếp đến doanh nghiệp | `POST /api/job-applications` |
 | 18 | GET | `/api/students/me/opportunities` | Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp | `GET /api/students/me/opportunities` |
-| 19 | GET | `/api/students/me/internships` | Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố | `GET /api/students/me/internships` |
+| 19 | GET | `/api/students/me/tasks` | Nhiệm vụ của mình theo kỳ OJT | `GET /api/students/me/tasks` |
+| 20 | GET | `/api/students/me/tasks/{id}/submissions` | Lịch sử nộp bài của mình | `GET /api/students/me/tasks/{id}/submissions` |
+| 21 | POST | `/api/students/me/tasks/{id}/submissions` | Nộp nội dung hoặc đường dẫn bài làm | `POST /api/students/me/tasks/{id}/submissions` |
+| 22 | GET | `/api/students/me/internships` | Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố | `GET /api/students/me/internships` |
+| 23 | GET | `/api/students/me/academic-warning` | Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu | `GET /api/students/me/academic-warning` |
+| 24 | POST | `/api/students/me/course-impact` | Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể | `POST /api/students/me/course-impact` |
+| 25 | POST | `/api/students/me/study-simulation` | Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn | `POST /api/students/me/study-simulation` |
+| 26 | POST | `/api/students/me/course-advice` | Tư vấn môn học/học lại, ưu tiên môn tiên quyết đang chặn môn sau | `POST /api/students/me/course-advice` |
+| 27 | POST | `/api/students/me/academic-chat` | Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình | `POST /api/students/me/academic-chat` |
+| 28 | GET | `/api/students/me/ojt-readiness` | Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ | `GET /api/students/me/ojt-readiness` |
+| 29 | POST | `/api/students/me/ojt-advice` | Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập | `POST /api/students/me/ojt-advice` |
 
 ## Auth
 
