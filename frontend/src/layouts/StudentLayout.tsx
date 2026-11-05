@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/common/Sidebar';
 import { Footer } from '@/components/common/Footer';
 import { StudentHeader } from '@/components/student/StudentHeader';
 import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
+import { AIConsultModal } from '@/components/common/AIConsultModal';
 
 function StudentShell() {
   const { user, logout } = useAuth();
@@ -13,6 +14,7 @@ function StudentShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   if (portal.mustChangePassword && location.pathname !== '/student/profile') return <Navigate to="/student/profile" replace />;
   const profile = portal.profile;
   const handleLogout = () => { logout(); navigate('/login'); };
@@ -38,6 +40,10 @@ function StudentShell() {
         <Footer />
       </main>
     </div>
+    {!portal.mustChangePassword && <>
+      <button type="button" onClick={() => setChatOpen(true)} className="fixed bottom-6 right-6 z-40 rounded-full bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-xl hover:bg-orange-700">Tư vấn AI ngay</button>
+      <AIConsultModal isOpen={chatOpen} onClose={() => setChatOpen(false)} />
+    </>}
   </div>;
 }
 

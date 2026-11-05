@@ -48,7 +48,19 @@ export function describeStudentRest(spec: Schema): Schema {
     channel: nullableText, templateId: nullable(id), relatedEntityType: nullableText, relatedEntityId: nullable(id)});
   const notifications = page(notification);
   notifications.properties.unreadCount = {type: 'integer', minimum: 0};
+  const warningLevel={type:'string',enum:['LOW','MEDIUM','HIGH','INSUFFICIENT_DATA']};
+  const warningSchema=object({level:warningLevel,label:text,method:{type:'string',enum:['ACADEMIC_RULES']},policyVersion:text,
+    isAiPrediction:{type:'boolean',enum:[false]},riskScore:{type:'number',nullable:true,enum:[null]},
+    reasons:array(object({code:text,message:text})),actions:array(text),limitations:array(text),computedAt:time,
+    evidence:{type:'object',additionalProperties:true}});
+  spec.components.schemas.AcademicRuleWarning=warningSchema;
   const academic = object({studentId: id, programId: nullable(id), ojtSemesterId: id,
+    academicWarning:reference('AcademicRuleWarning'),
+    currentSemester: {type:'integer',minimum:0,maximum:9,nullable:true},
+    earlyWarning: object({available:{type:'boolean'},status:{type:'string',enum:['PROGRESS_ONLY','NOT_AVAILABLE']},
+      currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},reasons:array(text),
+      riskLevel:warningLevel,assessment:reference('AcademicRuleWarning'),riskScore:{type:'number',nullable:true,enum:[null]},
+      isAiPrediction:{type:'boolean',enum:[false]},message:text,recommendations:array(text)}),
     student: context('student'), program: profile.properties.program,
     semester: context('semester'), academicProgress: progress,
     earnedCredits: number, missingCredits: number, failedCourseCount: {type: 'integer'},
@@ -129,6 +141,57 @@ export function describeStudentRest(spec: Schema): Schema {
     parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
 
+  spec.paths['/api/students/me/academic-warning']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu',
+    description:'Tự lấy hồ sơ và kỳ OJT từ JWT. Quy tắc ACADEMIC_RULES_V1: đạt ngưỡng hiện tại => LOW; kỳ 2–4 so môn bắt buộc kỳ trước chưa hoàn thành và môn nợ chặn tiên quyết; kỳ 4 có nút chặn => HIGH; kỳ 5 nếu đạt mọi môn đang học vẫn chưa đạt ngưỡng => HIGH, nếu kịch bản đạt ngưỡng => MEDIUM. Đến hạn xét hoặc đến kỳ OJT mà chưa đạt => HIGH. Thiếu dữ liệu không tự gán LOW. Không gọi Gemini, không tính xác suất, không ghi kết quả OJT chính thức. Mốc thời gian chốt điểm môn học chưa được xác minh; luôn trả limitations. Đây là chính sách triển khai phiên bản đầu để nhà trường rà soát.',
+    responses:{200:envelope(reference('AcademicRuleWarning')),401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
+  for(const [endpoint,example,summary] of [
+    ['course-impact',{courseCode:'SWR302'},'Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể'],
+    ['study-simulation',{passedCourseCodes:['SWP391','SWR302']},'Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn'],
+  ] as const) {
+    spec.paths['/api/students/me/'+endpoint]={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],summary,
+      description:'Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.',
+      requestBody:{required:true,content:{'application/json':{example,schema:{type:'object',additionalProperties:false,
+        required:[endpoint==='course-impact'?'courseCode':'passedCourseCodes'],properties:endpoint==='course-impact'?{courseCode:{type:'string',minLength:1,maxLength:20}}:{passedCourseCodes:{type:'array',minItems:1,maxItems:20,uniqueItems:true,items:{type:'string',maxLength:20}}}}}}},
+      responses:{200:envelope({type:'object',additionalProperties:true}),400:{description:'Môn không thuộc chương trình, trùng/tương đương hoặc request không hợp lệ'},
+        401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'},409:{description:'Thiếu cấu hình hoặc chưa đủ điều kiện theo dõi/mô phỏng'}}}};
+  }
+  const coursePlanSchema=object({status:text,message:text,items:array(object({priority:id,courseId:id,courseCode:nullableText,name:nullableText,
+    requirementId:id,credits:number,action:{type:'string',enum:['RETAKE','STUDY']},canPlan:{type:'boolean'},isAlternative:{type:'boolean'},
+    explanation:text,availability:{type:'string',enum:['NOT_MANAGED']},directDependentCount:{type:'integer'},unlocksCount:{type:'integer'},downstreamCount:{type:'integer'},
+    dependentCourses:array(object({courseId:id,courseCode:nullableText,name:nullableText,unlocksAfterPassing:{type:'boolean'},mandatory:{type:'boolean'}})),
+    prerequisites:array(object({minimumPassed:{type:'integer'},passedCount:{type:'integer'},remainingRequired:{type:'integer'},satisfied:{type:'boolean'},
+      courses:array(object({courseId:id,courseCode:nullableText,name:nullableText,passed:{type:'boolean'}}))}))}))});
+  spec.paths['/api/students/me/course-advice']={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Tư vấn môn học/học lại, ưu tiên môn tiên quyết đang chặn môn sau',
+    description:'Gửi {}. Backend xếp ưu tiên từ chương trình đã công bố và kết quả học tập, phân biệt nhóm tiên quyết AND/OR. canPlan chỉ nói đã đáp ứng tiên quyết trên dữ liệu hiện tại, không xác nhận mở lớp hoặc quyền đăng ký; môn tiên quyết phải được hoàn thành trước kỳ học môn sau. Gemini chọn khuyến nghị chung; không tự tạo quan hệ môn. Cần đủ điều kiện theo dõi sớm từ kỳ 2.',
+    requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false},example:{}}}},
+    responses:{200:envelope(object({status:{type:'string',enum:['READY','NOT_AVAILABLE','DATA_INCOMPLETE']},message:text,coursePlan:nullable(coursePlanSchema),
+      advice:{type:'object',nullable:true,additionalProperties:true},prioritySource:text,isAiPrediction:{type:'boolean',enum:[false]}})),
+      400:{description:'Chỉ nhận JSON {}'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
+  spec.paths['/api/students/me/academic-chat']={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình',
+    description:'Hỏi đáp từng câu độc lập, chưa lưu lịch sử hội thoại. Số liệu lấy từ hồ sơ của tài khoản JWT; không nhận studentId hoặc số liệu do client cung cấp. Câu hỏi xin tư vấn dùng Gemini theo điều kiện theo dõi sớm. Câu hỏi ngoài học vụ trả OUT_OF_SCOPE. Không dự báo xác suất rủi ro.',
+    requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['message'],properties:{message:{type:'string',minLength:1,maxLength:1000}}},example:{message:'Mình còn nợ môn nào và thiếu bao nhiêu tín chỉ?'}}}},
+    responses:{200:envelope(object({status:{type:'string',enum:['ANSWERED','DATA_INCOMPLETE','OUT_OF_SCOPE','NEED_COURSE_SELECTION']},topics:array(text),answer:text,
+      facts:{type:'object',nullable:true,additionalProperties:true},source:{type:'string',enum:['ACADEMIC_RECORDS']},isAiPrediction:{type:'boolean',enum:[false]},
+      recommendations:array(text),academicWarning:nullable(reference('AcademicRuleWarning')),coursePlan:nullable(coursePlanSchema),adviceSource:nullableText,adviceStatus:nullableText,aiError:{type:'object',nullable:true,additionalProperties:true}})),
+      400:{description:'message không hợp lệ hoặc trường không được hỗ trợ'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
+  spec.paths['/api/students/me/ojt-readiness']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ',
+    responses:{200:envelope(object({student:object({id,studentCode:text,fullName:text,currentSemester:{type:'integer',nullable:true},programName:nullableText}),
+      ojtSemesterId:nullable(id),academic:nullable(reference('StudentAcademicSummary')),academicProgress:progress})),
+      401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'},404:{description:'Không có hồ sơ sinh viên'}}}};
+  spec.paths['/api/students/me/ojt-advice']={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập',
+    description:'Chỉ dùng dữ liệu backend. Trước kỳ 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ trả NOT_AVAILABLE và không gọi Gemini. Mặc định AI tắt; thiếu cấu hình hoặc lỗi API trả FALLBACK. Không tạo xác suất rủi ro. Không lưu/cache tư vấn trong bước chuẩn bị này.',
+    requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['ojtSemesterId'],properties:{ojtSemesterId:id}}}}},
+    responses:{200:envelope(object({status:{type:'string',enum:['NOT_AVAILABLE','FALLBACK','READY']},source:{type:'string',enum:['RULES','GEMINI']},
+      academic:object({currentSemester:{type:'integer',nullable:true},earnedCredits:number,missingCredits:number,failedCourseCount:{type:'integer'},currentEligibilityStatus:text}),
+      explanation:text,recommendations:array(text),modelVersion:nullableText,fallbackReason:nullableText,
+      aiError:nullable(object({code:text,message:text,httpStatus:{type:'integer',nullable:true},phase:{type:'string',enum:['CONFIGURATION','REQUEST','READ_RESPONSE','VALIDATE_RESPONSE']},elapsedMs:{type:'integer'},timeoutMs:{type:'integer'}})),
+      riskLevel:warningLevel,academicWarning:nullable(reference('AcademicRuleWarning')),riskScore:{type:'number',nullable:true,enum:[null]},isAiPrediction:{type:'boolean',enum:[false]}})),
+      400:{description:'Dữ liệu không hợp lệ'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'},404:{description:'Không tìm thấy hồ sơ hoặc kỳ OJT'}}}};
   for (const [path, item] of Object.entries(spec.paths) as [string, Schema][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
       const op = item[method];
