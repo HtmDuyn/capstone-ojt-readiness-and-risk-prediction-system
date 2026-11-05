@@ -31,13 +31,13 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'enterprise-jobs',
-    label: 'Thông tin Vị trí Tuyển dụng',
+    label: 'Tin tuyển dụng',
     path: '/enterprise/jobs',
     icon: <Briefcase size={20} />,
     banner: {
-      title: 'Thông tin Vị trí Tuyển dụng',
-      description: 'Tra cứu vị trí thực tập, yêu cầu và chỉ tiêu tiếp nhận đã được ghi nhận. Trang này chỉ cung cấp thông tin, không hỗ trợ đăng tuyển.',
-      badge: 'Thông tin chỉ đọc',
+      title: 'Tuyển dụng thực tập',
+      description: 'Tạo và chỉnh sửa tin, xem đợt đăng tuyển và theo dõi kết quả duyệt của QHDN.',
+      badge: 'Tuyển dụng doanh nghiệp',
     },
   },
   {
