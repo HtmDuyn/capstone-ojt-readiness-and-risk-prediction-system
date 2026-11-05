@@ -1,6 +1,6 @@
 import qhdnRoutes from '../modules/qhdn/qhdn.routes';
 import recruitmentRoutes from '../modules/recruitment/recruitment.routes';
-import enterpriseRoutes from '../modules/qhdn/enterprise.routes';
+import enterpriseRoutes from '../modules/enterprise/enterprise.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import resultRoutes from '../modules/ojt-results/result.routes';
 import workflowRoutes from '../modules/academic/workflow.routes';

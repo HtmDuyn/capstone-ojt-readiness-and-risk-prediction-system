@@ -8447,4 +8447,59 @@ DO $privileges$ BEGIN
 END $privileges$;
 -- END CV EXTRACTION STORAGE V1
 
+-- Enterprise recruitment extension (20261105).
+-- Only enterprise-authored posts participate; QHDN imports and shared workflow stay unchanged.
+ALTER TABLE public."RecruitmentPosts" ADD COLUMN "EnterpriseManaged" boolean NOT NULL DEFAULT false;
+CREATE INDEX "IX_EnterpriseRecruitment_Continuation" ON public."RecruitmentPosts"("OJTSemesterID","WindowID")
+ WHERE "EnterpriseManaged" AND "Status" IN ('PUBLISHED','CLOSED');
+
+CREATE OR REPLACE FUNCTION public."AdvanceEnterpriseRecruitment"() RETURNS integer
+LANGUAGE plpgsql SET search_path=public AS $$
+DECLARE post_row record; continued integer:=0;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ FOR post_row IN
+  SELECT p."PostID",p."CreatedBy",p."WindowID" AS previous_window,next_window."WindowID" AS next_window,
+   (ap."EndDate"+1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh' AS deadline
+  FROM "RecruitmentPosts" p
+  JOIN "RecruitmentWindows" old_window ON old_window."WindowID"=p."WindowID"
+  JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=old_window."AcademicPeriodID"
+  JOIN "OJTSemesters" semester ON semester."OJTSemesterID"=p."OJTSemesterID" AND semester."AcademicPeriodID"=ap."AcademicPeriodID"
+  JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL
+  JOIN LATERAL (
+   SELECT w."WindowID",w."EndsAt" FROM "RecruitmentWindows" w
+   WHERE w."OJTSemesterID"=p."OJTSemesterID" AND w."AcademicPeriodID"=ap."AcademicPeriodID"
+    AND w."WindowID"<>p."WindowID" AND w."Status"='OPEN'
+    AND w."StartsAt">=old_window."EndsAt" AND w."StartsAt"<=clock_timestamp() AND w."EndsAt">clock_timestamp()
+   ORDER BY w."StartsAt",w."WindowID" LIMIT 1
+  ) next_window ON true
+  WHERE p."EnterpriseManaged" AND p."ArchivedAt" IS NULL AND p."Status" IN ('PUBLISHED','CLOSED')
+   AND p."PublishedAt" IS NOT NULL AND p."ReviewedAt"=p."PublishedAt"
+   AND old_window."EndsAt"<=clock_timestamp() AND ap."Kind"='SEMESTER' AND ap."Status" NOT IN ('CLOSED','ARCHIVED')
+   AND (ap."EndDate"+1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp()
+   AND EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos USING("PositionID")
+    WHERE pp."PostID"=p."PostID" AND pos."DeletedAt" IS NULL AND pos."ArchivedAt" IS NULL
+     AND pos."Status" IN ('OPEN','CLOSED') AND pos."Capacity">(SELECT count(*) FROM "InternshipAssignments" a
+      WHERE a."PositionID"=pos."PositionID" AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')))
+  FOR UPDATE OF p
+ LOOP
+  UPDATE "RecruitmentPosts" SET "WindowID"=post_row.next_window,"DeadlineAt"=post_row.deadline,"Status"='PUBLISHED',"UpdatedAt"=now()
+   WHERE "PostID"=post_row."PostID";
+  UPDATE "InternshipPositions" pos SET "Status"='OPEN'
+   FROM "RecruitmentPostPositions" pp WHERE pp."PostID"=post_row."PostID" AND pp."PositionID"=pos."PositionID"
+    AND pos."Status"='CLOSED' AND pos."DeletedAt" IS NULL AND pos."ArchivedAt" IS NULL;
+  INSERT INTO "AuditLogs" ("UserID","Action","EntityType","EntityID","Detail")
+   VALUES(post_row."CreatedBy",'ENTERPRISE_AUTO_CONTINUE','RecruitmentPosts',post_row."PostID",
+    jsonb_build_object('system',true,'before',jsonb_build_object('windowId',post_row.previous_window),
+     'after',jsonb_build_object('windowId',post_row.next_window,'deadlineAt',post_row.deadline))::text);
+  continued:=continued+1;
+ END LOOP;
+ RETURN continued;
+END $$;
+REVOKE ALL ON FUNCTION public."AdvanceEnterpriseRecruitment"() FROM PUBLIC;
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT EXECUTE ON FUNCTION public."AdvanceEnterpriseRecruitment"() TO service_role;
+ END IF;
+END $$;
 COMMIT;

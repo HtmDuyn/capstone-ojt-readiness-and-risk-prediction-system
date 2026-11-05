@@ -1,7 +1,7 @@
 # Đầu vào API dành cho FE và test thủ công
 
 Nguồn: OpenAPI hiện tại của backend. Tạo lại bằng `npm run docs:api` sau `npm run build`.
-Phạm vi: 133 operations; 41 path parameters; 245 query parameters; 72 request bodies.
+Phạm vi: 147 operations; 44 path parameters; 259 query parameters; 80 request bodies.
 
 
 Tất cả nhóm dùng REST: GET đọc dữ liệu, ID trong path, bộ lọc/phân trang trong query; GET không có body. POST tạo/gửi hồ sơ hoặc xem trước nghiệp vụ, PUT/PATCH cập nhật. Body nghiệp vụ dùng application/json; upload CV dùng multipart/form-data. Sinh viên dùng các tài nguyên /students/:id, /students/me/* và các route dùng chung; các adapter /api/student/*/search, /detail, /create, /update đã gỡ. Token, quyền sở hữu và trạng thái nghiệp vụ vẫn bắt buộc.
@@ -1403,6 +1403,128 @@ Body: application/json — bắt buộc.
 | contactPhone | string | Không / theo điều kiện nghiệp vụ | maxLength=20; nullable=true |  |
 | contactEmail | string | Không / theo điều kiện nghiệp vụ | format="email"; maxLength=100; nullable=true |  |
 | positionTitle | string | Không / theo điều kiện nghiệp vụ | maxLength=100; nullable=true | Chức danh của tài khoản đang đăng nhập tại doanh nghiệp. |
+
+## GET /api/enterprise/recruitment/posts
+
+Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu
+
+ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts are immutable. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- | --- |
+| query | page | integer | Không | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
+| query | limit | integer | Không | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
+| query | windowId | integer | Không | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
+| query | postId | integer | Không | minimum=1; maximum=2147483647 |  |
+| query | positionId | integer | Không | minimum=1; maximum=2147483647 | ID vị trí thực tập. |
+| query | status | string ∈ "DRAFT", "PENDING_REVIEW", "REJECTED", "PUBLISHED", "CLOSED" | Không |  |  |
+
+Không có request body.
+
+## POST /api/enterprise/recruitment/posts
+
+Tạo tin và tự động gửi QHDN duyệt
+
+ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts are immutable. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| windowId | integer | Có | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
+| title | string | Có | minLength=1; maxLength=500 |  |
+| content | string | Có | minLength=1; maxLength=30000 |  |
+| benefits | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
+| applicationInstructions | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
+| deadlineAt | string | Có | format="date-time" |  |
+| positions | array<object> | Có | minItems=1; maxItems=50 |  |
+| positions[].id | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
+| positions[].title | string | Có | minLength=1; maxLength=150 |  |
+| positions[].description | string | Có | minLength=1; maxLength=20000 |  |
+| positions[].requirements | string | Có | minLength=1; maxLength=20000 |  |
+| positions[].capacity | integer | Có | minimum=0; maximum=2147483647 |  |
+| positions[].location | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=1000; nullable=true |  |
+| positions[].workMode | string ∈ "ONSITE", "REMOTE", "HYBRID" | Không / theo điều kiện nghiệp vụ | nullable=true |  |
+
+## PATCH /api/enterprise/recruitment/posts/{id}
+
+Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp
+
+Chỉnh sửa tin thuộc doanh nghiệp trong JWT. Lấy id từ GET /api/enterprise/recruitment/posts. Chỉ gửi các trường cần đổi; không gửi windowId/companyId/status. Chỉ được sửa khi đợt đang nhận tin và tin chưa công bố (DRAFT/PENDING_REVIEW/REJECTED). Nếu gửi positions phải giữ đủ các vị trí cũ kèm id; vị trí mới không có id. Không được giảm capacity thấp hơn số sinh viên đã nhận. Lưu thành công tự chuyển PENDING_REVIEW để QHDN duyệt, không cần gọi API gửi duyệt.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- | --- |
+| path | id | integer | Có | minimum=1; maximum=2147483647 | ID: bản ghi. |
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| title | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=500 |  |
+| content | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=30000 |  |
+| benefits | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
+| applicationInstructions | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
+| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" |  |
+| positions | array<object> | Không / theo điều kiện nghiệp vụ | minItems=1; maxItems=50 |  |
+| positions[].id | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
+| positions[].title | string | Có | minLength=1; maxLength=150 |  |
+| positions[].description | string | Có | minLength=1; maxLength=20000 |  |
+| positions[].requirements | string | Có | minLength=1; maxLength=20000 |  |
+| positions[].capacity | integer | Có | minimum=0; maximum=2147483647 |  |
+| positions[].location | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=1000; nullable=true |  |
+| positions[].workMode | string ∈ "ONSITE", "REMOTE", "HYBRID" | Không / theo điều kiện nghiệp vụ | nullable=true |  |
+
+content:
+
+```json
+{
+  "title": "Tuyển thực tập sinh Backend",
+  "content": "Phát triển API và hệ thống nội bộ",
+  "benefits": "Có mentor hướng dẫn"
+}
+```
+
+positions:
+
+```json
+{
+  "positions": [
+    {
+      "id": 6,
+      "title": "Backend Intern",
+      "description": "Phát triển REST API",
+      "requirements": "TypeScript và PostgreSQL",
+      "capacity": 5,
+      "location": "TP.HCM",
+      "workMode": "HYBRID"
+    }
+  ]
+}
+```
+
+## GET /api/enterprise/recruitment/windows
+
+Xem đợt tuyển dụng và hạn doanh nghiệp được đăng tin
+
+Xem các đợt do QHDN thiết lập. startsAt là thời điểm bắt đầu đăng tin; endsAt là hạn cuối doanh nghiệp được tạo/chỉnh sửa tin. accepting=true khi đợt OPEN, đang trong thời gian cho phép và học kỳ còn khả dụng. deadlineAt của tin là hạn sinh viên ứng tuyển, khác với endsAt của đợt đăng tin. Chỉ role ENTERPRISE được dùng endpoint này.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- | --- |
+| query | page | integer | Không | minimum=1; maximum=2147483647 | Trang, bắt đầu từ 1. |
+| query | limit | integer | Không | minimum=1; maximum=100 | Số bản ghi mỗi trang. |
+| query | academicPeriodId | integer | Không | minimum=1; maximum=2147483647 | ID kỳ học hoặc Block 3. |
+
+Không có request body.
 
 ## POST /api/enterprise/tasks/bulk
 
@@ -2851,6 +2973,64 @@ Body: application/json — bắt buộc.
 | enrollmentYear | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID tài khoản. |
 | currentSemester | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID tài khoản. |
 
+## POST /api/students/me/academic-chat
+
+Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình
+
+Hỏi đáp từng câu độc lập, chưa lưu lịch sử hội thoại. Số liệu lấy từ hồ sơ của tài khoản JWT; không nhận studentId hoặc số liệu do client cung cấp. Câu hỏi xin tư vấn dùng Gemini theo điều kiện theo dõi sớm. Câu hỏi ngoài học vụ trả OUT_OF_SCOPE. Không dự báo xác suất rủi ro.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| message | string | Có | minLength=1; maxLength=1000 |  |
+
+## GET /api/students/me/academic-warning
+
+Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu
+
+Tự lấy hồ sơ và kỳ OJT từ JWT. Quy tắc ACADEMIC_RULES_V1: đạt ngưỡng hiện tại => LOW; kỳ 2–4 so môn bắt buộc kỳ trước chưa hoàn thành và môn nợ chặn tiên quyết; kỳ 4 có nút chặn => HIGH; kỳ 5 nếu đạt mọi môn đang học vẫn chưa đạt ngưỡng => HIGH, nếu kịch bản đạt ngưỡng => MEDIUM. Đến hạn xét hoặc đến kỳ OJT mà chưa đạt => HIGH. Thiếu dữ liệu không tự gán LOW. Không gọi Gemini, không tính xác suất, không ghi kết quả OJT chính thức. Mốc thời gian chốt điểm môn học chưa được xác minh; luôn trả limitations. Đây là chính sách triển khai phiên bản đầu để nhà trường rà soát. GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Không có request body.
+
+## POST /api/students/me/course-advice
+
+Tư vấn môn học/học lại, ưu tiên môn tiên quyết đang chặn môn sau
+
+Gửi {}. Backend xếp ưu tiên từ chương trình đã công bố và kết quả học tập, phân biệt nhóm tiên quyết AND/OR. canPlan chỉ nói đã đáp ứng tiên quyết trên dữ liệu hiện tại, không xác nhận mở lớp hoặc quyền đăng ký; môn tiên quyết phải được hoàn thành trước kỳ học môn sau. Gemini chọn khuyến nghị chung; không tự tạo quan hệ môn. Cần đủ điều kiện theo dõi sớm từ kỳ 2.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+Schema: object
+
+## POST /api/students/me/course-impact
+
+Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể
+
+Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| courseCode | string | Có | minLength=1; maxLength=20 |  |
+
 ## POST /api/students/me/cv
 
 Upload hoặc thay CV cá nhân
@@ -2933,6 +3113,34 @@ Body: application/json — bắt buộc.
 | --- | --- | --- | --- | --- |
 | isRead | boolean | Có |  |  |
 
+## POST /api/students/me/ojt-advice
+
+Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập
+
+Chỉ dùng dữ liệu backend. Trước kỳ 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ trả NOT_AVAILABLE và không gọi Gemini. Mặc định AI tắt; thiếu cấu hình hoặc lỗi API trả FALLBACK. Không tạo xác suất rủi ro. Không lưu/cache tư vấn trong bước chuẩn bị này.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| ojtSemesterId | integer | Có | minimum=1 |  |
+
+## GET /api/students/me/ojt-readiness
+
+Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ
+
+GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Không có request body.
+
 ## GET /api/students/me/opportunities
 
 Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp
@@ -2962,3 +3170,69 @@ Xác thực: Bearer token; role/ownership theo chức năng.
 | query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
 
 Không có request body.
+
+## POST /api/students/me/study-simulation
+
+Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn
+
+Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+Không có tham số URL/query.
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| passedCourseCodes | array<string> | Có | minItems=1; maxItems=20; uniqueItems=true |  |
+
+## GET /api/students/me/tasks
+
+Nhiệm vụ của mình theo kỳ OJT
+
+GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- | --- |
+| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 |  |
+| query | page | integer | Không | minimum=1; maximum=2147483647 |  |
+| query | limit | integer | Không | minimum=1; maximum=100 |  |
+
+Không có request body.
+
+## GET /api/students/me/tasks/{id}/submissions
+
+Lịch sử nộp bài của mình
+
+GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- | --- |
+| path | id | integer | Có | minimum=1; maximum=2147483647 |  |
+| query | page | integer | Không | minimum=1; maximum=2147483647 |  |
+| query | limit | integer | Không | minimum=1; maximum=100 |  |
+
+Không có request body.
+
+## POST /api/students/me/tasks/{id}/submissions
+
+Nộp nội dung hoặc đường dẫn bài làm
+
+Student submission atomically saves content, sets task DONE and PercentComplete to 100. Latest identical content replays without duplicate records or progress. Late submissions are flagged while the internship remains active. No enterprise approval is required.
+
+Xác thực: Bearer token; role/ownership theo chức năng.
+
+| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- | --- |
+| path | id | integer | Có | minimum=1; maximum=2147483647 |  |
+
+Body: application/json — bắt buộc.
+
+| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- | --- |
+| content | string | Có | minLength=1; maxLength=10000 |  |
