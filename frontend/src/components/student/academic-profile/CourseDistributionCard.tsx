@@ -1,8 +1,8 @@
 import React from 'react';
-import { mockCourseCategories } from '@/data/student/mockAcademicProfileData';
+import type { CourseCategoryDistribution } from '@/types/student/academicProfileTypes';
 import { useStudentAIConsult } from '../../../layouts/BaseLayout';
 
-export const CourseDistributionCard: React.FC = () => {
+export const CourseDistributionCard: React.FC<{ categories: CourseCategoryDistribution[] }> = ({ categories }) => {
   const { openAIConsult } = useStudentAIConsult();
 
   return (
@@ -25,7 +25,8 @@ export const CourseDistributionCard: React.FC = () => {
 
       {/* Categories List */}
       <div className="space-y-4 flex-1 flex flex-col justify-center">
-        {mockCourseCategories.map((cat) => (
+        {!categories.length && <p className="text-sm text-slate-500">Chưa có dữ liệu phân bổ môn học.</p>}
+        {categories.map((cat) => (
           <div key={cat.id} className="space-y-1.5">
             <div className="flex justify-between items-center">
               <span className="text-xs sm:text-sm font-semibold text-slate-700 font-outfit truncate pr-2">

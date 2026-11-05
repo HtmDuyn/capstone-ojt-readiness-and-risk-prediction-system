@@ -7,7 +7,6 @@ import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import { AIConsultModal } from "@/components/common/AIConsultModal";
 import { BotSparkleIcon } from "@/components/common/icons/AppIcons";
-import { mockStudentProfile } from "@/data/student/mockStudentData";
 import type { NavItem } from "@/types/common.types";
 
 interface BaseLayoutContextType {
@@ -60,15 +59,11 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   };
 
   const resolvedUserSummary: HeaderUserSummary = userSummary || {
-    fullName: user?.name || (isEducation ? 'Phòng Đào tạo' : mockStudentProfile.fullName),
-    email: user?.email || (isEducation ? '' : mockStudentProfile.email),
-    code: user?.id || (isEducation ? undefined : mockStudentProfile.studentCode),
-    subtitle:
-      user?.role === "student"
-        ? 'Sinh viên'
-        : user?.role?.toUpperCase(),
-    avatar: user?.avatar || (isEducation ? '' : mockStudentProfile.avatar),
-    department: undefined,
+    fullName: user?.name || (isEducation ? 'Phòng Đào tạo' : 'Người dùng'),
+    email: user?.email || '',
+    code: user?.role === 'student' ? undefined : user?.id,
+    subtitle: user?.role?.toUpperCase(),
+    avatar: user?.avatar || '',
   };
 
   return (
@@ -102,7 +97,6 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         <div className="relative z-10 lg:pl-[76px] lg:peer-hover:pl-[260px] flex flex-col min-h-screen flex-1 transition-all duration-300">
           {/* Header trên cùng */}
           <Header
-            student={isEducation || user?.role === "enterprise" ? undefined : mockStudentProfile}
             user={resolvedUserSummary}
             showNotifications={!isEducation}
             showLanguage={!isEducation}
@@ -149,7 +143,6 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         {!isEducation && <AIConsultModal
           isOpen={aiModalOpen}
           onClose={() => setAiModalOpen(false)}
-          student={mockStudentProfile}
           initialQuery={initialAiQuery}
         />}
       </div>

@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
+import StudentLayout from '@/layouts/StudentLayout';
 import { getMenuByRole } from "@/config";
 import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
 import EnterpriseDashboard from "@/pages/enterprise/EnterpriseDashboard";
@@ -23,8 +24,13 @@ import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
 import EducationSupportClassDemand from "@/pages/education/EducationSupportClassDemand";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
-import StudentAcademicProfile from "@/pages/student/StudentAcademicProfile";
-import StudentFeaturePage from "@/pages/student/StudentFeaturePage";
+import StudentAcademicProfile from "@/pages/student/StudentProfile";
+import StudentFeaturePage from "@/pages/student/StudentFeature";
+import StudentAIRisk from '@/pages/student/StudentAIRisk';
+import StudentOJTProgress from '@/pages/student/StudentOJTProgress';
+import StudentResults from '@/pages/student/StudentResults';
+import StudentNotifications from '@/pages/student/StudentNotifications';
+import StudentAccount from '@/pages/student/StudentAccount';
 import EducationDashboard from "@/pages/education/EducationDashboard";
 import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
 import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
@@ -69,24 +75,21 @@ const RolePlaceholderPage: React.FC<{ role: UserRole }> = ({ role }) => (
 // Các route riêng của sinh viên, đặt chung một layout và một guard quyền truy cập.
 const studentRoutes: RouteObject = {
   element: (
-    <BaseLayout
-      navItems={getMenuByRole("student")}
-      homePath="/student/dashboard"
-      brandSubtitle="Cổng Sinh viên"
-    />
+    <StudentLayout />
   ),
   children: [
     // Route chính của sinh viên.
     { path: "/student", element: <Navigate to="/student/dashboard" replace /> },
     { path: "/student/dashboard", element: <StudentDashboard /> },
     { path: "/student/academic-profile", element: <StudentAcademicProfile /> },
-    { path: "/student/risk-prediction", element: <StudentFeaturePage /> },
+    { path: "/student/risk-prediction", element: <StudentAIRisk /> },
     { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
     { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
-    { path: "/student/ojt-profile", element: <StudentFeaturePage /> },
-    { path: "/student/internship-progress", element: <StudentFeaturePage /> },
-    { path: "/student/evaluation-results", element: <StudentFeaturePage /> },
-    { path: "/student/notifications", element: <StudentFeaturePage /> },
+    { path: "/student/ojt-profile", element: <Navigate to="/student/ojt-registration" replace /> },
+    { path: "/student/internship-progress", element: <StudentOJTProgress /> },
+    { path: "/student/evaluation-results", element: <StudentResults /> },
+    { path: "/student/notifications", element: <StudentNotifications /> },
+    { path: "/student/profile", element: <StudentAccount /> },
 
     // Alias giữ tương thích với các đường dẫn cũ.
     {

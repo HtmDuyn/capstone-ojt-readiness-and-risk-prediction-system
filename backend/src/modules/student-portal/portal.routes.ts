@@ -12,6 +12,7 @@ import { readiness,studentAcademicWarning } from './readiness.service';
 import { academicChat } from './academic-chat.service';
 import { courseAdvice } from './ojt-advice.service';
 import { courseScenario } from './course-scenario.service';
+import { taskSubmissions, submitTask } from './task.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -51,6 +52,17 @@ router.patch('/students/me/notifications/:id', ...own, requireJsonBody, handle(r
   return readNotification(positiveId(r.params.id), r.user, body.isRead);
 }));
 router.get('/students/me/internships', ...read, handle(r => internships(r.query,r.user)));
+router.get('/students/me/tasks', ...read, handle(async r => {
+  const query = r.query;
+  for (const key of Object.keys(query)) if (!['ojtSemesterId','page','limit'].includes(key)) throw invalid('Unknown task parameter: ' + key);
+  return (await internships({ ojtSemesterId: positiveId(query.ojtSemesterId, 'ojtSemesterId'),
+    tasksPage: query.page, tasksLimit: query.limit }, r.user)).tasks;
+}));
+router.get('/students/me/tasks/:id/submissions', ...read, handle(r => taskSubmissions(positiveId(r.params.id, 'taskId'), r.query, r.user)));
+router.post('/students/me/tasks/:id/submissions', ...own, requireJsonBody, handle(r => {
+  if (Object.keys(r.query).length) throw invalid('Send submission fields in the JSON body.');
+  return submitTask(positiveId(r.params.id, 'taskId'), r.body, r.user);
+}, 201));
 router.get('/students/me/opportunities', ...read, handle(r => studentOpportunities(r.query, r.user)));
 router.get('/students/me/dashboard', ...read, handle(r => dashboard(r.query,r.user)));
 router.post('/job-applications', ...own, requireJsonBody, handle(r => applyToPosition(r.body, r.user), 201));

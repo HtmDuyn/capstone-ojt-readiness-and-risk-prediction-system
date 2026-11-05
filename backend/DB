@@ -8355,4 +8355,61 @@ BEGIN
   RAISE NOTICE 'Enterprise demo ready: 10 direct applications (4 pending, 3 accepted, 3 rejected); student01 is eligible and unregistered for direct-application testing.';
 END $enterprise_candidate_status_demo$;
 
+-- BEGIN STUDENT DATABASE AUDIT (READ ONLY)
+-- This block checks the CURRENT database; it does not create a second database.
+-- To audit an existing database, run ONLY this block, not the FULL RESET above.
+DO $student_database_audit$
+DECLARE
+  required_columns jsonb := '{"Users":["UserID","RoleID","Username","Email","Phone","Status","PasswordHash","MustChangePassword","TemporaryPasswordExpiresAt","AuthVersion"],"Roles":["RoleID","RoleCode"],"Students":["StudentID","UserID","ProgramID","Status","DeletedAt","CurrentSemester"],"TrainingPrograms":["ProgramID","Status"],"StudentAcademicPlacements":["StudentID","CohortID","GroupCode","UpdatedAt"],"StudentCourseResults":["StudentID","CourseID","Status","UpdatedAt","CreatedAt"],"StudentCVFiles":["CVFileID","StudentID","FileName","Content","MimeType","Sha256","UploadedBy","UploadedAt"],"StudentOJTCalculatedResults":["StudentID","BatchID","ProgramID","Status","Result","CheckedAt"],"OJTEligibilityResultBatches":["BatchID"],"EligibleStudentHandoffItems":["HandoffID","StudentID","OJTSemesterID","CheckID","CalculatedBatchID","Snapshot"],"EligibleStudentHandoffs":["HandoffID","CreatedAt"],"EligibilityChecks":["CheckID","StudentID","OJTSemesterID"],"EligibilityConfirmations":["CheckID"],"OJTSemesters":["OJTSemesterID","AcademicPeriodID"],"OJTRegistrationWindows":["WindowID","OJTSemesterID","StartsAt","EndsAt","Status","Scope"],"OJTRegistrations":["RegistrationID","StudentID","OJTSemesterID","WindowID","ProgramID","Application","Status"],"JobApplications":["ApplicationID","RegistrationID","StudentID","PostID","PositionID","EnterpriseID","CVFileID","OfficialCheckID","Status"],"RecruitmentPosts":["PostID","Status","DeadlineAt"],"RecruitmentPostPositions":["PostID","PositionID"],"InternshipPositions":["PositionID","OJTSemesterID","Capacity","Status"],"StudentEnterpriseCoordination":["CoordinationID","RegistrationID","ApplicationID","Decision","OJTSemesterID"],"InternshipAssignments":["AssignmentID","StudentID","CoordinationID","StartDate","EndDate","Status"],"InternshipTasks":["TaskID","AssignmentID","TaskName","Description","AssignedDate","DueDate","Status"],"TaskProgressUpdates":["UpdateID","TaskID","UpdatedByStudentID","UpdateDate","ProgressDescription","PercentComplete"],"Notifications":["NotificationID","UserID","Title","Content","IsRead","SentAt"],"OJTResults":["ResultID","AssignmentID","Status","OfficialScore","ConfirmedAt"],"AuditLogs":["LogID","UserID","EntityType","EntityID","Action","Detail"]}'::jsonb;
+  missing_columns text;
+  linked_accounts record;
+  handoffs record;
+  task_data record;
+  privileges record;
+BEGIN
+  SELECT string_agg(format('%I.%I', expected.table_name, expected.column_name), ', '
+    ORDER BY expected.table_name, expected.column_name)
+  INTO missing_columns
+  FROM (
+    SELECT tables.key AS table_name, columns.value AS column_name
+    FROM jsonb_each(required_columns) tables
+    CROSS JOIN LATERAL jsonb_array_elements_text(tables.value) columns
+  ) expected
+  WHERE NOT EXISTS (
+    SELECT 1 FROM information_schema.columns actual
+    WHERE actual.table_schema='public'
+      AND actual.table_name=expected.table_name AND actual.column_name=expected.column_name
+  );
+  IF missing_columns IS NOT NULL THEN
+    RAISE EXCEPTION 'Student database audit failed: missing tables/columns: %',missing_columns;
+  END IF;
+  IF to_regprocedure('public."AssertStudentOJTTerm6"(integer,integer)') IS NULL THEN
+    RAISE EXCEPTION 'Student database audit failed: AssertStudentOJTTerm6(integer,integer) is missing.';
+  END IF;
+  SELECT count(*)::int AS accounts,
+    count(*) FILTER (WHERE student."StudentID" IS NULL)::int AS unlinked
+  INTO linked_accounts
+  FROM public."Users" account JOIN public."Roles" role USING("RoleID")
+  LEFT JOIN public."Students" student ON student."UserID"=account."UserID" AND student."DeletedAt" IS NULL
+  WHERE role."RoleCode"='STUDENT' AND account."Status"='ACTIVE';
+  SELECT count(*) FILTER (WHERE "CalculatedBatchID" IS NOT NULL)::int AS saved,
+    count(*) FILTER (WHERE "CheckID" IS NOT NULL)::int AS official
+  INTO handoffs FROM public."EligibleStudentHandoffItems";
+  SELECT (SELECT count(*) FROM public."InternshipTasks") AS tasks,
+    (SELECT count(*) FROM public."TaskProgressUpdates") AS submissions INTO task_data;
+  RAISE NOTICE 'Student schema audit passed: 27 required tables, all required columns and OJT pathway function are present.';
+  RAISE NOTICE 'Student accounts: %, missing student links: %. Saved-result handoffs: %, official-check handoffs: %. Tasks: %, submissions: %.',
+    linked_accounts.accounts,linked_accounts.unlinked,handoffs.saved,handoffs.official,task_data.tasks,task_data.submissions;
+  FOR privileges IN
+    SELECT name AS table_name,
+      has_table_privilege(format('public.%I',name),'SELECT') AS readable,
+      has_table_privilege(format('public.%I',name),'INSERT') AS insertable
+    FROM unnest(ARRAY['TaskProgressUpdates','AuditLogs']) name
+  LOOP
+    RAISE NOTICE 'Current DB user permissions on %: SELECT=%, INSERT=%.',privileges.table_name,privileges.readable,privileges.insertable;
+  END LOOP;
+  RAISE NOTICE 'These are the permissions of the CURRENT SQL connection. Backend JWT_SECRET/AI provider settings must be checked in the server environment.';
+END $student_database_audit$;
+-- END STUDENT DATABASE AUDIT (READ ONLY)
+
 COMMIT;

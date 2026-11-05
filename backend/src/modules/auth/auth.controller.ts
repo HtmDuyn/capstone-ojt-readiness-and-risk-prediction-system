@@ -97,6 +97,7 @@ export const getCurrentUser = async (
         "User profile retrieved successfully",
 
       user: {
+        ...(user.role_code === 'STUDENT' ? { studentId: user.studentId } : {}),
         mustChangePassword: user.must_change_password,
         id:
           user.id,

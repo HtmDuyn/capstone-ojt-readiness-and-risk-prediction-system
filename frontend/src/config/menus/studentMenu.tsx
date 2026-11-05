@@ -3,9 +3,7 @@ import {
   DashboardGridIcon,
   AcademicCapIcon,
   RiskAnalyticsIcon,
-  RoadmapConsultingIcon,
   OjtRegisterIcon,
-  OjtProfileIcon,
   InternshipProgressIcon,
   EvaluationResultsIcon,
   NotificationBellIcon,
@@ -24,10 +22,9 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
       title: (name) => `Chào mừng bạn trở lại, ${name}!`,
       description: (
         <>
-          Bạn đã hoàn thành <span className="font-bold text-amber-300">75%</span> chương trình đào tạo. Kỳ OJT đang tới gần, hãy kiểm tra các khuyến nghị từ AI bên dưới.
+          Theo dõi tiến độ chương trình đào tạo và trạng thái OJT từ dữ liệu học vụ.
         </>
       ),
-      badge: 'Kỳ 7 • Đủ điều kiện OJT',
       primaryActionLabel: 'Đăng ký OJT',
       defaultAiPrompt: 'Cổng đăng ký OJT sẽ mở tiếp nhận hồ sơ doanh nghiệp khi nào?',
     },
@@ -41,51 +38,32 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
       title: 'Hồ sơ học tập sinh viên',
       description: (
         <>
-          Tổng hợp tiến độ tích lũy <span className="font-bold text-amber-300">114/152</span> tín chỉ, phân bổ môn học và phân tích lộ trình sẵn sàng cho kỳ OJT.
+          Tổng hợp tín chỉ tích lũy, bảng điểm và chương trình đào tạo của bạn.
         </>
       ),
-      badge: 'Kỳ 7 • Chuyên ngành KTPM',
       primaryActionLabel: 'Tư vấn lộ trình AI',
       defaultAiPrompt: 'Tôi muốn tư vấn tối ưu lộ trình môn học và điều kiện OJT cho kỳ học sắp tới.',
     },
   },
   {
     id: 'risk-prediction',
-    label: 'AI Dự báo rủi ro',
+    label: 'Phân tích & tư vấn OJT',
     path: '/student/risk-prediction',
     icon: <RiskAnalyticsIcon size={20} />,
     banner: {
-      title: 'AI Dự báo rủi ro học tập & OJT',
+      title: 'Phân tích học vụ & tư vấn OJT',
       description: (
         <>
-          Hệ thống AI phân tích chỉ số rủi ro trượt môn, phát hiện lỗ hổng kiến thức tiên quyết và cảnh báo nguy cơ trước thềm kỳ thực tập.
+          Đối chiếu điều kiện OJT và xem các môn cần bổ sung theo dữ liệu học vụ.
         </>
       ),
-      badge: 'AI Risk Engine v2.4',
       primaryActionLabel: 'Phân tích rủi ro ngay',
       defaultAiPrompt: 'Hãy phân tích chi tiết các nguy cơ trượt kỳ và đề xuất giải pháp phòng ngừa cho tôi.',
     },
   },
   {
-    id: 'roadmap-consulting',
-    label: 'AI Tư vấn lộ trình',
-    path: '/student/roadmap-consulting',
-    icon: <RoadmapConsultingIcon size={20} />,
-    banner: {
-      title: 'AI Tư vấn lộ trình học tập & OJT',
-      description: (
-        <>
-          Xây dựng lộ trình học tập cá nhân hóa chuẩn bị kiến thức thực chiến, tối ưu kỹ năng phù hợp với tiêu chuẩn doanh nghiệp đối tác.
-        </>
-      ),
-      badge: 'Cố vấn lộ trình 24/7',
-      primaryActionLabel: 'Tạo lộ trình mới',
-      defaultAiPrompt: 'Tư vấn lộ trình học tập chi tiết để sẵn sàng đi OJT tại doanh nghiệp Tier-1.',
-    },
-  },
-  {
     id: 'ojt-registration',
-    label: 'Đăng ký OJT',
+    label: 'OJT & hồ sơ ứng tuyển',
     path: '/student/ojt-registration',
     icon: <OjtRegisterIcon size={20} />,
     banner: {
@@ -95,42 +73,24 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
           Đăng ký nguyện vọng, lựa chọn doanh nghiệp phù hợp và theo dõi tiến độ xét duyệt hồ sơ thực tập từ nhà trường.
         </>
       ),
-      badge: 'Đợt 1 • Kỳ Fall 2024',
       primaryActionLabel: 'Nộp nguyện vọng OJT',
       defaultAiPrompt: 'Hướng dẫn quy trình và các giấy tờ cần thiết để nộp hồ sơ đăng ký OJT.',
     },
   },
-  {
-    id: 'ojt-profile',
-    label: 'Hồ sơ OJT',
-    path: '/student/ojt-profile',
-    icon: <OjtProfileIcon size={20} />,
-    banner: {
-      title: 'Hồ sơ OJT & Portfolio số',
-      description: (
-        <>
-          Quản lý CV số hóa, portfolio dự án, chứng chỉ kỹ năng công nghệ và hồ sơ năng lực gửi đến các đối tác doanh nghiệp.
-        </>
-      ),
-      badge: 'CV Hoàn thiện 85%',
-      primaryActionLabel: 'Cập nhật hồ sơ CV',
-      defaultAiPrompt: 'Hãy gợi ý cách cải thiện CV và Portfolio để tăng tỷ lệ trúng tuyển OJT.',
-    },
-  },
+
   {
     id: 'internship-progress',
-    label: 'Tiến độ thực tập',
+    label: 'Nhiệm vụ thực tập',
     path: '/student/internship-progress',
     icon: <InternshipProgressIcon size={20} />,
     banner: {
       title: 'Theo dõi tiến độ thực tập doanh nghiệp',
       description: (
         <>
-          Ghi nhận nhật ký làm việc hàng tuần, báo cáo tiến độ và theo dõi đánh giá các mốc milestone từ Mentor doanh nghiệp.
+          Nhận nhiệm vụ từ doanh nghiệp, nộp bài làm và theo dõi trạng thái xử lý.
         </>
       ),
-      badge: 'Tuần thực tập: 0/16',
-      primaryActionLabel: 'Báo cáo tuần này',
+      primaryActionLabel: 'Xem nhiệm vụ',
       defaultAiPrompt: 'Cách viết báo cáo tiến độ OJT hàng tuần chuẩn xác và đạt điểm cao.',
     },
   },
@@ -146,7 +106,6 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
           Xem điểm số chi tiết từ Mentor doanh nghiệp, Giảng viên hướng dẫn và nhận chứng nhận hoàn thành kỳ thực tập OJT.
         </>
       ),
-      badge: 'Đánh giá cuối kỳ',
       primaryActionLabel: 'Xem bảng điểm OJT',
       defaultAiPrompt: 'Tiêu chí đánh giá điểm thực tập doanh nghiệp OJT gồm những tiêu chuẩn nào?',
     },
@@ -165,7 +124,6 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
           Cập nhật kịp thời các thông báo học vụ, lịch phỏng vấn doanh nghiệp và cảnh báo quan trọng từ cố vấn AI.
         </>
       ),
-      badge: '3 thông báo mới',
       primaryActionLabel: 'Đánh dấu đã đọc',
       defaultAiPrompt: 'Tóm tắt các thông báo quan trọng nhất trong tuần qua cho tôi.',
     },

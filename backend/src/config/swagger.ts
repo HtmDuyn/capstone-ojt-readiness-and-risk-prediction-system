@@ -1,4 +1,5 @@
 import { describeAcademicRest } from './swagger-academic-rest';
+import { addStudentTaskOperations, describeStudentTaskResponses } from '../modules/student-portal/task.openapi';
 import { describeFrontendEligibilityResults } from '../modules/eligibility/frontend-results.openapi';
 import { describeHandoffWorkflow } from './swagger-handoff-workflow';
 import { describeAcademicContracts, describeAcademicOperationContracts } from './swagger-academic-contracts';
@@ -391,4 +392,5 @@ describeAdditionalListResponses(describedSpec);
 describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
 describeAcademicContracts(describedSpec);
-export const swaggerSpec = describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec)))));
+addStudentTaskOperations(describedSpec);
+export const swaggerSpec = describeStudentTaskResponses(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec))))));
