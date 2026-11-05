@@ -16,7 +16,7 @@ import { describeManualInputs } from './swagger-inputs';
 import { addAdminOperations } from '../modules/admin/admin.openapi';
 import { addPortalOperations } from '../modules/student-portal/portal.openapi';
 import { mergeSharedRoleContracts } from './shared-role-contracts';
-import { addEnterpriseOperations } from '../modules/qhdn/enterprise.openapi';
+import { addEnterpriseOperations } from '../modules/enterprise/enterprise.openapi';
 import { addRecruitmentOperations } from '../modules/recruitment/recruitment.openapi';
 import { describeRestOperations } from './rest-operations';
 import { describeStudentRest } from './swagger-student-rest';
