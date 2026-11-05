@@ -29,7 +29,7 @@ export async function academicChat(body:unknown,actor:Actor) {
     {enabled:process.env.OJT_GEMINI_ENABLED,apiKey:process.env.GEMINI_API_KEY,model:process.env.GEMINI_MODEL}):null;
   const coursePlan=wantsAdvice&&academic?.earlyWarning?.available?profile.coursePlan:null;
   const priorityText=coursePlan?.status==='READY'?coursePlan.items.slice(0,5).map(r=>r.explanation).join('\n'):'';
-  return {...result,answer:[result.answer,priorityText].filter(Boolean).join('\n\n'),coursePlan,
+  return {...result,academicWarning:academic?.academicWarning??null,answer:[result.answer,priorityText].filter(Boolean).join('\n\n'),coursePlan,
     source:'ACADEMIC_RECORDS',isAiPrediction:false,
     recommendations:advice?.recommendations??[],adviceSource:advice?.source??null,
     adviceStatus:advice?.status??null,aiError:advice?.aiError??null};

@@ -1,31 +1,24 @@
 import React from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { AcademicWarningPanel } from '@/components/student/dashboard/AcademicWarningPanel';
 import { useBaseLayout } from '../../layouts/BaseLayout';
 import { PageBanner } from '@/components/common/PageBanner';
-import { StatCards } from '@/components/student/dashboard/StatCards';
 import { ProgressChartCard } from '@/components/student/dashboard/ProgressChartCard';
 import { RoadmapStepper } from '@/components/student/dashboard/RoadmapStepper';
-import { AIRiskScoreCard } from '@/components/student/dashboard/AIRiskScoreCard';
-import { AIRecommendationsCard } from '@/components/student/dashboard/AIRecommendationsCard';
 import { UpcomingDeadlinesCard } from '@/components/student/dashboard/UpcomingDeadlinesCard';
 import { RecentActivityCard } from '@/components/student/dashboard/RecentActivityCard';
 
 import {
-  mockStudentProfile,
   mockSemesterProgress,
   mockRoadmapSteps,
-  mockAIRiskScore,
-  mockAIRecommendations,
   mockDeadlines,
   mockRecentActivities,
 } from '@/data/student/mockStudentData';
-import type { AIRecommendation } from '@/types/student/studentDashboardTypes';
 
 export const StudentDashboard: React.FC = () => {
   const { openAIConsult } = useBaseLayout();
+  const { user } = useAuth();
 
-  const handleRecClick = (rec: AIRecommendation) => {
-    openAIConsult(`Tôi muốn biết thêm về khuyến nghị: "${rec.title}"`);
-  };
 
   return (
     <div className="space-y-6">
@@ -34,7 +27,9 @@ export const StudentDashboard: React.FC = () => {
         <div className="xl:col-span-8 space-y-6">
           {/* Hero Page Banner */}
           <PageBanner
-            student={mockStudentProfile}
+            title={`Xin chào, ${user?.name??'bạn'}!`}
+            description="Theo dõi tiến độ, mức cảnh báo học vụ và kế hoạch chuẩn bị OJT từ dữ liệu của bạn."
+            badge={null}
             menuId="dashboard"
             primaryAction={{
               label: 'Đăng ký OJT',
@@ -49,9 +44,10 @@ export const StudentDashboard: React.FC = () => {
           />
 
           {/* 4 Metric Stats Cards */}
-          <StatCards student={mockStudentProfile} />
+          <AcademicWarningPanel />
 
           {/* Study Progress & Credits Bar Chart */}
+          <p className="text-xs text-slate-500">Biểu đồ và lộ trình bên dưới là dữ liệu minh họa; số liệu học vụ thật ở phần cảnh báo phía trên.</p>
           <ProgressChartCard data={mockSemesterProgress} />
 
           {/* Roadmap to OJT Semester Stepper */}
@@ -61,13 +57,9 @@ export const StudentDashboard: React.FC = () => {
         {/* Right Sidebar Section (4 cols on XL) */}
         <div className="xl:col-span-4 space-y-6">
           {/* AI Risk Score Donut Gauge */}
-          <AIRiskScoreCard data={mockAIRiskScore} />
+          <p className="text-xs text-slate-500">Lịch và hoạt động bên dưới là dữ liệu minh họa.</p>
 
           {/* AI Recommendations */}
-          <AIRecommendationsCard
-            recommendations={mockAIRecommendations}
-            onConsultAction={handleRecClick}
-          />
 
           {/* Upcoming Deadlines */}
           <UpcomingDeadlinesCard

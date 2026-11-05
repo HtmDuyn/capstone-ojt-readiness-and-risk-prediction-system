@@ -3,7 +3,8 @@ import type { PoolClient } from 'pg';
 import { academicTransaction } from '../academic/academic.repository';
 import { loadAcademicProgress,progressFromData,type AcademicProgressData } from '../students/academic-progress';
 import { readTransaction } from '../qhdn/read.repository';
-import { eligibility } from '../eligibility/eligibility.service';
+import { eligibility,evaluateEligibility,activeRule } from '../eligibility/eligibility.service';
+import { assessAcademicWarning } from './academic-warning';
 import { detail as curriculumDetail } from '../curriculum/curriculum.repository';
 
 
@@ -28,8 +29,32 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
   const scenarioProgress=progress.credits.completeConfiguration?progressFromData(source,true):null;
   const potential=scenarioProgress?.credits.completeConfiguration?Math.max(0,scenarioProgress.credits.earned-current.earnedCredits):null;
   const deadline=(await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0]??null;
+  const stage=placement?.semester??null;
+  const due=progress.requirements.filter(r=>r.required&&!r.completed&&source.courses.some(p=>p.ProgramCourseID===r.id&&p.RecommendedSemester!==null&&p.RecommendedSemester<stage));
+  const baselineComplete=stage!==null&&source.courses.filter(p=>p.IsRequired).every(p=>p.RecommendedSemester!==null&&Number.isInteger(p.RecommendedSemester));
+  const groups=(await c.query(`SELECT g."ProgramCourseID" AS "requirementId",g."MinimumPassed" AS "minimumPassed",
+    COALESCE(jsonb_agg(m."CourseID") FILTER(WHERE m."CourseID" IS NOT NULL),'[]'::jsonb) AS "courseIds"
+    FROM "ProgramPrerequisiteGroups" g LEFT JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID"
+    WHERE g."ProgramID"=$1 GROUP BY g."GroupID"`,[source.program?.ProgramID])).rows;
+  const aliasMap=new Map<number,number>(source.aliases.map(a=>[a.SourceCourseID,a.TargetCourseID]));
+  const canonical=(id:number)=>{const seen=new Set<number>();while(aliasMap.has(id)){if(seen.has(id))return -1;seen.add(id);id=aliasMap.get(id)!;}return id;};
+  const achieved=new Set(source.attempts.filter(a=>['PASSED','RECOGNIZED'].includes(a.status)).map(a=>canonical(a.courseId)));
+  const debtIds=new Set<number>(current.unpassedCourses.map((r:Row)=>r.courseId));
+  const blockingIds=new Set<number>(groups.filter(g=>due.some(r=>r.id===g.requirementId)&&g.courseIds.filter((id:number)=>achieved.has(canonical(id))).length<g.minimumPassed)
+    .flatMap(g=>g.courseIds.map(canonical).filter((id:number)=>debtIds.has(id))));
+  const scenarioRule=warning.available?await activeRule(c,source.program?.ProgramID,semesterId):null;
+  const projected= scenarioProgress&&scenarioRule?evaluateEligibility({student:{StudentID:studentId,Status:'ACTIVE',AccountStatus:'ACTIVE'},
+    semester:{OJTSemesterID:semesterId},rule:scenarioRule,progress:scenarioProgress,
+    attempts:source.attempts.map(a=>a.status==='IN_PROGRESS'?{...a,status:'RECOGNIZED'}:a),aliases:source.aliases}):null;
+  const assessment=assessAcademicWarning({available:warning.available,gateReasons:warning.reasons,semester:stage,status:current.status,
+    earnedCredits:current.earnedCredits,missingCredits:current.missingCredits,debt:current.unpassedCourseCount,
+    maxDebt:current.rule?.maxUnpassedCourses??null,
+    overdueCredits:baselineComplete?due.reduce((sum,r)=>sum+(r.credits??0),0):null,overdueCourses:due.map(r=>r.courseCode??r.name),
+    blockingCourses:source.program?.PrerequisitesReviewed===true?[...blockingIds].map(id=>current.unpassedCourses.find((r:Row)=>r.courseId===id)?.courseCode??String(id)):null,
+    projectedStatus:projected?.status??null,projectedCredits:projected?.earnedCredits??null,projectedDebt:projected?.unpassedCourseCount??null,
+    deadline:deadline?.assessmentDeadline?new Date(deadline.assessmentDeadline).toISOString():null});
   const [data]=await enrichListRows(c,[{studentId,programId:progress.program?.id,ojtSemesterId:semesterId,earnedCredits:current.earnedCredits,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,failedCourses:current.unpassedCourses,outstandingCourses:outstanding,inProgressCredits:potential,currentEligibility:publicEligibility(current),officialEligibility:publicEligibility(official),academicProgress:progress,scenario:{assumption:'ALL_CURRENT_COURSES_PASSED',potentialCredits:potential===null?null:current.earnedCredits+potential,isAiPrediction:false},gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,deadline,computedAt:progress.computedAt}]);
-  return {...data,currentSemester:warning.currentSemester,earlyWarning:warning,failedCourses:await enrichListRows(c,current.unpassedCourses),outstandingCourses:await enrichListRows(c,outstanding)};
+  return {...data,currentSemester:warning.currentSemester,academicWarning:assessment,earlyWarning:{...warning,riskLevel:assessment.level,assessment},failedCourses:await enrichListRows(c,current.unpassedCourses),outstandingCourses:await enrichListRows(c,outstanding)};
 }
 export async function supplementaryWithClient(c:PoolClient,studentId:number,programId:number,data:Row) {
     const prerequisites=(await c.query('SELECT pc."CourseID" AS "courseId",g."MinimumPassed" AS "minimumPassed",COALESCE(jsonb_agg(m."CourseID") FILTER(WHERE m."CourseID" IS NOT NULL),\'[]\'::jsonb) AS "courseIds" FROM "ProgramPrerequisiteGroups" g JOIN "ProgramCourses" pc ON pc."ProgramCourseID"=g."ProgramCourseID" LEFT JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID" WHERE g."ProgramID"=$1 GROUP BY pc."CourseID",g."GroupID"',[programId])).rows;

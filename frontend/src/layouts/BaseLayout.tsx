@@ -65,10 +65,10 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
     code: user?.id || (isEducation ? undefined : mockStudentProfile.studentCode),
     subtitle:
       user?.role === "student"
-        ? `${mockStudentProfile.studentCode} - ${mockStudentProfile.semester}`
+        ? 'Sinh viên'
         : user?.role?.toUpperCase(),
     avatar: user?.avatar || (isEducation ? '' : mockStudentProfile.avatar),
-    department: user?.role === "student" ? mockStudentProfile.major : undefined,
+    department: undefined,
   };
 
   return (

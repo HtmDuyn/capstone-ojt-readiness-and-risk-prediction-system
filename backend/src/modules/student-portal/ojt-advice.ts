@@ -1,3 +1,4 @@
+import type { assessAcademicWarning } from './academic-warning';
 export type AdviceSnapshot = {
   currentSemester: number | null;
   earnedCredits: number;
@@ -5,6 +6,7 @@ export type AdviceSnapshot = {
   failedCourseCount: number;
   currentEligibility: {status: string};
   earlyWarning: {available: boolean; message: string; recommendations: string[]};
+  academicWarning?:ReturnType<typeof assessAcademicWarning>;
 };
 
 // Gemini selects relevant actions; all displayed facts and wording stay under backend control.
@@ -38,9 +40,9 @@ export async function generateOjtAdvice(snapshot: AdviceSnapshot, config: Config
   const base = {
     academic: {currentSemester:snapshot.currentSemester,earnedCredits:snapshot.earnedCredits,
       missingCredits:snapshot.missingCredits,failedCourseCount:snapshot.failedCourseCount,
-      currentEligibilityStatus:snapshot.currentEligibility.status},
+      currentEligibilityStatus:snapshot.currentEligibility.status,warningLevel:snapshot.academicWarning?.level??'INSUFFICIENT_DATA'},
     explanation:snapshot.earlyWarning.message,
-    riskLevel:null,riskScore:null,isAiPrediction:false,
+    riskLevel:snapshot.academicWarning?.level??'INSUFFICIENT_DATA',academicWarning:snapshot.academicWarning??null,riskScore:null,isAiPrediction:false,
     aiError:null,
   };
   if (!snapshot.earlyWarning.available) return {...base,status:'NOT_AVAILABLE',source:'RULES',modelVersion:null,recommendations:[],fallbackReason:null};

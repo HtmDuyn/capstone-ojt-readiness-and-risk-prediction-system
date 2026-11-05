@@ -8,7 +8,7 @@ import { applyToPosition, studentOpportunities } from '../students/job-applicati
 import { notifications, readNotification } from './academic.service';
 import { roadmap } from './cv.service';
 import { ojtAdvice } from './ojt-advice.service';
-import { readiness } from './readiness.service';
+import { readiness,studentAcademicWarning } from './readiness.service';
 import { academicChat } from './academic-chat.service';
 import { courseAdvice } from './ojt-advice.service';
 import { courseScenario } from './course-scenario.service';
@@ -20,6 +20,10 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.get('/students/me/academic-warning', ...read, handle(r => {
+  if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
+  return studentAcademicWarning(r.user);
+}));
 router.post('/students/me/course-impact', ...own, requireJsonBody, handle(r => courseScenario(r.body,r.user,'IMPACT')));
 router.post('/students/me/study-simulation', ...own, requireJsonBody, handle(r => courseScenario(r.body,r.user,'SIMULATION')));
 router.post('/students/me/course-advice', ...own, requireJsonBody, handle(r => {

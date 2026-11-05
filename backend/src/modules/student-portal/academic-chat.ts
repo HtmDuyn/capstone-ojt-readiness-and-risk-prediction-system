@@ -7,6 +7,7 @@ export function academicAnswer(message:string, profile:Row) {
   if(/tin chi|tich luy|tien do/.test(question))topics.push('CREDITS');
   if(/ojt|dieu kien|thuc tap/.test(question))topics.push('ELIGIBILITY');
   if(/gpa|diem trung binh/.test(question))topics.push('GPA');
+  if(/canh bao|muc do|rui ro|risk/.test(question))topics.push('ACADEMIC_WARNING');
   if(/ky (hoc|may)|hoc ky|dang o ky/.test(question))topics.push('SEMESTER');
   const wantsAdvice=/nen |lam gi|tu van|khuyen nghi|ke hoach|goi y|tien quyet|mon can hoc/.test(question);
   if(wantsAdvice)topics.push('ADVICE');
@@ -21,6 +22,9 @@ export function academicAnswer(message:string, profile:Row) {
     currentEligibilityStatus:academic?.currentEligibility?.status??'REVIEW_REQUIRED',
     ojtSemesterId:profile.ojtSemesterId??null,computedAt:academic?.computedAt??progress?.computedAt??null};
   const parts:string[]=[];
+  if(topics.includes('ACADEMIC_WARNING'))parts.push(academic?.academicWarning
+    ?`Mức cảnh báo học vụ hiện tại: ${academic.academicWarning.label}. ${academic.academicWarning.reasons.map((r:Row)=>r.message).join(' ')} Đây là cảnh báo theo quy tắc, không phải xác suất trễ OJT.`
+    :'Chưa đủ dữ liệu để xác định mức cảnh báo học vụ.');
   if(topics.includes('FAILED_COURSES'))parts.push(!valid?'Chưa đủ dữ liệu đã đối soát để xác định danh sách môn còn nợ.'
     :courses.length?`Bạn hiện còn ${academic.failedCourseCount} môn chưa đạt: ${courses.map((r:Row)=>r.courseCode??`môn ID ${r.courseId}`).join(', ')}. Môn học lại đã đạt không còn được tính là môn nợ.`
     :'Theo dữ liệu hiện tại, bạn không có môn còn nợ.');

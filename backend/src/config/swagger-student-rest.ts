@@ -48,11 +48,18 @@ export function describeStudentRest(spec: Schema): Schema {
     channel: nullableText, templateId: nullable(id), relatedEntityType: nullableText, relatedEntityId: nullable(id)});
   const notifications = page(notification);
   notifications.properties.unreadCount = {type: 'integer', minimum: 0};
+  const warningLevel={type:'string',enum:['LOW','MEDIUM','HIGH','INSUFFICIENT_DATA']};
+  const warningSchema=object({level:warningLevel,label:text,method:{type:'string',enum:['ACADEMIC_RULES']},policyVersion:text,
+    isAiPrediction:{type:'boolean',enum:[false]},riskScore:{type:'number',nullable:true,enum:[null]},
+    reasons:array(object({code:text,message:text})),actions:array(text),limitations:array(text),computedAt:time,
+    evidence:{type:'object',additionalProperties:true}});
+  spec.components.schemas.AcademicRuleWarning=warningSchema;
   const academic = object({studentId: id, programId: nullable(id), ojtSemesterId: id,
+    academicWarning:reference('AcademicRuleWarning'),
     currentSemester: {type:'integer',minimum:0,maximum:9,nullable:true},
     earlyWarning: object({available:{type:'boolean'},status:{type:'string',enum:['PROGRESS_ONLY','NOT_AVAILABLE']},
       currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},reasons:array(text),
-      riskLevel:{type:'string',nullable:true,enum:[null]},riskScore:{type:'number',nullable:true,enum:[null]},
+      riskLevel:warningLevel,assessment:reference('AcademicRuleWarning'),riskScore:{type:'number',nullable:true,enum:[null]},
       isAiPrediction:{type:'boolean',enum:[false]},message:text,recommendations:array(text)}),
     student: context('student'), program: profile.properties.program,
     semester: context('semester'), academicProgress: progress,
@@ -134,6 +141,10 @@ export function describeStudentRest(spec: Schema): Schema {
     parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
 
+  spec.paths['/api/students/me/academic-warning']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu',
+    description:'Tự lấy hồ sơ và kỳ OJT từ JWT. Quy tắc ACADEMIC_RULES_V1: đạt ngưỡng hiện tại => LOW; kỳ 2–4 so môn bắt buộc kỳ trước chưa hoàn thành và môn nợ chặn tiên quyết; kỳ 4 có nút chặn => HIGH; kỳ 5 nếu đạt mọi môn đang học vẫn chưa đạt ngưỡng => HIGH, nếu kịch bản đạt ngưỡng => MEDIUM. Đến hạn xét hoặc đến kỳ OJT mà chưa đạt => HIGH. Thiếu dữ liệu không tự gán LOW. Không gọi Gemini, không tính xác suất, không ghi kết quả OJT chính thức. Mốc thời gian chốt điểm môn học chưa được xác minh; luôn trả limitations. Đây là chính sách triển khai phiên bản đầu để nhà trường rà soát.',
+    responses:{200:envelope(reference('AcademicRuleWarning')),401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
   for(const [endpoint,example,summary] of [
     ['course-impact',{courseCode:'SWR302'},'Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể'],
     ['study-simulation',{passedCourseCodes:['SWP391','SWR302']},'Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn'],
@@ -164,7 +175,7 @@ export function describeStudentRest(spec: Schema): Schema {
     requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['message'],properties:{message:{type:'string',minLength:1,maxLength:1000}}},example:{message:'Mình còn nợ môn nào và thiếu bao nhiêu tín chỉ?'}}}},
     responses:{200:envelope(object({status:{type:'string',enum:['ANSWERED','DATA_INCOMPLETE','OUT_OF_SCOPE','NEED_COURSE_SELECTION']},topics:array(text),answer:text,
       facts:{type:'object',nullable:true,additionalProperties:true},source:{type:'string',enum:['ACADEMIC_RECORDS']},isAiPrediction:{type:'boolean',enum:[false]},
-      recommendations:array(text),coursePlan:nullable(coursePlanSchema),adviceSource:nullableText,adviceStatus:nullableText,aiError:{type:'object',nullable:true,additionalProperties:true}})),
+      recommendations:array(text),academicWarning:nullable(reference('AcademicRuleWarning')),coursePlan:nullable(coursePlanSchema),adviceSource:nullableText,adviceStatus:nullableText,aiError:{type:'object',nullable:true,additionalProperties:true}})),
       400:{description:'message không hợp lệ hoặc trường không được hỗ trợ'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
   spec.paths['/api/students/me/ojt-readiness']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
     summary:'Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ',
@@ -179,7 +190,7 @@ export function describeStudentRest(spec: Schema): Schema {
       academic:object({currentSemester:{type:'integer',nullable:true},earnedCredits:number,missingCredits:number,failedCourseCount:{type:'integer'},currentEligibilityStatus:text}),
       explanation:text,recommendations:array(text),modelVersion:nullableText,fallbackReason:nullableText,
       aiError:nullable(object({code:text,message:text,httpStatus:{type:'integer',nullable:true},phase:{type:'string',enum:['CONFIGURATION','REQUEST','READ_RESPONSE','VALIDATE_RESPONSE']},elapsedMs:{type:'integer'},timeoutMs:{type:'integer'}})),
-      riskLevel:{type:'string',nullable:true,enum:[null]},riskScore:{type:'number',nullable:true,enum:[null]},isAiPrediction:{type:'boolean',enum:[false]}})),
+      riskLevel:warningLevel,academicWarning:nullable(reference('AcademicRuleWarning')),riskScore:{type:'number',nullable:true,enum:[null]},isAiPrediction:{type:'boolean',enum:[false]}})),
       400:{description:'Dữ liệu không hợp lệ'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'},404:{description:'Không tìm thấy hồ sơ hoặc kỳ OJT'}}}};
   for (const [path, item] of Object.entries(spec.paths) as [string, Schema][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
