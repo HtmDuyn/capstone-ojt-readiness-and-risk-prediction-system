@@ -1,314 +1,219 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { PageBanner } from '@/components/common/PageBanner';
-import {
-  AlertCircle,
-  Briefcase,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  MapPin,
-  Search,
-} from 'lucide-react';
-import {
-  enterpriseService,
-  type RecruitmentPost,
-  type RecruitmentPostPosition,
-} from '@/services/enterpriseService';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, BriefcaseBusiness, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Loader2, LockKeyhole, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
+import { RecruitmentPostDialog } from '@/components/enterprise/RecruitmentPostDialog';
+import { canEditRecruitmentPost, formatRecruitmentDate, loadRecruitmentData, postEditLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts } from '@/components/enterprise/recruitment';
+import { type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
-interface RecruitmentPositionInfo extends RecruitmentPostPosition {
-  postTitle: string;
-  periodCode?: string;
-  postStatus: RecruitmentPost['status'];
-  deadlineAt?: string | null;
-}
-
-const PAGE_SIZE = 9;
-const API_PAGE_SIZE = 100;
-
-const POST_STATUS_LABELS: Record<RecruitmentPost['status'], string> = {
-  DRAFT: 'Bản nháp',
-  PENDING_REVIEW: 'Chờ duyệt',
-  PUBLISHED: 'Đang tuyển',
-  REJECTED: 'Bị từ chối',
-  CLOSED: 'Đã đóng',
-  ARCHIVED: 'Đã lưu trữ',
+const PAGE_SIZE = 6;
+const statusStyle: Record<RecruitmentPost['status'], string> = {
+  DRAFT: 'bg-slate-100 text-slate-600', PENDING_REVIEW: 'bg-amber-50 text-amber-700',
+  PUBLISHED: 'bg-emerald-50 text-emerald-700', REJECTED: 'bg-rose-50 text-rose-700',
+  CLOSED: 'bg-slate-100 text-slate-600', ARCHIVED: 'bg-slate-100 text-slate-600',
 };
+const workModes: Record<string, string> = { ONSITE: 'Tại văn phòng', REMOTE: 'Từ xa', HYBRID: 'Kết hợp' };
 
-const POST_STATUS_STYLES: Record<RecruitmentPost['status'], string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  PENDING_REVIEW: 'bg-amber-100 text-amber-800',
-  PUBLISHED: 'bg-emerald-100 text-emerald-700',
-  REJECTED: 'bg-rose-100 text-rose-700',
-  CLOSED: 'bg-slate-100 text-slate-600',
-  ARCHIVED: 'bg-slate-100 text-slate-600',
-};
-
-export const EnterpriseJobs: React.FC = () => {
-  // Lấy companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
-  const { companyId } = useEnterprise();
-  const [positions, setPositions] = useState<RecruitmentPositionInfo[]>([]);
+export function EnterpriseJobs() {
+  const { reload: reloadProfile } = useEnterprise();
+  const [posts, setPosts] = useState<RecruitmentPost[]>([]);
+  const [windows, setWindows] = useState<RecruitmentWindow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [selectedWindowId, setSelectedWindowId] = useState<number>(-1);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [editor, setEditor] = useState<{ post: RecruitmentPost | null } | null>(null);
 
   useEffect(() => {
-    // Chờ companyId sẵn có mới tải dữ liệu
-    if (!companyId) return;
-    let cancelled = false;
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    void loadRecruitmentData(controller.signal).then(({ posts: newPosts, windows: newWindows }) => {
+      if (controller.signal.aborted) return;
+      setPosts(newPosts); setWindows(newWindows);
+      setSelectedWindowId(current => current === 0 || newWindows.some(w => w.id === current) ? current : newWindows.find(w => windowAcceptsPosts(w))?.id ?? newWindows[0]?.id ?? 0);
+    }).catch(err => { if (!controller.signal.aborted) setError(recruitmentError(err)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [revision]);
 
-    const loadPositions = async () => {
-      setLoading(true);
-      setError(null);
+  useEffect(() => {
+    const next = windows.flatMap(w => [Date.parse(w.startsAt), Date.parse(w.endsAt)]).filter(time => time > now);
+    const delay = next.length ? Math.min(30000, Math.min(...next) - now + 20) : 30000;
+    const timer = setTimeout(() => setNow(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [windows, now]);
+  const selectedWindow = windows.find(w => w.id === selectedWindowId);
+  const accepts = windowAcceptsPosts(selectedWindow, now);
+  const activeWindows = windows.filter(w => windowAcceptsPosts(w, now));
+  const filtered = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('vi');
+    return posts.filter(post => (selectedWindowId <= 0 || post.windowId === selectedWindowId) && (!status || post.status === status) && (!query || [post.title, post.content, post.periodCode,
+      ...(post.positions ?? []).flatMap(p => [p.title, p.description, p.requirements, p.location])]
+      .some(value => value?.toLocaleLowerCase('vi').includes(query))));
+  }, [posts, search, status, selectedWindowId]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totals = recruitmentTotals(filtered);
+  const refresh = useCallback(() => setRevision(value => value + 1), []);
+  const onSaved = (post: RecruitmentPost) => {
+    setSuccess(post.status === 'PUBLISHED'
+      ? `Đã ${editor?.post ? 'cập nhật' : 'đăng'} tin “${post.title}”. Sinh viên có thể xem ngay.`
+      : `Đã lưu tin “${post.title}”. Trạng thái: ${recruitmentStatusLabels[post.status]}.`);
+    setPosts(current => [...current.filter(item => item.id !== post.id), post].sort((a, b) => b.id - a.id));
+    setSelectedWindowId(post.windowId); setEditor(null); setPage(1); setSearch(''); setStatus(''); reloadProfile();
+  };
 
-      try {
-        // Truyền companyId vào API — bắt buộc để backend scope đúng doanh nghiệp
-        const firstPage = await enterpriseService.listRecruitmentPosts(companyId, {
-          page: 1,
-          limit: API_PAGE_SIZE,
-        });
-        if (!firstPage?.success || !firstPage.data) {
-          throw new Error('Không thể tải thông tin vị trí tuyển dụng.');
-        }
-
-        const posts = [...firstPage.data.items];
-        const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
-        for (let currentPage = 2; currentPage <= totalPages; currentPage += 1) {
-          // Truyền companyId cho mọi trang phân trang
-          const response = await enterpriseService.listRecruitmentPosts(companyId!, {
-            page: currentPage,
-            limit: API_PAGE_SIZE,
-          });
-          if (!response?.success || !response.data) {
-            throw new Error(`Không thể tải thông tin vị trí ở trang ${currentPage}.`);
-          }
-          posts.push(...response.data.items);
-        }
-
-        if (!cancelled) {
-          setPositions(
-            posts.flatMap((post) =>
-              (post.positions ?? []).map((position) => ({
-                ...position,
-                postTitle: post.title,
-                periodCode: post.periodCode,
-                postStatus: post.status,
-                deadlineAt: post.deadlineAt,
-              }))
-            )
-          );
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : 'Không thể tải thông tin vị trí tuyển dụng.';
-          setError(message);
-          console.error('Failed to load recruitment positions:', err);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    loadPositions();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey, companyId]);
-
-
-  const filteredPositions = useMemo(() => {
-    const query = searchTerm.trim().toLocaleLowerCase();
-    if (!query) return positions;
-    return positions.filter((position) =>
-      [
-        position.title,
-        position.code,
-        position.description,
-        position.requirements,
-        position.location,
-        position.postTitle,
-        position.periodCode,
-      ]
-        .filter(Boolean)
-        .some((value) => value?.toLocaleLowerCase().includes(query))
-    );
-  }, [positions, searchTerm]);
-
-  const totalPages = Math.ceil(filteredPositions.length / PAGE_SIZE);
-  const visiblePositions = filteredPositions.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE
-  );
-
-  return (
-    <div className="space-y-6 pb-12">
-      <PageBanner
-        title="Thông tin Vị trí Tuyển dụng"
-        description="Tra cứu vị trí thực tập, yêu cầu và chỉ tiêu tiếp nhận đã được ghi nhận. Trang này chỉ cung cấp thông tin, không hỗ trợ đăng tuyển."
-        badge="Thông tin chỉ đọc"
-      />
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Tìm theo vị trí, mã, yêu cầu hoặc địa điểm..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
-            value={searchTerm}
-            onChange={(event) => {
-              setSearchTerm(event.target.value);
-              setPage(1);
-            }}
-          />
+  return <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <header className="flex flex-wrap items-center justify-between gap-4 px-5 py-6 sm:px-7">
+      <div>
+        <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-semibold tracking-tight text-slate-900">Tin tuyển dụng</h1>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"><CheckCircle2 size={13} />Công bố trực tiếp</span>
         </div>
-        <p className="text-xs text-slate-500 font-medium">
-          Hiển thị <strong>{filteredPositions.length}</strong> vị trí
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Quản lý vị trí thực tập. Tin được hiển thị với sinh viên ngay sau khi đăng.</p>
+      </div>
+      <button type="button" disabled={loading || !!error || !activeWindows.length}
+        onClick={() => { setSuccess(''); setEditor({ post: null }); }}
+        className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
+        <Plus size={17} />Tạo tin tuyển dụng
+      </button>
+    </header>
+
+    {success && <div role="status" className="mx-5 mb-4 flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 sm:mx-7">
+      <CheckCircle2 size={18} className="mt-0.5 shrink-0" /><p>{success}</p>
+    </div>}
+
+    {loading ? <div role="status" className="flex items-center justify-center gap-3 border-t border-slate-100 py-16 text-sm text-slate-500">
+      <Loader2 size={20} className="animate-spin text-orange-600" />Đang tải tin tuyển dụng và thời hạn đăng tin...
+    </div> : error ? <div role="alert" className="border-t border-slate-100 px-5 py-12 text-center">
+      <AlertCircle size={22} className="mx-auto mb-2 text-rose-600" /><p className="text-sm text-rose-800">{error}</p>
+      <button type="button" onClick={refresh} className="mt-3 text-sm font-semibold text-orange-700 hover:underline">Thử lại</button>
+    </div> : <>
+      <section aria-label="Đợt và hạn đăng tin" className="border-y border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-7">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 lg:max-w-md">
+            <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
+            {windows.length > 0 ? <select id="recruitment-window-view" value={selectedWindowId}
+              onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+              <option value="0">Tất cả đợt đăng tin</option>
+              {windows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''}</option>)}
+            </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
+          </div>
+          {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div><p className="flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.endsAt)}</p>
+              <p className="mt-0.5 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)}</p>
+              <p className="mt-0.5 text-xs text-slate-400">Thời hạn do QHDN thiết lập</p>
+            </div>
+            <p className={`inline-flex items-center gap-2 text-xs font-medium ${accepts ? 'text-emerald-700' : 'text-slate-500'}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />{accepts ? 'Đang nhận tin' : 'Hiện không nhận tin'}
+            </p>
+          </div>}
+        </div>
+        {!activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể xem các tin đã đăng.</p>}
+        {selectedWindow?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
+          <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký OJT: tạm khóa chỉnh sửa tin{selectedWindow.studentRegistrationWindow?.endsAt ? ` đến ${formatRecruitmentDate(selectedWindow.studentRegistrationWindow.endsAt)}` : ''}. Bạn vẫn có thể tạo tin mới trong hạn đăng tuyển.
+        </p>}
+      </section>
+
+      <dl aria-label="Tổng quan tuyển dụng" className="grid grid-cols-2 gap-4 border-b border-slate-100 px-5 py-5 sm:grid-cols-4 sm:px-7">
+        {[['Tin tuyển dụng', filtered.length], ['Vị trí tuyển', totals.positions], ['Tổng chỉ tiêu', totals.capacity], ['Chỗ còn lại', totals.remaining]].map(([label, value]) => <div key={label}>
+          <dt className="text-xs text-slate-500">{label}</dt><dd className={`mt-1 text-2xl font-semibold tabular-nums ${label === 'Chỗ còn lại' ? 'text-orange-600' : 'text-slate-900'}`}>{value}</dd>
+        </div>)}
+      </dl>
+
+      <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-7">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input aria-label="Tìm tin tuyển dụng" type="search" placeholder="Tìm tin hoặc vị trí..." value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100" />
+        </div>
+        <div className="flex gap-2">
+          <select aria-label="Lọc trạng thái tin" value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+            <option value="">Tất cả trạng thái</option>
+            {Object.entries(recruitmentStatusLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <button type="button" onClick={refresh} disabled={loading} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-40">
+            <RefreshCw size={15} /><span>Tải lại</span>
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-1 px-5 pb-3 text-xs text-slate-400 sm:px-7">
+        <p><strong className="font-medium text-slate-600">{filtered.length} tin</strong> · {filtered.filter(p => p.status === 'PUBLISHED').length} đang hiển thị</p>
+        <p>Tin mới nhất hiển thị trước</p>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-            <p className="text-xs text-slate-500 font-medium">
-              Đang tải thông tin vị trí tuyển dụng...
-            </p>
-          </div>
+      {!visible.length ? <div className="border-t border-slate-100 px-6 py-14 text-center">
+        <BriefcaseBusiness size={30} className="mx-auto mb-3 text-slate-300" />
+        <h2 className="font-medium text-slate-700">{search || status ? 'Không có tin phù hợp' : 'Chưa có tin tuyển dụng'}</h2>
+        <p className="mt-1 text-sm text-slate-400">{search || status ? 'Thử đổi từ khóa hoặc trạng thái.' : 'Tạo tin đầu tiên để bắt đầu tuyển thực tập sinh.'}</p>
+      </div> : <section aria-label="Danh sách tin tuyển dụng">
+        <div className="hidden grid-cols-[minmax(0,1fr)_140px_80px_150px_120px] gap-4 border-y border-slate-100 bg-slate-50/50 px-7 py-2.5 text-xs text-slate-500 lg:grid">
+          <span>Tin tuyển dụng</span><span>Trạng thái</span><span>Còn chỗ</span><span>Hạn ứng tuyển</span><span className="sr-only">Thao tác</span>
         </div>
-      )}
-
-      {error && !loading && (
-        <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-center">
-          <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
-          <p className="text-sm text-rose-700 font-medium">{error}</p>
-          <button
-            onClick={() => setReloadKey((currentKey) => currentKey + 1)}
-            className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-colors"
-          >
-            Thử lại
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && visiblePositions.length === 0 && (
-        <div className="p-12 bg-white rounded-2xl border border-slate-200/80 text-center">
-          <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">
-            {searchTerm
-              ? 'Không tìm thấy vị trí phù hợp.'
-              : 'Chưa có thông tin vị trí tuyển dụng.'}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            Các vị trí đã được ghi nhận sẽ hiển thị tại đây để tra cứu.
-          </p>
-        </div>
-      )}
-
-      {!loading && !error && visiblePositions.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {visiblePositions.map((position) => (
-            <article
-              key={`${position.id}-${position.postTitle}`}
-              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden"
-            >
-              <div className="p-5 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-[11px] font-semibold text-orange-600 uppercase tracking-wider">
-                      {position.code}
-                    </span>
-                    <h2 className="font-bold text-slate-900 text-base mt-0.5">
-                      {position.title}
-                    </h2>
-                  </div>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${POST_STATUS_STYLES[position.postStatus]}`}
-                  >
-                    {POST_STATUS_LABELS[position.postStatus]}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-500">
-                  {position.postTitle}
-                  {position.periodCode ? ` · ${position.periodCode}` : ''}
+        {visible.map(post => {
+          const editable = canEditRecruitmentPost(post, windows, now);
+          const positions = post.positions ?? [];
+          const { remaining, capacity } = recruitmentTotals([post]);
+          const lockReason = postEditLockReason(post, windows, now);
+          return <article key={post.id} data-post-id={post.id} className="border-b border-slate-100 last:border-b-0">
+            <div className="grid items-center gap-3 px-5 pb-1 pt-5 sm:px-7 lg:grid-cols-[minmax(0,1fr)_140px_80px_150px_120px] lg:gap-4 lg:pt-4">
+              <div className="min-w-0">
+                <h2 className="break-words text-sm font-semibold text-slate-900">{post.title}</h2>
+                <p className="mt-1 truncate text-xs text-slate-400" title={positions.map(p => p.title).join(' · ')}>
+                  {positions.length} vị trí · {positions.map(p => p.title).join(', ') || post.periodCode}
                 </p>
-
-                {position.description && (
-                  <div>
-                    <h3 className="text-[11px] font-semibold text-slate-400 mb-1">
-                      Mô tả
-                    </h3>
-                    <p className="text-xs text-slate-600 whitespace-pre-line line-clamp-3">
-                      {position.description}
-                    </p>
-                  </div>
-                )}
-
-                {position.requirements && (
-                  <div>
-                    <h3 className="text-[11px] font-semibold text-slate-400 mb-1">
-                      Yêu cầu
-                    </h3>
-                    <p className="text-xs text-slate-600 whitespace-pre-line line-clamp-3">
-                      {position.requirements}
-                    </p>
-                  </div>
-                )}
-
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  {position.location && (
-                    <p className="flex items-center gap-1.5 text-xs text-slate-600">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                      {position.location}
-                      {position.workMode ? ` · ${position.workMode}` : ''}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Chỉ tiêu còn lại</span>
-                    <span className="font-bold text-slate-900">
-                      {position.remainingSlots} / {position.capacity} sinh viên
-                    </span>
-                  </div>
-                </div>
               </div>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {!loading && !error && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 pt-2">
-          <button
-            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-            disabled={page === 1}
-            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Trang trước"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs text-slate-600">
-            Trang <strong>{page}</strong> / <strong>{totalPages}</strong>
-          </span>
-          <button
-            onClick={() =>
-              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
-            }
-            disabled={page === totalPages}
-            className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Trang sau"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
+              <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle[post.status]}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />{recruitmentStatusLabels[post.status]}
+              </span>
+              <div title={`Đã nhận ${capacity - remaining}/${capacity} sinh viên`} className="max-w-24 text-xs tabular-nums text-slate-600"><span className="mr-1 text-slate-400 lg:hidden">Còn chỗ:</span>{remaining}/{capacity}
+                <div aria-hidden="true" className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${remaining > 0 ? 'bg-orange-400' : 'bg-slate-300'}`} style={{ width: `${capacity > 0 ? Math.min(100, Math.max(0, (capacity - remaining) / capacity * 100)) : 0}%` }} /></div>
+              </div>
+              <span className="text-xs text-slate-500"><span className="mr-1 text-slate-400 lg:hidden">Hạn ứng tuyển:</span>{formatRecruitmentDate(post.deadlineAt)}</span>
+              <button type="button" disabled={!editable} onClick={() => { setSuccess(''); setEditor({ post }); }}
+                title={editable ? 'Chỉnh sửa tin tuyển dụng' : lockReason}
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:border-orange-300 hover:text-orange-700 disabled:cursor-not-allowed disabled:opacity-40 lg:justify-self-end">
+                <Pencil size={13} />Chỉnh sửa tin
+              </button>
+            </div>
+            {!editable && <p className="flex items-start gap-1.5 px-5 pt-2 text-xs text-slate-500 sm:px-7"><LockKeyhole size={12} className="mt-0.5 shrink-0" />{lockReason}</p>}
+            {post.status === 'REJECTED' && post.reviewReason && <p className="px-5 pt-1 text-xs text-rose-700 sm:px-7">QHDN: {post.reviewReason}</p>}
+            <details className="px-5 pb-4 sm:px-7">
+              <summary className="mt-1 w-fit cursor-pointer text-xs text-slate-400 hover:text-orange-700">Xem chi tiết</summary>
+              <div className="mt-4 space-y-5 border-l-2 border-slate-100 pl-4 text-sm text-slate-600">
+                <div className="space-y-3 whitespace-pre-line break-words leading-relaxed">
+                  <p>{post.content}</p>
+                  {post.benefits && <p><strong className="font-medium text-slate-800">Quyền lợi: </strong>{post.benefits}</p>}
+                  {post.applicationInstructions && <p><strong className="font-medium text-slate-800">Ứng tuyển: </strong>{post.applicationInstructions}</p>}
+                  {post.reviewReason && post.status !== 'REJECTED' && <p className="text-xs"><strong>Phản hồi QHDN: </strong>{post.reviewReason}</p>}
+                </div>
+                <div className="divide-y divide-slate-100">{positions.map(p => <div key={p.id} className="space-y-1.5 py-3 first:pt-0">
+                  <p className="font-medium text-slate-800">{p.title}<span className="ml-3 text-xs font-normal text-slate-400">Còn {p.remainingSlots}/{p.capacity} chỗ</span></p>
+                  {(p.location || p.workMode) && <p className="text-xs text-slate-400">{[p.location, p.workMode ? workModes[p.workMode] ?? p.workMode : null].filter(Boolean).join(' · ')}</p>}
+                  <p className="whitespace-pre-line break-words text-xs leading-relaxed"><strong className="font-medium">Mô tả: </strong>{p.description}</p>
+                  <p className="whitespace-pre-line break-words text-xs leading-relaxed"><strong className="font-medium">Yêu cầu: </strong>{p.requirements}</p>
+                </div>)}</div>
+              </div>
+            </details>
+          </article>;
+        })}
+      </section>}
+      {totalPages > 1 && <nav aria-label="Phân trang tin tuyển dụng" className="flex items-center justify-end gap-4 border-t border-slate-100 px-5 py-4 sm:px-7">
+        <span className="text-xs text-slate-500">Trang {currentPage}/{totalPages}</span>
+        <button type="button" aria-label="Trang trước" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronLeft size={17} /></button>
+        <button type="button" aria-label="Trang sau" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronRight size={17} /></button>
+      </nav>}
+    </>}
+    {editor && <RecruitmentPostDialog windows={windows} initialWindowId={accepts ? selectedWindowId : activeWindows[0]?.id} post={editor.post} now={now} onClose={() => setEditor(null)} onSaved={onSaved} />}
+  </div>;
+}
 
 export default EnterpriseJobs;

@@ -75,6 +75,13 @@ export interface RecruitmentWindow {
   status: 'DRAFT' | 'OPEN' | 'CLOSED';
   startsAt: string;
   endsAt: string;
+  accepting: boolean;
+  canCreate?: boolean;
+  canEdit?: boolean;
+  postingDeadlineAt?: string;
+  deadlineManagedBy?: 'QHDN';
+  editLockCode?: string | null;
+  studentRegistrationWindow?: { id: number; name: string; startsAt: string; endsAt: string } | null;
   periodCode?: string;
   periodName?: string;
   periodStatus?: string;
@@ -85,7 +92,7 @@ export interface RecruitmentWindow {
 // ─── Recruitment Post Types ──────────────────────────────────────────────────
 export interface RecruitmentPostPosition {
   id: number;
-  code: string;
+  code: string | null;
   title: string;
   description: string;
   requirements: string;
@@ -99,7 +106,9 @@ export interface RecruitmentPostPosition {
 export interface RecruitmentPost {
   id: number;
   windowId: number;
-  enterpriseId: number;
+  companyId: number;
+  companyName?: string;
+  enterpriseId?: number;
   enterpriseName?: string;
   enterpriseCode?: string;
   periodCode?: string;
@@ -113,6 +122,44 @@ export interface RecruitmentPost {
   positions?: RecruitmentPostPosition[];
   createdAt?: string;
   updatedAt?: string;
+  reviewReason?: string | null;
+  reviewedAt?: string | null;
+  canEdit?: boolean;
+  requiresReview?: boolean;
+  replayed?: boolean;
+  postingDeadlineAt?: string | null;
+  deadlineManagedBy?: 'QHDN';
+  editLockCode?: string | null;
+  studentRegistrationWindow?: RecruitmentWindow['studentRegistrationWindow'];
+}
+
+export interface EnterpriseRecruitmentPositionInput {
+  id?: number;
+  title: string;
+  description: string;
+  requirements: string;
+  capacity: number;
+  location: string | null;
+  workMode: 'ONSITE' | 'REMOTE' | 'HYBRID' | null;
+}
+
+export interface EnterpriseRecruitmentPostInput {
+  title: string;
+  content: string;
+  benefits: string | null;
+  applicationInstructions: string | null;
+  positions: EnterpriseRecruitmentPositionInput[];
+}
+
+// QHDN owns all deadlines. Enterprise requests never send deadlineAt.
+export interface EnterpriseRecruitmentPostCreateInput extends EnterpriseRecruitmentPostInput {
+  windowId: number;
+  idempotencyKey?: string;
+}
+
+export interface EnterpriseRecruitmentPostResponse {
+  success: boolean;
+  data: RecruitmentPost;
 }
 
 // ─── Enterprise Candidate Types ──────────────────────────────────────────────
@@ -316,22 +363,32 @@ export const enterpriseService = {
     return response.data;
   },
 
-  // ── Recruitment Windows (JSON Input) ──────────────────────────────────────
-  // Gọi POST /api/json/recruitment/windows/list — không cần companyId
-  listRecruitmentWindows: async (params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<RecruitmentWindow>> => {
-    const response = await API.post<PaginatedResponse<RecruitmentWindow>>(
-      '/json/recruitment/windows/list',
-      { page: params.page ?? 1, limit: params.limit ?? 20, ...params }
-    );
+  // ── Recruitment Windows ──────────────────────────────────────
+  // API doanh nghiệp lấy quyền từ JWT, GET dùng query parameters.
+  listRecruitmentWindows: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<RecruitmentWindow>> => {
+    const response = await API.get<PaginatedResponse<RecruitmentWindow>>('/enterprise/recruitment/windows', { params, signal });
     return response.data;
   },
 
   // ── Recruitment Posts ─────────────────────────────────────────────────────
-  // Gọi GET /api/recruitment/posts
-  // companyId bắt buộc: backend scope ENTERPRISE chỉ trả về bài đăng của doanh nghiệp mình
-  listRecruitmentPosts: async (companyId: number, params: PaginatedRequest = { page: 1, limit: 20 }): Promise<PaginatedResponse<RecruitmentPost>> => {
-    const response = await API.get<PaginatedResponse<RecruitmentPost>>('/recruitment/posts', {
-      params: { ...params, page: params.page ?? 1, limit: params.limit ?? 20, companyId },
+  listRecruitmentPosts: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<RecruitmentPost>> => {
+    const response = await API.get<PaginatedResponse<RecruitmentPost>>('/enterprise/recruitment/posts', { params, signal });
+    return response.data;
+  },
+
+  createRecruitmentPost: async (data: EnterpriseRecruitmentPostCreateInput): Promise<EnterpriseRecruitmentPostResponse> => {
+    const { windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions } = data;
+    const response = await API.post<EnterpriseRecruitmentPostResponse>('/enterprise/recruitment/posts', {
+      windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions,
+    });
+    return response.data;
+  },
+
+  updateRecruitmentPost: async (id: number, data: EnterpriseRecruitmentPostInput): Promise<EnterpriseRecruitmentPostResponse> => {
+    // Whitelist enterprise-editable fields so deadlineAt cannot leak into PATCH.
+    const { title, content, benefits, applicationInstructions, positions } = data;
+    const response = await API.patch<EnterpriseRecruitmentPostResponse>(`/enterprise/recruitment/posts/${id}`, {
+      title, content, benefits, applicationInstructions, positions,
     });
     return response.data;
   },
