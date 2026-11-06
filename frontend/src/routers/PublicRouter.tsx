@@ -1,9 +1,6 @@
+import { educationRoutes } from './educationRoutes';
 import React from "react";
-import {
-  createBrowserRouter,
-  Navigate,
-  type RouteObject,
-} from "react-router-dom";
+import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import StudentLayout from '@/layouts/StudentLayout';
@@ -16,31 +13,19 @@ import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
 import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
 import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
 import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
-import EducationAcademicYear from "@/pages/education/EducationAcademicYear";
-import EducationOjtConditions from "@/pages/education/EducationOjtConditions";
-import EducationOjtFinalResults from "@/pages/education/EducationOjtFinalResults";
-import EducationStudentProgress from "@/pages/education/EducationStudentProgress";
-import EducationStudentStatus from "@/pages/education/EducationStudentStatus";
-import EducationSupportClassDemand from "@/pages/education/EducationSupportClassDemand";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentProfile";
-import StudentFeaturePage from "@/pages/student/StudentFeature";
-import StudentAIRisk from '@/pages/student/StudentAIRisk';
+import StudentOjtRisk from '@/pages/student/StudentOjtRisk';
 import StudentOJTProgress from '@/pages/student/StudentOJTProgress';
 import StudentResults from '@/pages/student/StudentResults';
 import StudentNotifications from '@/pages/student/StudentNotifications';
 import StudentAccount from '@/pages/student/StudentAccount';
-import EducationDashboard from "@/pages/education/EducationDashboard";
-import EducationOjtEligibility from "@/pages/education/EducationOjtEligibility";
-import EducationAcademicAlerts from "@/pages/education/EducationAcademicAlerts";
-import EducationGraduationReview from "@/pages/education/EducationGraduationReview";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
 import AdminAiConfig from "@/pages/admin/AdminAiConfig";
 import AdminSettings from "@/pages/admin/AdminSettings";
-
 import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
 import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
 import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
@@ -82,8 +67,8 @@ const studentRoutes: RouteObject = {
     { path: "/student", element: <Navigate to="/student/dashboard" replace /> },
     { path: "/student/dashboard", element: <StudentDashboard /> },
     { path: "/student/academic-profile", element: <StudentAcademicProfile /> },
-    { path: "/student/risk-prediction", element: <StudentAIRisk /> },
-    { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
+    { path: "/student/risk-prediction", element: <StudentOjtRisk /> },
+    { path: "/student/roadmap-consulting", element: <StudentOjtRisk /> },
     { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
     { path: "/student/ojt-profile", element: <Navigate to="/student/ojt-registration" replace /> },
     { path: "/student/internship-progress", element: <StudentOJTProgress /> },
@@ -165,7 +150,6 @@ export const router = createBrowserRouter([
             navItems={getMenuByRole("admin")}
             homePath="/admin/dashboard"
             brandSubtitle="Quản trị viên"
-            showAIConsult={false}
           />
         ),
         children: [
@@ -194,102 +178,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  educationRoutes,
   {
-    element: <PrivateRoute allowedRoles={["education"]} />,
-
-    children: [
-      {
-        element: (
-          <BaseLayout
-            navItems={getMenuByRole("education")}
-            homePath="/education/dashboard"
-            brandSubtitle="Phòng Đào tạo"
-            showAIConsult={false}
-          />
-        ),
-
-        children: [
-          { path: "/education/ojt-eligibility", element: <EducationOjtEligibility /> },
-          { path: "/education/academic-alerts", element: <EducationAcademicAlerts /> },
-          { path: "/education/graduation-review", element: <EducationGraduationReview /> },
-
-          /* =========================
-             DASHBOARD
-             ========================= */
-
-          {
-            path: "/education",
-            element: <Navigate to="/education/dashboard" replace />,
-          },
-
-          {
-            path: "/education/dashboard",
-            element: <EducationDashboard />,
-          },
-
-          /* =========================
-             QUẢN LÝ DỮ LIỆU
-             ========================= */
-
-          {
-            path: "/education/academic-year",
-            element: <EducationAcademicYear />,
-          },
-
-          {
-            path: "/education/student-import",
-            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentImport")).default }),
-          },
-          {
-            path: "/education/student-import/students/:studentId",
-            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentDetail")).default }),
-          },
-
-          {
-            path: "/education/curriculum-plan",
-            lazy: async () => ({ Component: (await import("@/pages/education/EducationCurriculumPlan")).default }),
-          },
-
-          {
-            path: "/education/ojt-conditions",
-            element: <EducationOjtConditions />,
-          },
-          {
-            path: "/education/ojt-handoff",
-            lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtHandoff")).default }),
-          },
-
-          /* =========================
-             QUẢN LÝ SINH VIÊN
-             ========================= */
-
-          {
-            path: "/education/student-progress",
-            element: <EducationStudentProgress />,
-          },
-
-          {
-            path: "/education/student-status",
-            element: <EducationStudentStatus />,
-          },
-          {
-            path: "/education/ojt-final-results",
-            element: <EducationOjtFinalResults />,
-          },
-
-          /* =========================
-             ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
-             ========================= */
-
-          {
-            path: "/education/ai-class-proposals",
-            element: <EducationSupportClassDemand />,
-          },
-        ],
-      },
-    ],
-  },
-    {
     element: <PrivateRoute allowedRoles={["qhdn"]} />,
     children: [
       {
@@ -298,7 +188,6 @@ export const router = createBrowserRouter([
             navItems={getMenuByRole("qhdn")}
             homePath="/qhdn/dashboard"
             brandSubtitle="Phòng Quan hệ Doanh nghiệp"
-            showAIConsult={false}
           />
         ),
         children: [
@@ -331,7 +220,6 @@ export const router = createBrowserRouter([
               navItems={getMenuByRole("enterprise")}
               homePath="/enterprise/dashboard"
               brandSubtitle="Đối tác Doanh nghiệp"
-              showAIConsult={false}
             />
           </EnterpriseProvider>
         ),

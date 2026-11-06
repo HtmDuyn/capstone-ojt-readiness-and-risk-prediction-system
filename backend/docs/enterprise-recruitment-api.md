@@ -131,4 +131,3 @@ Kiểm tra trực tiếp API sinh viên thấy tin mới ngay, quyền doanh ngh
 - Module doanh nghiệp dùng hàm kiểm tra quyền hiện có bao gồm kiểm tra xóa mềm, không sửa hàm dùng chung. API sửa tái sử dụng doanh nghiệp đã xác thực; summary tổng hợp vị trí trực tiếp, giảm việc tạo rồi phân tích lại JSON.
 - Worker tự quản lý một timer duy nhất và dọn timer/listener khi dừng. Không sửa vòng đời server hoặc worker của role khác.
 - POST `/api/enterprise/recruitment/posts` nhận thêm `idempotencyKey` tùy chọn (1–100 ký tự). Gửi lại cùng key/payload trả tin hiện có với `replayed:true`, kể cả gửi đồng thời. Dùng key cũ với nội dung khác trả 409 `IDEMPOTENCY_CONFLICT`. Muốn tạo tin khác dùng key mới. Không gửi key vẫn tạo tin như trước.
-ẹ

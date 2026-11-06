@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:education": "node --test --test-isolation=none tests/education/*.test.mjs"
   },
   "keywords": [],
   "author": "",

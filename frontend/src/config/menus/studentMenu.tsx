@@ -47,11 +47,11 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
   },
   {
     id: 'risk-prediction',
-    label: 'Phân tích & tư vấn OJT',
+    label: 'Rủi ro & lộ trình OJT',
     path: '/student/risk-prediction',
     icon: <RiskAnalyticsIcon size={20} />,
     banner: {
-      title: 'Phân tích học vụ & tư vấn OJT',
+      title: 'Rủi ro và lộ trình OJT',
       description: (
         <>
           Đối chiếu điều kiện OJT và xem các môn cần bổ sung theo dữ liệu học vụ.

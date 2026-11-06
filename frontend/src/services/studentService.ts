@@ -16,7 +16,6 @@ import type {
   Page,
   Profile,
   Registration,
-  Roadmap,
   Supplementary,
   Task,
   TaskSubmission,
@@ -198,16 +197,6 @@ export async function getCurriculum(id: number, signal?: AbortSignal) {
   );
   return response.curriculum;
 }
-export const getRoadmap = (semester: number, signal?: AbortSignal) =>
-  studentGet<Roadmap>(
-    '/students/me/roadmap-recommendations' +
-      studentQuery({ ojtSemesterId: semester }),
-    signal,
-  ).catch(error => {
-    if (error instanceof ApiError && error.code === 'AI_NOT_CONFIGURED')
-      throw new ApiError('Tư vấn AI chưa được cấu hình. Bạn vẫn có thể xem đối chiếu điều kiện OJT và các môn cần bổ sung.', error.status, error.code);
-    throw error;
-  });
 export const getCourseResults = (
   id: number,
   page: number,

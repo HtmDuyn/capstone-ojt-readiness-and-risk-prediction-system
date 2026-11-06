@@ -1408,7 +1408,7 @@ Body: application/json — bắt buộc.
 
 Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu
 
-ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts are immutable. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+ENTERPRISE only. Company scope comes from JWT membership. Creation/updates publish immediately (PUBLISHED and OPEN positions); no QHDN review is required. The QHDN recruitment intake must be OPEN and within startsAt/endsAt. Updates are locked while any OJT student registration window of the same semester is OPEN and currently accepting registrations. Creating a new post remains allowed. Deadlines are managed by QHDN, not company requests. Capacity cannot be lower than confirmed students. Closed/archived posts stay locked.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1425,9 +1425,9 @@ Không có request body.
 
 ## POST /api/enterprise/recruitment/posts
 
-Tạo tin và tự động gửi QHDN duyệt
+Tạo và công bố tin ngay cho sinh viên, không cần QHDN duyệt
 
-ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts are immutable. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+ENTERPRISE only. Company scope comes from JWT membership. Creation/updates publish immediately (PUBLISHED and OPEN positions); no QHDN review is required. The QHDN recruitment intake must be OPEN and within startsAt/endsAt. Updates are locked while any OJT student registration window of the same semester is OPEN and currently accepting registrations. Creating a new post remains allowed. Deadlines are managed by QHDN, not company requests. Capacity cannot be lower than confirmed students. Closed/archived posts stay locked.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1442,7 +1442,7 @@ Body: application/json — bắt buộc.
 | content | string | Có | minLength=1; maxLength=30000 |  |
 | benefits | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
 | applicationInstructions | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
-| deadlineAt | string | Có | format="date-time" |  |
+| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" | Tương thích client cũ: backend bỏ qua giá trị này. Doanh nghiệp không được đặt hoặc sửa hạn. |
 | positions | array<object> | Có | minItems=1; maxItems=50 |  |
 | positions[].id | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
 | positions[].title | string | Có | minLength=1; maxLength=150 |  |
@@ -1456,7 +1456,7 @@ Body: application/json — bắt buộc.
 
 Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp
 
-Chỉnh sửa tin thuộc doanh nghiệp trong JWT. Lấy id từ GET /api/enterprise/recruitment/posts. Chỉ gửi các trường cần đổi; không gửi windowId/companyId/status. Chỉ được sửa khi đợt đang nhận tin và tin chưa công bố (DRAFT/PENDING_REVIEW/REJECTED). Nếu gửi positions phải giữ đủ các vị trí cũ kèm id; vị trí mới không có id. Không được giảm capacity thấp hơn số sinh viên đã nhận. Lưu thành công tự chuyển PENDING_REVIEW để QHDN duyệt, không cần gọi API gửi duyệt.
+Sửa tin thuộc doanh nghiệp trong JWT, kể cả đã PUBLISHED, khi đợt đăng tuyển OPEN và chưa hết hạn. Không được sửa khi đợt đăng ký OJT hàng loạt của cùng kỳ đang OPEN và trong thời gian đăng ký: trả 409 RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION. Đợt chưa bắt đầu/đã hết hạn/đã đóng hoặc khác kỳ không gây khóa này. Tin CLOSED/ARCHIVED vẫn không được sửa. Nếu gửi positions phải giữ đủ vị trí cũ kèm id; chỉ tiêu không thấp hơn số sinh viên đã xác nhận. Lưu thành công vẫn PUBLISHED, vị trí OPEN, sinh viên thấy ngay, không cần QHDN duyệt và không thay đổi phân công. Không gửi windowId/companyId/status; deadlineAt từ client cũ bị bỏ qua, hạn QHDN lưu sẵn được giữ nguyên kể cả bằng endsAt.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1472,7 +1472,7 @@ Body: application/json — bắt buộc.
 | content | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=30000 |  |
 | benefits | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
 | applicationInstructions | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
-| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" |  |
+| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" | Tương thích client cũ: backend bỏ qua giá trị này. Doanh nghiệp không được đặt hoặc sửa hạn. |
 | positions | array<object> | Không / theo điều kiện nghiệp vụ | minItems=1; maxItems=50 |  |
 | positions[].id | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
 | positions[].title | string | Có | minLength=1; maxLength=150 |  |
@@ -1514,7 +1514,7 @@ positions:
 
 Xem đợt tuyển dụng và hạn doanh nghiệp được đăng tin
 
-Xem các đợt do QHDN thiết lập. startsAt là thời điểm bắt đầu đăng tin; endsAt là hạn cuối doanh nghiệp được tạo/chỉnh sửa tin. accepting=true khi đợt OPEN, đang trong thời gian cho phép và học kỳ còn khả dụng. deadlineAt của tin là hạn sinh viên ứng tuyển, khác với endsAt của đợt đăng tin. Chỉ role ENTERPRISE được dùng endpoint này.
+Xem thời hạn đăng tuyển do QHDN quản lý; doanh nghiệp chỉ đọc. accepting/canCreate=true khi đợt OPEN, trong thời gian cho phép và học kỳ khả dụng. canEdit còn yêu cầu không có đợt OJTRegistrationWindows cùng kỳ đang OPEN trong StartsAt/EndsAt. studentRegistrationWindow và editLockCode giải thích việc khóa sửa. Hạn ứng tuyển của tin là dữ liệu QHDN, khác với endsAt của đợt doanh nghiệp đăng tin.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -2973,64 +2973,6 @@ Body: application/json — bắt buộc.
 | enrollmentYear | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID tài khoản. |
 | currentSemester | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID tài khoản. |
 
-## POST /api/students/me/academic-chat
-
-Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình
-
-Hỏi đáp từng câu độc lập, chưa lưu lịch sử hội thoại. Số liệu lấy từ hồ sơ của tài khoản JWT; không nhận studentId hoặc số liệu do client cung cấp. Câu hỏi xin tư vấn dùng Gemini theo điều kiện theo dõi sớm. Câu hỏi ngoài học vụ trả OUT_OF_SCOPE. Không dự báo xác suất rủi ro.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| message | string | Có | minLength=1; maxLength=1000 |  |
-
-## GET /api/students/me/academic-warning
-
-Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu
-
-Tự lấy hồ sơ và kỳ OJT từ JWT. Quy tắc ACADEMIC_RULES_V1: đạt ngưỡng hiện tại => LOW; kỳ 2–4 so môn bắt buộc kỳ trước chưa hoàn thành và môn nợ chặn tiên quyết; kỳ 4 có nút chặn => HIGH; kỳ 5 nếu đạt mọi môn đang học vẫn chưa đạt ngưỡng => HIGH, nếu kịch bản đạt ngưỡng => MEDIUM. Đến hạn xét hoặc đến kỳ OJT mà chưa đạt => HIGH. Thiếu dữ liệu không tự gán LOW. Không gọi Gemini, không tính xác suất, không ghi kết quả OJT chính thức. Mốc thời gian chốt điểm môn học chưa được xác minh; luôn trả limitations. Đây là chính sách triển khai phiên bản đầu để nhà trường rà soát. GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Không có request body.
-
-## POST /api/students/me/course-advice
-
-Tư vấn môn học/học lại, ưu tiên môn tiên quyết đang chặn môn sau
-
-Gửi {}. Backend xếp ưu tiên từ chương trình đã công bố và kết quả học tập, phân biệt nhóm tiên quyết AND/OR. canPlan chỉ nói đã đáp ứng tiên quyết trên dữ liệu hiện tại, không xác nhận mở lớp hoặc quyền đăng ký; môn tiên quyết phải được hoàn thành trước kỳ học môn sau. Gemini chọn khuyến nghị chung; không tự tạo quan hệ môn. Cần đủ điều kiện theo dõi sớm từ kỳ 2.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-Schema: object
-
-## POST /api/students/me/course-impact
-
-Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể
-
-Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| courseCode | string | Có | minLength=1; maxLength=20 |  |
-
 ## POST /api/students/me/cv
 
 Upload hoặc thay CV cá nhân
@@ -3113,34 +3055,6 @@ Body: application/json — bắt buộc.
 | --- | --- | --- | --- | --- |
 | isRead | boolean | Có |  |  |
 
-## POST /api/students/me/ojt-advice
-
-Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập
-
-Chỉ dùng dữ liệu backend. Trước kỳ 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ trả NOT_AVAILABLE và không gọi Gemini. Mặc định AI tắt; thiếu cấu hình hoặc lỗi API trả FALLBACK. Không tạo xác suất rủi ro. Không lưu/cache tư vấn trong bước chuẩn bị này.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| ojtSemesterId | integer | Có | minimum=1 |  |
-
-## GET /api/students/me/ojt-readiness
-
-Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ
-
-GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Không có request body.
-
 ## GET /api/students/me/opportunities
 
 Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp
@@ -3156,36 +3070,6 @@ Xác thực: Bearer token; role/ownership theo chức năng.
 | query | limit | integer | Không | minimum=1 |  |
 
 Không có request body.
-
-## GET /api/students/me/roadmap-recommendations
-
-tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc
-
-GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-
-Không có request body.
-
-## POST /api/students/me/study-simulation
-
-Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn
-
-Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| passedCourseCodes | array<string> | Có | minItems=1; maxItems=20; uniqueItems=true |  |
 
 ## GET /api/students/me/tasks
 
@@ -3236,3 +3120,16 @@ Body: application/json — bắt buộc.
 | Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
 | --- | --- | --- | --- | --- |
 | content | string | Có | minLength=1; maxLength=10000 |  |
+
+## GET /api/students/me/ojt-risk-assessment
+
+Đánh giá rủi ro OJT và đề xuất lộ trình tương ứng
+
+Luồng mới: đánh giá rủi ro theo quy tắc học vụ trước, sau đó đề xuất môn học từ chương trình đã đối soát. Không nhận body hoặc query; tự lấy sinh viên và kỳ OJT từ JWT. Kỳ dưới 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ: INSUFFICIENT_DATA, roadmap NOT_AVAILABLE và không gợi ý môn. Thiếu dữ liệu tiên quyết: roadmap DATA_INCOMPLETE. Không gọi Gemini, không tính xác suất hoặc ghi kết quả chính thức. Lộ trình là thứ tự ưu tiên, chưa phải lịch mở lớp hay đăng ký môn. Các API cảnh báo, tư vấn, hỏi đáp và mô phỏng cũ đã được bỏ. GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
+
+- Authorization: Bearer <student-token>
+- Query/body: none.
+- Response: success, data.status, data.student, data.ojtSemesterId, data.risk, data.roadmap.
+- risk.level: LOW / MEDIUM / HIGH / INSUFFICIENT_DATA.
+- roadmap.status: READY / NOT_AVAILABLE / DATA_INCOMPLETE.
+- Errors: 400 invalid input; 401 missing token; 403 wrong role; 404 missing student.

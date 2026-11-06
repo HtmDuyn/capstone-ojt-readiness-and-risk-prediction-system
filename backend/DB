@@ -8412,11 +8412,44 @@ BEGIN
 END $student_database_audit$;
 -- END STUDENT DATABASE AUDIT (READ ONLY)
 
--- Enterprise recruitment extension (20261105).
--- Only enterprise-authored posts participate; QHDN imports and shared workflow stay unchanged.
-ALTER TABLE public."RecruitmentPosts" ADD COLUMN "EnterpriseManaged" boolean NOT NULL DEFAULT false;
-CREATE INDEX "IX_EnterpriseRecruitment_Continuation" ON public."RecruitmentPosts"("OJTSemesterID","WindowID")
+-- Enterprise recruitment: the canonical deadline and continuation rules live here.
+-- No separate migration script or second TypeScript continuation implementation.
+ALTER TABLE public."RecruitmentPosts" ADD COLUMN IF NOT EXISTS "EnterpriseManaged" boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS "IX_EnterpriseRecruitment_Continuation" ON public."RecruitmentPosts"("OJTSemesterID","WindowID")
  WHERE "EnterpriseManaged" AND "Status" IN ('PUBLISHED','CLOSED');
+
+CREATE OR REPLACE FUNCTION public."EnterpriseRecruitmentDeadline"(semester_id integer) RETURNS timestamptz
+LANGUAGE sql SET search_path=public AS $$
+ SELECT LEAST((ap."EndDate"+1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh',
+   COALESCE((SELECT max(rw."EndsAt") FROM "OJTRegistrationWindows" rw
+     WHERE rw."OJTSemesterID"=semester_id AND rw."Status" IN ('DRAFT','OPEN')
+       AND rw."EndsAt">clock_timestamp()),(ap."EndDate"+1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'))
+ FROM "OJTSemesters" term JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=term."AcademicPeriodID"
+ WHERE term."OJTSemesterID"=semester_id AND ap."Kind"='SEMESTER' AND ap."Status" NOT IN ('CLOSED','ARCHIVED');
+$$;
+REVOKE ALL ON FUNCTION public."EnterpriseRecruitmentDeadline"(integer) FROM PUBLIC;
+
+-- Publish valid enterprise-authored legacy submissions only.
+-- QHDN imports and other roles' posts, states, IDs and history remain unchanged.
+WITH published AS (
+ UPDATE public."RecruitmentPosts" p SET "Status"='PUBLISHED',"PublishedAt"=COALESCE(p."PublishedAt",now()),
+   "ReviewedBy"=NULL,"ReviewedAt"=NULL,"ReviewReason"=NULL,
+   "DeadlineAt"=COALESCE(p."DeadlineAt",public."EnterpriseRecruitmentDeadline"(p."OJTSemesterID"))
+ WHERE p."EnterpriseManaged" AND p."Status"='PENDING_REVIEW' AND p."ArchivedAt" IS NULL
+   AND COALESCE(p."DeadlineAt",public."EnterpriseRecruitmentDeadline"(p."OJTSemesterID"))>clock_timestamp()
+   AND EXISTS(SELECT 1 FROM "Enterprises" e WHERE e."EnterpriseID"=p."EnterpriseID" AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL)
+   AND EXISTS(SELECT 1 FROM "RecruitmentWindows" w JOIN "OJTSemesters" term ON term."OJTSemesterID"=w."OJTSemesterID"
+     JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=w."AcademicPeriodID"
+     WHERE w."WindowID"=p."WindowID" AND w."OJTSemesterID"=p."OJTSemesterID"
+       AND term."AcademicPeriodID"=ap."AcademicPeriodID" AND ap."Kind"='SEMESTER' AND ap."Status" NOT IN ('CLOSED','ARCHIVED'))
+   AND EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos USING("PositionID")
+     WHERE pp."PostID"=p."PostID" AND pos."Capacity">0)
+   AND NOT EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos USING("PositionID")
+     WHERE pp."PostID"=p."PostID" AND (pos."DeletedAt" IS NOT NULL OR pos."ArchivedAt" IS NOT NULL OR pos."Status"='ARCHIVED'))
+ RETURNING p."PostID"
+)
+UPDATE "InternshipPositions" pos SET "Status"='OPEN'
+ FROM "RecruitmentPostPositions" pp JOIN published p USING("PostID") WHERE pos."PositionID"=pp."PositionID";
 
 CREATE OR REPLACE FUNCTION public."AdvanceEnterpriseRecruitment"() RETURNS integer
 LANGUAGE plpgsql SET search_path=public AS $$
@@ -8425,7 +8458,7 @@ BEGIN
  PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
  FOR post_row IN
   SELECT p."PostID",p."CreatedBy",p."WindowID" AS previous_window,next_window."WindowID" AS next_window,
-   (ap."EndDate"+1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh' AS deadline
+   public."EnterpriseRecruitmentDeadline"(p."OJTSemesterID") AS deadline
   FROM "RecruitmentPosts" p
   JOIN "RecruitmentWindows" old_window ON old_window."WindowID"=p."WindowID"
   JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=old_window."AcademicPeriodID"
@@ -8438,10 +8471,13 @@ BEGIN
     AND w."StartsAt">=old_window."EndsAt" AND w."StartsAt"<=clock_timestamp() AND w."EndsAt">clock_timestamp()
    ORDER BY w."StartsAt",w."WindowID" LIMIT 1
   ) next_window ON true
-  WHERE p."EnterpriseManaged" AND p."ArchivedAt" IS NULL AND p."Status" IN ('PUBLISHED','CLOSED')
-   AND p."PublishedAt" IS NOT NULL AND p."ReviewedAt"=p."PublishedAt"
+  WHERE p."EnterpriseManaged" AND p."ArchivedAt" IS NULL
+   AND (p."Status"='PUBLISHED' OR (p."Status"='CLOSED' AND (p."ReviewedAt" IS NULL OR p."ReviewedAt"=p."PublishedAt")))
+   AND p."PublishedAt" IS NOT NULL
    AND old_window."EndsAt"<=clock_timestamp() AND ap."Kind"='SEMESTER' AND ap."Status" NOT IN ('CLOSED','ARCHIVED')
    AND (ap."EndDate"+1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'>clock_timestamp()
+   AND NOT EXISTS(SELECT 1 FROM "OJTRegistrationWindows" rw WHERE rw."OJTSemesterID"=p."OJTSemesterID"
+     AND rw."Status"='OPEN' AND rw."StartsAt"<=clock_timestamp() AND rw."EndsAt">clock_timestamp())
    AND EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos USING("PositionID")
     WHERE pp."PostID"=p."PostID" AND pos."DeletedAt" IS NULL AND pos."ArchivedAt" IS NULL
      AND pos."Status" IN ('OPEN','CLOSED') AND pos."Capacity">(SELECT count(*) FROM "InternshipAssignments" a
@@ -8464,6 +8500,7 @@ END $$;
 REVOKE ALL ON FUNCTION public."AdvanceEnterpriseRecruitment"() FROM PUBLIC;
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT EXECUTE ON FUNCTION public."EnterpriseRecruitmentDeadline"(integer) TO service_role;
   GRANT EXECUTE ON FUNCTION public."AdvanceEnterpriseRecruitment"() TO service_role;
  END IF;
 END $$;
