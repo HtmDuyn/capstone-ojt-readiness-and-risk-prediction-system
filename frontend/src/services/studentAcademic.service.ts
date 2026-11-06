@@ -13,7 +13,7 @@ export interface CourseItem {
 export interface CourseAdvice {status:string;message?:string;coursePlan:{status:string;message:string;items:CourseItem[]}|null;advice:Advice|null;}
 export interface Impact {explanation:string;message:string;dependentCourses:{courseCode:string;unlocksAfterPassing:boolean}[];indirectCourses:{courseCode:string}[];}
 export interface Simulation {before:{earnedCredits:number;missingCredits:number;failedCourseCount:number};after:{earnedCredits:number;missingCredits:number;failedCourseCount:number};message:string;prerequisiteWarnings:{courseCode:string;message:string}[];}
-export interface ChatAnswer {answer:string;recommendations:string[];adviceStatus:string|null;}
+export interface ChatAnswer {answer:string;recommendations:string[];adviceStatus:string|null;answerSource?:'GEMINI'|'RULES';modelVersion?:string|null;aiError?:{code:string;httpStatus?:number|null}|null;}
 async function get<T>(path:string,signal:AbortSignal){return (await apiRequest<{data:T}>(path,{signal})).data;}
 async function post<T>(path:string,body:unknown,signal:AbortSignal){return (await apiRequest<{data:T}>(path,{method:'POST',body:JSON.stringify(body),signal})).data;}
 export const studentAcademic={

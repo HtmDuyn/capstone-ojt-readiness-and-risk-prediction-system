@@ -3,6 +3,7 @@ import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { uploadStudentCv, downloadStudentCv } from '@/services/studentService';
 import { buttonClass, Card, dateText, Empty, inputClass } from './PortalUI';
 import type { CV } from '@/types/student/portal';
+import { CvExtractionCard } from './CvExtractionCard';
 
 export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; onUploaded?: (cv: CV) => void } = {}) {
   const { profile, refresh } = useStudentPortal();
@@ -28,7 +29,7 @@ export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; 
   };
   return (
     <Card title="CV của tôi">
-      <p className="text-sm text-slate-500">Lưu CV để sử dụng khi ứng tuyển. Hồ sơ này sẽ được dùng để gợi ý doanh nghiệp phù hợp khi tính năng AI được tích hợp.</p>
+      <p className="text-sm text-slate-500">Lưu CV để sử dụng khi ứng tuyển. Bạn có thể đọc CV bằng Claude, kiểm tra và xác nhận hồ sơ bên dưới. Phần gợi ý doanh nghiệp sẽ được tích hợp sau.</p>
       {cv ? (
         <div className="text-sm space-y-2">
           <p className="font-bold break-all">{cv.fileName}</p>
@@ -83,6 +84,7 @@ export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; 
           {error}
         </p>
       )}
+      {cv&&<CvExtractionCard key={cv.id} cvFileId={cv.id}/>}
     </Card>
   );
 }

@@ -171,10 +171,11 @@ export function describeStudentRest(spec: Schema): Schema {
       400:{description:'Chỉ nhận JSON {}'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
   spec.paths['/api/students/me/academic-chat']={post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
     summary:'Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình',
-    description:'Hỏi đáp từng câu độc lập, chưa lưu lịch sử hội thoại. Số liệu lấy từ hồ sơ của tài khoản JWT; không nhận studentId hoặc số liệu do client cung cấp. Câu hỏi xin tư vấn dùng Gemini theo điều kiện theo dõi sớm. Câu hỏi ngoài học vụ trả OUT_OF_SCOPE. Không dự báo xác suất rủi ro.',
+    description:'Hỏi đáp từng câu độc lập, chưa lưu lịch sử hội thoại. Gemini nhận diện ý câu hỏi và diễn giải kết quả backend. Backend xác định tín chỉ, môn nợ, điều kiện tiên quyết, mô phỏng và mức cảnh báo từ hồ sơ JWT; không nhận studentId hoặc số liệu từ client. Kế hoạch cá nhân tuân theo điều kiện theo dõi sớm. answerSource=GEMINI khi diễn giải thành công; RULES và aiError khi dự phòng. Không dự báo xác suất rủi ro.',
     requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['message'],properties:{message:{type:'string',minLength:1,maxLength:1000}}},example:{message:'Mình còn nợ môn nào và thiếu bao nhiêu tín chỉ?'}}}},
     responses:{200:envelope(object({status:{type:'string',enum:['ANSWERED','DATA_INCOMPLETE','OUT_OF_SCOPE','NEED_COURSE_SELECTION']},topics:array(text),answer:text,
       facts:{type:'object',nullable:true,additionalProperties:true},source:{type:'string',enum:['ACADEMIC_RECORDS']},isAiPrediction:{type:'boolean',enum:[false]},
+      answerSource:{type:'string',enum:['GEMINI','RULES']},modelVersion:nullableText,
       recommendations:array(text),academicWarning:nullable(reference('AcademicRuleWarning')),coursePlan:nullable(coursePlanSchema),adviceSource:nullableText,adviceStatus:nullableText,aiError:{type:'object',nullable:true,additionalProperties:true}})),
       400:{description:'message không hợp lệ hoặc trường không được hỗ trợ'},401:{description:'Chưa đăng nhập'},403:{description:'Không có quyền sinh viên'}}}};
   spec.paths['/api/students/me/ojt-readiness']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],

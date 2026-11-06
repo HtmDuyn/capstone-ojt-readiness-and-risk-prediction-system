@@ -42,7 +42,7 @@ function StudentShell() {
     </div>
     {!portal.mustChangePassword && <>
       <button type="button" onClick={() => setChatOpen(true)} className="fixed bottom-6 right-6 z-40 rounded-full bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-xl hover:bg-orange-700">Tư vấn AI ngay</button>
-      <AIConsultModal isOpen={chatOpen} onClose={() => setChatOpen(false)} />
+      <AIConsultModal isOpen={chatOpen} onClose={() => setChatOpen(false)} studentName={profile?.fullName} studentCode={profile?.studentCode} />
     </>}
   </div>;
 }
