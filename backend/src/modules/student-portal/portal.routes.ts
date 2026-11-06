@@ -6,12 +6,7 @@ import { inputObject, invalid, positiveId } from '../students/student.validation
 import { dashboard,internships } from './overview.service';
 import { applyToPosition, studentOpportunities } from '../students/job-application.service';
 import { notifications, readNotification } from './academic.service';
-import { roadmap } from './cv.service';
-import { ojtAdvice } from './ojt-advice.service';
-import { readiness,studentAcademicWarning } from './readiness.service';
-import { academicChat } from './academic-chat.service';
-import { courseAdvice } from './ojt-advice.service';
-import { courseScenario } from './course-scenario.service';
+import { assessOjtRisk } from './ojt-risk.service';
 import { taskSubmissions, submitTask } from './task.service';
 
 const router = Router();
@@ -21,29 +16,10 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
-router.get('/students/me/academic-warning', ...read, handle(r => {
+router.get('/students/me/ojt-risk-assessment', ...read, handle(r => {
   if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
-  return studentAcademicWarning(r.user);
-}));
-router.post('/students/me/course-impact', ...own, requireJsonBody, handle(r => courseScenario(r.body,r.user,'IMPACT')));
-router.post('/students/me/study-simulation', ...own, requireJsonBody, handle(r => courseScenario(r.body,r.user,'SIMULATION')));
-router.post('/students/me/course-advice', ...own, requireJsonBody, handle(r => {
-  if(Object.keys(r.body).length)throw invalid('Send an empty JSON object; course advice uses your academic records.');
-  return courseAdvice(r.user);
-}));
-router.post('/students/me/academic-chat', ...own, requireJsonBody, handle(r => academicChat(r.body,r.user)));
-router.get('/students/me/ojt-readiness', ...read, handle(r => {
-  if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
-  return readiness(r.user);
-}));
-router.post('/students/me/ojt-advice', ...own, requireJsonBody, handle(r => {
-  if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters. Send ojtSemesterId in the JSON body.');
-  const body=inputObject(r.body,['ojtSemesterId']);
-  return ojtAdvice(positiveId(body.ojtSemesterId,'ojtSemesterId'),r.user);
-}));
-router.get('/students/me/roadmap-recommendations', ...read, handle(r => {
-  inputObject(r.query, ['ojtSemesterId']);
-  return roadmap(positiveId(r.query.ojtSemesterId, 'ojtSemesterId'), r.user);
+  if(Number(r.headers['content-length']??0)>0||r.headers['transfer-encoding'])throw invalid('This endpoint does not accept a request body.');
+  return assessOjtRisk(r.user);
 }));
 router.get('/students/me/notifications', ...read, handle(r => notifications(r.query, r.user)));
 router.patch('/students/me/notifications/:id', ...own, requireJsonBody, handle(r => {

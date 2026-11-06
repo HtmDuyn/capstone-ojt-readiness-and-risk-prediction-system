@@ -8,6 +8,7 @@ export const academicOperations:Record<string,string[]> = {
   '/student-imports':['get','post','patch'], '/student-imports/{id}':['get'],
   '/curriculum-imports':['get','post','patch'], '/curriculum-imports/{id}':['get'],
   '/academic-alerts':['get'], '/course-demands':['get'], '/course-demands/export':['get'],
+  '/retake-class-proposals':['get'],
   '/combo-registration-windows/{id}/selections':['post'],
   '/academic-years':['get','post'], '/academic-years/{id}':['patch'],
   '/academic-years/{id}/calendar':['get','put'],

@@ -17,3 +17,17 @@ export interface DemandReport extends Page<CourseDemand> {
 }
 
 export type ReportPeriod = AcademicPeriod & { ojt?: OjtSemester | null };
+
+export interface RetakeClassProposal {
+  courseId:number;courseCode:string;courseName:string;failedStudentCount:number;
+  status:'PREPARE_CLASSES'|'MONITORING';proposedClassCount:number;fullCapacityClassCount:number;
+  additionalClassStudentCount:number;studentsInProposedClasses:number;waitingStudentCount:number;
+  studentsNeededForNextProposal:number;isEarlyPreparation:boolean;
+}
+export interface RetakeClassReport extends Page<RetakeClassProposal> {
+  block:{id:number|null;source:'CALCULATED'|'CONFIGURED';periodCode:string;name:string;startDate:string;endDate:string;status:string};
+  calendarPreview?:{source:string;mainSemester:{startDate:string;endDate:string};break:{startDate:string;endDate:string};storedSemesterEndDate:string;requiresCalendarReview:boolean}|null;
+  policy:{minimumToPrepare:number;preparationRangeEnd:number;classCapacity:number};
+  summary:{courseCount:number;proposedClassCount:number;waitingStudentCourseCount:number};
+  excludedStudentCount:number;unresolvedAlternativeStudentCount:number;limitations:string[];computedAt:string;
+}
