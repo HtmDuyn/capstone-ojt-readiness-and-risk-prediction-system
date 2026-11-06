@@ -14,6 +14,8 @@ export async function loadCoursePlanData(c:PoolClient,studentId:number) {
 }
 export async function coursePlanWithClient(c:PoolClient,studentId:number) {
   const {data,progress,groups,catalog,valid}=await loadCoursePlanData(c,studentId);
-  return buildCoursePlan({requirements:progress.requirements,attempts:data.attempts,groups,aliases:data.aliases,catalog,valid});
+  const requirements=progress.requirements.map(r=>({...r,
+    recommendedSemester:data.courses.find(course=>course.ProgramCourseID===r.id)?.RecommendedSemester??null}));
+  return buildCoursePlan({requirements,attempts:data.attempts,groups,aliases:data.aliases,catalog,valid});
 }
 

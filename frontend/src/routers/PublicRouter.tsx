@@ -25,8 +25,7 @@ import EducationSupportClassDemand from "@/pages/education/EducationSupportClass
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAcademicProfile from "@/pages/student/StudentProfile";
-import StudentFeaturePage from "@/pages/student/StudentFeature";
-import StudentAIRisk from '@/pages/student/StudentAIRisk';
+import StudentOjtRisk from '@/pages/student/StudentOjtRisk';
 import StudentOJTProgress from '@/pages/student/StudentOJTProgress';
 import StudentResults from '@/pages/student/StudentResults';
 import StudentNotifications from '@/pages/student/StudentNotifications';
@@ -82,8 +81,8 @@ const studentRoutes: RouteObject = {
     { path: "/student", element: <Navigate to="/student/dashboard" replace /> },
     { path: "/student/dashboard", element: <StudentDashboard /> },
     { path: "/student/academic-profile", element: <StudentAcademicProfile /> },
-    { path: "/student/risk-prediction", element: <StudentAIRisk /> },
-    { path: "/student/roadmap-consulting", element: <StudentFeaturePage /> },
+    { path: "/student/risk-prediction", element: <StudentOjtRisk /> },
+    { path: "/student/roadmap-consulting", element: <StudentOjtRisk /> },
     { path: "/student/ojt-registration", element: <StudentOjtRegistration /> },
     { path: "/student/ojt-profile", element: <Navigate to="/student/ojt-registration" replace /> },
     { path: "/student/internship-progress", element: <StudentOJTProgress /> },
@@ -165,7 +164,6 @@ export const router = createBrowserRouter([
             navItems={getMenuByRole("admin")}
             homePath="/admin/dashboard"
             brandSubtitle="Quản trị viên"
-            showAIConsult={false}
           />
         ),
         children: [
@@ -204,7 +202,6 @@ export const router = createBrowserRouter([
             navItems={getMenuByRole("education")}
             homePath="/education/dashboard"
             brandSubtitle="Phòng Đào tạo"
-            showAIConsult={false}
           />
         ),
 
@@ -298,7 +295,6 @@ export const router = createBrowserRouter([
             navItems={getMenuByRole("qhdn")}
             homePath="/qhdn/dashboard"
             brandSubtitle="Phòng Quan hệ Doanh nghiệp"
-            showAIConsult={false}
           />
         ),
         children: [
@@ -331,7 +327,6 @@ export const router = createBrowserRouter([
               navItems={getMenuByRole("enterprise")}
               homePath="/enterprise/dashboard"
               brandSubtitle="Đối tác Doanh nghiệp"
-              showAIConsult={false}
             />
           </EnterpriseProvider>
         ),

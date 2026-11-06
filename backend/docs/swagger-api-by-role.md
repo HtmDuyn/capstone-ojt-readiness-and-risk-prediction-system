@@ -191,7 +191,7 @@ Xem học tập, chọn combo và đăng ký OJT.
 | 10 | GET | `/api/students/me/notifications` | thông báo/lọc unread/phân trang, trả unreadCount cùng response | `GET /api/students/me/notifications` |
 | 11 | PATCH | `/api/students/me/notifications/{id}` | người nhận đánh dấu đọc, idempotent | `PATCH /api/students/me/notifications/{id}` |
 | 12 | GET | `/api/students/me/dashboard` | tổng hợp; không tạo thuật toán học vụ mới | `GET /api/students/me/dashboard` |
-| 13 | GET | `/api/students/me/roadmap-recommendations` | tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc | `GET /api/students/me/roadmap-recommendations` |
+| 13 | GET | `/api/students/me/ojt-risk-assessment` | Đánh giá rủi ro OJT và đề xuất lộ trình tương ứng | `GET /api/students/me/ojt-risk-assessment` |
 | 14 | POST | `/api/students/me/cv` | Upload hoặc thay CV cá nhân | `POST /api/students/me/cv` |
 | 15 | GET | `/api/students/{id}/cv` | Tải CV của sinh viên | `GET /api/students/{id}/cv` |
 | 16 | GET | `/api/job-applications` | Danh sách hồ sơ ứng tuyển doanh nghiệp | `GET /api/job-applications` |
@@ -201,13 +201,6 @@ Xem học tập, chọn combo và đăng ký OJT.
 | 20 | GET | `/api/students/me/tasks/{id}/submissions` | Lịch sử nộp bài của mình | `GET /api/students/me/tasks/{id}/submissions` |
 | 21 | POST | `/api/students/me/tasks/{id}/submissions` | Nộp nội dung hoặc đường dẫn bài làm | `POST /api/students/me/tasks/{id}/submissions` |
 | 22 | GET | `/api/students/me/internships` | Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố | `GET /api/students/me/internships` |
-| 23 | GET | `/api/students/me/academic-warning` | Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu | `GET /api/students/me/academic-warning` |
-| 24 | POST | `/api/students/me/course-impact` | Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể | `POST /api/students/me/course-impact` |
-| 25 | POST | `/api/students/me/study-simulation` | Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn | `POST /api/students/me/study-simulation` |
-| 26 | POST | `/api/students/me/course-advice` | Tư vấn môn học/học lại, ưu tiên môn tiên quyết đang chặn môn sau | `POST /api/students/me/course-advice` |
-| 27 | POST | `/api/students/me/academic-chat` | Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình | `POST /api/students/me/academic-chat` |
-| 28 | GET | `/api/students/me/ojt-readiness` | Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ | `GET /api/students/me/ojt-readiness` |
-| 29 | POST | `/api/students/me/ojt-advice` | Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập | `POST /api/students/me/ojt-advice` |
 
 ## Auth
 

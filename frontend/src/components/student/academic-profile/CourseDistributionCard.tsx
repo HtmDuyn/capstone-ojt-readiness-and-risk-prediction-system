@@ -1,9 +1,7 @@
 import React from 'react';
 import type { CourseCategoryDistribution } from '@/types/student/academicProfileTypes';
-import { useStudentAIConsult } from '../../../layouts/BaseLayout';
 
 export const CourseDistributionCard: React.FC<{ categories: CourseCategoryDistribution[] }> = ({ categories }) => {
-  const { openAIConsult } = useStudentAIConsult();
 
   return (
     <div className="card-glass p-5 sm:p-6 flex flex-col h-full min-h-[360px]">
@@ -12,15 +10,6 @@ export const CourseDistributionCard: React.FC<{ categories: CourseCategoryDistri
         <h3 className="text-base sm:text-lg font-bold text-slate-800 font-outfit tracking-tight">
           Phân bổ môn học
         </h3>
-        <button
-          type="button"
-          onClick={() =>
-            openAIConsult('Phân tích chi tiết phân bổ môn học theo từng chuyên ngành của tôi.')
-          }
-          className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer px-1"
-        >
-          Chi tiết
-        </button>
       </div>
 
       {/* Categories List */}

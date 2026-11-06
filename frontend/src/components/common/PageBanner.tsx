@@ -1,8 +1,7 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { StudentProfile } from '@/types/student/studentDashboardTypes';
 import { getStudentMenuItemById, getStudentMenuItemByPath } from '@/config/menus/studentMenu';
-import { useBaseLayout } from '../../layouts/BaseLayout';
 
 export interface BannerAction {
   label: string;
@@ -56,7 +55,7 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   onViewRoadmap,
 }) => {
   const location = useLocation();
-  const { openAIConsult } = useBaseLayout();
+  const navigate = useNavigate();
 
   // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
   const preset = menuId
@@ -102,10 +101,10 @@ export const PageBanner: React.FC<PageBannerProps> = ({
     };
   } else if (presetBanner?.primaryActionLabel) {
     resolvedPrimary = {
-      label: presetBanner.primaryActionLabel,
+      label: presetBanner.defaultAiPrompt ? 'Xem rủi ro và lộ trình' : presetBanner.primaryActionLabel,
       onClick: () => {
         if (presetBanner.defaultAiPrompt) {
-          openAIConsult(presetBanner.defaultAiPrompt);
+          navigate('/student/dashboard#ojt-risk');
         }
       },
     };

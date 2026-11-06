@@ -1,4 +1,4 @@
-import { AcademicWarningPanel } from '@/components/student/dashboard/AcademicWarningPanel';
+import { OjtRiskPanel } from '@/components/student/dashboard/OjtRiskPanel';
 import { Link } from 'react-router-dom';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
@@ -39,7 +39,7 @@ export const StudentDashboard = () => {
         error={resource.error}
         retry={resource.reload}
       />
-      <AcademicWarningPanel key={'academic-warning:' + (profile?.id ?? 'pending') + ':' + revision} />
+      <OjtRiskPanel key={'ojt-risk:' + (profile?.id ?? 'pending') + ':' + revision} />
       {data && (
         <>
           <AcademicMetrics data={data.academic} />

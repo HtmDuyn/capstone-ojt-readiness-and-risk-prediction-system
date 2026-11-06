@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { SubjectStatus, SubjectItem } from '@/types/student/academicProfileTypes';
-import { DownloadIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/common/icons/AppIcons';
-import { useStudentAIConsult } from '../../../layouts/BaseLayout';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/common/icons/AppIcons';
 
 /* ─── Status Badge ─────────────────────────────────────────── */
 const STATUS_CONFIG: Record<SubjectStatus, { label: string; dot: string; pill: string }> = {
@@ -51,7 +50,6 @@ const MAX_PAGE_VISIBLE = 4;
 
 /* ─── Component ────────────────────────────────────────────── */
 export const SubjectListTableCard: React.FC<{ subjects: SubjectItem[] }> = ({ subjects }) => {
-  const { openAIConsult } = useStudentAIConsult();
   const [filter, setFilter] = useState<string>('all');
   const [page, setPage] = useState<number>(1);
 
@@ -101,16 +99,6 @@ export const SubjectListTableCard: React.FC<{ subjects: SubjectItem[] }> = ({ su
           </div>
 
           {/* Export Button */}
-          <button
-            type="button"
-            onClick={() =>
-              openAIConsult('Tôi muốn xuất danh sách môn học ra file Excel/CSV. Hướng dẫn cách thực hiện?')
-            }
-            className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 rounded-xl transition-colors shadow-2xs cursor-pointer"
-            title="Xuất danh sách"
-          >
-            <DownloadIcon size={17} />
-          </button>
         </div>
       </div>
 

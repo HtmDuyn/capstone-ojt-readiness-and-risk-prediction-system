@@ -2973,64 +2973,6 @@ Body: application/json — bắt buộc.
 | enrollmentYear | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID tài khoản. |
 | currentSemester | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID tài khoản. |
 
-## POST /api/students/me/academic-chat
-
-Hỏi đáp môn nợ, tín chỉ, GPA và điều kiện OJT của chính mình
-
-Hỏi đáp từng câu độc lập, chưa lưu lịch sử hội thoại. Số liệu lấy từ hồ sơ của tài khoản JWT; không nhận studentId hoặc số liệu do client cung cấp. Câu hỏi xin tư vấn dùng Gemini theo điều kiện theo dõi sớm. Câu hỏi ngoài học vụ trả OUT_OF_SCOPE. Không dự báo xác suất rủi ro.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| message | string | Có | minLength=1; maxLength=1000 |  |
-
-## GET /api/students/me/academic-warning
-
-Mức cảnh báo sớm theo quy tắc học vụ: thấp, theo dõi, cao hoặc thiếu dữ liệu
-
-Tự lấy hồ sơ và kỳ OJT từ JWT. Quy tắc ACADEMIC_RULES_V1: đạt ngưỡng hiện tại => LOW; kỳ 2–4 so môn bắt buộc kỳ trước chưa hoàn thành và môn nợ chặn tiên quyết; kỳ 4 có nút chặn => HIGH; kỳ 5 nếu đạt mọi môn đang học vẫn chưa đạt ngưỡng => HIGH, nếu kịch bản đạt ngưỡng => MEDIUM. Đến hạn xét hoặc đến kỳ OJT mà chưa đạt => HIGH. Thiếu dữ liệu không tự gán LOW. Không gọi Gemini, không tính xác suất, không ghi kết quả OJT chính thức. Mốc thời gian chốt điểm môn học chưa được xác minh; luôn trả limitations. Đây là chính sách triển khai phiên bản đầu để nhà trường rà soát. GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Không có request body.
-
-## POST /api/students/me/course-advice
-
-Tư vấn môn học/học lại, ưu tiên môn tiên quyết đang chặn môn sau
-
-Gửi {}. Backend xếp ưu tiên từ chương trình đã công bố và kết quả học tập, phân biệt nhóm tiên quyết AND/OR. canPlan chỉ nói đã đáp ứng tiên quyết trên dữ liệu hiện tại, không xác nhận mở lớp hoặc quyền đăng ký; môn tiên quyết phải được hoàn thành trước kỳ học môn sau. Gemini chọn khuyến nghị chung; không tự tạo quan hệ môn. Cần đủ điều kiện theo dõi sớm từ kỳ 2.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-Schema: object
-
-## POST /api/students/me/course-impact
-
-Ảnh hưởng trực tiếp/gián tiếp nếu chưa đạt một môn cụ thể
-
-Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| courseCode | string | Có | minLength=1; maxLength=20 |  |
-
 ## POST /api/students/me/cv
 
 Upload hoặc thay CV cá nhân
@@ -3113,34 +3055,6 @@ Body: application/json — bắt buộc.
 | --- | --- | --- | --- | --- |
 | isRead | boolean | Có |  |  |
 
-## POST /api/students/me/ojt-advice
-
-Tạo tư vấn tiến độ OJT cho sinh viên đang đăng nhập
-
-Chỉ dùng dữ liệu backend. Trước kỳ 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ trả NOT_AVAILABLE và không gọi Gemini. Mặc định AI tắt; thiếu cấu hình hoặc lỗi API trả FALLBACK. Không tạo xác suất rủi ro. Không lưu/cache tư vấn trong bước chuẩn bị này.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| ojtSemesterId | integer | Có | minimum=1 |  |
-
-## GET /api/students/me/ojt-readiness
-
-Tiến độ của chính sinh viên, tự xác định kỳ OJT theo hồ sơ
-
-GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Không có request body.
-
 ## GET /api/students/me/opportunities
 
 Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp
@@ -3156,36 +3070,6 @@ Xác thực: Bearer token; role/ownership theo chức năng.
 | query | limit | integer | Không | minimum=1 |  |
 
 Không có request body.
-
-## GET /api/students/me/roadmap-recommendations
-
-tư vấn AI lộ trình; khác đề xuất môn bằng quy tắc
-
-GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-| Vị trí | Tên | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- | --- |
-| query | ojtSemesterId | integer | Có | minimum=1; maximum=2147483647 | ID kỳ OJT. |
-
-Không có request body.
-
-## POST /api/students/me/study-simulation
-
-Mô phỏng tín chỉ, môn nợ và điều kiện OJT nếu đạt các môn đã chọn
-
-Dữ liệu từ hồ sơ JWT. Không ghi DB, không gọi AI để tính số liệu. Chỉ nhận môn thuộc chương trình/lựa chọn đã xác nhận; không nhận ID sinh viên hoặc điểm từ client. Mô phỏng không cam kết hoàn thành trong cùng kỳ, không thay đổi kết quả chính thức. prerequisiteWarnings nêu điều kiện chưa đạt hiện tại; cần hoàn thành tiên quyết ở kỳ trước. Ảnh hưởng gián tiếp là đường liên hệ, không bảo đảm mọi môn bị chặn nếu có nhánh lựa chọn khác.
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Body: application/json — bắt buộc.
-
-| Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
-| --- | --- | --- | --- | --- |
-| passedCourseCodes | array<string> | Có | minItems=1; maxItems=20; uniqueItems=true |  |
 
 ## GET /api/students/me/tasks
 
@@ -3236,3 +3120,16 @@ Body: application/json — bắt buộc.
 | Trường JSON | Kiểu | Bắt buộc | Ràng buộc | Ý nghĩa |
 | --- | --- | --- | --- | --- |
 | content | string | Có | minLength=1; maxLength=10000 |  |
+
+## GET /api/students/me/ojt-risk-assessment
+
+Đánh giá rủi ro OJT và đề xuất lộ trình tương ứng
+
+Luồng mới: đánh giá rủi ro theo quy tắc học vụ trước, sau đó đề xuất môn học từ chương trình đã đối soát. Không nhận body hoặc query; tự lấy sinh viên và kỳ OJT từ JWT. Kỳ dưới 2, chưa có tín chỉ hoặc dữ liệu không hợp lệ: INSUFFICIENT_DATA, roadmap NOT_AVAILABLE và không gợi ý môn. Thiếu dữ liệu tiên quyết: roadmap DATA_INCOMPLETE. Không gọi Gemini, không tính xác suất hoặc ghi kết quả chính thức. Lộ trình là thứ tự ưu tiên, chưa phải lịch mở lớp hay đăng ký môn. Các API cảnh báo, tư vấn, hỏi đáp và mô phỏng cũ đã được bỏ. GET không nhận body. ID nằm trong path; bộ lọc và phân trang nằm trong query. Sinh viên chỉ truy cập dữ liệu thuộc phạm vi tài khoản.
+
+- Authorization: Bearer <student-token>
+- Query/body: none.
+- Response: success, data.status, data.student, data.ojtSemesterId, data.risk, data.roadmap.
+- risk.level: LOW / MEDIUM / HIGH / INSUFFICIENT_DATA.
+- roadmap.status: READY / NOT_AVAILABLE / DATA_INCOMPLETE.
+- Errors: 400 invalid input; 401 missing token; 403 wrong role; 404 missing student.

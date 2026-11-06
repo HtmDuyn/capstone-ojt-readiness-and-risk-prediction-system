@@ -1,1 +1,1 @@
-export { default, StudentFeaturePage } from './StudentFeature';
+export { default, default as StudentFeaturePage } from './StudentOjtRisk';
