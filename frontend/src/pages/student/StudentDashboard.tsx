@@ -4,7 +4,6 @@ import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
 import { getStudentDashboard } from '@/services/studentService';
 import {
-  AcademicMetrics,
   Card,
   dateText,
   EligibilityCard,
@@ -42,7 +41,6 @@ export const StudentDashboard = () => {
       <OjtRiskPanel key={'ojt-risk:' + (profile?.id ?? 'pending') + ':' + revision} />
       {data && (
         <>
-          <AcademicMetrics data={data.academic} />
           <div className="grid xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 space-y-6">
               <Card title="Tiến độ chương trình đào tạo">

@@ -147,12 +147,12 @@ export function describeStudentRest(spec: Schema): Schema {
     responses:{200:envelope(object({status:{type:'string',enum:['ASSESSED','INSUFFICIENT_DATA']},
       student:object({id,fullName:text,studentCode:text,currentSemester:number}),ojtSemesterId:nullable(id),
       risk:reference('AcademicRuleWarning'),roadmap:object({status:{type:'string',enum:['READY','NOT_AVAILABLE','DATA_INCOMPLETE']},
-        basedOnRiskLevel:warningLevel,targetSemester:{type:'integer',enum:[6]},objective:text,message:text,actions:array(text),limitations:array(text),
+        basedOnRiskLevel:warningLevel,targetSemester:{type:'integer',enum:[5]},objective:text,message:text,actions:array(text),limitations:array(text),
         items:array(object({courseId:id,courseCode:nullableText,name:nullableText,priority:id,
           action:{type:'string',enum:['RETAKE','STUDY']},stage:{type:'string',enum:['PRIORITIZE_NOW','AFTER_PREREQUISITES']},
           canPlan:{type:'boolean'},explanation:text,prerequisites:array({type:'object',additionalProperties:true}),
           dependentCourses:array({type:'object',additionalProperties:true}),downstreamCourses:array({type:'object',additionalProperties:true}),
-          requirementId:id,recommendedSemester:{type:'integer',minimum:0,maximum:6},credits:number,isAlternative:{type:'boolean'},availability:{type:'string',enum:['NOT_MANAGED']}}))})})),
+          requirementId:id,recommendedSemester:{type:'integer',minimum:0,maximum:5},credits:number,isAlternative:{type:'boolean'},availability:{type:'string',enum:['NOT_MANAGED']}}))})})),
       400:{description:'Không nhận query hoặc body'},401:{description:'Chưa đăng nhập'},403:{description:'Chỉ dành cho sinh viên'},404:{description:'Không có hồ sơ sinh viên'}}}};
   for (const [path, item] of Object.entries(spec.paths) as [string, Schema][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
