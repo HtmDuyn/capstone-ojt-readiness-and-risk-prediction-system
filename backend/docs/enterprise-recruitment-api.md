@@ -13,7 +13,7 @@ Tất cả endpoint mới yêu cầu JWT ENTERPRISE. Doanh nghiệp được l�
 | GET | `/api/enterprise/recruitment/windows` | Đợt đăng tin, hạn và trạng thái mở |
 | GET | `/api/enterprise/recruitment/posts` | Tổng hợp tin và toàn bộ chi tiết các vị trí |
 | POST | `/api/enterprise/recruitment/posts` | Tạo tin và tự gửi QHDN duyệt |
-| PATCH | `/api/enterprise/recruitment/posts/:id` | Sửa tin chưa công bố và tự gửi lại QHDN |
+| PATCH | `/api/enterprise/recruitment/posts/:id` | Sửa tin còn trong hạn đợt đăng tuyển, kể cả đã công bố, và tự gửi lại QHDN |
 
 GET posts hỗ trợ `postId`, `positionId`, `windowId`, `status`, `page`, `limit` (tối đa 100). Cùng một endpoint được dùng cho cả danh sách và màn hình chi tiết. Lọc `positionId` chọn tin chứa vị trí đó, vẫn trả toàn bộ vị trí của tin. Không có kết quả thuộc doanh nghiệp hiện tại thì trả danh sách rỗng.
 
@@ -93,8 +93,9 @@ Body POST mẫu (thay `windowId` và hạn theo dữ liệu thực):
 - Tạo thành công trả 201, lưu `PENDING_REVIEW` trong cùng transaction với các vị trí. Tin xuất hiện ngay trong hàng chờ QHDN bằng API hiện có; chưa hiển thị cho sinh viên trước khi QHDN công bố. Không gửi email hoặc tạo thông báo ngoài luồng.
 - PATCH chỉ gửi các trường cần sửa. Kết quả vẫn là `PENDING_REVIEW`, không cần gọi API gửi duyệt. Khi gửi `positions`, giữ đầy đủ các vị trí cũ kèm `id`; vị trí mới không có `id`.
 - Chỉ cho tạo/sửa khi đợt OPEN, đã tới giờ mở và chưa tới hạn. `deadlineAt` phải sau hạn đăng tin của doanh nghiệp và trong học kỳ.
-- Tin đã công bố bị khóa sửa. Không xóa vị trí cũ để bảo toàn lịch sử; có thể đặt capacity bằng 0 khi chưa có sinh viên được nhận, nếu tin vẫn còn ít nhất một vị trí có chỉ tiêu dương.
-- Chặn giảm capacity xuống thấp hơn số phân công chưa hủy của vị trí. Không sửa vị trí dùng chung với tin khác.
+- Tin DRAFT/PENDING_REVIEW/REJECTED/PUBLISHED được sửa nếu đợt OPEN, đã bắt đầu và chưa hết endsAt. Tin đã công bố sửa xong quay về PENDING_REVIEW để QHDN duyệt lại; các phân công hiện có giữ nguyên. Tin CLOSED/ARCHIVED vẫn bị khóa, kể cả khi đợt còn hạn.
+- Chặn giảm capacity xuống thấp hơn số sinh viên đã xác nhận tại từng vị trí (đếm phân công chưa hủy). Ví dụ đã xác nhận 3 sinh viên: giảm từ 5 xuống 3 hợp lệ, xuống 2 bị từ chối với 409 CAPACITY_BELOW_ACCEPTED. Đếm lại sau khi khóa vị trí, trong transaction dùng cùng advisory lock với thao tác nhận sinh viên để tránh vượt chỉ tiêu khi có yêu cầu đồng thời.
+- Không xóa vị trí cũ để bảo toàn lịch sử; có thể đặt capacity bằng 0 khi chưa có sinh viên được nhận, nếu tin vẫn còn ít nhất một vị trí có chỉ tiêu dương. Không sửa vị trí dùng chung với tin khác.
 
 QHDN tiếp tục dùng API mở đợt và duyệt/công bố hiện có, không đổi request/response hoặc quyền.
 
@@ -143,7 +144,7 @@ Kiểm thử PostgreSQL dùng DB riêng, có chặn nhầm host/cổng/tên DB; 
 
 ```powershell
 $env:ENTERPRISE_TEST_DATABASE_URL='postgresql://enterprise_test@127.0.0.1:55440/enterprise_recruitment_test'
-npm run test:enterprise-recruitment
+node --test tests/enterprise-recruitment.integration.cjs
 ```
 
 Kiểm tra quyền, cách ly doanh nghiệp, tạo/sửa tự gửi duyệt, GET tổng hợp, API cũ bị gỡ, chỉ tiêu giảm ngay khi nhận, tranh chấp đồng thời, giới hạn giảm capacity, tự chuyển vòng, giữ nguyên dữ liệu tin QHDN import và tôn trọng QHDN chủ động đóng tin.

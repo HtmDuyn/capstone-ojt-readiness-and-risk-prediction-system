@@ -75,7 +75,7 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
   if (!id && !positions) throw invalid('positions is required.');
   return academicTransaction(async c => {
     const own = await company(c,actor), before = id ? await ownPost(c,id,actor,true) : null;
-    if (before && !['DRAFT','REJECTED','PENDING_REVIEW'].includes(before.Status)) throw invalid('Only unpublished posts may be edited.',409,'RECRUITMENT_POST_LOCKED');
+    if (before && !['DRAFT','REJECTED','PENDING_REVIEW','PUBLISHED'].includes(before.Status)) throw invalid('Closed or archived posts cannot be edited.',409,'RECRUITMENT_POST_LOCKED');
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
     assertOpen(w);
     const title = requiredText(b.title ?? before?.Title,'title',500), content = requiredText(b.content ?? before?.Content,'content',30000);
@@ -99,6 +99,8 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
         if (pos.id && !existing.some(p => p.PositionID === pos.id)) throw invalid('Position does not belong to this post.',403,'POSITION_SCOPE_DENIED');
         if (pos.id) {
           if ((await c.query('SELECT 1 FROM "RecruitmentPostPositions" WHERE "PositionID"=$1 AND "PostID"<>$2',[pos.id,postId])).rowCount) throw invalid('A position shared with another post cannot be edited.',409,'POSITION_SHARED');
+          // Recount confirmed placements after locking the position. Acceptance uses the
+          // same academic transaction lock, so a concurrent acceptance cannot bypass this floor.
           const used = (await c.query(`SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "PositionID"=$1
             AND COALESCE(UPPER("Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[pos.id])).rows[0].n;
           if (pos.capacity < used) throw invalid('Capacity cannot be lower than the number of accepted students.',409,'CAPACITY_BELOW_ACCEPTED');
