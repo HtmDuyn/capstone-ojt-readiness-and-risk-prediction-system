@@ -70,7 +70,7 @@ test('enterprise-only recruitment workflow',async t=>{
    const r=await fetch(base+url,{method,headers:{Authorization:'Bearer '+token(ent)}});assert.equal(r.status,404);
   }
  });
- await t.test('edit remains submitted; deadline and publication prevent further edits',async()=>{
+ await t.test('published posts remain editable within the intake and return to QHDN review',async()=>{
   assert.equal(expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Updated title'}),200).status,'PENDING_REVIEW');
   expect(await req('POST','/enterprise/recruitment/posts',{...body,companyId:999}),400);
   await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()-interval '1 second' WHERE "WindowID"=$1`,[w.WindowID]);
@@ -78,7 +78,30 @@ test('enterprise-only recruitment workflow',async t=>{
   await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()+interval '1 hour' WHERE "WindowID"=$1`,[w.WindowID]);
   const result=expect(await req('POST',`/recruitment/posts/${created.id}/review`,{decision:'PUBLISH',reason:'Valid post'},staff),200);
   assert.equal(result.status,'PUBLISHED');
-  expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'After publication'}),409);
+  const edited=expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'After publication'}),200);
+  assert.equal(edited.title,'After publication');assert.equal(edited.status,'PENDING_REVIEW');
+  assert.equal(edited.reviewedAt,null);
+  expect(await req('POST',`/recruitment/posts/${created.id}/review`,{decision:'PUBLISH',reason:'Reviewed updated content'},staff),200);
+ });
+ await t.test('published edits are blocked after the intake expires or closes, and before it starts',async()=>{
+  const before=(await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1`,[created.id])).rows[0];
+  await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()-interval '1 second' WHERE "WindowID"=$1`,[w.WindowID]);
+  const expired=await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Expired edit'});
+  expect(expired,409);assert.equal(expired.body.errorCode,'RECRUITMENT_WINDOW_CLOSED');
+  await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()+interval '1 hour',"Status"='CLOSED' WHERE "WindowID"=$1`,[w.WindowID]);
+  expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Closed intake edit'}),409);
+  await db.query(`UPDATE "RecruitmentWindows" SET "Status"='OPEN',"StartsAt"=clock_timestamp()+interval '1 minute' WHERE "WindowID"=$1`,[w.WindowID]);
+  expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Early edit'}),409);
+  await db.query(`UPDATE "RecruitmentWindows" SET "StartsAt"=clock_timestamp()-interval '1 day' WHERE "WindowID"=$1`,[w.WindowID]);
+  assert.deepEqual((await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1`,[created.id])).rows[0],before);
+ });
+ await t.test('QHDN closed and archived posts cannot be reopened by enterprise editing',async()=>{
+  const closed=expect(await req('POST','/enterprise/recruitment/posts',{...body,title:'Closed post fixture'}),201);
+  expect(await req('POST',`/recruitment/posts/${closed.id}/close`,{reason:'QHDN explicitly closed'},staff),200);
+  const result=await req('PATCH',`/enterprise/recruitment/posts/${closed.id}`,{title:'Cannot reopen'});
+  expect(result,409);assert.equal(result.body.errorCode,'RECRUITMENT_POST_LOCKED');
+  await db.query(`UPDATE "RecruitmentPosts" SET "Status"='ARCHIVED' WHERE "PostID"=$1`,[closed.id]);
+  expect(await req('PATCH',`/enterprise/recruitment/posts/${closed.id}`,{title:'Cannot edit archive'}),409);
  });
  await t.test('ownership prevents reading and editing another company',async()=>{
   const own=(await db.query(`SELECT "EnterpriseID" id FROM "EnterpriseUsers" WHERE "UserID"=$1`,[ent.UserID])).rows[0].id;
@@ -88,7 +111,7 @@ test('enterprise-only recruitment workflow',async t=>{
   expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Steal'}),404);
   await db.query(`UPDATE "EnterpriseUsers" SET "EnterpriseID"=$2 WHERE "UserID"=$1`,[ent.UserID,own]);
  });
- let acceptedCandidate;
+ let acceptedCandidate,pendingCandidate;
  await t.test('acceptance immediately creates assignments, reduces slots and prevents concurrent overbooking',async()=>{
   const candidates=(await db.query(`SELECT "CoordinationID" id,"ApplicationID" application_id FROM "StudentEnterpriseCoordination" WHERE "Decision"='PENDING' ORDER BY "CoordinationID" LIMIT 3`)).rows;
   for(const co of candidates) {
@@ -100,17 +123,46 @@ test('enterprise-only recruitment workflow',async t=>{
   assert.equal(results.filter(r=>r.status===200).length,2,JSON.stringify(results));
   assert.equal(results.filter(r=>r.status===409).length,1);
   acceptedCandidate=candidates[results.findIndex(r=>r.status===200)].id;
+  pendingCandidate=candidates[results.findIndex(r=>r.status===409)].id;
   const list=expect(await req('GET',`/enterprise/recruitment/posts?postId=${created.id}`),200);
   assert.equal(list.items[0].positions[0].remainingSlots,0);assert.equal(list.summary.acceptedStudents,2);
   assert.equal((await db.query(`SELECT count(*)::int n FROM "InternshipAssignments" WHERE "PositionID"=$1`,[created.positions[0].id])).rows[0].n,2);
   expect(await req('PATCH',`/enterprise/candidates/${acceptedCandidate}/decision`,{decision:'ACCEPTED',reason:'Suitable'}),200);
  });
- await t.test('enterprise edit cannot reduce capacity below accepted count, even on a pending legacy post',async()=>{
-  // Synthetic pending fixture with historical placements, without changing shared review logic.
-  await db.query(`UPDATE "RecruitmentPosts" SET "Status"='PENDING_REVIEW' WHERE "PostID"=$1`,[created.id]);
-  const result=await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{positions:[{...position,id:created.positions[0].id,capacity:1}]});
+ await t.test('capacity below confirmed students is rejected and the whole published edit rolls back',async()=>{
+  const before=(await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1`,[created.id])).rows[0];
+  const originalPosition=(await db.query(`SELECT * FROM "InternshipPositions" WHERE "PositionID"=$1`,[created.positions[0].id])).rows[0];
+  const result=await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Must roll back',positions:[{...position,id:created.positions[0].id,capacity:1}]});
   expect(result,409);assert.equal(result.body.errorCode,'CAPACITY_BELOW_ACCEPTED');
-  await db.query(`UPDATE "RecruitmentPosts" SET "Status"='PUBLISHED' WHERE "PostID"=$1`,[created.id]);
+  assert.deepEqual((await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1`,[created.id])).rows[0],before);
+  assert.deepEqual((await db.query(`SELECT * FROM "InternshipPositions" WHERE "PositionID"=$1`,[created.positions[0].id])).rows[0],originalPosition);
+  expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{positions:[position]}),400);
+  assert.equal((await db.query(`SELECT count(*)::int n FROM "InternshipAssignments" WHERE "PositionID"=$1`,[created.positions[0].id])).rows[0].n,2);
+ });
+ await t.test('capacity can increase or decrease to the confirmed count without changing placements',async()=>{
+  const update=capacity=>req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{positions:[{...position,id:created.positions[0].id,capacity}]});
+  const increased=expect(await update(4),200);
+  assert.equal(increased.status,'PENDING_REVIEW');assert.equal(increased.positions[0].remainingSlots,2);
+  const above=expect(await update(3),200);
+  assert.equal(above.positions[0].remainingSlots,1);
+  const equal=expect(await update(2),200);
+  assert.equal(equal.positions[0].capacity,2);assert.equal(equal.positions[0].remainingSlots,0);
+  assert.equal((await db.query(`SELECT count(*)::int n FROM "InternshipAssignments" WHERE "PositionID"=$1 AND "Status"='ASSIGNED'`,[created.positions[0].id])).rows[0].n,2);
+  expect(await req('POST',`/recruitment/posts/${created.id}/review`,{decision:'PUBLISH',reason:'Capacity update approved'},staff),200);
+ });
+ await t.test('concurrent acceptance and quota reduction never leave capacity below confirmed count',async()=>{
+  expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{positions:[{...position,id:created.positions[0].id,capacity:3}]}),200);
+  expect(await req('POST',`/recruitment/posts/${created.id}/review`,{decision:'PUBLISH',reason:'One available seat'},staff),200);
+  const results=await Promise.all([
+   req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{positions:[{...position,id:created.positions[0].id,capacity:2}]}),
+   req('PATCH',`/enterprise/candidates/${pendingCandidate}/decision`,{decision:'ACCEPTED',reason:'Concurrent acceptance'}),
+  ]);
+  assert.equal(results.filter(r=>r.status===200).length,1,JSON.stringify(results));
+  assert.equal(results.filter(r=>r.status===409).length,1,JSON.stringify(results));
+  const slots=(await db.query(`SELECT p."Capacity" AS capacity,(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=p."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS confirmed FROM "InternshipPositions" p WHERE p."PositionID"=$1`,[created.positions[0].id])).rows[0];
+  assert.equal(slots.capacity,slots.confirmed);
+  const current=(await db.query(`SELECT "Status" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[created.id])).rows[0];
+  if(current.Status==='PENDING_REVIEW')expect(await req('POST',`/recruitment/posts/${created.id}/review`,{decision:'PUBLISH',reason:'Concurrent test post approved'},staff),200);
  });
  let next;
  await t.test('automatic continuation skips full/pending posts and leaves QHDN imported posts unchanged',async()=>{

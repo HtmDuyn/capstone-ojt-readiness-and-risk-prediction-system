@@ -1408,7 +1408,7 @@ Body: application/json — bắt buộc.
 
 Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu
 
-ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts are immutable. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts can be edited before the intake deadline and must be reviewed again; closed/archived posts stay locked. Capacity may decrease only to or above the confirmed student count for each position. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1427,7 +1427,7 @@ Không có request body.
 
 Tạo tin và tự động gửi QHDN duyệt
 
-ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts are immutable. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts can be edited before the intake deadline and must be reviewed again; closed/archived posts stay locked. Capacity may decrease only to or above the confirmed student count for each position. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1456,7 +1456,7 @@ Body: application/json — bắt buộc.
 
 Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp
 
-Chỉnh sửa tin thuộc doanh nghiệp trong JWT. Lấy id từ GET /api/enterprise/recruitment/posts. Chỉ gửi các trường cần đổi; không gửi windowId/companyId/status. Chỉ được sửa khi đợt đang nhận tin và tin chưa công bố (DRAFT/PENDING_REVIEW/REJECTED). Nếu gửi positions phải giữ đủ các vị trí cũ kèm id; vị trí mới không có id. Không được giảm capacity thấp hơn số sinh viên đã nhận. Lưu thành công tự chuyển PENDING_REVIEW để QHDN duyệt, không cần gọi API gửi duyệt.
+Chỉnh sửa tin thuộc doanh nghiệp trong JWT. Lấy id từ GET /api/enterprise/recruitment/posts. Chỉ gửi các trường cần đổi; không gửi windowId/companyId/status. Được sửa DRAFT/PENDING_REVIEW/REJECTED/PUBLISHED khi đợt OPEN, đã bắt đầu và chưa hết endsAt; tin CLOSED/ARCHIVED không được sửa. Nếu gửi positions phải giữ đủ các vị trí cũ kèm id; vị trí mới không có id. Cho phép giảm capacity nhưng không thấp hơn số sinh viên đã xác nhận tại từng vị trí (không tính phân công đã hủy); backend đếm lại trong transaction cùng khóa với thao tác nhận sinh viên. Ví dụ đã xác nhận 3 sinh viên: capacity=3 được chấp nhận, capacity=2 trả 409 CAPACITY_BELOW_ACCEPTED. Lưu thành công tự chuyển PENDING_REVIEW để QHDN duyệt lại, giữ nguyên sinh viên đã nhận và không cần gọi API gửi duyệt.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
