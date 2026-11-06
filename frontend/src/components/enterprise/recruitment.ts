@@ -39,15 +39,19 @@ export function recruitmentTotals(posts: RecruitmentPost[]) {
     remaining: positions.reduce((sum, p) => sum + p.remainingSlots, 0) };
 }
 
-async function allPages<T extends { id: number }>(fetchPage: (page: number) => Promise<PaginatedResponse<T>>, signal: AbortSignal) {
+export async function loadAllPages<T extends { id: number }>(
+  fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
+  signal: AbortSignal,
+  dataLabel = 'dữ liệu tuyển dụng',
+) {
   if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
   const first = await fetchPage(1);
-  if (!first.success || !first.data || first.data.limit <= 0) throw new Error('Không thể tải dữ liệu tuyển dụng.');
+  if (!first.success || !first.data || first.data.limit <= 0) throw new Error(`Không thể tải ${dataLabel}.`);
   const items = [...first.data.items];
   for (let page = 2; page <= Math.ceil(first.data.total / first.data.limit); page++) {
     if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
     const next = await fetchPage(page);
-    if (!next.success || !next.data) throw new Error('Không thể tải đầy đủ danh sách tuyển dụng.');
+    if (!next.success || !next.data) throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
     items.push(...next.data.items);
   }
   return uniqueById(items);
@@ -55,8 +59,8 @@ async function allPages<T extends { id: number }>(fetchPage: (page: number) => P
 
 export async function loadRecruitmentData(signal: AbortSignal) {
   const [posts, windows] = await Promise.all([
-    allPages(page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
-    allPages(page => enterpriseService.listRecruitmentWindows({ page, limit: 100 }, signal), signal),
+    loadAllPages(page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
+    loadAllPages(page => enterpriseService.listRecruitmentWindows({ page, limit: 100 }, signal), signal),
   ]);
   return { posts, windows };
 }

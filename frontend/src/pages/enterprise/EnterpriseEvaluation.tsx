@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { Award, CheckCircle2, ClipboardCheck, Loader2, AlertCircle, Send } from 'lucide-react';
+import { Award, CheckCircle2, ClipboardCheck, Loader2, AlertCircle, Send, ListChecks } from 'lucide-react';
 import {
   enterpriseService,
   type EnterpriseInternshipItem,
+  type EnterpriseInternshipTask,
 } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
+import { loadAllPages } from '@/components/enterprise/recruitment';
 
 interface EvaluationRow {
   id: number;
@@ -27,7 +29,11 @@ interface EvaluationForm {
   skillScore: string;
   overallScore: string;
   comments: string;
-  reason: string;
+}
+
+interface TaskProgress {
+  completed: number;
+  total: number;
 }
 
 type EvaluationScoreKey = keyof Pick<
@@ -48,7 +54,6 @@ const emptyForm: EvaluationForm = {
   skillScore: '',
   overallScore: '',
   comments: '',
-  reason: '',
 };
 
 const toEvaluationRow = (item: EnterpriseInternshipItem): EvaluationRow => {
@@ -69,8 +74,11 @@ const toEvaluationRow = (item: EnterpriseInternshipItem): EvaluationRow => {
 };
 
 export const EnterpriseEvaluation: React.FC = () => {
-  const { loading: profileLoading } = useEnterprise();
+  const { loading: profileLoading, companyId } = useEnterprise();
   const [evaluations, setEvaluations] = useState<EvaluationRow[]>([]);
+  const [taskProgress, setTaskProgress] = useState<Record<number, TaskProgress>>({});
+  const [taskProgressLoading, setTaskProgressLoading] = useState(true);
+  const [taskProgressError, setTaskProgressError] = useState<string | null>(null);
   const [selectedEval, setSelectedEval] = useState<EvaluationRow | null>(null);
   const [scores, setScores] = useState<EvaluationForm>(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -82,28 +90,62 @@ export const EnterpriseEvaluation: React.FC = () => {
   const fetchEvaluations = useCallback(async () => {
     if (profileLoading) return;
     setLoading(true);
+    setTaskProgressLoading(true);
     setError(null);
+    setTaskProgressError(null);
+    const signal = new AbortController().signal;
     try {
-      const response = await enterpriseService.listInternships();
-      if (!response?.success || !response.data) {
-        throw new Error('Không thể tải danh sách sinh viên thực tập');
-      }
+      const internships = await loadAllPages<EnterpriseInternshipItem>(
+        (page) => enterpriseService.listInternships({ page, limit: 100 }, signal),
+        signal,
+        'danh sách sinh viên thực tập',
+      );
 
       setEvaluations(
-        response.data.items
+        internships
           .filter((item) =>
             ['ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status?.toUpperCase() || '')
           )
           .map(toEvaluationRow)
       );
+
+      try {
+        if (!companyId) {
+          throw new Error('Không tìm thấy doanh nghiệp để tải tiến độ task.');
+        }
+        const tasks = await loadAllPages<EnterpriseInternshipTask>(
+          (page) => enterpriseService.listInternshipTasks(companyId, { page, limit: 100 }, signal),
+          signal,
+          'tiến độ task của sinh viên',
+        );
+        const progressByAssignment: Record<number, TaskProgress> = {};
+        for (const task of tasks) {
+          const progress = progressByAssignment[task.assignmentId] ?? { completed: 0, total: 0 };
+          progress.total += 1;
+          if (['DONE', 'COMPLETED'].includes(task.status.toUpperCase())) {
+            progress.completed += 1;
+          }
+          progressByAssignment[task.assignmentId] = progress;
+        }
+        setTaskProgress(progressByAssignment);
+      } catch (taskError: unknown) {
+        const message = taskError instanceof Error
+          ? taskError.message
+          : 'Không thể tải tiến độ task của sinh viên.';
+        setTaskProgressError(message);
+        console.error('Failed to load internship task progress:', taskError);
+      } finally {
+        setTaskProgressLoading(false);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Không thể tải danh sách đánh giá OJT';
       setError(message);
       console.error('Failed to load internship evaluations:', err);
     } finally {
       setLoading(false);
+      setTaskProgressLoading(false);
     }
-  }, [profileLoading]);
+  }, [companyId, profileLoading]);
 
   useEffect(() => {
     void fetchEvaluations();
@@ -118,19 +160,12 @@ export const EnterpriseEvaluation: React.FC = () => {
       skillScore: item.skillScore == null ? '' : String(item.skillScore),
       overallScore: item.overallScore == null ? '' : String(item.overallScore),
       comments: item.comments,
-      reason: '',
     });
   };
 
   const handleSubmitEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEval) return;
-
-    const reason = scores.reason.trim();
-    if (!reason) {
-      setActionError('Vui lòng nhập lý do nộp hoặc cập nhật đánh giá.');
-      return;
-    }
 
     const scoreValues = {
       completionScore: Number(scores.completionScore),
@@ -153,7 +188,7 @@ export const EnterpriseEvaluation: React.FC = () => {
       await enterpriseService.evaluateInternship(selectedEval.id, {
         ...scoreValues,
         comments: scores.comments.trim() || null,
-        reason,
+        reason: 'Đánh giá kết quả thực tập OJT',
       });
 
       setEvaluations((current) =>
@@ -189,6 +224,10 @@ export const EnterpriseEvaluation: React.FC = () => {
   };
 
   const submittedCount = evaluations.filter((item) => item.status === 'SUBMITTED').length;
+  const selectedProgress = taskProgress[selectedEval?.id ?? -1] ?? { completed: 0, total: 0 };
+  const selectedProgressPercent = selectedProgress.total
+    ? Math.round((selectedProgress.completed / selectedProgress.total) * 100)
+    : 0;
 
   return (
     <div className="space-y-6 pb-12">
@@ -312,69 +351,120 @@ export const EnterpriseEvaluation: React.FC = () => {
 
       {selectedEval && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl space-y-5 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="max-h-[92vh] w-full max-w-xl overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl">
+            <div className="flex items-start justify-between bg-gradient-to-r from-orange-50 via-white to-amber-50 px-6 py-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-500/20">
                   <Award className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900">Đánh giá thực tập OJT</h3>
-                  <p className="text-xs text-slate-500">
-                    {selectedEval.fullName} ({selectedEval.studentCode})
+                  <h3 className="text-base font-extrabold text-slate-900">Đánh giá kết quả OJT</h3>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    {selectedEval.fullName} <span className="text-slate-300">·</span> {selectedEval.studentCode}
                   </p>
+                  <p className="mt-1 text-[11px] text-slate-500">{selectedEval.position || 'Chưa cập nhật vị trí'}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedEval(null)}
                 aria-label="Đóng biểu mẫu"
-                className="font-bold text-slate-400 hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-white hover:text-slate-700"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmitEvaluation} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {scoreFields.map(({ key, label }) => (
-                  <label key={key} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <span className="block font-bold text-slate-700">{label} (0–10)</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.01"
-                        required
-                        inputMode="decimal"
-                        className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        value={scores[key]}
-                        onChange={(e) => setScores({ ...scores, [key]: e.target.value })}
+            <form onSubmit={handleSubmitEvaluation} className="max-h-[calc(92vh-84px)] space-y-5 overflow-y-auto px-6 py-5 text-xs">
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h4 className="flex items-center gap-2 font-bold text-slate-800">
+                    <ListChecks className="h-4 w-4 text-emerald-600" />
+                    Tiến độ task
+                  </h4>
+                  {!taskProgressLoading && !taskProgressError && (
+                    <span className="rounded-lg bg-white px-2.5 py-1.5 font-bold text-slate-700 shadow-sm">
+                      {selectedProgress.completed} / {selectedProgress.total} hoàn thành
+                    </span>
+                  )}
+                </div>
+                {taskProgressLoading ? (
+                  <p className="flex items-center gap-2 text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Đang tải tiến độ task...
+                  </p>
+                ) : taskProgressError ? (
+                  <p role="alert" className="text-rose-700">{taskProgressError}</p>
+                ) : (
+                  <>
+                    <div
+                      className="h-2.5 overflow-hidden rounded-full bg-emerald-100"
+                      role="progressbar"
+                      aria-label="Tiến độ hoàn thành task"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={selectedProgressPercent}
+                    >
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-[width] duration-700"
+                        style={{ width: `${selectedProgressPercent}%` }}
                       />
-                      <span className="text-slate-400">/ 10 điểm</span>
                     </div>
-                  </label>
-                ))}
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      {selectedProgress.total
+                        ? `Đã hoàn thành ${selectedProgressPercent}% số task được giao.`
+                        : 'Sinh viên chưa có task được giao.'}
+                    </p>
+                  </>
+                )}
+              </section>
+
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="font-bold text-slate-800">Chấm điểm theo tiêu chí</h4>
+                  <span className="text-[11px] text-slate-400">Thang điểm 0–10</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {scoreFields.map(({ key, label }) => (
+                    <label
+                      key={key}
+                      className={`rounded-2xl border p-3.5 transition-colors ${
+                        key === 'overallScore'
+                          ? 'border-orange-200 bg-orange-50/70'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="mb-2 block font-semibold text-slate-700">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="0.01"
+                          required
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          className={`w-full rounded-xl border bg-white px-3 py-2.5 text-base font-bold focus:outline-none focus:ring-2 ${
+                            key === 'overallScore'
+                              ? 'border-orange-200 text-orange-600 focus:ring-orange-400'
+                              : 'border-slate-200 text-slate-800 focus:ring-slate-300'
+                          }`}
+                          value={scores[key]}
+                          onChange={(e) => setScores({ ...scores, [key]: e.target.value })}
+                        />
+                        <span className="shrink-0 text-[11px] font-medium text-slate-400">/ 10</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <label className="block space-y-1">
-                <span className="font-semibold text-slate-700">Lý do nộp/cập nhật đánh giá</span>
-                <input
-                  required
-                  maxLength={2000}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Ví dụ: Đánh giá kết quả thực tập cuối kỳ"
-                  value={scores.reason}
-                  onChange={(e) => setScores({ ...scores, reason: e.target.value })}
-                />
-              </label>
-
-              <label className="block space-y-1">
-                <span className="font-semibold text-slate-700">Nhận xét chi tiết</span>
+                <span className="font-semibold text-slate-700">Nhận xét <span className="font-normal text-slate-400">(không bắt buộc)</span></span>
                 <textarea
-                  rows={3}
+                  rows={2}
                   maxLength={5000}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Ghi rõ ưu điểm và những điểm sinh viên cần phát triển thêm..."
                   value={scores.comments}
                   onChange={(e) => setScores({ ...scores, comments: e.target.value })}
@@ -387,7 +477,7 @@ export const EnterpriseEvaluation: React.FC = () => {
                 </p>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-1">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
                   type="button"
                   onClick={() => setSelectedEval(null)}

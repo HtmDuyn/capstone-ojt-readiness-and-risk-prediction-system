@@ -399,18 +399,20 @@ export const enterpriseService = {
     return response.data;
   },
 
-  listCandidates: async (params: PaginatedRequest = {}): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
+  listCandidates: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
     const response = await API.get<PaginatedResponse<EnterpriseCandidateItem>>('/enterprise/candidates', {
       params,
+      signal,
     });
     return response.data;
   },
 
   // ── Enterprise Internships ────────────────────────────────────────────────
   // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
-  listInternships: async (params: PaginatedRequest = {}): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
+  listInternships: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
     const response = await API.get<PaginatedResponse<EnterpriseInternshipItem>>('/enterprise/internships', {
       params,
+      signal,
     });
     return response.data;
   },
@@ -418,7 +420,7 @@ export const enterpriseService = {
   // ── Internship Tasks ──────────────────────────────────────────────────────
   // Gọi GET /api/internship-tasks
   // companyId BẮT BUỘC với vai trò ENTERPRISE — backend dùng để kiểm tra scope
-  listInternshipTasks: async (companyId: number, params: InternshipTaskListRequest = {}): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
+  listInternshipTasks: async (companyId: number, params: InternshipTaskListRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
     const response = await API.get<PaginatedResponse<EnterpriseInternshipTask>>('/internship-tasks', {
       params: {
         page: params.page ?? 1,
@@ -426,6 +428,7 @@ export const enterpriseService = {
         companyId,
         ...(params.assignmentId !== undefined ? { assignmentId: params.assignmentId } : {}),
       },
+      signal,
     });
     return response.data;
   },

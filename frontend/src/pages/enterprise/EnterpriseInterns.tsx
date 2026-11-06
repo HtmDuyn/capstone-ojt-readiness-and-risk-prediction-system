@@ -884,23 +884,14 @@ export const EnterpriseInterns: React.FC = () => {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
-                          <button
-                            onClick={() => setViewingIntern(intern)}
-                            className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-[11px] inline-flex items-center space-x-1 transition-colors"
-                            title="Xem chi tiết & quản lý nhiệm vụ"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Tasks</span>
-                          </button>
-                          <button
-                            onClick={() => handleOpenAssignModal([intern.id])}
-                            className="p-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 text-[11px] font-semibold transition-colors"
-                            title="Giao task riêng cho sinh viên này"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setViewingIntern(intern)}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-[11px] inline-flex items-center space-x-1 transition-colors"
+                          title="Xem chi tiết & quản lý nhiệm vụ"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Tasks</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1333,23 +1324,13 @@ export const EnterpriseInterns: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    handleOpenAssignModal([viewingIntern.id]);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center space-x-1 shadow-xs transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Giao task</span>
-                </button>
-                <button
-                  onClick={() => setViewingIntern(null)}
-                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
+              <button
+                onClick={() => setViewingIntern(null)}
+                aria-label="Đóng chi tiết sinh viên"
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                ✕
+              </button>
             </div>
 
             {/* Content */}

@@ -6,6 +6,7 @@ import {
   UserCheck,
   ChevronRight,
   Building2,
+  BriefcaseBusiness,
   FileCheck2,
   ClipboardCheck,
   ListChecks,
@@ -14,7 +15,14 @@ import {
   Send,
   AlertTriangle,
 } from 'lucide-react';
-import { enterpriseService, type EnterpriseInternshipTask } from '@/services/enterpriseService';
+import {
+  enterpriseService,
+  type EnterpriseCandidateItem,
+  type EnterpriseInternshipItem,
+  type EnterpriseInternshipTask,
+  type RecruitmentPost,
+} from '@/services/enterpriseService';
+import { loadAllPages, recruitmentTotals } from '@/components/enterprise/recruitment';
 import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -28,6 +36,22 @@ interface StudentTaskProgress {
   todo: number;
   total: number;
 }
+
+interface EnterpriseDashboardStats {
+  totalRecruitmentPosts: number;
+  remainingPositions: number;
+  pendingCandidates: number;
+  acceptedInterns: number;
+  completedInterns: number;
+}
+
+const emptyDashboardStats: EnterpriseDashboardStats = {
+  totalRecruitmentPosts: 0,
+  remainingPositions: 0,
+  pendingCandidates: 0,
+  acceptedInterns: 0,
+  completedInterns: 0,
+};
 
 const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgress[] => {
   const progressByStudent = new Map<number, StudentTaskProgress>();
@@ -65,6 +89,10 @@ export const EnterpriseDashboard: React.FC = () => {
   const [taskProgress, setTaskProgress] = useState<StudentTaskProgress[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
+  const [dashboardStats, setDashboardStats] = useState(emptyDashboardStats);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [chartAnimated, setChartAnimated] = useState(false);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
   const [incidentReport, setIncidentReport] = useState({
     studentId: '',
@@ -73,6 +101,76 @@ export const EnterpriseDashboard: React.FC = () => {
     description: '',
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!companyId) {
+      setStatsError(profileError || 'Không tìm thấy doanh nghiệp để tải thống kê.');
+      setStatsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadDashboardStats = async () => {
+      setStatsLoading(true);
+      setStatsError(null);
+      try {
+        const [posts, candidates, internships] = await Promise.all([
+          loadAllPages<RecruitmentPost>(
+            page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
+            controller.signal,
+            'danh sách tin tuyển dụng',
+          ),
+          loadAllPages<EnterpriseCandidateItem>(
+            page => enterpriseService.listCandidates({ page, limit: 100 }, controller.signal),
+            controller.signal,
+            'danh sách hồ sơ sinh viên',
+          ),
+          loadAllPages<EnterpriseInternshipItem>(
+            page => enterpriseService.listInternships({ page, limit: 100 }, controller.signal),
+            controller.signal,
+            'danh sách thực tập sinh',
+          ),
+        ]);
+        if (controller.signal.aborted) return;
+
+        const publishedPosts = posts.filter(post => post.status === 'PUBLISHED');
+        const activeStatuses = new Set(['ASSIGNED', 'ACTIVE', 'IN_PROGRESS']);
+        const completedInterns = internships.filter(
+          internship => internship.status.toUpperCase() === 'COMPLETED',
+        ).length;
+        setDashboardStats({
+          totalRecruitmentPosts: posts.length,
+          remainingPositions: recruitmentTotals(publishedPosts).remaining,
+          pendingCandidates: candidates.filter(candidate => candidate.decision === 'PENDING').length,
+          acceptedInterns: internships.filter(
+            internship => activeStatuses.has(internship.status.toUpperCase()),
+          ).length,
+          completedInterns,
+        });
+      } catch (err: unknown) {
+        if (controller.signal.aborted) return;
+        const message = err instanceof Error ? err.message : 'Không thể tải thống kê dashboard';
+        setStatsError(message);
+        console.error('Failed to load enterprise dashboard statistics:', err);
+      } finally {
+        if (!controller.signal.aborted) setStatsLoading(false);
+      }
+    };
+
+    void loadDashboardStats();
+    return () => controller.abort();
+  }, [companyId, loading, profileError]);
+
+  useEffect(() => {
+    if (statsLoading || statsError) {
+      setChartAnimated(false);
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => setChartAnimated(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [statsLoading, statsError]);
 
   useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
@@ -120,6 +218,12 @@ export const EnterpriseDashboard: React.FC = () => {
 
   const summary = profile?.summary;
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
+  const internshipStages = [
+    { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: 'bg-amber-500' },
+    { label: 'Đã tiếp nhận', value: dashboardStats.acceptedInterns, color: 'bg-blue-500' },
+    { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: 'bg-emerald-500' },
+  ];
+  const maxInternshipStage = Math.max(1, ...internshipStages.map(stage => stage.value));
 
   return (
     <div className="space-y-5 pb-12">
@@ -167,7 +271,7 @@ export const EnterpriseDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           {
             label: 'Hồ sơ chờ xét duyệt',
@@ -177,6 +281,8 @@ export const EnterpriseDashboard: React.FC = () => {
             icon: Users,
             color: 'blue',
             to: '/enterprise/candidates',
+            dataLoading: loading,
+            usesDashboardStats: false,
           },
           {
             label: 'Sinh viên đang thực tập',
@@ -186,6 +292,8 @@ export const EnterpriseDashboard: React.FC = () => {
             icon: UserCheck,
             color: 'emerald',
             to: '/enterprise/interns',
+            dataLoading: loading,
+            usesDashboardStats: false,
           },
           {
             label: 'Đánh giá OJT chờ xử lý',
@@ -195,6 +303,30 @@ export const EnterpriseDashboard: React.FC = () => {
             icon: FileCheck2,
             color: 'violet',
             to: '/enterprise/evaluation',
+            dataLoading: loading,
+            usesDashboardStats: false,
+          },
+          {
+            label: 'Tổng tin tuyển dụng',
+            value: dashboardStats.totalRecruitmentPosts,
+            unit: 'tin',
+            detail: 'Tổng số tin của doanh nghiệp',
+            icon: BriefcaseBusiness,
+            color: 'blue',
+            to: '/enterprise/jobs',
+            dataLoading: statsLoading,
+            usesDashboardStats: true,
+          },
+          {
+            label: 'Vị trí còn lại',
+            value: dashboardStats.remainingPositions,
+            unit: 'suất',
+            detail: 'Trong các tin đang tuyển',
+            icon: BriefcaseBusiness,
+            color: 'emerald',
+            to: '/enterprise/jobs',
+            dataLoading: statsLoading,
+            usesDashboardStats: true,
           },
         ].map((stat) => {
           const Icon = stat.icon;
@@ -215,7 +347,7 @@ export const EnterpriseDashboard: React.FC = () => {
                     {stat.label}
                   </p>
                   <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-                    {loading ? '...' : stat.value}
+                    {stat.dataLoading ? '...' : stat.usesDashboardStats && statsError ? '—' : stat.value}
                     <span className="ml-1.5 text-xs font-medium text-slate-400">{stat.unit}</span>
                   </p>
                 </div>
@@ -231,6 +363,84 @@ export const EnterpriseDashboard: React.FC = () => {
           );
         })}
       </div>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-slate-900">
+              <TrendingUp className="h-5 w-5 text-orange-500" />
+              Tổng quan sinh viên thực tập
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Số lượng hồ sơ chờ duyệt, sinh viên đã nhận và đã hoàn thành kỳ thực tập.
+            </p>
+          </div>
+          <Link
+            to="/enterprise/candidates"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Xem hồ sơ
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          {statsLoading ? (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+              <p className="text-xs font-medium text-slate-500">Đang tải thống kê sinh viên...</p>
+            </div>
+          ) : statsError ? (
+            <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
+              <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
+              <p className="text-sm font-medium text-rose-700">{statsError}</p>
+            </div>
+          ) : (
+            <div
+              className="relative h-64"
+              role="img"
+              aria-label={internshipStages
+                .map(stage => `${stage.label}: ${stage.value} sinh viên`)
+                .join(', ')}
+            >
+              <div className="absolute inset-x-8 bottom-12 top-2 flex flex-col justify-between" aria-hidden="true">
+                {[0, 1, 2, 3].map(tick => (
+                  <span key={tick} className="border-t border-dashed border-slate-200" />
+                ))}
+              </div>
+              <div className="absolute inset-x-0 bottom-12 top-2 flex items-end justify-around">
+                {internshipStages.map(stage => {
+                  const height = !chartAnimated || stage.value === 0
+                    ? 0
+                    : Math.max((stage.value / maxInternshipStage) * 100, 4);
+                  return (
+                    <div key={stage.label} className="relative flex h-full w-1/4 items-end justify-center">
+                      <span
+                        className="absolute z-10 text-xs font-bold text-slate-700"
+                        style={{ bottom: `calc(${height}% + 6px)` }}
+                      >
+                        {stage.value}
+                      </span>
+                      <div
+                        className={`w-12 rounded-t-lg shadow-sm transition-[height] duration-1000 ease-out sm:w-16 ${stage.color}`}
+                        style={{ height: `${height}%` }}
+                        title={`${stage.label}: ${stage.value} sinh viên`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="absolute inset-x-0 bottom-0 flex h-10 items-center justify-around">
+                {internshipStages.map(stage => (
+                  <span key={stage.label} className="w-1/3 text-center text-[11px] font-semibold text-slate-600">
+                    {stage.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -448,31 +658,6 @@ export const EnterpriseDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Enterprise Info Card */}
-          {profile && (
-            <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 text-xs shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="font-bold text-slate-900">Thông tin liên hệ HR</span>
-                <Link
-                  to="/enterprise/profile"
-                  className="text-orange-600 hover:underline font-semibold text-[11px]"
-                >
-                  Xem chi tiết
-                </Link>
-              </div>
-              <div className="space-y-1.5 text-slate-600">
-                <p>
-                  Đại diện: <strong>{profile.contactPersonName}</strong>
-                </p>
-                <p>
-                  Email: <strong>{profile.contactEmail}</strong>
-                </p>
-                <p>
-                  Ngành nghề: <strong>{profile.industry}</strong>
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
