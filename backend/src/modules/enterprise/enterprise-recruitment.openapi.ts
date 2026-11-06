@@ -19,7 +19,7 @@ export function addEnterpriseRecruitmentOperations(spec: Spec) {
   };
   add('get','/api/enterprise/recruitment/windows','Xem đợt tuyển dụng và hạn doanh nghiệp được đăng tin',{...page,academicPeriodId:id});
   add('get','/api/enterprise/recruitment/posts','Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu',{...page,windowId:id,postId:id,positionId:id,status:{type:'string',enum:['DRAFT','PENDING_REVIEW','REJECTED','PUBLISHED','CLOSED']}});
-  add('post','/api/enterprise/recruitment/posts','Tạo và công bố tin ngay cho sinh viên, không cần QHDN duyệt',{}, {windowId:id,...fields},['windowId','title','content','positions'],201);
+  add('post','/api/enterprise/recruitment/posts','Tạo và công bố tin ngay cho sinh viên, không cần QHDN duyệt',{}, {windowId:id,idempotencyKey:{...text(100),description:'Optional retry key. Reuse the same key and payload to return the existing post with replayed=true; a different payload returns 409.'},...fields},['windowId','title','content','positions'],201);
   add('patch','/api/enterprise/recruitment/posts/{id}','Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp',{},fields);
   const windows = spec.paths['/api/enterprise/recruitment/windows'].get;
   windows.description = 'Xem thời hạn đăng tuyển do QHDN quản lý; doanh nghiệp chỉ đọc. accepting/canCreate=true khi đợt OPEN, trong thời gian cho phép và học kỳ khả dụng. canEdit còn yêu cầu không có đợt OJTRegistrationWindows cùng kỳ đang OPEN trong StartsAt/EndsAt. studentRegistrationWindow và editLockCode giải thích việc khóa sửa. Hạn ứng tuyển của tin là dữ liệu QHDN, khác với endsAt của đợt doanh nghiệp đăng tin.';
