@@ -282,11 +282,6 @@ export interface OjtResult {
   outcome: string | null;
   status: string;
 }
-export interface Roadmap {
-  modelVersion: string;
-  recommendations: string[];
-  isAiRecommendation: boolean;
-}
 export interface Supplementary {
   items: {
     requirementId: number;

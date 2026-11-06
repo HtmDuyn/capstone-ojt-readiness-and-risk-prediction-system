@@ -3,6 +3,7 @@ import { academicReportingService as reports } from '@/services/academicReportin
 import type { Cohort, DemandReport, ReportPeriod, ReportScope } from '@/types/education/reporting.types';
 import { downloadCourseDemand } from '@/utils/downloadFile';
 import React from "react";
+import { RetakeClassProposals } from '@/components/education/RetakeClassProposals';
 const EducationSupportClassDemand: React.FC = () => {
   const [periods, setPeriods] = React.useState<ReportPeriod[]>([]);
   const [cohorts, setCohorts] = React.useState<Cohort[]>([]);
@@ -110,6 +111,7 @@ const EducationSupportClassDemand: React.FC = () => {
         <div className="flex items-center gap-3"><button className="rounded border p-2 disabled:opacity-50" disabled={page === 1 || loading} onClick={() => setPage(v => v - 1)}>Trước</button><span>Trang {page} / {Math.max(1, Math.ceil(data.total / data.limit))}</span><button className="rounded border p-2 disabled:opacity-50" disabled={page * data.limit >= data.total || loading} onClick={() => setPage(v => v + 1)}>Sau</button></div>
       </>}
     </section>
+    <RetakeClassProposals periods={periods} scope={scope} revision={refresh} catalogLoading={catalogLoading}/>
   </div>
   );
 };

@@ -11,6 +11,7 @@ import { selectionReport } from '../combo-registration/window.service';
 import { academicTransaction } from './academic.repository';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';
 import { enumValue } from '../students/student.validation';
+import { retakeClassProposals } from '../academic-reporting/retake-class.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
 const handle=(fn:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await fn(req)});}catch(error){next(error);}};
 router.get('/assessment-windows',...staff,handle(r=>assessmentWindows(r.query)));
@@ -40,6 +41,7 @@ for(const [path,kind]of [['student-imports','STUDENT'],['curriculum-imports','CU
 router.post('/student-imports/:id/email-retries',authenticate,authorizeRoles('ADMIN'),handle(r=>retryStudentImportEmail(positiveId(r.params.id),r.body,r.user),202));
 router.get('/academic-alerts',...staff,handle(r=>alerts(r.query)));
 router.get('/course-demands',...staff,handle(r=>courseDemand(r.query)));
+router.get('/retake-class-proposals',...staff,handle(r=>retakeClassProposals(r.query)));
 router.get('/course-demands/export',...staff,async(req,res,next)=>{try{
   const format=enumValue(req.query.format??'csv',['csv','json'],'format'),data=await courseDemand(req.query,true);
   if(format==='json'){res.json({success:true,data});return;}
