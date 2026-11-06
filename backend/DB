@@ -8414,8 +8414,8 @@ END $student_database_audit$;
 
 -- Enterprise recruitment extension (20261105).
 -- Only enterprise-authored posts participate; QHDN imports and shared workflow stay unchanged.
-ALTER TABLE public."RecruitmentPosts" ADD COLUMN "EnterpriseManaged" boolean NOT NULL DEFAULT false;
-CREATE INDEX "IX_EnterpriseRecruitment_Continuation" ON public."RecruitmentPosts"("OJTSemesterID","WindowID")
+ALTER TABLE public."RecruitmentPosts" ADD COLUMN IF NOT EXISTS "EnterpriseManaged" boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS "IX_EnterpriseRecruitment_Continuation" ON public."RecruitmentPosts"("OJTSemesterID","WindowID")
  WHERE "EnterpriseManaged" AND "Status" IN ('PUBLISHED','CLOSED');
 
 CREATE OR REPLACE FUNCTION public."AdvanceEnterpriseRecruitment"() RETURNS integer
