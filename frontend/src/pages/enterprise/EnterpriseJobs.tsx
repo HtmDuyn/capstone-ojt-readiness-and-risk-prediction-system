@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BriefcaseBusiness, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, Loader2, LockKeyhole, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, BriefcaseBusiness, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, FileText, LayoutGrid, Loader2, LockKeyhole, Pencil, Plus, RefreshCw, Search, UserCheck, Users } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { RecruitmentPostDialog } from '@/components/enterprise/RecruitmentPostDialog';
 import { RecruitmentPostDetailsDialog } from '@/components/enterprise/RecruitmentPostDetailsDialog';
@@ -74,25 +74,28 @@ export function EnterpriseJobs() {
     <PageBanner title={<><BriefcaseBusiness size={27} className="shrink-0 text-orange-400" />Tin tuyển dụng</>}
       breadcrumb={<span className="text-xs font-medium text-purple-200">Doanh nghiệp / Tuyển dụng thực tập</span>}
       description="Kết nối với sinh viên, tìm kiếm nhân sự phù hợp. Quản lý các vị trí và tin tuyển dụng của doanh nghiệp tại đây."
-      badge={<span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200"><CheckCircle2 size={13} />Công bố trực tiếp</span>}
-      extra={<button type="button" disabled={loading || !!error || !activeWindows.length}
+      badge={<span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200"><CheckCircle2 size={13} />Công bố trực tiếp</span>} />
+
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><h2 className="text-lg font-semibold text-slate-900">Quản lý tin tuyển dụng</h2><p className="mt-0.5 text-sm text-slate-500">Theo dõi các tin đã đăng và cập nhật vị trí tuyển dụng.</p></div>
+      <button type="button" disabled={loading || !!error || !activeWindows.length}
         onClick={() => { setSuccess(''); setEditor({ post: null }); }}
-        className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-950/20 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40">
+        className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
         <Plus size={17} />Tạo tin tuyển dụng
-      </button>} />
+      </button>
+    </div>
 
     {success && <div role="status" className="flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
       <CheckCircle2 size={18} className="mt-0.5 shrink-0" /><p>{success}</p>
     </div>}
 
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    {loading ? <div role="status" className="flex items-center justify-center gap-3 border-t border-slate-100 py-16 text-sm text-slate-500">
+    {loading ? <div role="status" className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white py-16 text-sm text-slate-500">
       <Loader2 size={20} className="animate-spin text-orange-600" />Đang tải tin tuyển dụng và thời hạn đăng tin...
-    </div> : error ? <div role="alert" className="border-t border-slate-100 px-5 py-12 text-center">
+    </div> : error ? <div role="alert" className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center">
       <AlertCircle size={22} className="mx-auto mb-2 text-rose-600" /><p className="text-sm text-rose-800">{error}</p>
       <button type="button" onClick={refresh} className="mt-3 text-sm font-semibold text-orange-700 hover:underline">Thử lại</button>
     </div> : <>
-      <section aria-label="Đợt và hạn đăng tin" className="border-y border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-7">
+      <section aria-label="Đợt và hạn đăng tin" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 lg:max-w-md">
             <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
@@ -104,10 +107,8 @@ export function EnterpriseJobs() {
             </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
           </div>
           {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <div><p className="flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.endsAt)}</p>
-              <p className="mt-0.5 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)}</p>
-              <p className="mt-0.5 text-xs text-slate-400">Thời hạn do QHDN thiết lập</p>
+            <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.endsAt)}</strong></p>
+              <p className="mt-1 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)} · QHDN quản lý thời hạn</p>
             </div>
             <p className={`inline-flex items-center gap-2 text-xs font-medium ${accepts ? 'text-emerald-700' : 'text-slate-500'}`}>
               <span className="h-1.5 w-1.5 rounded-full bg-current" />{accepts ? 'Đang nhận tin' : 'Hiện không nhận tin'}
@@ -120,12 +121,21 @@ export function EnterpriseJobs() {
         </p>}
       </section>
 
-      <dl aria-label="Tổng quan tuyển dụng" className="grid grid-cols-2 gap-4 border-b border-slate-100 px-5 py-5 sm:grid-cols-4 sm:px-7">
-        {[['Tin tuyển dụng', filtered.length], ['Vị trí tuyển', totals.positions], ['Tổng chỉ tiêu', totals.capacity], ['Chỗ còn lại', totals.remaining]].map(([label, value]) => <div key={label}>
-          <dt className="text-xs text-slate-500">{label}</dt><dd className={`mt-1 text-2xl font-semibold tabular-nums ${label === 'Chỗ còn lại' ? 'text-orange-600' : 'text-slate-900'}`}>{value}</dd>
+      <dl aria-label="Tổng quan tuyển dụng" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[
+          { label: 'Tin tuyển dụng', value: filtered.length, icon: FileText, tone: 'bg-blue-50 text-blue-600' },
+          { label: 'Vị trí tuyển', value: totals.positions, icon: LayoutGrid, tone: 'bg-violet-50 text-violet-600' },
+          { label: 'Tổng chỉ tiêu', value: totals.capacity, icon: Users, tone: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Chỗ còn lại', value: totals.remaining, icon: UserCheck, tone: 'bg-orange-50 text-orange-600' },
+        ].map(({ label, value, icon: Icon, tone }) => <div key={label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <dt className="flex items-center justify-between gap-3 text-sm font-medium text-slate-500">
+            <span>{label}</span><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon size={20} aria-hidden="true" /></span>
+          </dt>
+          <dd className={`mt-3 text-3xl font-bold tracking-tight tabular-nums sm:text-4xl ${label === 'Chỗ còn lại' ? 'text-orange-600' : 'text-slate-900'}`}>{value}</dd>
         </div>)}
       </dl>
 
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-7">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -174,10 +184,10 @@ export function EnterpriseJobs() {
                 {positions.slice(0, 2).map(position => <span key={position.id} title={position.title} className="max-w-full truncate rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">{position.title}</span>)}
                 {positions.length > 2 && <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">+{positions.length - 2} vị trí</span>}
               </div>
-              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 px-3.5 py-3">
-                <div><p className="text-xs text-slate-500">Tổng chỉ tiêu</p><p className="mt-1 text-lg font-semibold tabular-nums text-slate-800">{capacity}<span className="ml-1 text-xs font-normal text-slate-400">sinh viên</span></p></div>
-                <div className="border-l border-slate-200 pl-4"><p className="text-xs text-slate-500">Chỗ còn lại</p><p className={`mt-1 text-lg font-semibold tabular-nums ${remaining > 0 ? 'text-orange-600' : 'text-slate-500'}`}>{remaining}<span className="ml-1 text-xs font-normal text-slate-400">/{capacity}</span></p></div>
-              </div>
+              <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500">
+                <span>Tổng chỉ tiêu: <strong className="font-semibold tabular-nums text-slate-800">{capacity}</strong></span>
+                <span>Chỗ còn lại: <strong className={`font-semibold tabular-nums ${remaining > 0 ? 'text-orange-600' : 'text-slate-600'}`}>{remaining}</strong></span>
+              </p>
               <p className="flex items-start gap-2 text-xs text-slate-500"><Clock3 size={14} className="mt-0.5 shrink-0 text-slate-400" /><span>Hạn ứng tuyển<br /><strong className="mt-0.5 inline-block font-medium text-slate-700">{formatRecruitmentDate(post.deadlineAt)}</strong></span></p>
               {!editable && <p className="flex items-start gap-1.5 text-xs leading-relaxed text-amber-800"><LockKeyhole size={13} className="mt-0.5 shrink-0" />{lockReason}</p>}
             </div>
@@ -193,8 +203,8 @@ export function EnterpriseJobs() {
         <button type="button" aria-label="Trang trước" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronLeft size={17} /></button>
         <button type="button" aria-label="Trang sau" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"><ChevronRight size={17} /></button>
       </nav>}
+      </div>
     </>}
-    </div>
     {detailPost && <RecruitmentPostDetailsDialog post={detailPost} lockReason={postEditLockReason(detailPost, windows, now)} onClose={() => setDetailPost(null)}
       onEdit={() => { setDetailPost(null); setSuccess(''); setEditor({ post: detailPost }); }} />}
     {editor && <RecruitmentPostDialog windows={windows} initialWindowId={accepts ? selectedWindowId : activeWindows[0]?.id} post={editor.post} now={now} onClose={() => setEditor(null)} onSaved={onSaved} />}

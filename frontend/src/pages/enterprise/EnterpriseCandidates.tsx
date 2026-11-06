@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { Users, Search, CheckCircle2, XCircle, FileText, Calendar, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Search, CheckCircle2, XCircle, Eye, Check, X, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandidatePeriod } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -288,73 +288,84 @@ export const EnterpriseCandidates: React.FC = () => {
       {!loading && !error && filteredCandidates.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[900px] table-fixed text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="px-5 py-3.5">Sinh viên</th>
-                  <th className="px-5 py-3.5">Vị trí</th>
-                  <th className="px-5 py-3.5">Ngày nhận hồ sơ</th>
-                  <th className="px-5 py-3.5">Trạng thái</th>
-                  <th className="px-5 py-3.5 text-right">Thao tác</th>
+                  <th className="w-16 px-3 py-3.5 text-center">STT</th>
+                  <th className="w-[25%] px-4 py-3.5">Sinh viên</th>
+                  <th className="w-[22%] px-4 py-3.5">Vị trí</th>
+                  <th className="w-[16%] px-4 py-3.5 text-center">Ngày nhận hồ sơ</th>
+                  <th className="w-[14%] px-4 py-3.5 text-center">Trạng thái</th>
+                  <th className="w-[190px] px-3 py-3.5 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {visibleCandidates.map((c) => (
+                {visibleCandidates.map((c, index) => (
                   <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700">
-                          {c.student.fullName?.charAt(0) || '?'}
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900">{c.student.fullName}</div>
-                          <div className="text-[11px] text-slate-400">
-                            {c.student.studentCode} • {c.student.programName || c.student.programCode || ''}
-                          </div>
+                    <td className="px-3 py-4 text-center text-slate-400">
+                      {(page - 1) * limit + index + 1}
+                    </td>
+
+                    <td className="px-4 py-4">
+                      <div className="min-w-0">
+                        <div className="truncate font-bold text-slate-900">{c.student.fullName}</div>
+                        <div className="mt-1 truncate text-[11px] text-slate-400">
+                          {c.student.studentCode} · {c.student.programName || c.student.programCode || ''}
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-5 py-4">
-                      <div className="text-slate-700">{c.position.title}</div>
-                      <div className="text-[11px] text-slate-400">{c.position.code}</div>
+                    <td className="px-4 py-4">
+                      <div className="truncate text-slate-700">{c.position.title}</div>
+                      <div className="mt-1 truncate text-[11px] text-slate-400">{c.position.code}</div>
                     </td>
 
-                    <td className="px-5 py-4 text-slate-600">
+                    <td className="px-4 py-4 text-center text-slate-600">
                       {c.introducedAt ? new Date(c.introducedAt).toLocaleDateString('vi-VN') : '—'}
                     </td>
 
-                    <td className="px-5 py-4">
+                    <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${decisionColor(c.decision)}`}>
                         {decisionLabel(c.decision)}
                       </span>
                     </td>
 
-                    <td className="px-5 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => setSelectedCandidate(c)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors"
-                      >
-                        Xem hồ sơ
-                      </button>
-                      {c.decision === 'PENDING' && (
-                        <>
-                          <button
-                            onClick={() => handleDecision(c.id, 'ACCEPTED')}
-                            disabled={actionLoading === c.id}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors disabled:opacity-50"
-                          >
-                            {actionLoading === c.id ? '...' : 'Tiếp nhận'}
-                          </button>
-                          <button
-                            onClick={() => handleDecision(c.id, 'REJECTED')}
-                            disabled={actionLoading === c.id}
-                            className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold transition-colors disabled:opacity-50"
-                          >
-                            Từ chối
-                          </button>
-                        </>
-                      )}
+                    <td className="px-3 py-4">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCandidate(c)}
+                          aria-label={`Xem hồ sơ ${c.student.fullName}`}
+                          title="Xem hồ sơ"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-100"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {c.decision === 'PENDING' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleDecision(c.id, 'ACCEPTED')}
+                              disabled={actionLoading === c.id}
+                              aria-label={`Tiếp nhận ${c.student.fullName}`}
+                              title="Tiếp nhận"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {actionLoading === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDecision(c.id, 'REJECTED')}
+                              disabled={actionLoading === c.id}
+                              aria-label={`Từ chối ${c.student.fullName}`}
+                              title="Từ chối"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
