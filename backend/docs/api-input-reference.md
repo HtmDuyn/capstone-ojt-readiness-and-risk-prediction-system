@@ -1408,7 +1408,7 @@ Body: application/json — bắt buộc.
 
 Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu
 
-ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts can be edited before the intake deadline and must be reviewed again; closed/archived posts stay locked. Capacity may decrease only to or above the confirmed student count for each position. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+ENTERPRISE only. Company scope comes from JWT membership. Creation/updates publish immediately (PUBLISHED and OPEN positions); no QHDN review is required. The QHDN recruitment intake must be OPEN and within startsAt/endsAt. Updates are locked while any OJT student registration window of the same semester is OPEN and currently accepting registrations. Creating a new post remains allowed. Deadlines are managed by QHDN, not company requests. Capacity cannot be lower than confirmed students. Closed/archived posts stay locked.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1425,9 +1425,9 @@ Không có request body.
 
 ## POST /api/enterprise/recruitment/posts
 
-Tạo tin và tự động gửi QHDN duyệt
+Tạo và công bố tin ngay cho sinh viên, không cần QHDN duyệt
 
-ENTERPRISE only. Company scope comes from JWT membership. Create/edit requires an OPEN intake within startsAt/endsAt and automatically submits to QHDN (PENDING_REVIEW). Published posts can be edited before the intake deadline and must be reviewed again; closed/archived posts stay locked. Capacity may decrease only to or above the confirmed student count for each position. remainingSlots is capacity minus non-cancelled assignments. Approved enterprise posts with vacancies automatically continue in the next open intake of the same OJT semester.
+ENTERPRISE only. Company scope comes from JWT membership. Creation/updates publish immediately (PUBLISHED and OPEN positions); no QHDN review is required. The QHDN recruitment intake must be OPEN and within startsAt/endsAt. Updates are locked while any OJT student registration window of the same semester is OPEN and currently accepting registrations. Creating a new post remains allowed. Deadlines are managed by QHDN, not company requests. Capacity cannot be lower than confirmed students. Closed/archived posts stay locked.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1442,7 +1442,7 @@ Body: application/json — bắt buộc.
 | content | string | Có | minLength=1; maxLength=30000 |  |
 | benefits | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
 | applicationInstructions | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
-| deadlineAt | string | Có | format="date-time" |  |
+| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" | Tương thích client cũ: backend bỏ qua giá trị này. Doanh nghiệp không được đặt hoặc sửa hạn. |
 | positions | array<object> | Có | minItems=1; maxItems=50 |  |
 | positions[].id | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
 | positions[].title | string | Có | minLength=1; maxLength=150 |  |
@@ -1456,7 +1456,7 @@ Body: application/json — bắt buộc.
 
 Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp
 
-Chỉnh sửa tin thuộc doanh nghiệp trong JWT. Lấy id từ GET /api/enterprise/recruitment/posts. Chỉ gửi các trường cần đổi; không gửi windowId/companyId/status. Được sửa DRAFT/PENDING_REVIEW/REJECTED/PUBLISHED khi đợt OPEN, đã bắt đầu và chưa hết endsAt; tin CLOSED/ARCHIVED không được sửa. Nếu gửi positions phải giữ đủ các vị trí cũ kèm id; vị trí mới không có id. Cho phép giảm capacity nhưng không thấp hơn số sinh viên đã xác nhận tại từng vị trí (không tính phân công đã hủy); backend đếm lại trong transaction cùng khóa với thao tác nhận sinh viên. Ví dụ đã xác nhận 3 sinh viên: capacity=3 được chấp nhận, capacity=2 trả 409 CAPACITY_BELOW_ACCEPTED. Lưu thành công tự chuyển PENDING_REVIEW để QHDN duyệt lại, giữ nguyên sinh viên đã nhận và không cần gọi API gửi duyệt.
+Sửa tin thuộc doanh nghiệp trong JWT, kể cả đã PUBLISHED, khi đợt đăng tuyển OPEN và chưa hết hạn. Không được sửa khi đợt đăng ký OJT hàng loạt của cùng kỳ đang OPEN và trong thời gian đăng ký: trả 409 RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION. Đợt chưa bắt đầu/đã hết hạn/đã đóng hoặc khác kỳ không gây khóa này. Tin CLOSED/ARCHIVED vẫn không được sửa. Nếu gửi positions phải giữ đủ vị trí cũ kèm id; chỉ tiêu không thấp hơn số sinh viên đã xác nhận. Lưu thành công vẫn PUBLISHED, vị trí OPEN, sinh viên thấy ngay, không cần QHDN duyệt và không thay đổi phân công. Không gửi windowId/companyId/status; deadlineAt từ client cũ bị bỏ qua, hạn QHDN lưu sẵn được giữ nguyên kể cả bằng endsAt.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 
@@ -1472,7 +1472,7 @@ Body: application/json — bắt buộc.
 | content | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=30000 |  |
 | benefits | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
 | applicationInstructions | string | Không / theo điều kiện nghiệp vụ | minLength=1; maxLength=10000; nullable=true |  |
-| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" |  |
+| deadlineAt | string | Không / theo điều kiện nghiệp vụ | format="date-time" | Tương thích client cũ: backend bỏ qua giá trị này. Doanh nghiệp không được đặt hoặc sửa hạn. |
 | positions | array<object> | Không / theo điều kiện nghiệp vụ | minItems=1; maxItems=50 |  |
 | positions[].id | integer | Không / theo điều kiện nghiệp vụ | minimum=1; maximum=2147483647 | ID đợt đăng ký. |
 | positions[].title | string | Có | minLength=1; maxLength=150 |  |
@@ -1514,7 +1514,7 @@ positions:
 
 Xem đợt tuyển dụng và hạn doanh nghiệp được đăng tin
 
-Xem các đợt do QHDN thiết lập. startsAt là thời điểm bắt đầu đăng tin; endsAt là hạn cuối doanh nghiệp được tạo/chỉnh sửa tin. accepting=true khi đợt OPEN, đang trong thời gian cho phép và học kỳ còn khả dụng. deadlineAt của tin là hạn sinh viên ứng tuyển, khác với endsAt của đợt đăng tin. Chỉ role ENTERPRISE được dùng endpoint này.
+Xem thời hạn đăng tuyển do QHDN quản lý; doanh nghiệp chỉ đọc. accepting/canCreate=true khi đợt OPEN, trong thời gian cho phép và học kỳ khả dụng. canEdit còn yêu cầu không có đợt OJTRegistrationWindows cùng kỳ đang OPEN trong StartsAt/EndsAt. studentRegistrationWindow và editLockCode giải thích việc khóa sửa. Hạn ứng tuyển của tin là dữ liệu QHDN, khác với endsAt của đợt doanh nghiệp đăng tin.
 
 Xác thực: Bearer token; role/ownership theo chức năng.
 

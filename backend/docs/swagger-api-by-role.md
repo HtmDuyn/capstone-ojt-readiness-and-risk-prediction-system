@@ -167,7 +167,7 @@ Quản lý hồ sơ, tuyển dụng và thực tập sinh.
 | 7 | PUT | `/api/enterprise/internships/{id}/evaluation` | Gửi hoặc cập nhật đánh giá thực tập | `PUT /api/enterprise/internships/{id}/evaluation` |
 | 8 | GET | `/api/enterprise/recruitment/windows` | Xem đợt tuyển dụng và hạn doanh nghiệp được đăng tin | `GET /api/enterprise/recruitment/windows` |
 | 9 | GET | `/api/enterprise/recruitment/posts` | Danh sách tổng hợp tin, đầy đủ vị trí, mô tả và chỉ tiêu | `GET /api/enterprise/recruitment/posts` |
-| 10 | POST | `/api/enterprise/recruitment/posts` | Tạo tin và tự động gửi QHDN duyệt | `POST /api/enterprise/recruitment/posts` |
+| 10 | POST | `/api/enterprise/recruitment/posts` | Tạo và công bố tin ngay cho sinh viên, không cần QHDN duyệt | `POST /api/enterprise/recruitment/posts` |
 | 11 | PATCH | `/api/enterprise/recruitment/posts/{id}` | Cập nhật / chỉnh sửa tin tuyển dụng của doanh nghiệp | `PATCH /api/enterprise/recruitment/posts/{id}` |
 | 12 | GET | `/api/recruitment/posts` | Danh sách tin tuyển dụng | `GET /api/recruitment/posts` |
 | 13 | POST | `/api/enterprise/tasks/bulk` | Giao một hoặc nhiều task cho nhiều thực tập sinh | `POST /api/enterprise/tasks/bulk` |
