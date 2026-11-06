@@ -3,7 +3,8 @@ import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from '../qhdn/read.repository';
 import { templateField } from '../qhdn/context-fields';
-import { enterpriseScope, api } from '../qhdn/catalog.service';
+import { api } from '../qhdn/catalog.service';
+import { enterpriseScope } from '../qhdn/qhdn.repository';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
