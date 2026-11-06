@@ -1,24 +1,7 @@
+import { useEducationOjtFinalResults } from '@/hooks/useEducationOjtFinalResults';
 import { PageBanner } from "@/components/common/PageBanner";
-import { useEducationSemesters } from '@/hooks/useEducationSemesters';
-import API from "@/services/api";
-import { apiData, getPage } from '@/services/educationApi';
-import type { Page } from '@/types/education/api.types';
 import React from "react";
-type Result = {
-  id: number;
-  studentCode: string;
-  fullName: string;
-  enterpriseName: string;
-  semesterCode: string;
-  status: string;
-  officialScore: number | null;
-  completionScore: number | null;
-  attitudeScore: number | null;
-  skillScore: number | null;
-  comments: string | null;
-  outcome: string | null;
-  confirmedAt: string | null;
-};
+
 const statuses: Record<string, string> = {
   PENDING_ACADEMIC_CONFIRMATION: "Chờ xác nhận",
   REVISION_REQUESTED: "Chờ QHDN đối soát",
@@ -31,69 +14,7 @@ const outcome = (value: string | null) =>
       ? "Không đạt"
       : (value ?? "Chưa có kết quả chính thức");
 const EducationOjtFinalResults: React.FC = () => {
-  const [data, setData] = React.useState<Page<Result> | null>(null),
-    [selected, setSelected] = React.useState<Result | null>(null);
-  const [semesterId, setSemesterId] = React.useState('');
-  const { semesters, error: semesterError, reload: reloadSemesters } = useEducationSemesters();
-  const [search, setSearch] = React.useState(""),
-    [status, setStatus] = React.useState(""),
-    [page, setPage] = React.useState(1),
-    [refresh, setRefresh] = React.useState(0);
-  const [loading, setLoading] = React.useState(false),
-    [busy, setBusy] = React.useState(false),
-    [error, setError] = React.useState(""),
-    [notice, setNotice] = React.useState(""),
-    [reason, setReason] = React.useState("");
-  const keys = React.useRef(new Map<number, { reason: string; key: string }>());
-
-  React.useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    setData(null);
-    getPage<Result>(
-      "/ojt-results",
-      { page, limit: 20, search, status, ojtSemesterId: semesterId },
-      controller.signal,
-    )
-      .then(setData)
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [page, search, status, semesterId, refresh]);
-  async function confirm() {
-    if (!selected || busy || !reason.trim()) return;
-    const id = selected.id,
-      trimmed = reason.trim();
-    let attempt = keys.current.get(id);
-    if (!attempt || attempt.reason !== trimmed) {
-      attempt = { reason: trimmed, key: crypto.randomUUID() };
-      keys.current.set(id, attempt);
-    }
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await API.post(`/ojt-results/${id}/confirm`, {
-        reason: trimmed,
-        idempotencyKey: attempt.key,
-      });
-      apiData(response.data);
-      setSelected(null);
-      setReason("");
-      setPage(1);
-      setRefresh((v) => v + 1);
-      setNotice("Đã xác nhận và ghi nhận kết quả OJT trên hệ thống.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể xác nhận kết quả.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { data, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, setRefresh, loading, busy, error, setError, notice, reason, setReason, semesters, semesterError, reloadSemesters, confirm } = useEducationOjtFinalResults();
   return (
     <div className="space-y-6">
       <PageBanner
