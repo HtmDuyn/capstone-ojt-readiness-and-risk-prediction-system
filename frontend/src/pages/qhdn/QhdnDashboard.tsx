@@ -27,6 +27,7 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  BarController,
   BarElement,
   PointElement,
   LineElement,
@@ -52,6 +53,7 @@ import type {
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  BarController,
   BarElement,
   PointElement,
   LineElement,
@@ -252,13 +254,14 @@ export const QhdnDashboard: React.FC = () => {
 
   // Render Chart 1: Tiến độ luồng OJT (Phễu điều phối & Thực tập)
   useEffect(() => {
-    if (!pipelineChartRef.current) return;
+    const canvas = pipelineChartRef.current;
+    if (!canvas) return;
 
-    if (pipelineChartInstance.current) {
-      pipelineChartInstance.current.destroy();
-    }
+    pipelineChartInstance.current?.destroy();
+    pipelineChartInstance.current = null;
+    ChartJS.getChart(canvas)?.destroy();
 
-    const ctx = pipelineChartRef.current.getContext("2d");
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const labels = [
@@ -333,24 +336,27 @@ export const QhdnDashboard: React.FC = () => {
       },
     };
 
-    pipelineChartInstance.current = new ChartJS(ctx, config);
+    const chart = new ChartJS(ctx, config);
+    pipelineChartInstance.current = chart;
 
     return () => {
-      if (pipelineChartInstance.current) {
-        pipelineChartInstance.current.destroy();
+      chart.destroy();
+      if (pipelineChartInstance.current === chart) {
+        pipelineChartInstance.current = null;
       }
     };
   }, [kpiStats]);
 
   // Render Chart 2: Top 8 Quota Doanh nghiệp
   useEffect(() => {
-    if (quotaViewMode !== "chart" || !categoryChartRef.current) return;
+    const canvas = categoryChartRef.current;
+    if (quotaViewMode !== "chart" || !canvas) return;
 
-    if (categoryChartInstance.current) {
-      categoryChartInstance.current.destroy();
-    }
+    categoryChartInstance.current?.destroy();
+    categoryChartInstance.current = null;
+    ChartJS.getChart(canvas)?.destroy();
 
-    const ctx = categoryChartRef.current.getContext("2d");
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const entNames = top8Partners.map((e) => e.code || e.name);
@@ -407,11 +413,13 @@ export const QhdnDashboard: React.FC = () => {
       } as any,
     };
 
-    categoryChartInstance.current = new ChartJS(ctx, config);
+    const chart = new ChartJS(ctx, config);
+    categoryChartInstance.current = chart;
 
     return () => {
-      if (categoryChartInstance.current) {
-        categoryChartInstance.current.destroy();
+      chart.destroy();
+      if (categoryChartInstance.current === chart) {
+        categoryChartInstance.current = null;
       }
     };
   }, [quotaViewMode, top8Partners]);
