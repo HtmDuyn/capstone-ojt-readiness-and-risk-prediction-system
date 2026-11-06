@@ -120,14 +120,3 @@ node --test tests/enterprise-recruitment.integration.cjs
 ```
 
 Kiểm tra trực tiếp API sinh viên thấy tin mới ngay, quyền doanh nghiệp, thời hạn chỉ đọc, sửa tin có hai hạn bằng nhau, khóa/mở lại theo đợt sinh viên, khác kỳ, tạo mới trong khi khóa sửa, chỉ tiêu và nhận sinh viên đồng thời, QHDN mở đăng ký đồng thời với sửa tin, giữ nguyên tin import của QHDN, tiếp tục vòng sau và không phục hồi tin bị QHDN đóng.
-
-
-## Đồng bộ backend và DB
-
-- `backend/DB` là script duy nhất chứa schema, hàm DB và dữ liệu mẫu. Đây là script khởi tạo FULL RESET, không phải migration cho DB đang vận hành.
-- Giữ nguyên API duyệt tin, Swagger, import, các hàm dùng chung và server của các role khác. Tin tạo/sửa qua API doanh nghiệp công bố trực tiếp, không đi qua bước duyệt.
-- Script chỉ công bố tin PENDING_REVIEW hợp lệ có `EnterpriseManaged=true`; giữ nguyên ID và lịch sử. Không đổi tin import/QHDN hoặc các bản nháp, tin bị từ chối, đã đóng hay lưu trữ.
-- Trạng thái và trường duyệt cũ phục vụ đọc lịch sử và ghi nhận đóng tin. Luồng tạo/sửa mới không có bước duyệt.
-- Module doanh nghiệp dùng hàm kiểm tra quyền hiện có bao gồm kiểm tra xóa mềm, không sửa hàm dùng chung. API sửa tái sử dụng doanh nghiệp đã xác thực; summary tổng hợp vị trí trực tiếp, giảm việc tạo rồi phân tích lại JSON.
-- Worker tự quản lý một timer duy nhất và dọn timer/listener khi dừng. Không sửa vòng đời server hoặc worker của role khác.
-- POST `/api/enterprise/recruitment/posts` nhận thêm `idempotencyKey` tùy chọn (1–100 ký tự). Gửi lại cùng key/payload trả tin hiện có với `replayed:true`, kể cả gửi đồng thời. Dùng key cũ với nội dung khác trả 409 `IDEMPOTENCY_CONFLICT`. Muốn tạo tin khác dùng key mới. Không gửi key vẫn tạo tin như trước.
