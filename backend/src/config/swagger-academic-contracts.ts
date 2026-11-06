@@ -71,9 +71,9 @@ export function describeAcademicOperationContracts(spec:Spec) {
     if(!op)throw Error(`Missing academic operation: ${method} ${path}`);
     if(method==='get'){
       delete op.requestBody;
-      for(const parameter of op.parameters??[])if(parameter.in==='query')parameter.required=path==='/retake-class-proposals'&&parameter.name==='blockPeriodId';
+      for(const parameter of op.parameters??[])if(parameter.in==='query')parameter.required=false;
       op.description=[op.description,path==='/retake-class-proposals'
-        ?'Không nhận request body. Bắt buộc chọn blockPeriodId để xác định kỳ mở lớp; bộ lọc khác và phân trang tùy chọn. Mặc định page=1, limit=20.'
+        ?'Không nhận request body. Bắt buộc chọn đúng một: blockPeriodId (lịch đã lưu) hoặc semesterPeriodId (tự tính lịch xem trước theo 10+1+3 tuần, chưa ghi DB). Các bộ lọc khác tùy chọn. Mặc định page=1, limit=20.'
         :'Không nhận request body. Chỉ ID trên URL là bắt buộc (nếu có); bộ lọc query và phân trang đều tùy chọn. Danh sách mặc định page=1, limit=20.'].filter(Boolean).join(' ');
       if(path==='/academic-years'){
         op.parameters=(op.parameters??[]).filter((parameter:Spec)=>parameter.in!=='query');
