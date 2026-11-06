@@ -1,11 +1,10 @@
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
-import { dayString } from '../academic/workflow-policy';
-import { timestamp } from '../combo-registration/combo.validation';
 import { inputObject, invalid, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
 import { enterpriseScope, type Actor, type Row } from '../qhdn/qhdn.repository';
 import { readTransaction } from '../qhdn/read.repository';
-import { assertOpen, windowRecord, windowApi, postRecord, postApi, postSelect } from '../recruitment/recruitment.repository';
+import { assertOpen, windowRecord, postRecord, postApi, postSelect } from '../recruitment/recruitment.repository';
+import { assertNoStudentRegistration, enterpriseWindowApi, enterpriseWindowSelect, recruitmentDeadline } from './enterprise-recruitment.policy';
 
 async function company(c: PoolClient, actor: Actor) {
   if (actor.roleCode !== 'ENTERPRISE') throw invalid('Enterprise access required.', 403, 'FORBIDDEN');
@@ -17,20 +16,28 @@ async function ownPost(c: PoolClient, id: number, actor: Actor, lock = false) {
   return p;
 }
 async function detail(c: PoolClient, id: number, actor: Actor) {
-  return postApi(await ownPost(c,id,actor));
+  return (await postResponses(c,[await ownPost(c,id,actor)]))[0];
+}
+async function postResponses(c: PoolClient, posts: Row[]) {
+  const ids = [...new Set(posts.map(p => p.WindowID).filter(id => id != null))];
+  const rows = ids.length ? (await c.query(`${enterpriseWindowSelect} WHERE w."WindowID"=ANY($1::int[])`,[ids])).rows : [];
+  const windows = new Map(rows.map(w => [w.WindowID,enterpriseWindowApi(w)]));
+  return posts.map(p => {
+    const window = windows.get(p.WindowID);
+    return {...postApi(p),canEdit:!!window?.canEdit && !p.ArchivedAt && ['DRAFT','REJECTED','PENDING_REVIEW','PUBLISHED'].includes(p.Status),
+      postingDeadlineAt:window?.endsAt ?? null,deadlineManagedBy:'QHDN',requiresReview:false,
+      editLockCode:window?.editLockCode ?? null,studentRegistrationWindow:window?.studentRegistrationWindow ?? null};
+  });
 }
 export async function enterpriseWindows(params: Row, actor: Actor) {
   const p = pagination(params, ['academicPeriodId']);
   return readTransaction(async c => {
     await company(c, actor);
     const args = [params.academicPeriodId === undefined ? null : positiveId(params.academicPeriodId, 'academicPeriodId')];
-    const from = `FROM "RecruitmentWindows" w JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=w."AcademicPeriodID"
-      JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID"
-      WHERE ($1::int IS NULL OR w."AcademicPeriodID"=$1)`;
-    const total = (await c.query(`SELECT count(*)::int AS n ${from}`, args)).rows[0].n;
-    const rows = (await c.query(`SELECT w.*,ap."PeriodCode",ap."Name" AS "PeriodName",ap."Status" AS "PeriodStatus",
-      clock_timestamp() AS "DatabaseNow" ${from} ORDER BY w."WindowID" DESC LIMIT $2 OFFSET $3`, [...args,p.limit,p.offset])).rows;
-    return {items:rows.map(windowApi),total,page:p.page,limit:p.limit};
+    const sql = `${enterpriseWindowSelect} WHERE ($1::int IS NULL OR w."AcademicPeriodID"=$1)`;
+    const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) windows`, args)).rows[0].n;
+    const rows = (await c.query(`${sql} ORDER BY w."WindowID" DESC LIMIT $2 OFFSET $3`, [...args,p.limit,p.offset])).rows;
+    return {items:rows.map(enterpriseWindowApi),total,page:p.page,limit:p.limit};
   });
 }
 export async function enterprisePosts(params: Row, actor: Actor) {
@@ -51,7 +58,7 @@ export async function enterprisePosts(params: Row, actor: Actor) {
       FROM selected CROSS JOIN LATERAL jsonb_array_elements(positions) pos)
       SELECT count(*)::int AS "totalPositions",COALESCE(sum(capacity),0)::bigint AS "totalCapacity",
       COALESCE(sum(capacity-remaining),0)::bigint AS "acceptedStudents",COALESCE(sum(remaining),0)::bigint AS "remainingSlots" FROM positions`,args)).rows[0];
-    return {items:rows.map(postApi),total,page:p.page,limit:p.limit,
+    return {items:await postResponses(c,rows),total,page:p.page,limit:p.limit,
       summary:{totalPosts:total,totalPositions:summary.totalPositions,totalCapacity:Number(summary.totalCapacity),acceptedStudents:Number(summary.acceptedStudents),remainingSlots:Number(summary.remainingSlots)}};
   });
 }
@@ -78,17 +85,17 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     if (before && !['DRAFT','REJECTED','PENDING_REVIEW','PUBLISHED'].includes(before.Status)) throw invalid('Closed or archived posts cannot be edited.',409,'RECRUITMENT_POST_LOCKED');
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
     assertOpen(w);
+    if (before) await assertNoStudentRegistration(c,w.OJTSemesterID);
     const title = requiredText(b.title ?? before?.Title,'title',500), content = requiredText(b.content ?? before?.Content,'content',30000);
     const benefits = b.benefits === undefined ? before?.Benefits ?? null : optionalText(b.benefits,'benefits',10000);
     const instructions = b.applicationInstructions === undefined ? before?.ApplicationInstructions ?? null : optionalText(b.applicationInstructions,'applicationInstructions',10000);
-    const deadline = timestamp(b.deadlineAt ?? before?.DeadlineAt?.toISOString(),'deadlineAt');
-    const periodEnd = new Date(new Date(dayString(w.PeriodEndDate)+'T00:00:00+07:00').getTime()+86400000);
-    if (new Date(deadline) <= new Date(w.EndsAt) || new Date(deadline) > periodEnd) throw invalid('deadlineAt must follow the intake deadline and be within the academic semester.');
+    // deadlineAt remains accepted for old clients, but never controls a stored deadline.
+    const deadline = await recruitmentDeadline(c,w,before);
     if (positions && !positions.some(pos => pos.capacity > 0)) throw invalid('At least one position with positive capacity is required.');
     const row = (await c.query(id ? `UPDATE "RecruitmentPosts" SET "Title"=$1,"Content"=$2,"Benefits"=$3,"ApplicationInstructions"=$4,"DeadlineAt"=$5,
-      "Status"='PENDING_REVIEW',"EnterpriseManaged"=true,"ReviewedBy"=NULL,"ReviewedAt"=NULL,"ReviewReason"=NULL WHERE "PostID"=$6 RETURNING "PostID"`
-      : `INSERT INTO "RecruitmentPosts" ("Title","Content","Benefits","ApplicationInstructions","DeadlineAt","EnterpriseID","OJTSemesterID","WindowID","CreatedBy","Status","EnterpriseManaged")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PENDING_REVIEW',true) RETURNING "PostID"`,
+      "Status"='PUBLISHED',"PublishedAt"=COALESCE("PublishedAt",now()),"EnterpriseManaged"=true,"ReviewedBy"=NULL,"ReviewedAt"=NULL,"ReviewReason"=NULL WHERE "PostID"=$6 RETURNING "PostID"`
+      : `INSERT INTO "RecruitmentPosts" ("Title","Content","Benefits","ApplicationInstructions","DeadlineAt","EnterpriseID","OJTSemesterID","WindowID","CreatedBy","Status","EnterpriseManaged","PublishedAt")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PUBLISHED',true,now()) RETURNING "PostID"`,
       id ? [title,content,benefits,instructions,deadline,id] : [title,content,benefits,instructions,deadline,own,w.OJTSemesterID,w.WindowID,actor.userId])).rows[0];
     const postId = row.PostID;
     if (positions) {
@@ -107,15 +114,20 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
           await c.query(`UPDATE "InternshipPositions" SET "Title"=$2,"Description"=$3,"Requirements"=$4,"Capacity"=$5,"Location"=$6,"WorkMode"=$7,"RemainingSlots"=$8 WHERE "PositionID"=$1`,[pos.id,pos.title,pos.description,pos.requirements,pos.capacity,pos.location,pos.workMode,pos.capacity-used]);
         } else {
           const inserted = (await c.query(`INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","Title","Description","Requirements","Capacity","RemainingSlots","Status","Location","WorkMode")
-            VALUES ($1,$2,$3,$4,$5,$6,$6,'CLOSED',$7,$8) RETURNING "PositionID"`,[own,w.OJTSemesterID,pos.title,pos.description,pos.requirements,pos.capacity,pos.location,pos.workMode])).rows[0];
+            VALUES ($1,$2,$3,$4,$5,$6,$6,'OPEN',$7,$8) RETURNING "PositionID"`,[own,w.OJTSemesterID,pos.title,pos.description,pos.requirements,pos.capacity,pos.location,pos.workMode])).rows[0];
           await c.query(`INSERT INTO "RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID") VALUES ($1,$2,$3,$4)`,[postId,inserted.PositionID,own,w.OJTSemesterID]);
         }
       }
     }
     const ready = await ownPost(c,postId,actor);
     if (!ready.positions.length || !ready.positions.some((pos:Row) => pos.capacity > 0)) throw invalid('At least one position with positive capacity is required.');
+    if ((await c.query(`SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos USING("PositionID")
+      WHERE pp."PostID"=$1 AND (pos."Status"='ARCHIVED' OR pos."DeletedAt" IS NOT NULL OR pos."ArchivedAt" IS NOT NULL) LIMIT 1`,[postId])).rowCount)
+      throw invalid('Archived or deleted recruitment positions cannot be published.',409,'POSITION_ARCHIVED');
+    await c.query(`UPDATE "InternshipPositions" pos SET "Status"='OPEN' FROM "RecruitmentPostPositions" pp
+      WHERE pp."PostID"=$1 AND pp."PositionID"=pos."PositionID" AND pos."DeletedAt" IS NULL AND pos."ArchivedAt" IS NULL`,[postId]);
     const after = await detail(c,postId,actor);
-    await audit(c,actor.userId,'RecruitmentPosts',postId,id ? 'ENTERPRISE_UPDATE' : 'ENTERPRISE_CREATE',before ? postApi(before) : null,after);
+    await audit(c,actor.userId,'RecruitmentPosts',postId,id ? 'ENTERPRISE_UPDATE_PUBLISHED' : 'ENTERPRISE_PUBLISH',before ? postApi(before) : null,after);
     return after;
   });
 }
