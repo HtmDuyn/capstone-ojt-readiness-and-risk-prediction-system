@@ -17,7 +17,7 @@ Tin đã công bố vẫn chỉnh sửa được trong hạn. Frontend dùng `ca
 
 Mỗi form tạo tin giữ một `idempotencyKey` cho mọi lần gửi lại, kể cả khi mất phản hồi hoặc sửa nội dung sau lỗi. Backend trả lại tin đã tạo nếu payload giống nhau; payload khác với key đã lưu trả 409 để tránh tạo thêm tin. Khóa nút gửi trong lúc chờ. Muốn tạo tin khác thì mở form mới.
 
-Danh sách và vị trí lấy từ API tổng hợp, không gọi API chi tiết riêng. Dữ liệu phân trang được loại hàng trùng theo ID; tổng chỉ tiêu/chỗ trống đếm từng PositionID một lần. Bộ lọc đợt thực sự lọc tin. Sau khi lưu, thay đúng tin theo ID bằng response của API, không tải lại toàn bộ tin/đợt. Giao diện dùng danh sách dạng hàng, thông số tổng quan cùng một dải và form có một vùng cuộn, footer lưu cố định.
+Danh sách và vị trí lấy từ API tổng hợp, không gọi API chi tiết riêng. Dữ liệu phân trang được loại hàng trùng theo ID; tổng chỉ tiêu/chỗ trống đếm từng PositionID một lần. Bộ lọc đợt thực sự lọc tin. Sau khi lưu, thay đúng tin theo ID bằng response của API, không tải lại toàn bộ tin/đợt. Giao diện có banner và lưới card 1–3 cột theo kích thước màn hình. Mỗi card có nút Xem chi tiết và Chỉnh sửa ở cuối. Chi tiết mở popup từ dữ liệu đã tải; có thể chuyển sang popup chỉnh sửa. Các popup có vùng cuộn riêng, footer cố định và hỗ trợ phím Escape.
 
 ## Kiểm thử
 
