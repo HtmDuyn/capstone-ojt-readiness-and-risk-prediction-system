@@ -135,8 +135,13 @@ export interface EnterpriseRecruitmentPostInput {
   content: string;
   benefits: string | null;
   applicationInstructions: string | null;
-  deadlineAt: string;
   positions: EnterpriseRecruitmentPositionInput[];
+}
+
+// The existing create API requires an initial deadline; updates never change it.
+export interface EnterpriseRecruitmentPostCreateInput extends EnterpriseRecruitmentPostInput {
+  windowId: number;
+  deadlineAt: string;
 }
 
 export interface EnterpriseRecruitmentPostResponse {
@@ -358,13 +363,17 @@ export const enterpriseService = {
     return response.data;
   },
 
-  createRecruitmentPost: async (data: EnterpriseRecruitmentPostInput & { windowId: number }): Promise<EnterpriseRecruitmentPostResponse> => {
+  createRecruitmentPost: async (data: EnterpriseRecruitmentPostCreateInput): Promise<EnterpriseRecruitmentPostResponse> => {
     const response = await API.post<EnterpriseRecruitmentPostResponse>('/enterprise/recruitment/posts', data);
     return response.data;
   },
 
   updateRecruitmentPost: async (id: number, data: EnterpriseRecruitmentPostInput): Promise<EnterpriseRecruitmentPostResponse> => {
-    const response = await API.patch<EnterpriseRecruitmentPostResponse>(`/enterprise/recruitment/posts/${id}`, data);
+    // Whitelist enterprise-editable fields so deadlineAt cannot leak into PATCH.
+    const { title, content, benefits, applicationInstructions, positions } = data;
+    const response = await API.patch<EnterpriseRecruitmentPostResponse>(`/enterprise/recruitment/posts/${id}`, {
+      title, content, benefits, applicationInstructions, positions,
+    });
     return response.data;
   },
 

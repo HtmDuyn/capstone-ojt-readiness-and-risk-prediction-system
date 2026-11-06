@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, Loader2, Plus, Send, Trash2, X } from 'lucide-react';
 import { enterpriseService, type EnterpriseRecruitmentPostInput, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
-import { formatRecruitmentDate, recruitmentError, toLocalDateTime, windowAcceptsPosts } from './recruitment';
+import { canEditRecruitmentPost, formatRecruitmentDate, recruitmentError, windowAcceptsPosts } from './recruitment';
 
 interface PositionDraft {
   key: string; id?: number; title: string; description: string; requirements: string;
@@ -25,13 +25,10 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [windowId, setWindowId] = useState(post?.windowId ?? initialWindowId ?? windows.find(w => windowAcceptsPosts(w, now))?.id ?? 0);
-  const initialWindow = windows.find(w => w.id === (post?.windowId ?? initialWindowId)) ?? windows.find(w => windowAcceptsPosts(w, now));
   const [title, setTitle] = useState(post?.title ?? '');
   const [content, setContent] = useState(post?.content ?? '');
   const [benefits, setBenefits] = useState(post?.benefits ?? '');
   const [instructions, setInstructions] = useState(post?.applicationInstructions ?? '');
-  const [deadline, setDeadline] = useState(post?.deadlineAt ? toLocalDateTime(post.deadlineAt)
-    : initialWindow ? toLocalDateTime(new Date(new Date(initialWindow.endsAt).getTime() + 86400000).toISOString()) : '');
   const [positions, setPositions] = useState<PositionDraft[]>(post?.positions?.length
     ? post.positions.map(p => ({ key: String(p.id), id: p.id, title: p.title, description: p.description ?? '', requirements: p.requirements ?? '',
       capacity: String(p.capacity), minimum: Math.max(0, p.capacity - p.remainingSlots), location: p.location ?? '', workMode: p.workMode ?? '' }))
@@ -47,22 +44,13 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   }, []);
 
   const updatePosition = (key: string, changes: Partial<PositionDraft>) => setPositions(current => current.map(p => p.key === key ? { ...p, ...changes } : p));
-  const changeWindow = (value: number) => {
-    setWindowId(value);
-    const window = windows.find(w => w.id === value);
-    if (window) setDeadline(toLocalDateTime(new Date(new Date(window.endsAt).getTime() + 86400000).toISOString()));
-  };
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting.current) return;
     setError('');
     if (!windowAcceptsPosts(selectedWindow)) { setError('Đợt đăng tin không còn trong thời gian cho phép. Bạn chưa thể gửi tin này.'); return; }
-    if (post && !['DRAFT', 'PENDING_REVIEW', 'REJECTED'].includes(post.status)) { setError('Tin đã công bố không được chỉnh sửa.'); return; }
-    const end = new Date(deadline);
-    if (!Number.isFinite(end.getTime()) || end.getTime() <= new Date(selectedWindow!.endsAt).getTime()) {
-      setError('Hạn sinh viên ứng tuyển phải sau hạn cuối doanh nghiệp đăng tin.'); return;
-    }
+    if (post && !canEditRecruitmentPost(post, windows)) { setError('Tin đã đóng, lưu trữ hoặc đợt đăng tin đã hết hạn nên không thể chỉnh sửa.'); return; }
     if (!title.trim() || !content.trim() || positions.some(p => !p.title.trim() || !p.description.trim() || !p.requirements.trim())) {
       setError('Vui lòng điền tiêu đề, nội dung, mô tả và yêu cầu cho từng vị trí.'); return;
     }
@@ -72,7 +60,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
     if (!positions.some(p => Number(p.capacity) > 0)) { setError('Cần ít nhất một vị trí có chỉ tiêu lớn hơn 0.'); return; }
     const nullable = (value: string) => value.trim() || null;
     const payload: EnterpriseRecruitmentPostInput = {
-      title: title.trim(), content: content.trim(), benefits: nullable(benefits), applicationInstructions: nullable(instructions), deadlineAt: end.toISOString(),
+      title: title.trim(), content: content.trim(), benefits: nullable(benefits), applicationInstructions: nullable(instructions),
       positions: positions.map(p => ({ ...(p.id ? { id: p.id } : {}), title: p.title.trim(), description: p.description.trim(), requirements: p.requirements.trim(),
         capacity: Number(p.capacity), location: nullable(p.location), workMode: (p.workMode || null) as EnterpriseRecruitmentPostInput['positions'][number]['workMode'] })),
     };
@@ -80,7 +68,9 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
     setSaving(true);
     try {
       const response = post ? await enterpriseService.updateRecruitmentPost(post.id, payload)
-        : await enterpriseService.createRecruitmentPost({ ...payload, windowId });
+        // Preserve the existing create API's required default; no date is editable by enterprise.
+        : await enterpriseService.createRecruitmentPost({ ...payload, windowId,
+          deadlineAt: new Date(new Date(selectedWindow!.endsAt).getTime() + 86400000).toISOString() });
       if (!response.success || !response.data) throw new Error('Máy chủ chưa xác nhận lưu tin thành công. Vui lòng thử lại.');
       onSaved(response.data);
     } catch (err) { setError(recruitmentError(err)); }
@@ -93,14 +83,14 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-7">
         <div><p className="mb-1 text-xs font-semibold uppercase tracking-wider text-orange-600">Tuyển dụng thực tập</p>
           <h2 id="recruitment-dialog-title" className="text-xl font-bold text-slate-900">{post ? 'Chỉnh sửa tin tuyển dụng' : 'Tạo tin tuyển dụng'}</h2>
-          <p className="mt-1 text-sm text-slate-500">{post ? 'Lưu thay đổi và gửi lại QHDN duyệt.' : 'Tin được tự động gửi QHDN duyệt sau khi tạo.'}</p></div>
+          <p className="mt-1 text-sm text-slate-500">{post ? 'Được sửa trong hạn đợt đăng tin. Lưu xong, tin được gửi lại QHDN duyệt.' : 'Tin được tự động gửi QHDN duyệt sau khi tạo.'}</p></div>
         <button type="button" disabled={saving} onClick={onClose} aria-label="Đóng biểu mẫu" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"><X size={20} /></button>
       </header>
       <fieldset disabled={saving} className="min-h-0 flex-1 space-y-7 overflow-y-auto px-5 py-5 sm:px-7">
         <section className="space-y-3 rounded-xl border border-orange-100 bg-orange-50/60 p-4">
           <label htmlFor={inputId('window')} className="flex items-center gap-2 text-sm font-semibold text-slate-800"><CalendarDays size={17} className="text-orange-600" />Đợt đăng tin <span className="text-rose-600">*</span></label>
           {post ? <p className="text-sm font-medium text-slate-800">{selectedWindow?.name ?? 'Đợt đăng tin không còn khả dụng'}</p>
-            : <select id={inputId('window')} className={fieldClass} value={windowId} required onChange={e => changeWindow(Number(e.target.value))}>
+            : <select id={inputId('window')} className={fieldClass} value={windowId} required onChange={e => setWindowId(Number(e.target.value))}>
               <option value="0" disabled>Chọn đợt đang mở</option>
               {windows.map(w => <option key={w.id} value={w.id} disabled={!windowAcceptsPosts(w, now)}>{w.name} · {w.periodCode} {!windowAcceptsPosts(w, now) ? '— Không nhận tin' : ''}</option>)}
             </select>}
@@ -120,10 +110,11 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
             <div><label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor={inputId('instructions')}>Hướng dẫn ứng tuyển</label>
               <textarea id={inputId('instructions')} className={fieldClass} rows={3} value={instructions} onChange={e => setInstructions(e.target.value)} maxLength={10000} placeholder="Thông tin cần có trong CV, hình thức phỏng vấn..." /></div>
           </div>
-          <div><label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor={inputId('deadline')}>Hạn sinh viên ứng tuyển <span className="text-rose-600">*</span></label>
-            <input id={inputId('deadline')} className={fieldClass} type="datetime-local" required value={deadline}
-              min={selectedWindow ? toLocalDateTime(new Date(new Date(selectedWindow.endsAt).getTime() + 60000).toISOString()) : undefined} onChange={e => setDeadline(e.target.value)} />
-            <p className="mt-1.5 text-xs text-slate-500">Phải sau hạn đăng tin của doanh nghiệp và nằm trong học kỳ của đợt tuyển dụng. Thời gian hiển thị theo múi giờ thiết bị.</p></div>
+          <div className="border-l-2 border-slate-200 pl-3">
+            <p className="text-sm font-medium text-slate-700">Hạn sinh viên ứng tuyển</p>
+            <p id={inputId('deadline')} className="mt-1 text-sm text-slate-600">{post?.deadlineAt ? formatRecruitmentDate(post.deadlineAt) : 'QHDN sẽ xác nhận thời hạn khi duyệt tin.'}</p>
+            <p className="mt-1 text-xs text-slate-500">Thời hạn do Phòng Quan hệ doanh nghiệp quản lý. Doanh nghiệp không được chỉnh sửa.</p>
+          </div>
         </section>
         <section className="space-y-4">
           <div><h3 className="font-semibold text-slate-900">Vị trí tuyển dụng <span className="text-orange-600">({positions.length})</span></h3><p className="mt-1 text-xs text-slate-500">Một tin có thể tuyển nhiều vị trí với chỉ tiêu và yêu cầu riêng.</p></div>

@@ -75,7 +75,7 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
   if (!id && !positions) throw invalid('positions is required.');
   return academicTransaction(async c => {
     const own = await company(c,actor), before = id ? await ownPost(c,id,actor,true) : null;
-    if (before && !['DRAFT','REJECTED','PENDING_REVIEW'].includes(before.Status)) throw invalid('Only unpublished posts may be edited.',409,'RECRUITMENT_POST_LOCKED');
+    if (before && !['DRAFT','REJECTED','PENDING_REVIEW','PUBLISHED'].includes(before.Status)) throw invalid('Closed or archived posts cannot be edited.',409,'RECRUITMENT_POST_LOCKED');
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
     assertOpen(w);
     const title = requiredText(b.title ?? before?.Title,'title',500), content = requiredText(b.content ?? before?.Content,'content',30000);

@@ -172,7 +172,7 @@ export function EnterpriseJobs() {
               <span className="text-xs tabular-nums text-slate-600"><span className="mr-1 text-slate-400 lg:hidden">Còn chỗ:</span>{remaining}/{capacity}</span>
               <span className="text-xs text-slate-500"><span className="mr-1 text-slate-400 lg:hidden">Hạn ứng tuyển:</span>{formatRecruitmentDate(post.deadlineAt)}</span>
               <button type="button" disabled={!editable} onClick={() => { setSuccess(''); setEditor({ post }); }}
-                title={editable ? 'Chỉnh sửa tin tuyển dụng' : 'Chỉ sửa tin chưa công bố trong đợt còn mở'}
+                title={editable ? 'Chỉnh sửa tin tuyển dụng' : 'Đợt chưa mở, đã hết hạn hoặc tin đã đóng/lưu trữ'}
                 className="inline-flex w-fit items-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-slate-600 hover:text-orange-700 disabled:cursor-not-allowed disabled:opacity-35 lg:justify-self-end">
                 <Pencil size={13} />Chỉnh sửa tin
               </button>
@@ -193,7 +193,7 @@ export function EnterpriseJobs() {
                   <p className="whitespace-pre-line break-words text-xs leading-relaxed"><strong className="font-medium">Mô tả: </strong>{p.description}</p>
                   <p className="whitespace-pre-line break-words text-xs leading-relaxed"><strong className="font-medium">Yêu cầu: </strong>{p.requirements}</p>
                 </div>)}</div>
-                {!editable && <p className="text-xs text-slate-400">Chỉ chỉnh sửa khi tin chưa công bố và đợt đăng tin còn mở.</p>}
+                {!editable && <p className="text-xs text-slate-400">Chỉ chỉnh sửa trong hạn đợt đăng tin; tin đã đóng hoặc lưu trữ không được sửa.</p>}
               </div>
             </details>
           </article>;

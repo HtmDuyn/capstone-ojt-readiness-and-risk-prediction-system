@@ -16,7 +16,7 @@ export function windowAcceptsPosts(window?: RecruitmentWindow, now = Date.now())
 }
 
 export function canEditRecruitmentPost(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
-  return ['DRAFT', 'PENDING_REVIEW', 'REJECTED'].includes(post.status)
+  return ['DRAFT', 'PENDING_REVIEW', 'REJECTED', 'PUBLISHED'].includes(post.status)
     && windowAcceptsPosts(windows.find(window => window.id === post.windowId), now);
 }
 
@@ -31,13 +31,13 @@ export function recruitmentError(error: unknown) {
     const body = apiError.response?.data;
     const messages: Record<string, string> = {
       RECRUITMENT_WINDOW_CLOSED: 'Đợt đăng tin đã đóng hoặc hết hạn. Nội dung của bạn vẫn được giữ trong biểu mẫu.',
-      RECRUITMENT_POST_LOCKED: 'Tin đã được công bố hoặc không còn cho phép chỉnh sửa. Vui lòng tải lại danh sách.',
+      RECRUITMENT_POST_LOCKED: 'Tin đã đóng hoặc lưu trữ nên không còn cho phép chỉnh sửa. Vui lòng tải lại danh sách.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',
       RECRUITMENT_POST_NOT_FOUND: 'Không tìm thấy tin tuyển dụng thuộc doanh nghiệp của bạn.',
     };
     if (body?.errorCode && messages[body.errorCode]) return messages[body.errorCode];
-    if (body?.message?.includes('within the academic semester')) return 'Hạn nhận hồ sơ phải sau hạn đăng tin và nằm trong học kỳ của đợt tuyển dụng.';
+    if (body?.message?.includes('within the academic semester')) return 'Thời hạn do QHDN thiết lập đang không thỏa điều kiện cập nhật của hệ thống. Vui lòng nhờ QHDN kiểm tra lại thời hạn; nội dung bạn nhập vẫn được giữ, chưa được lưu.';
     if (body?.message) return body.message;
     if (!apiError.response) return 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.';
   }

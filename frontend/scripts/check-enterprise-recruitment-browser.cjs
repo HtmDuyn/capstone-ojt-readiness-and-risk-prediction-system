@@ -113,6 +113,7 @@ async function main() {
  passed('GET real enterprise windows and post APIs; dates render on the jobs page');
 
  await clickText('Tạo tin tuyển dụng');await waitFor(`!!document.querySelector('dialog[open]')`,'create form');
+ assert(await evaluate(`!document.querySelector('dialog input[type="datetime-local"], dialog input[type="date"]')`));
  await fill('#recruitment-title','E2E Tuyển Backend và Frontend');await fill('#recruitment-content','Thực tập phát triển REST API và giao diện React.');
  await fill('#recruitment-benefits','Có mentor hướng dẫn');await fill('#recruitment-instructions','Ứng tuyển qua hệ thống');
  await fill('#recruitment-position-0-title','Backend Intern');await fill('#recruitment-position-0-description','Phát triển REST API');await fill('#recruitment-position-0-requirements','TypeScript và PostgreSQL');
@@ -129,18 +130,22 @@ async function main() {
  const creates=records.filter(r=>r.method==='POST'&&r.path==='/api/enterprise/recruitment/posts');assert.equal(creates.length,1);assert.equal(creates[0].status,201);
  assert.equal(creates[0].body.windowId,window.WindowID);assert(!('companyId'in creates[0].body));assert.equal(creates[0].body.positions.length,2);assert(creates[0].body.positions.every(p=>!('id'in p)));assert(creates[0].body.deadlineAt.endsWith('Z'));
  let post=(await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "Title"=$1`,['E2E Tuyển Backend và Frontend'])).rows[0];
+ const originalDeadline=post.DeadlineAt.toISOString();
  assert.equal(post.Status,'PENDING_REVIEW');
  const positionIds=(await db.query(`SELECT "PositionID" id FROM "RecruitmentPostPositions" WHERE "PostID"=$1 ORDER BY "PositionID"`,[post.PostID])).rows.map(p=>p.id);
  passed('POST creates a real pending-review post with two positions; double-click sends exactly once');
 
  const article=`article[data-post-id="${post.PostID}"]`;
  await click(article+' button');await waitFor(`!!document.querySelector('dialog[open]')`,'edit form');
+ assert(await evaluate(`!document.querySelector('dialog input[type="datetime-local"], dialog input[type="date"]')&&document.querySelector('#recruitment-deadline').tagName==='P'`));
+ passed('enterprise creation and edit forms display deadlines without editable date inputs');
  assert.equal(await evaluate(`document.querySelector('#recruitment-title').value`),'E2E Tuyển Backend và Frontend');
  await fill('#recruitment-title','E2E Đã cập nhật tin tuyển dụng');await fill('#recruitment-position-0-capacity','4');
  await clickText('Lưu và gửi duyệt');
  await waitFor(`!document.querySelector('dialog[open]')&&document.body.innerText.includes('E2E Đã cập nhật tin tuyển dụng')&&!document.body.innerText.includes('Đang tải tin')`,'successful update');
  const edits=records.filter(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID);assert.equal(edits.length,1);assert.equal(edits[0].status,200);
- assert(!('windowId'in edits[0].body));assert(!('companyId'in edits[0].body));assert.deepEqual(edits[0].body.positions.map(p=>p.id),positionIds);
+ assert(!('windowId'in edits[0].body));assert(!('companyId'in edits[0].body));assert(!('deadlineAt'in edits[0].body));assert.deepEqual(edits[0].body.positions.map(p=>p.id),positionIds);
+ assert.equal((await db.query(`SELECT "DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].DeadlineAt.toISOString(),originalDeadline);
  assert.equal((await db.query(`SELECT "Title" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].Title,'E2E Đã cập nhật tin tuyển dụng');
  passed('PATCH updates the same real post and preserves all existing position IDs');
  await screenshot('jobs-desktop');
@@ -155,9 +160,41 @@ async function main() {
  passed('real deadline conflict preserves form input and leaves saved DB content unchanged');
  await clickText('Hủy');
  await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()+interval '1 hour' WHERE "WindowID"=$1`,[window.WindowID]);
- const review=await fetch(backendOrigin+'/api/recruitment/posts/'+post.PostID+'/review',{method:'POST',headers:{Authorization:'Bearer '+token(staff),'Content-Type':'application/json'},body:JSON.stringify({decision:'PUBLISH',reason:'Approved in local frontend test'})});assert.equal(review.status,200);
- await clickText('Tải lại');await waitFor(`document.querySelector(${JSON.stringify(article+' button')})?.disabled===true`,'published post locked');
- passed('QHDN publication locks the edit action without changing other roles');
+ const qhdnDeadline=new Date(post.DeadlineAt.getTime()+86400000).toISOString();
+ const review=await fetch(backendOrigin+'/api/recruitment/posts/'+post.PostID+'/review',{method:'POST',headers:{Authorization:'Bearer '+token(staff),'Content-Type':'application/json'},body:JSON.stringify({decision:'PUBLISH',reason:'Approved in local frontend test',deadlineAt:qhdnDeadline})});assert.equal(review.status,200);
+ await clickText('Tải lại');
+ await waitFor(`document.querySelector(${JSON.stringify(article)})?.innerText.includes('Đang tuyển')&&document.querySelector(${JSON.stringify(article+' button')})?.disabled===false`,'published post remains editable while intake is open');
+ await click(article+' button');await waitFor(`!!document.querySelector('dialog[open]')`,'published post edit dialog');
+ assert(await evaluate(`document.querySelector('#recruitment-deadline').textContent===new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(qhdnDeadline)}))`));
+ await fill('#recruitment-title','E2E Chỉnh sửa tin đã công bố');
+ await clickText('Lưu và gửi duyệt');
+ await waitFor(`!document.querySelector('dialog[open]')&&document.body.innerText.includes('E2E Chỉnh sửa tin đã công bố')&&!document.body.innerText.includes('Đang tải tin')`,'published post edit succeeds');
+ const editedPublished=(await db.query(`SELECT "Title","Status" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0];
+ assert.equal(editedPublished.Title,'E2E Chỉnh sửa tin đã công bố');assert.equal(editedPublished.Status,'PENDING_REVIEW');
+ const savedEdits=records.filter(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID&&r.status===200);
+ assert.equal(savedEdits.length,2);assert.deepEqual(savedEdits[1].body.positions.map(p=>p.id),positionIds);
+ assert(savedEdits.every(request=>!('deadlineAt'in request.body)));
+ assert.equal((await db.query(`SELECT "DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].DeadlineAt.toISOString(),qhdnDeadline);
+ passed('QHDN deadline is displayed exactly, omitted from every successful enterprise PATCH and preserved in DB');
+ passed('published post edit button, form submission and real PATCH all succeed within the intake deadline');
+
+ // Reproduce the screenshot's existing DEMO configuration without changing backend logic.
+ // The user requested frontend-only changes: show an actionable failure and preserve input/date.
+ const equalDeadline=(await db.query(`SELECT "EndsAt" FROM "RecruitmentWindows" WHERE "WindowID"=$1`,[window.WindowID])).rows[0].EndsAt.toISOString();
+ await db.query(`UPDATE "RecruitmentPosts" SET "DeadlineAt"=$2 WHERE "PostID"=$1`,[post.PostID,equalDeadline]);
+ await clickText('Tải lại');
+ await waitFor(`document.querySelector(${JSON.stringify(article)})?.innerText.includes(new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(equalDeadline)})))`,'reload existing equal-deadline configuration');
+ await click(article+' button');await fill('#recruitment-title','E2E Giữ nội dung khi hạn QHDN bị chặn');
+ await clickText('Lưu và gửi duyệt');
+ await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('QHDN kiểm tra lại')`,'explain backend rejection of QHDN deadline');
+ assert.equal(await evaluate(`document.querySelector('#recruitment-title').value`),'E2E Giữ nội dung khi hạn QHDN bị chặn');
+ const unchanged=(await db.query(`SELECT "Title","DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0];
+ assert.equal(unchanged.Title,'E2E Chỉnh sửa tin đã công bố');assert.equal(unchanged.DeadlineAt.toISOString(),equalDeadline);
+ const rejected=records.filter(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID).at(-1);
+ assert.equal(rejected.status,400);assert(!('deadlineAt'in rejected.body));
+ await screenshot('qhdn-deadline-rejection');
+ await clickText('Hủy');
+ passed('existing equal QHDN deadline rejection is explained; unsaved input and configured deadline are preserved');
 
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  await screenshot('jobs-mobile');
@@ -171,6 +208,7 @@ async function main() {
  await db.query(`UPDATE "RecruitmentWindows" SET "Status"='CLOSED' WHERE "WindowID"=$1`,[window.WindowID]);
  await clickText('Tải lại');await waitFor(`document.body.innerText.includes('Chưa có đợt nào đang nhận tin')`,'closed window display');
  assert(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Tạo tin tuyển dụng').disabled`));
+ assert(await evaluate(`document.querySelector(${JSON.stringify(article+' button')}).disabled`));
  passed('no open window disables creating posts and explains the deadline state');
 
  failWindows=true;await clickText('Tải lại');await waitFor(`!!document.querySelector('[role=alert]')`,'window API failure');
