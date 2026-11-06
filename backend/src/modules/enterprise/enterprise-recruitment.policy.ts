@@ -1,5 +1,4 @@
 import type { PoolClient } from 'pg';
-import { dayString } from '../academic/workflow-policy';
 import { invalid } from '../students/student.validation';
 import { windowApi } from '../recruitment/recruitment.repository';
 import type { Row } from '../qhdn/qhdn.repository';
@@ -18,10 +17,9 @@ export const enterpriseWindowSelect = `SELECT w.*,ap."PeriodCode",ap."Name" AS "
   JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID"`;
 
 export function enterpriseWindowApi(w: Row) {
-  const accepting = w.Kind === 'SEMESTER' && w.LinkedPeriodID === w.AcademicPeriodID
-    && !['CLOSED','ARCHIVED'].includes(w.PeriodStatus) && w.Status === 'OPEN'
-    && new Date(w.StartsAt) <= new Date(w.DatabaseNow) && new Date(w.EndsAt) > new Date(w.DatabaseNow);
-  return {...windowApi(w),accepting,canCreate:accepting,canEdit:accepting && !w.StudentRegistrationWindow,
+  const window = windowApi(w);
+  const accepting = window.accepting && w.Kind === 'SEMESTER' && w.LinkedPeriodID === w.AcademicPeriodID;
+  return {...window,accepting,canCreate:accepting,canEdit:accepting && !w.StudentRegistrationWindow,
     postingDeadlineAt:w.EndsAt,deadlineManagedBy:'QHDN',
     studentRegistrationWindow:w.StudentRegistrationWindow ?? null,
     editLockCode:w.StudentRegistrationWindow ? 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' : null};
@@ -39,12 +37,9 @@ export async function recruitmentDeadline(c: PoolClient, w: Row, before: Row | n
   // Existing deadlines belong to QHDN. Do not validate them against the separate
   // enterprise intake deadline or rewrite them during content/position changes.
   if (before) return before.DeadlineAt;
-  const semesterEnd = new Date(new Date(dayString(w.PeriodEndDate)+'T00:00:00+07:00').getTime()+86400000);
-  const configured = (await c.query(`SELECT max("EndsAt") AS deadline FROM "OJTRegistrationWindows"
-    WHERE "OJTSemesterID"=$1 AND "Status" IN ('DRAFT','OPEN') AND "EndsAt">clock_timestamp()`,[w.OJTSemesterID])).rows[0].deadline;
   // QHDN's student application period controls application expiry. Before one
   // is configured, use the linked semester's end so a newly published vacancy is visible.
-  const deadline = configured ? new Date(Math.min(new Date(configured).getTime(),semesterEnd.getTime())) : semesterEnd;
-  if (deadline <= new Date(w.DatabaseNow)) throw invalid('Học kỳ không còn thời hạn tuyển dụng khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
+  const deadline = (await c.query('SELECT public."EnterpriseRecruitmentDeadline"($1) AS deadline',[w.OJTSemesterID])).rows[0].deadline;
+  if (!deadline || deadline <= new Date(w.DatabaseNow)) throw invalid('Học kỳ không còn thời hạn tuyển dụng khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
   return deadline;
 }

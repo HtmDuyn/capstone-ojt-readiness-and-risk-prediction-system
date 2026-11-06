@@ -56,6 +56,71 @@ test('enterprise direct publishing and student-registration editing lock',async 
   assert(data.items.some(item=>item.postId===created.id));
   assert(data.items.some(item=>item.postId===second.id));
  });
+ await t.test('QHDN review contract stays available while enterprise publications bypass it',async()=>{
+  const blocked=await req('POST',`/recruitment/posts/${created.id}/review`,{decision:'REJECT',reason:'Already directly published'},staff);
+  expect(blocked,409);assert.equal(blocked.body.errorCode,'RECRUITMENT_POST_STATE_CONFLICT');
+  assert(require('../dist/config/swagger').swaggerSpec.paths['/api/recruitment/posts/{id}/review'].post);
+  assert.equal((await details(created.id)).status,'PUBLISHED');
+ });
+ await t.test('enterprise worker starts once and removes its own lifecycle listeners when stopped',async()=>{
+  const {startEnterpriseRecruitmentWorker}=require('../dist/modules/enterprise/enterprise-recruitment.worker');
+  const signals=['SIGTERM','SIGINT','beforeExit'],before=signals.map(name=>process.listenerCount(name));
+  process.env.ENTERPRISE_RECRUITMENT_WORKER_ENABLED='true';
+  const stop=startEnterpriseRecruitmentWorker();
+  try {
+   assert.equal(startEnterpriseRecruitmentWorker(),stop);
+   signals.forEach((name,i)=>assert.equal(process.listenerCount(name),before[i]+1));
+  } finally {stop();process.env.ENTERPRISE_RECRUITMENT_WORKER_ENABLED='false';}
+  signals.forEach((name,i)=>assert.equal(process.listenerCount(name),before[i]));
+ });
+ await t.test('concurrent create retries with the same idempotency key create one post and one position',async()=>{
+  const payload={...body,title:'Idempotent enterprise vacancy',idempotencyKey:'enterprise-create-retry'};
+  const results=await Promise.all([req('POST','/enterprise/recruitment/posts',payload),req('POST','/enterprise/recruitment/posts',payload)]);
+  const items=results.map(r=>expect(r,201));
+  assert.equal(items[0].id,items[1].id);assert.equal(items.filter(item=>item.replayed).length,1);
+  assert.equal((await db.query(`SELECT count(*)::int AS n FROM "RecruitmentPosts" WHERE "PostID"=$1 AND "SubmissionKey" LIKE 'enterprise:%'`,[items[0].id])).rows[0].n,1);
+  assert.equal((await details(items[0].id)).positions.length,1);
+  const conflict=await req('POST','/enterprise/recruitment/posts',{...payload,title:'Changed payload'});
+  expect(conflict,409);assert.equal(conflict.body.errorCode,'IDEMPOTENCY_CONFLICT');
+  assert.equal((await details(items[0].id)).title,payload.title);
+  expect(await req('POST','/enterprise/recruitment/posts',{...payload,idempotencyKey:''}),400);
+ });
+ let qhdnPending;
+ await t.test('QHDN pending submission fixture retains the existing staff workflow',async()=>{
+  const pos=(await db.query(`INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","Title","Description","Requirements","Capacity","RemainingSlots","Status")
+   SELECT "EnterpriseID","OJTSemesterID",'QHDN pending position','Staff submission','SQL',2,2,'CLOSED' FROM "InternshipPositions" WHERE "PositionID"=$1 RETURNING "PositionID"`,[created.positions[0].id])).rows[0];
+  qhdnPending=(await db.query(`INSERT INTO "RecruitmentPosts" ("EnterpriseID","OJTSemesterID","Title","Content","Status","CreatedBy","WindowID","DeadlineAt")
+   SELECT "EnterpriseID","OJTSemesterID",'QHDN pending post','Staff submission','PENDING_REVIEW',$2,"WindowID","DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1 RETURNING *`,[created.id,staff.UserID])).rows[0];
+  await db.query(`INSERT INTO "RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID") VALUES ($1,$2,$3,$4)`,[qhdnPending.PostID,pos.PositionID,qhdnPending.EnterpriseID,qhdnPending.OJTSemesterID]);
+  qhdnPending.positionId=pos.PositionID;
+  assert.equal(qhdnPending.EnterpriseManaged,false);
+ });
+ await t.test('DB reconciliation publishes valid legacy pending posts without adding rows',async()=>{
+  const before=(await db.query('SELECT count(*)::int AS n FROM "RecruitmentPosts"')).rows[0].n;
+  const sharedBefore=(await db.query('SELECT * FROM "RecruitmentPosts" WHERE NOT "EnterpriseManaged" ORDER BY "PostID"')).rows;
+  await db.query(`UPDATE "RecruitmentPosts" SET "Status"='PENDING_REVIEW',"PublishedAt"=NULL WHERE "PostID"=$1`,[second.id]);
+  await db.query(`UPDATE "InternshipPositions" SET "Status"='CLOSED' WHERE "PositionID"=$1`,[second.positions[0].id]);
+  const script=fs.readFileSync(path.join(__dirname,'../DB'),'utf8');
+  const start=script.indexOf('WITH published AS (');
+  const end=script.indexOf('CREATE OR REPLACE FUNCTION public."AdvanceEnterpriseRecruitment"',start);
+  await db.query(script.slice(start,end));
+  const post=await details(second.id);assert.equal(post.status,'PUBLISHED');assert.equal(post.positions[0].status,'OPEN');assert.equal(post.id,second.id);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM "RecruitmentPosts"')).rows[0].n,before);
+  assert.deepEqual((await db.query('SELECT * FROM "RecruitmentPosts" WHERE NOT "EnterpriseManaged" ORDER BY "PostID"')).rows,sharedBefore);
+  assert.equal((await db.query('SELECT "Status" FROM "InternshipPositions" WHERE "PositionID"=$1',[qhdnPending.positionId])).rows[0].Status,'CLOSED');
+  const reviewed=expect(await req('POST',`/recruitment/posts/${qhdnPending.PostID}/review`,{decision:'PUBLISH',reason:'Existing QHDN review workflow'},staff),200);
+  assert.equal(reviewed.status,'PUBLISHED');
+  assert.equal((await db.query('SELECT "Status" FROM "InternshipPositions" WHERE "PositionID"=$1',[qhdnPending.positionId])).rows[0].Status,'OPEN');
+ });
+ await t.test('soft-deleted enterprise is consistently denied profile, list and update access',async()=>{
+  const own=(await db.query('SELECT "EnterpriseID" id FROM "EnterpriseUsers" WHERE "UserID"=$1',[ent.UserID])).rows[0].id;
+  await db.query('UPDATE "Enterprises" SET "DeletedAt"=now() WHERE "EnterpriseID"=$1',[own]);
+  try {
+   expect(await req('GET','/enterprise/profile'),403);
+   expect(await req('GET','/enterprise/recruitment/posts'),403);
+   expect(await req('PATCH',`/enterprise/recruitment/posts/${created.id}`,{title:'Denied'}),403);
+  } finally {await db.query('UPDATE "Enterprises" SET "DeletedAt"=NULL WHERE "EnterpriseID"=$1',[own]);}
+ });
  await t.test('creation without a planned student intake uses the existing semester end, not client input',async()=>{
   await db.query(`UPDATE "OJTRegistrationWindows" SET "Status"='CLOSED' WHERE "OJTSemesterID"=$1`,[w.OJTSemesterID]);
   const fallback=expect(await req('POST','/enterprise/recruitment/posts',{...body,title:'Before student intake configuration',deadlineAt:'2099-01-01T00:00:00Z'}),201);
