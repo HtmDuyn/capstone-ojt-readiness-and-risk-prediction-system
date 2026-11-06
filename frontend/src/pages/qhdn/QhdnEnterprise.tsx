@@ -590,7 +590,6 @@ export default function QhdnEnterpriseManagement() {
           companies={companies}
           companyId={companyId}
           onCompanyChange={setCompanyId}
-          onDataChanged={() => setRevision((v) => v + 1)}
         />
       )}
       {selected && (

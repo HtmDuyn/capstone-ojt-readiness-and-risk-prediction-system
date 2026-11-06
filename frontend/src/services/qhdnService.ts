@@ -360,14 +360,6 @@ export const listRecruitmentPosts = async (
       params,
     })
   ).data.data;
-export const reviewRecruitmentPost = async (
-  id: number,
-  payload: {
-    decision: "PUBLISH" | "REJECT";
-    reason: string;
-    deadlineAt?: string;
-  },
-) => (await API.post(`/recruitment/posts/${id}/review`, payload)).data;
 // API trả Blob; utils/downloadFile phụ trách lưu file trên trình duyệt.
 export const getCvFile = async (
   studentId: number,

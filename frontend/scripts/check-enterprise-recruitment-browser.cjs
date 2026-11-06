@@ -7,7 +7,7 @@ const path = require('node:path');
 const {spawn} = require('node:child_process');
 const {createRequire} = require('node:module');
 const frontend = path.resolve(__dirname,'..');
-const backend = path.resolve(frontend,'../backend');
+const backend = path.resolve(process.env.ENTERPRISE_BACKEND_ROOT || path.join(frontend,'../backend'));
 const backendRequire = createRequire(path.join(backend,'package.json'));
 const target = process.env.ENTERPRISE_TEST_DATABASE_URL;
 if (!target) throw Error('Set ENTERPRISE_TEST_DATABASE_URL to the disposable local test database.');
@@ -24,7 +24,7 @@ const artifactDir = path.join(cache,'enterprise-recruitment-'+process.pid);
 const profileDir = path.join(artifactDir,'chrome-profile');
 const records = [], checks = [];
 const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
-let db, pool, server, vite, browser, cdp, failWindows = false;
+let db, pool, server, vite, browser, cdp, failWindows = false, loseCreateResponse = false, duplicatePostRows = false;
 
 class CDP {
  constructor(url) {
@@ -50,7 +50,7 @@ async function evaluate(expression) {
 }
 async function waitFor(expression,label) {
  const deadline=Date.now()+15000;
- while(Date.now()<deadline){if(await evaluate(expression))return;await sleep(100);}
+ while(Date.now()<deadline){if(await evaluate(`Boolean(${expression})`))return;await sleep(100);}
  throw Error('Timed out: '+label+'\n'+await evaluate('document.body.innerText.slice(-1600)'));
 }
 const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -82,8 +82,10 @@ async function main() {
  await db.query(await fs.readFile(path.join(backend,'DB'),'utf8'));
  const window=(await db.query(`SELECT w.* FROM "RecruitmentWindows" w JOIN "OJTSemesters" s USING("OJTSemesterID") WHERE s."SemesterCode"='DEMO-OJT-S6' LIMIT 1`)).rows[0];
  await db.query(`UPDATE "RecruitmentWindows" SET "StartsAt"=clock_timestamp()-interval '1 day',"EndsAt"=clock_timestamp()+interval '1 hour',"Status"='OPEN' WHERE "WindowID"=$1`,[window.WindowID]);
- const users=(await db.query(`SELECT u.*,r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID") WHERE u."Username"='enterprise01' OR r."RoleCode"='OJT_COORD' ORDER BY u."UserID"`)).rows;
- const ent=users.find(u=>u.Username==='enterprise01'),staff=users.find(u=>u.RoleCode==='OJT_COORD');
+ const registration=(await db.query('SELECT * FROM "OJTRegistrationWindows" WHERE "OJTSemesterID"=$1 ORDER BY "WindowID" LIMIT 1',[window.OJTSemesterID])).rows[0];
+ await db.query(`UPDATE "OJTRegistrationWindows" SET "Status"='DRAFT' WHERE "OJTSemesterID"=$1`,[window.OJTSemesterID]);
+ const users=(await db.query(`SELECT u.*,r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID") WHERE u."Username" IN ('enterprise01','student01') OR r."RoleCode"='OJT_COORD' ORDER BY u."UserID"`)).rows;
+ const ent=users.find(u=>u.Username==='enterprise01'),staff=users.find(u=>u.RoleCode==='OJT_COORD'),student=users.find(u=>u.Username==='student01');
  const jwt=backendRequire('jsonwebtoken');const token=user=>jwt.sign({userId:user.UserID,username:user.Username,authVersion:user.AuthVersion,roleCode:user.RoleCode},process.env.JWT_SECRET,{expiresIn:'1h'});
  const app=backendRequire('./dist/app').default;pool=backendRequire('./dist/config/database').pool;
  const logger=backendRequire('./dist/config/logger').logger,oldError=logger.error.bind(logger);
@@ -93,6 +95,18 @@ async function main() {
   req.on('data',data=>chunks.push(data));req.on('end',()=>{if(chunks.length)try{record.body=JSON.parse(Buffer.concat(chunks).toString());}catch{}});
   res.on('finish',()=>{record.status=res.statusCode;records.push(record);});
   if(failWindows&&req.url.startsWith('/api/enterprise/recruitment/windows')){res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({success:false,message:'Không thể tải đợt đăng tin thử nghiệm.'}));return;}
+  const end=res.end;
+  res.end=function(chunk,encoding,callback) {
+   if(chunk)try{record.response=JSON.parse(chunk.toString());}catch{}
+   if(loseCreateResponse&&req.method==='POST'&&record.path==='/api/enterprise/recruitment/posts'&&res.statusCode===201){
+    loseCreateResponse=false;res.statusCode=503;
+    chunk=JSON.stringify({success:false,message:'Ph\u1ea3n h\u1ed3i b\u1ecb gi\u00e1n \u0111o\u1ea1n. Th\u1eed l\u1ea1i \u0111\u1ec3 l\u1ea5y tin \u0111\u00e3 l\u01b0u.'});
+    res.setHeader('Content-Length',Buffer.byteLength(chunk));
+   } else if(duplicatePostRows&&req.method==='GET'&&record.path.startsWith('/api/enterprise/recruitment/posts')&&record.response?.data?.items?.length){
+    record.response.data.items.push(record.response.data.items[0]);chunk=JSON.stringify(record.response);res.setHeader('Content-Length',Buffer.byteLength(chunk));
+   }
+   return end.call(this,chunk,encoding,callback);
+  };
   app(req,res);
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -105,120 +119,142 @@ async function main() {
  await cdp.send('Network.setBlockedURLs',{urls:['*onrender.com*','*supabase.com*','*googleapis.com*','*gstatic.com*']});
  const runtimeErrors=[];cdp.on('Runtime.exceptionThrown',e=>runtimeErrors.push(e.exceptionDetails.exception?.description||e.exceptionDetails.text));
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
- await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('ojt_auth_token',${JSON.stringify(token(ent))});localStorage.setItem('ojt_auth_user',${JSON.stringify(JSON.stringify({id:String(ent.UserID),name:ent.FullName,email:ent.Email,role:'enterprise'}))});`});
+ const authScript=await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('ojt_auth_token',${JSON.stringify(token(ent))});localStorage.setItem('ojt_auth_user',${JSON.stringify(JSON.stringify({id:String(ent.UserID),name:ent.FullName,email:ent.Email,role:'enterprise'}))});`});
  await cdp.send('Page.navigate',{url:origin+'/enterprise/jobs'});
- await waitFor(`document.querySelector('button')&&document.body.innerText.includes('Hạn doanh nghiệp đăng / sửa tin')`,'initial jobs page');
+ await waitFor(`document.body.innerText.includes('Hạn doanh nghiệp đăng / sửa tin')`,'jobs loaded');
  assert(records.some(r=>r.method==='GET'&&r.path.startsWith('/api/enterprise/recruitment/windows')&&r.status===200));
- assert(!records.some(r=>r.path.includes('/json/recruitment')));
- passed('GET real enterprise windows and post APIs; dates render on the jobs page');
-
+ passed('loads enterprise windows and combined post/position API');
  await clickText('Tạo tin tuyển dụng');await waitFor(`!!document.querySelector('dialog[open]')`,'create form');
- assert(await evaluate(`!document.querySelector('dialog input[type="datetime-local"], dialog input[type="date"]')`));
- await fill('#recruitment-title','E2E Tuyển Backend và Frontend');await fill('#recruitment-content','Thực tập phát triển REST API và giao diện React.');
+ assert(await evaluate(`!document.querySelector('dialog input[type="datetime-local"],dialog input[type="date"]')`));
+ await fill('#recruitment-title','E2E Backend và Frontend');await fill('#recruitment-content','Thực tập phát triển API và giao diện.');
  await fill('#recruitment-benefits','Có mentor hướng dẫn');await fill('#recruitment-instructions','Ứng tuyển qua hệ thống');
  await fill('#recruitment-position-0-title','Backend Intern');await fill('#recruitment-position-0-description','Phát triển REST API');await fill('#recruitment-position-0-requirements','TypeScript và PostgreSQL');
  await fill('#recruitment-position-0-capacity','0');await fill('#recruitment-position-0-mode','HYBRID');
  await clickText('Thêm vị trí tuyển dụng');await fill('#recruitment-position-1-title','Frontend Intern');await fill('#recruitment-position-1-description','Xây dựng giao diện React');await fill('#recruitment-position-1-requirements','React và CSS');await fill('#recruitment-position-1-capacity','0');
- await clickText('Tạo tin và gửi duyệt');
- await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('ít nhất một vị trí')`,'zero-capacity validation');
+ await clickText('Đăng tin tuyển dụng');
+ await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('ít nhất một vị trí')`,'capacity validation');
  assert.equal(records.filter(r=>r.method==='POST'&&r.path==='/api/enterprise/recruitment/posts').length,0);
- passed('zero total capacity is blocked before sending a request');
+ passed('zero total capacity is rejected without an API mutation');
  await fill('#recruitment-position-0-capacity','3');await fill('#recruitment-position-1-capacity','2');
  await screenshot('create-desktop');
+ loseCreateResponse=true;
  await evaluate(`(() => {const b=document.querySelector('dialog button[type=submit]');b.click();b.click();})()`);
- await waitFor(`!document.querySelector('dialog[open]')&&document.body.innerText.includes('E2E Tuyển Backend và Frontend')&&!document.body.innerText.includes('Đang tải tin')`,'successful creation');
- const creates=records.filter(r=>r.method==='POST'&&r.path==='/api/enterprise/recruitment/posts');assert.equal(creates.length,1);assert.equal(creates[0].status,201);
- assert.equal(creates[0].body.windowId,window.WindowID);assert(!('companyId'in creates[0].body));assert.equal(creates[0].body.positions.length,2);assert(creates[0].body.positions.every(p=>!('id'in p)));assert(creates[0].body.deadlineAt.endsWith('Z'));
- let post=(await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "Title"=$1`,['E2E Tuyển Backend và Frontend'])).rows[0];
- const originalDeadline=post.DeadlineAt.toISOString();
- assert.equal(post.Status,'PENDING_REVIEW');
- const positionIds=(await db.query(`SELECT "PositionID" id FROM "RecruitmentPostPositions" WHERE "PostID"=$1 ORDER BY "PositionID"`,[post.PostID])).rows.map(p=>p.id);
- passed('POST creates a real pending-review post with two positions; double-click sends exactly once');
-
+ await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('Phản hồi bị gián đoạn')`,'response lost after commit');
+ assert.equal(records.filter(r=>r.method==='POST'&&r.path==='/api/enterprise/recruitment/posts').length,1);
+ assert.equal((await db.query(`SELECT count(*)::int n FROM "RecruitmentPosts" WHERE "Title"='E2E Backend và Frontend'`)).rows[0].n,1);
+ await fill('#recruitment-title','E2E Changed retry payload');await clickText('Đăng tin tuyển dụng');
+ await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('nội dung khác')`,'changed retry cannot duplicate');
+ assert.equal((await db.query(`SELECT count(*)::int n FROM "RecruitmentPosts" WHERE "Title"='E2E Changed retry payload'`)).rows[0].n,0);
+ passed('editing a retried form keeps its request key and cannot create a second post after an ambiguous response');
+ await fill('#recruitment-title','E2E Backend và Frontend');
+ await clickText('Đăng tin tuyển dụng');
+ await waitFor(`!document.querySelector('dialog[open]')&&document.body.innerText.includes('Sinh viên có thể xem ngay')`,'idempotent retry');
+ const creates=records.filter(r=>r.method==='POST'&&r.path==='/api/enterprise/recruitment/posts');
+ assert.equal(creates.length,3);assert(creates.every(r=>r.body.idempotencyKey===creates[0].body.idempotencyKey));assert.equal(creates[2].response.data.replayed,true);
+ assert(creates.every(r=>!('deadlineAt'in r.body)&&!('companyId'in r.body)&&!('status'in r.body)));
+ assert.equal(creates[1].body.positions.length,2);
+ let post=(await db.query(`SELECT * FROM "RecruitmentPosts" WHERE "Title"='E2E Backend và Frontend'`)).rows[0];
+ assert.equal(post.Status,'PUBLISHED');assert.equal(post.ReviewedAt,null);
+ assert.equal((await db.query(`SELECT count(*)::int n FROM "RecruitmentPosts" WHERE "Title"='E2E Backend và Frontend'`)).rows[0].n,1);
+ const ids=(await db.query('SELECT "PositionID" id FROM "RecruitmentPostPositions" WHERE "PostID"=$1 ORDER BY "PositionID"',[post.PostID])).rows.map(p=>p.id);
  const article=`article[data-post-id="${post.PostID}"]`;
+ passed('double click sends once; retry after committed response loss reuses the key and creates no duplicates');
+ const opportunities=await fetch(backendOrigin+`/api/students/me/opportunities?windowId=${registration.WindowID}&limit=100`,{headers:{Authorization:'Bearer '+token(student)}});
+ assert.equal(opportunities.status,200);assert((await opportunities.json()).data.items.some(item=>item.postId===post.PostID));
+ passed('student API sees the enterprise post immediately without QHDN review');
+ const readCount=records.filter(r=>r.method==='GET'&&r.path.includes('/enterprise/recruitment/')).length;
  await click(article+' button');await waitFor(`!!document.querySelector('dialog[open]')`,'edit form');
- assert(await evaluate(`!document.querySelector('dialog input[type="datetime-local"], dialog input[type="date"]')&&document.querySelector('#recruitment-deadline').tagName==='P'`));
- passed('enterprise creation and edit forms display deadlines without editable date inputs');
- assert.equal(await evaluate(`document.querySelector('#recruitment-title').value`),'E2E Tuyển Backend và Frontend');
- await fill('#recruitment-title','E2E Đã cập nhật tin tuyển dụng');await fill('#recruitment-position-0-capacity','4');
- await clickText('Lưu và gửi duyệt');
- await waitFor(`!document.querySelector('dialog[open]')&&document.body.innerText.includes('E2E Đã cập nhật tin tuyển dụng')&&!document.body.innerText.includes('Đang tải tin')`,'successful update');
- const edits=records.filter(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID);assert.equal(edits.length,1);assert.equal(edits[0].status,200);
- assert(!('windowId'in edits[0].body));assert(!('companyId'in edits[0].body));assert(!('deadlineAt'in edits[0].body));assert.deepEqual(edits[0].body.positions.map(p=>p.id),positionIds);
- assert.equal((await db.query(`SELECT "DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].DeadlineAt.toISOString(),originalDeadline);
- assert.equal((await db.query(`SELECT "Title" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].Title,'E2E Đã cập nhật tin tuyển dụng');
- passed('PATCH updates the same real post and preserves all existing position IDs');
+ assert(await evaluate(`document.querySelector('#recruitment-deadline').textContent===new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(post.DeadlineAt.toISOString())}))`));
+ await fill('#recruitment-title','E2E Tin đã cập nhật');await fill('#recruitment-position-0-capacity','4');
+ await clickText('Lưu thay đổi');await waitFor(`!document.querySelector('dialog[open]')&&document.querySelector(${JSON.stringify(article)})?.innerText.includes('E2E Tin đã cập nhật')`,'saved edit');
+ const edit=records.findLast(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID);
+ assert.equal(edit.status,200);assert(!('deadlineAt'in edit.body));assert(!('windowId'in edit.body));assert.deepEqual(edit.body.positions.map(p=>p.id),ids);
+ const stored=(await db.query('SELECT * FROM "RecruitmentPosts" WHERE "PostID"=$1',[post.PostID])).rows[0];
+ assert.equal(stored.Status,'PUBLISHED');assert.equal(stored.DeadlineAt.toISOString(),post.DeadlineAt.toISOString());
+ assert.equal(records.filter(r=>r.method==='GET'&&r.path.includes('/enterprise/recruitment/')).length,readCount);
+ passed('PATCH preserves deadlines/position IDs, stays published and updates UI without redundant list reloads');
  await screenshot('jobs-desktop');
-
+ duplicatePostRows=true;await clickText('Tải lại');await waitFor(`!document.body.innerText.includes('Đang tải tin')&&document.querySelector(${JSON.stringify(article)})`,'duplicate response');
+ assert.equal(await evaluate(`document.querySelectorAll(${JSON.stringify(article)}).length`),1);
+ duplicatePostRows=false;
+ passed('repeated post rows in an API page are deduplicated by ID');
+ const other=(await db.query(`INSERT INTO "RecruitmentWindows" ("AcademicPeriodID","OJTSemesterID","Name","StartsAt","EndsAt","Status","CreatedBy") VALUES ($1,$2,'E2E Future intake',clock_timestamp()+interval '1 day',clock_timestamp()+interval '2 days','DRAFT',$3) RETURNING "WindowID" id`,[window.AcademicPeriodID,window.OJTSemesterID,staff.UserID])).rows[0];
+ await clickText('Tải lại');await waitFor(`!!document.querySelector('#recruitment-window-view option[value="${other.id}"]')`,'second window loaded');
+ await fill('#recruitment-window-view',other.id);await waitFor(`!document.querySelector(${JSON.stringify(article)})`,'window filtering');
+ await fill('#recruitment-window-view','0');await waitFor(`!!document.querySelector(${JSON.stringify(article)})`,'all windows');
+ await clickText('Tải lại');await waitFor(`!document.body.innerText.includes('Đang tải tin')&&document.querySelector(${JSON.stringify(article)})`,'refresh all windows');
+ assert.equal(await evaluate(`document.querySelector('#recruitment-window-view').value`),'0');
+ passed('window selection filters posts and all-window selection survives refresh');
+ await fill('#recruitment-window-view',window.WindowID);
  await click(article+' button');await fill('#recruitment-title','E2E Nội dung chưa lưu');
- await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()-interval '1 second' WHERE "WindowID"=$1`,[window.WindowID]);
- await clickText('Lưu và gửi duyệt');
- await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('hết hạn')`,'backend 409 deadline conflict');
+ await db.query(`UPDATE "OJTRegistrationWindows" SET "Status"='OPEN',"StartsAt"=clock_timestamp()-interval '1 hour',"EndsAt"=clock_timestamp()+interval '1 hour' WHERE "WindowID"=$1`,[registration.WindowID]);
+ await clickText('Lưu thay đổi');await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('đăng ký OJT')`,'server-side edit lock');
  assert.equal(await evaluate(`document.querySelector('#recruitment-title').value`),'E2E Nội dung chưa lưu');
- assert.equal((await db.query(`SELECT "Title" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].Title,'E2E Đã cập nhật tin tuyển dụng');
- assert(records.some(r=>r.method==='PATCH'&&r.status===409));
- passed('real deadline conflict preserves form input and leaves saved DB content unchanged');
- await clickText('Hủy');
- await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()+interval '1 hour' WHERE "WindowID"=$1`,[window.WindowID]);
- const qhdnDeadline=new Date(post.DeadlineAt.getTime()+86400000).toISOString();
- const review=await fetch(backendOrigin+'/api/recruitment/posts/'+post.PostID+'/review',{method:'POST',headers:{Authorization:'Bearer '+token(staff),'Content-Type':'application/json'},body:JSON.stringify({decision:'PUBLISH',reason:'Approved in local frontend test',deadlineAt:qhdnDeadline})});assert.equal(review.status,200);
- await clickText('Tải lại');
- await waitFor(`document.querySelector(${JSON.stringify(article)})?.innerText.includes('Đang tuyển')&&document.querySelector(${JSON.stringify(article+' button')})?.disabled===false`,'published post remains editable while intake is open');
- await click(article+' button');await waitFor(`!!document.querySelector('dialog[open]')`,'published post edit dialog');
- assert(await evaluate(`document.querySelector('#recruitment-deadline').textContent===new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(qhdnDeadline)}))`));
- await fill('#recruitment-title','E2E Chỉnh sửa tin đã công bố');
- await clickText('Lưu và gửi duyệt');
- await waitFor(`!document.querySelector('dialog[open]')&&document.body.innerText.includes('E2E Chỉnh sửa tin đã công bố')&&!document.body.innerText.includes('Đang tải tin')`,'published post edit succeeds');
- const editedPublished=(await db.query(`SELECT "Title","Status" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0];
- assert.equal(editedPublished.Title,'E2E Chỉnh sửa tin đã công bố');assert.equal(editedPublished.Status,'PENDING_REVIEW');
- const savedEdits=records.filter(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID&&r.status===200);
- assert.equal(savedEdits.length,2);assert.deepEqual(savedEdits[1].body.positions.map(p=>p.id),positionIds);
- assert(savedEdits.every(request=>!('deadlineAt'in request.body)));
- assert.equal((await db.query(`SELECT "DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0].DeadlineAt.toISOString(),qhdnDeadline);
- passed('QHDN deadline is displayed exactly, omitted from every successful enterprise PATCH and preserved in DB');
- passed('published post edit button, form submission and real PATCH all succeed within the intake deadline');
-
- // Reproduce the screenshot's existing DEMO configuration without changing backend logic.
- // The user requested frontend-only changes: show an actionable failure and preserve input/date.
- const equalDeadline=(await db.query(`SELECT "EndsAt" FROM "RecruitmentWindows" WHERE "WindowID"=$1`,[window.WindowID])).rows[0].EndsAt.toISOString();
- await db.query(`UPDATE "RecruitmentPosts" SET "DeadlineAt"=$2 WHERE "PostID"=$1`,[post.PostID,equalDeadline]);
- await clickText('Tải lại');
- await waitFor(`document.querySelector(${JSON.stringify(article)})?.innerText.includes(new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(equalDeadline)})))`,'reload existing equal-deadline configuration');
- await click(article+' button');await fill('#recruitment-title','E2E Giữ nội dung khi hạn QHDN bị chặn');
- await clickText('Lưu và gửi duyệt');
- await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('QHDN kiểm tra lại')`,'explain backend rejection of QHDN deadline');
- assert.equal(await evaluate(`document.querySelector('#recruitment-title').value`),'E2E Giữ nội dung khi hạn QHDN bị chặn');
- const unchanged=(await db.query(`SELECT "Title","DeadlineAt" FROM "RecruitmentPosts" WHERE "PostID"=$1`,[post.PostID])).rows[0];
- assert.equal(unchanged.Title,'E2E Chỉnh sửa tin đã công bố');assert.equal(unchanged.DeadlineAt.toISOString(),equalDeadline);
- const rejected=records.filter(r=>r.method==='PATCH'&&r.path==='/api/enterprise/recruitment/posts/'+post.PostID).at(-1);
- assert.equal(rejected.status,400);assert(!('deadlineAt'in rejected.body));
- await screenshot('qhdn-deadline-rejection');
- await clickText('Hủy');
- passed('existing equal QHDN deadline rejection is explained; unsaved input and configured deadline are preserved');
-
+ assert.equal((await db.query('SELECT "Title" FROM "RecruitmentPosts" WHERE "PostID"=$1',[post.PostID])).rows[0].Title,'E2E Tin đã cập nhật');
+ await clickText('Hủy');await clickText('Tải lại');await waitFor(`document.querySelector(${JSON.stringify(article+' button')})?.disabled===true`,'metadata lock');
+ assert(await evaluate(`document.querySelector(${JSON.stringify(article)}).textContent.includes('đang đăng ký OJT')`));
+ assert(await evaluate(`!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Tạo tin tuyển dụng').disabled`));
+ passed('OJT registration lock is explained, blocks editing and preserves unsaved input after 409; creating remains available');
+ await db.query(`UPDATE "OJTRegistrationWindows" SET "Status"='CLOSED' WHERE "WindowID"=$1`,[registration.WindowID]);
+ await clickText('Tải lại');await waitFor(`document.querySelector(${JSON.stringify(article+' button')})?.disabled===false`,'unlock');
+ await click(article+' button');
+ const candidate=(await db.query(`SELECT "CoordinationID" id,"ApplicationID" application_id FROM "StudentEnterpriseCoordination" WHERE "EnterpriseID"=$1 AND "Decision"='PENDING' ORDER BY "CoordinationID" LIMIT 1`,[post.EnterpriseID])).rows[0];
+ assert(candidate);
+ await db.query('UPDATE "StudentEnterpriseCoordination" SET "PositionID"=$2,"ApplicationID"=NULL WHERE "CoordinationID"=$1',[candidate.id,ids[0]]);
+ await db.query('UPDATE "JobApplications" SET "PositionID"=$2,"PostID"=$3 WHERE "ApplicationID"=$1',[candidate.application_id,ids[0],post.PostID]);
+ await db.query('UPDATE "StudentEnterpriseCoordination" SET "ApplicationID"=$2 WHERE "CoordinationID"=$1',[candidate.id,candidate.application_id]);
+ const accept=await fetch(backendOrigin+`/api/enterprise/candidates/${candidate.id}/decision`,{method:'PATCH',headers:{Authorization:'Bearer '+token(ent),'Content-Type':'application/json'},body:JSON.stringify({decision:'ACCEPTED',reason:'E2E quota protection'})});
+ assert.equal(accept.status,200);
+ await fill('#recruitment-position-0-capacity','0');await clickText('Lưu thay đổi');
+ await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('Chỉ tiêu')`,'quota floor conflict');
+ assert(records.some(r=>r.status===409&&r.response?.errorCode==='CAPACITY_BELOW_ACCEPTED'));
+ await clickText('Hủy');await clickText('Tải lại');await waitFor(`document.querySelector(${JSON.stringify(article+' button')})?.disabled===false`,'quota reload');
+ await click(article+' button');assert.equal(await evaluate(`document.querySelector('#recruitment-position-0-capacity').min`),'1');
+ passed('backend quota race is shown correctly; refreshed form enforces the accepted-student floor');
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
- await screenshot('jobs-mobile');
- assert(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth`),'Jobs page should not overflow horizontally on mobile.');
- await clickText('Tạo tin tuyển dụng');await screenshot('create-mobile');
- assert(await evaluate(`document.querySelector('dialog').scrollWidth<=document.querySelector('dialog').clientWidth`),'Dialog should not overflow horizontally.');
+ await evaluate(`document.querySelector('dialog input').blur()`);
+ assert(await evaluate(`(() => {const d=document.querySelector('dialog').getBoundingClientRect(),f=document.querySelector('dialog footer').getBoundingClientRect();return d.width<=innerWidth&&d.height<=innerHeight&&f.bottom<=d.bottom+1&&f.top>=d.top;})()`));
+ assert(await evaluate(`document.querySelector('dialog fieldset').scrollWidth<=document.querySelector('dialog fieldset').clientWidth+1`));
+ await screenshot('edit-mobile');
  await cdp.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
- await waitFor(`!document.querySelector('dialog[open]')`,'Escape closes dialog');
- passed('mobile page and dialog have no horizontal overflow; Escape closes the form');
-
+ await cdp.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+ await waitFor(`!document.querySelector('dialog[open]')`,'Escape closes');
+ assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`));await screenshot('jobs-mobile');
+ passed('mobile dialog has one scroll area, visible footer, no horizontal overflow and closes with Escape');
+ await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+ await click(article+' button');await fill('#recruitment-title','E2E Quá hạn');
+ await db.query(`UPDATE "RecruitmentWindows" SET "EndsAt"=clock_timestamp()-interval '1 second' WHERE "WindowID"=$1`,[window.WindowID]);
+ await clickText('Lưu thay đổi');await waitFor(`document.querySelector('dialog [role=alert]')?.textContent.includes('hết hạn')`,'expired intake');
+ assert.equal(await evaluate(`document.querySelector('#recruitment-title').value`),'E2E Quá hạn');await clickText('Hủy');
  await db.query(`UPDATE "RecruitmentWindows" SET "Status"='CLOSED' WHERE "WindowID"=$1`,[window.WindowID]);
- await clickText('Tải lại');await waitFor(`document.body.innerText.includes('Chưa có đợt nào đang nhận tin')`,'closed window display');
+ await clickText('Tải lại');await waitFor(`document.body.innerText.includes('Chưa có đợt nào đang nhận tin')`,'closed window');
  assert(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Tạo tin tuyển dụng').disabled`));
- assert(await evaluate(`document.querySelector(${JSON.stringify(article+' button')}).disabled`));
- passed('no open window disables creating posts and explains the deadline state');
-
- failWindows=true;await clickText('Tải lại');await waitFor(`!!document.querySelector('[role=alert]')`,'window API failure');
- failWindows=false;await clickText('Thử lại');await waitFor(`!document.querySelector('[role=alert]')&&document.body.innerText.includes('Hạn doanh nghiệp đăng / sửa tin')`,'retry after API failure');
- passed('window API error is visible and retry restores the page');
+ passed('expired and closed intakes block mutations while preserving form input');
+ failWindows=true;await clickText('Tải lại');await waitFor(`!!document.querySelector('[role=alert]')`,'windows failure');
+ failWindows=false;await clickText('Thử lại');await waitFor(`!document.querySelector('[role=alert]')&&document.body.innerText.includes('Hạn doanh nghiệp đăng / sửa tin')`,'retry');
+ passed('failed window load is visible and retry recovers');
+ assert(!records.some(r=>/\/(review|submit|continue|offers)(\?|$)/.test(r.path)));
  assert.equal(runtimeErrors.length,0,runtimeErrors.join('\n'));
- passed('no uncaught browser runtime errors');
- await fs.writeFile(path.join(artifactDir,'report.json'),JSON.stringify({checks,requests:records,artifacts:artifactDir},null,2));
+ passed('no review/submit/continue requests and no uncaught browser errors');
+ await cdp.send('Page.removeScriptToEvaluateOnNewDocument',{identifier:authScript.identifier});
+ await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('ojt_auth_token',${JSON.stringify(token(staff))});localStorage.setItem('ojt_auth_user',${JSON.stringify(JSON.stringify({id:String(staff.UserID),name:staff.FullName,email:staff.Email,role:'qhdn'}))});`});
+ await cdp.send('Page.navigate',{url:origin+'/qhdn/enterprises'});
+ await waitFor(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='Tin tuyển dụng')`,'QHDN page');
+ await clickText('Tin tuyển dụng');await waitFor(`document.querySelector('[data-qhdn-recruitment] select')?.options.length>1`,'QHDN company list');
+ await fill('[data-qhdn-recruitment] select',post.EnterpriseID);
+ await waitFor(`!!document.querySelector('[data-qhdn-recruitment] article')`,'QHDN post list');
+ await click('[data-qhdn-recruitment] article button');
+ await waitFor(`document.querySelector('[role=dialog]')||document.querySelector('dialog[open]')`,'QHDN post detail');
+ assert(await evaluate(`!document.querySelector('[role=dialog] form,[role=dialog] select,[role=dialog] textarea,dialog[open] form')`));
+ assert(!await evaluate(`document.body.innerText.includes('Duyệt & công bố')||document.body.innerText.includes('Xem & duyệt tin')||document.body.innerText.includes('Từ chối công bố')`));
+ assert(!records.some(r=>/\/recruitment\/posts\/\d+\/review/.test(r.path)));
+ assert.equal(runtimeErrors.length,0,runtimeErrors.join('\n'));
+ passed('QHDN recruitment is read-only with no publish/reject form and no review API calls');
+ await screenshot('qhdn-recruitment-readonly');
+ await fs.writeFile(path.join(artifactDir,'report.json'),JSON.stringify({checks,requests:records,backend,artifacts:artifactDir},null,2));
  console.log('Artifacts: '+artifactDir);
 }
+
 
 async function cleanup() {
  if(cdp){try{await cdp.send('Browser.close');}catch{}cdp.socket.close();}

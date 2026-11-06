@@ -76,6 +76,12 @@ export interface RecruitmentWindow {
   startsAt: string;
   endsAt: string;
   accepting: boolean;
+  canCreate?: boolean;
+  canEdit?: boolean;
+  postingDeadlineAt?: string;
+  deadlineManagedBy?: 'QHDN';
+  editLockCode?: string | null;
+  studentRegistrationWindow?: { id: number; name: string; startsAt: string; endsAt: string } | null;
   periodCode?: string;
   periodName?: string;
   periodStatus?: string;
@@ -118,6 +124,13 @@ export interface RecruitmentPost {
   updatedAt?: string;
   reviewReason?: string | null;
   reviewedAt?: string | null;
+  canEdit?: boolean;
+  requiresReview?: boolean;
+  replayed?: boolean;
+  postingDeadlineAt?: string | null;
+  deadlineManagedBy?: 'QHDN';
+  editLockCode?: string | null;
+  studentRegistrationWindow?: RecruitmentWindow['studentRegistrationWindow'];
 }
 
 export interface EnterpriseRecruitmentPositionInput {
@@ -138,10 +151,10 @@ export interface EnterpriseRecruitmentPostInput {
   positions: EnterpriseRecruitmentPositionInput[];
 }
 
-// The existing create API requires an initial deadline; updates never change it.
+// QHDN owns all deadlines. Enterprise requests never send deadlineAt.
 export interface EnterpriseRecruitmentPostCreateInput extends EnterpriseRecruitmentPostInput {
   windowId: number;
-  deadlineAt: string;
+  idempotencyKey?: string;
 }
 
 export interface EnterpriseRecruitmentPostResponse {
@@ -364,7 +377,10 @@ export const enterpriseService = {
   },
 
   createRecruitmentPost: async (data: EnterpriseRecruitmentPostCreateInput): Promise<EnterpriseRecruitmentPostResponse> => {
-    const response = await API.post<EnterpriseRecruitmentPostResponse>('/enterprise/recruitment/posts', data);
+    const { windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions } = data;
+    const response = await API.post<EnterpriseRecruitmentPostResponse>('/enterprise/recruitment/posts', {
+      windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions,
+    });
     return response.data;
   },
 

@@ -103,9 +103,9 @@ export const recruitmentLabels: Record<string, string> = {
   OPEN: "Đang mở",
   CLOSED: "Đã đóng",
   DRAFT: "Bản nháp",
-  PENDING_REVIEW: "Chờ duyệt",
+  PENDING_REVIEW: "Tin cũ chưa công bố",
   PUBLISHED: "Đã công bố",
-  REJECTED: "Đã từ chối",
+  REJECTED: "Đã từ chối (dữ liệu cũ)",
   ARCHIVED: "Đã lưu trữ",
 };
 
