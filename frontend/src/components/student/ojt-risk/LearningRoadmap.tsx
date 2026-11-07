@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ArrowDown,ArrowRight,BookOpen,CheckCircle2,ChevronDown,GitBranch,GraduationCap,Info,LockKeyhole } from 'lucide-react';
+import { ArrowRight,BookOpen,CheckCircle2,ChevronDown,ChevronUp,GitBranch,GraduationCap,Info,LockKeyhole } from 'lucide-react';
 import type { RiskAssessment } from '@/services/studentOjtRisk.service';
 import { Badge,cardClass,focusClass,SectionTitle } from './risk-ui';
 
-export function LearningRoadmap({roadmap}:{roadmap:RiskAssessment['roadmap']}){
+export function LearningRoadmap({roadmap,embedded=false}:{roadmap:RiskAssessment['roadmap'];embedded?:boolean}){
   const [expanded,setExpanded]=useState(false);
   const visible=expanded?roadmap.items:roadmap.items.slice(0,4);
-  return <section aria-label="Lộ trình học tập đề xuất" className={`${cardClass} p-5 sm:p-6`}>
-    <SectionTitle eyebrow="Từng bước cải thiện tiến độ" title="Lộ trình học tập đề xuất" description={roadmap.status==='READY'?roadmap.objective:roadmap.message}
-      aside={<Badge className="border-blue-100 bg-blue-50 text-blue-700"><GraduationCap size={14} aria-hidden="true"/>Đến hết kỳ {roadmap.targetSemester}</Badge>}/>
+  return <section aria-label="Lộ trình học tập đề xuất" className={embedded?'min-w-0':`${cardClass} p-5 sm:p-6`}>
+    {embedded ? <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-base font-semibold text-slate-900">Lộ trình học tập đề xuất</h3><p className="mt-1 text-sm leading-relaxed text-slate-500">{roadmap.status==='READY'?roadmap.objective:roadmap.message}</p></div><Badge className="border-blue-100 bg-blue-50 text-blue-700">Đến hết kỳ {roadmap.targetSemester}</Badge></div>
+      : <SectionTitle eyebrow="Từng bước cải thiện tiến độ" title="Lộ trình học tập đề xuất" description={roadmap.status==='READY'?roadmap.objective:roadmap.message}
+        aside={<Badge className="border-blue-100 bg-blue-50 text-blue-700"><GraduationCap size={14} aria-hidden="true"/>Đến hết kỳ {roadmap.targetSemester}</Badge>}/>}
     {roadmap.status!=='READY'?<div className="mt-5 flex items-start gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5"><Info className="mt-0.5 shrink-0 text-slate-400" size={20} aria-hidden="true"/><div><h4 className="text-sm font-semibold text-slate-700">{roadmap.status==='NOT_AVAILABLE'?'Lộ trình chưa sẵn sàng':'Cần đối soát chương trình đào tạo'}</h4><p className="mt-1 text-sm leading-relaxed text-slate-500">Chưa có đủ dữ liệu hợp lệ để đề xuất môn học. Bạn có thể xem các hướng xử lý bên dưới.</p></div></div>
     :roadmap.items.length===0?<div className="mt-5 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5"><CheckCircle2 className="shrink-0 text-emerald-600" size={22} aria-hidden="true"/><div><h4 className="text-sm font-semibold text-slate-800">Chưa có môn cần bổ sung trong danh sách đề xuất</h4><p className="mt-1 text-sm leading-relaxed text-slate-500">Tiếp tục hoàn thành các môn đang học và theo dõi kết quả xét OJT của nhà trường.</p></div></div>
     :<><div className="mt-5 flex items-start gap-2 rounded-xl bg-blue-50/60 px-3.5 py-3 text-xs leading-relaxed text-blue-800"><Info size={15} className="mt-0.5 shrink-0" aria-hidden="true"/><p>Lộ trình chuẩn bị trước khi đi OJT, chỉ gồm môn đến hết kỳ {roadmap.targetSemester}. Không bao gồm môn thực tập OJT202. Thứ tự ưu tiên không phải lịch đăng ký môn.</p></div>
@@ -17,7 +18,7 @@ export function LearningRoadmap({roadmap}:{roadmap:RiskAssessment['roadmap']}){
         return <li key={course.courseId} className="relative pb-5 pl-10 last:pb-0 sm:pl-12">
           {index<visible.length-1&&<span aria-hidden="true" className="absolute bottom-0 left-3.5 top-8 w-px bg-slate-200 sm:left-4"/>}
           <span aria-hidden="true" className={`absolute left-0 top-1 grid size-7 place-items-center rounded-full border-2 border-white text-xs font-bold ring-1 sm:size-8 ${course.canPlan?'bg-orange-500 text-white ring-orange-200':'bg-slate-100 text-slate-500 ring-slate-200'}`}>{course.priority}</span>
-          <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition-shadow hover:shadow-md hover:shadow-slate-200/40 motion-reduce:transition-none"><div className="p-4 sm:p-5">
+          <article className={embedded?'overflow-hidden border-b border-slate-200 bg-white':'overflow-hidden rounded-2xl border border-slate-200 bg-white transition-shadow hover:shadow-md hover:shadow-slate-200/40 motion-reduce:transition-none'}><div className={embedded?'py-3 pr-2':'p-4 sm:p-5'}>
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Bước {course.priority}</p><h4 className="flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={17} className="shrink-0 text-slate-400" aria-hidden="true"/>{course.courseCode??course.name??'Môn học'}</h4>{course.courseCode&&course.name&&<p className="mt-1 text-xs text-slate-500">{course.name}</p>}</div><div className="flex flex-wrap gap-2"><Badge className={course.action==='RETAKE'?'border-orange-200 bg-orange-50 text-orange-800':'border-slate-200 bg-slate-50 text-slate-600'}>{course.action==='RETAKE'?'Học lại':'Học mới'}</Badge><Badge className={course.canPlan?'border-emerald-100 bg-emerald-50 text-emerald-700':'border-amber-100 bg-amber-50 text-amber-800'}>{course.canPlan?<CheckCircle2 size={12} aria-hidden="true"/>:<LockKeyhole size={12} aria-hidden="true"/>}{course.canPlan?'Có thể ưu tiên':'Cần tiên quyết'}</Badge></div></div>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">{course.explanation}</p>
             {!!course.dependentCourses?.length&&<div className="mt-4 rounded-xl bg-slate-50 p-3"><p className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><GitBranch size={14} aria-hidden="true"/>Liên quan điều kiện tiên quyết của</p><div className="mt-2 flex flex-wrap gap-1.5">{course.dependentCourses.map(c=><span key={c.courseId} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600"><ArrowRight size={11} aria-hidden="true"/>{c.courseCode??c.name??'Môn trong chương trình'}</span>)}</div></div>}
@@ -28,6 +29,19 @@ export function LearningRoadmap({roadmap}:{roadmap:RiskAssessment['roadmap']}){
       })}</ol>
       {roadmap.items.length>4&&<button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)} className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 ${focusClass}`}>{expanded?'Thu gọn lộ trình':`Xem thêm ${roadmap.items.length-4} môn trong lộ trình`}<ChevronDown size={16} className={expanded?'rotate-180':''} aria-hidden="true"/></button>}
     </>}
-    <details className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500"><summary className={`flex cursor-pointer list-none items-center gap-2 rounded-md font-medium ${focusClass}`}><ArrowDown size={13} aria-hidden="true"/>Lưu ý về lộ trình đề xuất</summary><p className="mt-3 leading-relaxed">{roadmap.message}</p><ul className="mt-2 list-disc space-y-2 pl-4 leading-relaxed">{roadmap.limitations.map((l,i)=><li key={i}>{l}</li>)}</ul></details>
+    {!embedded && <RoadmapNotes roadmap={roadmap} />}
   </section>;
+}
+
+export function RoadmapNotes({roadmap}:{roadmap:RiskAssessment['roadmap']}){
+  return <details className="group mt-4 rounded-lg border border-slate-200 bg-white" onToggle={event => event.currentTarget.querySelector('summary')?.setAttribute('aria-expanded', String(event.currentTarget.open))}>
+    <summary aria-expanded={false} className={`flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition-colors duration-150 hover:bg-slate-100 [&::-webkit-details-marker]:hidden ${focusClass}`}>
+      <span>Lưu ý về lộ trình đề xuất</span>
+      <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-700">
+        <span className="group-open:hidden">Xem chi tiết</span><span className="hidden group-open:inline">Thu gọn</span>
+        <ChevronDown size={20} className="group-open:hidden" aria-hidden="true"/><ChevronUp size={20} className="hidden group-open:block" aria-hidden="true"/>
+      </span>
+    </summary>
+    <div className="border-t border-slate-200 p-4 text-sm leading-relaxed text-slate-700"><p>{roadmap.message}</p><ul className="mt-2 list-disc space-y-2 pl-4">{roadmap.limitations.map((l,i)=><li key={i}>{l}</li>)}</ul></div>
+  </details>;
 }

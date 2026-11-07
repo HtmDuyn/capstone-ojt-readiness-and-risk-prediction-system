@@ -3,7 +3,7 @@ import { Building2, ChevronRight, FileText, MapPin, Search, Send } from 'lucide-
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
 import { allStudentPages, studentGet, studentQuery } from '@/services/studentService';
-import { buttonClass, Card, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
+import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage, StudentSemesterSelect } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import { OjtApplicationDialog } from '@/components/student/OjtApplicationDialog';
@@ -32,6 +32,7 @@ function RegistrationContent() {
   const [initialPosition, setInitialPosition] = useState<Opportunity>();
   const [savedCv, setSavedCv] = useState<CV | null>(null);
   const [message, setMessage] = useState('');
+  const [activeTab, setActiveTab] = useState<'apply' | 'records'>('apply');
   const scope = `${profile?.id}:${semesterId}:${revision}`;
   const windows = useStudentResource('ojt-windows:' + scope,
     (signal) => allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }), signal));
@@ -64,26 +65,34 @@ function RegistrationContent() {
     setInitialPosition(position); setDetailCompany(null); setMessage(''); setApplying(true);
   };
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {message && <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>}
-      <Card title="Ứng tuyển thực tập">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <label className="w-full space-y-2 text-sm text-slate-600 sm:max-w-lg">Đợt đăng ký
+      <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div role="tablist" aria-label="OJT và hồ sơ ứng tuyển" className="flex gap-6 overflow-x-auto border-b border-slate-200">
+          <button type="button" role="tab" id="apply-tab" aria-controls="apply-panel" aria-selected={activeTab === 'apply'} onClick={() => setActiveTab('apply')} className={`shrink-0 border-b-2 px-1 pb-3 text-sm transition-colors hover:text-orange-600 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 ${activeTab === 'apply' ? 'border-orange-500 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600'}`}>Ứng tuyển thực tập</button>
+          <button type="button" role="tab" id="records-tab" aria-controls="records-panel" aria-selected={activeTab === 'records'} onClick={() => setActiveTab('records')} className={`shrink-0 border-b-2 px-1 pb-3 text-sm transition-colors hover:text-orange-600 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 ${activeTab === 'records' ? 'border-orange-500 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600'}`}>Hồ sơ ứng tuyển của tôi</button>
+        </div>
+        <div role="tabpanel" id="apply-panel" aria-labelledby="apply-tab" hidden={activeTab !== 'apply'} className="space-y-4 pt-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="min-w-0"><StudentSemesterSelect /></div>
+          <label className="block min-w-0 space-y-2 text-sm font-medium text-slate-600">Đợt đăng ký
             <select aria-label="Chọn đợt đăng ký" className={inputClass} value={chosenWindow?.id ?? ''} disabled={windows.loading || !windows.data?.length} onChange={(event) => { setWindowChoice(event.target.value); setCompanyPage(1); setSearch(''); }}>
               {!windows.data?.length && <option value="">Chưa có đợt đăng ký</option>}
               {windows.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {statusText(item.status)}</option>)}
             </select>
           </label>
-          <button type="button" onClick={() => openApplication()} disabled={!canApply} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3'}><Send size={17} />Nộp đơn đăng ký OJT</button>
         </div>
         <ResourceState loading={windows.loading} error={windows.error} retry={windows.reload} />
-        {chosenWindow && <p className="text-xs text-slate-500">Nhận hồ sơ: {dateText(chosenWindow.startsAt)} – {dateText(chosenWindow.endsAt)}</p>}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {chosenWindow && <p className="text-sm text-slate-600">Nhận hồ sơ: {dateText(chosenWindow.startsAt)} – {dateText(chosenWindow.endsAt)}</p>}
+          <button type="button" onClick={() => openApplication()} disabled={!canApply} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
+        </div>
         {!!blockers.length && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{explainOjtBlockers(blockers)} Bạn vẫn có thể xem thông tin doanh nghiệp bên dưới.</p>}
-      </Card>
-
-      <Card title="Doanh nghiệp liên kết">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="border-t border-slate-200 pt-5">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div><h3 className="text-lg font-semibold text-slate-900">Doanh nghiệp liên kết</h3>
           <p className="text-sm text-slate-500">{companies.length} doanh nghiệp · {opportunities.data?.total ?? 0} vị trí trong đợt đã chọn</p>
+          </div>
           <label className="relative block sm:w-80"><Search size={17} className="absolute left-3 top-2.5 text-slate-400" /><input className={inputClass + ' pl-10'} aria-label="Tìm doanh nghiệp hoặc vị trí" placeholder="Tìm doanh nghiệp, vị trí, địa điểm..." value={search} onChange={(event) => { setSearch(event.target.value); setCompanyPage(1); }} /></label>
         </div>
         <ResourceState loading={opportunities.loading} error={opportunities.error} retry={opportunities.reload} />
@@ -91,7 +100,7 @@ function RegistrationContent() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredCompanies.slice((currentCompanyPage - 1) * 20, currentCompanyPage * 20).map((company) => {
             const positions = opportunities.data?.items.filter((item) => item.company.id === company.id) ?? [];
-            return <article key={company.id} className="flex flex-col rounded-2xl border border-slate-200 p-5 transition hover:border-orange-200 hover:shadow-md hover:shadow-orange-100/40">
+            return <article key={company.id} className="flex h-fit w-full max-w-[420px] flex-col justify-self-start rounded-2xl border border-slate-200 p-5 transition hover:border-orange-200 hover:shadow-md hover:shadow-orange-100/40">
               <div className="mb-4 flex items-start gap-3"><div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><Building2 size={23} /></div><div><h3 className="font-bold text-slate-900">{company.name}</h3><p className="mt-1 text-xs text-slate-500">{company.industry || 'Doanh nghiệp liên kết OJT'}</p></div></div>
               <p className="mb-3 flex items-start gap-2 text-sm text-slate-500"><MapPin size={16} className="mt-0.5 shrink-0" />{company.address || positions[0]?.location || 'Địa điểm chưa cập nhật'}</p>
               <p className="mb-4 text-sm text-slate-600">{positions.length} vị trí · {positions.reduce((sum, item) => sum + item.remainingSlots, 0)} chỗ còn nhận</p>
@@ -100,11 +109,14 @@ function RegistrationContent() {
           })}
         </div>
         {filteredCompanies.length > 20 && <Pagination page={currentCompanyPage} total={filteredCompanies.length} onChange={setCompanyPage} />}
-      </Card>
+      </div>
+        </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-        <StudentCvCard cv={cv} onUploaded={(uploaded) => { setSavedCv(uploaded); setMessage('Đã lưu CV vào hồ sơ của bạn.'); }} />
-        <Card title="Hồ sơ đã nộp">
+        <div role="tabpanel" id="records-panel" aria-labelledby="records-tab" hidden={activeTab !== 'records'} className="pt-5">
+        <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-0">
+        <div className="min-w-0 lg:pr-3"><StudentCvCard embedded cv={cv} onUploaded={(uploaded) => { setSavedCv(uploaded); setMessage('Đã lưu CV vào hồ sơ của bạn.'); }} /></div>
+        <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
+          <h3 className="text-base font-semibold text-slate-900">Hồ sơ đã nộp</h3>
           <ResourceState loading={applications.loading} error={applications.error} retry={applications.reload} />
           {!applications.loading && !applications.error && !applicationItems.length && <Empty>Chưa có đơn đăng ký. Chọn doanh nghiệp và nộp đơn khi đợt đăng ký mở.</Empty>}
           <div className="divide-y divide-slate-100">
@@ -116,8 +128,10 @@ function RegistrationContent() {
             </article>)}
           </div>
           {applicationItems.length > 20 && <Pagination page={currentApplicationPage} total={applicationItems.length} onChange={setApplicationPage} />}
-        </Card>
-      </div>
+        </div>
+        </div>
+        </div>
+      </section>
 
       {detailCompany && <StudentDialog title={detailCompany.name} onClose={() => setDetailCompany(null)}>
         <div className="space-y-6">
@@ -145,7 +159,7 @@ function RegistrationContent() {
 
 export default function StudentOjtRegistration() {
   const { profile, semesterId } = useStudentPortal();
-  return <StudentPage title="OJT & hồ sơ ứng tuyển" description="Khám phá doanh nghiệp liên kết, quản lý CV và theo dõi đơn đăng ký thực tập.">
+  return <StudentPage title="OJT & hồ sơ ứng tuyển" description="Khám phá doanh nghiệp liên kết, quản lý CV và theo dõi đơn đăng ký thực tập." showSemesterInBanner={false} compactTopSpacing>
     <RegistrationContent key={`${profile?.id}:${semesterId}`} />
   </StudentPage>;
 }
