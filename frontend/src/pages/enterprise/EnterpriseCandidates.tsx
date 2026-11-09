@@ -104,9 +104,9 @@ export const EnterpriseCandidates: React.FC = () => {
       await enterpriseService.decideCandidate(
         candidateId,
         decision,
-        decision === 'ACCEPTED' ? 'Tiếp nhận sinh viên thực tập' : 'Từ chối sinh viên'
+        decision === 'ACCEPTED' ? 'Đồng ý nhận sinh viên, chờ QHDN xác nhận thực nhận' : 'Từ chối sinh viên'
       );
-      const statusText = decision === 'ACCEPTED' ? 'tiếp nhận' : 'từ chối';
+      const statusText = decision === 'ACCEPTED' ? 'đồng ý nhận' : 'từ chối';
       setToastMessage(`Đã ${statusText} ứng viên thành công!`);
       setTimeout(() => setToastMessage(null), 4000);
       // Refresh the list
@@ -130,7 +130,7 @@ export const EnterpriseCandidates: React.FC = () => {
   };
 
   const decisionLabel = (decision: string): string => {
-    const labels: Record<string, string> = { PENDING: 'Chờ duyệt', ACCEPTED: 'Đã tiếp nhận', REJECTED: 'Đã từ chối' };
+    const labels: Record<string, string> = { PENDING: 'Chờ duyệt', ACCEPTED: 'Đồng ý nhận', SUPERSEDED: 'Đã chuyển điều phối', REJECTED: 'Đã từ chối' };
     return labels[decision] || decision;
   };
 
@@ -147,7 +147,7 @@ export const EnterpriseCandidates: React.FC = () => {
     <div className="space-y-6 pb-12">
       <PageBanner
         title="Hồ sơ sinh viên ứng tuyển"
-        description="Xem hồ sơ sinh viên gửi trực tiếp đến doanh nghiệp, sau đó xác nhận hoặc từ chối tiếp nhận thực tập."
+        description="Xem hồ sơ sinh viên tự ứng tuyển hoặc được QHDN giới thiệu. Doanh nghiệp đồng ý hoặc từ chối; QHDN ghi nhận thực nhận ở bước tiếp theo."
         badge="Ứng tuyển OJT"
       />
 
@@ -233,7 +233,7 @@ export const EnterpriseCandidates: React.FC = () => {
           >
             <option value="ALL">Tất cả trạng thái</option>
             <option value="PENDING">Chờ xét duyệt</option>
-            <option value="ACCEPTED">Đã tiếp nhận</option>
+            <option value="ACCEPTED">Đồng ý nhận</option>
             <option value="REJECTED">Đã từ chối</option>
           </select>
           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
@@ -326,8 +326,9 @@ export const EnterpriseCandidates: React.FC = () => {
 
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${decisionColor(c.decision)}`}>
-                        {decisionLabel(c.decision)}
+                        {c.receivedAt?'Đã thực nhận':decisionLabel(c.decision)}
                       </span>
+                      {c.source?.startsWith('QHDN_')&&<p className="mt-1 text-[11px] text-slate-500">{c.source==='QHDN_APPLICATION'?'QHDN bổ sung ứng tuyển':'QHDN điều phối'}</p>}
                     </td>
 
                     <td className="px-3 py-4">
@@ -341,7 +342,7 @@ export const EnterpriseCandidates: React.FC = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        {c.decision === 'PENDING' && (
+                        {c.decision === 'PENDING' && c.isLatestCoordination && (
                           <>
                             <button
                               type="button"
@@ -434,7 +435,7 @@ export const EnterpriseCandidates: React.FC = () => {
               <div className="p-3 bg-slate-50 rounded-xl space-y-1">
                 <span className="text-slate-400">Trạng thái</span>
                 <p className={`font-bold ${selectedCandidate.decision === 'ACCEPTED' ? 'text-emerald-600' : selectedCandidate.decision === 'REJECTED' ? 'text-rose-600' : 'text-amber-600'}`}>
-                  {decisionLabel(selectedCandidate.decision)}
+                  {selectedCandidate.receivedAt?'Đã thực nhận':decisionLabel(selectedCandidate.decision)}
                 </p>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl space-y-1">
@@ -462,7 +463,7 @@ export const EnterpriseCandidates: React.FC = () => {
             </div>
 
             {/* Actions */}
-            {selectedCandidate.decision === 'PENDING' && (
+            {selectedCandidate.decision === 'PENDING' && selectedCandidate.isLatestCoordination && (
               <div className="flex items-center justify-end space-x-3 pt-2">
                 <button
                   onClick={() => handleDecision(selectedCandidate.id, 'REJECTED')}

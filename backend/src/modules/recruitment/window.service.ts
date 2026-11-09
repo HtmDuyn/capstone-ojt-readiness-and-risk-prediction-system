@@ -99,7 +99,6 @@ export async function finalizeWindow(id:number,body:unknown,actor:number){
    count(*) FILTER(WHERE a."Status"='WITHDRAWN')::int AS withdrawn,
    count(*) FILTER(WHERE a."Status" NOT IN ('ACCEPTED','REJECTED','WITHDRAWN'))::int AS pending
    FROM "JobApplications" a JOIN "RecruitmentPosts" p USING("PostID") WHERE p."WindowID"=$1`,[id])).rows[0];
-  if(summary.pending)throw invalid(`Còn ${summary.pending} hồ sơ chưa có kết quả. Doanh nghiệp cần hoàn tất phản hồi trước khi chốt.`,409,'RECRUITMENT_RESULTS_PENDING');
   await c.query(`UPDATE "RecruitmentWindows" SET "Status"='CLOSED',"ResultsFinalizedAt"=clock_timestamp(),"ResultsFinalizedBy"=$2,"ResultsSummary"=$3,"UpdatedAt"=now() WHERE "WindowID"=$1`,[id,actor,JSON.stringify(summary)]);
   await c.query(`UPDATE "OJTRegistrationWindows" SET "Status"='CLOSED',"UpdatedAt"=now() WHERE "RecruitmentRoundID"=$1`,[id]);
   const after=await windowRecord(c,id);await audit(c,actor,'RecruitmentWindows',id,'FINALIZE_RESULTS',old,after,reason);return windowApi(after);

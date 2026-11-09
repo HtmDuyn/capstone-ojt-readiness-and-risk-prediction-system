@@ -196,7 +196,9 @@ export interface EnterpriseCandidateItem {
   registrationId: number;
   student: EnterpriseCandidateStudent;
   position: EnterpriseCandidatePosition;
-  decision: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  decision: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'SUPERSEDED';
+  source?: string;
+  receivedAt?: string | null;
   introducedAt: string;
   decisionAt?: string | null;
   rejectReason?: string | null;
