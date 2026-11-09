@@ -4,7 +4,7 @@ import { pool } from '../../config/database';
 import { encryptEmail, emailKey } from './email.crypto';
 import { fail, validateImport } from './import.validation';
 import { saveHistory, recordRejected, safeRow } from '../students/academic-import.service';
-import { windowRecord, assertOpen } from '../recruitment/recruitment.repository';
+
 import { importAcademicProfile } from '../students/complete-import.service';
 import { audit } from '../academic/academic.repository';
 import type { PoolClient } from 'pg';
@@ -40,12 +40,6 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       if(onCommit&&!preview){await onCommit(client,result);await client.query('COMMIT');}else await client.query('ROLLBACK');
       return result;
     }
-    let recruitmentDeadline: Date | undefined;
-    if (input.kind === 'ENTERPRISE') {
-      const window = await windowRecord(client, input.windowId!); assertOpen(window);
-      input.semesterId = window.OJTSemesterID;
-      recruitmentDeadline = window.EndsAt;
-    }
     const plans: { row: typeof input.rows[number]; userId?: number; entityId?: number; previousCode?: string; action: string }[] = [];
     for (let i = 0; i < input.rows.length; i++) {
       const row = input.rows[i];
@@ -70,10 +64,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       if (input.kind === 'ENTERPRISE' && match) {
         if (!match.UserID || match.RoleCode !== 'ENTERPRISE' || match.DeletedAt || match.EnterpriseStatus!=='ACTIVE' || match.UserStatus!=='ACTIVE') throw fail(`Row ${i + 1}: existing enterprise has no active enterprise account.`,409,'IDENTITY_CONFLICT');
         if (match.Email.toLowerCase()!==row.email) throw fail(`Row ${i+1}: enterprise code is already linked to another email.`,409,'IDENTITY_CONFLICT');
-        const conflict=await client.query('SELECT 1 FROM "InternshipPositions" WHERE "EnterpriseID"=$1 AND "OJTSemesterID"=$2 AND "RecruitmentCode"=ANY($3::text[])',[match.entity_id,input.semesterId,row.positions!.map(p=>p.code)]);
-        if(conflict.rowCount)throw fail('A recruitment position code already exists; supply a new position code. Existing posts are preserved.',409,'RECRUITMENT_CODE_EXISTS');
-        plans.push({row,userId:match.UserID,entityId:match.entity_id,action:'UPDATED'});
-        continue;
+        throw fail(`Row ${i+1}: enterprise account already exists; existing profiles and credentials are preserved.`,409,'ENTERPRISE_ACCOUNT_EXISTS');
       }
       if (match?.UserID && (match.RoleCode !== input.kind || match.Email.toLowerCase() !== row.email)) throw fail(`Row ${i + 1}: account email/role does not match existing identity.`, 409, 'IDENTITY_CONFLICT');
       const email = await client.query('SELECT "UserID" FROM "Users" WHERE lower("Email")=$1', [row.email]);
@@ -122,13 +113,8 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
           const ent = await client.query('INSERT INTO "Enterprises" ("EnterpriseCode","Name","Address","ContactEmail","ContactPersonName","Status") VALUES ($1,$2,$3,$4,$5,\'ACTIVE\') RETURNING "EnterpriseID"', [row.code, row.name, row.address ?? null, row.email, row.fullName]);
           p.entityId = ent.rows[0].EnterpriseID;
         }
-        // Existing enterprises retain account and contact data; only this semester's recruitment is added.
+        // Provision only the enterprise identity; recruitment is managed by the enterprise.
         await client.query('INSERT INTO "EnterpriseUsers" ("UserID","EnterpriseID","PositionTitle") VALUES ($1,$2,\'HR\') ON CONFLICT ("UserID") DO NOTHING', [p.userId, p.entityId]);
-        for (const position of row.positions!) {
-          const pos = await client.query('INSERT INTO "InternshipPositions" ("EnterpriseID","OJTSemesterID","RecruitmentCode","Title","Description","Requirements","Capacity","RemainingSlots","Status") VALUES ($1,$2,$3,$4,$5,$6,$7,$7,\'CLOSED\') RETURNING "PositionID"', [p.entityId, input.semesterId, position.code, position.title, position.description, position.requirements, position.capacity]);
-          const post = await client.query('INSERT INTO "RecruitmentPosts" ("EnterpriseID","OJTSemesterID","Title","Content","Status","CreatedBy","WindowID","DeadlineAt") VALUES ($1,$2,$3,$4,\'PENDING_REVIEW\',$5,$6,$7) RETURNING "PostID"', [p.entityId, input.semesterId, position.title, position.description, actorId, input.windowId, recruitmentDeadline]);
-          await client.query('INSERT INTO "RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID") VALUES ($1,$2,$3,$4)', [post.rows[0].PostID, pos.rows[0].PositionID, p.entityId, input.semesterId]);
-        }
       }
       await client.query('INSERT INTO "AccountImportRows" ("BatchID","RowNumber","SourceCode","UserID","Action") VALUES ($1,$2,$3,$4,$5)', [batchId, i + 1, row.code, p.userId, p.action]);
     }
@@ -148,7 +134,14 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
   } catch (error) {
     await client.query('ROLLBACK');
     if ((error as { code?: string }).code === '23505') throw fail('Duplicate account, import or recruitment code.', 409, 'IMPORT_CONFLICT');
-    if ((error as { code?: string }).code === '23514') throw fail((error as Error).message, 422, 'INVALID_STUDY_HISTORY');
+    if ((error as { code?: string }).code === '23514') {
+      if ((body as any)?.kind === 'ENTERPRISE') {
+        if ((error as { constraint?: string }).constraint === 'AccountImportBatches_check')
+          throw fail('Database chưa cập nhật luồng tạo tài khoản doanh nghiệp. Cần chạy khối ENTERPRISE ACCOUNT IMPORT V2 trong backend/DB.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
+        throw fail('Thông tin tài khoản doanh nghiệp không đáp ứng ràng buộc dữ liệu.',422,'INVALID_ENTERPRISE_ACCOUNT');
+      }
+      throw fail((error as Error).message, 422, 'INVALID_STUDY_HISTORY');
+    }
     throw error;
   } finally { client.release(); }
 }

@@ -65,10 +65,7 @@ export function buildEnterpriseImportPreviewRows(
     return {
       ...result,
       enterprise,
-      totalCapacity: enterprise?.positions.reduce(
-        (total, position) => total + position.capacity,
-        0,
-      ),
+
     };
   });
 }

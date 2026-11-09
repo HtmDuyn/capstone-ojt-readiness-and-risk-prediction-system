@@ -315,7 +315,7 @@ export default function QhdnEnterpriseManagement() {
             onClick={() => setImporting(true)}
           >
             <Upload size={17} />
-            Import doanh nghiệp
+            Tạo tài khoản doanh nghiệp
           </button>
         </div>
       </div>
@@ -622,7 +622,7 @@ export default function QhdnEnterpriseManagement() {
           onImported={() => {
             setRevision((v) => v + 1);
             setMessage(
-              "Đã import doanh nghiệp. Danh sách được cập nhật từ hệ thống.",
+              "Đã tạo tài khoản doanh nghiệp. Danh sách được cập nhật từ hệ thống.",
             );
           }}
         />

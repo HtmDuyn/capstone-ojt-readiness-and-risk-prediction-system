@@ -27,7 +27,6 @@ export function describeRestOperations(spec: Spec): Spec {
       description:'ID doanh nghiệp cần cập nhật; lấy từ danh sách doanh nghiệp.',
       schema:{type:'integer',minimum:1,maximum:2147483647}}];
     companyUpdate.requestBody.content['application/json'].examples = {
-      qhdn:{summary:'Phòng QHDN',value:{name:'Doanh nghiệp công nghệ',reason:'Cập nhật tên doanh nghiệp'}},
       admin:{summary:'Admin',value:{name:'Doanh nghiệp công nghệ'}},
     };
   }

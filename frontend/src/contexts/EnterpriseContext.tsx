@@ -8,6 +8,9 @@ import React, {
 } from 'react';
 import { enterpriseService } from '@/services/enterpriseService';
 import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
+import { apiRequest } from '@/services/studentService';
+import { useAuth } from '@/hooks/useAuth';
+import { EnterpriseFirstPassword } from '@/components/enterprise/EnterpriseFirstPassword';
 
 // ─── Enterprise Context ────────────────────────────────────────────────────────
 // Lưu thông tin doanh nghiệp (bao gồm companyId) sau khi đăng nhập.
@@ -28,6 +31,10 @@ interface EnterpriseProviderProps {
 }
 
 export function EnterpriseProvider({ children }: EnterpriseProviderProps) {
+  const {token,user}=useAuth();
+  const [access,setAccess]=useState<'checking'|'password'|'ready'|'error'>('checking');
+  const [accessError,setAccessError]=useState('');
+  const [accessRetry,setAccessRetry]=useState(0);
   const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +59,15 @@ export function EnterpriseProvider({ children }: EnterpriseProviderProps) {
   }, []);
 
   useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+    let active=true;
+    setAccess('checking');setProfile(null);setError(null);
+    apiRequest<{user:{mustChangePassword?:boolean}}>('/auth/me').then(result=>{
+      if(!active)return;
+      if(result.user.mustChangePassword){setAccess('password');setLoading(false);return;}
+      setAccess('ready');void loadProfile();
+    }).catch(e=>{if(active){setAccessError(e instanceof Error?e.message:'Không thể kiểm tra tài khoản.');setAccess('error');}});
+    return ()=>{active=false;};
+  }, [loadProfile,token,user?.id,accessRetry]);
 
   const value: EnterpriseContextValue = {
     profile,
@@ -63,6 +77,9 @@ export function EnterpriseProvider({ children }: EnterpriseProviderProps) {
     reload: loadProfile,
   };
 
+  if(access==='checking')return <div role="status" className="p-8 text-sm text-slate-600">Đang kiểm tra tài khoản doanh nghiệp…</div>;
+  if(access==='password')return <EnterpriseFirstPassword/>;
+  if(access==='error')return <div role="alert" className="space-y-3 p-8 text-sm text-slate-600"><p>{accessError}</p><button type="button" onClick={()=>setAccessRetry(v=>v+1)} className="rounded-xl bg-orange-500 px-4 py-2 text-white">Thử lại</button></div>;
   return (
     <EnterpriseContext.Provider value={value}>
       {children}

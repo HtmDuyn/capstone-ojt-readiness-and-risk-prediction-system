@@ -12,9 +12,6 @@
  *         idempotencyKey:
  *           type: string
  *           maxLength: 100
- *         semesterId:
- *           type: integer
- *           description: Required for enterprise imports; configure this and the next semester dates.
  *         rows:
  *           type: array
  *           minItems: 1
@@ -27,21 +24,6 @@
  *               email: { type: string, format: email, maxLength: 100 }
  *               fullName: { type: string, maxLength: 150 }
  *               name: { type: string, description: Required enterprise name }
- *               address: { type: string }
- *               positions:
- *                 type: array
- *                 description: Required for enterprise imports
- *                 minItems: 1
- *                 maxItems: 50
- *                 items:
- *                   type: object
- *                   required: [code, title, description, requirements, capacity]
- *                   properties:
- *                     code: { type: string, maxLength: 60 }
- *                     title: { type: string, maxLength: 150 }
- *                     description: { type: string }
- *                     requirements: { type: string }
- *                     capacity: { type: integer, minimum: 1 }
  *       example:
  *         kind: STUDENT
  *         idempotencyKey: students-2026-k1-001

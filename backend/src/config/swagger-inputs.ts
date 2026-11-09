@@ -204,7 +204,7 @@ export function describeManualInputs(spec: Spec): Spec {
     const media=importBody.content['application/json'];
     media.examples={
       student:{summary:'Nhập sinh viên',value:{kind:'STUDENT',idempotencyKey:'manual-student-import-001',rows:[{code:'SV-MANUAL-001',email:'student@example.invalid',fullName:'Sinh viên mẫu'}]}},
-      enterprise:{summary:'Nhập doanh nghiệp vào đợt tuyển dụng đang mở',value:{kind:'ENTERPRISE',idempotencyKey:'manual-enterprise-import-001',windowId:1,rows:[{code:'DN-MANUAL-001',email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu',address:'TP. Hồ Chí Minh',positions:[{code:'DEV-001',title:'Thực tập lập trình',description:'Mô tả công việc',requirements:'Yêu cầu tuyển dụng',capacity:5}]}]}}
+      enterprise:{summary:'Tạo tài khoản doanh nghiệp liên kết',value:{kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{code:'DN001',email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu'}]}}
     };
   }
   return spec;

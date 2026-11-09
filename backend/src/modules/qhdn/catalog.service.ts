@@ -118,7 +118,7 @@ export async function list(resource:Resource,params:Row,actor:Actor){
     return {items:await enrichListRows(c,items),total:count,page:p.page,limit:p.limit};
   });
 }
-export async function saveCompany(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
+export async function saveCompany(body:unknown,actor:Actor,id?:number){if(actor.roleCode!=='ADMIN')throw invalid('Only enterprises may update their own profile; QHDN has read-only access.',403,'FORBIDDEN');staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
   return academicTransaction(async c=>{
     const before=id?await record(c,'companies',id):null,values:Row={};
     const reason=requiredText(b.reason,'reason',2000);

@@ -173,6 +173,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
   for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
   for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
   for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign','POST /api/assignments','PATCH /api/assignments/{id}'])access.set(key,['ADMIN']);
+  access.set('PATCH /api/companies/{id}', ['ADMIN']);
   access.set('POST /api/ojt-registrations',['ADMIN','STUDENT']);
   for(const key of ['GET /api/ojt-registration-windows','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);

@@ -15,8 +15,9 @@ export function validateImport(body: unknown): ImportInput {
   if (b.kind !== 'STUDENT' && b.kind !== 'ENTERPRISE') throw fail('kind must be STUDENT or ENTERPRISE.');
   const idempotencyKey = text(b.idempotencyKey, 'idempotencyKey', 100);
   if (!Array.isArray(b.rows) || b.rows.length < 1 || b.rows.length > 500) throw fail('Import between 1 and 500 rows per batch.');
-  const semesterId = b.kind === 'ENTERPRISE' ? Number(b.semesterId) : undefined;
-  if (b.kind === 'ENTERPRISE' && (!Number.isSafeInteger(semesterId) || semesterId! <= 0)) throw fail('semesterId is required.');
+  const semesterId = undefined;
+  if (b.kind === 'ENTERPRISE' && (b.semesterId !== undefined || b.windowId !== undefined))
+    throw fail('Enterprise account import does not accept a semester or recruitment window.');
   const codes = new Set<string>(), emails = new Set<string>();
   const rows = b.rows.map((raw, index) => {
     try {
@@ -35,17 +36,8 @@ export function validateImport(body: unknown): ImportInput {
       }
       if (b.kind === 'ENTERPRISE') {
         row.name = text(r.name, 'name', 200);
-        row.address = r.address === undefined ? undefined : text(r.address, 'address', 300);
-        if (!Array.isArray(r.positions) || !r.positions.length || r.positions.length > 50) throw fail('Each enterprise requires 1–50 positions.');
-        const positionCodes = new Set<string>();
-        row.positions = r.positions.map(p => {
-          if (!p || typeof p !== 'object') throw fail('Position must be an object.');
-          const code = text(p.code, 'position.code', 60).toUpperCase();
-          if (positionCodes.has(code)) throw fail('Duplicate position code.');
-          positionCodes.add(code);
-          if (!Number.isSafeInteger(p.capacity) || p.capacity < 1 || p.capacity > 2147483647) throw fail('capacity must be a positive 32-bit integer.');
-          return { code, title: text(p.title, 'position.title', 150), description: text(p.description, 'position.description', 10000), requirements: text(p.requirements, 'position.requirements', 10000), capacity: p.capacity };
-        });
+        if (Object.keys(r).some(key => !['code','email','fullName','name'].includes(key)))
+          throw fail('Enterprise account import accepts only code, email, fullName and name; enterprises manage their own profiles and recruitment.');
       }
       return row;
     } catch (error) { throw fail(`Row ${index + 1}: ${(error as Error).message}`); }

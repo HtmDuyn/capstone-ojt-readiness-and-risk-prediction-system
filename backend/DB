@@ -1536,7 +1536,7 @@ ALTER TABLE public."AcademicYears" ADD CONSTRAINT "AcademicYears_YearCode_key" U
 ALTER TABLE public."AcademicYears" ADD CONSTRAINT "AcademicYears_pkey" PRIMARY KEY ("AcademicYearID");
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_IdempotencyKey_key" UNIQUE ("IdempotencyKey");
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_Kind_check" CHECK (("Kind" = ANY (ARRAY['STUDENT'::text, 'ENTERPRISE'::text])));
-ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_check" CHECK ((("Kind" = 'ENTERPRISE'::text) = ("OJTSemesterID" IS NOT NULL)));
+ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_check" CHECK (("Kind" = 'ENTERPRISE'::text) OR ("OJTSemesterID" IS NULL));
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_pkey" PRIMARY KEY ("BatchID");
 ALTER TABLE public."AccountImportRows" ADD CONSTRAINT "AccountImportRows_Action_check" CHECK (("Action" = ANY (ARRAY['CREATED'::text, 'UPDATED'::text])));
 ALTER TABLE public."AccountImportRows" ADD CONSTRAINT "AccountImportRows_pkey" PRIMARY KEY ("BatchID", "RowNumber");
@@ -8554,3 +8554,14 @@ CHECK (
 COMMIT;
 
 -- END CV EXTRACTION AND CERTIFICATES V1
+
+-- BEGIN ENTERPRISE ACCOUNT IMPORT V2
+-- Existing databases: run only this block; historical recruitment imports remain valid.
+BEGIN;
+ALTER TABLE public."AccountImportBatches"
+  DROP CONSTRAINT IF EXISTS "AccountImportBatches_check";
+ALTER TABLE public."AccountImportBatches"
+  ADD CONSTRAINT "AccountImportBatches_check"
+  CHECK ("Kind" = 'ENTERPRISE' OR "OJTSemesterID" IS NULL);
+COMMIT;
+-- END ENTERPRISE ACCOUNT IMPORT V2
