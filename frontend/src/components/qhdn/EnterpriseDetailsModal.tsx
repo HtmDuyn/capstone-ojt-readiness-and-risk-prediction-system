@@ -49,12 +49,12 @@ export function EnterpriseDetailsModal({
   positions: PositionListItem[];
   positionsError: string;
   scope: string;
-  initialTab?: "overview" | "positions" | "edit";
+  initialTab?: "overview" | "positions";
   onClose: () => void;
   onUpdated: () => void;
   onPosts: () => void;
 }) {
-  const [tab, setTab] = useState(initialTab === "edit" ? "overview" : initialTab);
+  const [tab, setTab] = useState(initialTab);
   const busy = false, error = "";
   const [positionId, setPositionId] = useState<number | null>(null);
   const totals = positionTotals(positions);

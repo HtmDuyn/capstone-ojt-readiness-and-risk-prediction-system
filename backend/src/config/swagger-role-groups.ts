@@ -118,7 +118,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PATCH /api/companies/{id}",
     "PATCH /api/recruitment/windows/{id}",
     "POST /api/assignments",
-    "POST /api/imports/archive",
     "POST /api/ojt-coordinations",
     "POST /api/ojt-coordinations/{id}/decision",
     "POST /api/ojt-coordinations/{id}/reassign",

@@ -330,13 +330,6 @@ export const listOjtResults = async (
   return response.data;
 };
 
-export const archiveRecruitment = async () =>
-  (
-    await API.post<{ success: boolean; archivedCount: number }>(
-      "/imports/archive",
-    )
-  ).data;
-
 export const updateCompany = async (
   id: number,
   payload: Partial<

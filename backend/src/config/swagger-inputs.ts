@@ -102,7 +102,6 @@ describe('/students/{id}/eligibility-checks', { get: 'Lịch sử kiểm tra đi
 describe('/students/{id}/eligibility', { get: 'Kết quả OJT và điều kiện còn thiếu' });
 describe('/eligibility-check-runs', { post: ['Xét điều kiện OJT hàng loạt và cập nhật trạng thái', 'Truyền phạm vi sinh viên bằng JSON body. Trả kết quả ngay và ghi nhận kết quả chính thức trong cùng lần gọi; không cần xác nhận riêng.'] });
 describe('/imports/emails/resend', { post: 'Resend email' });
-describe('/imports/archive', { post: 'Lưu trữ tuyển dụng sau hai học kỳ' });
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
 describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post: 'Nộp hồ sơ đăng ký OJT' });

@@ -5,7 +5,7 @@ import { loadAllPages } from "@/utils/loadAllPages";
 import { academicYears, linkedOjtSemesterId, preferredAcademicPeriod } from "@/utils/qhdnAcademicPeriods";
 import type { AcademicPeriodItem } from "@/types/qhdn/qhdnTypes";
 
-export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false) {
+export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, semestersOnly = false) {
   const [periods, setPeriods] = useState<AcademicPeriodItem[]>([]);
   const [yearId, setYearId] = useState("");
   const [periodId, setPeriodId] = useState(allowAll ? "ALL" : "");
@@ -15,11 +15,11 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false) {
   useEffect(() => {
     let active = true;
     loadAllPages((page) => getAcademicPeriods({ page, limit: 100 }))
-      .then((items) => { if (active) setPeriods(items); })
+      .then((items) => { if (active) setPeriods(semestersOnly ? items.filter(period => period.kind === 'SEMESTER') : items); })
       .catch((e) => { if (active) setError(errorMessage(e)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [semestersOnly]);
 
   const years = useMemo(() => academicYears(periods), [periods]);
   const filteredPeriods = useMemo(() => periods.filter((p) =>
@@ -39,6 +39,6 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false) {
     periodId: allPeriods ? "ALL" : selectedPeriod ? String(selectedPeriod.id) : "",
     selectPeriod: setPeriodId, selectedPeriod, allPeriods, allowAll,
     ojtSemesterId, semesterId: ojtSemesterId === null ? "" : String(ojtSemesterId),
-    loading, error,
+    loading, error, semestersOnly,
   };
 }

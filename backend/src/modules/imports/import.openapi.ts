@@ -83,14 +83,6 @@
  *       200: { description: Email queued again }
  *       400: { description: Invalid JSON or email }
  *       409: { description: Email cannot be retried }
- * /api/imports/archive:
- *   post:
- *     tags: [Imports]
- *     summary: ADMIN or OJT_COORD archives recruitment after two semesters
- *     security: [{ bearerAuth: [] }]
- *     responses:
- *       200: { description: Number of newly archived posts }
- *       403: { description: ADMIN or OJT_COORD required }
  * /api/auth/change-password:
  *   post:
  *     tags: [Auth]
