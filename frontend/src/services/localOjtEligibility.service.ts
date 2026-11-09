@@ -1,18 +1,19 @@
 import { apiData, getAllItems, getJson } from './educationApi';
 import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import type { Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
-import { calculateLocalOjtEligibility, LOCAL_OJT_RULE } from '@/utils/localOjtEligibility';
+import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/localOjtEligibility';
 import API from './api';
 import { clearEducationReadCache } from './educationReadCache';
 
 // Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
 export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
 export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
-export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string): Promise<number> {
+export const loadCurrentOjtRule = async (signal?: AbortSignal) => apiData<LocalOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
+export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: LocalOjtRule): Promise<number> {
   if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
   try {
     const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number } }>(LOCAL_OJT_SAVE_ENDPOINT, {
-      idempotencyKey, source: 'FRONTEND', rule: LOCAL_OJT_RULE,
+      idempotencyKey, source: 'FRONTEND', rule,
       results: [...results].sort((a, b) => a.studentId - b.studentId).map(({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt }) => ({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt })),
     });
     const body = response.data;
@@ -30,7 +31,7 @@ export async function saveLocalOjtResults(results: LocalOjtResult[], idempotency
   }
 }
 
-export async function loadAndCalculateLocalEligibility(studentId: number, signal?: AbortSignal): Promise<LocalOjtResult> {
+export async function loadAndCalculateLocalEligibility(studentId: number, rule: LocalOjtRule, signal?: AbortSignal): Promise<LocalOjtResult> {
   const profile = apiData<Profile>(await getJson(`/students/${studentId}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
   const first = profile.courseResults;
   if (!first || !Array.isArray(first.items) || !Number.isSafeInteger(first.total) || first.total < 0) throw new Error('Không tải được đầy đủ bảng điểm.');
@@ -40,5 +41,5 @@ export async function loadAndCalculateLocalEligibility(studentId: number, signal
     if (!next?.items.length) throw new Error('Bảng điểm chưa tải đầy đủ; chưa thể xét điều kiện.');
     attempts.push(...next.items);
   }
-  return calculateLocalOjtEligibility(studentId, profile, attempts);
+  return calculateLocalOjtEligibility(studentId, profile, attempts, rule);
 }

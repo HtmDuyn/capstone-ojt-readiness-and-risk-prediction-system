@@ -8504,4 +8504,36 @@ DO $$ BEGIN
   GRANT EXECUTE ON FUNCTION public."AdvanceEnterpriseRecruitment"() TO service_role;
  END IF;
 END $$;
+-- BEGIN INCREMENTAL UPDATE: 20261109_managed_ojt_policy
+-- Apply only this bounded block to an existing database; the full DB file resets data.
+ALTER TABLE public."OJTRuleSets" DROP CONSTRAINT IF EXISTS "OJTRuleSets_MinCredits_check";
+ALTER TABLE public."OJTRuleSets" DROP CONSTRAINT IF EXISTS "OJTRuleSets_MaxUnpassedCourses_check";
+ALTER TABLE public."OJTRuleSets" DROP CONSTRAINT IF EXISTS "OJTRuleSets_MinCredits_nonnegative";
+ALTER TABLE public."OJTRuleSets" DROP CONSTRAINT IF EXISTS "OJTRuleSets_MaxUnpassedCourses_nonnegative";
+ALTER TABLE public."OJTRuleSets" ADD CONSTRAINT "OJTRuleSets_MinCredits_nonnegative" CHECK ("MinCredits" >= 0) NOT VALID;
+ALTER TABLE public."OJTRuleSets" ADD CONSTRAINT "OJTRuleSets_MaxUnpassedCourses_nonnegative" CHECK ("MaxUnpassedCourses" >= 0) NOT VALID;
+ALTER TABLE public."OJTRuleSets" VALIDATE CONSTRAINT "OJTRuleSets_MinCredits_nonnegative";
+ALTER TABLE public."OJTRuleSets" VALIDATE CONSTRAINT "OJTRuleSets_MaxUnpassedCourses_nonnegative";
+CREATE TABLE IF NOT EXISTS public."OJTConditionPolicies" (
+  "PolicyID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "Version" int NOT NULL UNIQUE CHECK ("Version" > 0),
+  "MinCredits" numeric(6,2) NOT NULL CHECK ("MinCredits" >= 0),
+  "MaxUnpassedCourses" int NOT NULL CHECK ("MaxUnpassedCourses" >= 0),
+  "SourceHash" char(64) NOT NULL,
+  "CreatedBy" int NOT NULL REFERENCES public."Users"("UserID"),
+  "CreatedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),
+  "EffectiveAt" timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+ALTER TABLE public."OJTConditionPolicies" ADD COLUMN IF NOT EXISTS "EffectiveAt" timestamptz NOT NULL DEFAULT clock_timestamp();
+ALTER TABLE public."OJTConditionPolicies" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public."OJTConditionPolicies" FROM PUBLIC;
+REVOKE ALL ON SEQUENCE public."OJTConditionPolicies_PolicyID_seq" FROM PUBLIC;
+DO $security$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT ALL ON public."OJTConditionPolicies" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE public."OJTConditionPolicies_PolicyID_seq" TO service_role;
+ END IF;
+END $security$;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261109_managed_ojt_policy') ON CONFLICT DO NOTHING;
+-- END INCREMENTAL UPDATE: 20261109_managed_ojt_policy
 COMMIT;

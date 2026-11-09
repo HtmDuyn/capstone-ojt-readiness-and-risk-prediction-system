@@ -94,10 +94,9 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
         </div>
         <button onClick={() => setAdvanced(v => !v)} aria-expanded={advanced} aria-controls="progress-advanced-filters" className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium ${advanced || advancedCount ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><SlidersHorizontal size={17} />Lọc nâng cao{advancedCount ? ` (${advancedCount})` : ''}</button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {select('cohort', 'Khóa nhập học', options(unique(students.map(s => s.cohort))))}
         {select('curriculum', 'Khung chương trình', options(unique(cohortRows.map(s => s.curriculumCode))))}
-        {select('studentClass', 'Lớp sinh viên', options(unique(scope.map(s => s.studentClass))))}
         {select('term', 'Học kỳ hiện tại', options(unique(scope.map(s => s.currentTerm))))}
       </div>
       {advanced && <div id="progress-advanced-filters" className="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -116,7 +115,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
       </div>
       {warning && <p role="status" className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm text-amber-800">{warning}</p>}
       <div className="overflow-x-auto"><table className="w-full min-w-[1200px] text-left text-sm">
-        <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-xs font-semibold text-[#334155]"><tr>{['Sinh viên', 'Khóa / Lớp', 'Khung chương trình', 'Học kỳ', 'GPA', 'Tín chỉ tích lũy', 'Môn chưa đạt', 'Điều kiện OJT', ''].map(title => <th key={title} scope="col" className="whitespace-nowrap px-4 py-3 font-semibold">{title}</th>)}</tr></thead>
+        <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-xs font-semibold text-[#334155]"><tr>{['Sinh viên', 'Khóa / Lớp', 'Khung chương trình', 'Học kỳ', 'GPA', 'Tín chỉ tích lũy', 'Môn chưa đạt', 'Điều kiện OJT', 'Thao tác'].map(title => <th key={title} scope="col" className={`whitespace-nowrap py-3 font-semibold ${title === 'Thao tác' ? 'w-20 px-2 text-center' : 'px-4'}`}>{title}</th>)}</tr></thead>
         <tbody className="divide-y divide-[#E2E8F0]">
           {loading ? <tr><td colSpan={9} role="status" className="px-5 py-14 text-center text-slate-500">Đang tải danh sách và hồ sơ học tập...</td></tr> : error ? <tr><td colSpan={9} role="alert" className="px-5 py-12 text-center text-red-700"><p>{error}</p><button onClick={onReload} className="mt-3 font-semibold underline">Thử tải lại</button></td></tr> : visible.length ? visible.map(student => {
             const complete = student.completedCredits;
@@ -133,7 +132,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
               <td className="min-w-40 px-4 py-4"><p><span className="font-semibold text-slate-800">{complete ?? '—'}</span><span className="text-xs text-slate-400"> / {total ?? '—'} TC</span></p>{percent !== null && <div role="progressbar" aria-label={`Tín chỉ ${student.studentCode}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} className="mt-2 h-1.5 overflow-hidden rounded-full bg-orange-100"><div className="h-full rounded-full bg-orange-500" style={{ width: `${percent}%` }} /></div>}</td>
               <td className="px-4 py-4">{student.subjects.length ? <span className={failed ? 'font-semibold text-rose-600' : 'text-slate-500'}>{failed} môn</span> : <span className="text-slate-400">—</span>}</td>
               <td className="px-4 py-4"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle}`}>{student.detailsUnavailable ? 'Chưa tải được' : student.eligibilityStatus}</span></td>
-              <td className="px-4 py-4"><button aria-label={`Xem hồ sơ ${student.studentCode}`} onClick={() => onSelect(student)} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-orange-100 px-3 py-2 text-xs font-semibold text-orange-700 hover:bg-orange-50"><Eye size={15} />Chi tiết</button></td>
+              <td className="w-20 px-2 py-4 text-center"><button aria-label="Xem chi tiết" title="Xem chi tiết" onClick={() => onSelect(student)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"><Eye size={18} aria-hidden="true" /></button></td>
             </tr>;
           }) : <tr><td colSpan={9} className="px-5 py-14 text-center"><Users size={30} className="mx-auto text-slate-300" /><p className="mt-3 font-medium text-slate-700">{students.length ? 'Không có sinh viên khớp bộ lọc' : 'Chưa có sinh viên trong hệ thống'}</p><p className="mt-1 text-sm text-slate-500">{students.length ? 'Thử đổi từ khóa hoặc mở rộng phạm vi tìm kiếm.' : 'Sinh viên sẽ xuất hiện sau khi được thêm hoặc import thành công.'}</p>{active.length > 0 && <button onClick={() => setFilters(initialFilters)} className="mt-3 text-sm font-semibold text-orange-700">Xóa tất cả bộ lọc</button>}</td></tr>}
         </tbody>

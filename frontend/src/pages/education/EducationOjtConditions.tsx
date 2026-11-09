@@ -6,12 +6,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const EducationOjtConditions: React.FC = () => {
-  const { ready, runAll, saveResults, visible, pages, checked, currentResults, targets, loading, busy, saving, savedCount, error, setRevision, results, failures, notice, search, setSearch, filter, setFilter, setPage, currentPage } = useEducationOjtEligibility();
+  const { ready, runAll, saveResults, visible, pages, checked, currentResults, targets, loading, busy, saving, savedCount, error, setRevision, results, failures, notice, search, setSearch, filter, setFilter, setPage, currentPage, rule } = useEducationOjtEligibility();
   return <div className="space-y-6">
     <PageBanner title="Xét điều kiện đi OJT" description="Xét trực tiếp từ tín chỉ tích lũy và bảng điểm của tất cả sinh viên, không cần chọn năm học hoặc kỳ OJT." badge="Phòng Đào tạo" />
     <section className="space-y-4 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
-      <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck size={20} className="text-orange-600" />Từ 70 tín chỉ tích lũy, tối đa 2 môn chưa đạt</h2>
-      <p className="text-sm text-slate-600">FE tự xét sinh viên đang hoạt động ở tất cả khóa và chương trình. Môn đã học lại đạt hoặc được công nhận không tính là môn còn rớt. Kết quả không có ô chỉnh sửa.</p>
+      <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck size={20} className="text-orange-600" />{rule ? `Từ ${rule.minCredits} tín chỉ tích lũy, tối đa ${rule.maxUnpassedCourses} môn chưa đạt` : 'Đang tải điều kiện OJT'}</h2>
+      <p className="text-sm text-slate-600">Xét sinh viên đang hoạt động ở tất cả khóa và chương trình theo quy định hiện hành. Môn đã học lại đạt hoặc được công nhận không tính là môn còn rớt. Kết quả không có ô chỉnh sửa.</p>
       <div className="flex flex-wrap gap-3">
         {checked.length > 0 && !busy && <button onClick={() => void saveResults()} disabled={saving || savedCount !== null} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"><Save size={18} />{saving ? 'Đang lưu kết quả...' : savedCount !== null ? 'Đã lưu kết quả' : 'Lưu kết quả'}</button>}
         <button onClick={() => void runAll()} disabled={loading || busy || saving || !ready.length} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"><CheckCircle2 size={18} />{busy ? 'Đang xét điều kiện...' : Object.keys(failures).length ? 'Thử xét lại' : 'Xét điều kiện OJT tất cả sinh viên'}</button>

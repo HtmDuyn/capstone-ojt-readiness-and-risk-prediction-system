@@ -228,7 +228,7 @@ const EducationStudentStatus: React.FC = () => {
           {eligibilityLoading && <p role="status">Đang tính điều kiện từ dữ liệu hiện tại...</p>}
           {eligibilityError && <p role="alert" className="text-red-700">{eligibilityError}</p>}
           {eligibility && <div className="space-y-2 rounded-lg border p-4">
-            <h3 className="font-semibold">Điều kiện OJT: từ 70 tín chỉ, tối đa 2 môn còn rớt</h3>
+            <h3 className="font-semibold">{eligibility.current.rule ? `Điều kiện OJT: từ ${eligibility.current.rule.minCredits} tín chỉ, tối đa ${eligibility.current.rule.maxUnpassedCourses} môn chưa đạt` : 'Chưa có quy định OJT phù hợp với chương trình'}</h3>
             <p>Tính hiện tại (chưa phải quyết định chính thức): <strong>{eligibilityStatusLabel(eligibility.current.status)}</strong>.</p>
             <p>Tín chỉ đạt: {eligibility.current.earnedCredits}; còn thiếu: {eligibility.current.missingCredits ?? 'chưa xác định'}; môn còn rớt: {eligibility.current.unpassedCourseCount}.</p>
             <p>Môn còn rớt: {eligibility.current.unpassedCourses.map(c => c.courseCode).join(', ') || 'Không có'}.</p>
