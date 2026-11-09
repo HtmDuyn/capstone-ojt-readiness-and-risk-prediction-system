@@ -37,6 +37,7 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
   spec.paths['/api/job-applications'].post.description='POST tạo JobApplication và StudentEnterpriseCoordination PENDING trong cùng transaction. QHDN không duyệt hoặc chuyển tiếp; khi doanh nghiệp chấp nhận, assignment được tạo tự động.';
   spec.paths['/api/job-applications'].post.requestBody=body({
    windowId:id,postId:id,positionId:id,coverLetter:{type:'string',maxLength:5000},
+   certificates:{type:'array',maxItems:5,items:{type:'object',additionalProperties:false,required:['name','url'],properties:{name:{type:'string',maxLength:200},url:{type:'string',format:'uri',maxLength:2000}}}},
    application:{type:'object',additionalProperties:false,properties:{
     contactPhone:{type:'string',maxLength:30},contactEmail:{type:'string',maxLength:100},
     note:{type:'string',maxLength:2000}
