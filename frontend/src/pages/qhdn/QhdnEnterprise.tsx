@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Archive,
   ArrowUpRight,
   BriefcaseBusiness,
   Building2,
@@ -28,7 +27,6 @@ import {
 import { EnterpriseRecruitment } from "@/components/qhdn/EnterpriseRecruitment";
 import { QhdnEnterpriseImportModal } from "@/components/qhdn/import/QhdnEnterpriseImportModal";
 import {
-  archiveRecruitment,
   listCompanies,
   listPositions,
 } from "@/services/qhdnService";
@@ -86,7 +84,7 @@ export default function QhdnEnterpriseManagement() {
   const [tab, setTab] = useState<"companies" | "posts">(
     "companies",
   );
-  const catalog = useQhdnAcademicPeriods("", true);
+  const catalog = useQhdnAcademicPeriods("", true, true);
   const { periods, semesterId: semester } = catalog;
   const scopeOjtIds = useMemo(() => new Set(catalog.filteredPeriods
     .map(linkedOjtSemesterId).filter((id): id is number => id !== null)), [catalog.filteredPeriods]);
@@ -104,13 +102,11 @@ export default function QhdnEnterpriseManagement() {
     [page, setPage] = useState(1);
   const [selected, setSelected] = useState<{
     company: CompanyListItem;
-    tab: "overview" | "positions" | "edit";
+    tab: "overview" | "positions";
   } | null>(null);
   const [companyId, setCompanyId] = useState(""),
     [importing, setImporting] = useState(false);
-  const [archiving, setArchiving] = useState(false),
-    [busy, setBusy] = useState(false),
-    [archiveError, setArchiveError] = useState("");
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -142,7 +138,7 @@ export default function QhdnEnterpriseManagement() {
     setPositionsLoading(true);
     setPositionsError("");
     if (catalog.loading || (!catalog.allPeriods && !semester) ||
-      (catalog.allPeriods && catalog.yearId && !scopeOjtIds.size)) {
+      (catalog.allPeriods && !scopeOjtIds.size)) {
       setPositionsLoading(catalog.loading);
       return;
     }
@@ -155,7 +151,7 @@ export default function QhdnEnterpriseManagement() {
       }).then((r) => r.data),
     )
       .then((p) => {
-        if (active) setPositions(catalog.allPeriods && catalog.yearId
+        if (active) setPositions(catalog.allPeriods
           ? p.filter((position) => scopeOjtIds.has(position.ojtSemesterId)) : p);
       })
       .catch((e) => {
@@ -170,7 +166,7 @@ export default function QhdnEnterpriseManagement() {
   }, [revision, semester, catalog.loading, catalog.allPeriods, catalog.yearId, scopeOjtIds]);
   useEffect(() => setPage(1), [search, status, recruiting, catalog.periodId, catalog.yearId]);
   const scope = catalog.selectedPeriod?.name ||
-    (catalog.yearId ? "Năm học " + catalog.years.find((y) => String(y.id) === catalog.yearId)?.code : "Tất cả học kỳ / Block 3");
+    (catalog.yearId ? "Năm học " + catalog.years.find((y) => String(y.id) === catalog.yearId)?.code : "Tất cả học kỳ chính");
   const grouped = useMemo(() => {
     const map = new Map<number, PositionListItem[]>();
     positions.forEach((p) => {
@@ -214,6 +210,7 @@ export default function QhdnEnterpriseManagement() {
   };
   return (
     <div className="space-y-5 pb-10">
+
       <PageBanner
         title="Doanh nghiệp & Tuyển dụng"
         description="Theo dõi đối tác, vị trí tuyển dụng và chỉ tiêu tiếp nhận sinh viên trong một nơi."
@@ -298,31 +295,21 @@ export default function QhdnEnterpriseManagement() {
           ))}
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 pb-3 lg:w-auto lg:pb-0">
-          <button
-            type="button"
-            className={workflowSecondary + " flex-1 sm:flex-none"}
-            onClick={() => {
-              setArchiveError("");
-              setArchiving(true);
-            }}
-          >
-            <Archive size={15} />
-            Lưu trữ tuyển dụng
-          </button>
+
           <button
             type="button"
             className={workflowPrimary + " flex-1 sm:flex-none"}
             onClick={() => setImporting(true)}
           >
             <Upload size={17} />
-            Import doanh nghiệp
+            Tạo tài khoản doanh nghiệp
           </button>
         </div>
       </div>
       {message && <Notice>{message}</Notice>}
       {catalog.error && <Notice>{catalog.error}</Notice>}
       {!catalog.loading && catalog.selectedPeriod && !semester && (
-        <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Danh mục doanh nghiệp vẫn được giữ; chưa có chỉ tiêu OJT theo kỳ để hiển thị.</Notice>
+        <Notice>Học kỳ chính này chưa liên kết kỳ OJT. Danh mục doanh nghiệp vẫn được giữ; chưa có chỉ tiêu OJT theo kỳ để hiển thị.</Notice>
       )}
       {error && <Notice>{error}</Notice>}
       {tab === "companies" ? (
@@ -622,59 +609,12 @@ export default function QhdnEnterpriseManagement() {
           onImported={() => {
             setRevision((v) => v + 1);
             setMessage(
-              "Đã import doanh nghiệp. Danh sách được cập nhật từ hệ thống.",
+              "Đã tạo tài khoản doanh nghiệp. Danh sách được cập nhật từ hệ thống.",
             );
           }}
         />
       )}
-      {archiving && (
-        <WorkflowModal
-          title="Lưu trữ tuyển dụng"
-          subtitle="Dọn các dữ liệu tuyển dụng đã đủ điều kiện lưu trữ."
-          onClose={() => setArchiving(false)}
-          busy={busy}
-        >
-          <div className="space-y-5">
-            {archiveError && <Notice>{archiveError}</Notice>}
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
-              Hệ thống sẽ lưu trữ tuyển dụng đủ điều kiện sau hai học kỳ. Kiểm
-              tra trước khi xác nhận thực hiện.
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className={workflowSecondary}
-                disabled={busy}
-                onClick={() => setArchiving(false)}
-              >
-                Để sau
-              </button>
-              <button
-                className={workflowPrimary}
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  setArchiveError("");
-                  try {
-                    const r = await archiveRecruitment();
-                    setMessage(
-                      `Đã lưu trữ ${r.archivedCount} mục tuyển dụng đủ điều kiện.`,
-                    );
-                    setArchiving(false);
-                    setRevision((v) => v + 1);
-                  } catch (e) {
-                    setArchiveError(errorMessage(e));
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                <Archive size={16} />
-                {busy ? "Đang xử lý…" : "Xác nhận lưu trữ"}
-              </button>
-            </div>
-          </div>
-        </WorkflowModal>
-      )}
+
     </div>
   );
 }

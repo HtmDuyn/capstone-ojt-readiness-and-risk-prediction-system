@@ -149,12 +149,12 @@ export function AcademicPeriodFilter({
         </select>
       </label>
       <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-slate-500">
-        Học kỳ / Block 3
-        <select aria-label="Học kỳ / Block 3" className={controlClassName + " max-w-full sm:max-w-md"}
+        {selection.semestersOnly ? 'Học kỳ chính' : 'Học kỳ / Block 3'}
+        <select aria-label={selection.semestersOnly ? 'Học kỳ chính' : 'Học kỳ / Block 3'} className={controlClassName + " max-w-full sm:max-w-md"}
           value={selection.periodId} disabled={disabled || selection.loading || !selection.filteredPeriods.length}
           onChange={(e) => selection.selectPeriod(e.target.value)}>
-          {selection.allowAll && <option value="ALL">Tất cả học kỳ / Block 3</option>}
-          {!selection.filteredPeriods.length && <option value="">{selection.loading ? "Đang tải…" : "Không có học kỳ / Block 3"}</option>}
+          {selection.allowAll && <option value="ALL">{selection.semestersOnly ? 'Tất cả học kỳ chính' : 'Tất cả học kỳ / Block 3'}</option>}
+          {!selection.filteredPeriods.length && <option value="">{selection.loading ? "Đang tải…" : selection.semestersOnly ? 'Không có học kỳ chính' : "Không có học kỳ / Block 3"}</option>}
           {selection.years.filter((year) => !selection.yearId || String(year.id) === selection.yearId).map((year) => (
             <optgroup key={year.id} label={year.code}>
               {selection.filteredPeriods.filter((p) => p.academicYearId === year.id).map((period) => (

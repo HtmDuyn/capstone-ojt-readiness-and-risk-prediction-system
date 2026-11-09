@@ -1,178 +1,50 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Building2, RefreshCw, Search } from "lucide-react";
-import { PageBanner } from "@/components/common/PageBanner";
-import { AcademicPeriodFilter, StudentIdentity, WorkflowBadge, workflowInput, workflowSecondary } from "@/components/qhdn/StudentWorkflowUi";
-import { Notice, Pager } from "@/components/qhdn/QhdnUi";
-import { useQhdnRoster, useQhdnSemesters } from "@/hooks/useQhdnRoster";
-import {
-  companyName,
-  coordinationId,
-  placementLabels,
-  placementStatus,
-  studentMatches,
-  type PlacementStatus,
-} from "@/utils/qhdnStudentStatus";
-
-const time = (value?: string) =>
-  value
-    ? new Date(value).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })
-    : "Chưa cập nhật";
-
-export default function QhdnOjtCoordination() {
-  const [url] = useSearchParams();
-  const semester = useQhdnSemesters(url.get("semester") || "");
-  const roster = useQhdnRoster(semester.semesterId);
-  const [status, setStatus] = useState<PlacementStatus | "ALL">("ALL");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-
-  const applications = useMemo(
-    () => roster.students.filter((student) => !!coordinationId(student)),
-    [roster.students],
-  );
-  const counts = useMemo(
-    () =>
-      applications.reduce(
-        (result, student) => {
-          result[placementStatus(student)] += 1;
-          return result;
-        },
-        { UNSENT: 0, PENDING: 0, ACCEPTED: 0, REJECTED: 0 },
-      ),
-    [applications],
-  );
-  const filtered = applications.filter(
-    (student) =>
-      (status === "ALL" || placementStatus(student) === status) &&
-      studentMatches(student, search),
-  );
-  const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / 10)));
-  const visible = filtered.slice((safePage - 1) * 10, safePage * 10);
-
-  useEffect(() => setPage(1), [status, search, semester.semesterId]);
-
-  return (
-    <div className="space-y-5 pb-10">
-      <PageBanner
-        title="Theo dõi hồ sơ OJT"
-        description="Theo dõi trạng thái các hồ sơ sinh viên đã gửi trực tiếp đến doanh nghiệp. Doanh nghiệp phản hồi và tiếp nhận sinh viên; assignment được tạo tự động khi chấp nhận."
-        badge="Phòng QHDN"
-      />
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {(["PENDING", "ACCEPTED", "REJECTED"] as const).map((value) => (
-          <button
-            type="button"
-            key={value}
-            onClick={() => setStatus(status === value ? "ALL" : value)}
-            className={`rounded-2xl border p-4 text-left shadow-sm transition ${
-              status === value
-                ? "border-orange-300 bg-orange-50"
-                : "border-slate-200 bg-white hover:bg-slate-50"
-            }`}
-          >
-            <p className="text-sm font-semibold text-slate-600">{placementLabels[value]}</p>
-            <p className="mt-1 text-2xl font-extrabold text-slate-900">{counts[value]}</p>
-          </button>
-        ))}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm font-semibold text-slate-600">Tổng hồ sơ trực tiếp</p>
-          <p className="mt-1 text-2xl font-extrabold text-slate-900">{applications.length}</p>
-        </div>
-      </div>
-
-      <section className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
-        <div>
-          <h2 className="text-sm font-bold text-slate-900">Hồ sơ gửi đến doanh nghiệp</h2>
-          <p className="mt-1 text-xs text-slate-500">Chỉ xem và theo dõi; không cần điều phối hoặc lập phân công thủ công.</p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <AcademicPeriodFilter selection={semester} />
-          <button type="button" className={workflowSecondary} aria-label="Làm mới danh sách" disabled={roster.loading} onClick={roster.reload}>
-            <RefreshCw size={17} className={roster.loading ? "animate-spin" : ""} />
-          </button>
-        </div>
-      </section>
-
-      {semester.error && <Notice>{semester.error}</Notice>}
-      {roster.error && <Notice>{roster.error}</Notice>}
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-4">
-          <button
-            type="button"
-            className={`rounded-lg px-3 py-2 text-xs font-semibold ${status === "ALL" ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-500"}`}
-            onClick={() => setStatus("ALL")}
-          >
-            Tất cả · {applications.length}
-          </button>
-          {(["PENDING", "ACCEPTED", "REJECTED"] as const).map((value) => (
-            <button
-              type="button"
-              key={value}
-              onClick={() => setStatus(value)}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold ${status === value ? "bg-orange-50 text-orange-700" : "text-slate-500 hover:bg-slate-50"}`}
-            >
-              {placementLabels[value]} · {counts[value]}
-            </button>
-          ))}
-          <label className="relative ml-auto min-w-[220px] flex-1 sm:max-w-sm">
-            <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-            <input
-              className={`${workflowInput} !pl-10`}
-              aria-label="Tìm hồ sơ OJT"
-              placeholder="Tìm tên, MSSV, doanh nghiệp..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50/80">
-              <tr>
-                {["Sinh viên", "Doanh nghiệp / vị trí", "Ngày gửi", "Phản hồi", "Thực tập"].map((heading) => (
-                  <th key={heading} className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {visible.map((student) => {
-                const state = placementStatus(student);
-                return (
-                  <tr key={student.studentId} className="hover:bg-slate-50/70">
-                    <td className="px-5 py-4"><StudentIdentity student={student} /></td>
-                    <td className="px-5 py-4">
-                      <p className="flex items-center gap-1.5 font-medium text-slate-800"><Building2 size={14} className="text-slate-400" />{companyName(student)}</p>
-                      <p className="mt-1 text-xs text-slate-500">{student.position?.title || student.positionTitle || "Chưa cập nhật vị trí"}</p>
-                    </td>
-                    <td className="px-5 py-4 text-xs text-slate-500">{time(student.coordination?.coordinatedAt)}</td>
-                    <td className="px-5 py-4">
-                      <WorkflowBadge status={state} />
-                      {state === "REJECTED" && <p className="mt-2 max-w-[240px] text-xs leading-5 text-rose-700">{student.coordination?.rejectReason || "Doanh nghiệp chưa cung cấp lý do."}</p>}
-                    </td>
-                    <td className="px-5 py-4 text-xs text-slate-600">
-                      {state === "ACCEPTED"
-                        ? student.assignmentId || student.assignment
-                          ? "Đã tạo tự động"
-                          : "Đang đồng bộ assignment"
-                        : "Chưa tiếp nhận"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {(roster.loading || visible.length === 0) && (
-          <div className="p-8 text-center text-sm text-slate-500">
-            {roster.loading ? "Đang tải hồ sơ..." : "Chưa có hồ sơ phù hợp với bộ lọc."}
-          </div>
-        )}
-        <footer className="border-t border-slate-100 p-4">
-          <Pager page={safePage} total={filtered.length} limit={10} busy={roster.loading} onChange={setPage} />
-        </footer>
-      </section>
-    </div>
-  );
+import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { RefreshCw, UserPlus, CheckCheck, History } from 'lucide-react';
+import API from '@/services/api';
+import { PageBanner } from '@/components/common/PageBanner';
+import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
+import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
+import { Field, Notice, errorMessage } from '@/components/qhdn/QhdnUi';
+type Student={id:number;studentCode:string;fullName:string;coordinationId?:number;decision?:string;source?:string;companyName?:string;positionTitle?:string;positionId?:number;receivedAt?:string;receiptReason?:string;exceededCapacity?:boolean;receivedByName?:string;hasAssignment:boolean;history:{id:number;source:string;decision:string;company:string;position:string;at:string;reason?:string;rejectReason?:string}[]};
+type Position={id:number;title:string;companyName:string;capacity:number|null;actualCount:number};
+type Board={canCoordinate:boolean;context:{roundCount:number;unfinished:number;lastEndAt?:string};positions:Position[];items:Student[]};
+const sourceLabel=(source?:string)=>source==='QHDN_APPLICATION'?'QHDN bổ sung ứng tuyển':source==='QHDN_COORDINATION'?'QHDN điều phối':'Sinh viên ứng tuyển';
+const state=(s:Student)=>s.receivedAt?'RECEIVED':s.decision==='ACCEPTED'?'ACCEPTED':s.decision==='REJECTED'?'REJECTED':s.decision==='PENDING'?(s.source?.startsWith('QHDN_')?'COORDINATED':'APPLIED'):'UNPLACED';
+const labels:Record<string,string>={RECEIVED:'Đã thực nhận',ACCEPTED:'Doanh nghiệp đồng ý nhận',REJECTED:'Doanh nghiệp từ chối',COORDINATED:'QHDN bổ sung · Chờ phản hồi',APPLIED:'Đã ứng tuyển · Chờ phản hồi',UNPLACED:'Chưa có nơi thực tập',SUPERSEDED:'Đã chuyển điều phối'};
+export default function QhdnOjtCoordination(){
+ const [url]=useSearchParams(),semester=useQhdnAcademicPeriods(url.get('semester')||'',false,true);
+ const [data,setData]=useState<Board|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[revision,setRevision]=useState(0);
+ const [search,setSearch]=useState(''),[filter,setFilter]=useState('ALL'),[busy,setBusy]=useState(false);
+ const [task,setTask]=useState<{student:Student;kind:'coordinate'|'receive'|'history'}|null>(null);
+ useEffect(()=>{
+  setData(null);setError('');if(!semester.semesterId)return;
+  let active=true;setLoading(true);
+  API.get('/qhdn/placements',{params:{ojtSemesterId:semester.semesterId}}).then(r=>{if(active)setData(r.data.data);}).catch(e=>{if(active)setError(errorMessage(e));}).finally(()=>{if(active)setLoading(false);});
+  return()=>{active=false;};
+ },[semester.semesterId,revision]);
+ const refresh=()=>setRevision(v=>v+1);
+ const submit=async(e:FormEvent<HTMLFormElement>)=>{
+  e.preventDefault();if(!task)return;setBusy(true);setError('');const form=new FormData(e.currentTarget);
+  try{
+   if(task.kind==='coordinate')await API.post('/qhdn/placements',{studentId:task.student.id,ojtSemesterId:Number(semester.semesterId),positionId:Number(form.get('positionId')),source:form.get('source'),reason:form.get('reason')});
+   else await API.post(`/qhdn/placements/${task.student.coordinationId}/receive`,{reason:form.get('reason')});
+   setMessage(task.kind==='coordinate'?'Đã gửi hồ sơ đến doanh nghiệp. Sinh viên đang chờ doanh nghiệp phản hồi.':'Đã ghi nhận sinh viên thực nhận. Chỉ tiêu đăng tuyển được giữ nguyên.');setTask(null);refresh();
+  }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
+ };
+ const students=(data?.items??[]).filter(s=>(filter==='ALL'||state(s)===filter)&&`${s.studentCode} ${s.fullName}`.toLowerCase().includes(search.toLowerCase()));
+ return <div className="space-y-5 pb-10"><PageBanner title="Điều phối sinh viên và quản lý thực nhận" description="Bổ sung sinh viên chưa có nơi thực tập sau tuyển dụng, theo dõi phản hồi của doanh nghiệp và ghi nhận số lượng thực nhận." badge="Phòng QHDN"/>
+  <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5"><AcademicPeriodFilter selection={semester}/><button className={workflowSecondary} disabled={loading||busy} onClick={refresh}><RefreshCw size={16}/>Tải lại</button></section>
+  {(error||semester.error)&&<Notice>{error||semester.error}</Notice>}{message&&<Notice>{message}</Notice>}
+  {data&&!data.canCoordinate&&<Notice>Chỉ bổ sung điều phối sau khi đợt tuyển dụng cuối cùng kết thúc và QHDN chốt tổng hợp tất cả các đợt. Hiện còn {data.context.unfinished} đợt chưa hoàn tất{!data.context.roundCount?' hoặc chưa có lịch tuyển dụng':''}.</Notice>}
+  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{['APPLIED','COORDINATED','ACCEPTED','RECEIVED'].map(key=><button key={key} className="rounded-2xl border border-slate-200 bg-white p-5 text-left" onClick={()=>setFilter(filter===key?'ALL':key)}><p className="text-sm text-slate-500">{labels[key]}</p><p className="mt-2 text-2xl font-bold text-slate-800">{data?.items.filter(s=>state(s)===key).length??0}</p></button>)}</div>
+  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white"><div className="flex flex-wrap gap-3 border-b border-slate-100 p-5"><input className={workflowInput+' max-w-sm'} placeholder="Tìm mã hoặc tên sinh viên…" aria-label="Tìm sinh viên" value={search} onChange={e=>setSearch(e.target.value)}/><select className={workflowInput+' max-w-xs'} aria-label="Lọc trạng thái" value={filter} onChange={e=>setFilter(e.target.value)}><option value="ALL">Tất cả trạng thái</option>{Object.entries(labels).filter(([key])=>key!=='SUPERSEDED').map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>
+   {loading?<p className="p-8 text-center text-slate-500">Đang tải danh sách…</p>:!students.length?<p className="p-8 text-center text-slate-500">Không có sinh viên phù hợp trong danh sách bàn giao.</p>:<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Sinh viên','Doanh nghiệp / Vị trí','Nguồn hồ sơ','Trạng thái','Thao tác'].map(v=><th key={v} className="px-5 py-4">{v}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{students.map(s=>{
+    const canCoordinate=!!data?.canCoordinate&&!s.receivedAt&&!s.hasAssignment&&s.decision!=='ACCEPTED'&&!(s.decision==='PENDING'&&s.source?.startsWith('QHDN_'));
+    return <tr key={s.id}><td className="px-5 py-4"><p className="font-semibold text-slate-800">{s.fullName}</p><p className="text-xs text-slate-500">{s.studentCode}</p></td><td className="px-5 py-4">{s.companyName||'Chưa có doanh nghiệp'}<p className="text-xs text-slate-500">{s.positionTitle}</p></td><td className="px-5 py-4">{s.coordinationId?sourceLabel(s.source):'Chưa gửi hồ sơ'}</td><td className="px-5 py-4"><span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">{labels[state(s)]}</span>{s.receivedAt&&<p className="mt-2 text-xs text-slate-500">{new Date(s.receivedAt).toLocaleString('vi-VN')}</p>}</td><td className="px-5 py-4"><div className="flex flex-wrap gap-2"><button className={workflowSecondary} disabled={!canCoordinate||busy} onClick={()=>{setError('');setTask({student:s,kind:'coordinate'});}}><UserPlus size={15}/>Bổ sung</button>{s.decision==='ACCEPTED'&&!s.receivedAt&&<button className={workflowPrimary} disabled={busy} onClick={()=>{setError('');setTask({student:s,kind:'receive'});}}><CheckCheck size={15}/>Ghi nhận thực nhận</button>}<button className={workflowSecondary} onClick={()=>setTask({student:s,kind:'history'})}><History size={15}/>Lịch sử</button></div></td></tr>;
+   })}</tbody></table></div>}
+  </section>
+  <section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="font-bold text-slate-800">Chỉ tiêu và số lượng thực nhận</h2><p className="mt-1 text-sm text-slate-500">Thực nhận có thể vượt chỉ tiêu đăng tuyển. Hệ thống giữ nguyên chỉ tiêu ban đầu và lưu lý do từng lần xác nhận.</p><div className="mt-4 grid gap-3 md:grid-cols-2">{data?.positions.map(p=><div key={p.id} className="rounded-xl bg-slate-50 p-4"><p className="font-semibold text-slate-700">{p.companyName} · {p.title}</p><p className="mt-1 text-sm text-slate-600">Chỉ tiêu: {p.capacity??'Chưa có'} · Thực nhận: {p.actualCount}{p.actualCount>Number(p.capacity??0)?` · Vượt ${p.actualCount-Number(p.capacity??0)}`:''}</p></div>)}</div></section>
+  {task&&<WorkflowModal wide title={task.kind==='history'?'Lịch sử ứng tuyển và điều phối':task.kind==='coordinate'?'Bổ sung sinh viên cho doanh nghiệp':'Ghi nhận sinh viên thực nhận'} busy={busy} onClose={()=>setTask(null)}>{task.kind==='history'?<div className="space-y-3"><p className="font-semibold">{task.student.fullName} · {task.student.studentCode}</p><>{task.student.receivedAt&&<article className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-semibold text-emerald-800">Đã ghi nhận thực nhận{task.student.exceededCapacity?' · Vượt chỉ tiêu':''}</p><p className="mt-1 text-xs text-slate-600">{new Date(task.student.receivedAt).toLocaleString('vi-VN')} · {task.student.receivedByName}</p><p className="mt-2 text-sm text-slate-700">{task.student.receiptReason}</p></article>}{task.student.history.length?task.student.history.map(h=><article key={h.id} className="rounded-xl border border-slate-200 p-4"><p className="font-semibold">{h.company} · {h.position}</p><p className="mt-1 text-sm">{sourceLabel(h.source)} · {h.decision==='ACCEPTED'?labels.ACCEPTED:h.decision==='REJECTED'?labels.REJECTED:h.decision==='SUPERSEDED'?labels.SUPERSEDED:'Chờ phản hồi'}</p><p className="mt-1 text-xs text-slate-500">{new Date(h.at).toLocaleString('vi-VN')}</p>{(h.reason||h.rejectReason)&&<p className="mt-2 text-sm text-slate-600">{h.reason||h.rejectReason}</p>}</article>):<p>Chưa có lịch sử ứng tuyển hoặc điều phối.</p>}</></div>:<form onSubmit={submit} className="space-y-4">{error&&<Notice>{error}</Notice>}<p className="font-semibold text-slate-800">{task.student.fullName} · {task.student.studentCode}</p>{task.kind==='coordinate'?<><Notice>Hồ sơ được gửi ở trạng thái chờ phản hồi. QHDN bổ sung sinh viên không đồng nghĩa doanh nghiệp đã nhận sinh viên.</Notice><Field label="Danh sách tiếp nhận hồ sơ"><select name="source" className={workflowInput}><option value="QHDN_COORDINATION">Danh sách điều phối của QHDN</option><option value="QHDN_APPLICATION">Danh sách ứng tuyển bổ sung</option></select></Field><Field label="Doanh nghiệp và vị trí"><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{data?.positions.map(p=><option key={p.id} value={p.id}>{p.companyName} — {p.title} · Chỉ tiêu {p.capacity??0}, thực nhận {p.actualCount}</option>)}</select></Field></>:<Notice>Doanh nghiệp đã đồng ý nhận. Chỉ xác nhận khi sinh viên thực tế được tiếp nhận. Nếu vượt chỉ tiêu, ghi rõ lý do bên dưới.</Notice>}<Field label={task.kind==='coordinate'?'Lý do bổ sung / điều phối':'Lý do xác nhận thực nhận'}><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3}/></Field><div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={()=>setTask(null)}>Đóng</button><button className={workflowPrimary} disabled={busy}>{busy?'Đang lưu…':task.kind==='coordinate'?'Gửi hồ sơ đến doanh nghiệp':'Xác nhận thực nhận'}</button></div></form>}</WorkflowModal>}
+ </div>;
 }

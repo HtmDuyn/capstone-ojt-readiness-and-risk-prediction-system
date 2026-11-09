@@ -34,19 +34,11 @@ export interface EnterpriseImportRow {
   email: string;
   fullName: string;
   name: string;
-  address?: string;
-  positions: {
-    code: string;
-    title: string;
-    description: string;
-    requirements: string;
-    capacity: number;
-  }[];
+
 }
 
 export interface EnterpriseImportPayload {
   kind: "ENTERPRISE";
-  windowId: number;
   idempotencyKey: string;
   rows: EnterpriseImportRow[];
 }
@@ -546,6 +538,7 @@ export interface AcademicPeriodListResponse {
  * Đợt đăng ký OJT từ GET /api/ojt-registration-windows
  */
 export interface RegistrationWindowItem {
+  recruitmentRoundId?: number | null;
   id: number;
   name: string;
   ojtSemesterId: number;

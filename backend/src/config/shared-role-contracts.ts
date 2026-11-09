@@ -5,7 +5,7 @@ type Spec = Record<string, any>;
 // first for ADMIN; OJT_COORD uses the QHDN implementation.
 const sharedRoutes: Record<string, string[]> = {
   '/api/companies': ['post'],
-  '/api/companies/{id}': ['patch'],
+
   '/api/assignments': ['post'],
   '/api/assignments/{id}': ['patch'],
 };
@@ -50,5 +50,5 @@ export function mergeSharedRoleContracts(spec: Spec, qhdnPaths: Spec): void {
       ++count;
     }
   }
-  if (count !== 4) throw new Error('Expected 4 shared operations, got ' + count);
+  if (count !== 3) throw new Error('Expected 3 shared operations, got ' + count);
 }

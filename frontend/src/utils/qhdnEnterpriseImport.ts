@@ -2,11 +2,10 @@ import * as XLSX from "xlsx";
 import type { EnterpriseImportRow } from "../types/qhdn/qhdnTypes";
 
 const requiredHeaders = [
-  "code", "email", "fullName", "name", "positionCode", "title",
-  "description", "requirements", "capacity",
+  "code", "email", "fullName", "name",
 ];
 
-/** Convert one spreadsheet row per position into the account-import JSON contract. */
+/** One spreadsheet row provisions one enterprise account; recruitment is enterprise-managed. */
 export function parseEnterpriseImportSheet(data: ArrayBuffer): EnterpriseImportRow[] {
   let workbook: XLSX.WorkBook;
   try {
@@ -27,6 +26,7 @@ export function parseEnterpriseImportSheet(data: ArrayBuffer): EnterpriseImportR
   const namedHeaders = headers.filter(Boolean);
   if (new Set(namedHeaders).size !== namedHeaders.length)
     throw new Error("File có tên cột trùng nhau. Vui lòng kiểm tra hàng tiêu đề.");
+  if (namedHeaders.some(field => !requiredHeaders.includes(field))) throw new Error("Chỉ hỗ trợ 4 cột: code, email, fullName, name. Không nhập JD, vị trí hoặc hồ sơ doanh nghiệp.");
   const missing = requiredHeaders.filter((field) => !headers.includes(field));
   if (missing.length)
     throw new Error("File thiếu cột bắt buộc: " + missing.join(", ") + ".");
@@ -44,30 +44,13 @@ export function parseEnterpriseImportSheet(data: ArrayBuffer): EnterpriseImportR
     }
     const email = get("email").toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("email không hợp lệ.");
-    const capacity = Number(get("capacity"));
-    if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 2147483647)
-      fail("capacity phải là số nguyên dương, tối đa 2147483647.");
     const profile = {
       code: get("code").toUpperCase(), email,
       fullName: get("fullName"), name: get("name"),
-      ...(get("address") ? { address: get("address") } : {}),
+
     };
-    const existing = groups.get(email);
-    if (existing) {
-      const { positions: _positions, ...previousProfile } = existing;
-      if (JSON.stringify(previousProfile) !== JSON.stringify(profile))
-        fail("thông tin doanh nghiệp không nhất quán giữa các vị trí cùng email.");
-    }
-    const target = existing ?? { ...profile, positions: [] };
-    const positionCode = get("positionCode").toUpperCase();
-    if (target.positions.some((position) => position.code === positionCode))
-      fail("mã vị trí bị trùng trong cùng doanh nghiệp.");
-    if (target.positions.length >= 50) fail("mỗi doanh nghiệp chỉ được có tối đa 50 vị trí.");
-    target.positions.push({
-      code: positionCode, title: get("title"), description: get("description"),
-      requirements: get("requirements"), capacity,
-    });
-    groups.set(email, target);
+    if (groups.has(email) || [...groups.values()].some(row=>row.code===profile.code)) fail("Trùng mã hoặc email doanh nghiệp.");
+    groups.set(email, profile);
     if (groups.size > 500) fail("mỗi lần import chỉ được có tối đa 500 doanh nghiệp.");
   }
   if (!groups.size) throw new Error("File không có dòng dữ liệu doanh nghiệp.");

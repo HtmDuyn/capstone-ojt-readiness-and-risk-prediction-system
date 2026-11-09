@@ -62,7 +62,7 @@ const candidateFrom = `FROM "StudentEnterpriseCoordination" co
   JOIN "Students" s ON s."StudentID"=r."StudentID"
   JOIN "Users" u ON u."UserID"=s."UserID"
   JOIN "InternshipPositions" p ON p."PositionID"=co."PositionID"`;
-const candidateFields = `co."CoordinationID" AS id,co."EnterpriseID" AS "companyId",co."CoordinatedBy" AS "coordinatedBy",jsonb_build_object('id',r."RegistrationID",'status',r."Status",'registeredAt',r."RegisteredAt") AS registration,r."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",co."PositionID" AS "positionId",co."ApplicationID" AS "applicationId",r."RegistrationID" AS "registrationId",${student} AS student,${position} AS position,
+const candidateFields = `co."CoordinationID" AS id,co."Source" AS source,(SELECT receipt."ReceivedAt" FROM "OJTActualReceipts" receipt WHERE receipt."CoordinationID"=co."CoordinationID") AS "receivedAt",co."EnterpriseID" AS "companyId",co."CoordinatedBy" AS "coordinatedBy",jsonb_build_object('id',r."RegistrationID",'status',r."Status",'registeredAt',r."RegisteredAt") AS registration,r."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",co."PositionID" AS "positionId",co."ApplicationID" AS "applicationId",r."RegistrationID" AS "registrationId",${student} AS student,${position} AS position,
   COALESCE(co."Decision",'PENDING') AS decision,co."CoordinatedAt" AS "introducedAt",
   co."DecisionAt" AS "decisionAt",co."RejectReason" AS "rejectReason",
   NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID") AS "isLatestCoordination"`;

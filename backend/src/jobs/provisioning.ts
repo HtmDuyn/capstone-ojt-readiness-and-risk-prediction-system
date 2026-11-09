@@ -4,39 +4,6 @@ import nodemailer from 'nodemailer';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
 
-export async function archiveRecruitment() {
-  if (!pool) throw new Error('Database is not configured.');
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('recruitment-archive'))");
-    // Backfill retention for older/manual posts from the next chronological semester.
-    await client.query(`UPDATE "RecruitmentPosts" p SET "RetentionSemesterID"=(
-      SELECT n."OJTSemesterID" FROM "OJTSemesters" n JOIN "OJTSemesters" s ON s."OJTSemesterID"=p."OJTSemesterID"
-      WHERE n."StartDate">s."StartDate" AND (s."AcademicPeriodID" IS NULL OR EXISTS (
-        SELECT 1 FROM "AcademicPeriods" ap WHERE ap."AcademicPeriodID"=n."AcademicPeriodID" AND ap."Kind"='SEMESTER'))
-      ORDER BY n."StartDate",n."OJTSemesterID" LIMIT 1
-    ) WHERE p."RetentionSemesterID" IS NULL`);
-    await client.query(`UPDATE "RecruitmentPosts" SET "Status"='CLOSED',"UpdatedAt"=now()
-      WHERE "Status"='PUBLISHED' AND "DeadlineAt"<=now()`);
-    const posts = await client.query(`UPDATE "RecruitmentPosts" p SET "Status"='ARCHIVED',"ArchivedAt"=now(),"UpdatedAt"=now()
-      FROM "OJTSemesters" s WHERE s."OJTSemesterID"=p."RetentionSemesterID"
-      AND s."EndDate" < (now() AT TIME ZONE 'Asia/Bangkok')::date AND p."Status"<>'ARCHIVED'
-      RETURNING p."PostID"`);
-    await client.query(`UPDATE "InternshipPositions" pos SET "Status"='ARCHIVED',"ArchivedAt"=now()
-      WHERE pos."ArchivedAt" IS NULL AND EXISTS (SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" p ON p."PostID"=pp."PostID" WHERE pp."PositionID"=pos."PositionID" AND p."Status"='ARCHIVED')
-      AND NOT EXISTS (SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" p ON p."PostID"=pp."PostID" WHERE pp."PositionID"=pos."PositionID" AND p."Status"<>'ARCHIVED')`);
-    await client.query(`UPDATE "OJTMatchingProfiles" m SET "Status"='ARCHIVED',"UpdatedAt"=now()
-      WHERE m."Status"<>'ARCHIVED' AND (
-        EXISTS (SELECT 1 FROM "InternshipPositions" p WHERE p."PositionID"=m."PositionID" AND p."ArchivedAt" IS NOT NULL)
-        OR EXISTS (SELECT 1 FROM "OJTSemesters" n WHERE n."OJTSemesterID"=(SELECT n2."OJTSemesterID" FROM "OJTSemesters" n2 JOIN "OJTSemesters" s ON s."OJTSemesterID"=m."OJTSemesterID" WHERE n2."StartDate">s."StartDate" ORDER BY n2."StartDate",n2."OJTSemesterID" LIMIT 1) AND n."EndDate"<(now() AT TIME ZONE 'Asia/Bangkok')::date))`);
-    if (posts.rowCount) await client.query('INSERT INTO "RecruitmentArchiveRuns" ("ArchivedCount") VALUES ($1)', [posts.rowCount]);
-    await client.query('COMMIT');
-    return posts.rowCount ?? 0;
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { client.release(); }
-}
-
 export async function deliverEmails() {
   // Retire secrets even if SMTP is unavailable.
   await query(`UPDATE "EmailOutbox" e SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL
@@ -88,8 +55,8 @@ export function startProvisioningJobs() {
     if (busy || stopped) return;
     busy = true;
     try {
-      // An archive failure must not prevent account/result emails from being delivered.
-      for(const [name,job] of [['archive',archiveRecruitment],['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
+      // Deliver result notifications and account emails independently.
+      for(const [name,job] of [['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
         try { await job(); }
         catch (error: any) {
           // Log codes only: SMTP messages may contain recipient data or credentials.

@@ -12,9 +12,6 @@
  *         idempotencyKey:
  *           type: string
  *           maxLength: 100
- *         semesterId:
- *           type: integer
- *           description: Required for enterprise imports; configure this and the next semester dates.
  *         rows:
  *           type: array
  *           minItems: 1
@@ -27,21 +24,6 @@
  *               email: { type: string, format: email, maxLength: 100 }
  *               fullName: { type: string, maxLength: 150 }
  *               name: { type: string, description: Required enterprise name }
- *               address: { type: string }
- *               positions:
- *                 type: array
- *                 description: Required for enterprise imports
- *                 minItems: 1
- *                 maxItems: 50
- *                 items:
- *                   type: object
- *                   required: [code, title, description, requirements, capacity]
- *                   properties:
- *                     code: { type: string, maxLength: 60 }
- *                     title: { type: string, maxLength: 150 }
- *                     description: { type: string }
- *                     requirements: { type: string }
- *                     capacity: { type: integer, minimum: 1 }
  *       example:
  *         kind: STUDENT
  *         idempotencyKey: students-2026-k1-001
@@ -101,14 +83,6 @@
  *       200: { description: Email queued again }
  *       400: { description: Invalid JSON or email }
  *       409: { description: Email cannot be retried }
- * /api/imports/archive:
- *   post:
- *     tags: [Imports]
- *     summary: ADMIN or OJT_COORD archives recruitment after two semesters
- *     security: [{ bearerAuth: [] }]
- *     responses:
- *       200: { description: Number of newly archived posts }
- *       403: { description: ADMIN or OJT_COORD required }
  * /api/auth/change-password:
  *   post:
  *     tags: [Auth]
