@@ -6,7 +6,7 @@ export interface MatchingProfile {cv:{id:number}|null;status:string;analysis:CvA
   officialAcademic:{programCode:string|null;major:string|null;gpa:number|null;gpaScale:number|null};discrepancies:string[];message:string;}
 export const cvAnalysisApi={
  get:async(signal:AbortSignal)=>(await apiRequest<{data:MatchingProfile}>('/students/me/matching-profile',{signal})).data,
- analyze:async(cvFileId:number,signal:AbortSignal)=>(await apiRequest<{data:{analysis:CvAnalysis;replayed:boolean}}>('/students/me/cv/analyses',{
+ analyze:async(cvFileId:number,signal:AbortSignal)=>(await apiRequest<{data:{analysis:CvAnalysis;replayed:boolean;reviewMessage?:string|null}}>('/students/me/cv/analyses',{
   method:'POST',data:{cvFileId,consent:true},signal,timeout:90000,
  })).data,
  save:async(analysisId:number,revision:number,profile:CvProfile,confirm:boolean,signal:AbortSignal)=>(await apiRequest<{data:{analysis:CvAnalysis}}>('/students/me/matching-profile',{

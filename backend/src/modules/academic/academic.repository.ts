@@ -75,20 +75,26 @@ export async function academicTransaction<T>(work: (client: PoolClient) => Promi
   if(existingClient)return work(existingClient);
   if (!pool) throw academicError('Database is not configured.', 503, 'DATABASE_UNAVAILABLE');
   const client = await pool.connect();
+  let discardClient = false;
   try {
     await client.query('BEGIN');
+    // Do not let a writer waiting on the shared calendar lock occupy a small
+    // application pool indefinitely. Limits apply only to this transaction.
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SET LOCAL idle_in_transaction_session_timeout = '60s'");
     await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
     const value = await work(client);
     await client.query('COMMIT');
     return value;
   } catch (error) {
-    await client.query('ROLLBACK');
+    try { await client.query('ROLLBACK'); }
+    catch { discardClient = true; throw error; }
     const code = (error as { code?: string }).code;
     if (code === '23505') throw academicError('Academic code or group already exists.', 409, 'ACADEMIC_DUPLICATE');
     if (code === '23503') throw academicError('Referenced data is missing or the change conflicts with existing academic history.', 409, 'ACADEMIC_REFERENCE_CONFLICT');
     if (code === '23514') throw academicError('Academic data violates a database constraint.');
     throw error;
-  } finally { client.release(); }
+  } finally { client.release(discardClient); }
 }
 export async function audit(client: PoolClient, actorId: number, resource: string, id: number, action: string, before: unknown, after: unknown, reason?: string) {
   await client.query('INSERT INTO "AuditLogs" ("UserID","Action","EntityType","EntityID","Detail") VALUES ($1,$2,$3,$4,$5)', [actorId, action, resource, id, JSON.stringify({ before, after, reason })]);

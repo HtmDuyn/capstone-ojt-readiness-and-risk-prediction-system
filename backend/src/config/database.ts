@@ -57,6 +57,10 @@ const poolMax = Number(process.env.DB_POOL_MAX ?? 4);
 if (!Number.isInteger(poolMax) || poolMax < 1 || poolMax > 100) {
   throw new Error('DB_POOL_MAX must be an integer between 1 and 100.');
 }
+const connectionTimeout = Number(process.env.DB_CONNECTION_TIMEOUT_MS ?? 30_000);
+if (!Number.isInteger(connectionTimeout) || connectionTimeout < 1000 || connectionTimeout > 120000) {
+  throw new Error('DB_CONNECTION_TIMEOUT_MS must be an integer between 1000 and 120000.');
+}
 
 export const pool = databaseConfig.url
   ? new Pool({
@@ -65,12 +69,27 @@ export const pool = databaseConfig.url
 
       max: poolMax,
       application_name: "ojt-backend",
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
 
       idleTimeoutMillis: 30_000,
 
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: connectionTimeout,
     })
   : null;
+
+// pg removes the failed idle client itself. Catch its error so a temporary
+// database/pooler disconnect does not terminate the HTTP server. Never log
+// provider messages here: they can contain connection credentials.
+pool?.on('error', (error: Error & { code?: string }) => {
+  const code = String(error.code ?? 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0, 80);
+  logger.error('PostgreSQL idle connection lost.', {
+    code,
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+  });
+});
 
 export const query = async <
   Row extends QueryResultRow = QueryResultRow,
