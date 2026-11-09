@@ -20,9 +20,14 @@ export const receiveCV: RequestHandler = (req, res, next) => {
       if (Object.keys(req.body??{}).length) throw invalid('API upload CV chỉ nhận trường file cv.');
       if (req.file) {
         const file = req.file;
-        if (file.mimetype !== 'application/pdf' || !/\.pdf$/i.test(file.originalname) || !file.buffer.subarray(0,5).equals(Buffer.from('%PDF-')) || !file.buffer.subarray(-2048).includes(Buffer.from('%%EOF'))) {
-          throw invalid('CV phải là file PDF hợp lệ.', 400, 'INVALID_CV_FILE');
-        }
+        if (!/\.pdf$/i.test(file.originalname))
+          throw invalid('Tên file CV phải có phần mở rộng .pdf. Hãy xuất CV thành PDF, không chỉ đổi tên đuôi file.',400,'INVALID_CV_FILE');
+        if (!file.buffer.subarray(0,5).equals(Buffer.from('%PDF-')))
+          throw invalid('Nội dung file không có phần đầu định dạng PDF (%PDF-). Hãy mở file và xuất lại thành PDF rồi tải lên.',400,'INVALID_CV_FILE');
+        if (!file.buffer.subarray(-2048).includes(Buffer.from('%%EOF')))
+          throw invalid('File thiếu dấu kết thúc PDF (%%EOF) trong phần cuối. File có thể chưa tải đủ hoặc bị lỗi; hãy lưu/xuất lại thành PDF.',400,'INVALID_CV_FILE');
+        if (file.mimetype !== 'application/pdf')
+          throw invalid(`Nội dung có dấu hiệu PDF nhưng kiểu file gửi lên là ${file.mimetype || 'không xác định'}. Chọn trường cv dạng File và Content-Type application/pdf trong multipart/form-data.`,400,'INVALID_CV_FILE');
         file.originalname = file.originalname.split(/[\\/]/).pop()!.replace(/[\x00-\x1f\x7f]/g, '').slice(0,255);
       }
       next();
