@@ -1,10 +1,10 @@
 import { useState, useRef, type FormEvent } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { uploadStudentCv, downloadStudentCv } from '@/services/studentService';
-import { buttonClass, Card, dateText, Empty, inputClass } from './PortalUI';
+import { buttonClass, Card, dateText, Empty } from './PortalUI';
 import type { CV } from '@/types/student/portal';
 
-export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; onUploaded?: (cv: CV) => void } = {}) {
+export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: { cv?: CV | null; onUploaded?: (cv: CV) => void; embedded?: boolean } = {}) {
   const { profile, refresh } = useStudentPortal();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,8 +27,8 @@ export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; 
     }
   };
   return (
-    <Card title="CV của tôi">
-      <p className="text-sm text-slate-500">Lưu CV để sử dụng khi ứng tuyển. Hồ sơ này sẽ được dùng để gợi ý doanh nghiệp phù hợp khi tính năng AI được tích hợp.</p>
+    <Card title="CV của tôi" className={embedded ? '!rounded-none !border-0 !p-0 !shadow-none [&>h2]:!text-base [&>h2]:!font-semibold' : ''}>
+      <p className="text-sm text-slate-600">Lưu CV để sử dụng khi ứng tuyển. Hồ sơ này sẽ được dùng để gợi ý doanh nghiệp phù hợp khi tính năng AI được tích hợp.</p>
       {cv ? (
         <div className="text-sm space-y-2">
           <p className="font-bold break-all">{cv.fileName}</p>
@@ -63,16 +63,20 @@ export function StudentCvCard({ cv: providedCv, onUploaded }: { cv?: CV | null; 
             });
         }}
       >
-        <label className="block text-sm">
+        <label className="block text-sm text-slate-700">
           Tải CV PDF (tối đa 10 MB)
+          <span className="relative mt-2 flex min-w-0 items-center gap-3">
           <input
             ref={fileInput}
             disabled={busy}
-            className={inputClass + ' mt-2'}
+            className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
             type="file"
             accept="application/pdf,.pdf"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
+          <span className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium text-slate-800 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-orange-500">Chọn tệp CV</span>
+          <span className="min-w-0 truncate text-slate-600">{file?.name ?? 'Chưa chọn tệp'}</span>
+          </span>
         </label>
         <button type="submit" className={buttonClass} disabled={busy || !file}>
           {busy ? 'Đang xử lý...' : 'Lưu CV'}

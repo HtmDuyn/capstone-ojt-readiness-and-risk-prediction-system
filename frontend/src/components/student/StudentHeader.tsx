@@ -77,7 +77,7 @@ export const StudentHeader: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-8 py-3.5 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow-xs text-slate-800">
       {/* Left: Mobile menu toggle + Search bar */}
-      <div className="flex items-center gap-3 flex-1 max-w-xl">
+      <div className={showSearch ? "flex flex-1 max-w-xl items-center gap-3" : "flex items-center gap-3"}>
         <button
           type="button"
           onClick={onOpenMobileMenu}
