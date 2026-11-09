@@ -10,7 +10,7 @@ export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
   const year = Number(calendar.year.yearCode.slice(0, 4));
   const errors = useMemo(() => calendarErrors(year, rows), [year, rows]);
   const changed = JSON.stringify(rows) !== JSON.stringify(semesterDraft(calendar));
-  return <form className="space-y-4 rounded-xl border border-orange-200 bg-orange-50/30 p-5" onSubmit={async event => {
+  return <form className="space-y-4" onSubmit={async event => {
     event.preventDefault();
     if (!busy && !errors.length && changed && await onSave(rows)) onCancel();
   }}>

@@ -6,8 +6,10 @@ import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, Stu
 import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
 import React from "react";
 import { Link } from 'react-router-dom';
-import { FileSpreadsheet, Download, RefreshCw, CheckCircle2, AlertCircle, UploadCloud } from 'lucide-react';
+import { FileSpreadsheet, Download, CheckCircle2, AlertCircle } from 'lucide-react';
 const EducationStudentImport: React.FC = () => {
+  const [activeTab, setActiveTab] = React.useState<'import' | 'students'>(() =>
+    new URLSearchParams(window.location.search).get('tab') === 'students' ? 'students' : 'import');
   const [savedRevision, setSavedRevision] = React.useState(0);
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
     [rows, setRows] = React.useState<StudentImportRow[]>([]);
@@ -24,7 +26,6 @@ const EducationStudentImport: React.FC = () => {
   const [reviewFilter, setReviewFilter] = React.useState<'all' | 'valid' | 'error' | 'skipped'>('all');
   const [reviewErrors, setReviewErrors] = React.useState<Record<string, string[]>>({});
   const [previewSignature, setPreviewSignature] = React.useState('');
-  const [catalogRefresh, setCatalogRefresh] = React.useState(0);
   React.useEffect(() => {
     let active = true;
     setCatalogs(null);
@@ -39,7 +40,7 @@ const EducationStudentImport: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [catalogRefresh]);
+  }, []);
   const keptRows = rows.filter(row => !skipped.has(row.code));
   const rowErrors = (row: StudentImportRow) => reviewErrors[row.code] ?? [];
   const gradeCount = keptRows.reduce(
@@ -164,16 +165,18 @@ const EducationStudentImport: React.FC = () => {
         description="Tải file sinh viên và bảng điểm lên, xem lại thông tin rồi xác nhận import."
         badge="Phòng Đào tạo"
       />
-      <section className="space-y-6 rounded-2xl border border-slate-300 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex items-start gap-4">
-          <div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><FileSpreadsheet size={24} /></div>
-          <div><h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2><p className="mt-1 text-sm text-slate-600">Tạo mới hoặc cập nhật theo email; tài khoản đã có giữ nguyên mật khẩu. Bảng điểm có thể chứa lịch sử các học kỳ trước.</p></div>
+      <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
+        <div role="tablist" aria-label="Chức năng Import dữ liệu sinh viên" className="flex gap-6 overflow-x-auto border-b border-slate-200 px-5 sm:px-7">
+          <button type="button" role="tab" id="student-import-tab" aria-controls="student-import-panel" aria-selected={activeTab === 'import'} onClick={() => setActiveTab('import')} className={`-mb-px shrink-0 whitespace-nowrap border-b-2 py-4 text-sm transition-colors focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${activeTab === 'import' ? 'border-orange-600 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600 hover:text-slate-900'}`}>Nhập dữ liệu từ Excel</button>
+          <button type="button" role="tab" id="student-list-tab" aria-controls="student-list-panel" aria-selected={activeTab === 'students'} onClick={() => setActiveTab('students')} className={`-mb-px shrink-0 whitespace-nowrap border-b-2 py-4 text-sm transition-colors focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${activeTab === 'students' ? 'border-orange-600 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600 hover:text-slate-900'}`}>Danh sách sinh viên</button>
         </div>
-        <p className="text-sm text-slate-600">Mẫu Excel trống gồm hai sheet: Danh sách sinh viên và Kết quả học tập. Nhập đủ chương trình, khóa, nhóm và học kỳ hiện tại; mỗi dòng điểm dùng đúng học kỳ đã học. Để trống điểm cho môn đang học.</p>
-        <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-orange-400 bg-orange-50/40 p-5 sm:p-6">
-          <div className="flex items-start gap-3"><UploadCloud className="mt-0.5 shrink-0 text-orange-600" size={22} /><div><p className="font-semibold text-slate-900">Chọn tệp Excel để bắt đầu</p><p className="mt-1 text-sm text-slate-500">Định dạng .xlsx hoặc .xls, tối đa 8 MB. Dữ liệu sẽ được kiểm tra trước khi lưu.</p></div></div>
-          <div className="flex flex-wrap items-center gap-3">
-          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
+      <div role="tabpanel" id="student-import-panel" aria-labelledby="student-import-tab" hidden={activeTab !== 'import'} className={activeTab !== 'import' ? 'hidden' : ''}>
+      <section className="space-y-4 p-5 sm:p-7">
+        <h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2>
+        <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="min-w-0"><h3 className="font-semibold text-slate-900">Chọn tệp Excel</h3><p className="mt-1 break-all text-sm text-slate-600" aria-live="polite">{fileName || 'Chưa chọn tệp'}</p></div>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+          <label className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
             <FileSpreadsheet size={18} /> Chọn tệp Excel
             <input
               aria-label="Tệp sinh viên và bảng điểm"
@@ -188,46 +191,27 @@ const EducationStudentImport: React.FC = () => {
               }}
             />
           </label>
-          <span className="min-w-0 break-all text-sm text-slate-600" aria-live="polite">{fileName || 'Chưa chọn tệp'}</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
           <button
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
             disabled={!!busy}
             onClick={() => {
               try { downloadStudentImportTemplate(); }
               catch(e) { setError(e instanceof Error?e.message:'Không tải được mẫu Excel.'); }
             }}
           >
-            <Download size={16} /> Tải mẫu Excel trống
+            <Download size={16} /> Tải mẫu Excel
           </button>
-          <button
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
-            disabled={!!busy}
-            onClick={() => setCatalogRefresh((v) => v + 1)}
-          >
-            <RefreshCw size={16} /> Tải lại danh mục
-          </button>
-        </div>
-        {catalogs && <details className="rounded-xl border border-slate-200 p-4 text-sm">
-          <summary className="cursor-pointer font-semibold text-slate-800">Tra cứu mã chương trình, khóa/nhóm và học kỳ để điền file</summary>
-          <p className="mt-3 text-sm text-slate-600">Chọn khung chương trình áp dụng cho mã khóa của sinh viên. Ví dụ K21 có thể dùng khung K21A, K21B, K21C hoặc K21D; nhóm nhập học A/B/C/D được chọn riêng theo lộ trình đã cấu hình, không phải khớp chữ cái trong mã khung.</p>
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <div><h3 className="font-semibold">Chương trình đào tạo</h3><ul className="mt-2 max-h-64 space-y-2 overflow-auto text-slate-600">{catalogs.programs.map(item=><li key={item.id} className="break-words">{item.id} — {item.aliases.join(' / ')}</li>)}</ul></div>
-            <div><h3 className="font-semibold">Khóa / nhóm</h3><ul className="mt-2 max-h-64 space-y-3 overflow-auto text-slate-600">{catalogs.cohorts.map(item=><li key={item.id}><p>{item.id} — {item.aliases.join(' / ')}</p><p className="mt-1 text-xs">{item.groups?.length?item.groups.map(group=>`Nhóm ${group.groupCode}: bắt đầu ${catalogs.periods.find(period=>period.id===group.entryAcademicPeriodId)?.label??group.entryAcademicPeriodId}`).join('; '):'Chưa cấu hình nhóm nhập học.'}</p></li>)}</ul></div>
-            <div><h3 className="font-semibold">Học kỳ</h3><ul className="mt-2 max-h-64 space-y-2 overflow-auto text-slate-600">{catalogs.periods.map(item=><li key={item.id}>{item.id} — {item.aliases.join(' / ')}</li>)}</ul></div>
           </div>
-        </details>}
+        </div>
+        {error && (
+          <p role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle size={18} className="shrink-0" /> {error}
+          </p>
+        )}
         {!catalogs && <p className="text-sm text-slate-500">Bạn có thể tải mẫu trống ngay. Cần tải danh mục chương trình, khóa và học kỳ để kiểm tra file khi import.</p>}
         {busy === 'read' && (
           <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
             Đang đọc và ghép dữ liệu...
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <AlertCircle size={18} className="shrink-0" /> {error}
           </p>
         )}
         {rows.length > 0 && (
@@ -369,7 +353,11 @@ const EducationStudentImport: React.FC = () => {
           </div>
         )}
       </section>
-      <ImportedStudents revision={savedRevision} catalogs={catalogs} />
+      </div>
+      <div role="tabpanel" id="student-list-panel" aria-labelledby="student-list-tab" hidden={activeTab !== 'students'} className={activeTab !== 'students' ? 'hidden' : ''}>
+        <ImportedStudents revision={savedRevision} catalogs={catalogs} />
+      </div>
+      </div>
     </div>
   );
 };

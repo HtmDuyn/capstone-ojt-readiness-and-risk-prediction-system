@@ -87,7 +87,7 @@ export interface AcademicCatalogs {
   periods: CatalogOption[];
 }
 
-export interface ImportedRelation { id: number; code?: string; name?: string }
+export interface ImportedRelation { id: number; code?: string; name?: string; startDate?: string; endDate?: string }
 export interface ImportedStudent {
   id: number;
   studentCode: string;
