@@ -1,7 +1,7 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
 import { getAllItems } from '@/services/educationApi';
 import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/localOjtEligibility.service';
-import type { LocalOjtRule } from '@/utils/localOjtEligibility';
+import type { CurrentOjtRule } from '@/services/localOjtEligibility.service';
 import type { ImportedStudent } from '@/types/education/import.types';
 import React from 'react';
 
@@ -14,7 +14,7 @@ export function useEducationOjtEligibility() {
   const [busy, setBusy] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [savedCount, setSavedCount] = React.useState<number | null>(null);
-  const [rule, setRule] = React.useState<LocalOjtRule | null>(null);
+  const [rule, setRule] = React.useState<CurrentOjtRule | null>(null);
   const [error, setError] = React.useState('');
   const [revision, setRevision] = React.useState(0);
   const [results, setResults] = React.useState<Record<number, LocalOjtResult>>({});

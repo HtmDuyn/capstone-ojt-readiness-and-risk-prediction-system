@@ -8,12 +8,29 @@ import { clearEducationReadCache } from './educationReadCache';
 // Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
 export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
 export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
-export const loadCurrentOjtRule = async (signal?: AbortSignal) => apiData<LocalOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
-export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: LocalOjtRule): Promise<number> {
+export type CurrentOjtRule = LocalOjtRule & { legacyApi?: true };
+export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
+  // The main backend has a fixed 70/2 rule and no policy endpoint yet.
+  if (import.meta.env.VITE_OJT_POLICY_API !== 'true') {
+    return { version: 0, minCredits: 70, maxUnpassedCourses: 2, legacyApi: true };
+  }
+  try {
+    return apiData<LocalOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
+  } catch (error) {
+    const response = (error as { response?: { status?: number; data?: { errorCode?: string } } } | null)?.response;
+    if (response?.status === 404 && response.data?.errorCode === 'ROUTE_NOT_FOUND') {
+      return { version: 0, minCredits: 70, maxUnpassedCourses: 2, legacyApi: true };
+    }
+    throw error;
+  }
+};
+export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<number> {
   if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
   try {
     const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number } }>(LOCAL_OJT_SAVE_ENDPOINT, {
-      idempotencyKey, source: 'FRONTEND', rule,
+      idempotencyKey, source: 'FRONTEND', rule: rule.legacyApi
+        ? { minCredits: rule.minCredits, maxUnpassedCourses: rule.maxUnpassedCourses }
+        : { version: rule.version, minCredits: rule.minCredits, maxUnpassedCourses: rule.maxUnpassedCourses },
       results: [...results].sort((a, b) => a.studentId - b.studentId).map(({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt }) => ({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt })),
     });
     const body = response.data;
