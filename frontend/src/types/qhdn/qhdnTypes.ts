@@ -538,6 +538,7 @@ export interface AcademicPeriodListResponse {
  * Đợt đăng ký OJT từ GET /api/ojt-registration-windows
  */
 export interface RegistrationWindowItem {
+  recruitmentRoundId?: number | null;
   id: number;
   name: string;
   ojtSemesterId: number;

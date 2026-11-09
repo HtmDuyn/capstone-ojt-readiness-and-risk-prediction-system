@@ -6,6 +6,7 @@ import { enterpriseScope, type Actor, type Row } from '../qhdn/qhdn.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { assertOpen, windowRecord, postApi, postSelect } from '../recruitment/recruitment.repository';
 import { assertNoStudentRegistration, enterpriseWindowApi, enterpriseWindowSelect, recruitmentDeadline } from './enterprise-recruitment.policy';
+import { assertRoundPhase } from '../recruitment/round-policy';
 
 async function company(c: PoolClient, actor: Actor) {
   if (actor.roleCode !== 'ENTERPRISE') throw invalid('Enterprise access required.', 403, 'FORBIDDEN');
@@ -24,7 +25,7 @@ async function postResponses(c: PoolClient, posts: Row[]) {
   return posts.map(p => {
     const window = windows.get(p.WindowID);
     return {...postApi(p),canEdit:!!window?.canEdit && !p.ArchivedAt && editableStatuses.includes(p.Status),
-      postingDeadlineAt:window?.endsAt ?? null,deadlineManagedBy:'QHDN',requiresReview:false,
+      postingDeadlineAt:window?.postingDeadlineAt ?? null,deadlineManagedBy:'QHDN',requiresReview:false,
       editLockCode:window?.editLockCode ?? null,studentRegistrationWindow:window?.studentRegistrationWindow ?? null};
   });
 }
@@ -101,7 +102,10 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     if (before && !editableStatuses.includes(before.Status)) throw invalid('Closed or archived posts cannot be edited.',409,'RECRUITMENT_POST_LOCKED');
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
     assertOpen(w);
-    if (before) await assertNoStudentRegistration(c,w.OJTSemesterID);
+    assertRoundPhase(w,'POSTING');
+    if (before && !w.CampaignID) await assertNoStudentRegistration(c,w.OJTSemesterID);
+    if(before&&(await c.query('SELECT 1 FROM "JobApplications" WHERE "PostID"=$1 LIMIT 1',[before.PostID])).rowCount)
+      throw invalid('Tin đã có sinh viên ứng tuyển, không thể chỉnh sửa nội dung hoặc chỉ tiêu.',409,'RECRUITMENT_POST_HAS_APPLICATIONS');
     const title = requiredText(b.title ?? before?.Title,'title',500), content = requiredText(b.content ?? before?.Content,'content',30000);
     const benefits = b.benefits === undefined ? before?.Benefits ?? null : optionalText(b.benefits,'benefits',10000);
     const instructions = b.applicationInstructions === undefined ? before?.ApplicationInstructions ?? null : optionalText(b.applicationInstructions,'applicationInstructions',10000);

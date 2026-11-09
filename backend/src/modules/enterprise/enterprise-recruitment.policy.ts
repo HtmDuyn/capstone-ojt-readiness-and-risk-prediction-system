@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { invalid } from '../students/student.validation';
 import { windowApi } from '../recruitment/recruitment.repository';
 import type { Row } from '../qhdn/qhdn.repository';
+import { currentRoundPhase } from '../recruitment/round-policy';
 
 // A scoped student registration window represents the existing bulk OJT intake.
 // Use the same semester and actual opening interval, not just Status='OPEN'.
@@ -18,6 +19,11 @@ export const enterpriseWindowSelect = `SELECT w.*,ap."PeriodCode",ap."Name" AS "
 
 export function enterpriseWindowApi(w: Row) {
   const window = windowApi(w);
+  if(w.CampaignID){
+    const posting=currentRoundPhase(w)==='OPEN';
+    return {...window,accepting:posting,canCreate:posting,canEdit:posting,postingDeadlineAt:w.EndsAt,
+      deadlineManagedBy:'QHDN',studentRegistrationWindow:null,editLockCode:posting?null:'RECRUITMENT_PHASE_CLOSED'};
+  }
   const accepting = window.accepting && w.Kind === 'SEMESTER' && w.LinkedPeriodID === w.AcademicPeriodID;
   return {...window,accepting,canCreate:accepting,canEdit:accepting && !w.StudentRegistrationWindow,
     postingDeadlineAt:w.EndsAt,deadlineManagedBy:'QHDN',
@@ -34,6 +40,7 @@ export async function assertNoStudentRegistration(c: PoolClient, semesterId: num
 }
 
 export async function recruitmentDeadline(c: PoolClient, w: Row, before: Row | null) {
+  if(w.CampaignID)return w.EndsAt;
   // Existing deadlines belong to QHDN. Do not validate them against the separate
   // enterprise intake deadline or rewrite them during content/position changes.
   if (before) return before.DeadlineAt;

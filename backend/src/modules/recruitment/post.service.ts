@@ -1,3 +1,4 @@
+import { assertRoundPhase, recruitmentSchemaReady } from './round-policy';
 import { enrichListRows } from '../../shared/list-context';
 import { academicTransaction,audit } from '../academic/academic.repository';
 import { timestamp } from '../combo-registration/combo.validation';
@@ -36,7 +37,10 @@ export async function reviewPost(id:number,body:unknown,actor:Actor,close=false)
   if(close?!['PUBLISHED','PENDING_REVIEW'].includes(before.Status):before.Status!=='PENDING_REVIEW')throw invalid('This post cannot make the requested transition.',409,'RECRUITMENT_POST_STATE_CONFLICT');
   if(action==='PUBLISHED'){
    if(!before.WindowID)throw invalid('Reconcile the legacy post with an academic recruitment window first.',409);
-   const w=await windowRecord(c,before.WindowID),end=new Date(new Date(dayString(w.PeriodEndDate)+'T00:00:00+07:00').getTime()+86400000);
+   const w=await windowRecord(c,before.WindowID);
+   assertRoundPhase(w,'POSTING');
+   if(w.CampaignID&&requestedDeadline!==undefined)throw invalid('Recruitment deadlines are immutable.',409);
+   const end=new Date(new Date(dayString(w.PeriodEndDate)+'T00:00:00+07:00').getTime()+86400000);
    if(!deadline||new Date(deadline)<=w.DatabaseNow||new Date(deadline)>end||['CLOSED','ARCHIVED'].includes(w.PeriodStatus))throw invalid('Set a future vacancy deadline within an available academic semester.',409);
    if(!(await c.query('SELECT 1 FROM "Enterprises" WHERE "EnterpriseID"=$1 AND "Status"=\'ACTIVE\' AND "DeletedAt" IS NULL',[before.EnterpriseID])).rowCount)throw invalid('An active enterprise is required.',409);
    if(!before.positions.length||before.positions.some((p:Row)=>p.status==='ARCHIVED'))throw invalid('Valid recruitment positions are required.',409);
@@ -50,6 +54,7 @@ export async function reviewPost(id:number,body:unknown,actor:Actor,close=false)
 }
 export async function expireRecruitment() {
  return academicTransaction(async c=>{
+  if(!await recruitmentSchemaReady(c))return 0;
   await c.query(`UPDATE "RecruitmentWindows" SET "Status"='CLOSED',"UpdatedAt"=now() WHERE "Status"='OPEN' AND "EndsAt"<=clock_timestamp()`);
   const closed=await c.query(`UPDATE "RecruitmentPosts" SET "Status"='CLOSED',"UpdatedAt"=now() WHERE "Status"='PUBLISHED' AND "DeadlineAt"<=clock_timestamp()`);
   await closeUnusedPositions(c);return closed.rowCount??0;

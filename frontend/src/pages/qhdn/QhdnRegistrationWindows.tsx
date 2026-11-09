@@ -1,3 +1,5 @@
+import { RecruitmentRounds } from '@/components/qhdn/RecruitmentRounds';
+import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -26,7 +28,7 @@ import {
   workflowPrimary,
   workflowSecondary,
 } from "@/components/qhdn/StudentWorkflowUi";
-import { useQhdnRoster, useQhdnSemesters } from "@/hooks/useQhdnRoster";
+import { useQhdnRoster } from "@/hooks/useQhdnRoster";
 import {
   closeRegistrationWindow,
   createRegistrationWindow,
@@ -58,7 +60,8 @@ const localDate = (s: string) =>
   });
 export default function QhdnRegistrationWindows() {
   const [url] = useSearchParams();
-  const semester = useQhdnSemesters(url.get("semester") || "");
+  const semester = useQhdnAcademicPeriods(url.get("semester") || "", false, true);
+  const [roundCreateRequest,setRoundCreateRequest]=useState(0);
   const roster = useQhdnRoster(semester.semesterId, "eligible");
   const [tab, setTab] = useState<"students" | "windows">("students");
   const [search, setSearch] = useState(url.get("student") || ""),
@@ -101,7 +104,7 @@ export default function QhdnRegistrationWindows() {
       }).then((r) => r.data),
     )
       .then((r) => {
-        if (active) setWindows(r);
+        if (active) setWindows(r.filter(w=>!w.recruitmentRoundId));
       })
       .catch((e) => {
         if (active) setWindowError(errorMessage(e));
@@ -164,6 +167,7 @@ export default function QhdnRegistrationWindows() {
     kind: "create" | "extend" | "toggle",
     window?: RegistrationWindowItem,
   ) => {
+    if(kind === "create"){setTab("windows");setRoundCreateRequest(v=>v+1);return;}
     setWindowTask({ kind, window });
     setTaskError("");
     setCreatedId(null);
@@ -344,15 +348,6 @@ export default function QhdnRegistrationWindows() {
             Theo dõi doanh nghiệp phản hồi
             <ArrowRight size={14} />
           </Link>
-          <button
-            type="button"
-            className={workflowPrimary + " w-full sm:w-auto"}
-            disabled={busy || loading || !semester.semesterId}
-            onClick={() => openWindowTask("create")}
-          >
-            <Plus size={17} />
-            Mở đợt đăng ký
-          </button>
         </div>
       </div>
       {tab === "students" ? (
@@ -446,7 +441,7 @@ export default function QhdnRegistrationWindows() {
                   onClick={() => openWindowTask("create")}
                 >
                   <Plus size={15} />
-                  Mở đợt cho danh sách đã chọn
+                  Thiết lập đợt tuyển dụng
                 </button>
               </div>
             </div>
@@ -588,6 +583,8 @@ export default function QhdnRegistrationWindows() {
         </section>
       ) : (
         <div className="space-y-4">
+          <RecruitmentRounds selection={semester} createRequest={roundCreateRequest} onChanged={refresh} />
+          <details className="rounded-2xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer font-semibold text-slate-700">Các đợt đăng ký cũ</summary>
           {windowError && <Notice>{windowError}</Notice>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-slate-500">
@@ -677,6 +674,7 @@ export default function QhdnRegistrationWindows() {
             busy={windowLoading}
             onChange={setWindowPage}
           />
+          </details>
         </div>
       )}
       {windowTask && (

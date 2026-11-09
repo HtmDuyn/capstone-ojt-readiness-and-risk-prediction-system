@@ -1,6 +1,7 @@
 import { registrationRecord, eligibleOfficial } from '../ojt-registration/registration.service';
 import type { PoolClient } from 'pg';
 import { assertPublishedPosition } from '../recruitment/recruitment.repository';
+import { assertPostPhase } from '../recruitment/round-policy';
 import { academicTransaction } from '../academic/academic.repository';
 import { dateInput, dateRange } from '../academic/academic.schema';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, score } from '../students/student.validation';
@@ -36,11 +37,11 @@ async function latest(c:PoolClient,r:Row,coordinationId:number){
   const row=(await c.query('SELECT "CoordinationID" FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1',[r.RegistrationID])).rows[0];
   if(row?.CoordinationID!==coordinationId)throw invalid('Only the latest coordination can change.',409,'COORDINATION_SUPERSEDED');
 }
-async function availablePosition(c:PoolClient,id:number,semesterId:number){
-  await assertPublishedPosition(c,id);
+async function availablePosition(c:PoolClient,id:number,semesterId:number,phasedResult=false){
+  if(!phasedResult)await assertPublishedPosition(c,id);
   const p=await record(c,'positions',id),company=await record(c,'companies',p.EnterpriseID);
   if(p.OJTSemesterID!==semesterId)throw invalid('Position belongs to a different semester.',409,'POSITION_SEMESTER_MISMATCH');
-  if(company.Status!=='ACTIVE'||p.Status!=='OPEN')throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');
+  if(company.Status!=='ACTIVE'||(p.Status!=='OPEN'&&!(phasedResult&&p.Status==='CLOSED')))throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');
   if(p.Capacity==null||await occupied(c,id)>=p.Capacity)throw invalid('No remaining position capacity.',409,'POSITION_FULL');
   return p;
 }
@@ -84,6 +85,8 @@ export async function decision(id:number,body:unknown,actor:Actor){
   const b=inputObject(body,['decision','reason']),value=enumValue(b.decision,['ACCEPTED','REJECTED'],'decision'),reason=requiredText(b.reason,'reason',value==='REJECTED'?300:2000);
   return academicTransaction(async c=>{
     const before=await record(c,'coordinations',id);await assertScope(c,actor,before.EnterpriseID);
+    const application=before.ApplicationID?(await c.query('SELECT "PostID" FROM "JobApplications" WHERE "ApplicationID"=$1',[before.ApplicationID])).rows[0]:null;
+    const phasedResult=application?await assertPostPhase(c,application.PostID,'RESULTS'):false;
     const r=await registration(c,before.RegistrationID);await latest(c,r,id);
     if(before.Decision===value&&before.RejectReason===(value==='REJECTED'?reason:null)){
       if(value==='ACCEPTED'&&!(await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)
@@ -93,7 +96,7 @@ export async function decision(id:number,body:unknown,actor:Actor){
     if(accepted(before.Decision)||rejected(before.Decision))throw invalid('The enterprise decision is already final.',409,'DECISION_FINAL');
     if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)throw invalid('Coordination already has an assignment.',409);
     if(value==='ACCEPTED'){
-      const position=await availablePosition(c,before.PositionID,r.OJTSemesterID);
+      const position=await availablePosition(c,before.PositionID,r.OJTSemesterID,phasedResult);
       await noAssignment(c,r);
       if(position.EnterpriseID!==before.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
     }
@@ -105,7 +108,9 @@ export async function decision(id:number,body:unknown,actor:Actor){
 }
 async function createAcceptedAssignment(c:PoolClient,coordination:Row,r:Row,actor:Actor,reason:string){
   await noAssignment(c,r);
-  const position=await availablePosition(c,coordination.PositionID,r.OJTSemesterID);
+  const app=coordination.ApplicationID?(await c.query('SELECT "PostID" FROM "JobApplications" WHERE "ApplicationID"=$1',[coordination.ApplicationID])).rows[0]:null;
+  const phasedResult=app?await assertPostPhase(c,app.PostID,'RESULTS'):false;
+  const position=await availablePosition(c,coordination.PositionID,r.OJTSemesterID,phasedResult);
   if(position.EnterpriseID!==coordination.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
   const semester=(await c.query(`SELECT "StartDate","EndDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=$1`,[r.OJTSemesterID])).rows[0];
   if(!semester)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
