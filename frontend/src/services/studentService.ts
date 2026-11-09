@@ -339,6 +339,7 @@ export async function uploadStudentCv(file: File) {
     await apiRequest<{ data: CV }>('/students/me/cv', { method: 'POST', data: body })
   ).data;
 }
+export type StudentCertificate={name:string;url:string};
 export async function downloadStudentCv(studentId: number, cv: CV) {
   await downloadFile(async () => (
     await API.get<Blob>(`/students/${studentId}/cv`, {

@@ -3,6 +3,7 @@ import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { uploadStudentCv, downloadStudentCv } from '@/services/studentService';
 import { buttonClass, Card, dateText, Empty } from './PortalUI';
 import type { CV } from '@/types/student/portal';
+import { CvExtractionCard } from './CvExtractionCard';
 
 export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: { cv?: CV | null; onUploaded?: (cv: CV) => void; embedded?: boolean } = {}) {
   const { profile, refresh } = useStudentPortal();
@@ -27,8 +28,8 @@ export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: 
     }
   };
   return (
-    <Card title="CV của tôi" className={embedded ? '!rounded-none !border-0 !p-0 !shadow-none [&>h2]:!text-base [&>h2]:!font-semibold' : ''}>
-      <p className="text-sm text-slate-600">Lưu CV để sử dụng khi ứng tuyển. Hồ sơ này sẽ được dùng để gợi ý doanh nghiệp phù hợp khi tính năng AI được tích hợp.</p>
+    <Card title="CV c?a t?i" className={embedded ? '!rounded-none !border-0 !p-0 !shadow-none [&>h2]:!text-base [&>h2]:!font-semibold' : ''}>
+      <p className="text-sm text-slate-600">L?u CV ?? s? d?ng khi ?ng tuy?n. B?n c? th? ??c CV b?ng Claude, ki?m tra v? x?c nh?n h? s? b?n d??i. Ph?n g?i ? doanh nghi?p s? ???c t?ch h?p sau.</p>
       {cv ? (
         <div className="text-sm space-y-2">
           <p className="font-bold break-all">{cv.fileName}</p>
@@ -87,6 +88,7 @@ export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: 
           {error}
         </p>
       )}
+      {cv&&<CvExtractionCard key={cv.id} cvFileId={cv.id}/>}
     </Card>
   );
 }

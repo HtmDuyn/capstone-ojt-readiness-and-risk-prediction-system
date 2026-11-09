@@ -5,6 +5,7 @@ import { readTransaction } from '../qhdn/read.repository';
 import { occupied } from '../qhdn/catalog.service';
 import { registrationRecord, registrationApi, event } from '../ojt-registration/registration.service';
 import { currentCV, cvMetadataSql } from './cv.service';
+import { validateCertificateLinks } from './certificate.service';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
 import { requireStudentAdmission, studentAdmission } from '../student-portal/admission.service';
 import { assertOjtSemesterSix } from '../academic/workflow-policy';
@@ -23,12 +24,14 @@ const applicationSelect=`SELECT a."ApplicationID" AS id,a."RegistrationID" AS "r
  jsonb_build_object('id',p."PositionID",'code',p."RecruitmentCode",'title',p."Title",'requirements',p."Requirements",'description',p."Description",'status',p."Status",'capacity',p."Capacity",'remainingSlots',GREATEST(0,p."Capacity"-(SELECT count(*) FROM "InternshipAssignments" slot WHERE slot."PositionID"=p."PositionID" AND COALESCE(UPPER(slot."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')))) AS position,
  jsonb_build_object('id',post."PostID",'title',post."Title",'deadlineAt',post."DeadlineAt",'status',post."Status") AS post,
  CASE WHEN cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('cv')} END AS cv,
+ a."CertificateLinks" AS certificates,
  r."Status" AS "registrationStatus",EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AS "handedOff",
  (SELECT jsonb_build_object('id',co."CoordinationID",'decision',co."Decision",'rejectReason',co."RejectReason",'coordinatedAt',co."CoordinatedAt",'assignmentId',ass."AssignmentID",'assignmentStatus',ass."Status") FROM "StudentEnterpriseCoordination" co LEFT JOIN "InternshipAssignments" ass ON ass."CoordinationID"=co."CoordinationID" WHERE co."ApplicationID"=a."ApplicationID" ORDER BY co."CoordinationID" DESC LIMIT 1) AS coordination
  FROM "JobApplications" a JOIN "OJTRegistrations" r ON r."RegistrationID"=a."RegistrationID" JOIN "Students" s ON s."StudentID"=a."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID" LEFT JOIN "StudentCVFiles" cv ON cv."CVFileID"=a."CVFileID"`;
 
 export async function applyToPosition(body:unknown,actor:Actor) {
-  const b=inputObject(body,['registrationId','windowId','postId','positionId','coverLetter','application']);
+  const b=inputObject(body,['registrationId','windowId','postId','positionId','coverLetter','application','certificates']);
+  const certificates=validateCertificateLinks(b.certificates);
   const requestedRegistrationId=b.registrationId===undefined?null:positiveId(b.registrationId,'registrationId');
   const windowId=b.windowId===undefined?null:positiveId(b.windowId,'windowId');
   if(requestedRegistrationId===null&&windowId===null)throw invalid('windowId is required for a direct OJT application.',400,'OJT_REGISTRATION_WINDOW_REQUIRED');
@@ -90,6 +93,7 @@ export async function applyToPosition(body:unknown,actor:Actor) {
         : null;
       const currentForm=r?.Application??{};
       if(currentApplication?.coverLetter===letter&&(!w||r?.WindowID===w.WindowID)
+        &&JSON.stringify(currentApplication.certificates??[])===JSON.stringify(certificates)
         &&currentForm.contactPhone===applicationForm.contactPhone
         &&currentForm.contactEmail===applicationForm.contactEmail
         &&currentForm.note===applicationForm.note)return {...currentApplication,replayed:true};
@@ -130,6 +134,7 @@ export async function applyToPosition(body:unknown,actor:Actor) {
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING "ApplicationID"`,
       [r.RegistrationID,s.StudentID,semesterId,postId,positionId,p.EnterpriseID,cv?.id??null,eligibility.checkId??null,letter])).rows[0].ApplicationID;
     }
+    await c.query('UPDATE "JobApplications" SET "CertificateLinks"=$2 WHERE "ApplicationID"=$1',[applicationId,JSON.stringify(certificates)]);
     const coordination=(await c.query(`INSERT INTO "StudentEnterpriseCoordination"
       ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","Decision","ApplicationID","OJTSemesterID","PreviousCoordinationID")
       VALUES ($1,$2,$3,$4,'PENDING',$5,$6,$7) RETURNING "CoordinationID"`,

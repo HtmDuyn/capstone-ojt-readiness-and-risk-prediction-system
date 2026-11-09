@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Building2, ChevronRight, FileText, MapPin, Search, Send } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { allStudentPages, studentGet, studentQuery } from '@/services/studentService';
+import { allStudentPages, studentGet, studentQuery, type StudentCertificate } from '@/services/studentService';
 import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage, StudentSemesterSelect } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';
 import { StudentDialog } from '@/components/student/StudentDialog';
@@ -17,6 +17,7 @@ type RegistrationWindow = {
 type Application = {
   id: number; status: string; appliedAt: string; company: { name: string };
   position: { title: string }; cv?: CV | null;
+  certificates?: StudentCertificate[];
   coordination?: { decision: string; rejectReason?: string | null } | null;
 };
 type OpportunityResults = Page<Opportunity> & { blockers: string[] };
@@ -124,6 +125,7 @@ function RegistrationContent() {
               <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="font-semibold">{application.position.title}</h3><span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-800">{statusText(application.coordination?.decision || application.status)}</span></div>
               <p className="text-sm text-slate-500">{application.company.name} · {dateText(application.appliedAt)}</p>
               {application.cv && <p className="flex items-center gap-2 break-all text-xs text-slate-500"><FileText size={14} />CV đã gửi: {application.cv.fileName}</p>}
+              {!!application.certificates?.length&&<div className="space-y-1 text-xs text-slate-600"><p>Chứng chỉ đã đính kèm:</p>{application.certificates.map((item,index)=><a key={index} href={item.url} target="_blank" rel="noopener noreferrer" className="block break-all text-left text-blue-600 underline">{item.name}</a>)}</div>}
               {application.coordination?.rejectReason && <p className="text-sm text-red-700">Lý do từ chối: {application.coordination.rejectReason}</p>}
             </article>)}
           </div>
