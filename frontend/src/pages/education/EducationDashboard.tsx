@@ -5,7 +5,7 @@ import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle
 import React from 'react';
 
 export const EducationDashboard: React.FC = () => {
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
   return (
     <div className="mx-auto w-full max-w-[1500px]">
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -219,10 +219,6 @@ export const EducationDashboard: React.FC = () => {
               iconClass="bg-orange-50 text-orange-600"
               loading={alertsLoading}
             />
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <MetricCard label="Chưa xét / cần xét lại" value={awaitingConfirmationStudents} description="Chưa có kết quả đã lưu hoặc dữ liệu đã thay đổi" icon={<Info size={18} />} iconClass="bg-blue-50 text-blue-600" loading={dashboardLoading} />
-            <MetricCard label="Cần đối soát dữ liệu" value={insufficientDataStudents} description="Chưa đủ cấu hình để xét điều kiện" icon={<AlertTriangle size={18} />} iconClass="bg-orange-50 text-orange-600" loading={dashboardLoading} />
           </div>
         </section>
 
