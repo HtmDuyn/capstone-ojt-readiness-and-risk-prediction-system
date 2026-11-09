@@ -28,8 +28,8 @@ export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: 
     }
   };
   return (
-    <Card title="CV c?a t?i" className={embedded ? '!rounded-none !border-0 !p-0 !shadow-none [&>h2]:!text-base [&>h2]:!font-semibold' : ''}>
-      <p className="text-sm text-slate-600">L?u CV ?? s? d?ng khi ?ng tuy?n. B?n c? th? ??c CV b?ng Claude, ki?m tra v? x?c nh?n h? s? b?n d??i. Ph?n g?i ? doanh nghi?p s? ???c t?ch h?p sau.</p>
+    <Card title="CV của tôi" className={embedded ? '!rounded-none !border-0 !p-0 !shadow-none [&>h2]:!text-base [&>h2]:!font-semibold' : ''}>
+      <p className="text-sm leading-relaxed text-slate-600">Tải CV lên để sử dụng khi ứng tuyển. Sau khi phân tích CV, bạn có thể xem, chỉnh sửa và xác nhận thông tin hồ sơ bên dưới.</p>
       {cv ? (
         <div className="text-sm space-y-2">
           <p className="font-bold break-all">{cv.fileName}</p>

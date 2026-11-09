@@ -8,6 +8,7 @@ import { inputObject,invalid,positiveId } from '../students/student.validation';
 import { ownStudent,type Actor,type Row } from './shared';
 import { CV_SCHEMA_VERSION,validateCvProfile } from './cv-profile.schema';
 import { cvProviderConfig,CvProviderError,extractCvWithClaude } from './claude-cv';
+import { cvReviewMessage } from './cv-review-message';
 
 async function migrationGuard<T>(work:()=>Promise<T>) {
  try{return await work();}catch(e:any){if(e.code==='42P01')throw invalid('Cần chạy migration CV extraction trước khi dùng tính năng này.',503,'CV_MIGRATION_REQUIRED');throw e;}
@@ -66,7 +67,8 @@ export async function analyzeCurrentCv(body:unknown,actor:Actor) {
  if(prepared.cached)return {analysis:analysisApi(prepared.cached),replayed:true};
  let profile:ReturnType<typeof validateCvProfile>|null=null,failure:{code:string;message:string;httpStatus?:number;requestId?:string}|null=null;
  try{profile=await extractCvWithClaude(prepared.file!,config);}catch(e){failure=e instanceof CvProviderError?{code:e.code,message:e.message,httpStatus:e.httpStatus,requestId:e.requestId}:{code:'CV_PROVIDER_FAILED',message:'Không đọc được CV; có thể thử lại sau.'};}
- // The provider request runs outside the database transaction.
+ const reviewMessage=profile?await cvReviewMessage(profile):null;
+ // The provider requests run outside the database transaction.
  return migrationGuard(()=>academicTransaction(async c=>{
   await lockStudent(c,actor);const cv=await currentCV(c,prepared.studentId);
   if(cv?.id!==cvFileId){profile=null;failure={code:'CV_VERSION_CHANGED',message:'CV đã thay đổi trong lúc phân tích; hãy phân tích file mới.'};}
@@ -75,7 +77,7 @@ export async function analyzeCurrentCv(body:unknown,actor:Actor) {
    [cvFileId,prepared.token,failure?'FAILED':'NEEDS_REVIEW',profile?JSON.stringify(profile):null,failure?JSON.stringify(failure):null])).rows[0];
   if(!r)throw invalid('Tác vụ CV đã được thay thế; tải lại trạng thái.',409,'CV_ANALYSIS_SUPERSEDED');
   await audit(c,actor.userId,'StudentCVExtractions',r.AnalysisID,'ANALYZE_CV',null,{cvFileId,status:r.Status,model:r.Model});
-  return {analysis:analysisApi(r),replayed:false};
+  return {analysis:analysisApi(r),replayed:false,reviewMessage};
  }));
 }
 
