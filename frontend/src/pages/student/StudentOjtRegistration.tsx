@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, ChevronRight, FileText, MapPin, Search, Send } from 'lucide-react';
+import { Building2, ChevronRight, FileText, MapPin, Search, Send, BriefcaseBusiness, Inbox, AlertCircle, RefreshCw } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
 import { allStudentPages, studentGet, studentQuery, type StudentCertificate } from '@/services/studentService';
@@ -114,14 +114,15 @@ function RegistrationContent() {
         </div>
 
         <div role="tabpanel" id="records-panel" aria-labelledby="records-tab" hidden={activeTab !== 'records'} className="pt-5">
-        <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-0">
-        <div className="min-w-0 lg:pr-3"><StudentCvCard embedded cv={cv} onUploaded={(uploaded) => { setSavedCv(uploaded); setMessage('Đã lưu CV vào hồ sơ của bạn.'); }} /></div>
-        <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
-          <h3 className="text-base font-semibold text-slate-900">Hồ sơ đã nộp</h3>
-          <ResourceState loading={applications.loading} error={applications.error} retry={applications.reload} />
-          {!applications.loading && !applications.error && !applicationItems.length && <Empty>Chưa có đơn đăng ký. Chọn doanh nghiệp và nộp đơn khi đợt đăng ký mở.</Empty>}
-          <div className="divide-y divide-slate-100">
-            {applicationItems.slice((currentApplicationPage - 1) * 20, currentApplicationPage * 20).map((application) => <article key={application.id} className="space-y-2 py-4 first:pt-0">
+        <div className="min-w-0 space-y-5 rounded-2xl bg-slate-50/70 p-0 sm:p-4">
+        <StudentCvCard embedded cv={cv} onUploaded={(uploaded) => { setSavedCv(uploaded); setMessage('Đã lưu CV vào hồ sơ của bạn.'); }} />
+        <section aria-label="Hồ sơ đã nộp" className="min-w-0 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <header className="flex items-start gap-3"><span className="rounded-xl bg-orange-50 p-2.5 text-orange-600"><BriefcaseBusiness size={22}/></span><div><h2 className="text-lg font-semibold text-slate-800">Hồ sơ đã nộp</h2><p className="mt-1 text-sm text-slate-500">Theo dõi các vị trí thực tập mà bạn đã ứng tuyển.</p></div></header>
+          {applications.loading&&<div role="status" aria-label="Đang tải hồ sơ đã nộp" className="animate-pulse space-y-3">{[0,1,2].map(i=><div key={i} className="h-20 rounded-xl bg-slate-100"/>)}</div>}
+          {applications.error&&<div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4"><AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600"/><div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-slate-800">Không thể tải danh sách hồ sơ</h3><p className="mt-1 text-sm text-slate-600">Đã xảy ra sự cố khi tải dữ liệu. Vui lòng thử lại.</p><button type="button" onClick={applications.reload} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><RefreshCw size={15}/>Thử lại</button><details className="mt-3 text-xs text-slate-500"><summary className="cursor-pointer">Chi tiết kỹ thuật</summary><p className="mt-2 break-words">{applications.error}</p></details></div></div>}
+          {!applications.loading && !applications.error && !applicationItems.length && <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center"><span className="rounded-full bg-white p-3 text-slate-400"><Inbox size={28}/></span><h3 className="mt-3 text-sm font-semibold text-slate-700">Bạn chưa có hồ sơ ứng tuyển nào</h3><p className="mt-1 text-sm text-slate-500">Các vị trí bạn đã ứng tuyển sẽ được hiển thị tại đây.</p></div>}
+          <div className="space-y-3">
+            {applicationItems.slice((currentApplicationPage - 1) * 20, currentApplicationPage * 20).map((application) => <article key={application.id} className="min-w-0 space-y-2 rounded-xl border border-slate-200 p-4 transition hover:border-orange-200 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-2"><h3 className="font-semibold">{application.position.title}</h3><span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-800">{statusText(application.coordination?.decision || application.status)}</span></div>
               <p className="text-sm text-slate-500">{application.company.name} · {dateText(application.appliedAt)}</p>
               {application.cv && <p className="flex items-center gap-2 break-all text-xs text-slate-500"><FileText size={14} />CV đã gửi: {application.cv.fileName}</p>}
@@ -130,7 +131,7 @@ function RegistrationContent() {
             </article>)}
           </div>
           {applicationItems.length > 20 && <Pagination page={currentApplicationPage} total={applicationItems.length} onChange={setApplicationPage} />}
-        </div>
+        </section>
         </div>
         </div>
       </section>
