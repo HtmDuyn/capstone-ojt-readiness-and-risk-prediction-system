@@ -139,46 +139,51 @@ export function ResourceState({
     </>
   );
 }
+export function StudentSemesterSelect() {
+  const portal = useStudentPortal();
+  return (
+    <label className="block space-y-2 text-sm font-medium text-slate-600 sm:min-w-60">
+      Đợt OJT
+      <select
+        aria-label="Chọn đợt OJT"
+        className={inputClass + ' text-slate-800'}
+        disabled={portal.loading || !portal.semesters.length}
+        value={portal.semesterId ?? ''}
+        onChange={(e) => portal.selectSemester(Number(e.target.value))}
+      >
+        <option value="" disabled>Chưa có đợt OJT</option>
+        {portal.semesters.map((semester) => (
+          <option key={semester.id} value={semester.id}>{semester.name}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function StudentPage({
   title,
   description,
   children,
   needsSemester = true,
+  showSemesterInBanner = true,
+  compactTopSpacing = false,
 }: {
   title: string;
   description: string;
   children: ReactNode;
   needsSemester?: boolean;
+  showRefreshAction?: boolean;
+  showSemesterInBanner?: boolean;
+  compactTopSpacing?: boolean;
 }) {
   const portal = useStudentPortal();
   return (
-    <div className="space-y-6 pb-12 max-w-[1400px] mx-auto font-outfit">
+    <div className={`${compactTopSpacing ? 'space-y-5' : 'space-y-6'} pb-12 max-w-[1400px] mx-auto font-outfit`}>
       <StudentBanner
         title={title}
         description={description}
         badge={null}
-        primaryAction={{ label: 'Làm mới dữ liệu', onClick: portal.refresh }}
-        extra={
-          <label className="block space-y-2 text-sm font-medium text-slate-600 sm:min-w-60">
-            Đợt OJT
-            <select
-              aria-label="Chọn đợt OJT"
-              className={inputClass + ' text-slate-800'}
-              disabled={portal.loading || !portal.semesters.length}
-              value={portal.semesterId ?? ''}
-              onChange={(e) => portal.selectSemester(Number(e.target.value))}
-            >
-              <option value="" disabled>
-                Chưa có đợt OJT
-              </option>
-              {portal.semesters.map((semester) => (
-                <option key={semester.id} value={semester.id}>
-                  {semester.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        }
+        extra={showSemesterInBanner ? <StudentSemesterSelect /> : undefined}
       />
       <ResourceState
         loading={portal.loading}

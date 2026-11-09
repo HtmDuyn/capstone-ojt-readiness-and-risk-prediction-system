@@ -15,7 +15,7 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
   const [positionKey, setPositionKey] = useState(initialPosition ? `${initialPosition.postId}:${initialPosition.id}` : '');
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [email, setEmail] = useState(profile.email);
-  const [letter, setLetter] = useState('');
+  const [certificates, setCertificates] = useState<{name:string;url:string}[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +31,7 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
       if (file) { onUploaded(await uploadStudentCv(file)); setFile(null); }
       await studentPost('/job-applications', {
         windowId, postId: selected.postId, positionId: selected.id,
-        coverLetter: letter.trim() || null,
+        certificates,
         application: { contactPhone: phone.trim(), contactEmail: email.trim() },
       });
       onSubmitted();
@@ -70,7 +70,16 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
             </label>
             <p className="text-xs text-slate-500">CV mới cũng được lưu vào hồ sơ cá nhân. CV đã gửi trong đơn trước được giữ nguyên.</p>
           </div>
-          <label className="block space-y-2 text-sm font-medium">Giới thiệu bản thân<textarea rows={3} maxLength={5000} value={letter} onChange={(event) => setLetter(event.target.value)} placeholder="Kỹ năng, kinh nghiệm và mong muốn thực tập của bạn..." className={inputClass} /></label>
+          <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+            <p className="text-sm font-medium">Chứng chỉ bổ sung <span className="font-normal text-slate-500">(không bắt buộc)</span></p>
+            <p className="text-xs text-slate-500">Thêm tên chứng chỉ và đường dẫn xem chứng chỉ, tối đa 5 mục. Hãy cấp quyền xem đường dẫn cho người nhận hồ sơ.</p>
+            {certificates.map((item,index)=><div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
+              <label className="space-y-1 text-sm">Tên chứng chỉ<input required maxLength={200} value={item.name} placeholder="Ví dụ: Chứng chỉ tiếng Anh IELTS" className={inputClass} onChange={e=>setCertificates(current=>current.map((row,i)=>i===index?{...row,name:e.target.value}:row))} /></label>
+              <label className="space-y-1 text-sm">Đường dẫn<input required type="url" pattern="https?://.+" maxLength={2000} value={item.url} placeholder="https://drive.google.com/..." className={inputClass} onChange={e=>setCertificates(current=>current.map((row,i)=>i===index?{...row,url:e.target.value}:row))} /></label>
+              <button type="button" onClick={()=>setCertificates(current=>current.filter((_,i)=>i!==index))} className="self-end rounded-xl px-3 py-3 text-sm text-red-600" aria-label={`Bỏ chứng chỉ ${index+1}`}>Bỏ</button>
+            </div>)}
+            <button type="button" disabled={certificates.length>=5} onClick={()=>setCertificates(current=>[...current,{name:'',url:''}])} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium disabled:opacity-50">+ Thêm chứng chỉ</button>
+          </div>
         </fieldset>
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">

@@ -4,6 +4,7 @@ export function describeStudentWorkflow(spec: Record<string, any>) {
   const response=(schema:any)=>({description:'Thành công',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:schema}}}}});
   const page=(item:any)=>({type:'object',properties:{items:{type:'array',items:item},total:{type:'integer'},page:id,limit:id}});
   const security=[{bearerAuth:[]}];
+  const certificate={type:'object',additionalProperties:false,required:['name','url'],properties:{name:{type:'string',maxLength:200},url:{type:'string',format:'uri',maxLength:2000}}};
   const query=(name:string,required=false,schema:any=id)=>({name,in:'query',required,schema});
   const submit=spec.paths['/api/ojt-registrations'].post;
   const registration={type:'object',additionalProperties:true,properties:{id,studentId:id,status:text,application:{type:'object',properties:{contactPhone:{...text,nullable:true},contactEmail:{...text,nullable:true},note:{...text,nullable:true},cv}}}};
@@ -19,6 +20,9 @@ export function describeStudentWorkflow(spec: Record<string, any>) {
     get:{tags:['Sinh viên'],summary:'Danh sách hồ sơ ứng tuyển doanh nghiệp',description:'Sinh viên xem hồ sơ của mình; Admin/QHDN xem được trước bàn giao. Kèm vị trí, doanh nghiệp, tin tuyển, CV đã dùng và trạng thái điều phối.',security,parameters:[...['applicationId','studentId','registrationId','ojtSemesterId','companyId','positionId','page','limit'].map(n=>query(n)),query('status',false,{type:'string',enum:['SUBMITTED','REVIEWING','INTERVIEW','OFFERED','ACCEPTED','REJECTED','WITHDRAWN']})],responses:{200:response(page(application))}}
   };
   spec.paths['/api/students/me/opportunities']={get:{tags:['Sinh viên'],summary:'Vị trí tuyển dụng và quyền ứng tuyển',description:'Chọn đợt OJT bằng windowId. Tin đã công bố còn hạn, kèm doanh nghiệp, yêu cầu, chỉ tiêu, hồ sơ đã ứng tuyển, canApply và lý do bị chặn. Dự báo AI không cấp quyền ứng tuyển.',security,parameters:[query('windowId',true),query('page'),query('limit')],responses:{200:response({...page({type:'object',additionalProperties:true}),additionalProperties:true})}}};
+  Object.assign(application.properties,{certificates:{type:'array',items:certificate}});
+  const applySchema=spec.paths['/api/job-applications'].post.requestBody.content['application/json'].schema;
+  applySchema.properties.certificates={type:'array',maxItems:5,items:certificate,description:'Ch?ng ch? b? sung g?m t?n v? ???ng d?n HTTP/HTTPS. Kh?ng b?t bu?c.'};
   const profile=spec.paths['/api/students/{id}'].get.responses?.['200']?.content?.['application/json']?.schema?.properties?.data;
   if(profile?.properties)Object.assign(profile.properties,{cv,officialDecision:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']}});
   const coordination=spec.paths['/api/ojt-coordinations'].post.requestBody.content['application/json'].schema;

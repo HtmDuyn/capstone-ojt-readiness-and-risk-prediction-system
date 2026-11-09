@@ -7,6 +7,7 @@ import { dashboard,internships } from './overview.service';
 import { applyToPosition, studentOpportunities } from '../students/job-application.service';
 import { notifications, readNotification } from './academic.service';
 import { assessOjtRisk } from './ojt-risk.service';
+import { analyzeCurrentCv, matchingProfile, updateMatchingProfile } from './cv-extraction.service';
 import { taskSubmissions, submitTask } from './task.service';
 
 const router = Router();
@@ -16,6 +17,19 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.post('/students/me/cv/analyses', ...own, requireJsonBody,
+  handle(r => analyzeCurrentCv(r.body, r.user)));
+
+router.get('/students/me/matching-profile', ...read, handle(r => {
+  if (Object.keys(r.query).length) {
+    throw invalid('This endpoint does not accept query parameters.');
+  }
+  return matchingProfile(r.user);
+}));
+
+router.patch('/students/me/matching-profile', ...own, requireJsonBody,
+  handle(r => updateMatchingProfile(r.body, r.user)));
+
 router.get('/students/me/ojt-risk-assessment', ...read, handle(r => {
   if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
   if(Number(r.headers['content-length']??0)>0||r.headers['transfer-encoding'])throw invalid('This endpoint does not accept a request body.');

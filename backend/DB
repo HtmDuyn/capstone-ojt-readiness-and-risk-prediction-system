@@ -8537,3 +8537,52 @@ END $security$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261109_managed_ojt_policy') ON CONFLICT DO NOTHING;
 -- END INCREMENTAL UPDATE: 20261109_managed_ojt_policy
 COMMIT;
+
+-- BEGIN CV EXTRACTION AND CERTIFICATES V1
+-- Existing databases: run only this CV extraction and certificates block.
+-- Add CV extraction storage and application certificates.
+BEGIN;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "StudentCVFiles_FileStudent_unique" ON "StudentCVFiles" ("CVFileID","StudentID");
+CREATE TABLE IF NOT EXISTS "StudentCVExtractions" (
+ "AnalysisID" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "StudentID" integer NOT NULL REFERENCES "Students"("StudentID"),
+ "CVFileID" integer NOT NULL,
+ "FileHash" text NOT NULL,
+ "SchemaVersion" text NOT NULL,
+ "Model" text NOT NULL,
+ "Status" text NOT NULL CHECK ("Status" IN ('PROCESSING','NEEDS_REVIEW','CONFIRMED','FAILED')),
+ "ExtractedProfile" jsonb,
+ "Profile" jsonb,
+ "Revision" integer NOT NULL DEFAULT 1 CHECK ("Revision">0),
+ "RequestToken" uuid NOT NULL,
+ "ConsentAt" timestamptz NOT NULL DEFAULT now(),
+ "StartedAt" timestamptz NOT NULL DEFAULT now(),
+ "UpdatedAt" timestamptz NOT NULL DEFAULT now(),
+ "ConfirmedAt" timestamptz,
+ "Failure" jsonb,
+ CONSTRAINT "StudentCVExtractions_FileStudent_fkey" FOREIGN KEY ("CVFileID","StudentID") REFERENCES "StudentCVFiles"("CVFileID","StudentID"),
+ UNIQUE ("CVFileID","SchemaVersion","Model")
+);
+CREATE INDEX IF NOT EXISTS "StudentCVExtractions_StudentFile_idx" ON "StudentCVExtractions" ("StudentID","CVFileID","AnalysisID" DESC);
+ALTER TABLE "StudentCVExtractions" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON "StudentCVExtractions" FROM PUBLIC;
+DO $privileges$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT SELECT,INSERT,UPDATE,DELETE ON "StudentCVExtractions" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE "StudentCVExtractions_AnalysisID_seq" TO service_role;
+ END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN REVOKE ALL ON "StudentCVExtractions" FROM anon; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN REVOKE ALL ON "StudentCVExtractions" FROM authenticated; END IF;
+END $privileges$;
+
+ALTER TABLE public."JobApplications"
+ADD COLUMN IF NOT EXISTS "CertificateLinks" jsonb NOT NULL DEFAULT '[]'::jsonb
+CHECK (
+  jsonb_typeof("CertificateLinks") = 'array'
+  AND jsonb_array_length("CertificateLinks") <= 5
+);
+
+COMMIT;
+
+-- END CV EXTRACTION AND CERTIFICATES V1
