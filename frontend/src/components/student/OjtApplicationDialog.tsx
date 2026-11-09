@@ -15,6 +15,7 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
   const [positionKey, setPositionKey] = useState(initialPosition ? `${initialPosition.postId}:${initialPosition.id}` : '');
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [email, setEmail] = useState(profile.email);
+  const [coverLetter, setCoverLetter] = useState('');
   const [certificates, setCertificates] = useState<{name:string;url:string}[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,6 +32,7 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
       if (file) { onUploaded(await uploadStudentCv(file)); setFile(null); }
       await studentPost('/job-applications', {
         windowId, postId: selected.postId, positionId: selected.id,
+        coverLetter: coverLetter.trim() || null,
         certificates,
         application: { contactPhone: phone.trim(), contactEmail: email.trim() },
       });
@@ -62,6 +64,11 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
             <label className="space-y-2 text-sm font-medium">Email liên hệ <span className="text-orange-600">*</span><input type="email" required maxLength={100} value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} /></label>
             <label className="space-y-2 text-sm font-medium">Số điện thoại <span className="text-orange-600">*</span><input type="tel" required maxLength={20} value={phone} onChange={(event) => setPhone(event.target.value)} className={inputClass} /></label>
           </div>
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Thư ứng tuyển <span className="font-normal text-slate-500">(không bắt buộc)</span></span>
+            <textarea rows={5} maxLength={5000} value={coverLetter} onChange={event=>setCoverLetter(event.target.value)} className={inputClass+' resize-y leading-relaxed'} placeholder="Giới thiệu ngắn gọn về bản thân, lý do bạn muốn ứng tuyển và những kỹ năng, kinh nghiệm phù hợp với vị trí." />
+            <span className="flex justify-between gap-3 text-xs font-normal text-slate-500"><span>Nội dung này sẽ được gửi cùng hồ sơ đến doanh nghiệp.</span><span className="shrink-0">{coverLetter.length}/5.000</span></span>
+          </label>
           <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
             <p className="flex items-center gap-2 text-sm font-semibold"><FileText size={17} />CV ứng tuyển <span className="text-orange-600">*</span></p>
             {cv && <p className="break-all text-sm text-slate-600">CV đã lưu: <strong>{cv.fileName}</strong>. File này sẽ được đính kèm nếu bạn không chọn CV mới.</p>}
