@@ -1,6 +1,7 @@
 import { inputObject,invalid,requiredText } from '../students/student.validation';
 // Version the extraction policy too, so older translated/cached profiles are not replayed.
-export const CV_SCHEMA_VERSION='CV_PROFILE_V2';
+export const CV_SCHEMA_VERSION='CV_PROFILE_V4';
+export const CV_SKILL_CATEGORIES=['TOOL','TECHNOLOGY','PROFESSIONAL','SOFT','OTHER'] as const;
 type Row=Record<string,any>;
 const nullableText={type:['string','null']};
 const evidenceSchema={type:['object','null'],additionalProperties:false,required:['page','quote'],properties:{page:{type:'integer'},quote:{type:'string'}}};
@@ -8,7 +9,7 @@ function profileSchema(evidence:Row){
 const item=(fields:Row)=>({type:'object',additionalProperties:false,required:[...Object.keys(fields),'evidence'],properties:{...fields,evidence}});
 return {type:'object',additionalProperties:false,required:['summary','skills','projects','experience','languages','education'],properties:{
  summary:nullableText,
- skills:{type:'array',items:item({name:{type:'string'}})},
+ skills:{type:'array',items:item({name:{type:'string'},category:{type:'string',enum:CV_SKILL_CATEGORIES}})},
  projects:{type:'array',items:item({name:{type:'string'},description:nullableText,technologies:{type:'array',items:{type:'string'}}})},
  experience:{type:'array',items:item({role:{type:'string'},organization:nullableText,description:nullableText})},
  languages:{type:'array',items:item({language:{type:'string'},level:nullableText,certificate:nullableText,score:nullableText})},
@@ -34,7 +35,11 @@ export function validateCvProfile(value:unknown,fromProvider=false) {
   if(!Array.isArray(b[key])||b[key].length>50)throw invalid(`${key} must be an array of at most 50 entries.`);
   return b[key].map((v:unknown)=>{const row=inputObject(v,[...keys,'evidence']);return {...convert(row),evidence:parseEvidence(row.evidence)};});
  };
- const skills=parse('skills',['name'],r=>{const name=requiredText(r.name,'skill',100);return {name:skillAliases[name.toLowerCase()]??name};});
+ const skills=parse('skills',['name','category'],r=>{
+  const name=requiredText(r.name,'skill',100),category=r.category??(fromProvider?null:'OTHER');
+  if(!CV_SKILL_CATEGORIES.includes(category))throw invalid('Invalid skill category.');
+  return {name:skillAliases[name.toLowerCase()]??name,category};
+ });
  const seen=new Set<string>();
  return {summary:optional(b.summary,'summary'),skills:skills.filter(r=>{const k=r.name.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}),
   projects:parse('projects',['name','description','technologies'],r=>{

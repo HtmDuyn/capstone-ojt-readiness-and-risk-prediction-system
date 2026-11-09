@@ -1,5 +1,5 @@
 import { enrichListRows } from '../../shared/list-context';
-import { academicTransaction } from '../academic/academic.repository';
+import { readTransaction } from '../qhdn/read.repository';
 import { invalid,positiveId,pagination,enumValue } from '../students/student.validation';
 import { scopeKeys,type Row } from './report.repository';
 import { demandRows } from './report-format';
@@ -12,8 +12,8 @@ const deadlineStatus=(deadline:unknown,now:string)=>deadline==null?'NOT_CONFIGUR
 export async function alerts(params:Row) {
   const p=pagination(params,[...scopeKeys,'type']);
   const type=params.type===undefined?null:enumValue(params.type,['CREDIT_SHORTFALL','MISSING_REQUIRED_COURSES','EXCESS_FAILED_COURSES'],'type');
-  return academicTransaction(async c=>{
-    const {requested,scopes,data}=await readReports(c,params,['type']),computedAt=new Date().toISOString();
+  return readTransaction(async c=>{
+    const {requested,scopes,data}=await readReports(c,params,['type'],false),computedAt=new Date().toISOString();
     const all=data.flatMap(d=>d.rows.filter((r:Row)=>r.alertTypes.length&&(!type||r.alertTypes.includes(type))).map((r:Row)=>({...publicStudent(r),
       ojtSemesterId:d.scope.ojtSemesterId,academicPeriodId:d.scope.academicPeriodId,
       assessmentDeadline:d.scope.assessmentDeadline,deadlineStatus:deadlineStatus(d.scope.assessmentDeadline,computedAt)})));
@@ -29,8 +29,8 @@ export async function courseDemand(params:Row,exporting=false) {
   if(params.includeInProgress!==undefined&&!['true','false'].includes(params.includeInProgress))throw invalid('includeInProgress must be true or false.');
   const withProgress=params.includeInProgress==='true';
   if(!exporting&&params.format!==undefined)throw invalid('format is only supported for export.');
-  return academicTransaction(async c=>{
-    const {requested,scopes,data}=await readReports(c,params,['includeInProgress','courseId','format']);
+  return readTransaction(async c=>{
+    const {requested,scopes,data}=await readReports(c,params,['includeInProgress','courseId','format'],false);
     if(courseId&&!(await c.query('SELECT 1 FROM "Courses" WHERE "CourseID"=$1',[courseId])).rowCount)throw invalid('Course not found.',404);
     const details=data.flatMap(d=>d.period?demandRows(d,withProgress):[]).filter(r=>!courseId||r.courseId===courseId);
     const byCourse=new Map<string,Row>();

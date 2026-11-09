@@ -93,8 +93,13 @@ export function startProvisioningJobs() {
         try { await job(); }
         catch (error: any) {
           // Log codes only: SMTP messages may contain recipient data or credentials.
-          const code = String(error?.code ?? error?.errorCode ?? 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0, 80);
+          const category = /timeout exceeded when trying to connect|connection timeout/i.test(String(error?.message ?? ''))
+            ? 'DB_CONNECTION_TIMEOUT'
+            : String(error?.message ?? '').startsWith('EMAIL_OUTBOX_KEY must be') ? 'EMAIL_KEY_INVALID' : 'UNKNOWN';
+          const code = String(error?.code ?? error?.errorCode ?? category).replace(/[^A-Za-z0-9_]/g, '').slice(0, 80);
           console.error(`Provisioning ${name} job failed. Code: ${code}.`,
+            code === 'DB_CONNECTION_TIMEOUT' ? `Timed out acquiring a database connection. Pool total=${pool?.totalCount}, idle=${pool?.idleCount}, waiting=${pool?.waitingCount}.` :
+            code === 'EMAIL_KEY_INVALID' ? 'EMAIL_OUTBOX_KEY must contain exactly 64 hexadecimal characters.' :
             code === '57014' ? 'Database statement timed out.' :
             code === 'XX000' ? 'Database/pooler error; check connection capacity.' :
             name === 'email' ? 'Check database and mail configuration.' : 'Check database connection, locks and schema.');
