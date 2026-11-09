@@ -8503,3 +8503,9 @@ DO $$ BEGIN
  END IF;
 END $$;
 COMMIT;
+
+-- Optional certificate links submitted with OJT applications.
+BEGIN;
+ALTER TABLE public."JobApplications" ADD COLUMN IF NOT EXISTS "CertificateLinks" jsonb NOT NULL DEFAULT '[]'::jsonb
+ CHECK (jsonb_typeof("CertificateLinks")='array' AND jsonb_array_length("CertificateLinks")<=5);
+COMMIT;

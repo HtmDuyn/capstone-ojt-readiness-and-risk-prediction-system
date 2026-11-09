@@ -17,6 +17,7 @@ function analysisApi(r:Row|null) {
  return {id:r.AnalysisID,cvFileId:r.CVFileID,status:r.Status,revision:r.Revision,schemaVersion:r.SchemaVersion,
   modelVersion:r.Model,profile:r.Profile,extractedProfile:r.ExtractedProfile,confirmedAt:r.ConfirmedAt,
   updatedAt:r.UpdatedAt,error:r.Failure,evidenceVerified:false,
+  reviewMessage:'Hãy đối chiếu kết quả với CV gốc trước khi xác nhận. Thông tin trống có thể chưa được cung cấp hoặc chưa đọc rõ; bạn có thể bổ sung, chỉnh sửa.',
   confirmationRequired:r.Status!=='CONFIRMED',canRetry:r.Status==='FAILED'||(r.Status==='PROCESSING'&&Date.now()-new Date(r.StartedAt).getTime()>120000)};
 }
 async function lockStudent(c:PoolClient,actor:Actor) {
@@ -63,8 +64,8 @@ export async function analyzeCurrentCv(body:unknown,actor:Actor) {
   return {cached:null,record,file,token,studentId:student.StudentID};
  }));
  if(prepared.cached)return {analysis:analysisApi(prepared.cached),replayed:true};
- let profile:ReturnType<typeof validateCvProfile>|null=null,failure:{code:string;message:string}|null=null;
- try{profile=await extractCvWithClaude(prepared.file!,config);}catch(e){failure=e instanceof CvProviderError?{code:e.code,message:e.message}:{code:'CV_PROVIDER_FAILED',message:'Không đọc được CV; có thể thử lại sau.'};}
+ let profile:ReturnType<typeof validateCvProfile>|null=null,failure:{code:string;message:string;httpStatus?:number;requestId?:string}|null=null;
+ try{profile=await extractCvWithClaude(prepared.file!,config);}catch(e){failure=e instanceof CvProviderError?{code:e.code,message:e.message,httpStatus:e.httpStatus,requestId:e.requestId}:{code:'CV_PROVIDER_FAILED',message:'Không đọc được CV; có thể thử lại sau.'};}
  // The provider request runs outside the database transaction.
  return migrationGuard(()=>academicTransaction(async c=>{
   await lockStudent(c,actor);const cv=await currentCV(c,prepared.studentId);

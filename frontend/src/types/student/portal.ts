@@ -245,6 +245,7 @@ export interface Application {
   company: Named;
   position: { id: number; title: string };
   coverLetter: string | null;
+  certificates?: {name:string;url:string}[];
   reviewNote: string | null;
   coordination: { decision: string | null; rejectReason: string | null } | null;
 }

@@ -1,10 +1,12 @@
 import { inputObject,invalid,requiredText } from '../students/student.validation';
-export const CV_SCHEMA_VERSION='CV_PROFILE_V1';
+// Version the extraction policy too, so older translated/cached profiles are not replayed.
+export const CV_SCHEMA_VERSION='CV_PROFILE_V2';
 type Row=Record<string,any>;
 const nullableText={type:['string','null']};
 const evidenceSchema={type:['object','null'],additionalProperties:false,required:['page','quote'],properties:{page:{type:'integer'},quote:{type:'string'}}};
-const item=(fields:Row)=>({type:'object',additionalProperties:false,required:[...Object.keys(fields),'evidence'],properties:{...fields,evidence:evidenceSchema}});
-export const cvProfileSchema={type:'object',additionalProperties:false,required:['summary','skills','projects','experience','languages','education'],properties:{
+function profileSchema(evidence:Row){
+const item=(fields:Row)=>({type:'object',additionalProperties:false,required:[...Object.keys(fields),'evidence'],properties:{...fields,evidence}});
+return {type:'object',additionalProperties:false,required:['summary','skills','projects','experience','languages','education'],properties:{
  summary:nullableText,
  skills:{type:'array',items:item({name:{type:'string'}})},
  projects:{type:'array',items:item({name:{type:'string'},description:nullableText,technologies:{type:'array',items:{type:'string'}}})},
@@ -12,6 +14,11 @@ export const cvProfileSchema={type:'object',additionalProperties:false,required:
  languages:{type:'array',items:item({language:{type:'string'},level:nullableText,certificate:nullableText,score:nullableText})},
  education:{type:'array',items:item({institution:nullableText,degree:nullableText,major:nullableText,gpa:{type:['number','null']},gpaScale:{type:['number','null']}})},
 }};
+}
+// Manual edits may have no evidence. Provider extraction must always cite the PDF.
+// A separate provider schema also avoids Claude's limit on nullable/union fields.
+export const cvProfileSchema=profileSchema(evidenceSchema);
+export const cvExtractionSchema=profileSchema({...evidenceSchema,type:'object'});
 const optional=(value:unknown,name:string,max=2000)=>value===null?null:requiredText(value,name,max);
 const numeric=(v:unknown,name:string)=>{if(v===null)return null;if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>100)throw invalid(`Invalid ${name}.`);return v;};
 const skillAliases:Record<string,string>={js:'JavaScript',javascript:'JavaScript',ts:'TypeScript',typescript:'TypeScript',reactjs:'React',react:'React','node.js':'Node.js',nodejs:'Node.js',postgres:'PostgreSQL',postgresql:'PostgreSQL'};

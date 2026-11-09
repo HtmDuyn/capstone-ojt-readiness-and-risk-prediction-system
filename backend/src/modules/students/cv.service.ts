@@ -22,7 +22,12 @@ export const receiveCV: RequestHandler = (req, res, next) => {
         const file = req.file;
         if (!/\.pdf$/i.test(file.originalname))
           throw invalid('Tên file CV phải có phần mở rộng .pdf. Hãy xuất CV thành PDF, không chỉ đổi tên đuôi file.',400,'INVALID_CV_FILE');
-        if (!file.buffer.subarray(0,5).equals(Buffer.from('%PDF-')))
+        // Some PDF exporters prepend whitespace or a UTF-8 BOM. Accept only
+        // this bounded preamble, never arbitrary content before the signature.
+        // Preserve original bytes: trimming could invalidate PDF xref offsets.
+        const headerOffset=file.buffer.subarray(0,1029).indexOf(Buffer.from('%PDF-'));
+        const preamble=file.buffer.subarray(0,Math.max(0,headerOffset)).toString('latin1');
+        if (headerOffset<0||headerOffset>1024||!/^(?:\xEF\xBB\xBF)?[\x09\x0A\x0C\x0D\x20]*$/.test(preamble))
           throw invalid('Nội dung file không có phần đầu định dạng PDF (%PDF-). Hãy mở file và xuất lại thành PDF rồi tải lên.',400,'INVALID_CV_FILE');
         if (!file.buffer.subarray(-2048).includes(Buffer.from('%%EOF')))
           throw invalid('File thiếu dấu kết thúc PDF (%%EOF) trong phần cuối. File có thể chưa tải đủ hoặc bị lỗi; hãy lưu/xuất lại thành PDF.',400,'INVALID_CV_FILE');
