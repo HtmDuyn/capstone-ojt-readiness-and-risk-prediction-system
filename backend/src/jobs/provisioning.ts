@@ -38,10 +38,16 @@ export async function deliverEmails() {
         if (!delivery.accepted.length) throw new Error('SMTP_REJECTED');
         await query('UPDATE "EmailOutbox" SET "Status"=\'SENT\',"SentAt"=now(),"EncryptedPayload"=NULL,"LeaseUntil"=NULL,"LastError"=NULL WHERE "EmailID"=$1 AND "Status"=\'SENDING\'', [e.EmailID]);
         sent++;
-      } catch {
+      } catch (error: any) {
         // Never persist SMTP responses or email content: they may include credentials.
+        const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS'];
+        const errorCode = knownCodes.includes(error?.code) ? error.code : 'EMAIL_DELIVERY_FAILED';
+        const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
+          ? error.responseCode : undefined;
+        const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,
-          "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"='EMAIL_DELIVERY_FAILED' WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID]);
+          "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+        console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}.`);
       }
     }
     await query(`UPDATE "EmailOutbox" SET "Status"='FAILED',"LeaseUntil"=NULL,"LastError"='DELIVERY_LEASE_EXPIRED' WHERE "Status"='SENDING' AND "LeaseUntil"<now() AND "Attempts">=5`);
