@@ -205,13 +205,14 @@ export default function QhdnEnterpriseEvaluations() {
             {tab === "evaluations" && (
               <Table
                 headers={[
+                  "STT",
                   "Sinh viên / doanh nghiệp",
                   "Điểm",
                   "Trạng thái",
                   "Thao tác",
                 ]}
               >
-                {evaluations.data.items.map((r) => {
+                {evaluations.data.items.map((r, index) => {
                   const transferred = !!r.assignment?.result;
                   const ready =
                     !transferred &&
@@ -221,6 +222,7 @@ export default function QhdnEnterpriseEvaluations() {
                     );
                   return (
                     <tr key={r.id}>
+                      <td className="text-center tabular-nums text-slate-500">{(evaluations.page - 1) * evaluations.data.limit + index + 1}</td>
                       <td>
                         {r.fullName || r.studentCode || "—"}
                         <br />
@@ -234,15 +236,15 @@ export default function QhdnEnterpriseEvaluations() {
                           r.assignment?.status ||
                           "—"}
                       </td>
-                      <td className="space-x-2">
+                      <td className="whitespace-nowrap space-x-1.5">
                         <button
-                          className={control}
+                          className={control + " !rounded-lg !px-2.5 !py-1.5 !text-xs"}
                           onClick={() => setDetail(r)}
                         >
                           Chi tiết
                         </button>
                         <button
-                          className={control}
+                          className={control + " !rounded-lg !px-2.5 !py-1.5 !text-xs"}
                           disabled={busy || !ready}
                           title={
                             ready
@@ -251,7 +253,7 @@ export default function QhdnEnterpriseEvaluations() {
                           }
                           onClick={() => setTarget(r)}
                         >
-                          Gửi Phòng Đào tạo
+                          Gửi PĐT
                         </button>
                       </td>
                     </tr>
@@ -262,14 +264,16 @@ export default function QhdnEnterpriseEvaluations() {
             {tab === "results" && (
               <Table
                 headers={[
+                  "STT",
                   "Sinh viên",
                   "Doanh nghiệp",
                   "Điểm chính thức",
                   "Trạng thái",
                 ]}
               >
-                {results.data.items.map((r) => (
+                {results.data.items.map((r, index) => (
                   <tr key={r.id}>
+                    <td className="text-center tabular-nums text-slate-500">{(results.page - 1) * results.data.limit + index + 1}</td>
                     <td>
                       {r.fullName}
                       <br />

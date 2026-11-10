@@ -24,7 +24,6 @@ import {
   EnterpriseDetailsModal,
   EnterpriseStatus,
 } from "@/components/qhdn/EnterpriseDetailsModal";
-import { EnterpriseRecruitment } from "@/components/qhdn/EnterpriseRecruitment";
 import { QhdnEnterpriseImportModal } from "@/components/qhdn/import/QhdnEnterpriseImportModal";
 import {
   listCompanies,
@@ -39,7 +38,8 @@ import type {
 import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
 import { linkedOjtSemesterId } from "@/utils/qhdnAcademicPeriods";
 
-const cell = "px-5 py-5 align-middle";
+const cell = "px-5 py-4 align-middle sm:px-6";
+const filterInput = workflowInput + " h-11 min-w-0 truncate";
 function StatCard({
   label,
   value,
@@ -81,9 +81,6 @@ function StatCard({
   );
 }
 export default function QhdnEnterpriseManagement() {
-  const [tab, setTab] = useState<"companies" | "posts">(
-    "companies",
-  );
   const catalog = useQhdnAcademicPeriods("", true, true);
   const { periods, semesterId: semester } = catalog;
   const scopeOjtIds = useMemo(() => new Set(catalog.filteredPeriods
@@ -104,8 +101,7 @@ export default function QhdnEnterpriseManagement() {
     company: CompanyListItem;
     tab: "overview" | "positions";
   } | null>(null);
-  const [companyId, setCompanyId] = useState(""),
-    [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -177,17 +173,14 @@ export default function QhdnEnterpriseManagement() {
   }, [positions]);
   const filtered = companies.filter((c) => {
     const roles = grouped.get(c.id) || [],
-      totals = positionTotals(roles);
+      totals = positionTotals(roles),
+      hasSlots = c.status === "ACTIVE" && totals.available > 0;
     return (
       (!status || c.status === status) &&
       (positionsLoading ||
         !!positionsError ||
         !recruiting ||
-        (recruiting === "OPEN"
-          ? totals.open > 0
-          : recruiting === "AVAILABLE"
-            ? c.status === "ACTIVE" && totals.available > 0
-            : !roles.length)) &&
+        (recruiting === "AVAILABLE" ? hasSlots : !hasSlots)) &&
       [c.name, c.code, c.industry, c.contactPersonName, c.contactEmail].some(
         (v) =>
           String(v || "")
@@ -231,16 +224,16 @@ export default function QhdnEnterpriseManagement() {
               ? companies.filter(
                   (c) =>
                     c.status === "ACTIVE" &&
-                    (grouped.get(c.id) || []).some((p) => p.status === "OPEN"),
+                    positionTotals(grouped.get(c.id) || []).available > 0,
                 ).length
               : "—"
           }
           icon={<BriefcaseBusiness size={20} />}
-          hint="Đối tác đang hợp tác có vị trí mở"
+          hint="Đối tác đang hợp tác còn slot tiếp nhận"
           onClick={() => {
             reset();
             setStatus("ACTIVE");
-            setRecruiting("OPEN");
+            setRecruiting("AVAILABLE");
           }}
         />
         <StatCard
@@ -276,50 +269,19 @@ export default function QhdnEnterpriseManagement() {
           }}
         />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/80">
-        <div className="flex flex-wrap gap-1">
-          {(
-            [
-              ["companies", "Danh sách doanh nghiệp", Building2],
-              ["posts", "Tin tuyển dụng", BriefcaseBusiness],
-            ] as const
-          ).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-2 border-b-2 px-3 py-4 text-sm font-semibold transition ${tab === id ? "border-orange-600 text-orange-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-            >
-              <Icon size={17} />
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 pb-3 lg:w-auto lg:pb-0">
-
-          <button
-            type="button"
-            className={workflowPrimary + " flex-1 sm:flex-none"}
-            onClick={() => setImporting(true)}
-          >
-            <Upload size={17} />
-            Tạo tài khoản doanh nghiệp
-          </button>
-        </div>
-      </div>
       {message && <Notice>{message}</Notice>}
       {catalog.error && <Notice>{catalog.error}</Notice>}
       {!catalog.loading && catalog.selectedPeriod && !semester && (
         <Notice>Học kỳ chính này chưa liên kết kỳ OJT. Danh mục doanh nghiệp vẫn được giữ; chưa có chỉ tiêu OJT theo kỳ để hiển thị.</Notice>
       )}
       {error && <Notice>{error}</Notice>}
-      {tab === "companies" ? (
-        <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
           <div className="space-y-5 border-b border-slate-100 p-5 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  Danh sách doanh nghiệp liên kết{" "}
-                  <span className="ml-2 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-500">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="min-w-0">
+                <h2 className="flex flex-wrap items-center gap-2 text-lg font-bold text-slate-900">
+                  Danh sách doanh nghiệp liên kết
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs text-slate-500">
                     {filtered.length}
                   </span>
                 </h2>
@@ -328,36 +290,48 @@ export default function QhdnEnterpriseManagement() {
                   tiếp nhận.
                 </p>
               </div>
-              <button
-                className={workflowSecondary}
-                disabled={loading || positionsLoading}
-                onClick={() => setRevision((v) => v + 1)}
-              >
-                <RefreshCw size={16} />
-                Làm mới
-              </button>
+              <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                <button
+                  className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"}
+                  disabled={loading || positionsLoading}
+                  onClick={() => setRevision((v) => v + 1)}
+                >
+                  <RefreshCw size={16} />
+                  Làm mới
+                </button>
+                <button
+                  type="button"
+                  className={workflowPrimary + " h-11 flex-1 whitespace-nowrap sm:flex-none"}
+                  onClick={() => setImporting(true)}
+                >
+                  <Upload size={17} />
+                  Tạo tài khoản doanh nghiệp
+                </button>
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
-              <Field label="Tìm doanh nghiệp">
-                <div className="relative">
-                  <Search
-                    size={17}
-                    className="absolute left-3 top-3 text-slate-400"
-                  />
-                  <input
-                    aria-label="Tìm doanh nghiệp"
-                    className={workflowInput + " pl-10"}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Tên, mã, lĩnh vực hoặc email…"
-                  />
-                </div>
-              </Field>
-              <AcademicPeriodFilter selection={catalog} />
+            <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-6">
+              <div className="min-w-0 sm:col-span-2">
+                <Field label="Tìm doanh nghiệp">
+                  <div className="relative">
+                    <Search
+                      size={17}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      aria-label="Tìm doanh nghiệp"
+                      className={filterInput + " pl-10"}
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Tên, mã, lĩnh vực hoặc email…"
+                    />
+                  </div>
+                </Field>
+              </div>
+              <AcademicPeriodFilter selection={catalog} layout="grid" controlClassName={filterInput} />
               <Field label="Trạng thái hợp tác">
                 <select
                   aria-label="Trạng thái hợp tác"
-                  className={workflowInput}
+                  className={filterInput}
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
                 >
@@ -366,22 +340,21 @@ export default function QhdnEnterpriseManagement() {
                   <option value="INACTIVE">Ngừng hợp tác</option>
                 </select>
               </Field>
-              <Field label="Nhu cầu tuyển dụng">
+              <Field label="Trạng thái slot">
                 <select
-                  aria-label="Nhu cầu tuyển dụng"
-                  className={workflowInput}
+                  aria-label="Trạng thái slot"
+                  className={filterInput}
                   value={recruiting}
                   disabled={!ready}
                   onChange={(e) => setRecruiting(e.target.value)}
                 >
-                  <option value="">Tất cả nhu cầu</option>
-                  <option value="OPEN">Có vị trí đang mở</option>
-                  <option value="AVAILABLE">Còn chỗ tiếp nhận</option>
-                  <option value="NONE">Chưa có vị trí</option>
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="AVAILABLE">Còn slot</option>
+                  <option value="FULL">Hết slot</option>
                 </select>
               </Field>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500">
               <span>
                 <strong className="font-semibold text-slate-600">
                   Phạm vi chỉ tiêu:
@@ -411,18 +384,28 @@ export default function QhdnEnterpriseManagement() {
             )}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-left text-sm">
+            <table className="w-full min-w-[1200px] table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-16" />
+                <col className="w-[22%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
+                <col />
+              </colgroup>
               <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
                   {[
+                    "STT",
                     "Doanh nghiệp",
                     "Liên hệ",
                     "Vị trí tuyển dụng",
                     "Chỉ tiêu tiếp nhận",
                     "Trạng thái",
                     "Thao tác",
-                  ].map((h) => (
-                    <th className="px-5 py-4 font-bold" key={h}>
+                  ].map((h, index) => (
+                    <th scope="col" className={'whitespace-nowrap px-5 py-4 font-bold last:text-right sm:px-6 ' + (index === 0 ? 'text-center' : '')} key={h}>
                       {h}
                     </th>
                   ))}
@@ -433,7 +416,7 @@ export default function QhdnEnterpriseManagement() {
                   !error &&
                   filtered
                     .slice((currentPage - 1) * 10, currentPage * 10)
-                    .map((c) => {
+                    .map((c, index) => {
                       const roles = grouped.get(c.id) || [],
                         total = positionTotals(roles);
                       return (
@@ -441,14 +424,16 @@ export default function QhdnEnterpriseManagement() {
                           key={c.id}
                           className="transition hover:bg-orange-50/30"
                         >
+                          <td className={cell + " text-center tabular-nums text-slate-500"}>{(currentPage - 1) * 10 + index + 1}</td>
                           <td className={cell}>
                             <div className="flex items-center gap-3">
                               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-100 bg-orange-50 text-orange-600">
                                 <Building2 size={21} />
                               </span>
-                              <div>
+                              <div className="min-w-0">
                                 <button
-                                  className="text-left font-bold text-slate-800 hover:text-orange-600"
+                                  className="block max-w-full truncate text-left font-bold text-slate-800 hover:text-orange-600"
+                                  title={c.name}
                                   disabled={positionsLoading}
                                   onClick={() =>
                                     setSelected({ company: c, tab: "overview" })
@@ -456,25 +441,25 @@ export default function QhdnEnterpriseManagement() {
                                 >
                                   {c.name}
                                 </button>
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 truncate text-xs text-slate-500" title={`${c.code} · ${c.industry || "Chưa có lĩnh vực"}`}>
                                   {c.code} · {c.industry || "Chưa có lĩnh vực"}
                                 </p>
                               </div>
                             </div>
                           </td>
                           <td className={cell}>
-                            <p className="font-medium text-slate-700">
+                            <p className="truncate font-medium text-slate-700" title={c.contactPersonName || undefined}>
                               {c.contactPersonName || "Chưa có người liên hệ"}
                             </p>
                             <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                              <Mail size={12} />
-                              {c.contactEmail || "Chưa có email"}
+                              <Mail size={12} className="shrink-0" />
+                              <span className="truncate" title={c.contactEmail || undefined}>{c.contactEmail || "Chưa có email"}</span>
                             </p>
                           </td>
                           <td className={cell}>
                             {ready ? (
                               <button
-                                className="text-left hover:text-orange-700"
+                                className="block w-full min-w-0 text-left hover:text-orange-700"
                                 onClick={() =>
                                   setSelected({ company: c, tab: "positions" })
                                 }
@@ -486,7 +471,7 @@ export default function QhdnEnterpriseManagement() {
                                   </span>
                                 </span>
                                 <p
-                                  className="mt-1 max-w-[210px] truncate text-xs text-slate-500"
+                                  className="mt-1 truncate text-xs text-slate-500"
                                   title={roles.map((p) => p.title).join(", ")}
                                 >
                                   {roles
@@ -530,18 +515,19 @@ export default function QhdnEnterpriseManagement() {
                           <td className={cell}>
                             <EnterpriseStatus status={c.status} />
                           </td>
-                          <td className={cell}>
+                          <td className={cell + " text-right"}>
                             <button
                               className={
-                                workflowSecondary + " whitespace-nowrap"
+                                workflowSecondary + " !h-9 !w-9 !rounded-lg !p-0"
                               }
+                              aria-label={"Quản lý doanh nghiệp " + c.name}
+                              title="Quản lý doanh nghiệp"
                               disabled={positionsLoading}
                               onClick={() =>
                                 setSelected({ company: c, tab: "overview" })
                               }
                             >
                               <MoreHorizontal size={17} />
-                              Quản lý
                             </button>
                           </td>
                         </tr>
@@ -562,7 +548,7 @@ export default function QhdnEnterpriseManagement() {
               </p>
             </div>
           )}
-          <div className="border-t border-slate-100 p-5">
+          <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
             <Pager
               page={currentPage}
               total={filtered.length}
@@ -571,15 +557,7 @@ export default function QhdnEnterpriseManagement() {
               onChange={setPage}
             />
           </div>
-        </section>
-      ) : (
-        <EnterpriseRecruitment
-          companies={companies}
-          companyId={companyId}
-          onCompanyChange={setCompanyId}
-          onDataChanged={() => setRevision((v) => v + 1)}
-        />
-      )}
+      </section>
       {selected && (
         <EnterpriseDetailsModal
           company={selected.company}
@@ -591,11 +569,6 @@ export default function QhdnEnterpriseManagement() {
           onUpdated={() => {
             setRevision((v) => v + 1);
             setMessage("Đã cập nhật thông tin doanh nghiệp.");
-          }}
-          onPosts={() => {
-            setCompanyId(String(selected.company.id));
-            setSelected(null);
-            setTab("posts");
           }}
         />
       )}

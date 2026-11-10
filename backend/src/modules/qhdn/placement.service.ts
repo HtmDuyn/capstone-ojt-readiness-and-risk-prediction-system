@@ -25,7 +25,7 @@ export async function placementBoard(params:Row,actor:Actor){
  return readTransaction(async c=>{
   await requirePlacementSchema(c);
   const context=await placementContext(c,semesterId);
-  const items=(await c.query(`SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."RegistrationID" AS "registrationId",
+  const items=(await c.query(`SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."RegistrationID" AS "registrationId",r."Status" AS "registrationStatus",
    latest."CoordinationID" AS "coordinationId",latest."Decision" AS decision,latest."Source" AS source,latest."PositionID" AS "positionId",
    p."Title" AS "positionTitle",e."Name" AS "companyName",receipt."ReceivedAt" AS "receivedAt",receipt."Reason" AS "receiptReason",receipt."ExceededCapacity" AS "exceededCapacity",(SELECT "FullName" FROM "Users" WHERE "UserID"=receipt."ReceivedBy") AS "receivedByName",
    EXISTS(SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" ac ON ac."CoordinationID"=a."CoordinationID"
