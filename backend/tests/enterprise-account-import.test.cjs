@@ -17,6 +17,7 @@ process.env.SMTP_FROM = 'ojt@example.test';
 const { pool } = require('../dist/config/database');
 const { importAccounts } = require('../dist/modules/imports/import.service');
 const { decryptEmail } = require('../dist/modules/imports/email.crypto');
+const { encryptEmail } = require('../dist/modules/imports/email.crypto');
 const { deliverEmails } = require('../dist/jobs/provisioning');
 const { assignEnterpriseCodes } = require('../dist/modules/imports/enterprise-code');
 const { validateImport } = require('../dist/modules/imports/import.validation');
@@ -161,4 +162,39 @@ test('bulk enterprise import provisions accounts and delivers encrypted outbox m
     assert.ok(state.emails.every(email => email.Status === 'SENT' && email.EncryptedPayload === null));
     assert.equal(closed, true);
   });
+});
+
+test('failed email delivery records safe SMTP codes and preserves the retry payload', async t => {
+  const errors = [
+    { code: 'EAUTH', responseCode: 535, message: 'Private SMTP response', expected: 'EAUTH_535' },
+    { code: 'EENVELOPE', responseCode: 550, message: 'Private recipient', expected: 'EENVELOPE_550' },
+    { code: 'private-secret', message: 'Private credentials', expected: 'EMAIL_DELIVERY_FAILED' },
+  ];
+  for (const error of errors) {
+    await t.test(error.expected, async child => {
+      let claimed = false;
+      let failure;
+      const logs = [];
+      const payload = encryptEmail({ subject: 'Test', text: 'Private temporary password' });
+      child.mock.method(console, 'error', line => logs.push(line));
+      child.mock.method(nodemailer, 'createTransport', () => ({
+        async sendMail() { throw error; }, close() {},
+      }));
+      child.mock.method(pool, 'query', async (sql, args = []) => {
+        if (sql.startsWith('WITH candidate AS')) {
+          if (claimed) return { rows: [] };
+          claimed = true;
+          return { rows: [{ EmailID: '99', Recipient: 'recipient@example.test', Kind: 'ACCOUNT', EncryptedPayload: payload }] };
+        }
+        if (sql.includes('"LastError"=$2')) failure = { sql, args };
+        return { rows: [] };
+      });
+      assert.equal(await deliverEmails(), 0);
+      assert.deepEqual(failure.args, ['99', error.expected]);
+      assert.ok(failure.sql.includes('"Attempts">=5'));
+      assert.ok(!failure.sql.includes('"EncryptedPayload"=NULL'));
+      assert.ok(logs[0].includes(error.expected));
+      assert.ok(!JSON.stringify(logs).includes('Private'));
+    });
+  }
 });
