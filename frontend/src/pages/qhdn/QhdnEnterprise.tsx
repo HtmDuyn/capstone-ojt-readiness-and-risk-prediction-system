@@ -6,9 +6,12 @@ import {
   Filter,
   Mail,
   MoreHorizontal,
+  LockKeyhole,
+  UnlockKeyhole,
   RefreshCw,
   Search,
-  Upload,
+  FileSpreadsheet,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { PageBanner } from "@/components/common/PageBanner";
@@ -28,6 +31,7 @@ import { QhdnEnterpriseImportModal } from "@/components/qhdn/import/QhdnEnterpri
 import {
   listCompanies,
   listPositions,
+  setCompanyAccess,
 } from "@/services/qhdnService";
 import { loadAllPages } from "@/utils/loadAllPages";
 import { positionTotals } from "@/utils/qhdnEnterprise";
@@ -101,7 +105,27 @@ export default function QhdnEnterpriseManagement() {
     company: CompanyListItem;
     tab: "overview" | "positions";
   } | null>(null);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState<'manual' | 'file' | null>(null);
+  const [accessTask, setAccessTask] = useState<{ company: CompanyListItem; status: 'ACTIVE' | 'INACTIVE' } | null>(null);
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessError, setAccessError] = useState('');
+
+  const submitAccess = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!accessTask || accessBusy) return;
+    setAccessBusy(true);
+    setAccessError('');
+    try {
+      await setCompanyAccess(accessTask.company.id, accessTask.status);
+      setMessage(`${accessTask.status === 'INACTIVE' ? 'Đã khóa' : 'Đã mở khóa'} tài khoản doanh nghiệp ${accessTask.company.name}.`);
+      setAccessTask(null);
+      setRevision(value => value + 1);
+    } catch (error) {
+      setAccessError(errorMessage(error));
+    } finally {
+      setAccessBusy(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -290,7 +314,7 @@ export default function QhdnEnterpriseManagement() {
                   tiếp nhận.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+              <div className="flex flex-wrap items-center gap-2 xl:shrink-0">
                 <button
                   className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"}
                   disabled={loading || positionsLoading}
@@ -299,12 +323,15 @@ export default function QhdnEnterpriseManagement() {
                   <RefreshCw size={16} />
                   Làm mới
                 </button>
+                <button type="button" className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"} onClick={() => setImporting('file')}>
+                  <FileSpreadsheet size={17} />Import danh sách doanh nghiệp
+                </button>
                 <button
                   type="button"
                   className={workflowPrimary + " h-11 flex-1 whitespace-nowrap sm:flex-none"}
-                  onClick={() => setImporting(true)}
+                  onClick={() => setImporting('manual')}
                 >
-                  <Upload size={17} />
+                  <UserPlus size={17} />
                   Tạo tài khoản doanh nghiệp
                 </button>
               </div>
@@ -337,7 +364,7 @@ export default function QhdnEnterpriseManagement() {
                 >
                   <option value="">Tất cả trạng thái</option>
                   <option value="ACTIVE">Đang hợp tác</option>
-                  <option value="INACTIVE">Ngừng hợp tác</option>
+                  <option value="INACTIVE">Đã vô hiệu hóa</option>
                 </select>
               </Field>
               <Field label="Trạng thái slot">
@@ -516,6 +543,7 @@ export default function QhdnEnterpriseManagement() {
                             <EnterpriseStatus status={c.status} />
                           </td>
                           <td className={cell + " text-right"}>
+                            <div className="flex items-center justify-end gap-1.5">
                             <button
                               className={
                                 workflowSecondary + " !h-9 !w-9 !rounded-lg !p-0"
@@ -529,6 +557,22 @@ export default function QhdnEnterpriseManagement() {
                             >
                               <MoreHorizontal size={17} />
                             </button>
+                            <button
+                              type="button"
+                              className={workflowSecondary + ' !h-9 !w-9 !shrink-0 !rounded-lg !p-0 ' + (c.status === 'ACTIVE'
+                                ? '!border-rose-200 !text-rose-600 hover:!bg-rose-50'
+                                : '!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50')}
+                              title={c.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+                              aria-label={(c.status === 'ACTIVE' ? 'Khóa tài khoản ' : 'Mở khóa tài khoản ') + c.name}
+                              onClick={() => {
+                                setAccessTask({ company: c, status: c.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' });
+                                setAccessError('');
+                                setMessage('');
+                              }}
+                            >
+                              {c.status === 'ACTIVE' ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />}
+                            </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -558,6 +602,31 @@ export default function QhdnEnterpriseManagement() {
             />
           </div>
       </section>
+      {accessTask && (
+        <WorkflowModal
+          title={accessTask.status === 'INACTIVE' ? 'Khóa tài khoản doanh nghiệp' : 'Mở khóa tài khoản doanh nghiệp'}
+          subtitle={`${accessTask.company.name} · ${accessTask.company.code}`}
+          busy={accessBusy}
+          onClose={() => { if (!accessBusy) setAccessTask(null); }}
+        >
+          <form className="space-y-5" onSubmit={submitAccess}>
+            <Notice>
+              {accessTask.status === 'INACTIVE'
+                ? 'Tất cả tài khoản thuộc doanh nghiệp sẽ bị chặn đăng nhập và thu hồi phiên truy cập. Thông tin doanh nghiệp, hồ sơ sinh viên và dữ liệu OJT được giữ nguyên. Bạn có thể mở khóa lại sau.'
+                : 'Doanh nghiệp được phép truy cập trở lại và cần đăng nhập lại. Tài khoản bị quản trị viên khóa riêng vẫn giữ trạng thái khóa.'}
+            </Notice>
+            {accessError && <div role="alert"><Notice>{accessError}</Notice></div>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className={workflowSecondary} disabled={accessBusy} onClick={() => setAccessTask(null)}>Hủy</button>
+              <button type="submit" disabled={accessBusy}
+                className={workflowPrimary + (accessTask.status === 'INACTIVE' ? ' !bg-rose-600 hover:!bg-rose-700' : ' !bg-emerald-600 hover:!bg-emerald-700')}>
+                {accessTask.status === 'INACTIVE' ? <LockKeyhole size={16} /> : <UnlockKeyhole size={16} />}
+                {accessBusy ? 'Đang cập nhật…' : accessTask.status === 'INACTIVE' ? 'Xác nhận khóa' : 'Xác nhận mở khóa'}
+              </button>
+            </div>
+          </form>
+        </WorkflowModal>
+      )}
       {selected && (
         <EnterpriseDetailsModal
           company={selected.company}
@@ -574,15 +643,17 @@ export default function QhdnEnterpriseManagement() {
       )}
       {importing && (
         <QhdnEnterpriseImportModal
+          key={importing}
           isOpen
+          mode={importing}
           periods={periods}
           periodsLoading={catalog.loading}
           initialAcademicPeriodId={catalog.selectedPeriod?.kind === "SEMESTER" ? catalog.selectedPeriod.id : undefined}
-          onClose={() => setImporting(false)}
+          onClose={() => setImporting(null)}
           onImported={() => {
             setRevision((v) => v + 1);
             setMessage(
-              "Đã tạo tài khoản doanh nghiệp. Danh sách được cập nhật từ hệ thống.",
+              "Đã tạo tài khoản doanh nghiệp và đưa thông tin đăng nhập vào hàng chờ gửi email.",
             );
           }}
         />

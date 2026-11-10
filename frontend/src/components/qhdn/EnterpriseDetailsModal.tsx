@@ -22,7 +22,7 @@ export function EnterpriseStatus({ status }: { status: string }) {
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : status === "PENDING_REVIEW"
       ? "border-amber-200 bg-amber-50 text-amber-800"
-      : status === "REJECTED"
+      : ["REJECTED", "INACTIVE"].includes(status)
         ? "border-rose-200 bg-rose-50 text-rose-700"
         : "border-slate-200 bg-slate-50 text-slate-600";
   return (

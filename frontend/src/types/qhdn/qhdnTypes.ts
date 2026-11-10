@@ -30,7 +30,7 @@ export interface ImportCommitResponse extends ImportSummary {
 }
 
 export interface EnterpriseImportRow {
-  code: string;
+  code?: string;
   email: string;
   fullName: string;
   name: string;

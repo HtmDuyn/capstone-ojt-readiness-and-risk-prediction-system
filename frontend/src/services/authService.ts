@@ -21,6 +21,13 @@ export interface CurrentUserResponse {
 }
 
 export const authService = {
+  logout: async (token: string) => {
+    const response = await API.post<{ success: boolean; message: string }>("/auth/logout", undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000,
+    });
+    return response.data;
+  },
   login: async (credentials: { email: string; password: string }) => {
     const response = await API.post<LoginResponse>("/auth/login", credentials);
     return response.data;

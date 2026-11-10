@@ -172,9 +172,8 @@ export const authenticate = async (
      * ==============================
      */
     if (
-      currentUser.status
-        ?.toUpperCase() !==
-      "ACTIVE"
+      currentUser.status?.toUpperCase() !== "ACTIVE" ||
+      (currentUser.role_code === 'ENTERPRISE' && !currentUser.enterpriseActive)
     ) {
       res.status(403).json({
         success: false,
