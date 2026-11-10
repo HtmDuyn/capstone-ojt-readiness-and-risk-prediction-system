@@ -50,6 +50,14 @@ export const listCompanies = async (
   return response.data;
 };
 
+export const setCompanyAccess = async (id: number, status: 'ACTIVE' | 'INACTIVE') => {
+  const response = await API.patch<{ success: boolean; message?: string; data: CompanyListItem & { affectedAccounts: number } }>(
+    `/qhdn/companies/${id}/access`, { status },
+  );
+  if (!response.data.success) throw new Error(response.data.message || 'Không cập nhật được trạng thái tài khoản.');
+  return response.data.data;
+};
+
 /**
  * GET /api/positions
  * Danh sách vị trí thực tập kèm thông tin doanh nghiệp và học kỳ.

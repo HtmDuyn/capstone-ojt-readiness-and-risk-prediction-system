@@ -80,6 +80,7 @@ export function Pager({
       </span>
       <div className="flex gap-2">
         <button
+          type="button"
           className={control}
           disabled={busy || page <= 1}
           onClick={() => onChange(page - 1)}
@@ -87,6 +88,7 @@ export function Pager({
           Trước
         </button>
         <button
+          type="button"
           className={control}
           disabled={busy || page >= pages}
           onClick={() => onChange(page + 1)}
