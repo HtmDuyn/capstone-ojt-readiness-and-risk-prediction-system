@@ -25,7 +25,6 @@ type Student = {
 };
 type Position = { id: number; title: string; companyName: string; capacity: number | null; actualCount: number };
 type Board = { canCoordinate: boolean; context: { roundCount: number; unfinished: number }; positions: Position[]; items: Student[] };
-const sourceLabel = (source?: string) => source === 'QHDN_APPLICATION' ? 'QHDN điều phối ứng tuyển' : source === 'QHDN_COORDINATION' ? 'QHDN điều phối' : 'Sinh viên ứng tuyển';
 const cell = 'px-4 py-4 align-middle';
 const filterInput = workflowInput + ' h-11 min-w-0 truncate';
 const compactAction = 'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
@@ -114,11 +113,11 @@ export default function QhdnOjtCoordination() {
       {loading ? <p className="p-8 text-center text-slate-500">Đang tải danh sách…</p> : !students.length ?
         <p className="p-8 text-center text-slate-500">Không có sinh viên phù hợp trong danh sách bàn giao.</p> :
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
-            <colgroup><col className="w-16" /><col className="w-[22%]" /><col /><col className="w-[180px]" /><col className="w-[220px]" /><col className="w-[192px]" /></colgroup>
+          <table className="w-full min-w-[940px] table-fixed text-left text-sm">
+            <colgroup><col className="w-16" /><col className="w-[26%]" /><col /><col className="w-[220px]" /><col className="w-[192px]" /></colgroup>
             <thead className="bg-slate-50 text-xs text-slate-500"><tr>
-              {['STT', 'Sinh viên', 'Doanh nghiệp / Vị trí', 'Nguồn hồ sơ', 'Trạng thái', 'Thao tác'].map((label, index) =>
-                <th scope="col" key={label} className={'px-4 py-4 font-semibold ' + (index === 0 ? 'text-center' : index === 5 ? 'text-right' : '')}>{label}</th>)}
+              {['STT', 'Sinh viên', 'Doanh nghiệp / Vị trí', 'Trạng thái', 'Thao tác'].map((label, index) =>
+                <th scope="col" key={label} className={'px-4 py-4 font-semibold ' + (index === 0 ? 'text-center' : index === 4 ? 'text-right' : '')}>{label}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-slate-100">
               {students.map((student, index) => {
@@ -128,7 +127,6 @@ export default function QhdnOjtCoordination() {
                   <td className={cell + ' text-center tabular-nums text-slate-500'}>{index + 1}</td>
                   <td className={cell}><p className="font-semibold text-slate-800">{student.fullName}</p><p className="mt-1 text-xs text-slate-500">{student.studentCode}</p></td>
                   <td className={cell}><p className="break-words text-slate-700">{student.companyName || 'Chưa có doanh nghiệp'}</p><p className="mt-1 break-words text-xs text-slate-500">{student.positionTitle}</p></td>
-                  <td className={cell + ' text-xs text-slate-600'}>{student.coordinationId ? sourceLabel(student.source) : 'Chưa gửi hồ sơ'}</td>
                   <td className={cell}>
                     <span className={'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ' + placementStatusColors[status]}>
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />{placementStatusLabels[status]}
