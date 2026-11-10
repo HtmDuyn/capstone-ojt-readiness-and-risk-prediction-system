@@ -1,22 +1,19 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import {
   Building2,
   BriefcaseBusiness,
   Mail,
   MapPin,
-  Pencil,
   Phone,
-  Save,
   UserRound,
 } from "lucide-react";
-import { Field, Notice, errorMessage } from "./QhdnUi";
+import { Notice } from "./QhdnUi";
 import {
   WorkflowModal,
-  workflowInput,
   workflowPrimary,
   workflowSecondary,
 } from "./StudentWorkflowUi";
-import { updateCompany } from "@/services/qhdnService";
+
 import { positionTotals, recruitmentLabels } from "@/utils/qhdnEnterprise";
 import type { CompanyListItem, PositionListItem } from "@/types/qhdn/qhdnTypes";
 
@@ -25,7 +22,7 @@ export function EnterpriseStatus({ status }: { status: string }) {
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : status === "PENDING_REVIEW"
       ? "border-amber-200 bg-amber-50 text-amber-800"
-      : status === "REJECTED"
+      : ["REJECTED", "INACTIVE"].includes(status)
         ? "border-rose-200 bg-rose-50 text-rose-700"
         : "border-slate-200 bg-slate-50 text-slate-600";
   return (
@@ -45,48 +42,19 @@ export function EnterpriseDetailsModal({
   scope,
   initialTab = "overview",
   onClose,
-  onUpdated,
-  onPosts,
 }: {
   company: CompanyListItem;
   positions: PositionListItem[];
   positionsError: string;
   scope: string;
-  initialTab?: "overview" | "positions" | "edit";
+  initialTab?: "overview" | "positions";
   onClose: () => void;
   onUpdated: () => void;
-  onPosts: () => void;
 }) {
-  const [tab, setTab] = useState(initialTab),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+  const [tab, setTab] = useState(initialTab);
+  const busy = false, error = "";
   const [positionId, setPositionId] = useState<number | null>(null);
   const totals = positionTotals(positions);
-  const save = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      value = (key: string) => String(f.get(key) || "").trim();
-    setBusy(true);
-    setError("");
-    try {
-      await updateCompany(company.id, {
-        name: value("name"),
-        address: value("address") || null,
-        industry: value("industry") || null,
-        contactPersonName: value("contactPersonName") || null,
-        contactEmail: value("contactEmail") || null,
-        contactPhone: value("contactPhone") || null,
-        status: value("status"),
-        reason: value("reason"),
-      });
-      onUpdated();
-      onClose();
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <WorkflowModal
       wide
@@ -100,7 +68,6 @@ export function EnterpriseDetailsModal({
           [
             ["overview", "Tổng quan", Building2],
             ["positions", "Vị trí & chỉ tiêu", BriefcaseBusiness],
-            ["edit", "Cập nhật thông tin", Pencil],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -176,16 +143,6 @@ export function EnterpriseDetailsModal({
               );
             })}
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button className={workflowSecondary} onClick={onPosts}>
-              <BriefcaseBusiness size={16} />
-              Quản lý tin tuyển dụng
-            </button>
-            <button className={workflowPrimary} onClick={() => setTab("edit")}>
-              <Pencil size={16} />
-              Cập nhật doanh nghiệp
-            </button>
-          </div>
         </div>
       )}
       {tab === "positions" && (
@@ -199,9 +156,6 @@ export function EnterpriseDetailsModal({
                 {scope} · {positions.length} vị trí · {totals.open} đang mở
               </p>
             </div>
-            <button className={workflowSecondary} onClick={onPosts}>
-              Xem tin tuyển dụng
-            </button>
           </div>
           {positionsError ? (
             <Notice>{positionsError}</Notice>
@@ -211,14 +165,14 @@ export function EnterpriseDetailsModal({
             </div>
           ) : (
             <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
-              {positions.map((p) => (
+              {positions.map((p, index) => (
                 <article
                   key={p.id}
                   className="rounded-2xl border border-slate-200 p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h4 className="font-bold text-slate-800">{p.title}</h4>
+                      <h4 className="flex items-center gap-2 font-bold text-slate-800"><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium tabular-nums text-slate-500">STT {index + 1}</span>{p.title}</h4>
                       <p className="mt-1 text-xs text-slate-500">
                         {p.recruitmentCode || `Vị trí #${p.id}`} ·{" "}
                         {p.semester?.name ||
@@ -280,80 +234,6 @@ export function EnterpriseDetailsModal({
             </div>
           )}
         </div>
-      )}
-      {tab === "edit" && (
-        <form onSubmit={save} className="space-y-5">
-          <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            Cập nhật thông tin đối tác. Chỉ tiêu tiếp nhận được quản lý theo
-            từng vị trí tuyển dụng.
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {(
-              [
-                ["name", "Tên doanh nghiệp", 200],
-                ["industry", "Lĩnh vực hoạt động", 100],
-                ["contactPersonName", "Người liên hệ", 100],
-                ["contactEmail", "Email liên hệ", 100],
-                ["contactPhone", "Số điện thoại", 20],
-                ["address", "Địa chỉ", 300],
-              ] as const
-            ).map(([key, label, max]) => (
-              <Field key={key} label={label + (key === "name" ? " *" : "")}>
-                <input
-                  className={workflowInput}
-                  name={key}
-                  defaultValue={company[key] || ""}
-                  required={key === "name"}
-                  maxLength={max}
-                  type={
-                    key === "contactEmail"
-                      ? "email"
-                      : key === "contactPhone"
-                        ? "tel"
-                        : "text"
-                  }
-                  disabled={busy}
-                />
-              </Field>
-            ))}
-            <Field label="Trạng thái hợp tác">
-              <select
-                className={workflowInput}
-                name="status"
-                defaultValue={company.status}
-                disabled={busy}
-              >
-                <option value="ACTIVE">Đang hợp tác</option>
-                <option value="INACTIVE">Ngừng hợp tác</option>
-              </select>
-            </Field>
-          </div>
-          <Field label="Lý do cập nhật *">
-            <textarea
-              className={workflowInput}
-              name="reason"
-              rows={2}
-              required
-              maxLength={2000}
-              disabled={busy}
-              placeholder="Ghi ngắn gọn nội dung và lý do thay đổi…"
-            />
-          </Field>
-          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              className={workflowSecondary}
-              disabled={busy}
-              onClick={onClose}
-            >
-              Hủy
-            </button>
-            <button className={workflowPrimary} disabled={busy}>
-              <Save size={16} />
-              {busy ? "Đang lưu…" : "Lưu thay đổi"}
-            </button>
-          </div>
-        </form>
       )}
     </WorkflowModal>
   );

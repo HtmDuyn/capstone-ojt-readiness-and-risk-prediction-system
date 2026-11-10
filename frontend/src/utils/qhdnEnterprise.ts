@@ -42,7 +42,7 @@ export function selectEnterpriseImportPayload(
   selectedCodes: ReadonlySet<string>,
   idempotencyKey: string,
 ): EnterpriseImportPayload {
-  const rows = source.rows.filter((row) => selectedCodes.has(row.code));
+  const rows = source.rows.filter((row) => selectedCodes.has(row.code || row.email));
   if (!rows.length)
     throw new Error("Chọn ít nhất một doanh nghiệp để import.");
   if (rows.length !== selectedCodes.size)
@@ -56,19 +56,16 @@ export function buildEnterpriseImportPreviewRows(
 ) {
   const byCode = new Map(
     enterprises.map((enterprise) => [
-      enterprise.code.trim().toUpperCase(),
+      enterprise.code?.trim().toUpperCase(),
       enterprise,
     ]),
   );
   return results.map((result) => {
-    const enterprise = byCode.get(result.code?.trim().toUpperCase() ?? "");
+    const enterprise = byCode.get(result.code?.trim().toUpperCase() ?? "") ?? enterprises[result.rowNumber - 1];
     return {
       ...result,
       enterprise,
-      totalCapacity: enterprise?.positions.reduce(
-        (total, position) => total + position.capacity,
-        0,
-      ),
+
     };
   });
 }
@@ -99,7 +96,7 @@ export function normalizeEnterpriseImportPreview(
 
 export const recruitmentLabels: Record<string, string> = {
   ACTIVE: "Đang hợp tác",
-  INACTIVE: "Ngừng hợp tác",
+  INACTIVE: "Đã vô hiệu hóa",
   OPEN: "Đang mở",
   CLOSED: "Đã đóng",
   DRAFT: "Bản nháp",

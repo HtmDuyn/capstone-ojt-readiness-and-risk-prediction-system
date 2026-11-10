@@ -10,6 +10,7 @@ export type RoleCode =
 export interface AuthUserRecord {
   studentId: number | null;
   enterpriseId: number | null;
+  enterpriseActive: boolean;
   id: number;
   username: string;
   email: string;

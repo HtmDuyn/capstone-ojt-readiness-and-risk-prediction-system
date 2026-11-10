@@ -437,7 +437,7 @@ export const QhdnDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* KPI 1: Nhận từ Đào tạo */}
         <div
-          onClick={() => navigate("/qhdn/registration-windows")}
+          onClick={() => navigate('/qhdn/coordination' + (selectedSemesterId ? '?semester=' + selectedSemesterId : ''))}
           className="card-glass border border-slate-200/80 p-5 cursor-pointer hover:border-orange-300 hover:shadow-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -694,6 +694,7 @@ export const QhdnDashboard: React.FC = () => {
                 />
               </div>
 
+              <div className="flex items-center gap-2 px-2 text-[11px] font-semibold text-slate-500"><span className="w-5 shrink-0 text-center">STT</span><span className="flex-1">Doanh nghiệp</span><span className="w-36">Chỉ tiêu</span></div>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 text-xs">
                 {fullRankingPartners.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-slate-400 text-xs">
@@ -794,12 +795,13 @@ export const QhdnDashboard: React.FC = () => {
                 Hiện không có hồ sơ nào bị doanh nghiệp từ chối.
               </p>
             ) : (
-              rejectedCoordinations.slice(0, 4).map((coor) => (
+              rejectedCoordinations.slice(0, 4).map((coor, index) => (
                 <div
                   key={coor.id}
                   className="p-3 rounded-xl border border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3 text-xs"
                 >
-                  <div>
+                  <span className="shrink-0 rounded-md bg-white px-2 py-1 text-xs font-medium tabular-nums text-slate-500">STT {index + 1}</span>
+                  <div className="min-w-0 flex-1">
                     <p className="font-bold text-slate-900 text-sm">
                       {coor.student?.fullName || "Sinh viên"}{" "}
                       {coor.student?.studentCode && (
@@ -864,12 +866,13 @@ export const QhdnDashboard: React.FC = () => {
                 Chưa có phản hồi tiếp nhận mới từ doanh nghiệp trong kỳ này.
               </p>
             ) : (
-              acceptedCoordinations.slice(0, 4).map((coor) => (
+              acceptedCoordinations.slice(0, 4).map((coor, index) => (
                 <div
                   key={coor.id}
                   className="p-3 rounded-xl border border-slate-200/80 bg-slate-50 flex items-center justify-between gap-3 text-xs"
                 >
-                  <div>
+                  <span className="shrink-0 rounded-md bg-white px-2 py-1 text-xs font-medium tabular-nums text-slate-500">STT {index + 1}</span>
+                  <div className="min-w-0 flex-1">
                     <p className="font-bold text-slate-900 text-sm">
                       {coor.student?.fullName || "Sinh viên"}{" "}
                       <span className="font-normal text-xs text-slate-500">

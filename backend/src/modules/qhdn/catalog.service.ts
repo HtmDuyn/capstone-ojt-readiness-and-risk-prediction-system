@@ -10,7 +10,7 @@ import { staffContextFields, templateField, registrationField, assignmentField }
 export const configs = {
   companies: { table:'Enterprises', id:'EnterpriseID', fields:{code:'EnterpriseCode',name:'Name',address:'Address',industry:'Industry',contactPersonName:'ContactPersonName',contactPhone:'ContactPhone',contactEmail:'ContactEmail',status:'Status',createdAt:'CreatedAt'} },
   positions: { table:'InternshipPositions', id:'PositionID', fields:{companyId:'EnterpriseID',ojtSemesterId:'OJTSemesterID',recruitmentCode:'RecruitmentCode',title:'Title',description:'Description',requirements:'Requirements',capacity:'Capacity',remainingSlots:'RemainingSlots',status:'Status',location:'Location',workMode:'WorkMode'} },
-  coordinations: { table:'StudentEnterpriseCoordination', id:'CoordinationID', fields:{applicationId:'ApplicationID',registrationId:'RegistrationID',companyId:'EnterpriseID',positionId:'PositionID',coordinatedBy:'CoordinatedBy',coordinatedAt:'CoordinatedAt',decision:'Decision',decisionAt:'DecisionAt',rejectReason:'RejectReason',previousCoordinationId:'PreviousCoordinationID'} },
+  coordinations: { table:'StudentEnterpriseCoordination', id:'CoordinationID', fields:{source:'Source',coordinationReason:'CoordinationReason',applicationId:'ApplicationID',registrationId:'RegistrationID',companyId:'EnterpriseID',positionId:'PositionID',coordinatedBy:'CoordinatedBy',coordinatedAt:'CoordinatedAt',decision:'Decision',decisionAt:'DecisionAt',rejectReason:'RejectReason',previousCoordinationId:'PreviousCoordinationID'} },
   assignments: { table:'InternshipAssignments', id:'AssignmentID', fields:{coordinationId:'CoordinationID',studentId:'StudentID',companyId:'EnterpriseID',positionId:'PositionID',academicSupervisorId:'AcademicSupervisorID',enterpriseSupervisorName:'EnterpriseSupervisorName',startDate:'StartDate',endDate:'EndDate',status:'Status'} },
   evaluations: { table:'InternshipEvaluations', id:'EvaluationID', fields:{templateId:'TemplateID',scoreDetails:'ScoreDetails',assignmentId:'AssignmentID',evaluatedBy:'EvaluatedBy',evaluatedAt:'EvaluatedAt',completionScore:'CompletionScore',attitudeScore:'AttitudeScore',skillScore:'SkillScore',overallScore:'OverallScore',comments:'Comments',status:'Status'} },
 } as const;
@@ -118,7 +118,7 @@ export async function list(resource:Resource,params:Row,actor:Actor){
     return {items:await enrichListRows(c,items),total:count,page:p.page,limit:p.limit};
   });
 }
-export async function saveCompany(body:unknown,actor:Actor,id?:number){staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
+export async function saveCompany(body:unknown,actor:Actor,id?:number){if(actor.roleCode!=='ADMIN')throw invalid('Only enterprises may update their own profile; QHDN has read-only access.',403,'FORBIDDEN');staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
   return academicTransaction(async c=>{
     const before=id?await record(c,'companies',id):null,values:Row={};
     const reason=requiredText(b.reason,'reason',2000);

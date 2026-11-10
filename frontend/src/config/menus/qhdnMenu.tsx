@@ -19,7 +19,7 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
   },
   {
     id: "enterprises",
-    label: "Doanh nghiệp & Tuyển dụng",
+    label: "Doanh nghiệp đối tác",
     path: "/qhdn/enterprises",
     icon: <Building2 size={20} />,
     banner: {
@@ -44,7 +44,7 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
       },
       {
         id: "coordination",
-        label: "Theo dõi doanh nghiệp",
+        label: "Điều phối OJT",
         path: "/qhdn/coordination",
         icon: <Handshake size={16} />,
       },

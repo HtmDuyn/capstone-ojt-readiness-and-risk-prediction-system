@@ -38,7 +38,7 @@ export const statusText = (status?: string | null): string =>
     FAILED: 'Chưa đạt',
     RECOGNIZED: 'Được công nhận',
     WITHDRAWN: 'Đã rút',
-    ACCEPTED: 'Đã tiếp nhận',
+    ACCEPTED: 'Doanh nghiệp đồng ý nhận',
     PENDING: 'Chờ doanh nghiệp phản hồi',
     REVIEWING: 'Đang xét',
     INTERVIEW: 'Phỏng vấn',

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { archiveRecruitment } from '../../jobs/provisioning';
+
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { importAccounts } from './import.service';
@@ -32,9 +32,5 @@ router.post('/emails/resend', authorizeRoles('ADMIN'), async (req, res, next) =>
     if (!result.rowCount) throw fail('Only unexpired failed emails can be retried.', 409, 'EMAIL_NOT_RETRYABLE');
     res.json({ success: true, emailId: result.rows[0].EmailID, email });
   } catch (error) { next(error); }
-});
-router.post('/archive', authorizeRoles('ADMIN', 'OJT_COORD'), async (_req, res, next) => {
-  try { res.json({ success: true, archivedCount: await archiveRecruitment() }); }
-  catch (error) { next(error); }
 });
 export default router;

@@ -142,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="relative">
-              {currentUser.avatar ? (
+              {currentUser.avatar?.trim() ? (
                 <img
                   src={currentUser.avatar}
                   alt={currentUser.fullName}

@@ -1547,16 +1547,6 @@ Body: application/json — bắt buộc.
 | tasks[].description | string | Không / theo điều kiện nghiệp vụ | maxLength=10000 |  |
 | tasks[].dueDate | string | Có | format="date" |  |
 
-## POST /api/imports/archive
-
-Lưu trữ tuyển dụng sau hai học kỳ
-
-Xác thực: Bearer token; role/ownership theo chức năng.
-
-Không có tham số URL/query.
-
-Không có request body.
-
 ## POST /api/imports/commit
 
 Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin)

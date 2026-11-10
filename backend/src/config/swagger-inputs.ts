@@ -102,7 +102,6 @@ describe('/students/{id}/eligibility-checks', { get: 'Lịch sử kiểm tra đi
 describe('/students/{id}/eligibility', { get: 'Kết quả OJT và điều kiện còn thiếu' });
 describe('/eligibility-check-runs', { post: ['Xét điều kiện OJT hàng loạt và cập nhật trạng thái', 'Truyền phạm vi sinh viên bằng JSON body. Trả kết quả ngay và ghi nhận kết quả chính thức trong cùng lần gọi; không cần xác nhận riêng.'] });
 describe('/imports/emails/resend', { post: 'Resend email' });
-describe('/imports/archive', { post: 'Lưu trữ tuyển dụng sau hai học kỳ' });
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
 describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post: 'Nộp hồ sơ đăng ký OJT' });
@@ -204,7 +203,7 @@ export function describeManualInputs(spec: Spec): Spec {
     const media=importBody.content['application/json'];
     media.examples={
       student:{summary:'Nhập sinh viên',value:{kind:'STUDENT',idempotencyKey:'manual-student-import-001',rows:[{code:'SV-MANUAL-001',email:'student@example.invalid',fullName:'Sinh viên mẫu'}]}},
-      enterprise:{summary:'Nhập doanh nghiệp vào đợt tuyển dụng đang mở',value:{kind:'ENTERPRISE',idempotencyKey:'manual-enterprise-import-001',windowId:1,rows:[{code:'DN-MANUAL-001',email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu',address:'TP. Hồ Chí Minh',positions:[{code:'DEV-001',title:'Thực tập lập trình',description:'Mô tả công việc',requirements:'Yêu cầu tuyển dụng',capacity:5}]}]}}
+      enterprise:{summary:'Tạo tài khoản doanh nghiệp liên kết',value:{kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu'}]}}
     };
   }
   return spec;

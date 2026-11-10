@@ -1,4 +1,5 @@
 import type {
+  QhdnStudentDossier,
   ImportCommitResponse,
   EnterpriseImportPayload,
   ImportPreviewApiResponse,
@@ -6,13 +7,7 @@ import type {
 } from "@/types/qhdn/qhdnTypes";
 import { normalizeEnterpriseImportPreview } from "@/utils/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
-import type {
-  Page,
-  PageQuery,
-  RecruitmentPost,
-  ReportType,
-  Result,
-} from "@/types/qhdn/workflowTypes";
+import type { ReportType } from "@/types/qhdn/workflowTypes";
 import { loadAllPages } from "../utils/loadAllPages";
 import API from "./api";
 import type {
@@ -53,6 +48,14 @@ export const listCompanies = async (
 ): Promise<CompanyListResponse> => {
   const response = await API.get<CompanyListResponse>("/companies", { params });
   return response.data;
+};
+
+export const setCompanyAccess = async (id: number, status: 'ACTIVE' | 'INACTIVE') => {
+  const response = await API.patch<{ success: boolean; message?: string; data: CompanyListItem & { affectedAccounts: number } }>(
+    `/qhdn/companies/${id}/access`, { status },
+  );
+  if (!response.data.success) throw new Error(response.data.message || 'Không cập nhật được trạng thái tài khoản.');
+  return response.data.data;
 };
 
 /**
@@ -330,13 +333,6 @@ export const listOjtResults = async (
   return response.data;
 };
 
-export const archiveRecruitment = async () =>
-  (
-    await API.post<{ success: boolean; archivedCount: number }>(
-      "/imports/archive",
-    )
-  ).data;
-
 export const updateCompany = async (
   id: number,
   payload: Partial<
@@ -352,31 +348,25 @@ export const updateCompany = async (
     >
   > & { reason: string },
 ) => (await API.patch(`/companies/${id}`, payload)).data;
-export const listRecruitmentPosts = async (
-  params: PageQuery & { companyId: number; windowId?: number },
-) =>
-  (
-    await API.get<Result<Page<RecruitmentPost>>>("/recruitment/posts", {
-      params,
-    })
-  ).data.data;
-export const reviewRecruitmentPost = async (
-  id: number,
-  payload: {
-    decision: "PUBLISH" | "REJECT";
-    reason: string;
-    deadlineAt?: string;
-  },
-) => (await API.post(`/recruitment/posts/${id}/review`, payload)).data;
+export const getQhdnStudentDossier = async (studentId: number, ojtSemesterId: number, signal?: AbortSignal): Promise<QhdnStudentDossier> => {
+  const { data } = await API.get<{ success: boolean; data: QhdnStudentDossier; message?: string }>(`/qhdn/students/${studentId}`, {
+    params: { ojtSemesterId }, signal,
+  });
+  if (!data.success) throw new Error(data.message || 'Không tải được hồ sơ sinh viên.');
+  return data.data;
+};
+
 // API trả Blob; utils/downloadFile phụ trách lưu file trên trình duyệt.
 export const getCvFile = async (
   studentId: number,
   cvFileId?: number | null,
+  signal?: AbortSignal,
 ): Promise<Blob> =>
   (
     await API.get<Blob>(`/students/${studentId}/cv`, {
       params: cvFileId ? { cvFileId } : {},
       responseType: "blob",
+      signal,
     })
   ).data;
 export const exportOjtResults = async (

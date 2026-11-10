@@ -13,7 +13,7 @@ SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
 WITH RECURSIVE roots AS (
  SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('OJTEligibilityResultBatches','StudentOJTCalculatedResults','StudentCVFiles','RecruitmentWindows','OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
+ WHERE n.nspname='public' AND c.relname IN ('OJTActualReceipts','OJTEligibilityResultBatches','StudentOJTCalculatedResults','StudentCVFiles','RecruitmentCampaigns','RecruitmentWindows','OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions')
 ), edges AS (
  SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
  UNION
@@ -62,6 +62,7 @@ BEGIN
  IF names IS NOT NULL THEN EXECUTE 'DROP TABLE ' || names; END IF;
 END; $reset$;
 
+DROP FUNCTION IF EXISTS public."GuardRecruitmentRound"();
 DROP FUNCTION IF EXISTS public."StudentCourseSemesterTag"(student_id integer);
 DROP FUNCTION IF EXISTS public."GuardStudentProgramCohort"();
 DROP FUNCTION IF EXISTS public."CurriculumCohortCodes"(program_code text);
@@ -1536,7 +1537,7 @@ ALTER TABLE public."AcademicYears" ADD CONSTRAINT "AcademicYears_YearCode_key" U
 ALTER TABLE public."AcademicYears" ADD CONSTRAINT "AcademicYears_pkey" PRIMARY KEY ("AcademicYearID");
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_IdempotencyKey_key" UNIQUE ("IdempotencyKey");
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_Kind_check" CHECK (("Kind" = ANY (ARRAY['STUDENT'::text, 'ENTERPRISE'::text])));
-ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_check" CHECK ((("Kind" = 'ENTERPRISE'::text) = ("OJTSemesterID" IS NOT NULL)));
+ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_check" CHECK (("Kind" = 'ENTERPRISE'::text) OR ("OJTSemesterID" IS NULL));
 ALTER TABLE public."AccountImportBatches" ADD CONSTRAINT "AccountImportBatches_pkey" PRIMARY KEY ("BatchID");
 ALTER TABLE public."AccountImportRows" ADD CONSTRAINT "AccountImportRows_Action_check" CHECK (("Action" = ANY (ARRAY['CREATED'::text, 'UPDATED'::text])));
 ALTER TABLE public."AccountImportRows" ADD CONSTRAINT "AccountImportRows_pkey" PRIMARY KEY ("BatchID", "RowNumber");
@@ -8586,3 +8587,293 @@ CHECK (
 COMMIT;
 
 -- END CV EXTRACTION AND CERTIFICATES V1
+
+-- BEGIN ENTERPRISE ACCOUNT IMPORT V2
+-- Existing databases: run only this block; historical recruitment imports remain valid.
+BEGIN;
+ALTER TABLE public."AccountImportBatches"
+  DROP CONSTRAINT IF EXISTS "AccountImportBatches_check";
+ALTER TABLE public."AccountImportBatches"
+  ADD CONSTRAINT "AccountImportBatches_check"
+  CHECK ("Kind" = 'ENTERPRISE' OR "OJTSemesterID" IS NULL);
+COMMIT;
+-- END ENTERPRISE ACCOUNT IMPORT V2
+-- BEGIN OJT RECRUITMENT ROUNDS V1
+-- Additive migration. Existing recruitment records and applications are retained.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+CREATE TABLE IF NOT EXISTS public."RecruitmentCampaigns" (
+ "CampaignID" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ "OJTSemesterID" integer NOT NULL UNIQUE REFERENCES public."OJTSemesters"("OJTSemesterID"),
+ "Name" text NOT NULL,
+ "CreatedBy" integer NOT NULL REFERENCES public."Users"("UserID"),
+ "CreatedAt" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public."RecruitmentWindows"
+ ADD COLUMN IF NOT EXISTS "CampaignID" integer REFERENCES public."RecruitmentCampaigns"("CampaignID"),
+ ADD COLUMN IF NOT EXISTS "RoundNumber" integer,
+ ADD COLUMN IF NOT EXISTS "PostingStartsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "PostingEndsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ApplicationStartsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ApplicationEndsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ResultsStartsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ResultsEndsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ResultsFinalizedAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ResultsFinalizedBy" integer REFERENCES public."Users"("UserID"),
+ ADD COLUMN IF NOT EXISTS "ResultsSummary" jsonb;
+CREATE UNIQUE INDEX IF NOT EXISTS "UQ_RecruitmentRoundNumber" ON public."RecruitmentWindows"("CampaignID","RoundNumber");
+ALTER TABLE public."OJTRegistrationWindows" ADD COLUMN IF NOT EXISTS "RecruitmentRoundID" integer UNIQUE REFERENCES public."RecruitmentWindows"("WindowID");
+CREATE OR REPLACE FUNCTION public."GuardRoundStudentWindow"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  IF OLD."RecruitmentRoundID" IS NOT NULL AND (NEW."RecruitmentRoundID" IS DISTINCT FROM OLD."RecruitmentRoundID" OR NEW."Scope" IS DISTINCT FROM OLD."Scope") THEN
+   RAISE EXCEPTION 'Recruitment round application scope is immutable' USING ERRCODE='23514'; END IF;
+ END IF;
+ IF NEW."RecruitmentRoundID" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "RecruitmentWindows" w
+  WHERE w."WindowID"=NEW."RecruitmentRoundID" AND w."OJTSemesterID"=NEW."OJTSemesterID" AND w."AcademicPeriodID"=NEW."AcademicPeriodID"
+   AND w."ApplicationStartsAt"=NEW."StartsAt" AND w."ApplicationEndsAt"=NEW."EndsAt" AND (NEW."Status"<>'OPEN' OR w."Status"='OPEN')) THEN
+  RAISE EXCEPTION 'Application window must follow the recruitment round schedule and status' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS "TR_RoundStudentWindow" ON public."OJTRegistrationWindows";
+CREATE TRIGGER "TR_RoundStudentWindow" BEFORE INSERT OR UPDATE ON public."OJTRegistrationWindows"
+ FOR EACH ROW EXECUTE FUNCTION public."GuardRoundStudentWindow"();
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentRound"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW."CampaignID",NEW."RoundNumber",NEW."OJTSemesterID",NEW."AcademicPeriodID",NEW."StartsAt",NEW."EndsAt",
+    NEW."PostingStartsAt",NEW."PostingEndsAt",NEW."ApplicationStartsAt",NEW."ApplicationEndsAt",NEW."ResultsStartsAt",NEW."ResultsEndsAt")
+   IS DISTINCT FROM ROW(OLD."CampaignID",OLD."RoundNumber",OLD."OJTSemesterID",OLD."AcademicPeriodID",OLD."StartsAt",OLD."EndsAt",
+    OLD."PostingStartsAt",OLD."PostingEndsAt",OLD."ApplicationStartsAt",OLD."ApplicationEndsAt",OLD."ResultsStartsAt",OLD."ResultsEndsAt") THEN
+   RAISE EXCEPTION 'Recruitment deadlines are immutable after creation' USING ERRCODE='23514';
+  END IF;
+  IF OLD."ResultsFinalizedAt" IS NOT NULL AND NEW IS DISTINCT FROM OLD THEN
+   RAISE EXCEPTION 'Finalized recruitment round is immutable' USING ERRCODE='23514';
+  END IF;
+ END IF;
+ IF NEW."CampaignID" IS NULL THEN RETURN NEW; END IF;
+ IF NEW."RoundNumber" IS NULL OR NEW."RoundNumber"<1 OR NEW."PostingStartsAt" IS NULL OR NEW."PostingEndsAt" IS NULL
+  OR NEW."ApplicationStartsAt" IS NULL OR NEW."ApplicationEndsAt" IS NULL OR NEW."ResultsStartsAt" IS NULL OR NEW."ResultsEndsAt" IS NULL
+  OR NOT (NEW."StartsAt"=NEW."PostingStartsAt" AND NEW."EndsAt"=NEW."ResultsEndsAt"
+   AND NEW."PostingStartsAt"<NEW."PostingEndsAt" AND NEW."PostingEndsAt"<=NEW."ApplicationStartsAt"
+   AND NEW."ApplicationStartsAt"<NEW."ApplicationEndsAt" AND NEW."ApplicationEndsAt"<=NEW."ResultsStartsAt"
+   AND NEW."ResultsStartsAt"<NEW."ResultsEndsAt") THEN
+  RAISE EXCEPTION 'Three sequential non-overlapping phases are required' USING ERRCODE='23514';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM "RecruitmentCampaigns" c WHERE c."CampaignID"=NEW."CampaignID" AND c."OJTSemesterID"=NEW."OJTSemesterID") THEN
+  RAISE EXCEPTION 'Campaign semester mismatch' USING ERRCODE='23514'; END IF;
+ IF EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."EndsAt" AND w."EndsAt">NEW."StartsAt") THEN
+  RAISE EXCEPTION 'Recruitment rounds cannot overlap' USING ERRCODE='23514'; END IF;
+ IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."CampaignID"=NEW."CampaignID"
+  AND (w."RoundNumber">=NEW."RoundNumber" OR w."EndsAt">NEW."StartsAt")) THEN
+  RAISE EXCEPTION 'Recruitment rounds must follow their sequence' USING ERRCODE='23514'; END IF;
+ IF NEW."Status"='OPEN' AND (TG_OP='INSERT' OR OLD."Status" IS DISTINCT FROM 'OPEN') AND EXISTS(
+  SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."StartsAt" AND (w."EndsAt">clock_timestamp() OR w."ResultsFinalizedAt" IS NULL)) THEN
+  RAISE EXCEPTION 'Previous round must end and its results must be finalized before opening' USING ERRCODE='23514'; END IF;
+ IF (NEW."ResultsFinalizedAt" IS NULL)<>(NEW."ResultsFinalizedBy" IS NULL) THEN
+  RAISE EXCEPTION 'Finalization actor is required' USING ERRCODE='23514'; END IF;
+ IF NEW."ResultsFinalizedAt" IS NOT NULL AND (NEW."ResultsEndsAt">clock_timestamp() OR EXISTS(
+  SELECT 1 FROM "JobApplications" a JOIN "RecruitmentPosts" p ON p."PostID"=a."PostID"
+  WHERE p."WindowID"=NEW."WindowID" AND a."Status" NOT IN ('ACCEPTED','REJECTED','WITHDRAWN'))) THEN
+  RAISE EXCEPTION 'Round must end and all application decisions must be completed before finalization' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS "TR_RecruitmentRound" ON public."RecruitmentWindows";
+CREATE TRIGGER "TR_RecruitmentRound" BEFORE INSERT OR UPDATE ON public."RecruitmentWindows"
+ FOR EACH ROW EXECUTE FUNCTION public."GuardRecruitmentRound"();
+-- Automatic reassignment of posts to another round would change application history.
+CREATE OR REPLACE FUNCTION public."AdvanceEnterpriseRecruitment"() RETURNS integer
+LANGUAGE sql SET search_path=public,pg_catalog AS $$ SELECT 0 $$;
+ALTER TABLE public."RecruitmentCampaigns" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public."RecruitmentCampaigns" FROM PUBLIC;
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN REVOKE ALL ON public."RecruitmentCampaigns" FROM anon; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN REVOKE ALL ON public."RecruitmentCampaigns" FROM authenticated; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT SELECT,INSERT,UPDATE ON public."RecruitmentCampaigns" TO service_role;
+  GRANT USAGE,SELECT ON SEQUENCE public."RecruitmentCampaigns_CampaignID_seq" TO service_role;
+ END IF;
+END $$;
+COMMIT;
+-- END OJT RECRUITMENT ROUNDS V1
+
+-- BEGIN OJT RECRUITMENT CAMPAIGN V2
+-- Run this block after OJT RECRUITMENT ROUNDS V1. No application data is deleted.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+ALTER TABLE public."RecruitmentCampaigns"
+ ADD COLUMN IF NOT EXISTS "StartsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "EndsAt" timestamptz,
+ ADD COLUMN IF NOT EXISTS "ScheduleVersion" integer NOT NULL DEFAULT 1;
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentRound"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW."CampaignID",NEW."RoundNumber",NEW."OJTSemesterID",NEW."AcademicPeriodID",NEW."StartsAt",NEW."EndsAt",
+   NEW."PostingStartsAt",NEW."PostingEndsAt",NEW."ApplicationStartsAt",NEW."ApplicationEndsAt",NEW."ResultsStartsAt",NEW."ResultsEndsAt")
+   IS DISTINCT FROM ROW(OLD."CampaignID",OLD."RoundNumber",OLD."OJTSemesterID",OLD."AcademicPeriodID",OLD."StartsAt",OLD."EndsAt",
+   OLD."PostingStartsAt",OLD."PostingEndsAt",OLD."ApplicationStartsAt",OLD."ApplicationEndsAt",OLD."ResultsStartsAt",OLD."ResultsEndsAt") THEN
+   RAISE EXCEPTION 'Recruitment deadlines are immutable after creation' USING ERRCODE='23514'; END IF;
+  IF OLD."ResultsFinalizedAt" IS NOT NULL AND NEW IS DISTINCT FROM OLD THEN
+   RAISE EXCEPTION 'Finalized recruitment round is immutable' USING ERRCODE='23514'; END IF;
+ END IF;
+ IF NEW."CampaignID" IS NULL THEN RETURN NEW; END IF;
+ IF NEW."RoundNumber" IS NULL OR NEW."RoundNumber"<1 OR NEW."StartsAt">=NEW."EndsAt" THEN
+  RAISE EXCEPTION 'Invalid recruitment child schedule' USING ERRCODE='23514'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM "RecruitmentCampaigns" c WHERE c."CampaignID"=NEW."CampaignID" AND c."OJTSemesterID"=NEW."OJTSemesterID"
+  AND (c."ScheduleVersion"=1 OR (NEW."StartsAt">=c."StartsAt" AND NEW."EndsAt"<=c."EndsAt"))) THEN
+  RAISE EXCEPTION 'Child must belong to its campaign and fit within its dates' USING ERRCODE='23514'; END IF;
+ IF EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."EndsAt" AND w."EndsAt">NEW."StartsAt") THEN
+  RAISE EXCEPTION 'Recruitment rounds cannot overlap' USING ERRCODE='23514'; END IF;
+ IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."CampaignID"=NEW."CampaignID"
+  AND (w."RoundNumber">=NEW."RoundNumber" OR w."EndsAt">NEW."StartsAt")) THEN
+  RAISE EXCEPTION 'Child rounds must follow their sequence' USING ERRCODE='23514'; END IF;
+ IF NEW."Status"='OPEN' AND (TG_OP='INSERT' OR OLD."Status" IS DISTINCT FROM 'OPEN') AND EXISTS(
+  SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."StartsAt" AND (w."EndsAt">clock_timestamp() OR w."ResultsFinalizedAt" IS NULL)) THEN
+  RAISE EXCEPTION 'Previous child must end and its results must be finalized before opening' USING ERRCODE='23514'; END IF;
+ IF (NEW."ResultsFinalizedAt" IS NULL)<>(NEW."ResultsFinalizedBy" IS NULL) THEN
+  RAISE EXCEPTION 'Finalization actor is required' USING ERRCODE='23514'; END IF;
+ IF NEW."ResultsFinalizedAt" IS NOT NULL AND (NEW."EndsAt">clock_timestamp() OR EXISTS(
+  SELECT 1 FROM "JobApplications" a JOIN "RecruitmentPosts" p USING("PostID") WHERE p."WindowID"=NEW."WindowID"
+   AND a."Status" NOT IN ('ACCEPTED','REJECTED','WITHDRAWN'))) THEN
+  RAISE EXCEPTION 'Round must end and all decisions must be complete before finalization' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION public."GuardRoundStudentWindow"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ IF TG_OP='UPDATE' AND OLD."RecruitmentRoundID" IS NOT NULL AND
+  (NEW."RecruitmentRoundID" IS DISTINCT FROM OLD."RecruitmentRoundID" OR NEW."Scope" IS DISTINCT FROM OLD."Scope") THEN
+  RAISE EXCEPTION 'Recruitment child application scope is immutable' USING ERRCODE='23514'; END IF;
+ IF NEW."RecruitmentRoundID" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM "RecruitmentWindows" w JOIN "RecruitmentCampaigns" c USING("CampaignID")
+  WHERE w."WindowID"=NEW."RecruitmentRoundID" AND w."OJTSemesterID"=NEW."OJTSemesterID" AND w."AcademicPeriodID"=NEW."AcademicPeriodID"
+   AND NEW."StartsAt"=CASE WHEN c."ScheduleVersion"=2 THEN w."StartsAt" ELSE w."ApplicationStartsAt" END
+   AND NEW."EndsAt"=CASE WHEN c."ScheduleVersion"=2 THEN w."EndsAt" ELSE w."ApplicationEndsAt" END
+   AND (NEW."Status"<>'OPEN' OR w."Status"='OPEN')) THEN
+  RAISE EXCEPTION 'Application window must follow its child round schedule' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentCampaign"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ IF TG_OP='UPDATE' AND ROW(NEW."OJTSemesterID",NEW."StartsAt",NEW."EndsAt",NEW."ScheduleVersion")
+  IS DISTINCT FROM ROW(OLD."OJTSemesterID",OLD."StartsAt",OLD."EndsAt",OLD."ScheduleVersion") THEN
+  RAISE EXCEPTION 'Campaign dates are immutable' USING ERRCODE='23514'; END IF;
+ IF NEW."ScheduleVersion"=2 AND (NEW."StartsAt" IS NULL OR NEW."EndsAt" IS NULL OR NEW."StartsAt">=NEW."EndsAt") THEN
+  RAISE EXCEPTION 'Campaign start and end dates are required' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS "TR_RecruitmentCampaign" ON public."RecruitmentCampaigns";
+CREATE TRIGGER "TR_RecruitmentCampaign" BEFORE INSERT OR UPDATE ON public."RecruitmentCampaigns"
+ FOR EACH ROW EXECUTE FUNCTION public."GuardRecruitmentCampaign"();
+-- Existing V1 schedules and application history remain unchanged.
+COMMIT;
+-- END OJT RECRUITMENT CAMPAIGN V2
+-- BEGIN OJT PLACEMENT AND ACTUAL RECEIPT V1
+-- Additive update after OJT RECRUITMENT CAMPAIGN V2. Existing history is retained.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+ALTER TABLE public."StudentEnterpriseCoordination"
+ ADD COLUMN IF NOT EXISTS "Source" text NOT NULL DEFAULT 'STUDENT_APPLICATION',
+ ADD COLUMN IF NOT EXISTS "CoordinationReason" text;
+CREATE TABLE IF NOT EXISTS public."OJTActualReceipts" (
+ "StudentID" integer NOT NULL REFERENCES public."Students"("StudentID"),
+ "OJTSemesterID" integer NOT NULL REFERENCES public."OJTSemesters"("OJTSemesterID"),
+ "CoordinationID" integer NOT NULL UNIQUE REFERENCES public."StudentEnterpriseCoordination"("CoordinationID"),
+ "AssignmentID" integer NOT NULL UNIQUE REFERENCES public."InternshipAssignments"("AssignmentID"),
+ "ReceivedBy" integer NOT NULL REFERENCES public."Users"("UserID"),
+ "ReceivedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),
+ "Reason" text NOT NULL CHECK(length(btrim("Reason"))>0),
+ "OriginalCapacity" integer,
+ "ExceededCapacity" boolean NOT NULL,
+ PRIMARY KEY("StudentID","OJTSemesterID")
+);
+CREATE OR REPLACE FUNCTION public."GuardActualReceipt"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ IF TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Actual receipt history is immutable' USING ERRCODE='23514'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID")
+  JOIN "InternshipAssignments" a ON a."CoordinationID"=co."CoordinationID"
+  WHERE co."CoordinationID"=NEW."CoordinationID" AND co."Decision"='ACCEPTED' AND r."StudentID"=NEW."StudentID"
+   AND co."OJTSemesterID"=NEW."OJTSemesterID" AND a."AssignmentID"=NEW."AssignmentID" AND a."StudentID"=NEW."StudentID"
+   AND a."EnterpriseID"=co."EnterpriseID" AND a."PositionID"=co."PositionID"
+   AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) THEN
+  RAISE EXCEPTION 'Actual receipt requires enterprise acceptance and matching assignment' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS "TR_ActualReceipt" ON public."OJTActualReceipts";
+CREATE TRIGGER "TR_ActualReceipt" BEFORE INSERT OR UPDATE OR DELETE ON public."OJTActualReceipts"
+ FOR EACH ROW EXECUTE FUNCTION public."GuardActualReceipt"();
+CREATE OR REPLACE FUNCTION public."GuardUniqueStudentAssignment"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+DECLARE semester_id integer;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ SELECT "OJTSemesterID" INTO semester_id FROM "StudentEnterpriseCoordination" WHERE "CoordinationID"=NEW."CoordinationID";
+ IF COALESCE(upper(NEW."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') AND EXISTS(
+  SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID")
+   WHERE a."StudentID"=NEW."StudentID" AND co."OJTSemesterID"=semester_id AND a."AssignmentID"<>NEW."AssignmentID"
+    AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) THEN
+  RAISE EXCEPTION 'Student already has an assignment in this OJT semester' USING ERRCODE='23505'; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS "TR_UniqueStudentAssignment" ON public."InternshipAssignments";
+CREATE TRIGGER "TR_UniqueStudentAssignment" BEFORE INSERT OR UPDATE ON public."InternshipAssignments"
+ FOR EACH ROW EXECUTE FUNCTION public."GuardUniqueStudentAssignment"();
+ALTER TABLE public."OJTActualReceipts" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public."OJTActualReceipts" FROM PUBLIC;
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN REVOKE ALL ON public."OJTActualReceipts" FROM anon; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN REVOKE ALL ON public."OJTActualReceipts" FROM authenticated; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN GRANT SELECT,INSERT ON public."OJTActualReceipts" TO service_role; END IF;
+END $$;
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentRound"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW."CampaignID",NEW."RoundNumber",NEW."OJTSemesterID",NEW."AcademicPeriodID",NEW."StartsAt",NEW."EndsAt",
+   NEW."PostingStartsAt",NEW."PostingEndsAt",NEW."ApplicationStartsAt",NEW."ApplicationEndsAt",NEW."ResultsStartsAt",NEW."ResultsEndsAt")
+   IS DISTINCT FROM ROW(OLD."CampaignID",OLD."RoundNumber",OLD."OJTSemesterID",OLD."AcademicPeriodID",OLD."StartsAt",OLD."EndsAt",
+   OLD."PostingStartsAt",OLD."PostingEndsAt",OLD."ApplicationStartsAt",OLD."ApplicationEndsAt",OLD."ResultsStartsAt",OLD."ResultsEndsAt") THEN
+   RAISE EXCEPTION 'Recruitment deadlines are immutable after creation' USING ERRCODE='23514'; END IF;
+  IF OLD."ResultsFinalizedAt" IS NOT NULL AND NEW IS DISTINCT FROM OLD THEN
+   RAISE EXCEPTION 'Finalized recruitment round is immutable' USING ERRCODE='23514'; END IF;
+ END IF;
+ IF NEW."CampaignID" IS NULL THEN RETURN NEW; END IF;
+ IF NEW."RoundNumber" IS NULL OR NEW."RoundNumber"<1 OR NEW."StartsAt">=NEW."EndsAt" THEN
+  RAISE EXCEPTION 'Invalid recruitment child schedule' USING ERRCODE='23514'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM "RecruitmentCampaigns" c WHERE c."CampaignID"=NEW."CampaignID" AND c."OJTSemesterID"=NEW."OJTSemesterID"
+  AND (c."ScheduleVersion"=1 OR (NEW."StartsAt">=c."StartsAt" AND NEW."EndsAt"<=c."EndsAt"))) THEN
+  RAISE EXCEPTION 'Child must belong to its campaign and fit within its dates' USING ERRCODE='23514'; END IF;
+ IF EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."EndsAt" AND w."EndsAt">NEW."StartsAt") THEN
+  RAISE EXCEPTION 'Recruitment rounds cannot overlap' USING ERRCODE='23514'; END IF;
+ IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."CampaignID"=NEW."CampaignID"
+  AND (w."RoundNumber">=NEW."RoundNumber" OR w."EndsAt">NEW."StartsAt")) THEN
+  RAISE EXCEPTION 'Child rounds must follow their sequence' USING ERRCODE='23514'; END IF;
+ IF NEW."Status"='OPEN' AND (TG_OP='INSERT' OR OLD."Status" IS DISTINCT FROM 'OPEN') AND EXISTS(
+  SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."StartsAt" AND (w."EndsAt">clock_timestamp() OR w."ResultsFinalizedAt" IS NULL)) THEN
+  RAISE EXCEPTION 'Previous child must end and its results must be finalized before opening' USING ERRCODE='23514'; END IF;
+ IF (NEW."ResultsFinalizedAt" IS NULL)<>(NEW."ResultsFinalizedBy" IS NULL) THEN
+  RAISE EXCEPTION 'Finalization actor is required' USING ERRCODE='23514'; END IF;
+ IF NEW."ResultsFinalizedAt" IS NOT NULL AND (NEW."EndsAt">clock_timestamp()) THEN
+  RAISE EXCEPTION 'Round must end before finalization' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+
+COMMIT;
+-- END OJT PLACEMENT AND ACTUAL RECEIPT V1

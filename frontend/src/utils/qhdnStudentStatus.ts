@@ -10,7 +10,7 @@ export const receptionLabels: Record<ReceptionStatus, string> = {
 export const placementLabels: Record<PlacementStatus, string> = {
   UNSENT: "Cần điều phối",
   PENDING: "Chờ doanh nghiệp duyệt",
-  ACCEPTED: "Đã tiếp nhận",
+  ACCEPTED: "Doanh nghiệp đồng ý nhận",
   REJECTED: "Doanh nghiệp từ chối",
 };
 export const registrationId = (s: HandoffStudentItem) =>

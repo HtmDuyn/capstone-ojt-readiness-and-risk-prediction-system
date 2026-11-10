@@ -133,14 +133,16 @@ export function AcademicPeriodFilter({
   selection,
   disabled,
   controlClassName = workflowInput,
+  layout = "inline",
 }: {
   selection: ReturnType<typeof useQhdnAcademicPeriods>;
   disabled?: boolean;
   controlClassName?: string;
+  layout?: "inline" | "grid";
 }) {
   return (
-    <div className="flex min-w-0 max-w-full flex-wrap items-end gap-3">
-      <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
+    <div className={layout === "grid" ? "contents" : "flex min-w-0 max-w-full flex-wrap items-end gap-3"}>
+      <label className={layout === "grid" ? "flex min-w-0 flex-col gap-1 text-sm font-medium text-slate-700" : "flex flex-col gap-1.5 text-xs font-semibold text-slate-500"}>
         Năm học
         <select aria-label="Năm học" className={controlClassName} value={selection.yearId}
           disabled={disabled || selection.loading} onChange={(e) => selection.selectYear(e.target.value)}>
@@ -148,13 +150,13 @@ export function AcademicPeriodFilter({
           {selection.years.map((year) => <option key={year.id} value={year.id}>{year.code}</option>)}
         </select>
       </label>
-      <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-slate-500">
-        Học kỳ / Block 3
-        <select aria-label="Học kỳ / Block 3" className={controlClassName + " max-w-full sm:max-w-md"}
+      <label className={layout === "grid" ? "flex min-w-0 flex-col gap-1 text-sm font-medium text-slate-700" : "flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-slate-500"}>
+        {selection.semestersOnly ? 'Học kỳ chính' : 'Học kỳ / Block 3'}
+        <select aria-label={selection.semestersOnly ? 'Học kỳ chính' : 'Học kỳ / Block 3'} className={controlClassName + (layout === "grid" ? " max-w-full" : " max-w-full sm:max-w-md")}
           value={selection.periodId} disabled={disabled || selection.loading || !selection.filteredPeriods.length}
           onChange={(e) => selection.selectPeriod(e.target.value)}>
-          {selection.allowAll && <option value="ALL">Tất cả học kỳ / Block 3</option>}
-          {!selection.filteredPeriods.length && <option value="">{selection.loading ? "Đang tải…" : "Không có học kỳ / Block 3"}</option>}
+          {selection.allowAll && <option value="ALL">{selection.semestersOnly ? 'Tất cả học kỳ chính' : 'Tất cả học kỳ / Block 3'}</option>}
+          {!selection.filteredPeriods.length && <option value="">{selection.loading ? "Đang tải…" : selection.semestersOnly ? 'Không có học kỳ chính' : "Không có học kỳ / Block 3"}</option>}
           {selection.years.filter((year) => !selection.yearId || String(year.id) === selection.yearId).map((year) => (
             <optgroup key={year.id} label={year.code}>
               {selection.filteredPeriods.filter((p) => p.academicYearId === year.id).map((period) => (

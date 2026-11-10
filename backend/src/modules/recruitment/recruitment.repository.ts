@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { invalid } from '../students/student.validation';
 import { enterpriseScope } from '../qhdn/catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { currentRoundPhase } from './round-policy';
 
 export { type Actor, type Row };
 export async function windowRecord(c: PoolClient,id: number) {
@@ -20,6 +21,9 @@ export function assertOpen(w: Row) {
 }
 export const windowApi=(w:Row)=>({id:w.WindowID,ojtSemesterId:w.OJTSemesterID,academicPeriodId:w.AcademicPeriodID,periodCode:w.PeriodCode,
  periodName:w.PeriodName,name:w.Name,startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status,
+ campaignId:w.CampaignID,roundNumber:w.RoundNumber,currentPhase:currentRoundPhase(w),
+
+ resultsFinalizedAt:w.ResultsFinalizedAt,resultsSummary:w.ResultsSummary,
  accepting:w.Status==='OPEN'&&new Date(w.StartsAt)<=new Date(w.DatabaseNow)&&new Date(w.EndsAt)>new Date(w.DatabaseNow)&&!['CLOSED','ARCHIVED'].includes(w.PeriodStatus),
  createdAt:w.CreatedAt,updatedAt:w.UpdatedAt});
 

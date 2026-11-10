@@ -13,16 +13,19 @@ export function describeImportWorkflow(spec: Record<string,any>) {
   }};
   const schema=spec.components.schemas.AccountImportRequest;
   schema.properties.rows.items.properties.academic=academic;
-  schema.properties.rows.items.properties.code.description='Stable enterprise/student business code, distinct from database ID.';
+  schema.oneOf=[
+    {properties:{kind:{enum:['STUDENT']},rows:{items:{type:'object',required:['code','academic']}}}},
+    {properties:{kind:{enum:['ENTERPRISE']},rows:{items:{type:'object',required:['name']}}}},
+  ];
+  schema.properties.rows.items.properties.code.description='Mã sinh viên bắt buộc. Mã doanh nghiệp tự sinh theo dạng DN000001 khi bỏ trống; mã cũ vẫn được chấp nhận để tương thích file đã có.';
   const studentExample={kind:'STUDENT',idempotencyKey:'student-full-001',rows:[{code:'SV001',email:'student@example.com',fullName:'Nguyễn Văn A',academic:{programId:1,className:'SE01',placement:{cohortId:1,groupCode:'A',currentAcademicPeriodId:1},courseResults:[{courseCode:'PRF192',academicPeriodId:1,status:'PASSED',score:8,gradePoints:3.5,grade:'B'}]}}]};
-  const enterpriseExample={kind:'ENTERPRISE',idempotencyKey:'enterprise-import-001',semesterId:1,rows:[{code:'DN001',email:'hr@example.com',fullName:'Nguyễn Thị Mai',name:'Công ty ABC',address:'123 Nguyễn Văn Linh, TP. Hồ Chí Minh',positions:[{code:'DEV001',title:'Thực tập lập trình',description:'Tham gia phát triển phần mềm',requirements:'Kiến thức TypeScript và SQL',capacity:5}]}]};
+  const enterpriseExample={kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{email:'hr@example.com',fullName:'Người phụ trách',name:'Công ty ABC'}]};
   schema.example=enterpriseExample;
   for(const mode of ['preview','commit']){
     const op=spec.paths[`/api/imports/${mode}`].post;
     op.summary=mode==='preview'?'Kiểm tra import doanh nghiệp hoặc sinh viên':'Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin)';
-    const schema={type:'object',required:['kind','idempotencyKey','file'],properties:{kind:{type:'string',enum:['STUDENT','ENTERPRISE']},idempotencyKey:{type:'string',maxLength:100},semesterId:{type:'integer',minimum:1,description:'Required for ENTERPRISE'},mapping:{type:'string',description:'JSON map canonical field to header'},file:{type:'string',format:'binary',description:'XLSX or CSV; 8 MiB maximum. One row per course attempt or recruitment position.'}}};
-    op.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/AccountImportRequest'},examples:{enterprise:{summary:'QHDN — Import doanh nghiệp (mặc định)',description:'Thay semesterId bằng ID học kỳ OJT; code là mã doanh nghiệp, không phải ID trong DB. positions là dữ liệu vị trí theo hợp đồng import hiện tại.',value:enterpriseExample},student:{summary:'Phòng đào tạo/Admin — Import sinh viên',value:studentExample}}},'multipart/form-data':{schema}}};
-    op.description='ENTERPRISE: chỉ OJT_COORD được import, bắt buộc positions và semesterId. Trùng email giữ nguyên mã doanh nghiệp, tài khoản và tin cũ; chỉ thêm tuyển dụng với mã vị trí mới. Code/email trỏ tới hai doanh nghiệp khác nhau bị từ chối. STUDENT: ADMIN/ACADEMIC import tài khoản, academic, placement và courseResults trong một giao dịch. CV dùng API upload hiện tại.';
+    op.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/AccountImportRequest'},examples:{enterprise:{summary:'Tạo tài khoản doanh nghiệp liên kết',value:enterpriseExample},student:{summary:'Import sinh viên qua student-imports',value:studentExample}}}}};
+    op.description='Chỉ OJT_COORD được import tài khoản ENTERPRISE. Mỗi dòng gồm email, fullName, name; mã doanh nghiệp tự sinh khi không gửi code. Không nhập hồ sơ, JD, vị trí, kỳ hoặc đợt tuyển dụng. Mã trong preview là dự kiến; mã chính thức được cấp trong giao dịch tạo tài khoản và gửi trong email. Tài khoản mới nhận email mật khẩu tạm và phải đổi mật khẩu trước khi sử dụng. Tài khoản đã tồn tại được báo trùng; dữ liệu cũ được giữ nguyên. Retry dùng cùng idempotencyKey và payload.';
   }
   spec.paths['/api/enterprise/tasks/bulk']={post:{
     summary:'Giao một hoặc nhiều task cho nhiều thực tập sinh',

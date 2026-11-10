@@ -1,3 +1,4 @@
+import { placementBoard, supplementPlacement, recordActualReceipt } from './placement.service';
 import { dashboard, report, reportQuery, reportCsv } from './report.service';
 import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
@@ -7,16 +8,23 @@ import { list, saveCompany } from './catalog.service';
 import { coordinate, decision, assign, updateAssignment } from './workflow.service';
 import { registeredStudents } from './registered-students.service';
 import { eligibleStudents } from './eligible-students.service';
+import { studentDossier } from './student-profile.service';
+import { setCompanyAccess } from './company-access.service';
 const router=Router();
 const staff=[authenticate,authorizeRoles('ADMIN','OJT_COORD')];
 const admin=[authenticate,authorizeRoles('ADMIN')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
+router.get('/qhdn/placements',...staff,handle(req=>placementBoard(req.query,req.user)));
+router.post('/qhdn/placements',...staff,handle(req=>supplementPlacement(req.body,req.user),201));
+router.post('/qhdn/placements/:id/receive',...staff,handle(req=>recordActualReceipt(positiveId(req.params.id),req.body,req.user)));
 router.get('/qhdn/registered-students',...staff,handle(req=>registeredStudents(req.query,req.user)));
 router.get('/qhdn/eligible-students',...staff,handle(req=>eligibleStudents(req.query,req.user)));
+router.get('/qhdn/students/:id',...staff,handle(req=>studentDossier(positiveId(req.params.id),req.query,req.user)));
+router.patch('/qhdn/companies/:id/access',...staff,handle(req=>setCompanyAccess(positiveId(req.params.id),req.body,req.user)));
 for(const [path,resource] of [['companies','companies'],['positions','positions'],['ojt-coordinations','coordinations'],['assignments','assignments'],['internship-evaluations','evaluations']] as const){
   router.get(`/${path}`,...staff,handle(req=>list(resource,req.query,req.user)));
 }
-router.patch('/companies/:id',...staff,handle(req=>saveCompany(req.body,req.user,positiveId(req.params.id))));
+router.patch('/companies/:id',...admin,handle(req=>saveCompany(req.body,req.user,positiveId(req.params.id))));
 router.post('/ojt-coordinations',...admin,handle(req=>coordinate(req.body,req.user),201));
 router.post('/ojt-coordinations/:id/decision',...admin,handle(req=>decision(positiveId(req.params.id),req.body,req.user)));
 router.post('/ojt-coordinations/:id/reassign',...admin,handle(req=>coordinate(req.body,req.user,positiveId(req.params.id)),201));

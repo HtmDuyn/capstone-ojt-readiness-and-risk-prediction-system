@@ -109,6 +109,9 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/internship-evaluations",
     "GET /api/ojt-coordinations",
     "GET /api/positions",
+    "GET /api/qhdn/placements",
+    "POST /api/qhdn/placements",
+    "POST /api/qhdn/placements/{id}/receive",
     "GET /api/qhdn/dashboard",
     "GET /api/qhdn/registered-students",
     "GET /api/qhdn/eligible-students",
@@ -117,8 +120,9 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PATCH /api/assignments/{id}",
     "PATCH /api/companies/{id}",
     "PATCH /api/recruitment/windows/{id}",
+    "GET /api/recruitment/windows",
+    "POST /api/recruitment/windows/{id}/finalize",
     "POST /api/assignments",
-    "POST /api/imports/archive",
     "POST /api/ojt-coordinations",
     "POST /api/ojt-coordinations/{id}/decision",
     "POST /api/ojt-coordinations/{id}/reassign",
@@ -173,6 +177,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
   for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
   for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
   for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign','POST /api/assignments','PATCH /api/assignments/{id}'])access.set(key,['ADMIN']);
+  access.set('PATCH /api/companies/{id}', ['ADMIN']);
   access.set('POST /api/ojt-registrations',['ADMIN','STUDENT']);
   for(const key of ['GET /api/ojt-registration-windows','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);

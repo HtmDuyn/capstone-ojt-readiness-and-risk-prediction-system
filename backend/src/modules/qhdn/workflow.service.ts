@@ -1,6 +1,7 @@
 import { registrationRecord, eligibleOfficial } from '../ojt-registration/registration.service';
 import type { PoolClient } from 'pg';
 import { assertPublishedPosition } from '../recruitment/recruitment.repository';
+import { assertPostPhase } from '../recruitment/round-policy';
 import { academicTransaction } from '../academic/academic.repository';
 import { dateInput, dateRange } from '../academic/academic.schema';
 import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, score } from '../students/student.validation';
@@ -17,11 +18,7 @@ async function registration(c:PoolClient,id:number){
   const handoff=(await c.query(`SELECT "RegistrationID","CheckID","CalculatedBatchID" FROM "EligibleStudentHandoffItems"
     WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 AND ("RegistrationID" IS NULL OR "RegistrationID"=$3)
     ORDER BY ("RegistrationID"=$3) DESC LIMIT 1`,[r.StudentID,r.OJTSemesterID,r.RegistrationID])).rows[0];
-  const activeDirectApplication=(await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co
-    JOIN "JobApplications" app ON app."ApplicationID"=co."ApplicationID"
-    WHERE co."RegistrationID"=$1 AND app."Status" NOT IN ('REJECTED','WITHDRAWN') LIMIT 1`,[r.RegistrationID])).rowCount??0;
-  const directApplication=r.Status==='SUBMITTED'&&activeDirectApplication>0;
-  if((!['APPROVED','HANDED_OFF'].includes(r.Status)&&!directApplication)||!handoff)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
+  if(!['SUBMITTED','APPROVED','HANDED_OFF','REJECTED'].includes(r.Status)||!handoff)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');
   if(handoff.CalculatedBatchID!==null){
     if(r.ProgramID!==r.CurrentProgramID)throw invalid(`Registration ${r.RegistrationID}: curriculum changed; reject and resubmit the application.`,409,'REGISTRATION_PROGRAM_CHANGED');
     const eligibility=(await c.query(`SELECT ${calculatedEligibilitySql()} AS result FROM "Students" s WHERE s."StudentID"=$1`,[r.StudentID])).rows[0]?.result;
@@ -36,11 +33,11 @@ async function latest(c:PoolClient,r:Row,coordinationId:number){
   const row=(await c.query('SELECT "CoordinationID" FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1',[r.RegistrationID])).rows[0];
   if(row?.CoordinationID!==coordinationId)throw invalid('Only the latest coordination can change.',409,'COORDINATION_SUPERSEDED');
 }
-async function availablePosition(c:PoolClient,id:number,semesterId:number){
-  await assertPublishedPosition(c,id);
+async function availablePosition(c:PoolClient,id:number,semesterId:number,phasedResult=false){
+  if(!phasedResult)await assertPublishedPosition(c,id);
   const p=await record(c,'positions',id),company=await record(c,'companies',p.EnterpriseID);
   if(p.OJTSemesterID!==semesterId)throw invalid('Position belongs to a different semester.',409,'POSITION_SEMESTER_MISMATCH');
-  if(company.Status!=='ACTIVE'||p.Status!=='OPEN')throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');
+  if(company.Status!=='ACTIVE'||(p.Status!=='OPEN'&&!(phasedResult&&p.Status==='CLOSED')))throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');
   if(p.Capacity==null||await occupied(c,id)>=p.Capacity)throw invalid('No remaining position capacity.',409,'POSITION_FULL');
   return p;
 }
@@ -81,40 +78,30 @@ export async function coordinate(body:unknown,actor:Actor,previousId?:number){
   });
 }
 export async function decision(id:number,body:unknown,actor:Actor){
+  if(actor.roleCode!=='ENTERPRISE')throw invalid('Chỉ doanh nghiệp được xác nhận đồng ý hoặc từ chối sinh viên.',403,'FORBIDDEN');
   const b=inputObject(body,['decision','reason']),value=enumValue(b.decision,['ACCEPTED','REJECTED'],'decision'),reason=requiredText(b.reason,'reason',value==='REJECTED'?300:2000);
   return academicTransaction(async c=>{
     const before=await record(c,'coordinations',id);await assertScope(c,actor,before.EnterpriseID);
+    const application=before.ApplicationID?(await c.query('SELECT "PostID" FROM "JobApplications" WHERE "ApplicationID"=$1',[before.ApplicationID])).rows[0]:null;
+    if(application)await assertPostPhase(c,application.PostID,'RESULTS');
     const r=await registration(c,before.RegistrationID);await latest(c,r,id);
     if(before.Decision===value&&before.RejectReason===(value==='REJECTED'?reason:null)){
-      if(value==='ACCEPTED'&&!(await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)
-        await createAcceptedAssignment(c,before,r,actor,reason);
+
       return {...api('coordinations',before),replayed:true};
     }
     if(accepted(before.Decision)||rejected(before.Decision))throw invalid('The enterprise decision is already final.',409,'DECISION_FINAL');
     if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[id])).rowCount)throw invalid('Coordination already has an assignment.',409);
     if(value==='ACCEPTED'){
-      const position=await availablePosition(c,before.PositionID,r.OJTSemesterID);
+      const position=await record(c,'positions',before.PositionID),company=await record(c,'companies',before.EnterpriseID);
+      if(company.Status!=='ACTIVE'||position.DeletedAt||position.ArchivedAt)throw invalid('Doanh nghiệp hoặc vị trí không còn hoạt động.',409);
       await noAssignment(c,r);
       if(position.EnterpriseID!==before.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
     }
     const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];
     if(before.ApplicationID)await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4 WHERE "ApplicationID"=$1',[before.ApplicationID,value,actor.userId,reason]);
-    if(value==='ACCEPTED')await createAcceptedAssignment(c,after,r,actor,reason);
+
     await log(c,'coordinations',before,after,actor,'ENTERPRISE_DECISION',reason);return {...api('coordinations',after),replayed:false};
   });
-}
-async function createAcceptedAssignment(c:PoolClient,coordination:Row,r:Row,actor:Actor,reason:string){
-  await noAssignment(c,r);
-  const position=await availablePosition(c,coordination.PositionID,r.OJTSemesterID);
-  if(position.EnterpriseID!==coordination.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
-  const semester=(await c.query(`SELECT "StartDate","EndDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=$1`,[r.OJTSemesterID])).rows[0];
-  if(!semester)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
-  const dates=assignmentDates({startDate:dateOnly(semester.StartDate),endDate:dateOnly(semester.EndDate)});
-  const assignment=await persist(c,'assignments',{CoordinationID:coordination.CoordinationID,StudentID:r.StudentID,
-    EnterpriseID:coordination.EnterpriseID,PositionID:coordination.PositionID,EnterpriseSupervisorName:null,...dates,Status:'ASSIGNED'});
-  await refreshSlots(c,position.PositionID);
-  await log(c,'assignments',null,assignment,actor,'AUTO_ASSIGN_AFTER_ACCEPTANCE',reason);
-  return assignment;
 }
 function dateOnly(value:unknown):string{
   return value instanceof Date
