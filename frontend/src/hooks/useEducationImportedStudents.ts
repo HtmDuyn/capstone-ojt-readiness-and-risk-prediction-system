@@ -8,7 +8,8 @@ const message = (e: unknown) => e instanceof Error ? e.message : 'Không tải �
 export function useEducationImportedStudents(revision: number, sortActive = false) {
   const [filters, setFilters] = useState<ImportedStudentFilters>(() => {
     const query = new URLSearchParams(window.location.search);
-    return { search: query.get('search') ?? '', programId: query.get('programId') ?? '', cohortId: query.get('cohortId') ?? '', status: query.get('status') ?? '', importBatchId: '' };
+    const status = query.get('status') ?? '';
+    return { search: query.get('search') ?? '', programId: query.get('programId') ?? '', cohortId: query.get('cohortId') ?? '', status: ['ACTIVE', 'SUSPENDED', 'DROPPED_OUT'].includes(status) ? status : '', importBatchId: '' };
   });
   const [page, setPage] = useState(() => {
     const value = Number(new URLSearchParams(window.location.search).get('page'));
@@ -77,7 +78,6 @@ export function useEducationImportedStudents(revision: number, sortActive = fals
 export function useImportedStudentDetail(id: number, revision: number) {
   const [profile, setProfile] = useState<ImportedStudentProfile | null>(null);
   const [results, setResults] = useState<Page<StoredCourseResult> | null>(null);
-  const [page, setPage] = useState(1);
   const [profileLoading, setProfileLoading] = useState(true);
   const [resultsLoading, setResultsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,11 +93,25 @@ export function useImportedStudentDetail(id: number, revision: number) {
   }, [id, revision, refresh]);
   useEffect(() => {
     const c = new AbortController(); setResultsLoading(true); setResultsError(''); setResults(null);
-    importService.getStoredCourseResults(id, page, c.signal)
+    (async () => {
+      const first = await importService.getStoredCourseResults(id, 1, c.signal);
+      const items = [...first.items];
+      if (!Number.isSafeInteger(first.total) || first.total < 0 || !Number.isSafeInteger(first.limit) || first.limit < 1)
+        throw new Error('Backend trả thông tin phân trang bảng điểm không hợp lệ.');
+      for (let next = 2; items.length < first.total; next++) {
+        const page = await importService.getStoredCourseResults(id, next, c.signal);
+        if (page.total !== first.total || !page.items.length)
+          throw new Error('Bảng điểm đã thay đổi trong lúc tải. Hãy mở lại hồ sơ để xem đầy đủ.');
+        items.push(...page.items);
+      }
+      if (items.length !== first.total || new Set(items.map(item => item.id)).size !== items.length)
+        throw new Error('Không tải được đầy đủ bảng điểm. Hãy mở lại hồ sơ.');
+      return { ...first, items };
+    })()
       .then(rows => { if (!c.signal.aborted) setResults(rows); })
       .catch(e => { if (!c.signal.aborted) setResultsError(message(e)); })
       .finally(() => { if (!c.signal.aborted) setResultsLoading(false); });
     return () => c.abort();
-  }, [id, page, revision, refresh]);
-  return { profile, results, page, setPage, profileLoading, resultsLoading, error, resultsError, reload: () => setRefresh(v => v + 1) };
+  }, [id, revision, refresh]);
+  return { profile, results, profileLoading, resultsLoading, error, resultsError, reload: () => setRefresh(v => v + 1) };
 }

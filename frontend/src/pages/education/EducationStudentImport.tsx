@@ -173,11 +173,14 @@ const EducationStudentImport: React.FC = () => {
       <div role="tabpanel" id="student-import-panel" aria-labelledby="student-import-tab" hidden={activeTab !== 'import'} className={activeTab !== 'import' ? 'hidden' : ''}>
       <section className="space-y-4 p-5 sm:p-7">
         <h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2>
-        <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="min-w-0"><h3 className="font-semibold text-slate-900">Chọn tệp Excel</h3><p className="mt-1 break-all text-sm text-slate-600" aria-live="polite">{fileName || 'Chưa chọn tệp'}</p></div>
-          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          <label className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
-            <FileSpreadsheet size={18} /> Chọn tệp Excel
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <div className="flex max-w-full flex-col items-center gap-1">
+            <FileSpreadsheet size={24} className="text-green-700" aria-hidden="true" />
+            <p className="max-w-full break-all text-sm font-medium text-slate-700" aria-live="polite">{fileName || 'Chưa chọn tệp Excel'}</p>
+          </div>
+          <div className="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
+          <label className={`inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 sm:w-auto ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
+            Chọn tệp Excel
             <input
               aria-label="Tệp sinh viên và bảng điểm"
               className="sr-only"
@@ -192,7 +195,7 @@ const EducationStudentImport: React.FC = () => {
             />
           </label>
           <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50 sm:w-auto"
             disabled={!!busy}
             onClick={() => {
               try { downloadStudentImportTemplate(); }
