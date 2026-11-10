@@ -8,6 +8,7 @@ import { list, saveCompany } from './catalog.service';
 import { coordinate, decision, assign, updateAssignment } from './workflow.service';
 import { registeredStudents } from './registered-students.service';
 import { eligibleStudents } from './eligible-students.service';
+import { studentDossier } from './student-profile.service';
 const router=Router();
 const staff=[authenticate,authorizeRoles('ADMIN','OJT_COORD')];
 const admin=[authenticate,authorizeRoles('ADMIN')];
@@ -17,6 +18,7 @@ router.post('/qhdn/placements',...staff,handle(req=>supplementPlacement(req.body
 router.post('/qhdn/placements/:id/receive',...staff,handle(req=>recordActualReceipt(positiveId(req.params.id),req.body,req.user)));
 router.get('/qhdn/registered-students',...staff,handle(req=>registeredStudents(req.query,req.user)));
 router.get('/qhdn/eligible-students',...staff,handle(req=>eligibleStudents(req.query,req.user)));
+router.get('/qhdn/students/:id',...staff,handle(req=>studentDossier(positiveId(req.params.id),req.query,req.user)));
 for(const [path,resource] of [['companies','companies'],['positions','positions'],['ojt-coordinations','coordinations'],['assignments','assignments'],['internship-evaluations','evaluations']] as const){
   router.get(`/${path}`,...staff,handle(req=>list(resource,req.query,req.user)));
 }

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test:education": "node --test --test-isolation=none tests/education/*.test.mjs"
+    "test:education": "node --test --test-isolation=none tests/education/*.test.mjs",
+    "test:qhdn": "node --test --test-isolation=none tests/qhdn/*.test.mjs"
   },
   "keywords": [],
   "author": "",

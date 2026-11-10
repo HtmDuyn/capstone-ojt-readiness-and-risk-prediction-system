@@ -43,6 +43,47 @@ export interface EnterpriseImportPayload {
   rows: EnterpriseImportRow[];
 }
 
+export interface QhdnStudentCv {
+  id: number;
+  studentId: number;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+}
+
+export interface QhdnStudentDossier {
+  id: number;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  className: string | null;
+  status: string;
+  enrollmentYear: number | null;
+  currentSemester: number | null;
+  programCode: string | null;
+  programName: string | null;
+  majorCode: string | null;
+  majorName: string | null;
+  cohortName: string | null;
+  groupCode: string | null;
+  currentPeriodName: string | null;
+  ojtSemesterId: number;
+  semesterName: string;
+  cv: QhdnStudentCv | null;
+  submittedCv: QhdnStudentCv | null;
+  registeredAt: string | null;
+  applicationEmail: string | null;
+  applicationPhone: string | null;
+  companyName: string | null;
+  positionTitle: string | null;
+  decision: string | null;
+  rejectReason: string | null;
+  coverLetter: string | null;
+  certificates: { name: string; url: string }[] | null;
+}
+
 export interface CompanyListItem {
   id: number;
   code: string;

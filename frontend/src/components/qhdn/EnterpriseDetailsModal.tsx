@@ -42,8 +42,6 @@ export function EnterpriseDetailsModal({
   scope,
   initialTab = "overview",
   onClose,
-
-  onPosts,
 }: {
   company: CompanyListItem;
   positions: PositionListItem[];
@@ -52,7 +50,6 @@ export function EnterpriseDetailsModal({
   initialTab?: "overview" | "positions";
   onClose: () => void;
   onUpdated: () => void;
-  onPosts: () => void;
 }) {
   const [tab, setTab] = useState(initialTab);
   const busy = false, error = "";
@@ -146,13 +143,6 @@ export function EnterpriseDetailsModal({
               );
             })}
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button className={workflowSecondary} onClick={onPosts}>
-              <BriefcaseBusiness size={16} />
-              Quản lý tin tuyển dụng
-            </button>
-
-          </div>
         </div>
       )}
       {tab === "positions" && (
@@ -166,9 +156,6 @@ export function EnterpriseDetailsModal({
                 {scope} · {positions.length} vị trí · {totals.open} đang mở
               </p>
             </div>
-            <button className={workflowSecondary} onClick={onPosts}>
-              Xem tin tuyển dụng
-            </button>
           </div>
           {positionsError ? (
             <Notice>{positionsError}</Notice>
@@ -178,14 +165,14 @@ export function EnterpriseDetailsModal({
             </div>
           ) : (
             <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
-              {positions.map((p) => (
+              {positions.map((p, index) => (
                 <article
                   key={p.id}
                   className="rounded-2xl border border-slate-200 p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h4 className="font-bold text-slate-800">{p.title}</h4>
+                      <h4 className="flex items-center gap-2 font-bold text-slate-800"><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium tabular-nums text-slate-500">STT {index + 1}</span>{p.title}</h4>
                       <p className="mt-1 text-xs text-slate-500">
                         {p.recruitmentCode || `Vị trí #${p.id}`} ·{" "}
                         {p.semester?.name ||

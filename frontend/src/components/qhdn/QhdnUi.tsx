@@ -110,7 +110,7 @@ export function Table({
         <thead className="border-b bg-slate-50">
           <tr>
             {headers.map((h) => (
-              <th className="whitespace-nowrap p-3" key={h}>
+              <th scope="col" className={'whitespace-nowrap p-3 ' + (h === 'STT' ? 'w-16 text-center' : '')} key={h}>
                 {h}
               </th>
             ))}
