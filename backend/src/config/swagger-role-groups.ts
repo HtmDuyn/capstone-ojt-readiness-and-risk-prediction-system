@@ -115,6 +115,8 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/qhdn/dashboard",
     "GET /api/qhdn/registered-students",
     "GET /api/qhdn/eligible-students",
+    "GET /api/qhdn/students/{id}",
+    "PATCH /api/qhdn/companies/{id}/access",
     "GET /api/qhdn/reports",
     "GET /api/qhdn/reports/export",
     "PATCH /api/assignments/{id}",

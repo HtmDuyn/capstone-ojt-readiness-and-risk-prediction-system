@@ -28,4 +28,4 @@
  *       '404':
  *         description: Student not found in the semester's handoff list.
  */
-export {};
+export const studentProfileOpenApi = true;

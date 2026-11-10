@@ -28,4 +28,4 @@
  *       '403': { description: QHDN or Admin role required. }
  *       '404': { description: Company not found or already deleted. }
  */
-export {};
+export const companyAccessOpenApi = true;
