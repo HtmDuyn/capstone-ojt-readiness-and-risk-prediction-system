@@ -45,6 +45,14 @@ export async function deliverEmails() {
         const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
           ? error.responseCode : undefined;
         const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
+        // Authentication is shared by every recipient. Pause this batch without
+        // exhausting delivery attempts while an operator repairs SMTP credentials.
+        if (errorCode === 'EAUTH') {
+          await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
+            "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+          console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}. Check SMTP_USER and SMTP_PASSWORD; Gmail requires an app password. Batch paused.`);
+          break;
+        }
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,
           "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
         console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}.`);

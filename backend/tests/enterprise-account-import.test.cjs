@@ -173,6 +173,7 @@ test('failed email delivery records safe SMTP codes and preserves the retry payl
   for (const error of errors) {
     await t.test(error.expected, async child => {
       let claimed = false;
+      let claims = 0;
       let failure;
       const logs = [];
       const payload = encryptEmail({ subject: 'Test', text: 'Private temporary password' });
@@ -182,6 +183,7 @@ test('failed email delivery records safe SMTP codes and preserves the retry payl
       }));
       child.mock.method(pool, 'query', async (sql, args = []) => {
         if (sql.startsWith('WITH candidate AS')) {
+          claims++;
           if (claimed) return { rows: [] };
           claimed = true;
           return { rows: [{ EmailID: '99', Recipient: 'recipient@example.test', Kind: 'ACCOUNT', EncryptedPayload: payload }] };
@@ -191,7 +193,10 @@ test('failed email delivery records safe SMTP codes and preserves the retry payl
       });
       assert.equal(await deliverEmails(), 0);
       assert.deepEqual(failure.args, ['99', error.expected]);
-      assert.ok(failure.sql.includes('"Attempts">=5'));
+      if (error.code === 'EAUTH') {
+        assert.ok(failure.sql.includes('GREATEST("Attempts"-1,0)'));
+        assert.equal(claims, 1, 'authentication failure pauses the batch');
+      } else assert.ok(failure.sql.includes('"Attempts">=5'));
       assert.ok(!failure.sql.includes('"EncryptedPayload"=NULL'));
       assert.ok(logs[0].includes(error.expected));
       assert.ok(!JSON.stringify(logs).includes('Private'));

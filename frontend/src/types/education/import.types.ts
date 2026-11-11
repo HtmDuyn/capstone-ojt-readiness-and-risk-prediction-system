@@ -64,6 +64,7 @@ export interface ImportPreviewResponse {
 }
 
 export interface ImportCommitResponse {
+  importId?: number;
   success: boolean;
   created: number;
   updated: number;
@@ -71,7 +72,7 @@ export interface ImportCommitResponse {
   batchId?: string;
   academicImportId?: string;
   replayed?: boolean;
-  students?: { studentCode: string; action: string; emailStatus: string }[];
+  students?: { studentCode: string; email?: string; action: string; emailStatus: string; emailLastError?: string | null }[];
 }
 
 export interface CatalogOption {

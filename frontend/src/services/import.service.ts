@@ -84,6 +84,11 @@ interface StudentImportResource {
 }
 
 export const importService = {
+  getStudentImport: async (id: number, signal?: AbortSignal): Promise<ImportCommitResponse> => {
+    const resource = apiData<StudentImportResource>(await getJson(`/student-imports/${id}`, {}, signal));
+    if (resource.status !== 'COMMITTED' || !resource.result) throw new Error('Đợt nhập chưa hoàn tất.');
+    return { ...resource.result, importId: resource.id, students: resource.students, success: true };
+  },
   listImportedStudents: (filters: ImportedStudentFilters, page: number, signal?: AbortSignal) =>
     getPage<ImportedStudent>('/students', { ...filters, page, limit: 20 }, signal),
   listStudentImportBatches: (signal?: AbortSignal) =>
@@ -114,6 +119,6 @@ export const importService = {
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'COMMITTED' || !resource.result)
       throw new Error('Backend chưa xác nhận hoàn tất import.');
-    return { ...resource.result, students: resource.students, success: true };
+    return { ...resource.result, importId: resource.id, students: resource.students, success: true };
   },
 };

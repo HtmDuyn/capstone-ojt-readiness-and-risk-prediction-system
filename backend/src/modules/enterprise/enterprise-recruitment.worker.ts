@@ -4,7 +4,7 @@ import { academicTransaction } from '../academic/academic.repository';
 
 // Operates exclusively on posts explicitly submitted through the enterprise API.
 export async function advanceEnterpriseRecruitment() {
-  return academicTransaction(async c => {
+  try { return await academicTransaction(async c => {
     let carried=0;
     if((await c.query(`SELECT to_regprocedure('public."CarryForwardRecruitmentPosts"(integer)') IS NOT NULL AS ready`)).rows[0].ready){
       const windows=(await c.query(`SELECT "WindowID" FROM "RecruitmentWindows" WHERE "Status"='OPEN' AND "PostingStartsAt"<=clock_timestamp() AND "PostingEndsAt">clock_timestamp()`)).rows;
@@ -12,7 +12,11 @@ export async function advanceEnterpriseRecruitment() {
     }
     const result = await c.query('SELECT public."AdvanceEnterpriseRecruitment"() AS continued');
     return Number(result.rows[0].continued)+carried;
-  });
+  }, undefined, 'try'); }
+  catch (error) {
+    if ((error as { code?: string }).code === '55P03') return 0;
+    throw error;
+  }
 }
 
 let stopWorker: (() => void) | undefined;
