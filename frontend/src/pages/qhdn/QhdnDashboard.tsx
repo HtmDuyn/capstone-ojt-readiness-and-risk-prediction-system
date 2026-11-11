@@ -43,7 +43,10 @@ import {
   listCompanies,
   listPositions,
   listCoordinations,
+  getDashboardPlacements,
+  getQhdnDashboardSummary,
 } from "@/services/qhdnService";
+import { placementDashboardStats, type QhdnDashboardSummary } from '@/utils/qhdnDashboard';
 import type {
   CoordinationItem,
   CompanyListItem,
@@ -70,6 +73,12 @@ export const QhdnDashboard: React.FC = () => {
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [revision, setRevision] = useState(0);
+  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats> } | null>(null);
+  const [internshipStats, setInternshipStats] = useState<{ semesterId: number; data: QhdnDashboardSummary } | null>(null);
+  const [internshipError, setInternshipError] = useState('');
+  const [eligibleError, setEligibleError] = useState('');
+  const [eligibleLoading, setEligibleLoading] = useState(false);
 
   // Enterprise Quota calculation data
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
@@ -94,6 +103,33 @@ export const QhdnDashboard: React.FC = () => {
 
   const categoryChartRef = useRef<HTMLCanvasElement | null>(null);
   const categoryChartInstance = useRef<ChartJS | null>(null);
+
+  // Count exactly the same students and current decisions as the coordination screen.
+  useEffect(() => {
+    let active = true;
+    setPlacementStats(null);
+    setInternshipStats(null);
+    setEligibleError('');
+    setInternshipError('');
+    setEligibleLoading(!!selectedSemesterId);
+    if (!selectedSemesterId) return () => { active = false; };
+    Promise.allSettled([
+      getDashboardPlacements(selectedSemesterId)
+        .then(items => { if (active) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(items) }); })
+        .catch(error => { if (active) setEligibleError(errorMessage(error)); }),
+      getQhdnDashboardSummary(selectedSemesterId)
+        .then(data => { if (active) setInternshipStats({ semesterId: selectedSemesterId, data }); })
+        .catch(error => { if (active) setInternshipError(errorMessage(error)); }),
+    ])
+      .finally(() => { if (active) setEligibleLoading(false); });
+    return () => { active = false; };
+  }, [selectedSemesterId, revision]);
+
+  useEffect(() => {
+    const refresh = () => setRevision(value => value + 1);
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
 
   // The company catalog is independent of the selected OJT semester.
   useEffect(() => {
@@ -179,7 +215,7 @@ export const QhdnDashboard: React.FC = () => {
     return () => {
       isActive = false;
     };
-  }, [selectedSemesterId]);
+  }, [selectedSemesterId, revision]);
 
   // Tính toán Quota của từng doanh nghiệp từ vị trí tuyển dụng
   const enterpriseQuotaList = useMemo(() => {
@@ -234,23 +270,27 @@ export const QhdnDashboard: React.FC = () => {
     );
   }, [enterpriseQuotaList, quotaSearch]);
 
-  // Keep the original cards; aggregate statistics remain unavailable while their API is excluded.
+  // Keep a failed request distinct from a successful count of zero.
   const kpiStats = useMemo<Record<
     "handedOff" | "assigned" | "rejected" | "waiting" | "partnerCount" |
     "acceptanceRate" | "inProgress" | "completed" | "totalResults" |
-    "confirmedResults" | "passedResults", number | null>>(() => ({
-    handedOff: null,
-    assigned: null,
-    rejected: isLoading || !selectedSemesterId || loadError ? null : rejectedCoordinations.length,
-    waiting: null,
-    partnerCount: companiesLoading ? null : companies.length,
-    acceptanceRate: null,
-    inProgress: null,
-    completed: null,
-    totalResults: null,
-    confirmedResults: null,
-    passedResults: null,
-  }), [companies.length, companiesLoading, isLoading, selectedSemesterId, loadError, rejectedCoordinations.length]);
+    "confirmedResults" | "passedResults", number | null>>(() => {
+    const roster = placementStats?.semesterId === selectedSemesterId ? placementStats.stats : null;
+    const summary = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data : null;
+    return {
+      handedOff: roster?.handedOff ?? null,
+      assigned: roster?.assigned ?? null,
+      rejected: roster?.rejected ?? null,
+      waiting: roster?.waiting ?? null,
+      partnerCount: companiesLoading ? null : companies.length,
+      acceptanceRate: roster?.acceptanceRate ?? null,
+      inProgress: summary ? summary.assignments.assigned + summary.assignments.active : null,
+      completed: summary?.assignments.completed ?? null,
+      totalResults: summary?.results.total ?? null,
+      confirmedResults: summary?.results.confirmed ?? null,
+      passedResults: summary?.results.passed ?? null,
+    };
+  }, [placementStats, internshipStats, companies.length, companiesLoading, selectedSemesterId]);
 
   // Render Chart 1: Tiến độ luồng OJT (Phễu điều phối & Thực tập)
   useEffect(() => {
@@ -328,6 +368,7 @@ export const QhdnDashboard: React.FC = () => {
             beginAtZero: true,
             grid: { color: "#f1f5f9" },
             ticks: {
+              precision: 0,
               font: { family: "Inter, sans-serif", size: 11 },
               callback: (val) => `${val} SV`,
             },
@@ -476,7 +517,7 @@ export const QhdnDashboard: React.FC = () => {
             {kpiStats.acceptanceRate == null ? "—" : `${kpiStats.acceptanceRate}%`}
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            Đã chốt:{" "}
+            Được DN nhận:{" "}
             <strong className="text-slate-800 font-bold">
               {kpiStats.assigned ?? "—"}
             </strong>{" "}
@@ -581,7 +622,7 @@ export const QhdnDashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {(catalog.loading || isLoading) && (
+          {(catalog.loading || isLoading || eligibleLoading) && (
             <span className="text-xs text-orange-600 flex items-center gap-1.5 animate-pulse mr-1">
               <RefreshCw size={13} className="animate-spin" />
               Đang đồng bộ API...
@@ -592,10 +633,16 @@ export const QhdnDashboard: React.FC = () => {
             selection={catalog}
             controlClassName="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
           />
+          <button type="button" disabled={catalog.loading || isLoading || eligibleLoading} onClick={() => setRevision(value => value + 1)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50">
+            <RefreshCw size={14} />Tải lại
+          </button>
         </div>
       </div>
 
       {catalog.error && <Notice>{catalog.error}</Notice>}
+      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện đã bàn giao: {eligibleError}. Chọn Tải lại để thử lại.</Notice>}
+      {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}. Chọn Tải lại để thử lại.</Notice>}
       {!catalog.loading && catalog.selectedPeriod && !selectedSemesterId && (
         <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Chưa có dữ liệu OJT theo kỳ để hiển thị.</Notice>
       )}
@@ -618,9 +665,9 @@ export const QhdnDashboard: React.FC = () => {
           </div>
           <div className="relative w-full h-72">
             <canvas ref={pipelineChartRef} />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            {kpiStats.handedOff === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="rounded-xl bg-white/95 px-4 py-2 text-sm text-slate-500">Chưa có dữ liệu thống kê tổng hợp.</p>
-            </div>
+            </div>}
           </div>
         </div>
 
