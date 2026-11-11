@@ -217,7 +217,7 @@ export const parseStudentImportWorkbook = async (
   const emails = new Set<string>();
 
   const students: StudentImportRow[] = rows.map((row, index) => {
-    const number = index + 2;
+    const number = typeof row.__rowNum__ === 'number' ? row.__rowNum__ + 1 : index + 2;
 
     const code = getCell(row, ["Mã sinh viên", "MSSV", "code"]).toUpperCase();
 
@@ -306,11 +306,11 @@ export const parseStudentImportWorkbook = async (
   const byCode = new Map(
     students.map((student) => [student.code.trim().toUpperCase(), student]),
   );
-  for (const { code, ...result } of results) {
+  for (const { code, rowNumber, ...result } of results) {
     const student = byCode.get(code.trim().toUpperCase());
     if (!student)
       throw new Error(
-        "Bảng điểm có MSSV " +
+        `Sheet Kết quả học tập, dòng ${rowNumber}: Bảng điểm có MSSV ` +
           code +
           " không thuộc danh sách sinh viên trong tệp.",
       );
@@ -366,14 +366,14 @@ const parseStatus = (raw: string, rowNumber: number): CourseResultStatus => {
 const parseCourseResultImportWorkbook = (
   book: XLSX.WorkBook,
   catalogs: AcademicCatalogs,
-): (StudentCourseResult & { code: string })[] => {
+): (StudentCourseResult & { code: string; rowNumber: number })[] => {
 
   const rows = readRows(book, "Kết quả học tập", true);
 
   const seen = new Set<string>();
 
   return rows.map((row, index) => {
-    const number = index + 2;
+    const number = typeof row.__rowNum__ === 'number' ? row.__rowNum__ + 1 : index + 2;
 
     const code = getCell(row, ["Mã sinh viên", "MSSV", "code"]);
 
@@ -440,6 +440,7 @@ const parseCourseResultImportWorkbook = (
 
     return {
       code,
+      rowNumber: number,
       courseCode,
       academicPeriodId,
       status,
