@@ -43,9 +43,9 @@ export function EnterpriseJobs() {
   }, [revision]);
 
   useEffect(() => {
-    const next = windows.flatMap(w => [Date.parse(w.startsAt), Date.parse(w.endsAt)]).filter(time => time > now);
+    const next = windows.flatMap(w => [Date.parse(w.postingStartsAt ?? w.startsAt), Date.parse(w.postingDeadlineAt ?? w.endsAt), Date.parse(w.applicationEndsAt ?? w.endsAt), Date.parse(w.resultsEndsAt ?? w.endsAt)]).filter(time => time > now);
     const delay = next.length ? Math.min(30000, Math.min(...next) - now + 20) : 30000;
-    const timer = setTimeout(() => setNow(Date.now()), delay);
+    const timer = setTimeout(() => { setNow(Date.now()); if (next.some(time => time <= Date.now())) setRevision(v => v + 1); }, delay);
     return () => clearTimeout(timer);
   }, [windows, now]);
   const selectedWindow = windows.find(w => w.id === selectedWindowId);
@@ -107,7 +107,7 @@ export function EnterpriseJobs() {
             </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
           </div>
           {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.endsAt)}</strong></p>
+            <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
               <p className="mt-1 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)} · QHDN quản lý thời hạn</p>
             </div>
             <p className={`inline-flex items-center gap-2 text-xs font-medium ${accepts ? 'text-emerald-700' : 'text-slate-500'}`}>

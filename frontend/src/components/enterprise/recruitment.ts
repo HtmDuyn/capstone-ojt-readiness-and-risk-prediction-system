@@ -12,7 +12,8 @@ export const formatRecruitmentDate = (value?: string | null) => value && Number.
 
 export function windowAcceptsPosts(window?: RecruitmentWindow, now = Date.now()) {
   return !!window && window.accepting && window.canCreate !== false && window.status === 'OPEN'
-    && new Date(window.startsAt).getTime() <= now && new Date(window.endsAt).getTime() > now;
+    && new Date(window.postingStartsAt ?? window.startsAt).getTime() <= now
+    && new Date(window.postingDeadlineAt ?? window.endsAt).getTime() > now;
 }
 
 export function canEditRecruitmentPost(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {

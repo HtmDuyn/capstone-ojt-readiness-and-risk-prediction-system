@@ -1,4 +1,4 @@
-import { assertRoundPhase, recruitmentSchemaReady } from './round-policy';
+import { assertRoundPhase, recruitmentSchemaReady, expireRecruitmentResponses } from './round-policy';
 import { enrichListRows } from '../../shared/list-context';
 import { academicTransaction,audit } from '../academic/academic.repository';
 import { timestamp } from '../combo-registration/combo.validation';
@@ -55,6 +55,7 @@ export async function reviewPost(id:number,body:unknown,actor:Actor,close=false)
 export async function expireRecruitment() {
  return academicTransaction(async c=>{
   if(!await recruitmentSchemaReady(c))return 0;
+  await expireRecruitmentResponses(c);
   await c.query(`UPDATE "RecruitmentWindows" SET "Status"='CLOSED',"UpdatedAt"=now() WHERE "Status"='OPEN' AND "EndsAt"<=clock_timestamp()`);
   const closed=await c.query(`UPDATE "RecruitmentPosts" SET "Status"='CLOSED',"UpdatedAt"=now() WHERE "Status"='PUBLISHED' AND "DeadlineAt"<=clock_timestamp()`);
   await closeUnusedPositions(c);return closed.rowCount??0;

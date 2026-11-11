@@ -79,6 +79,12 @@ export interface RecruitmentWindow {
   canCreate?: boolean;
   canEdit?: boolean;
   postingDeadlineAt?: string;
+  postingStartsAt?: string;
+  postingEndsAt?: string;
+  applicationStartsAt?: string;
+  applicationEndsAt?: string;
+  resultsStartsAt?: string;
+  resultsEndsAt?: string;
   deadlineManagedBy?: 'QHDN';
   editLockCode?: string | null;
   studentRegistrationWindow?: { id: number; name: string; startsAt: string; endsAt: string } | null;
@@ -203,6 +209,7 @@ export interface EnterpriseCandidateItem {
   decisionAt?: string | null;
   rejectReason?: string | null;
   isLatestCoordination: boolean;
+  canRespond?: boolean;
   application?: Record<string, unknown> | null;
   jobApplication?: Record<string, unknown> | null;
 }

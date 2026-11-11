@@ -33,12 +33,12 @@ async function latest(c:PoolClient,r:Row,coordinationId:number){
   const row=(await c.query('SELECT "CoordinationID" FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1',[r.RegistrationID])).rows[0];
   if(row?.CoordinationID!==coordinationId)throw invalid('Only the latest coordination can change.',409,'COORDINATION_SUPERSEDED');
 }
-async function availablePosition(c:PoolClient,id:number,semesterId:number,phasedResult=false){
+async function availablePosition(c:PoolClient,id:number,semesterId:number,phasedResult=false,reserved=false){
   if(!phasedResult)await assertPublishedPosition(c,id);
   const p=await record(c,'positions',id),company=await record(c,'companies',p.EnterpriseID);
   if(p.OJTSemesterID!==semesterId)throw invalid('Position belongs to a different semester.',409,'POSITION_SEMESTER_MISMATCH');
   if(company.Status!=='ACTIVE'||(p.Status!=='OPEN'&&!(phasedResult&&p.Status==='CLOSED')))throw invalid('An active company and open position are required.',409,'POSITION_NOT_OPEN');
-  if(p.Capacity==null||await occupied(c,id)>=p.Capacity)throw invalid('No remaining position capacity.',409,'POSITION_FULL');
+  if(p.Capacity==null||(await occupied(c,id))-(reserved?1:0)>=p.Capacity)throw invalid('No remaining position capacity.',409,'POSITION_FULL');
   return p;
 }
 async function noAssignment(c:PoolClient,r:Row){
@@ -95,10 +95,19 @@ export async function decision(id:number,body:unknown,actor:Actor){
       const position=await record(c,'positions',before.PositionID),company=await record(c,'companies',before.EnterpriseID);
       if(company.Status!=='ACTIVE'||position.DeletedAt||position.ArchivedAt)throw invalid('Doanh nghiệp hoặc vị trí không còn hoạt động.',409);
       await noAssignment(c,r);
+      if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED' AND co."CoordinationID"<>$3`,[r.StudentID,r.OJTSemesterID,id])).rowCount)
+        throw invalid('Sinh viên đã xác nhận nơi thực tập trong kỳ.',409,'STUDENT_ALREADY_CONFIRMED');
+      if(await occupied(c,before.PositionID)>=position.Capacity)throw invalid('Vị trí đã hết chỉ tiêu dùng chung trong kỳ.',409,'POSITION_FULL');
       if(position.EnterpriseID!==before.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
     }
     const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];
     if(before.ApplicationID)await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4 WHERE "ApplicationID"=$1',[before.ApplicationID,value,actor.userId,reason]);
+    await refreshSlots(c,before.PositionID);
+    if(value==='REJECTED')await c.query(`INSERT INTO "Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt")
+      SELECT staff."UserID",'Sinh viên bị doanh nghiệp từ chối',student."FullName"||' đã bị doanh nghiệp từ chối. QHDN có thể điều phối ngay hoặc chờ tổng hợp cuối đợt. Lý do: '||$3::text,'IN_APP','StudentEnterpriseCoordination',$1::int,now()
+      FROM "Users" staff JOIN "Roles" role ON role."RoleID"=staff."RoleID"
+      CROSS JOIN "Students" s JOIN "Users" student ON student."UserID"=s."UserID"
+      WHERE s."StudentID"=$2 AND staff."Status"='ACTIVE' AND role."RoleCode" IN ('ADMIN','OJT_COORD')`,[id,r.StudentID,reason]);
 
     await log(c,'coordinations',before,after,actor,'ENTERPRISE_DECISION',reason);return {...api('coordinations',after),replayed:false};
   });
@@ -118,7 +127,7 @@ export async function assign(body:unknown,actor:Actor){staff(actor);const b=inpu
     if(!accepted(co.Decision))throw invalid('An accepted coordination is required.',409,'COORDINATION_NOT_ACCEPTED');
     await noAssignment(c,r);
     if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[coordinationId])).rowCount)throw invalid('Coordination already has an assignment.',409,'ASSIGNMENT_EXISTS');
-    const p=await availablePosition(c,co.PositionID,r.OJTSemesterID);
+    const p=await availablePosition(c,co.PositionID,r.OJTSemesterID,true,true);
     if(p.EnterpriseID!==co.EnterpriseID)throw invalid('Coordination and position company do not match.',409);
     const after=await persist(c,'assignments',{CoordinationID:coordinationId,StudentID:r.StudentID,EnterpriseID:co.EnterpriseID,PositionID:co.PositionID,EnterpriseSupervisorName:optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100),...dates,Status:'ASSIGNED'});
     await refreshSlots(c,p.PositionID);await log(c,'assignments',null,after,actor,'ASSIGN',reason);return api('assignments',after);
