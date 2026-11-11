@@ -95,7 +95,22 @@ export function EnterpriseJobs() {
       <AlertCircle size={22} className="mx-auto mb-2 text-rose-600" /><p className="text-sm text-rose-800">{error}</p>
       <button type="button" onClick={refresh} className="mt-3 text-sm font-semibold text-orange-700 hover:underline">Thử lại</button>
     </div> : <>
-      <section aria-label="Đợt và hạn đăng tin" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <dl aria-label="Tổng quan tuyển dụng" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[
+          { label: 'Tin tuyển dụng', value: filtered.length, icon: FileText, tone: 'bg-blue-50 text-blue-600' },
+          { label: 'Vị trí tuyển', value: totals.positions, icon: LayoutGrid, tone: 'bg-violet-50 text-violet-600' },
+          { label: 'Tổng chỉ tiêu', value: totals.capacity, icon: Users, tone: 'bg-emerald-50 text-emerald-600' },
+          { label: 'Chỗ còn lại', value: totals.remaining, icon: UserCheck, tone: 'bg-orange-50 text-orange-600' },
+        ].map(({ label, value, icon: Icon, tone }) => <div key={label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <dt className="flex items-center justify-between gap-3 text-sm font-medium text-slate-500">
+            <span>{label}</span><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon size={20} aria-hidden="true" /></span>
+          </dt>
+          <dd className={`mt-3 text-3xl font-bold tracking-tight tabular-nums sm:text-4xl ${label === 'Chỗ còn lại' ? 'text-orange-600' : 'text-slate-900'}`}>{value}</dd>
+        </div>)}
+      </dl>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section aria-label="Đợt và hạn đăng tin" className="border-b border-slate-100 px-5 py-4 sm:px-7 sm:py-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 lg:max-w-md">
             <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
@@ -120,22 +135,6 @@ export function EnterpriseJobs() {
           <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký OJT: tạm khóa chỉnh sửa tin{selectedWindow.studentRegistrationWindow?.endsAt ? ` đến ${formatRecruitmentDate(selectedWindow.studentRegistrationWindow.endsAt)}` : ''}. Bạn vẫn có thể tạo tin mới trong hạn đăng tuyển.
         </p>}
       </section>
-
-      <dl aria-label="Tổng quan tuyển dụng" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[
-          { label: 'Tin tuyển dụng', value: filtered.length, icon: FileText, tone: 'bg-blue-50 text-blue-600' },
-          { label: 'Vị trí tuyển', value: totals.positions, icon: LayoutGrid, tone: 'bg-violet-50 text-violet-600' },
-          { label: 'Tổng chỉ tiêu', value: totals.capacity, icon: Users, tone: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Chỗ còn lại', value: totals.remaining, icon: UserCheck, tone: 'bg-orange-50 text-orange-600' },
-        ].map(({ label, value, icon: Icon, tone }) => <div key={label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <dt className="flex items-center justify-between gap-3 text-sm font-medium text-slate-500">
-            <span>{label}</span><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}><Icon size={20} aria-hidden="true" /></span>
-          </dt>
-          <dd className={`mt-3 text-3xl font-bold tracking-tight tabular-nums sm:text-4xl ${label === 'Chỗ còn lại' ? 'text-orange-600' : 'text-slate-900'}`}>{value}</dd>
-        </div>)}
-      </dl>
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-7">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
