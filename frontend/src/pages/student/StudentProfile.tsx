@@ -112,27 +112,26 @@ export const StudentAcademicProfile = () => {
                   <table className="w-full min-w-[760px] text-sm text-left">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-slate-700 [&>th]:font-semibold">
-                        <th className="p-3">Môn học</th>
+                        <th className="p-3 whitespace-nowrap">Mã môn</th>
+                        <th className="p-3">Tên môn</th>
                         <th className="px-3 whitespace-nowrap">Kỳ</th>
                         <th className="px-3 whitespace-nowrap">Học kỳ</th>
                         <th>Lần học</th>
                         <th>Điểm</th>
-                        <th>Điểm GPA</th>
                         <th>Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filtered.map((item) => (
                         <tr key={item.id} className="border-b border-slate-200 bg-white transition-colors duration-150 hover:bg-slate-50">
-                          <td className="p-3">
+                          <td className="p-3 whitespace-nowrap">
                             <strong className="text-slate-800">{item.courseCode}</strong>
-                            <p className="mt-0.5 text-xs text-slate-500">{item.courseName}</p>
                           </td>
+                          <td className="p-3 text-slate-800">{item.courseName}</td>
                           <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
                           <td className="px-3 whitespace-nowrap">{item.periodCode || 'Chưa cập nhật'}</td>
                           <td>{item.attemptNumber}</td>
                           <td className={item.score == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.score ?? '—'}</td>
-                          <td className={item.gradePoints == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.gradePoints ?? '—'}</td>
                           <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{statusText(item.status)}</td>
                         </tr>
                       ))}
