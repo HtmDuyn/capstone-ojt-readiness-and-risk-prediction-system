@@ -21,10 +21,10 @@ export async function retakeClassProposals(params:Row){
       let dates;try{dates=previewBlockCalendar(block.CalendarStart);}catch{throw invalid('Semester start date is invalid.',409,'BLOCK_DATES_INVALID');}
       const year=(await c.query('SELECT to_char("StartDate",\'YYYY-MM-DD\') AS start,to_char("EndDate",\'YYYY-MM-DD\') AS end FROM "AcademicYears" WHERE "AcademicYearID"=$1',[block.AcademicYearID])).rows[0];
       const next=(await c.query('SELECT to_char("StartDate",\'YYYY-MM-DD\') AS start FROM "AcademicPeriods" WHERE "Kind"=\'SEMESTER\' AND "StartDate">$1::date ORDER BY "StartDate" LIMIT 1',[dates.mainSemester.startDate])).rows[0];
-      if(!year||dates.mainSemester.startDate<year.start||dates.block.endDate>year.end||next&&dates.block.endDate>=next.start)
-        throw invalid('Calculated Block overlaps the next semester or leaves the academic year. Review the calendar.',409,'CALCULATED_BLOCK_CONFLICT');
+      if(!year||dates.mainSemester.startDate<year.start||dates.block.endDate>year.end||dates.block.endDate>block.CalendarEnd||next&&dates.block.endDate>=next.start)
+        throw invalid('Calculated Block must fit within the selected semester and academic year.',409,'CALCULATED_BLOCK_CONFLICT');
       calendarPreview={...dates,source:'CALCULATED',sourceSemesterId:periodId,storedSemesterEndDate:block.CalendarEnd,
-        requiresCalendarReview:block.CalendarEnd!==dates.mainSemester.endDate};
+        requiresCalendarReview:false};
       block={...block,AcademicPeriodID:null,ParentPeriodID:periodId,Kind:'BLOCK3',Status:'PLANNED',
         PeriodCode:`${block.PeriodCode}-BLOCK3-PREVIEW`,Name:`Block 3 - ${block.Name}`,StartDate:dates.block.startDate,EndDate:dates.block.endDate};
     }
@@ -32,15 +32,17 @@ export async function retakeClassProposals(params:Row){
     const parent=(await c.query('SELECT * FROM "AcademicPeriods" WHERE "AcademicPeriodID"=$1',[block.ParentPeriodID])).rows[0];
     if(!parent||parent.Kind!=='SEMESTER'||parent.AcademicYearID!==block.AcademicYearID)
       throw invalid('Block 3 must have a valid parent semester.',409,'BLOCK_PARENT_INVALID');
-    if(!['PLANNED','ACTIVE'].includes(block.Status))throw invalid('Select a planned or active Block 3.',409,'BLOCK_NOT_OPEN_FOR_PLANNING');
+    if(parent.Status!=='PLANNED'||new Date(parent.StartDate).toISOString().slice(0,10)<=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}))
+      throw invalid('Select an upcoming semester.',409,'UPCOMING_SEMESTER_REQUIRED');
+    if(block.Status!=='PLANNED')throw invalid('Select a planned Block 3.',409,'BLOCK_NOT_OPEN_FOR_PLANNING');
     if(!block.StartDate||!block.EndDate||new Date(block.EndDate)<new Date(block.StartDate))throw invalid('Block dates need review.',409,'BLOCK_DATES_INVALID');
-    if(!preview&&(!parent.EndDate||new Date(block.StartDate)<=new Date(parent.EndDate)))
-      throw invalid('Block 3 must start after its parent semester ends.',409,'BLOCK_BEFORE_PARENT_END');
+    if(!preview&&(new Date(block.StartDate)<new Date(parent.StartDate)||new Date(block.EndDate)>new Date(parent.EndDate)))
+      throw invalid('Block 3 must be within its parent semester.',409,'BLOCK_OUTSIDE_PARENT_SEMESTER');
     if(new Date(block.EndDate).getTime()+86400000<=Date.now())throw invalid('Select a Block 3 that has not ended.',409,'BLOCK_ALREADY_ENDED');
     if(courseId&&!(await c.query('SELECT 1 FROM "Courses" WHERE "CourseID"=$1',[courseId])).rowCount)throw invalid('Course not found.',404);
     const {requested,data}=await readReports(c,{...params,academicPeriodId:periodId},['blockPeriodId','semesterPeriodId','courseId'],false);
     const demand=collectRetakeDemand(data);
-    const items=demand.items.filter(r=>!courseId||r.courseId===courseId);
+    const items=demand.items.filter(r=>r.proposedClassCount>0&&(!courseId||r.courseId===courseId));
     return {scope:requested,calendarPreview,block:{id:preview?null:periodId,source:preview?'CALCULATED':'CONFIGURED',periodCode:block.PeriodCode,name:block.Name,parentPeriodId:block.ParentPeriodID,
       startDate:block.StartDate,endDate:block.EndDate,status:preview?'PREVIEW':block.Status},policy:RETAKE_CLASS_POLICY,
       summary:{courseCount:items.length,proposedClassCount:items.reduce((n,r)=>n+r.proposedClassCount,0),

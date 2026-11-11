@@ -10,10 +10,10 @@ export const academicReportingService = {
       return (await API.get('/retake-class-proposals',{params:{...filters,...(mode==='CALCULATED'?{semesterPeriodId:periodId}:{blockPeriodId:periodId}),page,limit:20},signal,timeout:30000})).data.data;
     }catch(error){
       const body=(error as {response?:{data?:{errorCode?:string}}}).response?.data;
-      if(body?.errorCode==='BLOCK_BEFORE_PARENT_END')throw new Error('Block 3 phải bắt đầu sau khi kỳ học chính kết thúc. Vui lòng kiểm tra lịch đã cấu hình.');
-      if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Lịch Block 3 tính được vượt năm học hoặc trùng kỳ tiếp theo. Phòng đào tạo cần rà soát lịch.');
+      if(body?.errorCode==='BLOCK_OUTSIDE_PARENT_SEMESTER')throw new Error('Block 3 phải nằm trong thời gian của kỳ học đã chọn. Vui lòng kiểm tra lịch đã cấu hình.');
+      if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Học kỳ đã chọn không đủ thời gian cho Block 10, một tuần nghỉ và Block 3. Vui lòng kiểm tra ngày của học kỳ.');
       if(body?.errorCode==='SEMESTER_REQUIRED')throw new Error('Vui lòng chọn kỳ học chính để tự tính lịch Block 3.');
-      const messages:Record<string,string>={BLOCK3_REQUIRED:'Vui lòng chọn kỳ học loại Block 3.',BLOCK_PERIOD_NOT_FOUND:'Không tìm thấy kỳ Block 3 đã chọn.',BLOCK_PARENT_INVALID:'Kỳ Block 3 chưa được gắn đúng với học kỳ chính. Vui lòng đối soát cấu hình.',BLOCK_NOT_OPEN_FOR_PLANNING:'Kỳ Block 3 này không còn ở trạng thái có thể lập kế hoạch.',BLOCK_ALREADY_ENDED:'Kỳ Block 3 đã kết thúc. Vui lòng chọn kỳ sắp tới hoặc đang diễn ra.',BLOCK_DATES_INVALID:'Ngày bắt đầu và kết thúc Block 3 chưa hợp lệ.'};
+      const messages:Record<string,string>={UPCOMING_SEMESTER_REQUIRED:'Vui lòng chọn học kỳ sắp tới.',BLOCK3_REQUIRED:'Vui lòng chọn kỳ học loại Block 3.',BLOCK_PERIOD_NOT_FOUND:'Không tìm thấy kỳ Block 3 đã chọn.',BLOCK_PARENT_INVALID:'Kỳ Block 3 chưa được gắn đúng với học kỳ chính. Vui lòng đối soát cấu hình.',BLOCK_NOT_OPEN_FOR_PLANNING:'Kỳ Block 3 này không còn ở trạng thái có thể lập kế hoạch.',BLOCK_ALREADY_ENDED:'Kỳ Block 3 đã kết thúc. Vui lòng chọn kỳ sắp tới hoặc đang diễn ra.',BLOCK_DATES_INVALID:'Ngày bắt đầu và kết thúc Block 3 chưa hợp lệ.'};
       throw new Error(messages[body?.errorCode??'']??'Không tải được đề xuất mở lớp. Vui lòng kiểm tra kết nối và thử lại.');
     }
   },

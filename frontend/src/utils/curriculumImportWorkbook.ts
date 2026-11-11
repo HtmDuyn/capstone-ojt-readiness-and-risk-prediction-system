@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { CurriculumDetail, CurriculumImportPayload, Major } from '@/types/education/curriculum.types';
-import { downloadCurriculumTemplate } from './curriculumTemplateWorkbook';
+import { curriculumImportSheets, downloadCurriculumTemplate } from './curriculumTemplateWorkbook';
 type ExcelRow = Record<
   string,
   unknown
@@ -10,15 +10,7 @@ type ExcelRow = Record<
    CONSTANTS
    ========================================================= */
 
-const REQUIRED_SHEETS = [
-  "01_Curriculum",
-  "02_Courses",
-  "03_Prerequisites",
-  "04_Combos",
-  "05_ComboCourses",
-  "06_ChoiceGroups",
-  "07_Equivalences",
-] as const;
+const REQUIRED_SHEETS = Object.keys(curriculumImportSheets);
 
 /* =========================================================
    BASIC HELPERS

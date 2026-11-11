@@ -3,18 +3,17 @@ import * as CFB from 'cfb';
 
 const TEMPLATE_NAME = 'Mau_Import_Khung_Chuong_Trinh.xlsx';
 
-const sheets = [
-  {
-    name: 'Thông tin khung chương trình',
-    headers: ['Mã khung chương trình', 'Tên khung chương trình', 'Mô tả', 'Số quyết định', 'Ngày quyết định', 'Tổng tín chỉ'],
-    widths: [28, 38, 40, 22, 20, 18],
-  },
-  {
-    name: 'Danh sách môn học',
-    headers: ['Mã môn học', 'Tên môn học', 'Kỳ khuyến nghị', 'Tín chỉ', 'Loại', 'Tiên quyết'],
-    widths: [20, 40, 20, 14, 22, 42],
-  },
-] as const;
+export const curriculumImportSheets = {
+  '01_Curriculum': ['code', 'name', 'version', 'majorCode', 'totalCredits', 'effectiveYear', 'gpaScale'],
+  '02_Courses': ['courseCode', 'credits', 'semester', 'isRequired', 'entryKind', 'prerequisiteText'],
+  '03_Prerequisites': ['courseCode', 'groupCode', 'minimumPassed', 'prerequisiteCourseCodes'],
+  '04_Combos': ['code', 'name', 'selectionGroup', 'note'],
+  '05_ComboCourses': ['comboCode', 'courseCode', 'credits', 'semester', 'slotCourseCodes', 'prerequisiteText', 'note'],
+  '06_ChoiceGroups': ['comboCode', 'code', 'minCourses', 'maxCourses', 'courseCodes'],
+  '07_Equivalences': ['sourceCourseCode', 'targetCourseCode', 'reason'],
+} as const;
+
+const sheets = Object.entries(curriculumImportSheets);
 
 // SheetJS Community writes the data and column widths. Its writer does not
 // serialize header styles or frozen panes, so finish those two XLSX parts here.
@@ -29,29 +28,25 @@ const replacePart = (zip: any, path: string, transform: (xml: string) => string)
 
 export const createCurriculumTemplateWorkbook = (): Uint8Array => {
   const workbook = XLSX.utils.book_new();
-  for (const { name, headers, widths } of sheets) {
+  for (const [name, headers] of sheets) {
     const sheet = XLSX.utils.aoa_to_sheet([[...headers]]);
-    sheet['!cols'] = widths.map(wch => ({ wch }));
+    sheet['!cols'] = headers.map(header => ({ wch: Math.max(18, header.length + 4) }));
     XLSX.utils.book_append_sheet(workbook, sheet, name);
   }
 
   const zip = CFB.read(new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })), { type: 'array' });
   replacePart(zip, 'xl/styles.xml', xml => xml
-    .replace(/<numFmts count="(\d+)">/, (_, count: string) => `<numFmts count="${Number(count) + 1}">`)
-    .replace('</numFmts>', '<numFmt numFmtId="164" formatCode="dd/MM/yyyy"/></numFmts>')
     .replace('<fonts count="1">', '<fonts count="2">')
     .replace('</fonts>', '<font><sz val="12"/><color rgb="FF334155"/><name val="Calibri"/><b/></font></fonts>')
     .replace('<fills count="2">', '<fills count="3">')
     .replace('</fills>', '<fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill></fills>')
-    .replace('</cellXfs>', '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>')
-    .replace('<cellXfs count="1">', '<cellXfs count="3">'));
+    .replace('</cellXfs>', '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>')
+    .replace('<cellXfs count="1">', '<cellXfs count="2">'));
 
-  sheets.forEach((sheet, index) => {
-    replacePart(zip, `xl/worksheets/sheet${index + 1}.xml`, xml => (index === 0
-      ? xml.replace(/(<col min="5" max="5"[^>]*)(\/>)/, '$1 style="2"$2')
-      : xml)
+  sheets.forEach((_, index) => {
+    replacePart(zip, `xl/worksheets/sheet${index + 1}.xml`, xml => xml
       .replace('<sheetView workbookViewId="0"/>', '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView>')
-      .replace(/(<c r="[A-F]1")/g, '$1 s="1"'));
+      .replace(/(<c r="[A-Z]+1")/g, '$1 s="1"'));
   });
   return new Uint8Array(CFB.write(zip, { type: 'array', fileType: 'zip' }));
 };

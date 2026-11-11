@@ -348,6 +348,12 @@ const EducationStudentImport: React.FC = () => {
               <span>Đã nhập {result.total} sinh viên cùng bảng điểm tương ứng. Mã đợt:{" "}
                 {result.academicImportId ?? result.batchId ?? "—"}
                 {result.replayed ? " (yêu cầu đã được xử lý trước đó)" : ""}.</span>
+              {!!result.created && <span>
+                {result.created} tài khoản mới. Email đăng nhập được xử lý tự động.
+                {result.students?.filter(student => student.action === 'CREATED' && student.emailStatus === 'SENT').length
+                  ? ` Đã gửi ${result.students.filter(student => student.action === 'CREATED' && student.emailStatus === 'SENT').length} email tại thời điểm nhập.`
+                  : ''}
+              </span>}
             </p>
             <p>Để xét điều kiện OJT từ dữ liệu vừa nhập, chuyển đến trang Xét điều kiện đi OJT, chọn phạm vi và bấm xét điều kiện.</p>
             <Link to="/education/ojt-conditions" className="inline-flex rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700">

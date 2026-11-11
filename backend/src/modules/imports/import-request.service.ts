@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { scheduleAccountEmailDelivery } from '../../jobs/provisioning';
 import { academicTransaction,audit } from '../academic/academic.repository';
 import { inputObject,positiveId,requiredText,pagination,invalid } from '../students/student.validation';
 import { importAccounts,type ImportCommitHook } from './import.service';
@@ -72,6 +73,7 @@ export async function commitImportRequest(kind:ImportKind,body:unknown,actor:Act
   };
   const payload={...row.Payload,idempotencyKey:'rest-'+kind.toLowerCase()+'-import-'+id};
   const result=kind==='STUDENT'?await importAccounts(payload,actor.userId,false,onCommit):await importCurriculum(payload,actor.userId,false,onCommit);
+  if (kind === 'STUDENT' && result.created > 0 && !result.replayed) scheduleAccountEmailDelivery();
   return {...await importRequests(kind,{},actor,id),replayed:result.replayed};
 }
 

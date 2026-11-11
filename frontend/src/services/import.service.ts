@@ -80,6 +80,7 @@ interface StudentImportResource {
   status: string;
   preview: Omit<ImportPreviewResponse, 'success'>;
   result?: Omit<ImportCommitResponse, 'success'>;
+  students?: ImportCommitResponse['students'];
 }
 
 export const importService = {
@@ -113,6 +114,6 @@ export const importService = {
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'COMMITTED' || !resource.result)
       throw new Error('Backend chưa xác nhận hoàn tất import.');
-    return { ...resource.result, success: true };
+    return { ...resource.result, students: resource.students, success: true };
   },
 };

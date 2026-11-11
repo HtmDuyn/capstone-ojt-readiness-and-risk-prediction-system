@@ -135,13 +135,13 @@ const readRows = (
 export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   const book = XLSX.utils.book_new();
   const sheets: [string, string[], number[], number[]][] = [
-    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [28, 20, 36, 18, 28, 22, 16, 12, 24], [1, 3, 4, 6, 7, 8]],
-    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [20, 20, 36, 24, 14, 20, 16], [0, 1, 3, 5]],
+    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 20, 12, 24], [1, 3, 4, 6, 7, 8]],
+    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 38, 20, 14, 19, 15], [0, 1, 3, 5]],
   ];
   for (const [name, headers, widths, textColumns] of sheets) {
     const sheet = XLSX.utils.aoa_to_sheet([headers]);
     sheet['!cols'] = widths.map(wch => ({ wch }));
-    sheet['!rows'] = [{ hpt: 28 }];
+    sheet['!rows'] = [{ hpt: 36 }];
     const maxRows = name === 'Danh sách sinh viên' ? 500 : 1000;
     // Text format protects student codes, phone zeroes and calendar codes.
     for (let r = 1; r <= maxRows; r++) for (const c of textColumns)
@@ -176,9 +176,9 @@ export const createStudentImportTemplateFile = (): Uint8Array => {
       xml = xml.replace(pattern, `<${tag} count="${index + 1}">${match[2]}${item}</${tag}>`);
       return index;
     };
-    const fontId = appendStyle('fonts', '<font><b/><sz val="12"/><color rgb="FF334155"/><name val="Calibri"/></font>');
+    const fontId = appendStyle('fonts', '<font><b/><sz val="13"/><color rgb="FF334155"/><name val="Calibri"/></font>');
     const fillId = appendStyle('fills', '<fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill>');
-    headerStyle = appendStyle('cellXfs', `<xf numFmtId="0" fontId="${fontId}" fillId="${fillId}" borderId="0" xfId="0" applyFont="1" applyFill="1"/>`);
+    headerStyle = appendStyle('cellXfs', `<xf numFmtId="0" fontId="${fontId}" fillId="${fillId}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>`);
     return xml;
   });
   for (let index = 1; index <= 2; index++) {

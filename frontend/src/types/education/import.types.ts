@@ -71,6 +71,7 @@ export interface ImportCommitResponse {
   batchId?: string;
   academicImportId?: string;
   replayed?: boolean;
+  students?: { studentCode: string; action: string; emailStatus: string }[];
 }
 
 export interface CatalogOption {
