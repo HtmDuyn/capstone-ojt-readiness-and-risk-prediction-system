@@ -56,8 +56,7 @@ export async function enterprisePosts(params: Row, actor: Actor) {
     const rows = (await c.query(`${sql} ORDER BY p."PostID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
     const summary = (await c.query(`WITH selected AS (${selected}), positions AS (
       SELECT DISTINCT pos."PositionID" AS id,pos."Capacity" AS capacity,
-        GREATEST(0,pos."Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=pos."PositionID"
-          AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))) AS remaining
+        GREATEST(0,pos."Capacity"-public."RecruitmentOccupiedSlots"(pos."PositionID")) AS remaining
       FROM selected JOIN "RecruitmentPostPositions" pp USING("PostID") JOIN "InternshipPositions" pos USING("PositionID"))
       SELECT count(*)::int AS "totalPositions",COALESCE(sum(capacity),0)::bigint AS "totalCapacity",
       COALESCE(sum(capacity-remaining),0)::bigint AS "acceptedStudents",COALESCE(sum(remaining),0)::bigint AS "remainingSlots" FROM positions`,args)).rows[0];
@@ -121,8 +120,7 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     if (positions) {
       const existing = (await c.query(`SELECT pos.*,
         EXISTS(SELECT 1 FROM "RecruitmentPostPositions" other WHERE other."PositionID"=pos."PositionID" AND other."PostID"<>$1) AS shared,
-        (SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=pos."PositionID"
-          AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS accepted
+        public."RecruitmentOccupiedSlots"(pos."PositionID") AS accepted
         FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos USING("PositionID") WHERE pp."PostID"=$1 FOR UPDATE OF pos`,[postId])).rows;
       const existingById = new Map(existing.map(pos => [pos.PositionID,pos]));
       // Preserve IDs, applications and placement history. Remove a position by setting capacity=0 when unused.
@@ -131,7 +129,11 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
         const saved = pos.id ? existingById.get(pos.id) : null;
         if (pos.id && !saved) throw invalid('Position does not belong to this post.',403,'POSITION_SCOPE_DENIED');
         if (pos.id) {
-          if (saved!.shared) throw invalid('A position shared with another post cannot be edited.',409,'POSITION_SHARED');
+          if (saved!.shared) {
+            if(pos.title!==saved!.Title||pos.description!==saved!.Description||pos.requirements!==saved!.Requirements||pos.capacity!==saved!.Capacity||pos.location!==saved!.Location||pos.workMode!==saved!.WorkMode)
+              throw invalid('Vị trí tiếp tục tuyển dùng chung chỉ tiêu và điều kiện trong kỳ; không đặt lại qua đợt bổ sung.',409,'POSITION_SHARED');
+            continue;
+          }
           // Recount confirmed placements after locking the position. Acceptance uses the
           // same academic transaction lock, so a concurrent acceptance cannot bypass this floor.
           const used = saved!.accepted;

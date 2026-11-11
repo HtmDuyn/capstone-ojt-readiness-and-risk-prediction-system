@@ -91,6 +91,8 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   ] },
   { roles: ["ADMIN","ACADEMIC","OJT_COORD","ENTERPRISE","STUDENT"], operations: [
     "GET /api/auth/me",
+    "GET /api/accounts/me/notifications",
+    "PATCH /api/accounts/me/notifications/{id}",
     "PATCH /api/accounts/me/profile",
     "POST /api/auth/change-password",
     "POST /api/auth/login",

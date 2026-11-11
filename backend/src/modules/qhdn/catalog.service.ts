@@ -40,8 +40,8 @@ export async function record(c:PoolClient,resource:Resource,id:number,lock=true)
   const cfg=configs[resource],row=(await c.query(`SELECT * FROM "${cfg.table}" WHERE "${cfg.id}"=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];
   if(!row)throw invalid(`${resource} record not found.`,404,'QHDN_RECORD_NOT_FOUND');return row;
 }
-export async function occupied(c:PoolClient,positionId:number){return (await c.query(`SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "PositionID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[positionId])).rows[0].n as number;}
-export async function refreshSlots(c:PoolClient,positionId:number){await c.query(`UPDATE "InternshipPositions" SET "RemainingSlots"=GREATEST(0,"Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" WHERE "PositionID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))) WHERE "PositionID"=$1`,[positionId]);}
+export async function occupied(c:PoolClient,positionId:number){return (await c.query(`SELECT public."RecruitmentOccupiedSlots"($1) AS n`,[positionId])).rows[0].n as number;}
+export async function refreshSlots(c:PoolClient,positionId:number){await c.query(`UPDATE "InternshipPositions" SET "RemainingSlots"=GREATEST(0,"Capacity"-public."RecruitmentOccupiedSlots"($1)) WHERE "PositionID"=$1`,[positionId]);}
 export async function persist(c:PoolClient,resource:Resource,values:Row,id?:number):Promise<Row>{
   const cfg=configs[resource],cols=Object.keys(values),args=Object.values(values);
   return (await c.query(id?`UPDATE "${cfg.table}" SET ${cols.map((k,i)=>`"${k}"=$${i+1}`).join(',')} WHERE "${cfg.id}"=$${args.length+1} RETURNING *`:`INSERT INTO "${cfg.table}" (${cols.map(k=>`"${k}"`).join(',')}) VALUES (${cols.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,id?[...args,id]:args)).rows[0];
@@ -67,7 +67,7 @@ export async function list(resource:Resource,params:Row,actor:Actor){
     if(resource==='companies'||resource==='positions')filters.push('t."DeletedAt" IS NULL');
     let from=`FROM "${configs[resource].table}" t`;
     let extras='',companyColumn='t."EnterpriseID"';
-    if(resource==='positions'){from+=' JOIN "Enterprises" e ON e."EnterpriseID"=t."EnterpriseID"';extras=`,e."Name" AS "companyName",(SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."PositionID"=t."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS "Occupied"`;}
+    if(resource==='positions'){from+=' JOIN "Enterprises" e ON e."EnterpriseID"=t."EnterpriseID"';extras=`,e."Name" AS "companyName",public."RecruitmentOccupiedSlots"(t."PositionID") AS "Occupied"`;}
     if(['coordinations','assignments','evaluations'].includes(resource)){
       if(resource==='coordinations')from+=' JOIN "OJTRegistrations" r ON r."RegistrationID"=t."RegistrationID"';
       else {if(resource==='evaluations')from+=' JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID"';from+=` JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=${resource==='assignments'?'t':'a'}."CoordinationID" JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"`;}

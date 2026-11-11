@@ -22,6 +22,10 @@ type Student = {
   positionTitle?: string;
   receivedAt?: string;
   hasAssignment: boolean;
+  needsFollowUp?: boolean;
+  rejectReason?: string;
+  canCoordinate?: boolean;
+  coordinationBlockedReason?: string | null;
 };
 type Position = { id: number; title: string; companyName: string; capacity: number | null; actualCount: number };
 type Board = { canCoordinate: boolean; context: { roundCount: number; unfinished: number }; positions: Position[]; items: Student[] };
@@ -34,22 +38,34 @@ export default function QhdnOjtCoordination() {
   const [data, setData] = useState<Board | null>(null), [loading, setLoading] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [revision, setRevision] = useState(0);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState<PlacementStatus | 'ALL'>('ALL'), [busy, setBusy] = useState(false);
+  const [followUpOnly, setFollowUpOnly] = useState(false);
   const [task, setTask] = useState<{ student: Student; kind: 'coordinate' | 'receive' } | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
 
   useEffect(() => {
     setData(null);
     setDetail(null);
+    setTask(null);
+    setLoading(!!semester.semesterId);
+  }, [semester.semesterId]);
+  useEffect(() => {
     setError('');
     if (!semester.semesterId) { setLoading(false); return; }
     let active = true;
-    setLoading(true);
+    if (!data) setLoading(true);
     API.get('/qhdn/placements', { params: { ojtSemesterId: semester.semesterId } })
       .then(r => { if (active) setData(r.data.data); })
       .catch(e => { if (active) setError(errorMessage(e)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [semester.semesterId, revision]);
+
+  useEffect(() => {
+    const refreshIfIdle = () => { if (semester.semesterId && !busy && !task && !detail && document.visibilityState === 'visible') setRevision(v => v + 1); };
+    const timer = window.setInterval(refreshIfIdle, 15000);
+    window.addEventListener('focus', refreshIfIdle);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshIfIdle); };
+  }, [semester.semesterId, busy, task, detail]);
 
   const refresh = () => setRevision(v => v + 1);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -73,16 +89,16 @@ export default function QhdnOjtCoordination() {
     } catch (e) { setError(errorMessage(e)); }
     finally { setBusy(false); }
   };
-  const students = (data?.items ?? []).filter(s =>
+  const students = (data?.items ?? []).filter(s => (!followUpOnly || s.needsFollowUp) &&
     (filter === 'ALL' || placementStatus(s) === filter) &&
     `${s.studentCode} ${s.fullName}`.toLowerCase().includes(search.toLowerCase()),
   );
 
   return <div className="space-y-5 pb-10">
-    <PageBanner title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên chưa có nơi thực tập sau tuyển dụng, theo dõi phản hồi của doanh nghiệp và ghi nhận số lượng thực nhận." badge="Phòng QHDN" />
+    <PageBanner title="Điều phối sinh viên và quản lý thực nhận" description="Sinh viên bị doanh nghiệp từ chối có thể được điều phối ngay trong đợt tuyển dụng, hoặc xử lý cùng tổng hợp cuối đợt." badge="Phòng QHDN" />
     {(error || semester.error) && <Notice>{error || semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}
-    {data && !data.canCoordinate && <Notice>Chỉ điều phối sau khi đợt tuyển dụng cuối cùng kết thúc và QHDN chốt tổng hợp tất cả các đợt. Hiện còn {data.context.unfinished} đợt chưa hoàn tất{!data.context.roundCount ? ' hoặc chưa có lịch tuyển dụng' : ''}.</Notice>}
+    {data && data.context.unfinished > 0 && <Notice>Đợt tuyển dụng đang diễn ra. QHDN có thể điều phối ngay các sinh viên đã bị doanh nghiệp từ chối. Mốc kết thúc và chốt tổng hợp dùng để thống kê toàn bộ sinh viên chưa được nhận, không chặn xử lý sớm hồ sơ bị từ chối.</Notice>}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
       {placementStatuses.map(status => <button key={status} aria-pressed={filter === status}
         className={'rounded-2xl border p-4 text-left transition ' + (filter === status ? placementStatusColors[status] : 'border-slate-200 bg-white hover:border-slate-300')}
@@ -110,6 +126,7 @@ export default function QhdnOjtCoordination() {
         </Field>
         <button className={workflowSecondary + ' h-11 whitespace-nowrap sm:justify-self-end'} disabled={loading || busy} onClick={refresh}><RefreshCw size={16} />Tải lại</button>
       </div>
+      <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({data?.items.filter(s => s.needsFollowUp).length ?? 0})</label>
       {loading ? <p className="p-8 text-center text-slate-500">Đang tải danh sách…</p> : !students.length ?
         <p className="p-8 text-center text-slate-500">Không có sinh viên phù hợp trong danh sách bàn giao.</p> :
         <div className="overflow-x-auto">
@@ -122,7 +139,7 @@ export default function QhdnOjtCoordination() {
             <tbody className="divide-y divide-slate-100">
               {students.map((student, index) => {
                 const status = placementStatus(student);
-                const canCoordinate = !!data?.canCoordinate && !student.receivedAt && !student.hasAssignment && student.decision !== 'ACCEPTED' && !(student.decision === 'PENDING' && student.source?.startsWith('QHDN_'));
+                const canCoordinate = student.canCoordinate === true;
                 return <tr key={student.id} className="hover:bg-slate-50/60">
                   <td className={cell + ' text-center tabular-nums text-slate-500'}>{index + 1}</td>
                   <td className={cell}><p className="font-semibold text-slate-800">{student.fullName}</p><p className="mt-1 text-xs text-slate-500">{student.studentCode}</p></td>
@@ -132,6 +149,8 @@ export default function QhdnOjtCoordination() {
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />{placementStatusLabels[status]}
                     </span>
                     {student.receivedAt && <p className="mt-2 text-xs text-slate-500">{new Date(student.receivedAt).toLocaleString('vi-VN')}</p>}
+                    {student.needsFollowUp && <p className="mt-2 text-xs font-medium text-red-600">Doanh nghiệp quá hạn phản hồi · Cần QHDN theo dõi điều phối</p>}
+                    {student.decision === 'REJECTED' && canCoordinate && <p className="mt-2 text-xs font-medium text-orange-600">Có thể điều phối ngay</p>}
                   </td>
                   <td className={cell + ' text-right'}>
                     <div className="flex items-center justify-end gap-1.5">
@@ -140,7 +159,7 @@ export default function QhdnOjtCoordination() {
                         aria-label={'Ghi nhận thực nhận cho ' + student.fullName} title="Ghi nhận sinh viên thực tế được tiếp nhận"
                         onClick={() => { setError(''); setTask({ student, kind: 'receive' }); }}><CheckCheck size={14} />Thực nhận</button> :
                       <button className={compactAction + ' border-slate-200 bg-white text-slate-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700'} disabled={!canCoordinate || busy}
-                        aria-label={'Điều phối ' + student.fullName} title="Điều phối sinh viên đến doanh nghiệp"
+                        aria-label={'Điều phối ' + student.fullName} title={student.coordinationBlockedReason || 'Điều phối sinh viên đến doanh nghiệp'}
                         onClick={() => { setError(''); setTask({ student, kind: 'coordinate' }); }}><UserPlus size={14} />Điều phối</button>)}
                     <button type="button" aria-label={'Xem hồ sơ ' + student.fullName} title="Xem hồ sơ sinh viên và CV"
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700"

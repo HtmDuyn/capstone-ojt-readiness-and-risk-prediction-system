@@ -6,6 +6,7 @@ import { requireStudentAdmission } from '../student-portal/admission.service';
 import { assertOjtSemesterSix } from '../academic/workflow-policy';
 import { staff, record, refreshSlots } from './catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { coordinationAvailability } from './placement.policy';
 
 export async function requirePlacementSchema(c:PoolClient){
  const ready=(await c.query(`SELECT to_regclass('public."OJTActualReceipts"') IS NOT NULL AS ready`)).rows[0].ready;
@@ -16,17 +17,16 @@ export async function placementContext(c:PoolClient,semesterId:number){
   count(*) FILTER(WHERE "EndsAt">clock_timestamp() OR "ResultsFinalizedAt" IS NULL)::int AS unfinished
   FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "CampaignID" IS NOT NULL`,[semesterId])).rows[0];
 }
-async function afterRecruitment(c:PoolClient,semesterId:number){
- const context=await placementContext(c,semesterId);
- if(!context.roundCount||context.unfinished)throw invalid('Chỉ điều phối sau khi đợt tuyển dụng cuối cùng kết thúc và QHDN đã chốt tổng hợp các đợt.',409,'RECRUITMENT_NOT_FINISHED');
-}
 export async function placementBoard(params:Row,actor:Actor){
  staff(actor);const semesterId=positiveId(params.ojtSemesterId,'ojtSemesterId');
  return readTransaction(async c=>{
   await requirePlacementSchema(c);
   const context=await placementContext(c,semesterId);
   const items=(await c.query(`SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."RegistrationID" AS "registrationId",r."Status" AS "registrationStatus",
-   latest."CoordinationID" AS "coordinationId",latest."Decision" AS decision,latest."Source" AS source,latest."PositionID" AS "positionId",
+   latest."CoordinationID" AS "coordinationId",latest."Decision" AS decision,latest."RejectReason" AS "rejectReason",
+   (s."Status"='ACTIVE' AND u."Status"='ACTIVE') AS "isActive",
+   EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=s."StudentID" AND co."OJTSemesterID"=$1 AND co."Decision"='ACCEPTED') AS "hasConfirmedPlace",
+   (latest."Decision"='REJECTED' AND EXISTS(SELECT 1 FROM "ApplicationEvents" ev WHERE ev."ApplicationID"=latest."ApplicationID" AND ev."Action"='AUTO_REJECT_RESPONSE_DEADLINE')) AS "needsFollowUp",latest."Source" AS source,latest."PositionID" AS "positionId",
    p."Title" AS "positionTitle",e."Name" AS "companyName",receipt."ReceivedAt" AS "receivedAt",receipt."Reason" AS "receiptReason",receipt."ExceededCapacity" AS "exceededCapacity",(SELECT "FullName" FROM "Users" WHERE "UserID"=receipt."ReceivedBy") AS "receivedByName",
    EXISTS(SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" ac ON ac."CoordinationID"=a."CoordinationID"
     WHERE a."StudentID"=s."StudentID" AND ac."OJTSemesterID"=$1 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS "hasAssignment",
@@ -42,7 +42,8 @@ export async function placementBoard(params:Row,actor:Actor){
   const positions=(await c.query(`SELECT p."PositionID" AS id,p."Title" AS title,e."Name" AS "companyName",p."Capacity" AS capacity,
    (SELECT count(*)::int FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE co."PositionID"=p."PositionID") AS "actualCount"
    FROM "InternshipPositions" p JOIN "Enterprises" e USING("EnterpriseID") WHERE p."OJTSemesterID"=$1 AND p."DeletedAt" IS NULL AND p."ArchivedAt" IS NULL AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL ORDER BY e."Name",p."Title"`,[semesterId])).rows;
-  return {canCoordinate:context.roundCount>0&&context.unfinished===0,context,positions,items};
+  const students=items.map(student=>({...student,...coordinationAvailability(student,context)}));
+  return {canCoordinate:students.some(student=>student.canCoordinate),summaryReady:context.roundCount>0&&context.unfinished===0,context,positions,items:students};
  });
 }
 export async function supplementPlacement(body:unknown,actor:Actor){
@@ -50,12 +51,13 @@ export async function supplementPlacement(body:unknown,actor:Actor){
  const studentId=positiveId(b.studentId,'studentId'),semesterId=positiveId(b.ojtSemesterId,'ojtSemesterId'),positionId=positiveId(b.positionId,'positionId');
  const source=enumValue(b.source,['QHDN_APPLICATION','QHDN_COORDINATION'],'source'),reason=requiredText(b.reason,'reason',2000);
  return academicTransaction(async c=>{
-  await requirePlacementSchema(c);await afterRecruitment(c,semesterId);
+  await requirePlacementSchema(c);
   const s=(await c.query(`SELECT s.* FROM "Students" s JOIN "Users" u USING("UserID") WHERE s."StudentID"=$1 AND s."Status"='ACTIVE' AND u."Status"='ACTIVE' AND s."DeletedAt" IS NULL FOR UPDATE OF s`,[studentId])).rows[0];
   if(!s)throw invalid('Sinh viên không còn hoạt động.',409);
   await requireStudentAdmission(c,studentId,semesterId);await assertOjtSemesterSix(c,studentId,semesterId);
   if((await c.query(`SELECT 1 FROM "OJTActualReceipts" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 UNION ALL
-    SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."StudentID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[studentId,semesterId])).rowCount)throw invalid('Sinh viên đã có nơi thực tập trong kỳ này.',409,'ASSIGNMENT_EXISTS');
+    SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."StudentID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
+    UNION ALL SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED'`,[studentId,semesterId])).rowCount)throw invalid('Sinh viên đã có nơi thực tập trong kỳ này.',409,'ASSIGNMENT_EXISTS');
   const p=await record(c,'positions',positionId),company=await record(c,'companies',p.EnterpriseID);
   if(p.OJTSemesterID!==semesterId||p.DeletedAt||p.ArchivedAt||company.Status!=='ACTIVE'||company.DeletedAt||p.Status==='ARCHIVED')throw invalid('Vị trí hoặc doanh nghiệp không phù hợp với kỳ OJT.',409);
   let r=(await c.query('SELECT * FROM "OJTRegistrations" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 FOR UPDATE',[studentId,semesterId])).rows[0];
@@ -66,6 +68,8 @@ export async function supplementPlacement(body:unknown,actor:Actor){
    if(previous.PositionID===positionId&&previous.Source===source&&previous.CoordinationReason===reason)return {...previous,replayed:true};
    throw invalid('Sinh viên đang chờ doanh nghiệp phản hồi điều phối trước.',409,'COORDINATION_PENDING');
   }
+  const availability=coordinationAvailability({decision:previous?.Decision,source:previous?.Source},await placementContext(c,semesterId));
+  if(!availability.canCoordinate)throw invalid(availability.coordinationBlockedReason!,409,'COORDINATION_NOT_READY');
   if(previous?.Decision==='PENDING'){
    await c.query(`UPDATE "StudentEnterpriseCoordination" SET "Decision"='SUPERSEDED',"DecisionAt"=now() WHERE "CoordinationID"=$1`,[previous.CoordinationID]);
    if(previous.ApplicationID)await c.query(`UPDATE "JobApplications" SET "Status"='WITHDRAWN',"ReviewNote"=$2,"ReviewedBy"=$3,"UpdatedAt"=now() WHERE "ApplicationID"=$1`,[previous.ApplicationID,reason,actor.userId]);

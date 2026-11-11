@@ -342,7 +342,7 @@ export const EnterpriseCandidates: React.FC = () => {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        {c.decision === 'PENDING' && c.isLatestCoordination && (
+                        {c.decision === 'PENDING' && c.isLatestCoordination && c.canRespond !== false && (
                           <>
                             <button
                               type="button"
@@ -463,7 +463,8 @@ export const EnterpriseCandidates: React.FC = () => {
             </div>
 
             {/* Actions */}
-            {selectedCandidate.decision === 'PENDING' && selectedCandidate.isLatestCoordination && (
+            {selectedCandidate.decision === 'PENDING' && selectedCandidate.canRespond === false && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Hiện ngoài hạn xét tuyển, phản hồi của đợt. Bạn vẫn có thể xem hồ sơ; quyết định nhận hoặc từ chối chỉ được cập nhật trong hạn phản hồi.</p>}
+            {selectedCandidate.decision === 'PENDING' && selectedCandidate.isLatestCoordination && selectedCandidate.canRespond !== false && (
               <div className="flex items-center justify-end space-x-3 pt-2">
                 <button
                   onClick={() => handleDecision(selectedCandidate.id, 'REJECTED')}

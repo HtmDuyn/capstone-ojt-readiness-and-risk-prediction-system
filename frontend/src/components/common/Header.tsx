@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AccountNotificationBell } from './AccountNotificationBell';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Building2 } from 'lucide-react';
 import {
   SearchIcon,
-  NotificationBellIcon,
   GlobeIcon,
   MenuIcon,
   LogoutIcon,
@@ -103,14 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right: Notification, Language, User profile */}
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Notification Bell */}
-        {showNotifications && <button
-          type="button"
-          className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors cursor-pointer"
-          title="Thông báo"
-        >
-          <NotificationBellIcon size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full ring-2 ring-white animate-pulse" />
-        </button>}
+        {showNotifications && <AccountNotificationBell />}
 
         {/* Language selector */}
         {showLanguage && <button

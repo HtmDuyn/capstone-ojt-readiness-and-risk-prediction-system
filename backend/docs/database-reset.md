@@ -1,10 +1,10 @@
 # Reset DB và dữ liệu 20 sinh viên
 
-`backend/DB` là script **full reset**: xóa bảng/dữ liệu ứng dụng cũ, tạo schema, nạp danh mục và đúng **20 sinh viên** trong một transaction. Chỉ chạy khi muốn khởi tạo lại database. Nếu có lỗi ở bất kỳ phần nào, cả lần reset được rollback.
+`backend/DB` là script **full reset**: xóa bảng/dữ liệu ứng dụng cũ, tạo schema, nạp danh mục và đúng **20 sinh viên**. Chỉ chạy khi muốn khởi tạo lại database. File gồm nhiều khối `BEGIN`/`COMMIT` độc lập: lỗi ở khối sau không rollback các khối đã commit trước đó. Vì vậy không dùng toàn bộ file để nâng cấp database đang có dữ liệu cần giữ.
 
 ## Thứ tự khởi tạo
 
-File tạo trực tiếp schema cuối cùng: dọn đối tượng ứng dụng → tạo bảng đủ cột → khóa/index → hàm/view → INSERT catalog và cấu hình cuối → seed lịch/hồ sơ → foreign key/trigger → quyền truy cập → kiểm tra và COMMIT. Không còn các đoạn ALTER để thêm lại cột hoặc UPDATE để vá bản ghi vừa INSERT.
+File tạo schema nền: dọn đối tượng ứng dụng → tạo bảng → khóa/index → hàm/view → INSERT catalog và cấu hình → seed lịch/hồ sơ → foreign key/trigger → quyền truy cập → kiểm tra và COMMIT. Các khối cập nhật ở cuối file tiếp tục bổ sung cột, hàm và trigger cho CV, tuyển dụng ba hạn, gia hạn, đợt bổ sung và kiểm soát truy cập. Phải chạy đến hết file để có schema cuối cùng.
 
 Các khóa ngoại được lắp sau khi đã có đủ bản ghi tham chiếu, để xử lý các quan hệ vòng mà không tắt trigger hoặc dùng chế độ bỏ qua ràng buộc. Các kiểm tra lịch sử học và seed chạy trước commit.
 
@@ -14,7 +14,7 @@ Toàn bộ schema, hàm, trigger, quyền truy cập và dữ liệu khởi tạ
 
 ## Cách chạy
 
-Mở toàn bộ `backend/DB` trong pgAdmin/DBeaver/SQL Editor và chạy từ `BEGIN` đến `COMMIT`, hoặc từ thư mục gốc dự án:
+Chỉ với database dùng thử hoặc khi đã chủ động quyết định reset: mở toàn bộ `backend/DB` trong pgAdmin/DBeaver/SQL Editor và chạy từ đầu đến cuối file, hoặc từ thư mục gốc dự án:
 
 ```powershell
 psql -X -v ON_ERROR_STOP=1 -d your_database -f backend/DB

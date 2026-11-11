@@ -15,6 +15,8 @@ const blockers: Record<string, string> = {
   ELIGIBILITY_CHECK_STALE: 'Kết quả xét điều kiện cần được cập nhật.',
   ELIGIBILITY_HANDOFF_STALE: 'Dữ liệu học tập đã thay đổi sau bàn giao; liên hệ Phòng Đào tạo để rà soát.',
   APPLICATION_ALREADY_IN_PROCESS: 'Bạn đã có đơn đang chờ xử lý hoặc đã được tiếp nhận trong đợt này.',
+  STUDENT_ALREADY_CONFIRMED: 'Bạn đã được xác nhận nơi thực tập trong kỳ nên không thể ứng tuyển mới, kể cả ở đợt bổ sung.',
+  APPLICATION_ROUND_ALREADY_SUBMITTED: 'Hồ sơ đợt này được giữ nguyên. Bạn có thể nộp hồ sơ mới khi đợt bổ sung mở ứng tuyển.',
   POSITION_FULL: 'Vị trí đã đủ chỉ tiêu.',
   OJT_REGISTRATION_WINDOW_UNAVAILABLE: 'Đợt đăng ký chưa mở hoặc đã hết hạn.',
   REGISTRATION_OUT_OF_SCOPE: 'Bạn không thuộc phạm vi của đợt đăng ký này.',

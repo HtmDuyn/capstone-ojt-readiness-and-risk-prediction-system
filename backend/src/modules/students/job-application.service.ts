@@ -12,6 +12,7 @@ import { assertOjtSemesterSix } from '../academic/workflow-policy';
 import { invalid, inputObject, positiveId, optionalText, pagination, enumValue } from './student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { assertPostPhase } from '../recruitment/round-policy';
+import { requireLifecycleSchema } from '../recruitment/lifecycle.service';
 
 export async function ownStudent(c:PoolClient,actor:Actor) {
   if(actor.roleCode!=='STUDENT')throw invalid('Chức năng dành cho sinh viên.',403,'FORBIDDEN');
@@ -22,10 +23,11 @@ export async function ownStudent(c:PoolClient,actor:Actor) {
 const applicationSelect=`SELECT a."ApplicationID" AS id,a."RegistrationID" AS "registrationId",a."StudentID" AS "studentId",s."StudentCode" AS "studentCode",u."FullName" AS "fullName",
  a."OJTSemesterID" AS "ojtSemesterId",a."PostID" AS "postId",a."PositionID" AS "positionId",a."EnterpriseID" AS "companyId",a."CVFileID" AS "cvFileId",a."OfficialCheckID" AS "officialCheckId",a."CoverLetter" AS "coverLetter",a."Status" AS status,a."AppliedAt" AS "appliedAt",a."UpdatedAt" AS "updatedAt",a."ReviewNote" AS "reviewNote",
  jsonb_build_object('id',e."EnterpriseID",'name',e."Name",'address',e."Address",'contactEmail',e."ContactEmail") AS company,
- jsonb_build_object('id',p."PositionID",'code',p."RecruitmentCode",'title',p."Title",'requirements',p."Requirements",'description',p."Description",'status',p."Status",'capacity',p."Capacity",'remainingSlots',GREATEST(0,p."Capacity"-(SELECT count(*) FROM "InternshipAssignments" slot WHERE slot."PositionID"=p."PositionID" AND COALESCE(UPPER(slot."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')))) AS position,
+ jsonb_build_object('id',p."PositionID",'code',p."RecruitmentCode",'title',p."Title",'requirements',p."Requirements",'description',p."Description",'status',p."Status",'capacity',p."Capacity",'remainingSlots',GREATEST(0,p."Capacity"-public."RecruitmentOccupiedSlots"(p."PositionID"))) AS position,
  jsonb_build_object('id',post."PostID",'title',post."Title",'deadlineAt',post."DeadlineAt",'status',post."Status") AS post,
  CASE WHEN cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('cv')} END AS cv,
  a."CertificateLinks" AS certificates,
+ a."ApplicationSnapshot" AS "applicationSnapshot",
  r."Status" AS "registrationStatus",EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AS "handedOff",
  (SELECT jsonb_build_object('id',co."CoordinationID",'decision',co."Decision",'rejectReason',co."RejectReason",'coordinatedAt',co."CoordinatedAt",'assignmentId',ass."AssignmentID",'assignmentStatus',ass."Status") FROM "StudentEnterpriseCoordination" co LEFT JOIN "InternshipAssignments" ass ON ass."CoordinationID"=co."CoordinationID" WHERE co."ApplicationID"=a."ApplicationID" ORDER BY co."CoordinationID" DESC LIMIT 1) AS coordination
  FROM "JobApplications" a JOIN "OJTRegistrations" r ON r."RegistrationID"=a."RegistrationID" JOIN "Students" s ON s."StudentID"=a."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID" LEFT JOIN "StudentCVFiles" cv ON cv."CVFileID"=a."CVFileID"`;
@@ -40,6 +42,7 @@ export async function applyToPosition(body:unknown,actor:Actor) {
   const form=b.application===undefined?{}:inputObject(b.application,['contactPhone','contactEmail','note']);
   return academicTransaction(async c=>{
     const s=await ownStudent(c,actor);
+    await requireLifecycleSchema(c);
     await assertPostPhase(c,postId,'APPLICATION');
     const applicationForm={
       contactPhone:optionalText(form.contactPhone??s.Phone,'contactPhone',30),
@@ -60,6 +63,9 @@ export async function applyToPosition(body:unknown,actor:Actor) {
 
     const semesterId=w?.OJTSemesterID??requestedRegistration?.OJTSemesterID;
     if(!semesterId)throw invalid('OJT semester is required.',400,'OJT_SEMESTER_REQUIRED');
+    if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED'
+      UNION ALL SELECT 1 FROM "InternshipAssignments" ia JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE ia."StudentID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(ia."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') LIMIT 1`,[s.StudentID,semesterId])).rowCount)
+      throw invalid('Sinh viên đã xác nhận nơi thực tập trong kỳ, không được ứng tuyển mới.',409,'STUDENT_ALREADY_CONFIRMED');
     if(w){
       const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
       if(w.Status!=='OPEN'||now<new Date(w.StartsAt)||now>=new Date(w.EndsAt))throw invalid('Đợt đăng ký sinh viên đã đóng hoặc ngoài thời hạn.',409,'OJT_REGISTRATION_WINDOW_UNAVAILABLE');
@@ -72,8 +78,9 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       }
     }
 
-    const p=(await c.query(`SELECT p.*,post."EnterpriseID" AS "PostEnterpriseID",post."Status" AS "PostStatus",post."DeadlineAt",e."Status" AS "CompanyStatus" FROM "InternshipPositions" p JOIN "RecruitmentPostPositions" pp ON pp."PositionID"=p."PositionID" JOIN "RecruitmentPosts" post ON post."PostID"=pp."PostID" JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" WHERE p."PositionID"=$1 AND post."PostID"=$2 FOR UPDATE OF p,post,e`,[positionId,postId])).rows[0];
+    const p=(await c.query(`SELECT p.*,post."EnterpriseID" AS "PostEnterpriseID",post."Status" AS "PostStatus",post."WindowID" AS "PostWindowID",post."DeadlineAt",e."Status" AS "CompanyStatus" FROM "InternshipPositions" p JOIN "RecruitmentPostPositions" pp ON pp."PositionID"=p."PositionID" JOIN "RecruitmentPosts" post ON post."PostID"=pp."PostID" JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" WHERE p."PositionID"=$1 AND post."PostID"=$2 FOR UPDATE OF p,post,e`,[positionId,postId])).rows[0];
     if(!p)throw invalid('Vị trí không thuộc tin tuyển dụng.',404,'POSITION_NOT_FOUND');
+    if(w?.RecruitmentRoundID&&w.RecruitmentRoundID!==p.PostWindowID)throw invalid('Vị trí không thuộc đợt ứng tuyển đã chọn.',409,'RECRUITMENT_ROUND_MISMATCH');
     if(p.OJTSemesterID!==semesterId||p.EnterpriseID!==p.PostEnterpriseID)throw invalid('Vị trí không khớp kỳ OJT/doanh nghiệp.',409,'POSITION_SEMESTER_MISMATCH');
     const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
     if(p.PostStatus!=='PUBLISHED'||(p.DeadlineAt&&now>=new Date(p.DeadlineAt)))throw invalid('Tin chưa công bố hoặc đã hết hạn.',409,'RECRUITMENT_NOT_PUBLISHED');
@@ -128,15 +135,14 @@ export async function applyToPosition(body:unknown,actor:Actor) {
     const existingApplication=(await c.query(`SELECT * FROM "JobApplications" WHERE "RegistrationID"=$1 AND "PostID"=$2 AND "PositionID"=$3 ORDER BY "ApplicationID" DESC LIMIT 1 FOR UPDATE`,[r.RegistrationID,postId,positionId])).rows[0]??null;
     const eligibility=admission;
     let applicationId:number;
-    if(existingApplication){
-      applicationId=existingApplication.ApplicationID;
-      await c.query(`UPDATE "JobApplications" SET "Status"='SUBMITTED',"CoverLetter"=$2,"CVFileID"=$3,"OfficialCheckID"=$4,"UpdatedAt"=now(),"ReviewedBy"=NULL,"ReviewNote"=NULL WHERE "ApplicationID"=$1`,[applicationId,letter,cv?.id??null,eligibility.checkId??null]);
-    }else{
+    if(existingApplication)throw invalid('Đã có hồ sơ ở vị trí này trong đợt. Hồ sơ cũ được giữ nguyên; ứng tuyển mới ở đợt bổ sung.',409,'APPLICATION_ROUND_ALREADY_SUBMITTED');
+    {
       applicationId=(await c.query(`INSERT INTO "JobApplications" ("RegistrationID","StudentID","OJTSemesterID","PostID","PositionID","EnterpriseID","CVFileID","OfficialCheckID","CoverLetter")
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING "ApplicationID"`,
       [r.RegistrationID,s.StudentID,semesterId,postId,positionId,p.EnterpriseID,cv?.id??null,eligibility.checkId??null,letter])).rows[0].ApplicationID;
     }
     await c.query('UPDATE "JobApplications" SET "CertificateLinks"=$2 WHERE "ApplicationID"=$1',[applicationId,JSON.stringify(certificates)]);
+    await c.query(`UPDATE "JobApplications" SET "ApplicationSnapshot"=$2 WHERE "ApplicationID"=$1`,[applicationId,JSON.stringify({application:applicationForm,position:p,post:{id:postId,windowId:p.PostWindowID},coverLetter:letter,certificates,cvFileId:cv.id})]);
     const coordination=(await c.query(`INSERT INTO "StudentEnterpriseCoordination"
       ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","Decision","ApplicationID","OJTSemesterID","PreviousCoordinationID")
       VALUES ($1,$2,$3,$4,'PENDING',$5,$6,$7) RETURNING "CoordinationID"`,
@@ -193,9 +199,10 @@ export async function studentOpportunities(params:Row,actor:Actor) {
     if(latestCoordination&&latestCoordination.Decision!=='REJECTED')blockers.push('APPLICATION_ALREADY_IN_PROCESS');
     const hasAssignment=r&&(await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[r.RegistrationID])).rowCount;
     if(hasAssignment)blockers.push('ASSIGNMENT_EXISTS');
-    const sql=`SELECT p."PositionID" AS id,p."OJTSemesterID" AS "ojtSemesterId",post."PostID" AS "postId",p."RecruitmentCode" AS code,p."Title" AS title,p."Description" AS description,p."Requirements" AS requirements,p."Location" AS location,p."WorkMode" AS "workMode",p."Capacity" AS capacity,GREATEST(0,p."Capacity"-(SELECT count(*) FROM "InternshipAssignments" a WHERE a."PositionID"=p."PositionID" AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))) AS "remainingSlots",jsonb_build_object('id',e."EnterpriseID",'name',e."Name",'address',e."Address") AS company,jsonb_build_object('id',post."PostID",'title',post."Title",'deadlineAt',post."DeadlineAt",'content',post."Content",'benefits',post."Benefits") AS post,(SELECT app."ApplicationID" FROM "JobApplications" app JOIN "OJTRegistrations" reg ON reg."RegistrationID"=app."RegistrationID" WHERE reg."StudentID"=$2 AND app."PositionID"=p."PositionID" AND app."PostID"=post."PostID" ORDER BY app."ApplicationID" DESC LIMIT 1) AS "applicationId" FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" JOIN "RecruitmentPostPositions" pp ON pp."PositionID"=p."PositionID" JOIN "RecruitmentPosts" post ON post."PostID"=pp."PostID" WHERE p."OJTSemesterID"=$1 AND p."Status"='OPEN' AND e."Status"='ACTIVE' AND post."Status"='PUBLISHED' AND (post."DeadlineAt" IS NULL OR post."DeadlineAt">clock_timestamp()) AND NOT EXISTS(SELECT 1 FROM "RecruitmentWindows" rw WHERE rw."WindowID"=post."WindowID" AND rw."CampaignID" IS NOT NULL AND (rw."Status"<>'OPEN' OR clock_timestamp()<rw."StartsAt" OR clock_timestamp()>=rw."EndsAt"))`;
-    const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) x`,[semesterId,s.StudentID])).rows[0].n;
-    const rows=(await c.query(sql+' ORDER BY p."PositionID",post."PostID" LIMIT $3 OFFSET $4',[semesterId,s.StudentID,p.limit,p.offset])).rows;
+    if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED' LIMIT 1`,[s.StudentID,semesterId])).rowCount)blockers.push('STUDENT_ALREADY_CONFIRMED');
+    const sql=`SELECT p."PositionID" AS id,p."OJTSemesterID" AS "ojtSemesterId",post."PostID" AS "postId",p."RecruitmentCode" AS code,p."Title" AS title,p."Description" AS description,p."Requirements" AS requirements,p."Location" AS location,p."WorkMode" AS "workMode",p."Capacity" AS capacity,GREATEST(0,p."Capacity"-public."RecruitmentOccupiedSlots"(p."PositionID")) AS "remainingSlots",jsonb_build_object('id',e."EnterpriseID",'name',e."Name",'address',e."Address") AS company,jsonb_build_object('id',post."PostID",'title',post."Title",'deadlineAt',post."DeadlineAt",'content',post."Content",'benefits',post."Benefits") AS post,(SELECT app."ApplicationID" FROM "JobApplications" app JOIN "OJTRegistrations" reg ON reg."RegistrationID"=app."RegistrationID" WHERE reg."StudentID"=$2 AND app."PositionID"=p."PositionID" AND app."PostID"=post."PostID" ORDER BY app."ApplicationID" DESC LIMIT 1) AS "applicationId" FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" JOIN "RecruitmentPostPositions" pp ON pp."PositionID"=p."PositionID" JOIN "RecruitmentPosts" post ON post."PostID"=pp."PostID" WHERE p."OJTSemesterID"=$1 AND ($3::int IS NULL OR post."WindowID"=$3) AND p."Status"='OPEN' AND e."Status"='ACTIVE' AND post."Status"='PUBLISHED' AND (post."DeadlineAt" IS NULL OR post."DeadlineAt">clock_timestamp()) AND NOT EXISTS(SELECT 1 FROM "RecruitmentWindows" rw WHERE rw."WindowID"=post."WindowID" AND rw."CampaignID" IS NOT NULL AND (rw."Status"<>'OPEN' OR clock_timestamp()<rw."StartsAt" OR clock_timestamp()>=rw."EndsAt"))`;
+    const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) x`,[semesterId,s.StudentID,w.RecruitmentRoundID??null])).rows[0].n;
+    const rows=(await c.query(sql+' ORDER BY p."PositionID",post."PostID" LIMIT $4 OFFSET $5',[semesterId,s.StudentID,w.RecruitmentRoundID??null,p.limit,p.offset])).rows;
     const items=rows.map(pos=>{const reasons=[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])];return {...pos,remainingSlots:Number(pos.remainingSlots),canApply:!reasons.length,blockers:reasons};});
     return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:r?.RegistrationID??null,windowId,ojtSemesterId:semesterId,officialEligibility:official,admissionEligibility:admission,canApply:!blockers.length,blockers};
   });
