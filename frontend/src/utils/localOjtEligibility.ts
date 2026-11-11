@@ -1,8 +1,8 @@
 import type { Attempt, Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
 
-export const LOCAL_OJT_RULE = { minCredits: 70, maxUnpassedCourses: 2 } as const;
+export type LocalOjtRule = { version: number; minCredits: number; maxUnpassedCourses: number };
 
-export function calculateLocalOjtEligibility(studentId: number, profile: Profile, attempts: Attempt[]): LocalOjtResult {
+export function calculateLocalOjtEligibility(studentId: number, profile: Profile, attempts: Attempt[], rule: LocalOjtRule): LocalOjtResult {
   const credits = profile.academicProgress?.credits;
   const earned = credits?.earned;
   const earnedCredits = typeof earned === 'number' && Number.isFinite(earned) && earned >= 0 ? earned : null;
@@ -15,10 +15,10 @@ export function calculateLocalOjtEligibility(studentId: number, profile: Profile
   const academicIssues = earnedCredits === null || credits?.completeConfiguration !== true
     ? ['Chưa đủ dữ liệu tín chỉ hoặc cấu hình chương trình để kết luận.'] : [];
   const reasons: string[] = [];
-  if (earnedCredits !== null && earnedCredits < LOCAL_OJT_RULE.minCredits) reasons.push(`Còn thiếu ${Math.round((LOCAL_OJT_RULE.minCredits - earnedCredits) * 100) / 100} tín chỉ so với mức 70.`);
-  if (failed.size > LOCAL_OJT_RULE.maxUnpassedCourses) reasons.push(`Còn ${failed.size} môn chưa đạt, vượt giới hạn 2 môn.`);
+  if (earnedCredits !== null && earnedCredits < rule.minCredits) reasons.push(`Còn thiếu ${Math.round((rule.minCredits - earnedCredits) * 100) / 100} tín chỉ so với mức ${rule.minCredits}.`);
+  if (failed.size > rule.maxUnpassedCourses) reasons.push(`Còn ${failed.size} môn chưa đạt, vượt giới hạn ${rule.maxUnpassedCourses} môn.`);
   return { studentId, earnedCredits, unpassedCourseCount: failed.size, reasons, academicIssues,
-    status: academicIssues.length ? 'REVIEW_REQUIRED' : earnedCredits! >= LOCAL_OJT_RULE.minCredits && failed.size <= LOCAL_OJT_RULE.maxUnpassedCourses ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
-    checkedAt: new Date().toISOString() };
+    status: academicIssues.length ? 'REVIEW_REQUIRED' : earnedCredits! >= rule.minCredits && failed.size <= rule.maxUnpassedCourses ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+    policyVersion: rule.version, checkedAt: new Date().toISOString() };
 }
 

@@ -1,6 +1,7 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
 import { getAllItems } from '@/services/educationApi';
-import { loadAndCalculateLocalEligibility, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/localOjtEligibility.service';
+import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/localOjtEligibility.service';
+import type { CurrentOjtRule } from '@/services/localOjtEligibility.service';
 import type { ImportedStudent } from '@/types/education/import.types';
 import React from 'react';
 
@@ -13,6 +14,7 @@ export function useEducationOjtEligibility() {
   const [busy, setBusy] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [savedCount, setSavedCount] = React.useState<number | null>(null);
+  const [rule, setRule] = React.useState<CurrentOjtRule | null>(null);
   const [error, setError] = React.useState('');
   const [revision, setRevision] = React.useState(0);
   const [results, setResults] = React.useState<Record<number, LocalOjtResult>>({});
@@ -28,14 +30,17 @@ export function useEducationOjtEligibility() {
   React.useEffect(() => {
     const c = new AbortController();
     setLoading(true); setError(''); setResults({}); setFailures({}); setNotice(''); setTargets([]); activeRequest.current?.abort();
-    setSavedCount(null); saveKey.current = null;
+    setSavedCount(null); setRule(null); saveKey.current = null;
     Promise.allSettled([
       getAllItems<ImportedStudent>('/students', {}, c.signal),
       loadSavedLocalOjtResults(c.signal),
-    ]).then(([studentResponse, savedResponse]) => {
+      loadCurrentOjtRule(c.signal),
+    ]).then(([studentResponse, savedResponse, ruleResponse]) => {
       if (c.signal.aborted) return;
       if (studentResponse.status === 'rejected') throw studentResponse.reason;
       const students = studentResponse.value;
+      if (ruleResponse.status === 'rejected') throw ruleResponse.reason;
+      setRule(ruleResponse.value);
       setTargets(students.map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
       const stored = savedResponse.status === 'fulfilled' ? savedResponse.value : students.flatMap(student => student.calculatedEligibility ? [{ ...student.calculatedEligibility, studentId: student.id }] : []);
       const studentIds = new Set(students.map(student => student.id));
@@ -52,17 +57,19 @@ export function useEducationOjtEligibility() {
   }, [revision]);
   const ready = targets.filter(t => !t.reason);
   async function runAll() {
-    if (running.current || savingRequest.current || loading || !ready.length) return;
+    if (running.current || savingRequest.current || loading || !ready.length || !rule) return;
     const controller = new AbortController(); activeRequest.current = controller;
     running.current = true; setBusy(true); setError(''); setNotice(''); setFailures({}); setResults({});
     setSavedCount(null); saveKey.current = null;
     let next = 0, completed = 0, failed = 0;
     try {
+      const currentRule = await loadCurrentOjtRule(controller.signal);
+      setRule(currentRule);
       await Promise.all(Array.from({ length: Math.min(4, ready.length) }, async () => {
         while (next < ready.length && !controller.signal.aborted) {
           const target = ready[next++];
           try {
-            const result = await loadAndCalculateLocalEligibility(target.student.id, controller.signal);
+            const result = await loadAndCalculateLocalEligibility(target.student.id, currentRule, controller.signal);
             if (controller.signal.aborted) return;
             completed++;
             setResults(previous => ({ ...previous, [target.student.id]: result }));
@@ -76,15 +83,17 @@ export function useEducationOjtEligibility() {
         }
       }));
       if (!controller.signal.aborted) setNotice('Đã xét ' + completed + ' sinh viên bằng FE. ' + (targets.length - ready.length) + ' sinh viên không hoạt động; ' + failed + ' hồ sơ gặp lỗi. Kết quả chưa lưu vào database.');
+    } catch (e) {
+      if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Không tải được điều kiện OJT đang áp dụng.');
     } finally { running.current = false; if (!controller.signal.aborted) setBusy(false); }
   }
   async function saveResults() {
     const calculated = Object.values(results);
-    if (running.current || savingRequest.current || !calculated.length || savedCount !== null) return;
+    if (running.current || savingRequest.current || !calculated.length || savedCount !== null || !rule) return;
     savingRequest.current = true; setSaving(true); setError('');
     saveKey.current ??= crypto.randomUUID();
     try {
-      const count = await saveLocalOjtResults(calculated, saveKey.current);
+      const count = await saveLocalOjtResults(calculated, saveKey.current, rule);
       setSavedCount(count);
       setNotice(`Đã lưu ${count} kết quả xét điều kiện OJT vào hệ thống.`);
     } catch (e) {
@@ -98,5 +107,5 @@ export function useEducationOjtEligibility() {
   const checked = Object.values(results);
   const currentResults = checked.filter(result => !result.isStale);
 
-  return { ready, runAll, saveResults, visible, pages, checked, currentResults, targets, loading, busy, saving, savedCount, error, setRevision, results, failures, notice, search, setSearch, filter, setFilter, setPage, currentPage };
+  return { ready, runAll, saveResults, visible, pages, checked, currentResults, targets, loading, busy, saving, savedCount, error, setRevision, results, failures, notice, search, setSearch, filter, setFilter, setPage, currentPage, rule };
 }

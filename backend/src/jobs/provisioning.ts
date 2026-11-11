@@ -55,14 +55,21 @@ export async function deliverEmails() {
   return sent;
 }
 
+let wakeProvisioning: (() => void) | undefined;
+
+export function scheduleAccountEmailDelivery() {
+  wakeProvisioning?.();
+}
+
 export function startProvisioningJobs() {
   let busy = false, stopped = false;
+  let requested = false;
   const tick = async () => {
     if (busy || stopped) return;
     busy = true;
     try {
       // Deliver result notifications and account emails independently.
-      for(const [name,job] of [['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
+      for(const [name,job] of [['email',deliverEmails],['results',notifyCompletedInternships]] as const) {
         try { await job(); }
         catch (error: any) {
           // Log codes only: SMTP messages may contain recipient data or credentials.
@@ -79,10 +86,25 @@ export function startProvisioningJobs() {
         }
       }
     }
-    finally { busy = false; }
+    finally {
+      busy = false;
+      if (requested && !stopped) {
+        requested = false;
+        void tick();
+      }
+    }
   };
+  const wake = () => {
+    if (busy) requested = true;
+    else void tick();
+  };
+  wakeProvisioning = wake;
   const timer = setInterval(() => void tick(), 60000);
   timer.unref();
   void tick();
-  return () => { stopped = true; clearInterval(timer); };
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+    if (wakeProvisioning === wake) wakeProvisioning = undefined;
+  };
 }

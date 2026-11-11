@@ -13,6 +13,7 @@ const EducationCurriculumPlan: React.FC = () => {
     [error, setError] = React.useState(""),
     [loading, setLoading] = React.useState(false),
     [refresh, setRefresh] = React.useState(0);
+  const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
   React.useEffect(() => {
     const c = new AbortController();
     setError("");
@@ -36,6 +37,7 @@ const EducationCurriculumPlan: React.FC = () => {
   React.useEffect(() => {
     let active = true;
     setDetail(null);
+    setDescriptionExpanded(false);
     if (!programId) return;
     setError("");
     setLoading(true);
@@ -55,6 +57,8 @@ const EducationCurriculumPlan: React.FC = () => {
     };
   }, [programId, refresh]);
   const selectedMajor = majors.find((m) => String(m.id) === majorId);
+  const description = detail?.description?.trim() ?? "";
+  const hasLongDescription = description.length > 240;
   return (
     <div className="space-y-6">
       <PageBanner
@@ -66,7 +70,7 @@ const EducationCurriculumPlan: React.FC = () => {
         <div className="flex flex-wrap gap-3">
           <select
             aria-label="Chuyên ngành"
-            className="rounded border p-2"
+            className="min-w-44 flex-1 rounded border p-2"
             value={majorId}
             onChange={(e) => {
               setMajorId(e.target.value);
@@ -82,7 +86,7 @@ const EducationCurriculumPlan: React.FC = () => {
           </select>
           <select
             aria-label="Khung chương trình"
-            className="rounded border p-2"
+            className="min-w-60 flex-[2] rounded border p-2"
             value={programId}
             onChange={(e) => setProgramId(e.target.value)}
           >
@@ -95,12 +99,6 @@ const EducationCurriculumPlan: React.FC = () => {
                 </option>
               ))}
           </select>
-          <button
-            className="rounded border p-2"
-            onClick={() => setRefresh((v) => v + 1)}
-          >
-            Tải lại
-          </button>
           <CurriculumImportActions
             majors={majors}
             selectedMajorCode={selectedMajor?.code ?? null}
@@ -122,14 +120,35 @@ const EducationCurriculumPlan: React.FC = () => {
         )}
         {detail && (
           <>
-            <h2 className="text-lg font-bold">
-              {detail.code} — {detail.name}
-            </h2>
-            <p>
-              Chuyên ngành: {detail.majorName}; tổng tín chỉ:{" "}
-              {detail.totalCredits}; phiên bản: {detail.version ?? "—"}; năm áp
-              dụng: {detail.effectiveYear ?? "—"}
-            </p>
+            <div className="space-y-4 border-b border-slate-200 pb-5">
+              <h2 className="text-lg font-semibold text-slate-900">Thông tin khung chương trình</h2>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-500">Mã khung chương trình</p>
+                <p className="mt-1 break-words text-sm font-semibold text-orange-700">{detail.code}</p>
+                <p className="mt-3 text-xs font-medium text-slate-500">Tên khung chương trình</p>
+                <p className="mt-1 break-words text-base font-semibold text-slate-900">{detail.name}</p>
+              </div>
+              <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Chuyên ngành', detail.majorName],
+                  ['Tổng số tín chỉ', detail.totalCredits],
+                  ['Phiên bản', detail.version ?? '—'],
+                  ['Năm áp dụng', detail.effectiveYear ?? '—'],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0 rounded-lg bg-slate-50 px-4 py-3">
+                    <dt className="text-xs font-medium text-slate-500">{label}</dt>
+                    <dd className="mt-1 break-words text-sm font-semibold text-slate-800">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-slate-800">Mô tả khung chương trình</h3>
+                <p className={`mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700 ${hasLongDescription && !descriptionExpanded ? 'line-clamp-3' : ''}`}>
+                  {description || 'Chưa có mô tả'}
+                </p>
+                {hasLongDescription && <button type="button" onClick={() => setDescriptionExpanded(value => !value)} aria-expanded={descriptionExpanded} className="mt-2 text-sm font-medium text-orange-700 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">{descriptionExpanded ? 'Thu gọn' : 'Xem thêm'}</button>}
+              </div>
+            </div>
             <h3 className="font-semibold">Môn học trong khung</h3>
             <div className="overflow-auto">
               <table className="w-full text-left text-sm">

@@ -5,7 +5,9 @@ import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle
 import React from 'react';
 
 export const EducationDashboard: React.FC = () => {
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, courseDemands, academicAlerts, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
+  const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible > 0);
+  const chartMax = Math.max(4, Math.ceil(Math.max(0, ...cohortResults.map(period => period.eligible + period.ineligible)) / 4) * 4);
   return (
     <div className="mx-auto w-full max-w-[1500px]">
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -220,10 +222,6 @@ export const EducationDashboard: React.FC = () => {
               loading={alertsLoading}
             />
           </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <MetricCard label="Chưa xét / cần xét lại" value={awaitingConfirmationStudents} description="Chưa có kết quả đã lưu hoặc dữ liệu đã thay đổi" icon={<Info size={18} />} iconClass="bg-blue-50 text-blue-600" loading={dashboardLoading} />
-            <MetricCard label="Cần đối soát dữ liệu" value={insufficientDataStudents} description="Chưa đủ cấu hình để xét điều kiện" icon={<AlertTriangle size={18} />} iconClass="bg-orange-50 text-orange-600" loading={dashboardLoading} />
-          </div>
         </section>
 
         {/* =============================================
@@ -317,64 +315,25 @@ export const EducationDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* OJT BY PERIOD */}
+            {/* OJT BY COHORT */}
 
             <div className="p-5">
               <SectionTitle
                 icon={<BarChart3 size={18} />}
-                title="Điều kiện OJT theo khóa"
+                title="Kết quả xét điều kiện OJT theo khóa"
                 description="Kết quả xét của từng khóa trong phạm vi đã chọn."
                 iconClass="bg-blue-50 text-blue-600"
               />
 
-              {periodStatistics.length === 0 ? (
+              {cohortResults.length === 0 ? (
                 <EmptyState
                   loading={dashboardLoading}
                   title="Chưa có thống kê theo khóa"
                   description="Chọn kỳ học có liên kết OJT để xem kết quả theo khóa."
                 />
               ) : (
-                <div className="mt-6 space-y-5">
-                  {periodStatistics.map((period, index) => {
-                    const eligibleWidth =
-                      (period.eligible / maxPeriodStudents) * 100;
-
-                    const ineligibleWidth =
-                      (period.ineligible / maxPeriodStudents) * 100;
-
-                    return (
-                      <div key={`${period.label}-${index}`}>
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-slate-700">
-                            {period.label}
-                          </span>
-
-                          <span className="text-xs text-slate-400">
-                            {formatNumber(period.eligible + period.ineligible)}{" "}
-                            SV
-                          </span>
-                        </div>
-
-                        <div className="flex h-3 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="bg-green-500"
-                            style={{
-                              width: `${eligibleWidth}%`,
-                            }}
-                          />
-
-                          <div
-                            className="bg-red-400"
-                            style={{
-                              width: `${ineligibleWidth}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div className="flex flex-wrap gap-4 pt-2 text-xs text-slate-500">
+                <div className="mt-5">
+                  <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600">
                     <span className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
                       Đủ điều kiện
@@ -385,6 +344,37 @@ export const EducationDashboard: React.FC = () => {
                       Chưa đủ điều kiện
                     </span>
                   </div>
+                  <div className="flex h-[270px] gap-2" role="group" aria-label="Biểu đồ số sinh viên đủ và chưa đủ điều kiện OJT theo khóa">
+                    <div className="flex h-[220px] w-8 shrink-0 flex-col justify-between text-right text-[11px] text-slate-500">
+                      {[chartMax, chartMax * 0.75, chartMax * 0.5, chartMax * 0.25, 0].map(value => <span key={value}>{value}</span>)}
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-x-auto">
+                      <div className="relative h-[270px] w-max min-w-full">
+                        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 flex h-[220px] flex-col justify-between border-b border-l border-slate-300">
+                          {[0, 1, 2, 3, 4].map(value => <div key={value} className="border-t border-slate-100" />)}
+                        </div>
+                        <div className="relative z-10 flex h-full min-w-max items-start gap-4 px-4">
+                          {cohortResults.map((period, index) => {
+                            const total = period.eligible + period.ineligible;
+                            const details = `${period.label}: ${period.eligible} sinh viên đủ điều kiện, ${period.ineligible} sinh viên chưa đủ điều kiện`;
+                            return (
+                              <div key={`${period.label}-${index}`} className="flex h-full min-w-[88px] max-w-[130px] flex-1 flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-orange-400" title={details} role="img" aria-label={details} tabIndex={0}>
+                                <div className="flex h-[220px] w-full flex-col items-center justify-end">
+                                  <span className="mb-1 text-xs font-semibold text-slate-700">{total}</span>
+                                  <div className="flex w-12 flex-col-reverse overflow-hidden rounded-t-sm" style={{ height: `${total / chartMax * 196}px` }}>
+                                    <div className="bg-green-500" style={{ height: `${period.eligible / total * 100}%` }} />
+                                    <div className="bg-red-300" style={{ height: `${period.ineligible / total * 100}%` }} />
+                                  </div>
+                                </div>
+                                <span className="mt-2 w-full break-words text-center text-xs font-medium text-slate-700">{period.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-center text-xs text-slate-500">Khóa sinh viên · Số lượng sinh viên</p>
                 </div>
               )}
             </div>
@@ -401,48 +391,33 @@ export const EducationDashboard: React.FC = () => {
           </h2>
 
           <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 lg:grid-cols-2">
-            {/* COHORT PROGRESS */}
+            {/* YEARLY OJT ELIGIBILITY */}
 
             <div className="border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
               <SectionTitle
                 icon={<GraduationCap size={18} />}
-                title="Tỷ lệ đủ điều kiện OJT theo khóa"
-                description="Số sinh viên đủ điều kiện trên tổng sinh viên của từng khóa."
+                title="Tỷ lệ sinh viên đủ điều kiện OJT theo năm học"
+                description="Tỷ lệ trên tổng sinh viên có kết quả xét hợp lệ của từng năm học."
                 iconClass="bg-blue-50 text-blue-600"
               />
 
-              {cohortProgress.length === 0 ? (
-                <EmptyState
-                  loading={dashboardLoading}
-                  title="Chưa có tỷ lệ theo khóa"
-                  description="Tỷ lệ hiển thị khi phạm vi đã chọn có sinh viên."
-                />
-              ) : (
-                <div className="mt-6 space-y-5">
-                  {cohortProgress.map((cohort, index) => (
-                    <div key={`${cohort.label}-${index}`}>
-                      <div className="mb-2 flex justify-between gap-3">
-                        <span className="text-xs font-semibold text-slate-700">
-                          {cohort.label}
-                        </span>
-
-                        <span className="text-xs font-bold text-blue-600">
-                          {formatPercent(cohort.percent)}
-                        </span>
-                      </div>
-
-                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full bg-blue-500"
-                          style={{
-                            width: `${cohort.percent}%`,
-                          }}
-                        />
-                      </div>
+              <div className="mt-5" aria-label="Biểu đồ tỷ lệ đủ điều kiện OJT theo năm học">
+                <div className="flex h-[250px] gap-3">
+                  <div className="flex w-10 shrink-0 flex-col justify-between pb-px text-right text-[11px] text-slate-500">
+                    <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
+                  </div>
+                  <div className="relative min-w-0 flex-1 border-b border-l border-slate-300">
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                      {[0, 25, 50, 75, 100].map(value => <div key={value} className="border-t border-slate-100" />)}
                     </div>
-                  ))}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+                      <p className="text-sm font-semibold text-slate-700">Chưa có dữ liệu theo năm học</p>
+                      <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">Dữ liệu kết quả xét hiện chưa gắn với năm học để tính tỷ lệ chính xác.</p>
+                    </div>
+                  </div>
                 </div>
-              )}
+                <p className="mt-2 pl-10 text-center text-xs text-slate-500">Năm học</p>
+              </div>
             </div>
 
             {/* COURSE DEMAND */}

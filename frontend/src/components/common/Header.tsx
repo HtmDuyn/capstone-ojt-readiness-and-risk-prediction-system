@@ -135,14 +135,17 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="relative">
-              {currentUser.avatar?.trim() ? <img
-                src={currentUser.avatar}
-                alt={currentUser.fullName}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/40 shadow-xs"
-              /> : <span
-                aria-label={currentUser.fullName}
-                className="flex w-9 h-9 sm:w-10 sm:h-10 items-center justify-center rounded-full bg-orange-100 font-bold text-orange-700 ring-2 ring-orange-500/40 shadow-xs"
-              >{currentUser.fullName.trim().slice(0, 1).toUpperCase() || '?'}</span>}
+              {currentUser.avatar?.trim() ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.fullName}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/40 shadow-xs"
+                />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700 ring-2 ring-orange-500/40 shadow-xs sm:h-10 sm:w-10" aria-label={currentUser.fullName}>
+                  {currentUser.fullName.trim().charAt(0).toUpperCase() || '?'}
+                </span>
+              )}
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
             </div>
           </button>

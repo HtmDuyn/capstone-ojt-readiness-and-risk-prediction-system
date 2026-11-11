@@ -127,13 +127,24 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
     icon: <CalendarDays size={20} />,
     children: [
       {
+        id: 'ojt-policy',
+        label: 'Quản lý điều kiện xét OJT',
+        path: '/education/ojt-policy',
+        icon: <FileCheck size={20} />,
+        banner: {
+          title: 'Quản lý điều kiện xét OJT',
+          description: 'Kiểm tra và áp dụng điều kiện xét OJT theo khung chương trình.',
+          badge: 'Phòng Đào tạo',
+        },
+      },
+      {
         id: 'ojt-conditions',
         label: 'Xét điều kiện và danh sách',
         path: '/education/ojt-conditions',
         icon: <FileCheck size={20} />,
         banner: {
           title: 'Xét điều kiện đi OJT',
-          description: 'Quy tắc chung: từ 70 tín chỉ, tối đa 2 môn còn rớt. Lọc danh sách theo kết quả xét.',
+          description: 'Xét theo quy định OJT đang áp dụng và lọc danh sách theo kết quả xét.',
           badge: 'Phòng Đào tạo',
         },
       },

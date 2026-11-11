@@ -22,7 +22,8 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
     FROM "StudentAcademicPlacements" p WHERE p."StudentID"=$1`,[studentId])).rows[0];
   const warning=earlyWarning({currentSemester:placement?.semester??null,earnedCredits:current.earnedCredits,
     completeConfiguration:!!progress.credits.completeConfiguration,issues:progress.issues,
-    eligibilityStatus:current.status,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount});
+    eligibilityStatus:current.status,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,
+    maxUnpassedCourses:current.rule?.maxUnpassedCourses??null});
   const results=source.attempts;
   const outstanding=progress.requirements.filter((r:Row)=>!r.completed).map((r:Row)=>({...r,learningStatus:current.unpassedCourses.some((u:Row)=>r.choices.includes(u.courseId))?'FAILED':results.some(a=>r.choices.includes(a.courseId)&&a.status==='IN_PROGRESS')?'IN_PROGRESS':'NOT_STUDIED'}));
   // Requirements are unique curriculum slots; a scenario never counts a retake twice.

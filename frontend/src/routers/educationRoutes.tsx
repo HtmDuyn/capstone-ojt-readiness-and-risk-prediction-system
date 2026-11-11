@@ -60,6 +60,10 @@ export const educationRoutes: RouteObject = {
             lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtConditions")).default }),
           },
           {
+            path: "/education/ojt-policy",
+            lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtPolicy")).default }),
+          },
+          {
             path: "/education/ojt-handoff",
             lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtHandoff")).default }),
           },

@@ -10,7 +10,7 @@ const roleNames: Record<RoleCode, string> = {
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   { roles: ['STUDENT'], operations: ['GET /api/students/me/tasks', 'GET /api/students/me/tasks/{id}/submissions', 'POST /api/students/me/tasks/{id}/submissions'] },
-  { roles: ['ADMIN','ACADEMIC'], operations: ['GET /api/ojt-eligibility-results','POST /api/ojt-eligibility-results'] },
+  { roles: ['ADMIN','ACADEMIC'], operations: ['GET /api/ojt-eligibility-results','POST /api/ojt-eligibility-results','GET /api/ojt-condition-policy','POST /api/ojt-condition-policy/preview','POST /api/ojt-condition-policy'] },
   {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},
   {roles:["STUDENT"],operations:["GET /api/students/me/academic-summary","GET /api/students/me/supplementary-course-options","GET /api/students/me/curriculum","GET /api/students/me/notifications","PATCH /api/students/me/notifications/{id}","GET /api/students/me/assignments/current","GET /api/students/me/ojt-results","GET /api/students/me/ojt-results/{id}","GET /api/students/me/dashboard","GET /api/students/me/roadmap-recommendations"]},
   {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
@@ -182,6 +182,8 @@ export function groupSwaggerByRole(spec: Spec): Spec {
   for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
   for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign','POST /api/assignments','PATCH /api/assignments/{id}'])access.set(key,['ADMIN']);
   access.set('PATCH /api/companies/{id}', ['ADMIN']);
+  access.set('PATCH /api/qhdn/companies/{id}/access', ['ADMIN', 'OJT_COORD']);
+  access.set('GET /api/qhdn/students/{id}', ['ADMIN', 'OJT_COORD']);
   access.set('POST /api/ojt-registrations',['ADMIN','STUDENT']);
   for(const key of ['GET /api/ojt-registration-windows','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
   access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);

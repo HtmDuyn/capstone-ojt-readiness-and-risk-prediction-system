@@ -2,15 +2,25 @@ import { randomUUID } from 'node:crypto';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { inputObject, invalid, positiveId, requiredText } from '../students/student.validation';
 import { activeRule, fingerprint, performEligibilityCheck, confirmEligibilityWithClient } from './eligibility.service';
+import { assessProgram } from './ojt-policy-feasibility';
+import { detail } from '../curriculum/curriculum.repository';
+import { publicationIssuesForData } from '../curriculum/curriculum.service';
 function ids(value:unknown,name:string) {if(value===undefined)return null;if(!Array.isArray(value)||!value.length||value.length>10000)throw invalid(`${name} must contain 1 to 10000 IDs.`);const values=value.map(v=>positiveId(v,name));if(new Set(values).size!==values.length)throw invalid(`${name} contains duplicate IDs.`);return values.sort((a,b)=>a-b);}
-// Use the fixed policy automatically; versioned rows retain the audit/history contract.
+// Legacy databases start at 70/2. A published common policy takes precedence.
 async function ensureFixedRule(c:import('pg').PoolClient,programId:number|null,semesterId:number,actor:number){
  if(!programId||await activeRule(c,programId,semesterId))return;
  const program=(await c.query('SELECT "Status" FROM "TrainingPrograms" WHERE "ProgramID"=$1',[programId])).rows[0];
  if(program?.Status!=='PUBLISHED')return;
- const rule=(await c.query(`INSERT INTO "OJTRuleSets" ("ProgramID","Version","Name","Status","CreatedBy","PublishedBy","PublishedAt") SELECT $1,COALESCE(max("Version"),0)+1,'Điều kiện OJT: 70 tín chỉ, tối đa 2 môn nợ','PUBLISHED',$2,$2,now() FROM "OJTRuleSets" WHERE "ProgramID"=$1 AND "OJTSemesterID" IS NULL RETURNING *`,[programId,actor])).rows[0];
+ const policy=(await c.query('SELECT * FROM "OJTConditionPolicies" ORDER BY "Version" DESC LIMIT 1')).rows[0];
+ if(policy){
+  const curriculum=await detail(c,programId),validation=await publicationIssuesForData(c,curriculum);
+  const result=assessProgram(curriculum,Number(policy.MinCredits),validation.issues);
+  if(!['VALID','WARNING'].includes(result.status)||policy.MaxUnpassedCourses>(result.preOjtCourseCount??-1))return;
+ }
+ const minCredits=policy?Number(policy.MinCredits):70,maxUnpassed=policy?policy.MaxUnpassedCourses:2;
+ const rule=(await c.query(`INSERT INTO "OJTRuleSets" ("ProgramID","Version","Name","MinCredits","MaxUnpassedCourses","Status","CreatedBy","PublishedBy","PublishedAt") SELECT $1,COALESCE(max("Version"),0)+1,$2,$3,$4,'PUBLISHED',$5,$5,now() FROM "OJTRuleSets" WHERE "ProgramID"=$1 AND "OJTSemesterID" IS NULL RETURNING *`,[programId,policy?`Điều kiện OJT chung phiên bản ${policy.Version}`:'Điều kiện OJT: 70 tín chỉ, tối đa 2 môn nợ',minCredits,maxUnpassed,actor])).rows[0];
  await c.query('INSERT INTO "OJTActiveRuleSets" ("ProgramID","ScopeSemesterID","RuleSetID") VALUES ($1,0,$2)',[programId,rule.RuleSetID]);
- await audit(c,actor,'OJTRuleSets',rule.RuleSetID,'PUBLISH_FIXED_POLICY',null,{minCredits:70,maxUnpassedCourses:2});
+ await audit(c,actor,'OJTRuleSets',rule.RuleSetID,'PUBLISH_POLICY',null,{minCredits,maxUnpassedCourses:maxUnpassed});
 }
 async function batchSummary(c:import('pg').PoolClient,runId:number,semesterId:number,replayed:boolean){
  const rows=(await c.query(`SELECT e."CheckID" AS "checkId",e."CheckedAt" AS "checkedAt",e."Result" AS result,f."ConfirmedAt" AS "confirmedAt",s."StudentCode" AS "studentCode",u."FullName" AS "fullName" FROM "EligibilityChecks" e JOIN "Students" s ON s."StudentID"=e."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" LEFT JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID" WHERE e."RunID"=$1 ORDER BY e."StudentID"`,[runId])).rows;
@@ -38,7 +48,7 @@ export async function checkBatch(body:unknown,actorId:number) {
  await c.query(`INSERT INTO "EligibilityRunStudents" ("RunID","StudentID","ProgramID","RuleSetID") SELECT $1,s."StudentID",s."ProgramID",rule."RuleSetID" FROM "Students" s LEFT JOIN LATERAL (SELECT a."RuleSetID" FROM "OJTActiveRuleSets" a WHERE a."ProgramID"=s."ProgramID" AND a."ScopeSemesterID" IN (0,$3) ORDER BY a."ScopeSemesterID" DESC LIMIT 1) rule ON true WHERE s."StudentID"=ANY($2::int[]) ORDER BY s."StudentID"`,[run.RunID,students.map(s=>s.StudentID),semesterId]);
  for(const student of students){
   const check=await performEligibilityCheck(c,student.StudentID,semesterId,actorId,'BATCH',run.RunID);
-  if(confirmResults&&check.status!=='REVIEW_REQUIRED')await confirmEligibilityWithClient(c,check.checkId,actorId,'Xét điều kiện OJT hàng loạt: tối thiểu 70 tín chỉ, tối đa 2 môn còn nợ.');
+  if(confirmResults&&check.status!=='REVIEW_REQUIRED'&&check.rule)await confirmEligibilityWithClient(c,check.checkId,actorId,`Xét điều kiện OJT hàng loạt: tối thiểu ${check.rule.minCredits} tín chỉ, tối đa ${check.rule.maxUnpassedCourses} môn chưa đạt.`);
   await c.query('UPDATE "EligibilityRunStudents" SET "Status"=\'COMPLETED\',"CheckID"=$3 WHERE "RunID"=$1 AND "StudentID"=$2',[run.RunID,student.StudentID,check.checkId]);
  }
  await c.query('UPDATE "EligibilityCheckRuns" SET "Status"=\'COMPLETED\',"CompletedAt"=now() WHERE "RunID"=$1',[run.RunID]);
