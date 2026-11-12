@@ -36,6 +36,9 @@ const sendImportRequest = async <T>(
   try {
     result = await response.json();
   } catch {
+    if (response.status === 404) {
+      throw new Error("Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).");
+    }
     throw new Error(
       `Backend trả về dữ liệu không hợp lệ (HTTP ${response.status}).`,
     );
@@ -55,9 +58,13 @@ const sendImportRequest = async <T>(
   }
 
   if (response.status === 404) {
+    if (body?.errorCode === 'ROUTE_NOT_FOUND') {
+      throw new Error(`Không tìm thấy đường dẫn API ${endpoint} (HTTP 404).`);
+    }
     throw new Error(
-      `API ${endpoint} chưa có trên Backend đang deploy (HTTP 404). ` +
-        "Kiểm tra nhánh đã merge và phiên bản Render.",
+      typeof body?.message === 'string' && body.message.trim()
+        ? body.message
+        : "Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).",
     );
   }
 

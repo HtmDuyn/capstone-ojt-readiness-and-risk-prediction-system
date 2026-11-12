@@ -36,6 +36,30 @@ test('file mẫu tải xuống có hai sheet, đúng cột và header cố đị
     assert.match(sheetXml, /<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"\/>/);
     assert.match(sheetXml, /<c r="A1" s="[1-9]\d*"/);
   }
+  assert.match(xml('xl/worksheets/sheet1.xml'), /sqref="F2:F501".*"Đang học,Bảo lưu,Thôi học"/);
+});
+
+test('trạng thái tiếng Việt trong Excel được đổi sang enum Backend', async () => {
+  const option = (id, code) => ({ id, label: code, aliases: [code] });
+  for (const [input, expected] of [
+    ['  ĐANG   HỌC  ', 'ACTIVE'],
+    ['  bảo lưu  ', 'SUSPENDED'],
+    ['  THÔI HỌC  ', 'DROPPED_OUT'],
+  ]) {
+    const book = XLSX.read(workbookModule.createStudentImportTemplateFile(), { type: 'array' });
+    XLSX.utils.sheet_add_aoa(book.Sheets['Danh sách sinh viên'], [[
+      'Nguyễn Văn A', 'SE250001', 'student@example.com', '', 'BIT_IS_K19B',
+      input, 'K19', 'A', 'FALL2026',
+    ]], { origin: 'A2' });
+    const file = new File([XLSX.write(book, { type: 'array', bookType: 'xlsx' })], 'import.xlsx');
+    const rows = await workbookModule.parseStudentImportWorkbook(file, {
+      programs: [option(1, 'BIT_IS_K19B')],
+      cohorts: [option(2, 'K19')],
+      periods: [option(3, 'FALL2026')],
+    });
+    assert.equal(rows[0].academic.status, expected);
+    assert.equal(workbookModule.STUDENT_STATUS_LABELS[expected], input.trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi').replace(/^./, c => c.toLocaleUpperCase('vi')));
+  }
 });
 
 test('parser đọc được file có tiêu đề mới và tạo payload gồm Nhóm cùng kỳ học của từng môn', async () => {

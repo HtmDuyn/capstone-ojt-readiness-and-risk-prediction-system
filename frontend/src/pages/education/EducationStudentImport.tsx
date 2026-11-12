@@ -151,7 +151,6 @@ const EducationStudentImport: React.FC = () => {
   ).filter(row => reviewFilter === 'all' || (reviewFilter === 'skipped' ? skipped.has(row.code) : reviewFilter === 'error' ? !skipped.has(row.code) && !!rowErrors(row).length : !skipped.has(row.code) && !!previewSignature && !rowErrors(row).length));
   const errorRows = rows.filter(row => rowErrors(row).length > 0);
   const errorCount = errorRows.length;
-  const validCount = previewSignature ? keptRows.filter(row => !rowErrors(row).length).length : 0;
   const selectedErrorCount = keptRows.filter(row => !!rowErrors(row).length).length;
   const toggleSkip = (code: string) => {
     setSkipped(previous => { const next = new Set(previous); if (next.has(code)) next.delete(code); else next.add(code); return next; });
@@ -233,15 +232,6 @@ const EducationStudentImport: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Xem trước dữ liệu Import</h2>
               <p className="mt-1 text-sm text-slate-500">Kiểm tra danh sách từ {fileName}. Sinh viên bị bỏ qua cùng toàn bộ kết quả học tập của họ sẽ không được gửi để lưu.</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {[
-                ['Tổng sinh viên', rows.length],
-                ['Hợp lệ', validCount],
-                ['Có lỗi', errorCount],
-                ['Được chọn Import', keptRows.length],
-                ['Bị bỏ qua', skipped.size],
-              ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-300 bg-slate-50 p-4"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div>)}
             </div>
             <div className="flex flex-wrap items-center gap-3">
             <input
@@ -367,19 +357,18 @@ const EducationStudentImport: React.FC = () => {
   );
 };
 function StudentImportCourseResults({ student, catalogs }: { student: StudentImportRow; catalogs: AcademicCatalogs | null }) {
+  const resultStatusLabels: Record<string, string> = { PASSED: 'Đạt', FAILED: 'Không đạt' };
   return <div className="space-y-3">
     <h3 className="font-semibold text-slate-900">Bảng điểm trong tệp: {student.code} — {student.fullName}</h3>
-    {!student.academic.courseResults.length ? <p className="text-slate-500">Chưa có kết quả học tập trong tệp.</p> : <table className="w-full max-w-6xl text-left text-sm">
-      <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]"><tr>{['Mã môn', 'Học kỳ ghi nhận', 'Lần học', 'Trạng thái', 'Điểm số', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu'].map(label => <th key={label} className="px-3 py-2 font-semibold">{label}</th>)}</tr></thead>
+    {!student.academic.courseResults.length ? <p className="text-slate-500">Chưa có kết quả học tập trong tệp.</p> : <table className="w-full table-fixed text-left text-sm">
+      <colgroup><col className="w-[20%]" /><col className="w-[32%]" /><col className="w-[14%]" /><col className="w-[20%]" /><col className="w-[14%]" /></colgroup>
+      <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]"><tr>{['Mã môn', 'Học kỳ ghi nhận', 'Lần học', 'Trạng thái', 'Điểm số'].map(label => <th key={label} className="px-3 py-2 font-semibold">{label}</th>)}</tr></thead>
       <tbody>{student.academic.courseResults.map((result, index) => <tr key={index} className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]">
-        <td className="px-3 py-2 font-medium">{result.courseCode}</td>
-        <td className="px-3 py-2">{catalogs?.periods.find(p => p.id === result.academicPeriodId)?.label ?? result.academicPeriodId}</td>
+        <td className="break-words px-3 py-2 font-medium">{result.courseCode}</td>
+        <td className="break-words px-3 py-2">{catalogs?.periods.find(p => p.id === result.academicPeriodId)?.label ?? result.academicPeriodId}</td>
         <td className="px-3 py-2">{result.attemptNumber ?? 1}</td>
-        <td className="px-3 py-2">{result.status}</td>
+        <td className="px-3 py-2">{resultStatusLabels[result.status] ?? result.status}</td>
         <td className="px-3 py-2">{result.score ?? '—'}</td>
-        <td className="px-3 py-2">{result.gradePoints ?? '—'}</td>
-        <td className="px-3 py-2">{result.grade ?? '—'}</td>
-        <td className="px-3 py-2">{result.sourceReference ?? '—'}</td>
       </tr>)}</tbody>
     </table>}
   </div>;

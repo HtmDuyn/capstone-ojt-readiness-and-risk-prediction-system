@@ -7,7 +7,12 @@ import type { CourseResultStatus, StudentAcademicStatus, StudentCourseResult, St
 type DataObject = Record<string, unknown>;
 
 export const STUDENT_STATUS_LABELS: Record<StudentAcademicStatus, string> = {
-  ACTIVE: 'Đang học', INACTIVE: 'Không hoạt động', SUSPENDED: 'Tạm ngưng', GRADUATED: 'Đã tốt nghiệp', DROPPED_OUT: 'Đã thôi học',
+  ACTIVE: 'Đang học', INACTIVE: 'Không hoạt động', SUSPENDED: 'Bảo lưu', GRADUATED: 'Đã tốt nghiệp', DROPPED_OUT: 'Thôi học',
+};
+
+const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> = {
+  SUSPENDED: ['Tạm ngưng', 'Tạm ngừng học'],
+  DROPPED_OUT: ['Đã thôi học'],
 };
 
 export const STUDENT_IMPORT_COLUMNS = [
@@ -186,6 +191,10 @@ export const createStudentImportTemplateFile = (): Uint8Array => {
       const view = '<sheetView workbookViewId="0"/>';
       if (!xml.includes(view)) throw new Error('Không tạo được file Excel mẫu: thiếu cấu hình cố định hàng tiêu đề.');
       xml = xml.replace(view, '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>');
+      if (index === 1) {
+        const validation = '<dataValidations count="1"><dataValidation type="list" allowBlank="1" showInputMessage="1" promptTitle="Trạng thái học vụ" prompt="Chọn trạng thái bằng tiếng Việt" sqref="F2:F501"><formula1>"Đang học,Bảo lưu,Thôi học"</formula1></dataValidation></dataValidations>';
+        xml = xml.replace('</worksheet>', `${validation}</worksheet>`);
+      }
       return xml.replace(/<c r="([A-Z]+)1"([^>]*)>/g, (_cell, column: string, attributes: string) => `<c r="${column}1" s="${headerStyle}"${attributes}>`);
     });
   }
@@ -273,8 +282,9 @@ export const parseStudentImportWorkbook = async (
     const entryAcademicPeriodId = entry ? resolveOption(entry, catalogs.periods, 'kỳ bắt đầu chuyên ngành', number) : undefined;
     if (catalogs.periods.find(period => period.id === entryAcademicPeriodId)?.kind === 'BLOCK3') throw new Error(`Dòng ${number}: Kỳ bắt đầu chuyên ngành phải là học kỳ thường, không phải Block 3.`);
     const rawStatus = getCell(row, ['Trạng thái học vụ', 'Trạng thái sinh viên', 'studentStatus', 'status']);
-    const status = rawStatus ? (Object.keys(STUDENT_STATUS_LABELS) as StudentAcademicStatus[]).find(key => normalize(key) === normalize(rawStatus) || normalize(STUDENT_STATUS_LABELS[key]) === normalize(rawStatus)) : undefined;
-    if (rawStatus && !status) throw new Error(`Dòng ${number}: Trạng thái sinh viên phải là ${Object.keys(STUDENT_STATUS_LABELS).join(', ')}.`);
+    const status = rawStatus ? (Object.keys(STUDENT_STATUS_LABELS) as StudentAcademicStatus[]).find(key =>
+      [key, STUDENT_STATUS_LABELS[key], ...(STUDENT_STATUS_ALIASES[key] ?? [])].some(label => normalize(label) === normalize(rawStatus))) : undefined;
+    if (rawStatus && !status) throw new Error(`Dòng ${number}: Trạng thái sinh viên phải là Đang học, Bảo lưu hoặc Thôi học.`);
     const phone = getCell(row, ['Số điện thoại', 'phone']);
     const className = getCell(row, ['Lớp', 'className']);
     if (phone.length > 20 || className.length > 20) throw new Error(`Dòng ${number}: Điện thoại và lớp tối đa 20 ký tự.`);
