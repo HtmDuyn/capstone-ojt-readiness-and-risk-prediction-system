@@ -31,7 +31,7 @@ export default function EducationSupportClassDemand() {
   }, [attempt]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageBanner title="Nhu cầu lớp hỗ trợ" description="Đề xuất lớp học lại trong Block 3 của học kỳ sắp tới." badge="Phòng Đào tạo" />
       {error ? (
         <div className="flex items-center gap-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-800">

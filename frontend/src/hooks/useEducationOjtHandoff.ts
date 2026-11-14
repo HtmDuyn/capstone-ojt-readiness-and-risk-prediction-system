@@ -8,11 +8,10 @@ import type { ImportedStudent } from '@/types/education/import.types';
 import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import { handoffTarget, type HandoffCohort } from '@/utils/ojtHandoff';
 
-type Candidate = { student: ImportedStudent; result: SavedOjtEligibility; blocked: string; targetName: string };
+type Candidate = { student: ImportedStudent; result: SavedOjtEligibility; blocked: string; targetName: string; curriculumSemester: number | null; targetId?: number };
 
 export function useEducationOjtHandoff() {
   const { semesters, error: semesterError, reload: reloadSemesters } = useEducationSemesters();
-  const [semesterId, setSemesterId] = useState('');
   const [students, setStudents] = useState<ImportedStudent[]>([]);
   const [results, setResults] = useState<Record<number, SavedOjtEligibility>>({});
   const [cohorts, setCohorts] = useState<HandoffCohort[]>([]);
@@ -33,7 +32,7 @@ export function useEducationOjtHandoff() {
     Promise.all([
       getAllItems<ImportedStudent>('/students', {}, controller.signal),
       loadSavedLocalOjtResults(controller.signal),
-      semesterId ? educationOjtWorkflowService.getHandoffs(Number(semesterId), controller.signal) : Promise.resolve([]),
+      educationOjtWorkflowService.getHandoffs(undefined, controller.signal),
       getAllItems<HandoffCohort>('/cohorts', {}, controller.signal),
     ]).then(([allStudents, saved, handoffs, allCohorts]) => {
       if (controller.signal.aborted) return;
@@ -42,40 +41,44 @@ export function useEducationOjtHandoff() {
     }).catch(e => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Không tải được danh sách bàn giao.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [semesterId, refresh]);
+  }, [refresh]);
 
   const candidates = useMemo<Candidate[]>(() => {
-    const handed = new Set(history.flatMap(h => h.studentIds));
+    const handed = new Set(history.flatMap(h => h.studentIds.map(id => `${h.ojtSemesterId}:${id}`)));
     return students.flatMap(student => {
       const eligibility = handoffTarget(student, results[student.id], cohorts, semesters);
       if (!eligibility) return [];
-      const { result, target, issue } = eligibility;
-      if (semesterId && target && target.id !== Number(semesterId)) return [];
-      const blocked = issue || (!semesterId ? 'Chọn kỳ OJT để bàn giao'
-        : handed.has(student.id) ? 'Đã bàn giao trong kỳ này'
+      const { result, target, curriculumSemester, issue } = eligibility;
+      const blocked = issue || (target && handed.has(`${target.id}:${student.id}`) ? 'Đã bàn giao trong kỳ OJT này'
         : target?.status === 'CLOSED' || target?.status === 'ARCHIVED' ? 'Kỳ OJT đã đóng'
         : '');
-      return [{ student, result, blocked, targetName: target ? `${target.name} (${target.semesterCode})` : 'Chưa cấu hình' }];
+      return [{ student, result, blocked, targetId: target?.id, targetName: target?.name ?? 'Chưa cấu hình', curriculumSemester }];
     });
-  }, [students, results, cohorts, semesters, history, semesterId]);
+  }, [students, results, cohorts, semesters, history]);
   const visible = candidates.filter(({ student }) => `${student.studentCode} ${student.fullName} ${student.program?.name ?? ''}`.toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')));
   const available = visible.filter(c => !c.blocked);
   const allChecked = available.length > 0 && available.every(c => selected.includes(c.student.id));
 
   async function submit() {
-    if (!semesterId || !selected.length || !reason.trim() || loading || saving) return;
+    if (!selected.length || !reason.trim() || loading || saving) return;
     const ids = [...selected].sort((a, b) => a - b);
     if (ids.length > 1000) { setError('Mỗi lần bàn giao tối đa 1.000 sinh viên.'); return; }
-    if (ids.some(id => !candidates.some(c => c.student.id === id && !c.blocked))) { setError('Danh sách đã thay đổi. Hãy chọn lại sinh viên.'); return; }
-    const signature = JSON.stringify({ ojtSemesterId: Number(semesterId), studentIds: ids, reason: reason.trim() });
+    if (ids.some(id => !candidates.some(c => c.student.id === id && !c.blocked && c.targetId))) { setError('Danh sách hoặc kỳ OJT đã thay đổi. Hãy chọn lại sinh viên.'); return; }
+    const groups = new Map<number, number[]>();
+    ids.forEach(id => { const targetId = candidates.find(c => c.student.id === id)!.targetId!; groups.set(targetId, [...(groups.get(targetId) ?? []), id]); });
+    const signature = JSON.stringify({ groups: [...groups], reason: reason.trim() });
     if (request.current?.signature !== signature) request.current = { signature, key: crypto.randomUUID() };
     setSaving(true); setError(''); setSuccess('');
     try {
-      const result = await educationOjtWorkflowService.handoff({
-        ojtSemesterId: Number(semesterId), studentIds: ids, reason: reason.trim(), idempotencyKey: request.current.key,
-      });
-      if (!result.handoffId || result.total !== ids.length || result.recipientRole !== 'OJT_COORD') throw new Error('Chưa nhận được xác nhận bàn giao đầy đủ từ hệ thống. Hãy tải lại để kiểm tra.');
-      setSuccess(`Đã bàn giao ${result.total} sinh viên sang Phòng Quan hệ doanh nghiệp (đợt #${result.handoffId}).`);
+      let total = 0;
+      for (const [ojtSemesterId, studentIds] of groups) {
+        const result = await educationOjtWorkflowService.handoff({
+          ojtSemesterId, studentIds, reason: reason.trim(), idempotencyKey: `${request.current.key}-${ojtSemesterId}`,
+        });
+        if (!result.handoffId || result.total !== studentIds.length || result.recipientRole !== 'OJT_COORD') throw new Error('Chưa nhận được xác nhận bàn giao đầy đủ từ hệ thống. Hãy tải lại để kiểm tra.');
+        total += result.total;
+      }
+      setSuccess(`Đã bàn giao ${total} sinh viên sang Phòng Quan hệ doanh nghiệp.`);
       setSelected([]); setReason(''); request.current = null; setRefresh(n => n + 1);
     } catch (e) {
       const code = (e as { response?: { data?: { errorCode?: string; code?: string } } })?.response?.data;
@@ -86,5 +89,5 @@ export function useEducationOjtHandoff() {
     finally { setSaving(false); }
   }
 
-  return { candidates, visible, available, allChecked, submit, semesterId, setSemesterId, students, history, selected, setSelected, search, setSearch, reason, setReason, loading, saving, error, success, setSuccess, setRefresh, semesters, semesterError, reloadSemesters };
+  return { candidates, visible, available, allChecked, submit, history, students, results, selected, setSelected, search, setSearch, reason, setReason, loading, saving, error, success, setSuccess, setRefresh, semesterError, reloadSemesters };
 }

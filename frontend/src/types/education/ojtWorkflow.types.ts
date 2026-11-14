@@ -1,4 +1,4 @@
-export type Handoff = { id: number; studentCount: number; studentIds: number[]; createdAt: string; reason: string };
+export type Handoff = { id: number; ojtSemesterId: number; semesterCode?: string; semester?: { id: number; name: string; code: string } | null; studentCount: number; studentIds: number[]; createdAt: string; reason: string };
 
 export type OjtFinalResult = {
   id: number;
