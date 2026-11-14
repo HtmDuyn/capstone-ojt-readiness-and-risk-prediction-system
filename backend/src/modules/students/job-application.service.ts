@@ -166,7 +166,7 @@ export async function listApplications(params:Row,actor:Actor,existingClient?:Po
   },existingClient);
 }
 
-export async function studentOpportunities(params:Row,actor:Actor) {
+export async function studentOpportunities(params:Row,actor:Actor,existingClient?:PoolClient) {
   const p=pagination(params,['windowId']),windowId=positiveId(params.windowId,'windowId');
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async c=>{
@@ -198,5 +198,5 @@ export async function studentOpportunities(params:Row,actor:Actor) {
     const rows=(await c.query(sql+' ORDER BY p."PositionID",post."PostID" LIMIT $3 OFFSET $4',[semesterId,s.StudentID,p.limit,p.offset])).rows;
     const items=rows.map(pos=>{const reasons=[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])];return {...pos,remainingSlots:Number(pos.remainingSlots),canApply:!reasons.length,blockers:reasons};});
     return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:r?.RegistrationID??null,windowId,ojtSemesterId:semesterId,officialEligibility:official,admissionEligibility:admission,canApply:!blockers.length,blockers};
-  });
+  },existingClient);
 }
