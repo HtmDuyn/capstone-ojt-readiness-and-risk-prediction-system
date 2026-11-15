@@ -31,10 +31,11 @@ test('submitted registrations without a company decision remain separate from wa
   }
 });
 
-test('enterprise acceptance remains separate from actual receipt', () => {
+test('accepted, assigned and historical received students share the accepted status', () => {
   const student = { decision: 'ACCEPTED' };
   assert.equal(placementStatus(student), 'ACCEPTED');
-  assert.equal(placementStatus({ ...student, receivedAt: '2026-11-10T01:00:00Z' }), 'RECEIVED');
+  assert.equal(placementStatus({ ...student, receivedAt: '2026-11-10T01:00:00Z' }), 'ACCEPTED');
+  assert.equal(placementStatus({hasAssignment:true}), 'ACCEPTED');
 });
 
 test('students without a current application are not applied', () => {
@@ -43,9 +44,9 @@ test('students without a current application are not applied', () => {
   }
 });
 
-test('the filter offers six distinct business statuses with separate colors', () => {
+test('the filter offers five business statuses without a separate received state', () => {
   assert.deepEqual(placementStatuses.map(status => placementStatusLabels[status]), [
-    'Doanh nghiệp từ chối', 'Doanh nghiệp đã nhận', 'Đã ứng tuyển', 'Chờ phản hồi DN', 'Chưa ứng tuyển', 'Thực nhận',
+    'Doanh nghiệp từ chối', 'Doanh nghiệp đã nhận', 'Đã ứng tuyển', 'Chờ phản hồi DN', 'Chưa ứng tuyển',
   ]);
-  assert.equal(new Set(placementStatuses.map(status => placementStatusColors[status])).size, 6);
+  assert.equal(new Set(placementStatuses.map(status => placementStatusColors[status])).size, 5);
 });

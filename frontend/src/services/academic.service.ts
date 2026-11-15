@@ -69,6 +69,7 @@ const authorizedFetch = async (
   const token = getAuthToken();
 
   return fetch(`${API_BASE_URL}${path}`, {
+    cache:'no-store',
     method,
     headers: {
       "Content-Type": "application/json",

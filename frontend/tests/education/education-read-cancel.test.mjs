@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { clearEducationReadCache, educationRead } from '../../src/services/educationReadCache.ts';
 
 globalThis.localStorage = { getItem: () => 'test-session' };
+test('completed reads are not cached; a refresh always loads the latest server value',async()=>{
+ clearEducationReadCache();let version=1,calls=0;
+ const load=async()=>{calls++;return {version};};
+ assert.deepEqual(await educationRead('fresh-data',load),{version:1});
+ version=2;
+ assert.deepEqual(await educationRead('fresh-data',load),{version:2});
+ assert.equal(calls,2);
+});
 
 test('hủy người chờ cũ không hủy dữ liệu cho request mới', async () => {
   clearEducationReadCache();

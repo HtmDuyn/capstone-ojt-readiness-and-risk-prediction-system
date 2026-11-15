@@ -97,7 +97,7 @@ export async function decision(id:number,body:unknown,actor:Actor){
       await noAssignment(c,r);
       if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED' AND co."CoordinationID"<>$3`,[r.StudentID,r.OJTSemesterID,id])).rowCount)
         throw invalid('Sinh viên đã xác nhận nơi thực tập trong kỳ.',409,'STUDENT_ALREADY_CONFIRMED');
-      if(await occupied(c,before.PositionID)>=position.Capacity)throw invalid('Vị trí đã hết chỉ tiêu dùng chung trong kỳ.',409,'POSITION_FULL');
+      if(!['QHDN_COORDINATION','QHDN_APPLICATION'].includes(before.Source)&&await occupied(c,before.PositionID)>=position.Capacity)throw invalid('Vị trí đã hết chỉ tiêu dùng chung trong kỳ.',409,'POSITION_FULL');
       if(position.EnterpriseID!==before.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
     }
     const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];

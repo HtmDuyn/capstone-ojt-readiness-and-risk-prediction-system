@@ -1,5 +1,11 @@
 # Đợt tuyển dụng với ba hạn
 
+QHDN điều phối ngay sinh viên bị doanh nghiệp từ chối. Sinh viên chưa ứng tuyển (kể cả chưa có OJTRegistration) được điều phối ngay khi hết hạn đăng ký/ứng tuyển, không cần chờ hạn phản hồi hoặc chốt tổng hợp. Hết hạn được kiểm tra bằng giờ database ở cả danh sách và lúc gửi điều phối. Hồ sơ đang chờ doanh nghiệp phản hồi, đã được nhận hoặc có phân công vẫn được bảo vệ khỏi điều phối trùng. Giao diện QHDN không còn nút xác nhận Thực nhận; dữ liệu và lịch sử thực nhận hiện có được giữ lại.
+
+Điều phối hàng loạt QHDN chọn doanh nghiệp qua `companyId`, không chọn vị trí trên giao diện. API tự liên kết dữ liệu vị trí nội bộ và cho điều phối vượt chỉ tiêu, kể cả còn 0 slot. Danh sách doanh nghiệp hiển thị slot còn lại = max(0, tổng chỉ tiêu − tổng thực nhận). Hồ sơ điều phối vẫn chờ doanh nghiệp phản hồi; số thực nhận cập nhật theo sinh viên doanh nghiệp đã nhận hoặc có phân công, gộp dữ liệu thực nhận cũ và không đếm trùng; không thay đổi chỉ tiêu. Nhận hồ sơ do QHDN điều phối được phép vượt chỉ tiêu; ứng tuyển thông thường vẫn giữ giới hạn cũ. Database đã triển khai cần chạy riêng khối `OJT QHDN COORDINATION CAPACITY V6` trong `backend/DB` để cho phép doanh nghiệp xác nhận các hồ sơ điều phối vượt chỉ tiêu.
+
+Để dùng sửa/xóa lịch QHDN trên database đã có V4, chạy riêng khối `-- BEGIN OJT QHDN SCHEDULE EDITING V5` đến `-- END OJT QHDN SCHEDULE EDITING V5` trong `backend/DB`. Không chạy toàn bộ script trên database đang dùng vì phần đầu reset dữ liệu.
+
 Mỗi đợt tuyển dụng con gồm ba khoảng thời gian có ngày giờ bắt đầu và kết thúc:
 
 | Hạn | Thao tác được phép |
@@ -8,7 +14,7 @@ Mỗi đợt tuyển dụng con gồm ba khoảng thời gian có ngày giờ b�
 | 2. Sinh viên ứng tuyển | Sinh viên đủ điều kiện và đã bàn giao nộp hồ sơ vào vị trí thuộc đúng đợt. Tin, điều kiện và chỉ tiêu tuyển dụng được khóa. |
 | 3. Doanh nghiệp xét tuyển, phản hồi | Doanh nghiệp xem hồ sơ, liên hệ, phỏng vấn ngay và cập nhật nhận/từ chối. |
 
-Hạn 1 kết thúc trước hoặc đúng lúc hạn 2 bắt đầu. Hạn 3 **bắt đầu cùng hạn 2 và kết thúc sau hạn 2**. Mọi khoảng có giờ kết thúc lớn hơn giờ bắt đầu. Mốc bắt đầu được tính trong hạn; đúng giờ kết thúc là hết hạn.
+Hạn 1 kết thúc trước hoặc đúng lúc hạn 2 bắt đầu. Hạn 3 được gợi ý bắt đầu cùng hạn 2 nhưng có thể chỉnh tay từ lúc mở hạn 2 trở đi; kết thúc bằng hoặc sau hạn 2. Mọi khoảng có giờ kết thúc lớn hơn giờ bắt đầu. Mốc bắt đầu được tính trong hạn; đúng giờ kết thúc là hết hạn.
 
 ## Tạo và mở
 
@@ -16,7 +22,13 @@ Giao diện tạo một đợt với tên và ba cặp ngày giờ. Không có g
 
 Role OJT_COORD và ADMIN tạo đợt tổng cùng 1–30 đợt tuyển dụng con trong một transaction. Mỗi kỳ OJT có một đợt tổng. Các đợt con không trùng nhau và nằm trong lịch đợt tổng; đợt tổng bắt đầu trong tương lai và không vượt ngày kết thúc học kỳ.
 
-Mỗi phần tử rounds nhận name và đủ sáu trường postingStartsAt, postingEndsAt, applicationStartsAt, applicationEndsAt, resultsStartsAt, resultsEndsAt. Không nhận startsAt/endsAt chung cho đợt con mới. Các mốc bắt đầu được giữ cố định. QHDN chỉ được kéo dài thời điểm kết thúc của giai đoạn đang mở, bảo đảm không trùng lịch và không vượt học kỳ. Cửa sổ ứng tuyển OJT liên kết dùng chính lịch hạn 2.
+Mỗi phần tử rounds nhận name và đủ sáu trường postingStartsAt, postingEndsAt, applicationStartsAt, applicationEndsAt, resultsStartsAt, resultsEndsAt. Không nhận startsAt/endsAt chung cho đợt con mới. Cửa sổ ứng tuyển OJT liên kết dùng chính lịch hạn 2.
+
+Form QHDN tự gợi ý hạn 2 bắt đầu khi hạn 1 kết thúc và kéo dài 7 ngày. Giờ bắt đầu hạn 3 được gợi ý theo hạn 2 và có thể chỉnh tay. Ngày và giờ kết thúc hạn 3 để trống khi tạo, người dùng tự chọn; không tự điền hoặc cập nhật theo hạn 2. Các mốc đã chỉnh tay không bị gợi ý tiếp theo ghi đè.
+
+Chỉ OJT_COORD có API `PATCH /api/recruitment/windows/:id/schedule` và `DELETE /api/recruitment/windows/:id`. Đợt DRAFT chưa từng mở được sửa toàn bộ lịch (lịch mới phải bắt đầu trong tương lai) và xóa nếu chưa có dữ liệu liên quan. Đợt OPEN còn thời gian được sửa các mốc tương lai; mốc bắt đầu đã diễn ra, giai đoạn đã hết, đợt CLOSED/hết hạn/chốt tổng hợp không được sửa. Đợt đã mở, kể cả mở trước lịch, tuyệt đối không được xóa. `OpenedAt` giữ dấu lần mở đầu tiên; trigger DB chặn xóa và quay về DRAFT.
+
+Sửa lịch đồng bộ biên đợt tổng, cửa sổ ứng tuyển và hạn tin tuyển dụng trong cùng transaction; lịch không được trùng đợt khác, đổi thứ tự hoặc vượt học kỳ. Đợt OPEN gửi thông báo cập nhật lịch và ghi audit. Các API cũ và giao diện các role khác giữ nguyên thao tác.
 
 Có thể mở đợt trước giờ đăng tin; hiển thị Chờ bắt đầu. Hệ thống giới hạn từng thao tác theo hạn thực tế. Mở đợt sau yêu cầu các đợt trước kết thúc và được chốt tổng hợp. Không mở lại đợt đã đóng/hết hạn/chốt kết quả.
 
@@ -31,7 +43,7 @@ Có thể mở đợt trước giờ đăng tin; hiển thị Chờ bắt đầu
 
 ## Gia hạn và đợt bổ sung
 
-Nút **Gia hạn** chỉ xuất hiện với giai đoạn đang mở. Chỉ kéo dài thời điểm kết thúc; không đổi các mốc bắt đầu. Hạn đăng tin không vượt giờ mở ứng tuyển; hạn ứng tuyển luôn kết thúc trước hạn phản hồi. Có thể gia hạn đồng thời ứng tuyển và phản hồi. Hạn ứng tuyển đã đóng không mở lại, kể cả khi hạn phản hồi vẫn còn. Các thay đổi dùng giờ database, kiểm tra lại trong transaction và lưu audit; thông báo trong hệ thống gửi đến doanh nghiệp đang hoạt động, sinh viên đã bàn giao của kỳ và QHDN/Admin. Chuông thông báo DN/QHDN hiển thị nội dung gia hạn; từng người chỉ xem và đánh dấu thông báo của mình.
+Nút **Gia hạn** chỉ xuất hiện với giai đoạn đang mở. Chỉ kéo dài thời điểm kết thúc; không đổi các mốc bắt đầu. Hạn đăng tin không vượt giờ mở ứng tuyển; hạn ứng tuyển kết thúc trước hoặc bằng hạn phản hồi. Có thể gia hạn đồng thời ứng tuyển và phản hồi. Hạn ứng tuyển đã đóng không mở lại, kể cả khi hạn phản hồi vẫn còn. Các thay đổi dùng giờ database, kiểm tra lại trong transaction và lưu audit; thông báo trong hệ thống gửi đến doanh nghiệp đang hoạt động, sinh viên đã bàn giao của kỳ và QHDN/Admin. Chuông thông báo DN/QHDN hiển thị nội dung gia hạn; từng người chỉ xem và đánh dấu thông báo của mình.
 
 Sau khi đợt hiện tại kết thúc và được chốt tổng hợp, nút **Tạo đợt bổ sung** mở đúng form tên + ba cặp ngày giờ như tạo đợt mới. API vẫn dùng POST /api/recruitment/windows với supplemental=true. Mỗi đợt bổ sung có lịch riêng, bắt đầu trong tương lai; backend tự đánh số và mở rộng biên quản lý của kỳ, không sửa lịch đợt trước.
 

@@ -9,6 +9,10 @@ const roleNames: Record<RoleCode, string> = {
 };
 
 const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
+  { roles: ['OJT_COORD'], operations: [
+    'PATCH /api/recruitment/windows/{id}/schedule',
+    'DELETE /api/recruitment/windows/{id}',
+  ] },
   { roles: ['STUDENT'], operations: ['GET /api/students/me/tasks', 'GET /api/students/me/tasks/{id}/submissions', 'POST /api/students/me/tasks/{id}/submissions'] },
   { roles: ['ADMIN','ACADEMIC'], operations: ['GET /api/ojt-eligibility-results','POST /api/ojt-eligibility-results','GET /api/ojt-condition-policy','POST /api/ojt-condition-policy/preview','POST /api/ojt-condition-policy'] },
   {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},

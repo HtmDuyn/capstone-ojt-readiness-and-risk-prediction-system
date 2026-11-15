@@ -9163,3 +9163,147 @@ DO $permissions$ BEGIN
 END $permissions$;
 COMMIT;
 -- END DATABASE ACCESS HARDENING V1
+
+-- BEGIN OJT QHDN SCHEDULE EDITING V5
+-- Additive update after LIFECYCLE V4. Run this block alone on an existing database.
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+SET LOCAL lock_timeout='5s';
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+ALTER TABLE public."RecruitmentWindows" ADD COLUMN IF NOT EXISTS "OpenedAt" timestamptz;
+ALTER TABLE public."RecruitmentWindows" DISABLE TRIGGER "TR_RecruitmentRound";
+UPDATE public."RecruitmentWindows" SET "OpenedAt"=COALESCE("UpdatedAt","CreatedAt",clock_timestamp())
+ WHERE "OpenedAt" IS NULL AND ("Status"<>'DRAFT' OR "ResultsFinalizedAt" IS NOT NULL
+ OR EXISTS(SELECT 1 FROM "RecruitmentPosts" p WHERE p."WindowID"="RecruitmentWindows"."WindowID")
+ OR EXISTS(SELECT 1 FROM "AuditLogs" a WHERE a."EntityType"='RecruitmentWindows' AND a."EntityID"="RecruitmentWindows"."WindowID"
+ AND a."Action"='UPDATE' AND a."Detail" LIKE '%OPEN%'));
+ALTER TABLE public."RecruitmentWindows" ENABLE TRIGGER "TR_RecruitmentRound";
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentCampaign"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$ BEGIN
+ IF TG_OP='UPDATE' AND (NEW."OJTSemesterID" IS DISTINCT FROM OLD."OJTSemesterID" OR NEW."ScheduleVersion" IS DISTINCT FROM OLD."ScheduleVersion") THEN
+  RAISE EXCEPTION 'Campaign identity is immutable' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' AND current_setting('app.qhdn_schedule_edit',true) IS DISTINCT FROM 'on'
+  AND (NEW."StartsAt" IS DISTINCT FROM OLD."StartsAt" OR NEW."EndsAt"<OLD."EndsAt") THEN
+  RAISE EXCEPTION 'Campaign may only extend its end outside QHDN schedule editing' USING ERRCODE='23514'; END IF;
+ IF NEW."ScheduleVersion">=2 AND (NEW."StartsAt" IS NULL OR NEW."EndsAt" IS NULL OR NEW."StartsAt">=NEW."EndsAt") THEN
+  RAISE EXCEPTION 'Invalid campaign bounds' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' AND EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."CampaignID"=NEW."CampaignID"
+  AND (w."StartsAt"<NEW."StartsAt" OR w."EndsAt">NEW."EndsAt")) THEN
+  RAISE EXCEPTION 'Campaign must contain all rounds' USING ERRCODE='23514'; END IF;
+ RETURN NEW; END $$;
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentRound"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+DECLARE phase_key text; old_time timestamptz; new_time timestamptz;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF TG_OP='UPDATE' AND OLD."OpenedAt" IS NOT NULL AND NEW."OpenedAt" IS DISTINCT FROM OLD."OpenedAt" THEN
+  RAISE EXCEPTION 'First opening time is immutable' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' AND OLD."Status"<>'DRAFT' AND NEW."Status"='DRAFT' THEN
+  RAISE EXCEPTION 'Opened rounds cannot return to draft' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' AND current_setting('app.qhdn_schedule_edit',true)='on' THEN
+  IF OLD."ResultsFinalizedAt" IS NOT NULL OR NOT (OLD."Status"='DRAFT' AND OLD."OpenedAt" IS NULL OR OLD."Status"='OPEN' AND clock_timestamp()<OLD."EndsAt") THEN
+   RAISE EXCEPTION 'Only draft or unexpired open rounds can be edited' USING ERRCODE='23514'; END IF;
+  IF ROW(NEW."CampaignID",NEW."RoundNumber",NEW."OJTSemesterID",NEW."AcademicPeriodID",NEW."Status") IS DISTINCT FROM ROW(OLD."CampaignID",OLD."RoundNumber",OLD."OJTSemesterID",OLD."AcademicPeriodID",OLD."Status") THEN
+   RAISE EXCEPTION 'Schedule editing cannot change identity or status' USING ERRCODE='23514'; END IF;
+  IF OLD."Status"='DRAFT' AND NEW."StartsAt"<=clock_timestamp() THEN
+   RAISE EXCEPTION 'Draft must start in the future' USING ERRCODE='23514'; END IF;
+  IF OLD."Status"='OPEN' THEN
+   FOR phase_key IN SELECT unnest(ARRAY['PostingStartsAt','PostingEndsAt','ApplicationStartsAt','ApplicationEndsAt','ResultsStartsAt','ResultsEndsAt']) LOOP
+    old_time:=(to_jsonb(OLD)->>phase_key)::timestamptz;
+    new_time:=(to_jsonb(NEW)->>phase_key)::timestamptz;
+    IF new_time IS DISTINCT FROM old_time AND (old_time<=clock_timestamp() OR new_time<=clock_timestamp()) THEN
+     RAISE EXCEPTION 'Past boundaries and closed phases are immutable' USING ERRCODE='23514'; END IF;
+   END LOOP;
+  END IF;
+ ELSE
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW."CampaignID",NEW."RoundNumber",NEW."OJTSemesterID",NEW."AcademicPeriodID",NEW."StartsAt",NEW."PostingStartsAt",NEW."ApplicationStartsAt",NEW."ResultsStartsAt")
+   IS DISTINCT FROM ROW(OLD."CampaignID",OLD."RoundNumber",OLD."OJTSemesterID",OLD."AcademicPeriodID",OLD."StartsAt",OLD."PostingStartsAt",OLD."ApplicationStartsAt",OLD."ResultsStartsAt") THEN
+   RAISE EXCEPTION 'Round identities and phase start times are immutable' USING ERRCODE='23514'; END IF;
+  IF ROW(NEW."EndsAt",NEW."PostingEndsAt",NEW."ApplicationEndsAt",NEW."ResultsEndsAt") IS DISTINCT FROM ROW(OLD."EndsAt",OLD."PostingEndsAt",OLD."ApplicationEndsAt",OLD."ResultsEndsAt") THEN
+   IF OLD."Status"<>'OPEN' OR OLD."ResultsFinalizedAt" IS NOT NULL OR NEW."EndsAt"<>NEW."ResultsEndsAt"
+    OR NEW."PostingEndsAt"<OLD."PostingEndsAt" OR NEW."ApplicationEndsAt"<OLD."ApplicationEndsAt" OR NEW."ResultsEndsAt"<OLD."ResultsEndsAt"
+    OR (NEW."PostingEndsAt" IS DISTINCT FROM OLD."PostingEndsAt" AND NOT (OLD."PostingStartsAt"<=clock_timestamp() AND clock_timestamp()<OLD."PostingEndsAt"))
+    OR (NEW."ApplicationEndsAt" IS DISTINCT FROM OLD."ApplicationEndsAt" AND NOT (OLD."ApplicationStartsAt"<=clock_timestamp() AND clock_timestamp()<OLD."ApplicationEndsAt"))
+    OR (NEW."ResultsEndsAt" IS DISTINCT FROM OLD."ResultsEndsAt" AND NOT (OLD."ResultsStartsAt"<=clock_timestamp() AND clock_timestamp()<OLD."ResultsEndsAt")) THEN
+    RAISE EXCEPTION 'Only extend an open phase; closed application intake cannot reopen' USING ERRCODE='23514'; END IF;
+  END IF;
+  IF OLD."ResultsFinalizedAt" IS NOT NULL AND NEW IS DISTINCT FROM OLD THEN
+   RAISE EXCEPTION 'Finalized recruitment round is immutable' USING ERRCODE='23514'; END IF;
+ END IF;
+ END IF;
+ IF NEW."Status"='OPEN' AND NEW."OpenedAt" IS NULL THEN NEW."OpenedAt":=clock_timestamp(); END IF;
+ IF NEW."CampaignID" IS NULL THEN RETURN NEW; END IF;
+ IF NEW."RoundNumber" IS NULL OR NEW."RoundNumber"<1 OR NEW."StartsAt">=NEW."EndsAt" THEN
+  RAISE EXCEPTION 'Invalid recruitment child schedule' USING ERRCODE='23514'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM "RecruitmentCampaigns" c WHERE c."CampaignID"=NEW."CampaignID" AND c."OJTSemesterID"=NEW."OJTSemesterID"
+  AND (c."ScheduleVersion"=1 OR (NEW."StartsAt">=c."StartsAt" AND NEW."EndsAt"<=c."EndsAt"))) THEN
+  RAISE EXCEPTION 'Child must belong to its campaign and fit within its dates' USING ERRCODE='23514'; END IF;
+ IF EXISTS(SELECT 1 FROM "RecruitmentCampaigns" c WHERE c."CampaignID"=NEW."CampaignID" AND c."ScheduleVersion"=3) AND (
+  NEW."PostingStartsAt" IS NULL OR NEW."PostingEndsAt" IS NULL OR NEW."ApplicationStartsAt" IS NULL
+  OR NEW."ApplicationEndsAt" IS NULL OR NEW."ResultsStartsAt" IS NULL OR NEW."ResultsEndsAt" IS NULL
+  OR NOT (NEW."StartsAt"=NEW."PostingStartsAt" AND NEW."EndsAt"=NEW."ResultsEndsAt"
+   AND NEW."PostingStartsAt"<NEW."PostingEndsAt" AND NEW."PostingEndsAt"<=NEW."ApplicationStartsAt"
+   AND NEW."ApplicationStartsAt"<NEW."ApplicationEndsAt" AND NEW."ResultsStartsAt">=NEW."ApplicationStartsAt" AND NEW."ResultsStartsAt"<NEW."ResultsEndsAt"
+   AND NEW."ResultsEndsAt">=NEW."ApplicationEndsAt")) THEN
+  RAISE EXCEPTION 'Invalid posting/application/response intervals: review starts at or after applications and ends no earlier' USING ERRCODE='23514'; END IF;
+ IF EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."EndsAt" AND w."EndsAt">NEW."StartsAt") THEN
+  RAISE EXCEPTION 'Recruitment rounds cannot overlap' USING ERRCODE='23514'; END IF;
+ IF EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."CampaignID"=NEW."CampaignID" AND w."WindowID"<>NEW."WindowID"
+  AND ((w."RoundNumber"<NEW."RoundNumber" AND w."EndsAt">NEW."StartsAt") OR (w."RoundNumber">NEW."RoundNumber" AND w."StartsAt"<NEW."EndsAt"))) THEN
+  RAISE EXCEPTION 'Round order cannot change' USING ERRCODE='23514'; END IF;
+ IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM "RecruitmentWindows" w WHERE w."CampaignID"=NEW."CampaignID"
+  AND (w."RoundNumber">=NEW."RoundNumber" OR w."EndsAt">NEW."StartsAt")) THEN
+  RAISE EXCEPTION 'Child rounds must follow their sequence' USING ERRCODE='23514'; END IF;
+ IF NEW."Status"='OPEN' AND (TG_OP='INSERT' OR OLD."Status" IS DISTINCT FROM 'OPEN') AND EXISTS(
+  SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=NEW."OJTSemesterID" AND w."WindowID"<>NEW."WindowID"
+  AND w."StartsAt"<NEW."StartsAt" AND (w."EndsAt">clock_timestamp() OR w."ResultsFinalizedAt" IS NULL)) THEN
+  RAISE EXCEPTION 'Previous child must end and its results must be finalized before opening' USING ERRCODE='23514'; END IF;
+ IF (NEW."ResultsFinalizedAt" IS NULL)<>(NEW."ResultsFinalizedBy" IS NULL) THEN
+  RAISE EXCEPTION 'Finalization actor is required' USING ERRCODE='23514'; END IF;
+ IF NEW."ResultsFinalizedAt" IS NOT NULL AND (NEW."EndsAt">clock_timestamp()) THEN
+  RAISE EXCEPTION 'Round must end before finalization' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentRoundDeletion"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$ BEGIN
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ IF OLD."CampaignID" IS NOT NULL AND (OLD."Status"<>'DRAFT' OR OLD."OpenedAt" IS NOT NULL OR OLD."ResultsFinalizedAt" IS NOT NULL) THEN
+  RAISE EXCEPTION 'Cannot delete a round that has been opened' USING ERRCODE='23514'; END IF;
+ RETURN OLD; END $$;
+DROP TRIGGER IF EXISTS "TR_RecruitmentRoundDeletion" ON public."RecruitmentWindows";
+CREATE TRIGGER "TR_RecruitmentRoundDeletion" BEFORE DELETE ON public."RecruitmentWindows"
+ FOR EACH ROW EXECUTE FUNCTION public."GuardRecruitmentRoundDeletion"();
+DO $$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+ GRANT DELETE ON public."RecruitmentCampaigns" TO service_role;
+ END IF; END $$;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_schedule_editing') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END OJT QHDN SCHEDULE EDITING V5
+
+-- BEGIN OJT QHDN COORDINATION CAPACITY V6
+-- Additive: QHDN referrals may exceed the advertised target; actual receipt
+-- remains a separate confirmation and never changes the original Capacity.
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentCapacity"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+DECLARE student_id integer; cap integer;
+BEGIN
+ IF NEW."Decision"<>'ACCEPTED' THEN RETURN NEW; END IF;
+ IF TG_OP='UPDATE' AND OLD."Decision"='ACCEPTED' THEN RETURN NEW; END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ SELECT "StudentID" INTO student_id FROM "OJTRegistrations" WHERE "RegistrationID"=NEW."RegistrationID";
+ IF EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE r."StudentID"=student_id AND co."OJTSemesterID"=NEW."OJTSemesterID" AND co."Decision"='ACCEPTED' AND co."CoordinationID"<>NEW."CoordinationID") THEN
+  RAISE EXCEPTION 'Student already confirmed in this OJT semester' USING ERRCODE='23514'; END IF;
+ SELECT "Capacity" INTO cap FROM "InternshipPositions" WHERE "PositionID"=NEW."PositionID" FOR UPDATE;
+ IF NEW."Source" NOT IN ('QHDN_COORDINATION','QHDN_APPLICATION') AND (cap IS NULL OR public."RecruitmentOccupiedSlots"(NEW."PositionID")>=cap) THEN
+  RAISE EXCEPTION 'Shared semester capacity is exhausted' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_coordination_capacity') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END OJT QHDN COORDINATION CAPACITY V6
