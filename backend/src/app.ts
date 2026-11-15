@@ -23,8 +23,11 @@ import {
 } from "./middleware/error-handler";
 
 import routes from "./routes";
+import { apiNoCache } from './middleware/api-no-cache';
 
 const app = express();
+app.disable('etag');
+app.use('/api',apiNoCache);
 
 const publicDirectory =
   path.join(

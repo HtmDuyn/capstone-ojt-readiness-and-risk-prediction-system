@@ -58,6 +58,11 @@ export const API = axios.create({
 });
 
 API.interceptors.request.use(config => {
+  if(['get','head'].includes(config.method?.toLowerCase()??'get')){
+    config.headers??={};
+    config.headers['Cache-Control']='no-cache';
+    config.headers['Pragma']='no-cache';
+  }
   const headers = config.headers as unknown as StudentHeaders;
   const token = localStorage.getItem('ojt_auth_token');
   if (config.url !== '/auth/login' && token && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
