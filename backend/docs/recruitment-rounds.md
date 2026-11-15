@@ -1,5 +1,9 @@
 # Đợt tuyển dụng với ba hạn
 
+QHDN điều phối ngay sinh viên bị doanh nghiệp từ chối. Sinh viên chưa ứng tuyển (kể cả chưa có OJTRegistration) được điều phối ngay khi hết hạn đăng ký/ứng tuyển, không cần chờ hạn phản hồi hoặc chốt tổng hợp. Hết hạn được kiểm tra bằng giờ database ở cả danh sách và lúc gửi điều phối. Hồ sơ đang chờ doanh nghiệp phản hồi, đã được nhận hoặc có phân công vẫn được bảo vệ khỏi điều phối trùng. Giao diện QHDN không còn nút xác nhận Thực nhận; dữ liệu và lịch sử thực nhận hiện có được giữ lại.
+
+Điều phối hàng loạt QHDN chọn doanh nghiệp qua `companyId`, không chọn vị trí trên giao diện. API tự liên kết dữ liệu vị trí nội bộ và cho điều phối vượt chỉ tiêu, kể cả còn 0 slot. Danh sách doanh nghiệp hiển thị slot còn lại = max(0, tổng chỉ tiêu − tổng thực nhận). Hồ sơ điều phối vẫn chờ doanh nghiệp phản hồi; số thực nhận cập nhật theo sinh viên doanh nghiệp đã nhận hoặc có phân công, gộp dữ liệu thực nhận cũ và không đếm trùng; không thay đổi chỉ tiêu. Nhận hồ sơ do QHDN điều phối được phép vượt chỉ tiêu; ứng tuyển thông thường vẫn giữ giới hạn cũ. Database đã triển khai cần chạy riêng khối `OJT QHDN COORDINATION CAPACITY V6` trong `backend/DB` để cho phép doanh nghiệp xác nhận các hồ sơ điều phối vượt chỉ tiêu.
+
 Để dùng sửa/xóa lịch QHDN trên database đã có V4, chạy riêng khối `-- BEGIN OJT QHDN SCHEDULE EDITING V5` đến `-- END OJT QHDN SCHEDULE EDITING V5` trong `backend/DB`. Không chạy toàn bộ script trên database đang dùng vì phần đầu reset dữ liệu.
 
 Mỗi đợt tuyển dụng con gồm ba khoảng thời gian có ngày giờ bắt đầu và kết thúc:

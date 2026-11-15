@@ -65,9 +65,9 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     banner: {
       title: "Báo cáo OJT",
       description:
-        "Tổng hợp kết quả đánh giá kỹ năng chuyên môn, thái độ và điểm thực tập OJT từ người hướng dẫn doanh nghiệp.",
+        "Theo dõi kết quả chuyển giao và xuất báo cáo OJT theo học kỳ.",
       badge: "Kết quả OJT",
-      primaryActionLabel: "Tải bảng đánh giá",
+      primaryActionLabel: "Xuất báo cáo",
     },
   },
 ];

@@ -1,6 +1,18 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {coordinationAvailability}=require('../dist/modules/qhdn/placement.policy');
 const ongoing={roundCount:1,unfinished:1},complete={roundCount:1,unfinished:0};
+test('unregistered students can be coordinated immediately after applications expire, before finalization',()=>{
+ for(const context of [{...ongoing,applicationDeadlinePassed:true},{roundCount:0,unfinished:0,applicationDeadlinePassed:true}]){
+  assert.equal(coordinationAvailability({},context).canCoordinate,true);
+  assert.equal(coordinationAvailability({decision:null},context).canCoordinate,true);
+  assert.equal(coordinationAvailability({decision:'REJECTED'},context).canCoordinate,true);
+  assert.equal(coordinationAvailability({decision:'PENDING',source:'STUDENT_APPLICATION'},context).canCoordinate,false);
+  assert.equal(coordinationAvailability({decision:'PENDING',source:'QHDN_COORDINATION'},context).canCoordinate,false);
+  assert.equal(coordinationAvailability({decision:'ACCEPTED'},context).canCoordinate,false);
+  assert.equal(coordinationAvailability({hasAssignment:true},context).canCoordinate,false);
+ }
+ assert.equal(coordinationAvailability({},{...ongoing,applicationDeadlinePassed:false}).canCoordinate,false);
+});
 test('enterprise rejection can be coordinated immediately, without an ended or finalized round',()=>{
  for(const source of ['STUDENT_APPLICATION','QHDN_COORDINATION','QHDN_APPLICATION']){
   assert.equal(coordinationAvailability({decision:'REJECTED',source},ongoing).canCoordinate,true);

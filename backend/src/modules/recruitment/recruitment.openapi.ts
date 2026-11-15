@@ -16,7 +16,7 @@ export function addRecruitmentOperations(spec:Spec) {
  add('get','/api/accounts/me/notifications','List own notifications and unread count',allRoles,page);
  add('patch','/api/accounts/me/notifications/{id}','Mark own notification as read',allRoles,{}, {isRead:{type:'boolean',enum:[true]}},['isRead']);
  add('get','/api/qhdn/placements','List handed-off students, coordination history and actual receipts',staff,{ojtSemesterId:id});
- add('post','/api/qhdn/placements','QHDN immediately re-coordinates rejected students; other unplaced students follow final recruitment summaries',staff,{}, {studentId:id,ojtSemesterId:id,positionId:id,source:{type:'string',enum:['QHDN_APPLICATION','QHDN_COORDINATION']},reason},['studentId','ojtSemesterId','positionId','source','reason']);
+ add('post','/api/qhdn/placements','QHDN coordinates to a company (companyId) or a position (positionId); supply exactly one. QHDN referrals may exceed advertised capacity; actual receipt is confirmed separately.',staff,{}, {studentId:id,ojtSemesterId:id,positionId:id,companyId:id,source:{type:'string',enum:['QHDN_APPLICATION','QHDN_COORDINATION']},reason},['studentId','ojtSemesterId','source','reason']);
  add('post','/api/qhdn/placements/{id}/receive','Record actual receipt after enterprise acceptance; exceeding capacity is allowed with a reason',staff,{},{reason},['reason']);
  const phaseKeys=['postingStartsAt','postingEndsAt','applicationStartsAt','applicationEndsAt','resultsStartsAt','resultsEndsAt'];
  const child={type:'object',additionalProperties:false,required:['name',...phaseKeys],properties:{name:text(150),...Object.fromEntries(phaseKeys.map(key=>[key,time]))}};

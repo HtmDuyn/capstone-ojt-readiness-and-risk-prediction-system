@@ -7,6 +7,14 @@ const w={CampaignID:1,Status:'DRAFT',Kind:'SEMESTER',AcademicPeriodID:1,LinkedPe
  ApplicationStartsAt:'2026-12-03T00:00:00Z',ApplicationEndsAt:'2026-12-10T00:00:00Z',
  ResultsStartsAt:'2026-12-03T00:00:00Z',ResultsEndsAt:'2026-12-10T00:00:00Z'};
 const input=(row,patch={})=>({...Object.fromEntries(Object.entries(scheduleColumns).map(([key,col])=>[key,row[col]])),...patch});
+test('opened in advance remains fully editable until the scheduled start, but cannot be deleted',()=>{
+ const scheduled={...w,Status:'OPEN',OpenedAt:w.DatabaseNow};
+ assert.equal(schedulePermissions(scheduled).canEditSchedule,true);
+ assert.equal(schedulePermissions(scheduled).canDelete,false);
+ assert.equal(schedulePermissions(scheduled).editableScheduleFields.length,6);
+ assert.doesNotThrow(()=>editedSchedule(scheduled,input(scheduled,{postingStartsAt:'2026-12-01T12:00:00Z',resultsStartsAt:'2026-12-04T00:00:00Z'})));
+ assert.throws(()=>editedSchedule(scheduled,input(scheduled,{postingStartsAt:scheduled.DatabaseNow})));
+});
 test('draft allows complete rescheduling and deletion; historical opening always prevents deletion',()=>{
  assert.equal(schedulePermissions(w).canDelete,true);
  assert.equal(schedulePermissions(w).editableScheduleFields.length,6);

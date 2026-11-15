@@ -45,7 +45,7 @@ export async function listWindows(params: Row) {
     const campaigns=(await c.query(`SELECT c."CampaignID" AS id,c."Name" AS name,c."StartsAt" AS "startsAt",c."EndsAt" AS "endsAt"
    FROM "RecruitmentCampaigns" c JOIN "OJTSemesters" o USING("OJTSemesterID")
    WHERE ($1::int IS NULL OR o."AcademicPeriodID"=$1) ORDER BY c."CampaignID"`,[period])).rows;
-  return {campaigns,items:rows.map(w=>({...windowApi(w),...schedulePermissions(w),campaignName:w.CampaignName,pendingCount:w.PendingCount})),total:rows.length};
+  return {campaigns,items:rows.map(w=>({...windowApi(w),...schedulePermissions(w),serverNow:w.DatabaseNow,campaignName:w.CampaignName,pendingCount:w.PendingCount})),total:rows.length};
  });
 }
 export async function saveWindow(body:unknown,actor:number,id?:number) {

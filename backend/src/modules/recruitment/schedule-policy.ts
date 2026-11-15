@@ -14,9 +14,10 @@ export function schedulePermissions(w:Row) {
  const available=!!w.CampaignID&&hasPhaseSchedule(w)&&!w.ResultsFinalizedAt&&
   w.Kind==='SEMESTER'&&w.LinkedPeriodID===w.AcademicPeriodID&&!['CLOSED','ARCHIVED'].includes(w.PeriodStatus);
  const draft=w.Status==='DRAFT'&&!w.OpenedAt;
- const editable=available&&(draft||(w.Status==='OPEN'&&now<+new Date(w.EndsAt)));
+ const scheduled=w.Status==='OPEN'&&now<+new Date(w.StartsAt);
+ const editable=available&&(draft||scheduled||(w.Status==='OPEN'&&now<+new Date(w.EndsAt)));
  const editableScheduleFields=editable?Object.entries(scheduleColumns).filter(([,column])=>{
-  if(draft)return true;
+  if(draft||scheduled)return true;
   return now<+new Date(w[column]);
  }).map(([key])=>key):[];
  return {canEditSchedule:editable,canDelete:available&&draft,editableScheduleFields};
