@@ -11,7 +11,8 @@ test('concurrent application/response extensions are atomic and never reopen clo
  const active={...w,DatabaseNow:'2026-11-11T12:00:00Z'};
  const after=extendedSchedule(active,{applicationEndsAt:'2026-11-11T15:00:00Z',resultsEndsAt:'2026-11-11T16:00:00Z'});
  assert.equal(after.ApplicationStartsAt,w.ApplicationStartsAt);assert.equal(+after.EndsAt,+new Date('2026-11-11T16:00:00Z'));
- assert.throws(()=>extendedSchedule(active,{applicationEndsAt:'2026-11-11T14:00:00Z'}));
+ assert.doesNotThrow(()=>extendedSchedule(active,{applicationEndsAt:'2026-11-11T14:00:00Z'}));
+ assert.throws(()=>extendedSchedule(active,{applicationEndsAt:'2026-11-11T14:00:01Z'}));
  const closed={...w,DatabaseNow:w.ApplicationEndsAt};
  assert.throws(()=>extendedSchedule(closed,{applicationEndsAt:'2026-11-11T13:30:00Z'}),e=>e.errorCode==='RECRUITMENT_EXTENSION_CLOSED');
  assert.doesNotThrow(()=>extendedSchedule(closed,{resultsEndsAt:'2026-11-11T15:00:00Z'}));

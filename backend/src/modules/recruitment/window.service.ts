@@ -7,6 +7,8 @@ import { inputObject, invalid, positiveId, requiredText, enumValue } from '../st
 import { windowRecord, windowApi, previousRoundSelect, type Row } from './recruitment.repository';
 import { extendWindow, requireLifecycleSchema } from './lifecycle.service';
 import { requireRecruitmentSchema, requireThreePhaseSchema, expireRecruitmentResponses } from './round-policy';
+import { schedulePermissions } from './schedule-policy';
+import { requireScheduleEditingSchema } from './schedule.service';
 
 export function validateCampaignSchedule(body:Row) {
  const start=new Date(timestamp(body.startsAt,'startsAt')),end=new Date(timestamp(body.endsAt,'endsAt'));
@@ -17,7 +19,7 @@ export function validateCampaignSchedule(body:Row) {
   const r=inputObject(value,['name',...keys]);
   const times=Object.fromEntries(keys.map(key=>[key,new Date(timestamp(r[key],'round.'+key))]));
   const {postingStartsAt:ps,postingEndsAt:pe,applicationStartsAt:as,applicationEndsAt:ae,resultsStartsAt:rs,resultsEndsAt:re}=times;
-  if(!(ps<pe&&pe<=as&&as<ae&&+rs===+as&&ae<re))throw invalid('Hạn đăng tin phải kết thúc trước hạn ứng tuyển. Hạn xét tuyển bắt đầu cùng hạn ứng tuyển và kết thúc sau hạn ứng tuyển.',400,'RECRUITMENT_PHASE_SCHEDULE_INVALID');
+  if(!(ps<pe&&pe<=as&&as<ae&&rs>=as&&rs<re&&ae<=re))throw invalid('Hạn đăng tin kết thúc trước hoặc cùng lúc ứng tuyển. Hạn xét tuyển bắt đầu từ lúc mở ứng tuyển trở đi, kết thúc sau lúc bắt đầu và bằng hoặc sau hạn ứng tuyển.',400,'RECRUITMENT_PHASE_SCHEDULE_INVALID');
   return {name:requiredText(r.name,'round.name',150),start:ps,end:re,
    postingStartsAt:ps,postingEndsAt:pe,applicationStartsAt:as,applicationEndsAt:ae,resultsStartsAt:rs,resultsEndsAt:re};
  });
@@ -43,7 +45,7 @@ export async function listWindows(params: Row) {
     const campaigns=(await c.query(`SELECT c."CampaignID" AS id,c."Name" AS name,c."StartsAt" AS "startsAt",c."EndsAt" AS "endsAt"
    FROM "RecruitmentCampaigns" c JOIN "OJTSemesters" o USING("OJTSemesterID")
    WHERE ($1::int IS NULL OR o."AcademicPeriodID"=$1) ORDER BY c."CampaignID"`,[period])).rows;
-  return {campaigns,items:rows.map(w=>({...windowApi(w),campaignName:w.CampaignName,pendingCount:w.PendingCount})),total:rows.length};
+  return {campaigns,items:rows.map(w=>({...windowApi(w),...schedulePermissions(w),campaignName:w.CampaignName,pendingCount:w.PendingCount})),total:rows.length};
  });
 }
 export async function saveWindow(body:unknown,actor:number,id?:number) {
@@ -76,6 +78,7 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
   await requireThreePhaseSchema(c);
   await requireLifecycleSchema(c);
   const schedule=validateCampaignSchedule(b);
+  if(schedule.rounds.some(r=>+r.applicationEndsAt===+r.resultsEndsAt||+r.resultsStartsAt!==+r.applicationStartsAt))await requireScheduleEditingSchema(c);
   if(schedule.end>periodBounds(period).end)throw invalid('Thời hạn không được vượt quá ngày kết thúc học kỳ.');
   const databaseNow=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
   if(schedule.start<=databaseNow)throw invalid('Đợt OJT phải bắt đầu trong tương lai.');

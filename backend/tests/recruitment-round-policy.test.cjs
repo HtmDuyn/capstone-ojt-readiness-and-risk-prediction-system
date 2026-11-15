@@ -47,9 +47,11 @@ test('campaign children must be ordered, non-overlapping and inside the parent',
   assert.equal(validateCampaignSchedule(body).rounds.length, 1);
   for (const change of [
     { postingEndsAt: '2026-11-11T09:01:00Z' }, { resultsEndsAt: '2026-11-11T12:01:00Z' },
-    { resultsEndsAt: child.applicationEndsAt }, { resultsStartsAt: child.applicationEndsAt },
+    { resultsEndsAt: '2026-11-11T10:59:59Z' }, { resultsStartsAt: '2026-11-11T08:59:59Z' }, { resultsStartsAt:child.resultsEndsAt },
   ]) assert.throws(() => validateCampaignSchedule({ ...body, rounds: [{ ...child, ...change }] }));
   assert.throws(() => validateCampaignSchedule({ ...body, rounds: [child, child] }));
+  assert.doesNotThrow(()=>validateCampaignSchedule({...body,rounds:[{...child,resultsEndsAt:child.applicationEndsAt}]}));
+  assert.doesNotThrow(()=>validateCampaignSchedule({...body,rounds:[{...child,resultsStartsAt:child.applicationEndsAt}]}));
 });
 
 test('posting, concurrent applications/reviews, review-only and deadline boundaries', () => {

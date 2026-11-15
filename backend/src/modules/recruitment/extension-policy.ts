@@ -17,8 +17,8 @@ export function extendedSchedule(before:Row, input:Row) {
   after[column]=value;changed=true;
  }
  if(!changed)throw invalid('Chọn ít nhất một thời hạn mới dài hơn hiện tại.');
- if(new Date(after.PostingEndsAt)>new Date(after.ApplicationStartsAt)||new Date(after.ApplicationEndsAt)>=new Date(after.ResultsEndsAt))
-  throw invalid('Hạn đăng tin không vượt giờ mở ứng tuyển; hạn phản hồi phải kết thúc sau hạn ứng tuyển. Có thể gia hạn đồng thời hạn ứng tuyển và phản hồi.',400,'RECRUITMENT_PHASE_SCHEDULE_INVALID');
+ if(new Date(after.PostingEndsAt)>new Date(after.ApplicationStartsAt)||new Date(after.ApplicationEndsAt)>new Date(after.ResultsEndsAt))
+  throw invalid('Hạn đăng tin không vượt giờ mở ứng tuyển; hạn phản hồi kết thúc bằng hoặc sau hạn ứng tuyển. Có thể gia hạn đồng thời hạn ứng tuyển và phản hồi.',400,'RECRUITMENT_PHASE_SCHEDULE_INVALID');
  after.EndsAt=after.ResultsEndsAt;
  return after;
 }
