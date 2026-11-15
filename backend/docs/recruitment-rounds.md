@@ -24,7 +24,7 @@ Role OJT_COORD và ADMIN tạo đợt tổng cùng 1–30 đợt tuyển dụng 
 
 Mỗi phần tử rounds nhận name và đủ sáu trường postingStartsAt, postingEndsAt, applicationStartsAt, applicationEndsAt, resultsStartsAt, resultsEndsAt. Không nhận startsAt/endsAt chung cho đợt con mới. Cửa sổ ứng tuyển OJT liên kết dùng chính lịch hạn 2.
 
-Form QHDN tự gợi ý hạn 2 bắt đầu khi hạn 1 kết thúc và kéo dài 7 ngày. Hạn 3 được gợi ý bắt đầu cùng hạn 2, mặc định kết thúc bằng hạn 2. Tất cả mốc được gợi ý, kể cả giờ bắt đầu hạn 3, có thể chỉnh tay. Các mốc đã chỉnh tay không bị gợi ý tiếp theo ghi đè.
+Form QHDN tự gợi ý hạn 2 bắt đầu khi hạn 1 kết thúc và kéo dài 7 ngày. Giờ bắt đầu hạn 3 được gợi ý theo hạn 2 và có thể chỉnh tay. Ngày và giờ kết thúc hạn 3 để trống khi tạo, người dùng tự chọn; không tự điền hoặc cập nhật theo hạn 2. Các mốc đã chỉnh tay không bị gợi ý tiếp theo ghi đè.
 
 Chỉ OJT_COORD có API `PATCH /api/recruitment/windows/:id/schedule` và `DELETE /api/recruitment/windows/:id`. Đợt DRAFT chưa từng mở được sửa toàn bộ lịch (lịch mới phải bắt đầu trong tương lai) và xóa nếu chưa có dữ liệu liên quan. Đợt OPEN còn thời gian được sửa các mốc tương lai; mốc bắt đầu đã diễn ra, giai đoạn đã hết, đợt CLOSED/hết hạn/chốt tổng hợp không được sửa. Đợt đã mở, kể cả mở trước lịch, tuyệt đối không được xóa. `OpenedAt` giữ dấu lần mở đầu tiên; trigger DB chặn xóa và quay về DRAFT.
 

@@ -76,7 +76,13 @@ async function main(){
  assert.ok(await evaluate(`document.querySelector('[role="dialog"]').scrollWidth<=document.querySelector('[role="dialog"]').clientWidth`),'Date controls fit mobile dialog');
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
  await screenshot('schedule-desktop');
- await fill('#resultsStartsAt-date','2028-11-12');await fill('[aria-label="Giờ bắt đầu 3. doanh nghiệp xét tuyển, phản hồi"]','16:00');
+ assert.equal(await evaluate(`document.querySelector('#resultsStartsAt-date').type`),'text');
+ assert.equal(await evaluate(`document.querySelector('#resultsStartsAt-time').type`),'text');
+ await fill('#resultsStartsAt-date','12/11/2028');await fill('[aria-label="Giờ bắt đầu 3. doanh nghiệp xét tuyển, phản hồi"]','16:00');
+ assert.equal(await evaluate(`document.querySelector('#resultsStartsAt-date').value`),'12/11/2028');
+ assert.equal(await evaluate(`document.querySelector('#resultsStartsAt-time').value`),'16:00');
+ await fill('#resultsStartsAt-picker','2028-11-12');
+ assert.equal(await evaluate(`document.querySelector('#resultsStartsAt-date').value`),'12/11/2028');
  await fill('[role="dialog"] textarea[name="reason"]','Điều chỉnh lịch trước giờ bắt đầu');await clickText('Lưu lịch');
  await waitFor(`!document.querySelector('[role="dialog"]')`);
  assert.ok(records.some(record=>record.method==='PATCH'&&record.path==='/recruitment/windows/1/schedule'&&record.body.resultsStartsAt==='2028-11-12T09:00:00.000Z'));

@@ -7,7 +7,15 @@ test('posting deadline suggests seven application days, crossing month and year 
  assert.equal(draft.applicationStartsAt,'28/12/2026 08:30');
  assert.equal(draft.applicationEndsAt,'04/01/2027 08:30');
  assert.equal(draft.resultsStartsAt,draft.applicationStartsAt);
- assert.equal(draft.resultsEndsAt,draft.applicationEndsAt);
+ assert.equal(draft.resultsEndsAt,'');
+});
+test('response deadline is never generated or overwritten when application dates change',()=>{
+ let draft=updateScheduleDraft(emptySchedule,'applicationStartsAt','03/12/2026 09:00',new Set());
+ draft=updateScheduleDraft(draft,'applicationEndsAt','12/12/2026 17:00',new Set());
+ assert.equal(draft.resultsEndsAt,'');
+ draft=updateScheduleDraft(draft,'resultsEndsAt','15/12/2026 18:00',new Set());
+ draft=updateScheduleDraft(draft,'applicationStartsAt','04/12/2026 09:00',new Set());
+ assert.equal(draft.resultsEndsAt,'15/12/2026 18:00');
 });
 test('manual deadlines survive suggestions; response start follows application start',()=>{
  let draft=updateScheduleDraft(emptySchedule,'postingEndsAt','01/12/2026 08:30',new Set());

@@ -40,6 +40,5 @@ export function updateScheduleDraft(before:ScheduleDraft,key:ScheduleField,value
    next.applicationEndsAt=formatScheduleDate(end);
   }
  }
- if(!manual.has('resultsEndsAt')&&parseScheduleDate(next.applicationEndsAt))next.resultsEndsAt=next.applicationEndsAt;
  return next;
 }
