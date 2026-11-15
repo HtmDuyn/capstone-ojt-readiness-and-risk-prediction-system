@@ -1,13 +1,22 @@
 import { EmptyState, ErrorNotice, MetricCard, SectionTitle } from '@/components/education/EducationUi';
+import { OjtResultDonut } from '@/components/education/OjtResultDonut';
+import { courseDemandOverview } from '@/utils/courseDemandOverview';
 import { useEducationDashboard } from '@/hooks/useEducationDashboard';
-import { clampPercent, formatDate, formatNumber, formatPercent } from '@/utils/educationDashboard';
-import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle2, FileDown, GraduationCap, Info, PieChart, RefreshCcw, Users } from 'lucide-react';
+import { formatDate, formatNumber, formatPercent } from '@/utils/educationDashboard';
+import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle2, FileDown, Info, PieChart, Users } from 'lucide-react';
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export const EducationDashboard: React.FC = () => {
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, courseDemands, academicAlerts, handleRefresh, handleYearChange, handleExport } = useEducationDashboard();
-  const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible > 0);
-  const chartMax = Math.max(4, Math.ceil(Math.max(0, ...cohortResults.map(period => period.eligible + period.ineligible)) / 4) * 4);
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard();
+  const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible + period.reviewRequired > 0);
+  const chartMax = Math.max(4, Math.ceil(Math.max(0, ...cohortResults.map(period => period.eligible + period.ineligible + period.reviewRequired)) / 4) * 4);
+  const ojtGroups = [
+    { label: 'Đủ điều kiện', count: eligibleStudents ?? 0, color: '#22c55e', dotClass: 'bg-green-500' },
+    { label: 'Chưa đủ điều kiện', count: ineligibleStudents ?? 0, color: '#f87171', dotClass: 'bg-red-400' },
+    { label: 'Cần đối soát', count: reviewRequiredStudents ?? 0, color: '#fb923c', dotClass: 'bg-orange-400' },
+  ];
+  const demandOverview = courseDemandOverview(courseDemands);
   return (
     <div className="mx-auto w-full max-w-[1500px]">
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -16,41 +25,29 @@ export const EducationDashboard: React.FC = () => {
             ============================================= */}
 
         <header className="border-b border-slate-200 px-5 py-5 md:px-7">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div>
-              <p className="text-xs font-semibold text-orange-600">
-                Trang chủ / Phòng Đào tạo
-              </p>
-
-              <h1 className="mt-2 text-xl font-extrabold text-slate-900">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
                 Tổng quan học vụ và OJT
               </h1>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Theo dõi sinh viên, kết quả xét OJT đã lưu từ FE và tình hình học vụ.
+              <p className="mt-2 text-sm text-slate-500">
+                Theo dõi tình hình học tập, điều kiện thực tập OJT và các chỉ số học vụ của sinh viên.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <RefreshCcw size={14} />
-                Tải lại
-              </button>
-
+            <div className="flex shrink-0 flex-col items-start gap-1 md:items-end">
               <button
                 type="button"
                 disabled={exporting || dashboardLoading}
                 onClick={handleExport}
-                title="Xuất nhu cầu học phần theo phạm vi đang chọn"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Xuất CSV nhu cầu học phần theo phạm vi đang chọn"
+                className="inline-flex items-center gap-2 rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-700 transition hover:border-orange-400 hover:bg-orange-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <FileDown size={14} />
-                {exporting ? 'Đang xuất...' : 'Xuất nhu cầu CSV'}
+                <FileDown size={16} aria-hidden="true" />
+                {exporting ? 'Đang xuất...' : 'Xuất báo cáo'}
               </button>
+              <span className="text-xs text-slate-500">CSV nhu cầu học phần</span>
             </div>
           </div>
         </header>
@@ -153,12 +150,12 @@ export const EducationDashboard: React.FC = () => {
 
             <span>
               {selectedOjtSemesterId
-                  ? "Báo cáo học vụ theo kỳ đã chọn; thống kê điều kiện OJT dùng kết quả FE đã lưu, độc lập với kỳ học."
+                  ? "Báo cáo học vụ theo kỳ đã chọn; kết quả xét điều kiện OJT được tổng hợp riêng, không phụ thuộc kỳ học và chưa phải quyết định chính thức."
                   : selectedPeriod
-                    ? "Đang xem học vụ theo kỳ học đã chọn; kết quả OJT lấy theo kỳ do hồ sơ API xác định."
+                    ? "Đang xem học vụ theo kỳ học đã chọn; kết quả xét điều kiện OJT theo kỳ ghi nhận trong hồ sơ và chưa phải quyết định chính thức."
                     : selectedYear
-                    ? "Năm học đang được dùng để lọc danh sách kỳ học. Backend chưa hỗ trợ lọc trực tiếp thống kê bằng academicYearId nên số liệu bên dưới vẫn thuộc phạm vi toàn hệ thống."
-                    : "Đang xem toàn hệ thống. Mỗi sinh viên được tính một lần theo kết quả FE đã lưu; kết quả này không phải quyết định OJT chính thức."}
+                    ? "Năm học chỉ lọc danh sách kỳ học; số liệu bên dưới vẫn tổng hợp toàn hệ thống. Kết quả xét điều kiện OJT phục vụ theo dõi, chưa phải quyết định chính thức."
+                    : "Dữ liệu tổng hợp theo phạm vi đã chọn, mỗi sinh viên được tính một lần. Kết quả xét điều kiện OJT phục vụ công tác theo dõi và chuẩn bị thực tập, chưa phải quyết định chính thức."}
             </span>
           </div>
         </section>
@@ -239,78 +236,20 @@ export const EducationDashboard: React.FC = () => {
             <div className="border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
               <SectionTitle
                 icon={<PieChart size={18} />}
-                title="Tỷ lệ đủ điều kiện OJT"
-                description="Tính trên nhóm sinh viên đã có kết quả xét."
+                title="Tổng hợp kết quả xét điều kiện OJT"
+                description="Kết quả xét đã lưu của sinh viên trong phạm vi thống kê; không phải tỷ lệ của một kỳ OJT cụ thể."
                 iconClass="bg-green-50 text-green-600"
               />
 
-              {eligiblePercent === null ? (
+              {dashboardError ? <ErrorNotice message={dashboardError} /> : assessedStudents === null || assessedStudents === 0 ? (
                 <EmptyState
                   loading={dashboardLoading}
                   title="Chưa có kết quả xét điều kiện OJT"
-                  description="Biểu đồ sẽ hiển thị khi API Dashboard trả đủ số sinh viên đã xét."
+                  description="Chưa có kết quả xét đã lưu trong phạm vi đang xem."
                 />
               ) : (
-                <div className="py-7">
-                  <div className="flex flex-col items-center justify-center gap-6 sm:flex-row">
-                    <div
-                      className="relative h-40 w-40 shrink-0 rounded-full"
-                      style={{
-                        background: `conic-gradient(
-                          #22c55e 0% ${clampPercent(eligiblePercent)}%,
-                          #f87171 ${clampPercent(eligiblePercent)}% 100%
-                        )`,
-                      }}
-                    >
-                      <div className="absolute inset-5 flex flex-col items-center justify-center rounded-full bg-white">
-                        <span className="text-2xl font-extrabold text-slate-800">
-                          {formatPercent(eligiblePercent)}
-                        </span>
-
-                        <span className="mt-1 text-[11px] text-slate-400">
-                          Đủ điều kiện
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <span className="h-3 w-3 rounded-full bg-green-500" />
-
-                        <div>
-                          <p className="text-xs text-slate-500">Đủ điều kiện</p>
-
-                          <p className="text-sm font-bold text-slate-800">
-                            {formatNumber(eligibleStudents)} sinh viên
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span className="h-3 w-3 rounded-full bg-red-400" />
-
-                        <div>
-                          <p className="text-xs text-slate-500">
-                            Chưa đủ điều kiện
-                          </p>
-
-                          <p className="text-sm font-bold text-slate-800">
-                            {formatNumber(ineligibleStudents)} sinh viên
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-slate-400">
-                        Tổng đã xét: {formatNumber(assessedStudents)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 rounded-lg bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
-                    Tỷ lệ chưa đủ điều kiện:{" "}
-                    <strong>{formatPercent(ineligiblePercent ?? 0)}</strong>.
-                    Kết quả được lấy từ dữ liệu Backend.
-                  </div>
+                <div className="py-5">
+                  <OjtResultDonut groups={ojtGroups} />
                 </div>
               )}
             </div>
@@ -329,7 +268,7 @@ export const EducationDashboard: React.FC = () => {
                 <EmptyState
                   loading={dashboardLoading}
                   title="Chưa có thống kê theo khóa"
-                  description="Chọn kỳ học có liên kết OJT để xem kết quả theo khóa."
+                  description="Chưa có kết quả xét đã lưu theo khóa trong phạm vi đang xem."
                 />
               ) : (
                 <div className="mt-5">
@@ -343,8 +282,9 @@ export const EducationDashboard: React.FC = () => {
                       <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
                       Chưa đủ điều kiện
                     </span>
+                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Cần đối soát</span>
                   </div>
-                  <div className="flex h-[270px] gap-2" role="group" aria-label="Biểu đồ số sinh viên đủ và chưa đủ điều kiện OJT theo khóa">
+                  <div className="flex h-[270px] gap-2" role="group" aria-label="Biểu đồ kết quả xét điều kiện OJT theo khóa">
                     <div className="flex h-[220px] w-8 shrink-0 flex-col justify-between text-right text-[11px] text-slate-500">
                       {[chartMax, chartMax * 0.75, chartMax * 0.5, chartMax * 0.25, 0].map(value => <span key={value}>{value}</span>)}
                     </div>
@@ -355,15 +295,14 @@ export const EducationDashboard: React.FC = () => {
                         </div>
                         <div className="relative z-10 flex h-full min-w-max items-start gap-4 px-4">
                           {cohortResults.map((period, index) => {
-                            const total = period.eligible + period.ineligible;
-                            const details = `${period.label}: ${period.eligible} sinh viên đủ điều kiện, ${period.ineligible} sinh viên chưa đủ điều kiện`;
+                            const total = period.eligible + period.ineligible + period.reviewRequired;
+                            const details = `${period.label}: ${period.eligible} sinh viên đủ điều kiện, ${period.ineligible} sinh viên chưa đủ điều kiện, ${period.reviewRequired} sinh viên cần đối soát`;
                             return (
                               <div key={`${period.label}-${index}`} className="flex h-full min-w-[88px] max-w-[130px] flex-1 flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-orange-400" title={details} role="img" aria-label={details} tabIndex={0}>
                                 <div className="flex h-[220px] w-full flex-col items-center justify-end">
                                   <span className="mb-1 text-xs font-semibold text-slate-700">{total}</span>
-                                  <div className="flex w-12 flex-col-reverse overflow-hidden rounded-t-sm" style={{ height: `${total / chartMax * 196}px` }}>
-                                    <div className="bg-green-500" style={{ height: `${period.eligible / total * 100}%` }} />
-                                    <div className="bg-red-300" style={{ height: `${period.ineligible / total * 100}%` }} />
+                                  <div className="flex w-12 flex-col-reverse rounded-t-sm" style={{ height: `${total / chartMax * 196}px` }}>
+                                    {([['Đủ điều kiện', period.eligible, 'bg-green-500'], ['Chưa đủ điều kiện', period.ineligible, 'bg-red-400'], ['Cần đối soát', period.reviewRequired, 'bg-orange-400']] as const).map(([label, count, color]) => count > 0 && <div key={label} tabIndex={0} title={`${period.label} · ${label}: ${count} sinh viên`} aria-label={`${period.label} · ${label}: ${count} sinh viên`} className={`relative cursor-pointer transition-[filter,transform] duration-200 hover:z-10 hover:scale-x-110 hover:brightness-110 focus:z-10 focus:scale-x-110 focus:brightness-110 ${color}`} style={{ height: `${count / total * 100}%` }} />)}
                                   </div>
                                 </div>
                                 <span className="mt-2 w-full break-words text-center text-xs font-medium text-slate-700">{period.label}</span>
@@ -386,49 +325,26 @@ export const EducationDashboard: React.FC = () => {
             ============================================= */}
 
         <section className="border-b border-slate-200 px-5 py-5 md:px-7">
-          <h2 className="mb-4 text-sm font-bold text-slate-800">
-            Thống kê học tập
-          </h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-slate-900">Thống kê học tập</h2>
+            <Link to="/education/ai-class-proposals" className="text-sm font-semibold text-orange-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">Xem chi tiết nhu cầu lớp hỗ trợ</Link>
+          </div>
 
-          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 lg:grid-cols-2">
-            {/* YEARLY OJT ELIGIBILITY */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            {([
+              ['Học phần có nhu cầu', demandOverview.courseCount, 'Học phần duy nhất từ nhu cầu học, không riêng học lại'],
+              ['Lượt nhu cầu học', demandOverview.demandCount, 'Cặp sinh viên – học phần duy nhất trong phạm vi đang xem'],
+              ['Lớp hỗ trợ đề xuất', null, 'Cần chọn kỳ học/Block 3 tại trang nhu cầu lớp hỗ trợ'],
+            ] as const).map(([label, value, description], index) => <div key={label} className="flex min-h-32 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <span className={`mb-3 h-1 w-10 rounded-full ${['bg-orange-400', 'bg-blue-400', 'bg-emerald-400'][index]}`} aria-hidden="true" />
+              <p className="text-sm font-semibold text-slate-700">{label}</p>
+              <p className="mt-2 text-3xl font-extrabold leading-none text-slate-900">{courseDemandLoading ? 'Đang tải…' : formatNumber(courseDemandError ? null : value)}</p>
+              <p className="mt-auto pt-2 text-xs leading-5 text-slate-500">{description}</p>
+            </div>)}
+          </div>
 
-            <div className="border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
-              <SectionTitle
-                icon={<GraduationCap size={18} />}
-                title="Tỷ lệ sinh viên đủ điều kiện OJT theo năm học"
-                description="Tỷ lệ trên tổng sinh viên có kết quả xét hợp lệ của từng năm học."
-                iconClass="bg-blue-50 text-blue-600"
-              />
-
-              <div className="mt-5" aria-label="Biểu đồ tỷ lệ đủ điều kiện OJT theo năm học">
-                <div className="flex h-[250px] gap-3">
-                  <div className="flex w-10 shrink-0 flex-col justify-between pb-px text-right text-[11px] text-slate-500">
-                    <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
-                  </div>
-                  <div className="relative min-w-0 flex-1 border-b border-l border-slate-300">
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-                      {[0, 25, 50, 75, 100].map(value => <div key={value} className="border-t border-slate-100" />)}
-                    </div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-                      <p className="text-sm font-semibold text-slate-700">Chưa có dữ liệu theo năm học</p>
-                      <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">Dữ liệu kết quả xét hiện chưa gắn với năm học để tính tỷ lệ chính xác.</p>
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-2 pl-10 text-center text-xs text-slate-500">Năm học</p>
-              </div>
-            </div>
-
-            {/* COURSE DEMAND */}
-
-            <div className="p-5">
-              <SectionTitle
-                icon={<BookOpen size={18} />}
-                title="Nhu cầu học phần"
-                description="Các học phần có nhu cầu học từ dữ liệu học vụ."
-                iconClass="bg-orange-50 text-orange-600"
-              />
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="text-base font-bold text-slate-800">Top 5 học phần có nhu cầu cao nhất</h3>
 
               {courseDemandError && (
                 <div className="mt-4">
@@ -443,34 +359,29 @@ export const EducationDashboard: React.FC = () => {
                   description="Chưa có dữ liệu học phần phù hợp từ Backend."
                 />
               ) : (
-                <div className="mt-5 divide-y divide-[#E2E8F0]">
-                  {courseDemands.slice(0, 5).map((course) => (
-                    <div
-                      key={course.id}
-                      className="flex items-center justify-between gap-4 bg-white py-3 transition-colors duration-150 hover:bg-[#EAF2FF]"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800">
-                          {course.code}
-                        </p>
-
-                        <p className="mt-1 truncate text-xs text-slate-500">
-                          {course.name}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-bold text-orange-600">
-                          {formatNumber(course.count)}
-                        </p>
-
-                        <p className="text-[11px] text-slate-400">Sinh viên</p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="mt-3 max-w-full overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full min-w-[850px] table-fixed text-left text-sm">
+                    <thead className="bg-slate-100 text-xs font-semibold text-slate-700"><tr>
+                      <th scope="col" className="w-14 px-3 py-2 text-center">STT</th>
+                      <th scope="col" className="w-28 px-3 py-2">Mã môn học</th>
+                      <th scope="col" className="w-[34%] px-3 py-2">Tên môn học</th>
+                      <th scope="col" className="w-36 px-3 py-2">Kỳ học</th>
+                      <th scope="col" className="w-36 px-3 py-2">Kỳ OJT</th>
+                      <th scope="col" className="w-28 px-3 py-2 text-right">Số sinh viên</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {demandOverview.top.map((course, index) => <tr key={course.id} className="align-top transition-colors hover:bg-orange-50/60">
+                        <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
+                        <td className="px-3 py-2 font-bold text-slate-800">{course.code}</td>
+                        <td className="break-words px-3 py-2 text-slate-700" title={course.name}>{course.name}</td>
+                        <td className="break-words px-3 py-2 text-slate-600">{course.periodName ?? '—'}</td>
+                        <td className="break-words px-3 py-2 text-slate-600">{course.ojtSemesterName ?? '—'}</td>
+                        <td className="px-3 py-2 text-right font-bold tabular-nums text-orange-600">{formatNumber(course.count)}</td>
+                      </tr>)}
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </div>
           </div>
         </section>
 
@@ -482,77 +393,41 @@ export const EducationDashboard: React.FC = () => {
           <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <SectionTitle
               icon={<BellRing size={18} />}
-              title="Danh sách cảnh báo học vụ"
-              description="Các cảnh báo được hệ thống ghi nhận để Phòng Đào tạo theo dõi."
+              title="Tổng quan cảnh báo học vụ"
+              description="Số liệu theo phạm vi thống kê đang chọn."
               iconClass="bg-orange-50 text-orange-600"
             />
-
-            <div className="rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-600">
-              Tổng cảnh báo: {formatNumber(alertCount)}
-            </div>
+            <Link to="/education/student-status" className="text-sm font-semibold text-orange-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">Xem danh sách sinh viên</Link>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200">
+          <div className="bg-white">
             {alertsError && (
-              <div className="m-4">
+              <div className="mb-4">
                 <ErrorNotice message={alertsError} />
               </div>
             )}
 
-            {academicAlerts.length === 0 ? (
+            {!alertOverview || alertOverview.total === 0 ? (
               <EmptyState
                 loading={alertsLoading}
                 title="Chưa có cảnh báo học vụ"
-                description="Chưa có dữ liệu cảnh báo được trả về cho phạm vi đang chọn."
+                description="Chưa có cảnh báo trong phạm vi đang xem."
               />
             ) : (
-              <div className="divide-y divide-[#E2E8F0]">
-                {academicAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="flex items-start gap-3 bg-white px-5 py-4 transition-colors duration-150 hover:bg-[#EAF2FF]"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
-                      <AlertTriangle size={17} />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-800">
-                        {alert.title}
-                      </p>
-
-                      {alert.description && (
-                        <p className="mt-1 text-xs leading-5 text-slate-500">
-                          {alert.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {alert.date && (
-                      <span className="shrink-0 text-xs text-slate-400">
-                        {formatDate(alert.date)}
-                      </span>
-                    )}
-                  </div>
-                ))}
+              <div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4"><p className="text-sm text-slate-600">Tổng số cảnh báo</p><p className="mt-1 text-2xl font-bold text-orange-700">{formatNumber(alertOverview.total)}</p></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm text-slate-600">Sinh viên có cảnh báo</p><p className="mt-1 text-2xl font-bold text-slate-900">{formatNumber(alertOverview.studentCount)}</p></div>
+                </div>
+                <h3 className="mt-5 text-sm font-bold text-slate-800">Theo loại cảnh báo</h3>
+                <div className={`mt-3 grid gap-3 ${alertOverview.groups.length === 1 ? 'grid-cols-1' : alertOverview.groups.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+                  {alertOverview.groups.map(group => <div key={group.type} className="flex min-h-20 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-orange-50/60"><span className="min-w-0 break-words text-sm text-slate-700">{group.label}</span><strong className="shrink-0 text-lg tabular-nums text-orange-700">{formatNumber(group.count)}</strong></div>)}
+                </div>
               </div>
             )}
           </div>
         </section>
 
-        {/* =============================================
-            FOOTER
-            ============================================= */}
-
-        <footer className="flex items-start gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 text-xs leading-5 text-slate-500 md:px-7">
-          <Info size={15} className="mt-0.5 shrink-0 text-blue-500" />
-
-          <span>
-            Dashboard chỉ hiển thị số liệu do Backend cung cấp. Hệ thống không
-            tự xét điều kiện OJT, không tự tạo cảnh báo AI và không sử dụng dữ
-            liệu giả. Những thống kê chưa có dữ liệu phù hợp sẽ được để trống.
-          </span>
-        </footer>
       </div>
     </div>
   );

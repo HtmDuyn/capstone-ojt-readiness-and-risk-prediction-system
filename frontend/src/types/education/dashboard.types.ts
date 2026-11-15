@@ -20,6 +20,7 @@ export interface PeriodStatistic {
   label: string;
   eligible: number;
   ineligible: number;
+  reviewRequired: number;
 }
 
 export interface CohortProgress {
@@ -29,9 +30,13 @@ export interface CohortProgress {
 
 export interface CourseDemand {
   id: string;
+  courseId: number | null;
+  studentIds: number[] | null;
   code: string;
   name: string;
   count: number | null;
+  periodName: string | null;
+  ojtSemesterName: string | null;
 }
 
 export interface AcademicAlert {
