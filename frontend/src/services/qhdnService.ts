@@ -339,6 +339,7 @@ export const listOjtResults = async (
     ojtSemesterId?: number;
     status?: string;
     search?: string;
+    includeUntransferred?: 'true' | 'false';
   } = { page: 1, limit: 100 },
 ): Promise<OjtResultListResponse> => {
   const response = await API.get<OjtResultListResponse>("/ojt-results", {
@@ -386,10 +387,11 @@ export const getCvFile = async (
 export const exportOjtResults = async (
   semesterId: number,
   format: "csv" | "pdf",
+  includeUntransferred = false,
 ): Promise<Blob> =>
   (
     await API.get<Blob>(`/ojt-semesters/${semesterId}/results/export`, {
-      params: { format },
+      params: { format, ...(includeUntransferred ? { includeUntransferred: 'true' } : {}) },
       responseType: "blob",
     })
   ).data;

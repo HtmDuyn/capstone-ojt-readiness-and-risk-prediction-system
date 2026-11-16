@@ -48,7 +48,7 @@ function fixtures(server){server.middlewares.use('/api',(req,res)=>{
   if(legacySummary)return send({context:{roundCount:1,unfinished:0},canCoordinate:false,...(legacySummary==='empty'?{companies:[]}:{}),positions:[{id:1,companyName:'TechViet',title:'Backend',capacity:2,actualCount:0},{id:2,companyName:'TechViet',title:'Frontend',capacity:3,actualCount:0}],items:[1,2,3].map(id=>({id,studentCode:'SE25000'+id,fullName:'Đã nhận '+id,companyName:'TechViet',decision:'ACCEPTED',canCoordinate:false,hasAssignment:false}))});
   return send({context:{roundCount:1,unfinished:1,applicationDeadlinePassed:true},canCoordinate:true,positions:[],companies:[{id:1,name:'Công ty Phần mềm Việt',capacity:1,actualCount:2,availableSlots:0}],items:[...[1,2].map(id=>({id,studentCode:'SE18000'+id,fullName:'Sinh viên '+id,canCoordinate:true,hasAssignment:false,decision:'REJECTED'})),{id:3,studentCode:'SE180003',fullName:'Đã được nhận',companyName:'Công ty Phần mềm Việt',canCoordinate:false,hasAssignment:false,decision:'ACCEPTED'},{id:4,studentCode:'SE180004',fullName:'Chưa đăng ký đã quá hạn',canCoordinate:true,hasAssignment:false}]});
  }
- if(url.pathname==='/ojt-results')return send(paged([{id:1,fullName:'Nguyễn Minh Anh',studentCode:'SE180001',enterpriseName:'Công ty Phần mềm Việt',officialScore:8.5,status:'PENDING_ACADEMIC_CONFIRMATION'}]));
+ if(url.pathname==='/ojt-results'){assert.equal(url.searchParams.get('includeUntransferred'),'true');return send(paged([{id:1,evaluationId:1,resultId:null,fullName:'Nguyễn Minh Anh',studentCode:'SE180001',enterpriseName:'Công ty Phần mềm Việt',completionScore:8,attitudeScore:9,skillScore:0,overallScore:8.25,officialScore:null,status:'SUBMITTED'}]));}
  if(url.pathname.includes('/export')){res.setHeader('Content-Type','text/csv');res.end('student,score\nSE180001,8.5');return;}
  return send({...paged([]),unreadCount:0});
 });}
@@ -71,6 +71,13 @@ async function main(){
  assert.equal(await evaluate(`import('/src/config/api.ts').then(module=>module.API_BASE_URL)`),'/api','Development defaults to the local API proxy without a test-only URL override');
  assert.equal(await evaluate(`document.querySelectorAll('[role="tab"]').length`),2);
  assert.equal(await evaluate(`document.body.innerText.includes('Phiếu đánh giá')`),false);
+ assert.ok(await evaluate(`document.querySelector('[role="tabpanel"]').textContent.includes('Đã đánh giá · Chưa chuyển giao')`));
+ assert.equal(await evaluate(`document.querySelector('[role="tabpanel"]').textContent.includes('Điểm chính thức')`),false);
+ assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('[role="tabpanel"] thead th')).map(cell=>cell.textContent)`),['STT','Sinh viên','Doanh nghiệp','Điểm hoàn thành','Điểm thái độ','Điểm kỹ năng','Điểm tổng kết OJT','Trạng thái']);
+ assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('[role="tabpanel"] tbody tr:first-child td')).slice(3,7).map(cell=>cell.textContent)`),['8','9','0','8.25']);
+ await clickText('CSV');
+ await waitFor(`document.body.innerText.includes('Đã tải kết quả OJT.')`);
+ assert.ok(records.some(record=>record.path==='/ojt-semesters/1/results/export'));
  await screenshot('reports-results-desktop');
  await clickText('Xuất báo cáo');await waitFor(`document.body.innerText.includes('Tải báo cáo CSV')`);await screenshot('reports-export-desktop');
  assert.equal(await evaluate(`document.body.innerText.includes('Tất cả doanh nghiệp')`),false);

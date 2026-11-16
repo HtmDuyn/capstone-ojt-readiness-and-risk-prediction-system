@@ -325,6 +325,7 @@ export interface InternshipEvaluationListResponse {
  */
 export interface OjtResultItem {
   id: number;
+  resultId?: number | null;
   evaluationId?: number;
   assignmentId: number;
   studentId: number;
@@ -336,7 +337,8 @@ export interface OjtResultItem {
   enterpriseName: string;
   ojtSemesterId: number;
   semesterCode?: string;
-  status: "PENDING_ACADEMIC_CONFIRMATION" | "REVISION_REQUESTED" | "CONFIRMED";
+  status: "SUBMITTED" | "PENDING_ACADEMIC_CONFIRMATION" | "REVISION_REQUESTED" | "CONFIRMED";
+  overallScore?: number | null;
   officialScore: number | null;
   completionScore?: number | null;
   attitudeScore?: number | null;
