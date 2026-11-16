@@ -10,7 +10,16 @@ test('whole DB bootstrap supports fresh/repeated runs, grants and protected exte
  await db.query(`CREATE SCHEMA IF NOT EXISTS auth; CREATE TABLE IF NOT EXISTS auth._bootstrap_audit_sentinel (id integer PRIMARY KEY); INSERT INTO auth._bootstrap_audit_sentinel VALUES(1) ON CONFLICT DO NOTHING;
   CREATE TABLE IF NOT EXISTS public._bootstrap_unrelated (id integer PRIMARY KEY); INSERT INTO public._bootstrap_unrelated VALUES(1) ON CONFLICT DO NOTHING`);
  for(let run=0;run<2;run++){
+  if(run===1){
+   // Earlier releases created this JD extraction table. It depends on current
+   // application tables but is intentionally absent from the final schema.
+   await db.query(`CREATE TABLE public."RecruitmentPostExtractions" ("ExtractionID" integer PRIMARY KEY,"PostID" integer REFERENCES public."RecruitmentPosts"("PostID"),"RequestedBy" integer REFERENCES public."Users"("UserID"));
+    INSERT INTO public."RecruitmentPostExtractions" SELECT 1,(SELECT min("PostID") FROM public."RecruitmentPosts"),(SELECT min("UserID") FROM public."Users")`);
+   assert.ok((await db.query(`SELECT to_regclass('public."OJTConditionPolicies"') AS name`)).rows[0].name,'Managed policy table exists before repeated reset');
+  }
   await db.query(sql);
+  assert.equal((await db.query(`SELECT to_regclass('public."RecruitmentPostExtractions"') AS name`)).rows[0].name,null,'Legacy extraction table is removed during full reset');
+  assert.ok((await db.query(`SELECT to_regclass('public."OJTConditionPolicies"') AS name`)).rows[0].name,'Managed policy table is recreated');
   assert.equal((await db.query('SELECT count(*)::int n FROM "Students"')).rows[0].n,20);
   assert.equal((await db.query('SELECT count(*)::int n FROM auth._bootstrap_audit_sentinel')).rows[0].n,1);
   assert.equal((await db.query('SELECT count(*)::int n FROM public._bootstrap_unrelated')).rows[0].n,1);
