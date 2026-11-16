@@ -75,11 +75,12 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           {/* Header trên cùng */}
           <Header
             user={resolvedUserSummary}
-            showNotifications={!isEducation}
-            showLanguage={!isEducation}
+            showNotifications={!isEducation && user?.role !== 'enterprise'}
+            showLanguage={!isEducation && user?.role !== 'enterprise'}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
             showSearch={
+              user?.role !== 'enterprise' &&
               brandSubtitle !== "Phòng Đào tạo" &&
               brandSubtitle !== "Quản trị viên"
             }

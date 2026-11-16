@@ -16,3 +16,8 @@ test('Swagger initializes and QHDN schedule actions have the same access as thei
   assert.ok(operation.security.length);
  }
 });
+test('enterprise bulk preview and confirmation are registered under the enterprise role',()=>{
+ for(const path of ['/api/enterprise/candidates/acceptance-preview','/api/enterprise/candidates/accept-bulk']){
+  assert.deepEqual(swaggerSpec.paths[path].post['x-roles'],['ENTERPRISE']);
+ }
+});

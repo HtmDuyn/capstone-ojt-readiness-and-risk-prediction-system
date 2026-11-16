@@ -486,7 +486,9 @@ CREATE TABLE public."EnterpriseUsers" (
   "PositionTitle" character varying(100)
 );
 CREATE TABLE public."Enterprises" (
+  -- Internal relation key; the UI identifies enterprises by EnterpriseCode.
   "EnterpriseID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."Enterprises_EnterpriseID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
+  -- Unique public enterprise/profile identifier (legacy codes or generated DN000001 codes).
   "EnterpriseCode" character varying(20) NOT NULL,
   "Name" character varying(200) NOT NULL,
   "Address" character varying(300),
@@ -9307,3 +9309,27 @@ END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_coordination_capacity') ON CONFLICT DO NOTHING;
 COMMIT;
 -- END OJT QHDN COORDINATION CAPACITY V6
+
+-- BEGIN OJT ENTERPRISE BULK ACCEPTANCE V7
+-- Additive. Only the validated company-scoped acceptance transaction may exceed capacity.
+BEGIN;
+SET LOCAL search_path=public,pg_catalog;
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+CREATE OR REPLACE FUNCTION public."GuardRecruitmentCapacity"() RETURNS trigger
+LANGUAGE plpgsql SET search_path=public,pg_catalog AS $$
+DECLARE student_id integer; cap integer;
+BEGIN
+ IF NEW."Decision"<>'ACCEPTED' THEN RETURN NEW; END IF;
+ IF TG_OP='UPDATE' AND OLD."Decision"='ACCEPTED' THEN RETURN NEW; END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
+ SELECT "StudentID" INTO student_id FROM "OJTRegistrations" WHERE "RegistrationID"=NEW."RegistrationID";
+ IF EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE r."StudentID"=student_id AND co."OJTSemesterID"=NEW."OJTSemesterID" AND co."Decision"='ACCEPTED' AND co."CoordinationID"<>NEW."CoordinationID") THEN
+  RAISE EXCEPTION 'Student already confirmed in this OJT semester' USING ERRCODE='23514'; END IF;
+ SELECT "Capacity" INTO cap FROM "InternshipPositions" WHERE "PositionID"=NEW."PositionID" FOR UPDATE;
+ IF NEW."Source" NOT IN ('QHDN_COORDINATION','QHDN_APPLICATION') AND current_setting('app.enterprise_bulk_company_id',true) IS DISTINCT FROM NEW."EnterpriseID"::text AND (cap IS NULL OR public."RecruitmentOccupiedSlots"(NEW."PositionID")>=cap) THEN
+  RAISE EXCEPTION 'Shared semester capacity is exhausted' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_enterprise_bulk_acceptance') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END OJT ENTERPRISE BULK ACCEPTANCE V7

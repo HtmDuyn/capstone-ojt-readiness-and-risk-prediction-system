@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden sm:inline">{lang}</span>
         </button>}
 
-        <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />
+        {(showNotifications || showLanguage) && <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />}
 
         {/* User Profile Info & Avatar */}
         <div className="relative" ref={dropdownRef}>

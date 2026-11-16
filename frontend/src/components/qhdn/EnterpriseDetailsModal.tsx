@@ -59,7 +59,7 @@ export function EnterpriseDetailsModal({
     <WorkflowModal
       wide
       title={company.name}
-      subtitle={`Mã ${company.code} · Thông tin đối tác và nhu cầu tiếp nhận sinh viên`}
+      subtitle={`Mã doanh nghiệp: ${company.code} · Thông tin đối tác và nhu cầu tiếp nhận sinh viên`}
       busy={busy}
       onClose={onClose}
     >

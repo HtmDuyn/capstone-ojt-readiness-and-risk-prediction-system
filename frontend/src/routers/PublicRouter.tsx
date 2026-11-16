@@ -12,6 +12,7 @@ import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
 import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
 import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
 import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
+import EnterpriseNotifications from "@/pages/enterprise/EnterpriseNotifications";
 import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
@@ -251,6 +252,10 @@ export const router = createBrowserRouter([
           {
             path: "/enterprise/profile",
             element: <EnterpriseProfile />,
+          },
+          {
+            path: "/enterprise/notifications",
+            element: <EnterpriseNotifications />,
           },
         ],
       },
