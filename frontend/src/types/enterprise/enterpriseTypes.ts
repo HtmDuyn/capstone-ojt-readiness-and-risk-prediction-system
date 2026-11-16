@@ -38,6 +38,7 @@ export interface EnterpriseProfileSummary {
   activeInterns: number;
   /** Unique students received through acceptance, a valid assignment or receipt history. */
   acceptedInterns: number;
+  /** Unique students with a submitted enterprise evaluation and an overall score. */
   completedInterns: number;
   pendingEvaluations: number;
 }

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import {
   enterpriseService,
+  type EnterpriseCandidateItem,
   type EnterpriseInternshipTask,
   type RecruitmentPost,
 } from '@/services/enterpriseService';
@@ -28,16 +29,6 @@ import type { EnterpriseProfileSummary } from '@/types/enterprise/enterpriseType
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
-interface StudentTaskProgress {
-  studentId: number;
-  studentName: string;
-  studentCode: string;
-  completed: number;
-  inProgress: number;
-  todo: number;
-  total: number;
-}
-
 interface EnterpriseDashboardStats {
   totalRecruitmentPosts: number;
   publishedRecruitmentPosts: number;
@@ -45,6 +36,7 @@ interface EnterpriseDashboardStats {
   remainingPositions: number;
   pendingCandidates: number;
   acceptedInterns: number;
+  rejectedCandidates: number;
   activeInterns: number;
   completedInterns: number;
 }
@@ -56,11 +48,12 @@ const emptyDashboardStats: EnterpriseDashboardStats = {
   remainingPositions: 0,
   pendingCandidates: 0,
   acceptedInterns: 0,
+  rejectedCandidates: 0,
   activeInterns: 0,
   completedInterns: 0,
 };
 
-interface LifecycleStage {
+interface CandidateStage {
   label: string;
   value: number;
   color: string;
@@ -82,81 +75,48 @@ const formatTaskDate = (value: string) => {
     : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' }).format(date);
 };
 
-const LifecycleDonut: React.FC<{
-  stages: LifecycleStage[];
+const TaskCompletionDonut: React.FC<{
+  completed: number;
   total: number;
   animated: boolean;
-}> = ({ stages, total, animated }) => {
-  let offset = 0;
-
+}> = ({ completed, total, animated }) => {
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
     <div
       role="img"
-      aria-label={stages.map(stage => `${stage.label}: ${stage.value} sinh viên`).join(', ')}
-      className="relative mx-auto h-52 w-52 shrink-0"
+      aria-label={`Biểu đồ tròn tiến độ task toàn sinh viên: ${percentage}% hoàn thành, ${completed}/${total} task`}
+      className="relative mx-auto h-56 w-56 shrink-0"
     >
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden="true">
+        <defs>
+          <linearGradient id="task-completion-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#14b8a6" />
+            <stop offset="100%" stopColor="#6366f1" />
+          </linearGradient>
+        </defs>
         <circle cx="60" cy="60" r="46" fill="none" stroke="#e2e8f0" strokeWidth="12" />
-        {stages.map(stage => {
-          const percentage = total > 0 ? (stage.value / total) * 100 : 0;
-          const dashOffset = offset;
-          offset += percentage;
-          return (
-            <circle
-              key={stage.label}
-              cx="60"
-              cy="60"
-              r="46"
-              pathLength="100"
-              fill="none"
-              stroke={stage.color}
-              strokeWidth="12"
-              strokeLinecap="butt"
-              strokeDasharray={`${animated ? percentage : 0} 100`}
-              strokeDashoffset={-dashOffset}
-              className="transition-[stroke-dasharray,stroke-dashoffset] duration-1000 ease-out"
-              data-chart-label={`${stage.label}: ${stage.value} sinh viên`}
-            />
-          );
-        })}
+        <circle
+          cx="60"
+          cy="60"
+          r="46"
+          pathLength="100"
+          fill="none"
+          stroke="url(#task-completion-gradient)"
+          strokeWidth="12"
+          strokeLinecap="round"
+          strokeDasharray={`${animated ? percentage : 0} 100`}
+          className="transition-[stroke-dasharray] duration-1000 ease-out"
+          data-chart-label={`Task hoàn thành: ${percentage}%`}
+        />
       </svg>
       <div className="pointer-events-none absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
-        <span className="text-4xl font-black tracking-tight text-slate-900">{total}</span>
+        <span className="text-4xl font-black tracking-tight text-slate-900">{percentage}%</span>
         <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-          hồ sơ theo dõi
+          task hoàn thành
         </span>
+        <span className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">{completed}/{total} task</span>
       </div>
     </div>
-  );
-};
-
-const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgress[] => {
-  const progressByStudent = new Map<number, StudentTaskProgress>();
-
-  for (const task of tasks) {
-    const progress = progressByStudent.get(task.studentId) ?? {
-      studentId: task.studentId,
-      studentName: task.student?.fullName || 'Sinh viên',
-      studentCode: task.student?.studentCode || '',
-      completed: 0,
-      inProgress: 0,
-      todo: 0,
-      total: 0,
-    };
-    const status = task.status.toUpperCase();
-    progress.total += 1;
-    if (status === 'DONE' || status === 'COMPLETED') {
-      progress.completed += 1;
-    } else if (status === 'IN_PROGRESS') {
-      progress.inProgress += 1;
-    } else {
-      progress.todo += 1;
-    }
-    progressByStudent.set(task.studentId, progress);
-  }
-
-  return [...progressByStudent.values()].sort(
-    (a, b) => b.total - a.total || a.studentName.localeCompare(b.studentName)
   );
 };
 
@@ -180,7 +140,6 @@ export const EnterpriseDashboard: React.FC = () => {
     description: '',
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const taskProgress = useMemo(() => buildTaskProgress(tasks), [tasks]);
   const taskSummary = useMemo(() => {
     const today = new Date();
     const todayKey = dateKey(today);
@@ -218,19 +177,29 @@ export const EnterpriseDashboard: React.FC = () => {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const [posts, profileResponse] = await Promise.all([
+        const [posts, profileResponse, rejectedCandidates] = await Promise.all([
           loadAllPages<RecruitmentPost>(
             page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
             controller.signal,
             'danh sách tin tuyển dụng',
           ),
           enterpriseService.getProfile(controller.signal),
+          loadAllPages<EnterpriseCandidateItem>(
+            page => enterpriseService.listCandidates({ decision: 'REJECTED', page, limit: 100 }, controller.signal),
+            controller.signal,
+            'danh sách hồ sơ bị từ chối',
+          ),
         ]);
         if (controller.signal.aborted) return;
 
         const publishedPosts = posts.filter(post => post.status === 'PUBLISHED');
         if (!profileResponse.success || !profileResponse.data?.summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
         const currentSummary = profileResponse.data.summary;
+        const rejectedStudents = new Set(
+          rejectedCandidates
+            .filter(candidate => candidate.decision === 'REJECTED' && candidate.isLatestCoordination)
+            .map(candidate => candidate.studentId)
+        );
         const counts = [
           currentSummary.pendingCandidates,
           currentSummary.acceptedInterns,
@@ -238,6 +207,7 @@ export const EnterpriseDashboard: React.FC = () => {
           currentSummary.activeInterns,
           currentSummary.pendingPosts,
           currentSummary.publishedPosts,
+          rejectedStudents.size,
         ];
         if (!counts.every(count => Number.isSafeInteger(count) && count >= 0)) {
           throw new Error('Chưa tải được đầy đủ số liệu thống kê. Vui lòng thử lại.');
@@ -250,6 +220,7 @@ export const EnterpriseDashboard: React.FC = () => {
           remainingPositions: recruitmentTotals(publishedPosts).remaining,
           pendingCandidates: currentSummary.pendingCandidates,
           acceptedInterns: currentSummary.acceptedInterns,
+          rejectedCandidates: rejectedStudents.size,
           activeInterns: currentSummary.activeInterns,
           completedInterns: currentSummary.completedInterns,
         });
@@ -274,14 +245,14 @@ export const EnterpriseDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (statsLoading || statsError) {
+    if (statsLoading || statsError || tasksLoading || tasksError) {
       setChartAnimated(false);
       return;
     }
 
     const frame = window.requestAnimationFrame(() => setChartAnimated(true));
     return () => window.cancelAnimationFrame(frame);
-  }, [statsLoading, statsError]);
+  }, [statsLoading, statsError, tasksLoading, tasksError]);
 
   useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
@@ -331,20 +302,18 @@ export const EnterpriseDashboard: React.FC = () => {
   };
 
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
-  const lifecycleStages: LifecycleStage[] = [
+  const candidateStages: CandidateStage[] = [
     { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: '#f59e0b' },
     {
-      label: 'Đã tiếp nhận',
+      label: 'Đã nhận',
       value: Math.max(0, dashboardStats.acceptedInterns - dashboardStats.completedInterns),
       color: '#6366f1',
     },
     { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: '#10b981' },
+    { label: 'Đã từ chối', value: dashboardStats.rejectedCandidates, color: '#f43f5e' },
   ];
-  const lifecycleTotal = lifecycleStages.reduce((total, stage) => total + stage.value, 0);
-  const visibleTaskProgress = taskProgress.slice(0, 6);
-  const taskChartLabel = visibleTaskProgress
-    .map(student => `${student.studentName}: ${student.completed} hoàn thành, ${student.inProgress} đang làm, ${student.todo} chưa bắt đầu`)
-    .join('; ');
+  const maxCandidateStage = Math.max(1, ...candidateStages.map(stage => stage.value));
+  const candidateChartLabel = candidateStages.map(stage => `${stage.label}: ${stage.value}`).join(', ');
   const statCards = [
     {
       label: 'Hồ sơ chờ duyệt',
@@ -365,7 +334,7 @@ export const EnterpriseDashboard: React.FC = () => {
     {
       label: 'Đã hoàn thành',
       value: dashboardStats.completedInterns,
-      detail: 'Sinh viên hoàn tất kỳ OJT',
+      detail: 'Sinh viên đã được chấm điểm OJT',
       icon: CheckCircle2,
       to: '/enterprise/interns',
       tone: 'indigo',
@@ -523,53 +492,56 @@ export const EnterpriseDashboard: React.FC = () => {
           <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">People overview</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-600">Task completion</p>
                 <h2 className="mt-1 flex items-center gap-2 text-base font-extrabold text-slate-900">
-                  <TrendingUp className="h-4 w-4 text-orange-500" />
-                  Vòng đời sinh viên
+                  <ListChecks className="h-4 w-4 text-teal-500" />
+                  Tiến độ hoàn thành Task
                 </h2>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Theo dõi hồ sơ chờ duyệt, đã tiếp nhận và đã hoàn thành.
+                  Tỷ lệ task hoàn thành trên tổng số task được giao cho toàn bộ sinh viên.
                 </p>
               </div>
               <Link
-                to="/enterprise/candidates"
-                aria-label="Xem hồ sơ sinh viên"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-orange-50 hover:text-orange-600"
+                to="/enterprise/interns"
+                aria-label="Quản lý task thực tập"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600"
               >
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
           <div className="p-5 sm:p-6">
-            {statsLoading ? (
+            {tasksLoading ? (
               <div role="status" className="flex flex-col items-center gap-3 py-8">
-                <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
-                <p className="text-xs font-medium text-slate-500">Đang tải thống kê sinh viên...</p>
+                <Loader2 className="h-7 w-7 animate-spin text-teal-500" />
+                <p className="text-xs font-medium text-slate-500">Đang tính tiến độ task...</p>
               </div>
-            ) : statsError ? (
+            ) : tasksError ? (
               <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
                 <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-                <p className="text-sm font-medium text-rose-700">{statsError}</p>
+                <p className="text-sm font-medium text-rose-700">{tasksError}</p>
               </div>
             ) : (
               <>
-                <LifecycleDonut stages={lifecycleStages} total={lifecycleTotal} animated={chartAnimated} />
-                <div className="mt-5 space-y-3">
-                  {lifecycleStages.map(stage => {
-                    const percentage = lifecycleTotal ? Math.round((stage.value / lifecycleTotal) * 100) : 0;
-                    return (
-                      <div key={stage.label} className="flex items-center gap-3">
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />
-                        <span className="min-w-0 flex-1 text-xs font-medium text-slate-600">{stage.label}</span>
-                        <span className="text-xs font-bold tabular-nums text-slate-900">{stage.value}</span>
-                        <span className="w-9 text-right text-[10px] font-semibold tabular-nums text-slate-400">{percentage}%</span>
-                      </div>
-                    );
-                  })}
+                <TaskCompletionDonut
+                  completed={taskSummary.completed}
+                  total={taskSummary.total}
+                  animated={chartAnimated}
+                />
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Hoàn thành', value: taskSummary.completed, color: 'text-teal-700', tone: 'bg-teal-50' },
+                    { label: 'Đang làm', value: taskSummary.inProgress, color: 'text-indigo-700', tone: 'bg-indigo-50' },
+                    { label: 'Chưa bắt đầu', value: taskSummary.todo, color: 'text-slate-700', tone: 'bg-slate-50' },
+                  ].map(metric => (
+                    <div key={metric.label} className={`rounded-xl px-2.5 py-2.5 ${metric.tone}`}>
+                      <p className={`text-lg font-black tabular-nums ${metric.color}`}>{metric.value}</p>
+                      <p className="text-[9px] font-semibold text-slate-500">{metric.label}</p>
+                    </div>
+                  ))}
                 </div>
                 <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-[10px] leading-relaxed text-slate-500">
-                  Biểu đồ tách sinh viên đã hoàn thành khỏi nhóm đã tiếp nhận để tránh đếm trùng. Tổng tiếp nhận hiển thị ở thẻ chỉ số phía trên.
+                  Phần trăm được tính từ tổng số task đã hoàn thành chia cho toàn bộ task của doanh nghiệp.
                 </p>
               </>
             )}
@@ -579,86 +551,82 @@ export const EnterpriseDashboard: React.FC = () => {
         <article className="enterprise-reveal overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_16px_50px_-36px_rgba(30,41,59,0.45)]" style={{ animationDelay: '100ms' }}>
           <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-600">Workload analytics</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-600">Student status</p>
               <h2 className="mt-1 flex items-center gap-2 text-base font-extrabold text-slate-900">
-                <ListChecks className="h-4 w-4 text-indigo-500" />
-                Tiến độ công việc theo sinh viên
+                <TrendingUp className="h-4 w-4 text-indigo-500" />
+                Trạng thái tiếp nhận sinh viên
               </h2>
-              <p className="mt-1 text-xs text-slate-500">Phân bổ task hoàn thành, đang thực hiện và chưa bắt đầu.</p>
+              <p className="mt-1 text-xs text-slate-500">Số lượng theo từng giai đoạn xử lý hồ sơ và thực tập.</p>
             </div>
             <Link
-              to="/enterprise/interns"
+              to="/enterprise/candidates"
               className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-800"
             >
-              Quản lý task <ChevronRight className="h-4 w-4" />
+              Quản lý hồ sơ <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="p-5 sm:p-6">
-            {tasksLoading ? (
+            {statsLoading ? (
               <div role="status" className="flex flex-col items-center gap-3 py-8">
                 <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
-                <p className="text-xs font-medium text-slate-500">Đang tải tiến độ task...</p>
+                <p className="text-xs font-medium text-slate-500">Đang tải trạng thái sinh viên...</p>
               </div>
-            ) : tasksError ? (
+            ) : statsError ? (
               <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
                 <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-                <p className="text-sm font-medium text-rose-700">{tasksError}</p>
-              </div>
-            ) : taskProgress.length === 0 ? (
-              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
-                <ListChecks className="mx-auto mb-2 h-7 w-7 text-slate-300" />
-                <p className="text-sm font-semibold text-slate-600">Chưa có task để thống kê.</p>
-                <p className="mt-1 text-xs text-slate-400">Tiến độ sẽ hiển thị khi task được giao cho sinh viên.</p>
+                <p className="text-sm font-medium text-rose-700">{statsError}</p>
               </div>
             ) : (
               <>
-                <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-semibold text-slate-500">
-                  <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />Hoàn thành</span>
-                  <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-indigo-500" />Đang làm</span>
-                  <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-slate-200" />Chưa bắt đầu</span>
-                  <span className="ml-auto text-slate-400">Hiển thị tối đa 6 sinh viên có task</span>
-                </div>
                 <div
                   role="img"
-                  aria-label={`Biểu đồ cột tiến độ task theo sinh viên: ${taskChartLabel}`}
-                  className="space-y-4"
+                  aria-label={`Biểu đồ cột trạng thái sinh viên: ${candidateChartLabel}`}
+                  className="relative h-64"
                 >
-                  {visibleTaskProgress.map(student => {
-                    const completeWidth = student.total ? (student.completed / student.total) * 100 : 0;
-                    const inProgressWidth = student.total ? (student.inProgress / student.total) * 100 : 0;
-                    const todoWidth = student.total ? (student.todo / student.total) * 100 : 0;
-                    const completion = student.total ? Math.round((student.completed / student.total) * 100) : 0;
+                  <div className="absolute inset-x-7 bottom-11 top-2 flex flex-col justify-between" aria-hidden="true">
+                    {[0, 1, 2, 3, 4].map(tick => (
+                      <span key={tick} className="border-t border-dashed border-slate-200" />
+                    ))}
+                  </div>
+                  <div className="absolute inset-x-0 bottom-11 top-2 flex items-end justify-around">
+                    {candidateStages.map((stage, index) => {
+                      const height = chartAnimated && stage.value > 0
+                        ? Math.max((stage.value / maxCandidateStage) * 100, 4)
+                        : 0;
                     return (
-                      <div key={student.studentId} className="grid grid-cols-[minmax(76px,0.75fr)_minmax(90px,2fr)_42px] items-center gap-3 sm:grid-cols-[minmax(105px,0.8fr)_minmax(100px,2fr)_52px]">
-                        <div className="min-w-0">
-                          <p className="truncate text-[11px] font-bold text-slate-700">{student.studentCode || student.studentName}</p>
-                          <p className="truncate text-[9px] text-slate-400">{student.studentName}</p>
-                        </div>
-                        <div className="flex h-3.5 min-w-0 overflow-hidden rounded-full bg-slate-100">
-                          <span title={`${student.completed} task hoàn thành`} className="h-full bg-emerald-500 transition-[width] duration-1000 ease-out" style={{ width: `${chartAnimated ? completeWidth : 0}%` }} />
-                          <span title={`${student.inProgress} task đang làm`} className="h-full bg-indigo-500 transition-[width] duration-1000 ease-out" style={{ width: `${chartAnimated ? inProgressWidth : 0}%` }} />
-                          <span title={`${student.todo} task chưa bắt đầu`} className="h-full bg-slate-200 transition-[width] duration-1000 ease-out" style={{ width: `${chartAnimated ? todoWidth : 0}%` }} />
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[11px] font-extrabold tabular-nums text-slate-800">{completion}%</p>
-                          <p className="text-[9px] tabular-nums text-slate-400">{student.completed}/{student.total}</p>
-                        </div>
+                      <div key={stage.label} className="relative flex h-full w-1/5 items-end justify-center">
+                        <span
+                          className="absolute z-10 text-xs font-extrabold tabular-nums text-slate-700"
+                          style={{ bottom: `calc(${height}% + 7px)` }}
+                        >
+                          {stage.value}
+                        </span>
+                        <div
+                          data-chart-status={stage.label}
+                          className="w-10 rounded-t-xl transition-[height] duration-1000 ease-out sm:w-14"
+                          style={{
+                            height: `${height}%`,
+                            background: `linear-gradient(180deg, ${stage.color} 0%, ${stage.color}cc 100%)`,
+                            boxShadow: `0 8px 18px ${stage.color}33`,
+                            transitionDelay: `${index * 100}ms`,
+                          }}
+                          title={`${stage.label}: ${stage.value}`}
+                        />
                       </div>
                     );
                   })}
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 flex h-10 items-center justify-around">
+                    {candidateStages.map(stage => (
+                      <span key={stage.label} className="w-1/4 px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-600">
+                        {stage.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-6 grid grid-cols-3 gap-2 border-t border-slate-100 pt-4">
-                  {[
-                    { label: 'Hoàn thành', value: taskSummary.completed, color: 'text-emerald-600' },
-                    { label: 'Đang làm', value: taskSummary.inProgress, color: 'text-indigo-600' },
-                    { label: 'Chưa bắt đầu', value: taskSummary.todo, color: 'text-slate-600' },
-                  ].map(metric => (
-                    <div key={metric.label} className="rounded-xl bg-slate-50 px-3 py-2.5">
-                      <p className={`text-lg font-black tabular-nums ${metric.color}`}>{metric.value}</p>
-                      <p className="text-[9px] font-semibold text-slate-500">{metric.label}</p>
-                    </div>
-                  ))}
-                </div>
+                <p className="mt-3 rounded-xl bg-indigo-50/70 px-3 py-2.5 text-[10px] leading-relaxed text-indigo-800">
+                  Nhóm “Đã nhận” không tính sinh viên đã hoàn thành, giúp các cột thể hiện từng giai đoạn riêng biệt.
+                </p>
               </>
             )}
           </div>

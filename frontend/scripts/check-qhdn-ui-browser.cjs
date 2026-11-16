@@ -39,10 +39,13 @@ function fixtures(server){server.middlewares.use('/api',(req,res)=>{
   send(round);
  });return;}
  if(url.pathname==='/auth/me'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({user:{mustChangePassword:false}}));return;}
- if(url.pathname==='/enterprise/profile'){const summary={...enterpriseProfile.summary,pendingCandidates:bulkAccepted?0:3,acceptedInterns:(bulkAccepted?3:0)+extraAccepted,completedInterns:0};if(legacyDashboard){delete summary.acceptedInterns;delete summary.completedInterns;}return send({...enterpriseProfile,summary});}
+ if(url.pathname==='/enterprise/profile'){const summary={...enterpriseProfile.summary,pendingCandidates:bulkAccepted?0:3,acceptedInterns:(bulkAccepted?3:0)+extraAccepted,completedInterns:1};if(legacyDashboard){delete summary.acceptedInterns;delete summary.completedInterns;}return send({...enterpriseProfile,summary});}
  if(url.pathname==='/accounts/me/notifications')return send({...paged([{id:1,title:'Đợt tuyển dụng mới',content:'Kiểm tra lịch tiếp nhận sinh viên của doanh nghiệp.',isRead:notificationRead[account],sentAt:'2026-11-16T09:00:00Z'},{id:2,title:'Hồ sơ đã cập nhật',content:'Thông tin doanh nghiệp đã được lưu.',isRead:true,sentAt:'2026-11-15T09:00:00Z'}]),unreadCount:notificationRead[account]?0:1});
  if(url.pathname==='/enterprise/candidate-periods')return send({items:[]});
- if(url.pathname==='/enterprise/candidates')return send(paged([1,2,3].map(id=>({id,decision:bulkAccepted?'ACCEPTED':'PENDING',isLatestCoordination:true,canRespond:!bulkAccepted,introducedAt:'2026-11-16T00:00:00Z',student:{id,fullName:'Ứng viên '+id,studentCode:'SE18000'+id},position:{id:1,title:'Intern',code:'INTERN'}}))));
+ if(url.pathname==='/enterprise/candidates'){
+  if(url.searchParams.get('decision')==='REJECTED')return send(paged([{id:4,studentId:4,decision:'REJECTED',isLatestCoordination:true,introducedAt:'2026-11-16T00:00:00Z',student:{id:4,fullName:'Ứng viên 4',studentCode:'SE180004'},position:{id:1,title:'Intern',code:'INTERN'}}]));
+  return send(paged([1,2,3].map(id=>({id,decision:bulkAccepted?'ACCEPTED':'PENDING',isLatestCoordination:true,canRespond:!bulkAccepted,introducedAt:'2026-11-16T00:00:00Z',student:{id,fullName:'Ứng viên '+id,studentCode:'SE18000'+id},position:{id:1,title:'Intern',code:'INTERN'}}))));
+ }
  if(url.pathname==='/internship-tasks')return send(paged([
   {id:101,assignmentId:11,studentId:1,name:'Thiết kế API',status:'DONE',student:{id:1,studentCode:'SE180001',fullName:'Ứng viên 1'}},
   {id:102,assignmentId:11,studentId:1,name:'Viết kiểm thử',status:'IN_PROGRESS',student:{id:1,studentCode:'SE180001',fullName:'Ứng viên 1'}},
@@ -207,16 +210,17 @@ async function main(){
  assert.equal(bulkRequests.length,1);assert.equal(bulkRequests[0].body.allowOverCapacity,true);assert.deepEqual(bulkRequests[0].body.candidateIds,[1,2,3]);
  const priorProfileLoads=records.filter(record=>record.path==='/enterprise/profile').length;
  await clickText('Tổng quan');
- await waitFor(`location.pathname==='/enterprise/dashboard'&&!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 3 sinh viên"]')`);
- await waitFor(`!!document.querySelector('[role="img"][aria-label^="Biểu đồ cột tiến độ task"]')`);
+ await waitFor(`location.pathname==='/enterprise/dashboard'&&!!document.querySelector('[role="img"][aria-label^="Biểu đồ cột trạng thái sinh viên"]')`);
+ await waitFor(`!!document.querySelector('[role="img"][aria-label^="Biểu đồ tròn tiến độ task toàn sinh viên"]')`);
  assert.equal(await evaluate(`!!document.querySelector('.enterprise-hero a,.enterprise-hero button,.enterprise-hero-stat')`),false,'Hero banner contains only enterprise identity and status');
  assert.ok(await evaluate(`(()=>{const actions=document.querySelector('.enterprise-dashboard-actions');return actions&&actions.textContent.includes('Duyệt hồ sơ sinh viên')&&actions.textContent.includes('Làm mới số liệu')})()`),'Dashboard actions are placed below the hero');
  assert.equal(await evaluate(`!!document.querySelector('[data-stat-label="Đánh giá cần xử lý"]')`),false,'Pending evaluation card is removed from dashboard KPIs');
- assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label^="Biểu đồ cột tiến độ task"]').getAttribute('aria-label').includes('1 hoàn thành')`),'Task chart reports its completion breakdown accessibly');
+ assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label^="Biểu đồ tròn tiến độ task toàn sinh viên"]').getAttribute('aria-label').includes('33% hoàn thành, 1/3 task')`),'Task donut reports aggregate completion accessibly');
+ assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label^="Biểu đồ cột trạng thái sinh viên"]').getAttribute('aria-label').includes('Chờ duyệt: 0, Đã nhận: 2, Đã hoàn thành: 1, Đã từ chối: 1')`),'A submitted evaluation appears in the completed column');
+ assert.ok(await evaluate(`document.querySelector('[data-stat-label="Đã hoàn thành"]').textContent.includes('1')`),'Evaluated students count as completed in the dashboard KPI');
  assert.ok(records.filter(record=>record.path==='/enterprise/profile').length>priorProfileLoads,'Returning to dashboard fetches fresh figures instead of cached context');
  assert.ok(await evaluate(`document.querySelector('[data-stat-label="Sinh viên đã tiếp nhận"]').textContent.includes('3')`));
- assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label*="Đã tiếp nhận"]').getAttribute('aria-label').includes('Chờ duyệt: 0 sinh viên')`));
- await waitFor(`document.querySelector('[role="img"] [data-chart-label="Đã tiếp nhận: 3 sinh viên"]').getBoundingClientRect().height>100`);
+ await waitFor(`document.querySelector('[role="img"] [data-chart-label="Task hoàn thành: 33%"]').getBoundingClientRect().height>100`);
  await waitFor(`Array.from(document.querySelectorAll('.enterprise-reveal')).every(element=>getComputedStyle(element).opacity==='1')`);
  await screenshot('enterprise-dashboard-after-acceptance');
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
@@ -226,13 +230,13 @@ async function main(){
  extraAccepted=1;
  await waitFor(`!Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='Làm mới số liệu').disabled`);
  await clickText('Làm mới số liệu');
- await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 4 sinh viên"]')`);
+ await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã nhận: 3"]')`);
  assert.ok(await evaluate(`document.querySelector('[data-stat-label="Sinh viên đã tiếp nhận"]').textContent.includes('4')`));
  legacyDashboard=true;await clickText('Làm mới số liệu');
  await waitFor(`document.body.innerText.includes('Chưa tải được đầy đủ số liệu thống kê')`);
- assert.equal(await evaluate(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận"]')`),false,'Missing counts produce an error instead of NaN/blank bars');
+ assert.equal(await evaluate(`!!document.querySelector('[role="img"][aria-label^="Biểu đồ cột trạng thái sinh viên"]')`),false,'Missing counts produce an error instead of NaN/blank bars');
  legacyDashboard=false;await clickText('Làm mới số liệu');
- await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 4 sinh viên"]')`);
+ await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã nhận: 3"]')`);
  assert.equal(await evaluate(`!!document.querySelector('header button[aria-label^="Thông báo"]')`),false);
  await clickText('Thông báo');
  await waitFor(`location.pathname==='/enterprise/notifications'&&document.body.innerText.includes('Đợt tuyển dụng mới')`);

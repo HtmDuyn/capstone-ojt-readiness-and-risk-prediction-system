@@ -65,7 +65,7 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  assert.equal((await enterpriseProfile(actor)).summary.acceptedInterns,3);
  await db.query(`UPDATE "InternshipAssignments" SET "Status"='COMPLETED' WHERE "AssignmentID"=$1`,[assigned]);
  const completed=(await enterpriseProfile(actor)).summary;
- assert.equal(completed.acceptedInterns,3);assert.equal(completed.completedInterns,1);
+ assert.equal(completed.acceptedInterns,3);assert.equal(completed.completedInterns,0,'Assignment status alone does not count as completion before evaluation');
  const {evaluate}=require('../dist/modules/qhdn/workflow.service');
  const {list:results,resultCsv}=require('../dist/modules/ojt-results/result.service');
  const {transferResult}=require('../dist/modules/ojt-results/result-workflow.service');
@@ -75,6 +75,7 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  const beforeGrading=await dashboard(dashboardScope,staff);
  assert.deepEqual(beforeGrading.progress,{completed:0,inProgress:1,evaluated:0});
  const submitted=await evaluate(assigned,{completionScore:8,attitudeScore:9,skillScore:8,overallScore:8.25,comments:'Enterprise assessment',reason:'Integration assessment'},actor);
+ assert.equal((await enterpriseProfile(actor)).summary.completedInterns,1,'A submitted score counts the student as completed even while assignment status is active');
  const afterGrading=await dashboard(dashboardScope,staff);
  assert.deepEqual(afterGrading.progress,{completed:1,inProgress:0,evaluated:1},'A submitted evaluation completes the dashboard stage before assignment update or transfer');
  assert.equal(afterGrading.assignments.completed,0,'Dashboard does not mutate assignment status');
