@@ -365,8 +365,8 @@ export const enterpriseService = {
     (await API.post('/enterprise/candidates/accept-bulk',{candidateIds:preview.candidateIds,confirmationToken:preview.confirmationToken,allowOverCapacity,reason})).data.data,
   // ── Profile ──────────────────────────────────────────────────────────────
   // Gọi GET /api/enterprise/profile — không cần companyId vì backend lấy từ JWT
-  getProfile: async (): Promise<EnterpriseProfileResponse> => {
-    const response = await API.get<EnterpriseProfileResponse>('/enterprise/profile');
+  getProfile: async (signal?: AbortSignal): Promise<EnterpriseProfileResponse> => {
+    const response = await API.get<EnterpriseProfileResponse>('/enterprise/profile', { signal });
     return response.data;
   },
 

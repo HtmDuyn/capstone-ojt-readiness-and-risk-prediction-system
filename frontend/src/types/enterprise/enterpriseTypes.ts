@@ -36,6 +36,9 @@ export interface EnterpriseProfileSummary {
   pendingPosts: number;
   pendingCandidates: number;
   activeInterns: number;
+  /** Unique students received through acceptance, a valid assignment or receipt history. */
+  acceptedInterns: number;
+  completedInterns: number;
   pendingEvaluations: number;
 }
 

@@ -88,6 +88,7 @@ export function startProvisioningJobs() {
           console.error(`Provisioning ${name} job failed. Code: ${code}.`,
             code === 'DB_CONNECTION_TIMEOUT' ? `Timed out acquiring a database connection. Pool total=${pool?.totalCount}, idle=${pool?.idleCount}, waiting=${pool?.waitingCount}.` :
             code === 'EMAIL_KEY_INVALID' ? 'EMAIL_OUTBOX_KEY must contain exactly 64 hexadecimal characters.' :
+            ['ENOTFOUND','EAI_AGAIN'].includes(code) ? 'Cannot resolve the database hostname. Check DB_HOST or the connection URL and network DNS. The job will retry on its next scheduled run.' :
             code === '57014' ? 'Database statement timed out.' :
             code === 'XX000' ? 'Database/pooler error; check connection capacity.' :
             name === 'email' ? 'Check database and mail configuration.' : 'Check database connection, locks and schema.');
