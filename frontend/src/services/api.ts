@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { clearEducationReadCache } from './educationReadCache';
+import { expireBearerSession, expireSession } from './authSession';
 
 export { API_BASE_URL };
 
@@ -40,10 +41,7 @@ API.interceptors.response.use(
   },
   (error: AxiosError) => {
     if (error.response && error.response.status === 401) {
-      console.error('Unauthorized, please login again.');
-      // Xóa token hoặc chuyển hướng về trang login nếu cần
-      // localStorage.removeItem('token');
-      // window.location.href = '/login';
+      expireBearerSession(error.config?.headers?.Authorization);
     }
     return Promise.reject(error);
   }
@@ -64,6 +62,7 @@ export async function apiRequest<T>(
     throw new Error('Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.');
   }
   const body = await response.json().catch(() => null);
+  if (response.status === 401) expireSession(token);
   if ([502, 503, 504].includes(response.status)) {
     throw new Error('Máy chủ hoặc proxy API không khả dụng (HTTP ' + response.status + '). Kiểm tra backend tại ' + API_BASE_URL + '.');
   }

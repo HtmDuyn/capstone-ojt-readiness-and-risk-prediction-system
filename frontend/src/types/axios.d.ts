@@ -1,5 +1,6 @@
 declare module "axios" {
   export type AxiosError<T = unknown> = Error & {
+    config?: InternalAxiosRequestConfig;
     response?: {
       status?: number;
       data?: T;
