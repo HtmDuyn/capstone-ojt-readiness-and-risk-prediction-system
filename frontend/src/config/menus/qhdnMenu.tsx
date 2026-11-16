@@ -1,6 +1,6 @@
 import React from "react";
 import { DashboardGridIcon } from "@/components/common/icons/AppIcons";
-import { Building2, Handshake, Award, UserCheck } from "lucide-react";
+import { Bell, Building2, Handshake, Award, UserCheck } from "lucide-react";
 import type { NavItem } from "@/types/common.types";
 
 export const QHDN_NAV_ITEMS: NavItem[] = [
@@ -68,6 +68,17 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
         "Theo dõi kết quả chuyển giao và xuất báo cáo OJT theo học kỳ.",
       badge: "Kết quả OJT",
       primaryActionLabel: "Xuất báo cáo",
+    },
+  },
+  {
+    id: "notifications",
+    label: "Thông báo",
+    path: "/qhdn/notifications",
+    icon: <Bell size={20} />,
+    banner: {
+      title: "Thông báo",
+      description: "Theo dõi thông báo được gửi đến tài khoản Quan hệ Doanh nghiệp.",
+      badge: "Phòng QHDN",
     },
   },
 ];

@@ -7,7 +7,8 @@ const root=path.resolve(__dirname,'..');
 const artifacts=path.join(root,'.cache','qhdn-ui-'+process.pid);
 const records=[],errors=[];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let vite,browser,cdp,legacySummary=false,bulkAccepted=false,notificationRead=false,extraAccepted=0,legacyDashboard=false;
+let vite,browser,cdp,legacySummary=false,bulkAccepted=false,extraAccepted=0,legacyDashboard=false;
+const notificationRead={qhdn:false,enterprise:false};
 class CDP {
  constructor(url){
   this.socket=new WebSocket(url);this.pending=new Map();this.id=0;
@@ -25,20 +26,21 @@ const period={id:1,academicYearId:1,academicYear:{id:1,code:'2028–2029'},perio
 const round={id:1,name:'Tuyển dụng Fall 2028',campaignId:1,roundNumber:1,status:'OPEN',currentPhase:'SCHEDULED',startsAt:'2028-11-11T07:40:00Z',endsAt:'2028-11-13T13:00:00Z',postingStartsAt:'2028-11-11T07:40:00Z',postingEndsAt:'2028-11-11T12:40:00Z',applicationStartsAt:'2028-11-12T07:40:00Z',applicationEndsAt:'2028-11-12T12:40:00Z',resultsStartsAt:'2028-11-12T07:40:00Z',resultsEndsAt:'2028-11-13T13:00:00Z',canOpen:false,pendingCount:0};
 const enterpriseProfile={id:17,code:'TECHVIET',name:'TechViet',status:'ACTIVE',industry:'Information Technology',address:null,contactPersonName:'HR Department',contactEmail:'hr@techviet.example',contactPhone:null,createdAt:'2026-10-27T02:54:00Z',representative:{id:1,userId:1,username:'enterprise01',fullName:'TechViet HR',email:'hr@techviet.example',phone:null,positionTitle:'HR'},summary:{scope:'ALL_SEMESTERS',pendingCandidates:3,activeInterns:0,pendingEvaluations:0}};
 function fixtures(server){server.middlewares.use('/api',(req,res)=>{
- const url=new URL(req.url,'http://localhost');const record={path:url.pathname,method:req.method};records.push(record);
+ const account=req.headers.authorization==='Bearer enterprise-fixture'?'enterprise':'qhdn';
+ const url=new URL(req.url,'http://localhost');const record={path:url.pathname,method:req.method,account};records.push(record);
  const paged=items=>({items,total:items.length,page:1,limit:100});
  const send=data=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({success:true,data}));};
  if(req.method==='PATCH'||req.method==='POST'){let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{
   record.body=JSON.parse(body);
   if(url.pathname==='/enterprise/profile'){assert.equal(record.body.companyId,17);const {companyId,...changes}=record.body;Object.assign(enterpriseProfile,changes);return send(enterpriseProfile);}
-  if(url.pathname==='/accounts/me/notifications/1'){assert.equal(record.body.isRead,true);notificationRead=true;return send({id:1,isRead:true});}
+  if(url.pathname==='/accounts/me/notifications/1'){assert.equal(record.body.isRead,true);notificationRead[account]=true;return send({id:1,isRead:true});}
   if(url.pathname==='/enterprise/candidates/acceptance-preview')return send({candidateIds:record.body.candidateIds,confirmationToken:'fixture',totalSelected:record.body.candidateIds.length,overCapacity:true,semesters:[{ojtSemesterId:1,name:'Fall 2028',capacity:2,currentCount:0,selectedCount:3,afterCount:3,excessCount:1}]});
   if(url.pathname==='/enterprise/candidates/accept-bulk'){assert.equal(record.body.allowOverCapacity,true);bulkAccepted=true;return send({acceptedCount:3});}
   send(round);
  });return;}
  if(url.pathname==='/auth/me'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({user:{mustChangePassword:false}}));return;}
  if(url.pathname==='/enterprise/profile'){const summary={...enterpriseProfile.summary,pendingCandidates:bulkAccepted?0:3,acceptedInterns:(bulkAccepted?3:0)+extraAccepted,completedInterns:0};if(legacyDashboard){delete summary.acceptedInterns;delete summary.completedInterns;}return send({...enterpriseProfile,summary});}
- if(url.pathname==='/accounts/me/notifications')return send({...paged([{id:1,title:'Đợt tuyển dụng mới',content:'Kiểm tra lịch tiếp nhận sinh viên của doanh nghiệp.',isRead:notificationRead,sentAt:'2026-11-16T09:00:00Z'},{id:2,title:'Hồ sơ đã cập nhật',content:'Thông tin doanh nghiệp đã được lưu.',isRead:true,sentAt:'2026-11-15T09:00:00Z'}]),unreadCount:notificationRead?0:1});
+ if(url.pathname==='/accounts/me/notifications')return send({...paged([{id:1,title:'Đợt tuyển dụng mới',content:'Kiểm tra lịch tiếp nhận sinh viên của doanh nghiệp.',isRead:notificationRead[account],sentAt:'2026-11-16T09:00:00Z'},{id:2,title:'Hồ sơ đã cập nhật',content:'Thông tin doanh nghiệp đã được lưu.',isRead:true,sentAt:'2026-11-15T09:00:00Z'}]),unreadCount:notificationRead[account]?0:1});
  if(url.pathname==='/enterprise/candidate-periods')return send({items:[]});
  if(url.pathname==='/enterprise/candidates')return send(paged([1,2,3].map(id=>({id,decision:bulkAccepted?'ACCEPTED':'PENDING',isLatestCoordination:true,canRespond:!bulkAccepted,introducedAt:'2026-11-16T00:00:00Z',student:{id,fullName:'Ứng viên '+id,studentCode:'SE18000'+id},position:{id:1,title:'Intern',code:'INTERN'}}))));
  if(url.pathname==='/academic-periods'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({success:true,...paged([period])}));return;}
@@ -68,6 +70,9 @@ async function main(){
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
  await cdp.send('Page.navigate',{url:origin+'/qhdn/evaluations'});
  await waitFor(`document.body.innerText.includes('Nguyễn Minh Anh')`);
+ assert.equal(await evaluate(`!!document.querySelector('header input')`),false,'QHDN header has no search bar');
+ assert.equal(await evaluate(`!!document.querySelector('header button[title="Đổi ngôn ngữ"]')`),false,'QHDN header has no language selector');
+ assert.equal(await evaluate(`!!document.querySelector('header button[aria-label^="Thông báo"]')`),false,'QHDN header has no notification bell');
  assert.equal(await evaluate(`import('/src/config/api.ts').then(module=>module.API_BASE_URL)`),'/api','Development defaults to the local API proxy without a test-only URL override');
  assert.equal(await evaluate(`document.querySelectorAll('[role="tab"]').length`),2);
  assert.equal(await evaluate(`document.body.innerText.includes('Phiếu đánh giá')`),false);
@@ -132,7 +137,22 @@ async function main(){
   assert.deepEqual(summary,[['1','TechViet','5','3','0']]);
   await screenshot('company-summary-'+mode);
  }
- await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('ojt_auth_user',JSON.stringify({id:'1',name:'Doanh nghiệp',email:'enterprise@example.test',role:'enterprise'}));`});
+ assert.equal(records.some(record=>record.path==='/accounts/me/notifications'),false,'Notification requests start from the menu page instead of header polling');
+ await clickText('Thông báo');
+ await waitFor(`location.pathname==='/qhdn/notifications'&&document.body.innerText.includes('Đợt tuyển dụng mới')`);
+ assert.ok(await evaluate(`document.querySelector('section[aria-label="Danh sách thông báo"]').textContent.includes('1 chưa đọc')`));
+ assert.ok(await evaluate(`document.body.innerText.includes('tài khoản Quan hệ Doanh nghiệp')`));
+ await screenshot('qhdn-notifications-desktop');
+ await clickText('Đánh dấu đã đọc');
+ await waitFor(`document.querySelector('section[aria-label="Danh sách thông báo"]').textContent.includes('0 chưa đọc')`);
+ await clickText('Tải lại');
+ await waitFor(`!document.querySelector('[role="status"]')&&document.querySelector('section[aria-label="Danh sách thông báo"]').textContent.includes('0 chưa đọc')`);
+ assert.equal(records.filter(record=>record.account==='qhdn'&&record.method==='PATCH'&&record.path==='/accounts/me/notifications/1').length,1);
+ await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ await screenshot('qhdn-notifications-mobile');
+ assert.ok(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'Notification page fits mobile width');
+ await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+ await cdp.send('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('ojt_auth_token','enterprise-fixture');localStorage.setItem('ojt_auth_user',JSON.stringify({id:'1',name:'Doanh nghiệp',email:'enterprise@example.test',role:'enterprise'}));`});
  await cdp.send('Page.navigate',{url:origin+'/enterprise/candidates'});
  await waitFor(`document.body.innerText.includes('Ứng viên 3')`);
  await screenshot('enterprise-candidates-desktop');
@@ -179,7 +199,7 @@ async function main(){
  await waitFor(`document.querySelector('section[aria-label="Danh sách thông báo"]').textContent.includes('0 chưa đọc')`);
  await clickText('Tải lại');
  await waitFor(`!document.querySelector('[role="status"]')&&document.querySelector('section[aria-label="Danh sách thông báo"]').textContent.includes('0 chưa đọc')`);
- assert.equal(records.filter(record=>record.method==='PATCH'&&record.path==='/accounts/me/notifications/1').length,1);
+ assert.equal(records.filter(record=>record.account==='enterprise'&&record.method==='PATCH'&&record.path==='/accounts/me/notifications/1').length,1);
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  await screenshot('enterprise-notifications-mobile');
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
