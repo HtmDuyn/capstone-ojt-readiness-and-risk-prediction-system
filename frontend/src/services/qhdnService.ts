@@ -10,18 +10,23 @@ import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
 import { loadAllPages } from "../utils/loadAllPages";
 import API from "./api";
-import type { DashboardPlacementStudent, QhdnDashboardSummary } from '@/utils/qhdnDashboard';
+import type { DashboardPlacementStudent, DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdnDashboard';
 
 /** Use the same roster as the OJT coordination screen, including unregistered students. */
 export const getDashboardPlacements = async (ojtSemesterId: number): Promise<DashboardPlacementStudent[]> => {
-  const response = await API.get<{ success: boolean; data: { items: DashboardPlacementStudent[] } }>('/qhdn/placements', { params: { ojtSemesterId } });
+  return (await getDashboardPlacementBoard(ojtSemesterId)).items;
+};
+export const getDashboardPlacementBoard = async (ojtSemesterId: number): Promise<DashboardPlacementBoard> => {
+  const response = await API.get<{ success: boolean; data: DashboardPlacementBoard }>('/qhdn/placements', { params: { ojtSemesterId } });
   if (!response.data.success) throw new Error('Không tải được danh sách điều phối OJT.');
-  return response.data.data.items;
+  return response.data.data;
 };
 
 export const getQhdnDashboardSummary = async (ojtSemesterId: number): Promise<QhdnDashboardSummary> => {
   const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard', { params: { ojtSemesterId } });
   if (!response.data.success) throw new Error('Không tải được thống kê thực tập OJT.');
+  const progress=response.data.data?.progress;
+  if(!progress||![progress.completed,progress.inProgress,progress.evaluated].every(count=>Number.isSafeInteger(count)&&count>=0))throw new Error('Chưa tải được đầy đủ thống kê kết quả OJT. Vui lòng thử lại.');
   return response.data.data;
 };
 import type {

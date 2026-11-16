@@ -161,7 +161,19 @@ export async function dashboard(params:Row,actor:Actor){
    count(*) FILTER (WHERE "AssignmentID" IS NOT NULL)::int AS assigned FROM handed_off`,args)).rows[0];
   const totals=(await c.query(`SELECT COALESCE(sum("totalAssignments"),0)::int AS total,COALESCE(sum(assigned),0)::int AS assigned,COALESCE(sum(active),0)::int AS active,COALESCE(sum(completed),0)::int AS completed,COALESCE(sum(failed),0)::int AS failed,COALESCE(sum(cancelled),0)::int AS cancelled,COALESCE(sum("totalResults"),0)::int AS "totalResults",COALESCE(sum("pendingResults"),0)::int AS "pendingResults",COALESCE(sum("revisionRequestedResults"),0)::int AS "revisionRequestedResults",COALESCE(sum("confirmedResults"),0)::int AS "confirmedResults",COALESCE(sum("passedResults"),0)::int AS "passedResults",COALESCE(sum("failedResults"),0)::int AS "failedResults" FROM (${internshipSql}) report`,args)).rows[0];
   const {totalResults,pendingResults,revisionRequestedResults,confirmedResults,passedResults,failedResults,...assignments}=totals;
-  return {filters:f,partners,positions,students,assignments,results:{total:totalResults,pending:pendingResults,revisionRequested:revisionRequestedResults,confirmed:confirmedResults,passed:passedResults,failed:failedResults}};
+  // A submitted company evaluation is visible immediately, without a transfer or
+  // assignment-status update. Aggregate once per student and OJT semester.
+  const progress=(await c.query(`${assignmentCte}, student_progress AS (
+   SELECT a."StudentID",a.semester_id,
+    bool_or(a.assignment_status='COMPLETED' OR (ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS finished,
+    bool_or(a.assignment_status IN ('ASSIGNED','ACTIVE','IN_PROGRESS')) AS ongoing,
+    bool_or(ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS evaluated
+   FROM scoped_assignments a LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID"
+   WHERE a.assignment_status NOT IN ('CANCELLED','CANCELED') GROUP BY a."StudentID",a.semester_id
+  ) SELECT count(*) FILTER(WHERE finished)::int AS completed,
+   count(*) FILTER(WHERE ongoing AND NOT finished)::int AS "inProgress",
+   count(*) FILTER(WHERE evaluated)::int AS evaluated FROM student_progress`,args)).rows[0];
+  return {filters:f,partners,positions,students,assignments,progress,results:{total:totalResults,pending:pendingResults,revisionRequested:revisionRequestedResults,confirmed:confirmedResults,passed:passedResults,failed:failedResults}};
  });
 }
 export const reportColumns:Record<ReportType,string[]>={

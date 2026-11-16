@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Building2,
   BriefcaseBusiness,
-  FileCheck2,
   ClipboardCheck,
   ListChecks,
   Loader2,
@@ -15,9 +14,13 @@ import {
   Send,
   AlertTriangle,
   RefreshCw,
+  Clock3,
+  CalendarClock,
+  Sparkles,
 } from 'lucide-react';
 import {
   enterpriseService,
+  type EnterpriseCandidateItem,
   type EnterpriseInternshipTask,
   type RecruitmentPost,
 } from '@/services/enterpriseService';
@@ -26,59 +29,94 @@ import type { EnterpriseProfileSummary } from '@/types/enterprise/enterpriseType
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
-interface StudentTaskProgress {
-  studentId: number;
-  studentName: string;
-  studentCode: string;
-  completed: number;
-  inProgress: number;
-  todo: number;
-  total: number;
-}
-
 interface EnterpriseDashboardStats {
   totalRecruitmentPosts: number;
+  publishedRecruitmentPosts: number;
+  pendingRecruitmentPosts: number;
   remainingPositions: number;
   pendingCandidates: number;
   acceptedInterns: number;
+  rejectedCandidates: number;
+  activeInterns: number;
   completedInterns: number;
 }
 
 const emptyDashboardStats: EnterpriseDashboardStats = {
   totalRecruitmentPosts: 0,
+  publishedRecruitmentPosts: 0,
+  pendingRecruitmentPosts: 0,
   remainingPositions: 0,
   pendingCandidates: 0,
   acceptedInterns: 0,
+  rejectedCandidates: 0,
+  activeInterns: 0,
   completedInterns: 0,
 };
 
-const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgress[] => {
-  const progressByStudent = new Map<number, StudentTaskProgress>();
+interface CandidateStage {
+  label: string;
+  value: number;
+  color: string;
+}
 
-  for (const task of tasks) {
-    const progress = progressByStudent.get(task.studentId) ?? {
-      studentId: task.studentId,
-      studentName: task.student?.fullName || 'Sinh viên',
-      studentCode: task.student?.studentCode || '',
-      completed: 0,
-      inProgress: 0,
-      todo: 0,
-      total: 0,
-    };
-    const status = task.status.toUpperCase();
-    progress.total += 1;
-    if (status === 'DONE' || status === 'COMPLETED') {
-      progress.completed += 1;
-    } else if (status === 'IN_PROGRESS') {
-      progress.inProgress += 1;
-    } else {
-      progress.todo += 1;
-    }
-    progressByStudent.set(task.studentId, progress);
-  }
+const isTaskComplete = (status: string) => ['DONE', 'COMPLETED'].includes(status.toUpperCase());
 
-  return [...progressByStudent.values()].sort(
-    (a, b) => b.total - a.total || a.studentName.localeCompare(b.studentName)
+const dateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatTaskDate = (value: string) => {
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? 'Chưa xác định ngày'
+    : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' }).format(date);
+};
+
+const TaskCompletionDonut: React.FC<{
+  completed: number;
+  total: number;
+  animated: boolean;
+}> = ({ completed, total, animated }) => {
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  return (
+    <div
+      role="img"
+      aria-label={`Biểu đồ tròn tiến độ task toàn sinh viên: ${percentage}% hoàn thành, ${completed}/${total} task`}
+      className="relative mx-auto h-56 w-56 shrink-0"
+    >
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden="true">
+        <defs>
+          <linearGradient id="task-completion-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#14b8a6" />
+            <stop offset="100%" stopColor="#6366f1" />
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="46" fill="none" stroke="#e2e8f0" strokeWidth="12" />
+        <circle
+          cx="60"
+          cy="60"
+          r="46"
+          pathLength="100"
+          fill="none"
+          stroke="url(#task-completion-gradient)"
+          strokeWidth="12"
+          strokeLinecap="round"
+          strokeDasharray={`${animated ? percentage : 0} 100`}
+          className="transition-[stroke-dasharray] duration-1000 ease-out"
+          data-chart-label={`Task hoàn thành: ${percentage}%`}
+        />
+      </svg>
+      <div className="pointer-events-none absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
+        <span className="text-4xl font-black tracking-tight text-slate-900">{percentage}%</span>
+        <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          task hoàn thành
+        </span>
+        <span className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">{completed}/{total} task</span>
+      </div>
+    </div>
   );
 };
 
@@ -87,7 +125,7 @@ export const EnterpriseDashboard: React.FC = () => {
   const { profile, companyId, loading, error: profileError } = useEnterprise();
   const [summary, setSummary] = useState<EnterpriseProfileSummary | null>(null);
   const [revision, setRevision] = useState(0);
-  const [taskProgress, setTaskProgress] = useState<StudentTaskProgress[]>([]);
+  const [tasks, setTasks] = useState<EnterpriseInternshipTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState(emptyDashboardStats);
@@ -102,6 +140,29 @@ export const EnterpriseDashboard: React.FC = () => {
     description: '',
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const taskSummary = useMemo(() => {
+    const today = new Date();
+    const todayKey = dateKey(today);
+    const dueLimit = new Date(today);
+    dueLimit.setDate(dueLimit.getDate() + 7);
+    const dueLimitKey = dateKey(dueLimit);
+    const activeTasks = tasks.filter(task => !isTaskComplete(task.status));
+
+    return {
+      total: tasks.length,
+      completed: tasks.filter(task => isTaskComplete(task.status)).length,
+      inProgress: tasks.filter(task => task.status.toUpperCase() === 'IN_PROGRESS').length,
+      todo: tasks.filter(task => !isTaskComplete(task.status) && task.status.toUpperCase() !== 'IN_PROGRESS').length,
+      overdue: activeTasks.filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) < todayKey).length,
+      dueSoon: activeTasks
+        .filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) >= todayKey && task.dueDate!.slice(0, 10) <= dueLimitKey)
+        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')),
+      attention: activeTasks
+        .filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) <= dueLimitKey)
+        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+        .slice(0, 3),
+    };
+  }, [tasks]);
 
   useEffect(() => {
     if (loading) return;
@@ -116,29 +177,51 @@ export const EnterpriseDashboard: React.FC = () => {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const [posts, profileResponse] = await Promise.all([
+        const [posts, profileResponse, rejectedCandidates] = await Promise.all([
           loadAllPages<RecruitmentPost>(
             page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
             controller.signal,
             'danh sách tin tuyển dụng',
           ),
           enterpriseService.getProfile(controller.signal),
+          loadAllPages<EnterpriseCandidateItem>(
+            page => enterpriseService.listCandidates({ decision: 'REJECTED', page, limit: 100 }, controller.signal),
+            controller.signal,
+            'danh sách hồ sơ bị từ chối',
+          ),
         ]);
         if (controller.signal.aborted) return;
 
         const publishedPosts = posts.filter(post => post.status === 'PUBLISHED');
         if (!profileResponse.success || !profileResponse.data?.summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
         const currentSummary = profileResponse.data.summary;
-        const counts = [currentSummary.pendingCandidates, currentSummary.acceptedInterns, currentSummary.completedInterns, currentSummary.pendingEvaluations];
+        const rejectedStudents = new Set(
+          rejectedCandidates
+            .filter(candidate => candidate.decision === 'REJECTED' && candidate.isLatestCoordination)
+            .map(candidate => candidate.studentId)
+        );
+        const counts = [
+          currentSummary.pendingCandidates,
+          currentSummary.acceptedInterns,
+          currentSummary.completedInterns,
+          currentSummary.activeInterns,
+          currentSummary.pendingPosts,
+          currentSummary.publishedPosts,
+          rejectedStudents.size,
+        ];
         if (!counts.every(count => Number.isSafeInteger(count) && count >= 0)) {
           throw new Error('Chưa tải được đầy đủ số liệu thống kê. Vui lòng thử lại.');
         }
         setSummary(currentSummary);
         setDashboardStats({
           totalRecruitmentPosts: posts.length,
+          publishedRecruitmentPosts: publishedPosts.length,
+          pendingRecruitmentPosts: currentSummary.pendingPosts,
           remainingPositions: recruitmentTotals(publishedPosts).remaining,
           pendingCandidates: currentSummary.pendingCandidates,
           acceptedInterns: currentSummary.acceptedInterns,
+          rejectedCandidates: rejectedStudents.size,
+          activeInterns: currentSummary.activeInterns,
           completedInterns: currentSummary.completedInterns,
         });
       } catch (err: unknown) {
@@ -162,14 +245,14 @@ export const EnterpriseDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (statsLoading || statsError) {
+    if (statsLoading || statsError || tasksLoading || tasksError) {
       setChartAnimated(false);
       return;
     }
 
     const frame = window.requestAnimationFrame(() => setChartAnimated(true));
     return () => window.cancelAnimationFrame(frame);
-  }, [statsLoading, statsError]);
+  }, [statsLoading, statsError, tasksLoading, tasksError]);
 
   useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
@@ -195,7 +278,7 @@ export const EnterpriseDashboard: React.FC = () => {
           tasks.push(...response.data.items);
         }
 
-        if (!controller.signal.aborted) setTaskProgress(buildTaskProgress(tasks));
+        if (!controller.signal.aborted) setTasks(tasks);
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu tiến độ task';
@@ -219,45 +302,140 @@ export const EnterpriseDashboard: React.FC = () => {
   };
 
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
-  const internshipStages = [
-    { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: 'bg-amber-500' },
-    { label: 'Đã tiếp nhận', value: dashboardStats.acceptedInterns, color: 'bg-blue-500' },
-    { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: 'bg-emerald-500' },
+  const candidateStages: CandidateStage[] = [
+    { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: '#f59e0b' },
+    {
+      label: 'Đã nhận',
+      value: Math.max(0, dashboardStats.acceptedInterns - dashboardStats.completedInterns),
+      color: '#6366f1',
+    },
+    { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: '#10b981' },
+    { label: 'Đã từ chối', value: dashboardStats.rejectedCandidates, color: '#f43f5e' },
   ];
-  const maxInternshipStage = Math.max(1, ...internshipStages.map(stage => stage.value));
+  const maxCandidateStage = Math.max(1, ...candidateStages.map(stage => stage.value));
+  const candidateChartLabel = candidateStages.map(stage => `${stage.label}: ${stage.value}`).join(', ');
+  const statCards = [
+    {
+      label: 'Hồ sơ chờ duyệt',
+      value: dashboardStats.pendingCandidates,
+      detail: 'Ứng viên đang chờ phản hồi',
+      icon: Users,
+      to: '/enterprise/candidates',
+      tone: 'amber',
+    },
+    {
+      label: 'Đang thực tập',
+      value: dashboardStats.activeInterns,
+      detail: 'Đang có phân công thực tập',
+      icon: BriefcaseBusiness,
+      to: '/enterprise/interns',
+      tone: 'emerald',
+    },
+    {
+      label: 'Đã hoàn thành',
+      value: dashboardStats.completedInterns,
+      detail: 'Sinh viên đã được chấm điểm OJT',
+      icon: CheckCircle2,
+      to: '/enterprise/interns',
+      tone: 'indigo',
+    },
+    {
+      label: 'Tin tuyển dụng',
+      value: dashboardStats.totalRecruitmentPosts,
+      detail: `${dashboardStats.publishedRecruitmentPosts} tin đang hiển thị${dashboardStats.pendingRecruitmentPosts ? ` · ${dashboardStats.pendingRecruitmentPosts} chờ duyệt` : ''}`,
+      icon: BriefcaseBusiness,
+      to: '/enterprise/jobs',
+      tone: 'blue',
+    },
+    {
+      label: 'Vị trí còn trống',
+      value: dashboardStats.remainingPositions,
+      detail: 'Trong các tin đang tuyển',
+      icon: ClipboardCheck,
+      to: '/enterprise/jobs',
+      tone: 'cyan',
+    },
+  ];
+  const statTones: Record<string, string> = {
+    amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+    indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+    cyan: 'bg-cyan-50 text-cyan-700 ring-cyan-100',
+  };
 
   return (
-    <div className="space-y-5 pb-12">
-      <section className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-950 via-indigo-950 to-slate-900 px-6 py-8 text-white shadow-xl shadow-indigo-950/15 sm:px-9 sm:py-10">
-        <div className="absolute -right-12 -top-24 -z-10 h-72 w-72 rounded-full bg-orange-500/25 blur-3xl" />
-        <div className="absolute -bottom-32 right-1/3 -z-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <div className="enterprise-dashboard space-y-6 pb-12">
+      <section className="enterprise-hero enterprise-reveal relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-[#090d1c] px-5 py-7 text-white shadow-2xl shadow-indigo-950/20 sm:px-8 sm:py-9 lg:px-10">
+        <div className="enterprise-grid-overlay pointer-events-none absolute inset-0 opacity-30" />
+        <div className="enterprise-orb pointer-events-none absolute -right-16 -top-24 h-80 w-80 rounded-full bg-orange-500/25 blur-3xl" />
+        <div className="enterprise-orb enterprise-orb-delay pointer-events-none absolute -bottom-36 left-1/3 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
+        <div className="relative">
           <div className="max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-indigo-100 backdrop-blur">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-100 backdrop-blur">
               <Building2 className="h-3.5 w-3.5 text-orange-300" />
-              <span>CỔNG QUẢN LÝ THỰC TẬP DOANH NGHIỆP</span>
+              <span>Enterprise · OJT control center</span>
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200/70">
+              Tổng quan hoạt động doanh nghiệp
+            </p>
+            <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-[42px]">
               {companyName}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-indigo-100/80">
-              Tiếp nhận ứng viên, theo dõi tiến độ công việc và đồng hành cùng sinh viên trong kỳ thực tập OJT.
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-indigo-100/75">
+              Quản lý tiếp nhận sinh viên, vị trí tuyển dụng, tiến độ thực tập và các đầu việc cần xử lý tại một nơi.
             </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-3">
-            <span
-              className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
-                profile?.status === 'ACTIVE'
-                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                  : 'border-white/15 bg-white/10 text-indigo-100'
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
-              {profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
-            </span>
-            <button type="button" onClick={() => setRevision(value => value + 1)} disabled={statsLoading} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />Làm mới số liệu</button>
+            <div className="mt-6">
+              <span
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
+                  profile?.status === 'ACTIVE'
+                    ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                    : 'border-white/15 bg-white/10 text-indigo-100'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+                {profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
+              </span>
+            </div>
           </div>
         </div>
+      </section>
+
+      <section
+          className="enterprise-dashboard-actions enterprise-reveal flex flex-col gap-4 rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_12px_36px_-28px_rgba(15,23,42,0.45)] sm:flex-row sm:items-center sm:justify-between sm:px-5"
+          style={{ animationDelay: '80ms' }}
+      >
+          <div data-stat-label="Sinh viên đã tiếp nhận" className="flex min-w-0 items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+              <UserCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Sinh viên đã tiếp nhận</p>
+              <p className="mt-0.5 text-2xl font-black leading-none tracking-tight text-slate-900">
+                {statsLoading || statsError ? '—' : dashboardStats.acceptedInterns}
+                <span className="ml-1.5 text-xs font-semibold text-slate-400">sinh viên</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Link
+              to="/enterprise/candidates"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm shadow-orange-900/15 transition hover:-translate-y-0.5 hover:bg-orange-600"
+            >
+              <UserCheck className="h-4 w-4" />
+              Duyệt hồ sơ sinh viên
+            </Link>
+            <button
+              type="button"
+              onClick={() => setRevision(value => value + 1)}
+              disabled={statsLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
+              Làm mới số liệu
+            </button>
+          </div>
       </section>
 
       {toastMessage && (
@@ -275,282 +453,226 @@ export const EnterpriseDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          {
-            label: 'Hồ sơ chờ xét duyệt',
-            value: dashboardStats.pendingCandidates,
-            unit: 'ứng viên',
-            detail: 'Ứng tuyển vào doanh nghiệp',
-            icon: Users,
-            color: 'blue',
-            to: '/enterprise/candidates',
-            dataLoading: statsLoading,
-            usesDashboardStats: true,
-          },
-          {
-            label: 'Sinh viên đã tiếp nhận',
-            value: dashboardStats.acceptedInterns,
-            unit: 'sinh viên',
-            detail: 'Đã được doanh nghiệp duyệt nhận',
-            icon: UserCheck,
-            color: 'emerald',
-            to: '/enterprise/candidates',
-            dataLoading: statsLoading,
-            usesDashboardStats: true,
-          },
-          {
-            label: 'Đánh giá OJT chờ xử lý',
-            value: summary?.pendingEvaluations ?? 0,
-            unit: 'phiếu',
-            detail: 'Cần hoàn tất đánh giá',
-            icon: FileCheck2,
-            color: 'violet',
-            to: '/enterprise/evaluation',
-            dataLoading: statsLoading,
-            usesDashboardStats: true,
-          },
-          {
-            label: 'Tổng tin tuyển dụng',
-            value: dashboardStats.totalRecruitmentPosts,
-            unit: 'tin',
-            detail: 'Tổng số tin của doanh nghiệp',
-            icon: BriefcaseBusiness,
-            color: 'blue',
-            to: '/enterprise/jobs',
-            dataLoading: statsLoading,
-            usesDashboardStats: true,
-          },
-          {
-            label: 'Vị trí còn lại',
-            value: dashboardStats.remainingPositions,
-            unit: 'suất',
-            detail: 'Trong các tin đang tuyển',
-            icon: BriefcaseBusiness,
-            color: 'emerald',
-            to: '/enterprise/jobs',
-            dataLoading: statsLoading,
-            usesDashboardStats: true,
-          },
-        ].map((stat) => {
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        {statCards.map((stat, index) => {
           const Icon = stat.icon;
-          const colors = {
-            blue: 'bg-blue-50 text-blue-600 ring-blue-100',
-            emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
-            violet: 'bg-violet-50 text-violet-600 ring-violet-100',
-          }[stat.color];
           return (
             <Link
               key={stat.label}
               to={stat.to}
-              className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              data-stat-label={stat.label}
+              style={{ animationDelay: `${80 + index * 70}ms` }}
+              className="enterprise-reveal group relative overflow-hidden rounded-2xl border border-white/70 bg-white p-4 shadow-[0_8px_24px_-16px_rgba(15,23,42,0.35)] transition duration-300 hover:-translate-y-1 hover:border-indigo-100 hover:shadow-lg sm:p-5"
             >
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-indigo-200 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                     {stat.label}
                   </p>
-                  <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-                    {stat.dataLoading ? '...' : stat.usesDashboardStats && statsError ? '—' : stat.value}
-                    <span className="ml-1.5 text-xs font-medium text-slate-400">{stat.unit}</span>
+                  <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">
+                    {statsLoading ? '—' : statsError ? '—' : stat.value}
                   </p>
                 </div>
-                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${colors}`}>
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${statTones[stat.tone]}`}>
                   <Icon className="h-5 w-5" />
                 </span>
               </div>
-              <div className="mt-4 flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-500">{stat.detail}</span>
-                <ChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-orange-500" />
+              <div className="mt-3 flex items-end justify-between gap-2 text-[10px]">
+                <span className="font-medium leading-relaxed text-slate-500">{stat.detail}</span>
+                <ChevronRight className="mb-0.5 h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-orange-500" />
               </div>
             </Link>
           );
         })}
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <h2 className="flex items-center gap-2 font-bold text-slate-900">
-              <TrendingUp className="h-5 w-5 text-orange-500" />
-              Tổng quan sinh viên thực tập
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Được duyệt là đã tiếp nhận; số đã tiếp nhận bao gồm cả sinh viên đang thực tập và đã hoàn thành.
-            </p>
-          </div>
-          <Link
-            to="/enterprise/candidates"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
-          >
-            Xem hồ sơ
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        <div className="p-5 sm:p-6">
-          {statsLoading ? (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
-              <p className="text-xs font-medium text-slate-500">Đang tải thống kê sinh viên...</p>
-            </div>
-          ) : statsError ? (
-            <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
-              <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-              <p className="text-sm font-medium text-rose-700">{statsError}</p>
-            </div>
-          ) : (
-            <div
-              className="relative h-64"
-              role="img"
-              aria-label={internshipStages
-                .map(stage => `${stage.label}: ${stage.value} sinh viên`)
-                .join(', ')}
-            >
-              <div className="absolute inset-x-8 bottom-12 top-2 flex flex-col justify-between" aria-hidden="true">
-                {[0, 1, 2, 3].map(tick => (
-                  <span key={tick} className="border-t border-dashed border-slate-200" />
-                ))}
+      <section className="grid gap-5 xl:grid-cols-[minmax(280px,0.82fr)_minmax(0,1.7fr)]">
+        <article className="enterprise-reveal overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_16px_50px_-36px_rgba(30,41,59,0.45)]">
+          <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-600">Task completion</p>
+                <h2 className="mt-1 flex items-center gap-2 text-base font-extrabold text-slate-900">
+                  <ListChecks className="h-4 w-4 text-teal-500" />
+                  Tiến độ hoàn thành Task
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Tỷ lệ task hoàn thành trên tổng số task được giao cho toàn bộ sinh viên.
+                </p>
               </div>
-              <div className="absolute inset-x-0 bottom-12 top-2 flex items-end justify-around">
-                {internshipStages.map(stage => {
-                  const height = !chartAnimated || stage.value === 0
-                    ? 0
-                    : Math.max((stage.value / maxInternshipStage) * 100, 4);
-                  return (
-                    <div key={stage.label} className="relative flex h-full w-1/4 items-end justify-center">
-                      <span
-                        className="absolute z-10 text-xs font-bold text-slate-700"
-                        style={{ bottom: `calc(${height}% + 6px)` }}
-                      >
-                        {stage.value}
-                      </span>
-                      <div
-                        className={`w-12 rounded-t-lg shadow-sm transition-[height] duration-1000 ease-out sm:w-16 ${stage.color}`}
-                        style={{ height: `${height}%` }}
-                        title={`${stage.label}: ${stage.value} sinh viên`}
-                      />
+              <Link
+                to="/enterprise/interns"
+                aria-label="Quản lý task thực tập"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+          <div className="p-5 sm:p-6">
+            {tasksLoading ? (
+              <div role="status" className="flex flex-col items-center gap-3 py-8">
+                <Loader2 className="h-7 w-7 animate-spin text-teal-500" />
+                <p className="text-xs font-medium text-slate-500">Đang tính tiến độ task...</p>
+              </div>
+            ) : tasksError ? (
+              <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
+                <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
+                <p className="text-sm font-medium text-rose-700">{tasksError}</p>
+              </div>
+            ) : (
+              <>
+                <TaskCompletionDonut
+                  completed={taskSummary.completed}
+                  total={taskSummary.total}
+                  animated={chartAnimated}
+                />
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Hoàn thành', value: taskSummary.completed, color: 'text-teal-700', tone: 'bg-teal-50' },
+                    { label: 'Đang làm', value: taskSummary.inProgress, color: 'text-indigo-700', tone: 'bg-indigo-50' },
+                    { label: 'Chưa bắt đầu', value: taskSummary.todo, color: 'text-slate-700', tone: 'bg-slate-50' },
+                  ].map(metric => (
+                    <div key={metric.label} className={`rounded-xl px-2.5 py-2.5 ${metric.tone}`}>
+                      <p className={`text-lg font-black tabular-nums ${metric.color}`}>{metric.value}</p>
+                      <p className="text-[9px] font-semibold text-slate-500">{metric.label}</p>
                     </div>
-                  );
-                })}
-              </div>
-              <div className="absolute inset-x-0 bottom-0 flex h-10 items-center justify-around">
-                {internshipStages.map(stage => (
-                  <span key={stage.label} className="w-1/3 text-center text-[11px] font-semibold text-slate-600">
-                    {stage.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <h2 className="flex items-center gap-2 font-bold text-slate-900">
-              <ListChecks className="h-5 w-5 text-orange-500" />
-              Tiến độ Task của sinh viên
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Tỷ lệ task đã hoàn thành trên tổng số task được giao.
-            </p>
-          </div>
-          <Link
-            to="/enterprise/interns"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
-          >
-            Quản lý task
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        <div className="p-5 sm:p-6">
-          {tasksLoading ? (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
-              <p className="text-xs font-medium text-slate-500">Đang tải tiến độ task...</p>
-            </div>
-          ) : tasksError ? (
-            <div className="rounded-xl bg-rose-50 p-5 text-center">
-              <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-              <p className="text-sm font-medium text-rose-700">{tasksError}</p>
-            </div>
-          ) : taskProgress.length === 0 ? (
-            <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
-              <ListChecks className="mx-auto mb-2 h-7 w-7 text-slate-300" />
-              <p className="text-sm font-semibold text-slate-600">Chưa có task để thống kê.</p>
-              <p className="mt-1 text-xs text-slate-400">
-                Tiến độ sẽ hiển thị tại đây khi task được giao cho sinh viên.
-              </p>
-            </div>
-          ) : (
-            <div>
-              <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-medium text-slate-500">
-                <span><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />Tỷ lệ task đã hoàn thành</span>
-              </div>
-
-              <div className="flex">
-                <div className="flex h-56 w-9 shrink-0 flex-col justify-between pb-8 pr-2 text-right text-[10px] text-slate-400">
-                  <span>100%</span>
-                  <span>75%</span>
-                  <span>50%</span>
-                  <span>25%</span>
-                  <span>0%</span>
+                  ))}
                 </div>
+                <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-[10px] leading-relaxed text-slate-500">
+                  Phần trăm được tính từ tổng số task đã hoàn thành chia cho toàn bộ task của doanh nghiệp.
+                </p>
+              </>
+            )}
+          </div>
+        </article>
 
-                <div className="min-w-0 flex-1 overflow-x-auto">
-                  <div
-                    className="relative h-56"
-                    style={{ minWidth: `${Math.max(100, taskProgress.length * 76)}px` }}
-                  >
-                    <div className="absolute inset-x-0 bottom-8 top-0 flex flex-col justify-between" aria-hidden="true">
-                      {[0, 1, 2, 3, 4].map((tick) => (
-                        <span key={tick} className="border-t border-dashed border-slate-200" />
-                      ))}
-                    </div>
-
-                    <div className="absolute inset-0 flex gap-2">
-                      {taskProgress.map((student) => {
-                        const completion = Math.round((student.completed / student.total) * 100);
-                        const barHeight = completion * (192 / 224);
-                        return (
-                          <div
-                            key={student.studentId}
-                            className="relative h-full min-w-0 flex-1"
-                            role="img"
-                            aria-label={`${student.studentName}: ${completion}% hoàn thành, ${student.completed} task xong, ${student.inProgress} đang làm, ${student.todo} chưa bắt đầu`}
-                          >
-                            <span
-                              className="absolute z-10 w-full rounded bg-white/90 text-center text-[10px] font-bold text-slate-600"
-                              style={{ top: `${Math.max(0, 192 - barHeight - 16)}px` }}
-                            >
-                              {completion}%
-                            </span>
-                            <div
-                              className="absolute bottom-8 left-1/2 w-8 -translate-x-1/2 rounded-t-md bg-emerald-500 shadow-sm transition-all hover:w-10 hover:bg-emerald-600 sm:w-10 sm:hover:w-12"
-                              style={{ height: `${barHeight}%` }}
-                              title={`${student.studentName}: ${student.completed}/${student.total} hoàn thành, ${student.inProgress} đang làm, ${student.todo} chưa bắt đầu`}
-                            />
-                            <div className="absolute inset-x-0 bottom-0 h-8 overflow-hidden text-center">
-                              <p className="truncate text-[10px] font-semibold text-slate-700">
-                                {student.studentCode || student.studentName}
-                              </p>
-                              <p className="text-[9px] text-slate-400">
-                                {student.completed}/{student.total} task
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+        <article className="enterprise-reveal overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_16px_50px_-36px_rgba(30,41,59,0.45)]" style={{ animationDelay: '100ms' }}>
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-600">Student status</p>
+              <h2 className="mt-1 flex items-center gap-2 text-base font-extrabold text-slate-900">
+                <TrendingUp className="h-4 w-4 text-indigo-500" />
+                Trạng thái tiếp nhận sinh viên
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">Số lượng theo từng giai đoạn xử lý hồ sơ và thực tập.</p>
+            </div>
+            <Link
+              to="/enterprise/candidates"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-800"
+            >
+              Quản lý hồ sơ <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="p-5 sm:p-6">
+            {statsLoading ? (
+              <div role="status" className="flex flex-col items-center gap-3 py-8">
+                <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
+                <p className="text-xs font-medium text-slate-500">Đang tải trạng thái sinh viên...</p>
+              </div>
+            ) : statsError ? (
+              <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
+                <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
+                <p className="text-sm font-medium text-rose-700">{statsError}</p>
+              </div>
+            ) : (
+              <>
+                <div
+                  role="img"
+                  aria-label={`Biểu đồ cột trạng thái sinh viên: ${candidateChartLabel}`}
+                  className="relative h-64"
+                >
+                  <div className="absolute inset-x-7 bottom-11 top-2 flex flex-col justify-between" aria-hidden="true">
+                    {[0, 1, 2, 3, 4].map(tick => (
+                      <span key={tick} className="border-t border-dashed border-slate-200" />
+                    ))}
+                  </div>
+                  <div className="absolute inset-x-0 bottom-11 top-2 flex items-end justify-around">
+                    {candidateStages.map((stage, index) => {
+                      const height = chartAnimated && stage.value > 0
+                        ? Math.max((stage.value / maxCandidateStage) * 100, 4)
+                        : 0;
+                    return (
+                      <div key={stage.label} className="relative flex h-full w-1/5 items-end justify-center">
+                        <span
+                          className="absolute z-10 text-xs font-extrabold tabular-nums text-slate-700"
+                          style={{ bottom: `calc(${height}% + 7px)` }}
+                        >
+                          {stage.value}
+                        </span>
+                        <div
+                          data-chart-status={stage.label}
+                          className="w-10 rounded-t-xl transition-[height] duration-1000 ease-out sm:w-14"
+                          style={{
+                            height: `${height}%`,
+                            background: `linear-gradient(180deg, ${stage.color} 0%, ${stage.color}cc 100%)`,
+                            boxShadow: `0 8px 18px ${stage.color}33`,
+                            transitionDelay: `${index * 100}ms`,
+                          }}
+                          title={`${stage.label}: ${stage.value}`}
+                        />
+                      </div>
+                    );
+                  })}
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 flex h-10 items-center justify-around">
+                    {candidateStages.map(stage => (
+                      <span key={stage.label} className="w-1/4 px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-600">
+                        {stage.label}
+                      </span>
+                    ))}
                   </div>
                 </div>
+                <p className="mt-3 rounded-xl bg-indigo-50/70 px-3 py-2.5 text-[10px] leading-relaxed text-indigo-800">
+                  Nhóm “Đã nhận” không tính sinh viên đã hoàn thành, giúp các cột thể hiện từng giai đoạn riêng biệt.
+                </p>
+              </>
+            )}
+          </div>
+          {!tasksLoading && !tasksError && (
+            <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                  <CalendarClock className="h-4 w-4 text-orange-500" />
+                  Việc cần theo dõi
+                </h3>
+                <div className="flex items-center gap-3 text-[10px] font-semibold">
+                  <span className={taskSummary.overdue > 0 ? 'text-rose-600' : 'text-slate-500'}>
+                    {taskSummary.overdue} task quá hạn
+                  </span>
+                  <span className="text-amber-600">{taskSummary.dueSoon.length} sắp đến hạn</span>
+                </div>
               </div>
+              {taskSummary.attention.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {taskSummary.attention.map(task => {
+                    const dueDate = (task.dueDate || '').slice(0, 10);
+                    const overdue = dueDate < dateKey(new Date());
+                    return (
+                      <div key={task.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-white bg-white px-3 py-2.5">
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${overdue ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
+                          {overdue ? <AlertTriangle className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[10px] font-bold text-slate-700">{task.name}</p>
+                          <p className="truncate text-[9px] text-slate-400">{task.student?.fullName || task.fullName || 'Sinh viên'}</p>
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-bold ${overdue ? 'text-rose-600' : 'text-amber-600'}`}>
+                          {formatTaskDate(dueDate)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-white bg-white px-3 py-3 text-[10px] font-medium text-slate-500">
+                  Chưa có task quá hạn hoặc đến hạn trong 7 ngày tới.
+                </p>
+              )}
             </div>
           )}
-        </div>
+        </article>
       </section>
 
       {/* Main Grid Section */}

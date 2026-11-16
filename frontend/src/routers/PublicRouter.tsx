@@ -32,6 +32,7 @@ import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
 import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
 import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
 import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
+import QhdnNotifications from "@/pages/qhdn/QhdnNotifications";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -204,6 +205,7 @@ export const router = createBrowserRouter([
           { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
           { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
           { path: "/qhdn/evaluations", element: <QhdnEnterpriseEvaluations /> },
+          { path: "/qhdn/notifications", element: <QhdnNotifications /> },
           { path: "/qhdn/analytics", element: <Navigate to="/qhdn/dashboard" replace /> },
           { path: "/qhdn/interviews", element: <Navigate to="/qhdn/coordination" replace /> },
         ],
