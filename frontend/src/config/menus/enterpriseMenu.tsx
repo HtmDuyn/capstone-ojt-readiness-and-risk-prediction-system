@@ -8,7 +8,7 @@ import type { NavItem } from '@/types/common.types';
 export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   {
     id: 'enterprise-dashboard',
-    label: 'Tổng quan Doanh nghiệp',
+    label: 'Tổng quan',
     path: '/enterprise/dashboard',
     icon: <DashboardGridIcon size={20} />,
     banner: {
@@ -19,7 +19,7 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'enterprise-candidates',
-    label: 'Duyệt Hồ sơ Sinh viên',
+    label: 'Hồ sơ Sinh viên',
     path: '/enterprise/candidates',
     icon: <Users size={20} />,
     banner: {
@@ -31,7 +31,7 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'enterprise-jobs',
-    label: 'Thông tin Vị trí Tuyển dụng',
+    label: 'Thông tin Tuyển dụng',
     path: '/enterprise/jobs',
     icon: <Briefcase size={20} />,
     banner: {
@@ -42,7 +42,7 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'enterprise-interns',
-    label: 'Theo dõi & Giao Task',
+    label: 'Quản lý Task',
     path: '/enterprise/interns',
     icon: <CheckSquare size={20} />,
     banner: {

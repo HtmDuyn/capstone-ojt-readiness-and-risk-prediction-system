@@ -357,7 +357,12 @@ export interface InternshipTaskListRequest {
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
+export type EnterpriseAcceptancePreview={candidateIds:number[];confirmationToken:string;totalSelected:number;overCapacity:boolean;semesters:{ojtSemesterId:number;name:string;capacity:number;currentCount:number;selectedCount:number;afterCount:number;excessCount:number}[]};
 export const enterpriseService = {
+  previewAcceptance:async(candidateIds:number[]):Promise<EnterpriseAcceptancePreview>=>
+    (await API.post('/enterprise/candidates/acceptance-preview',{candidateIds})).data.data,
+  acceptCandidates:async(preview:EnterpriseAcceptancePreview,allowOverCapacity:boolean,reason:string):Promise<unknown>=>
+    (await API.post('/enterprise/candidates/accept-bulk',{candidateIds:preview.candidateIds,confirmationToken:preview.confirmationToken,allowOverCapacity,reason})).data.data,
   // ── Profile ──────────────────────────────────────────────────────────────
   // Gọi GET /api/enterprise/profile — không cần companyId vì backend lấy từ JWT
   getProfile: async (): Promise<EnterpriseProfileResponse> => {

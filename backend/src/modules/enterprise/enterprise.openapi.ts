@@ -22,6 +22,11 @@ export function addEnterpriseOperations(spec: Spec) {
     }};
   };
   const candidateId = [{in:'path',name:'id',required:true,schema:id}];
+  const bulkIds={type:'array',minItems:1,maxItems:200,uniqueItems:true,items:id};
+  for(const [endpoint,summary,confirm] of [['acceptance-preview','Preview selected candidates and company capacity per semester',false],['accept-bulk','Accept selected candidates atomically; explicitly confirm any over-capacity intake',true]] as const){
+    const properties={candidateIds:bulkIds,...(confirm?{confirmationToken:{type:'string',maxLength:64},allowOverCapacity:{type:'boolean'},reason:{type:'string',maxLength:2000}}:{})};
+    add('post','/api/enterprise/candidates/'+endpoint,summary,[],{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:confirm?['candidateIds','confirmationToken','allowOverCapacity','reason']:['candidateIds'],properties}}}});
+  }
   add('get','/api/enterprise/profile','Hồ sơ doanh nghiệp đang đăng nhập',[]);
   const optionalText=(maxLength:number)=>({type:'string',maxLength,nullable:true});
   add('patch','/api/enterprise/profile','Cập nhật hồ sơ doanh nghiệp đã được import',[],{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,minProperties:2,required:['companyId'],properties:{companyId:{...id,description:'ID doanh nghiệp đã được import, phải thuộc tài khoản đăng nhập.'},name:{type:'string',minLength:1,maxLength:200},address:optionalText(300),industry:optionalText(100),contactPersonName:optionalText(100),contactPhone:optionalText(20),contactEmail:{...optionalText(100),format:'email'},positionTitle:{...optionalText(100),description:'Chức danh của tài khoản đang đăng nhập tại doanh nghiệp.'}}},example:{companyId:1,name:'Công ty ABC',address:'123 Nguyễn Văn Linh, TP. Hồ Chí Minh',industry:'Công nghệ thông tin',contactPersonName:'Nguyễn Thị Mai',contactPhone:'0901234567',contactEmail:'hr@example.com',positionTitle:'Trưởng phòng nhân sự'}}}});

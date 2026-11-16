@@ -104,6 +104,22 @@ Worker trong module doanh nghiệp chạy mỗi phút, chỉ cập nhật tin En
 
 Worker không sửa tin trong lúc đợt đăng ký OJT của sinh viên đang hoạt động; không tự mở lại tin QHDN chủ động đóng, tin bị từ chối/lưu trữ hoặc tin import không thuộc EnterpriseManaged. Không sửa hàm DB, schema, worker hay service của role khác.
 
+## Tiếp nhận sinh viên hàng loạt
+
+- `POST /api/enterprise/candidates/acceptance-preview` nhận `candidateIds` (1–200 ID hồ sơ điều phối, không trùng), chỉ cho role `ENTERPRISE` và hồ sơ mới nhất đang chờ của doanh nghiệp đăng nhập.
+- Kết quả gồm `confirmationToken` và số liệu theo từng kỳ: `capacity`, `currentCount`, `selectedCount`, `afterCount`, `excessCount`. Chỉ tiêu là tổng các vị trí chưa xóa/lưu trữ của doanh nghiệp trong kỳ. Số thực nhận đếm mỗi sinh viên một lần từ hồ sơ đã nhận, phân công còn hiệu lực hoặc lịch sử thực nhận, thống nhất với bảng QHDN.
+- `POST /api/enterprise/candidates/accept-bulk` nhận `candidateIds`, `confirmationToken`, `allowOverCapacity` (boolean), `reason`. Khi `afterCount > capacity`, phải gửi `allowOverCapacity: true` sau khi doanh nghiệp xác nhận phần vượt. Còn 0 slot vẫn được nhận nếu đồng ý vượt chỉ tiêu. Giữ nguyên chỉ tiêu; cập nhật trạng thái nhận và số thực nhận/chênh lệch ở QHDN.
+- Toàn bộ danh sách chạy trong một transaction; một hồ sơ lỗi thì không nhận hồ sơ nào. Vẫn kiểm tra quyền, hạn phản hồi, điều kiện bàn giao, nơi thực tập đã xác nhận và phân công hiện có. Số liệu thay đổi sau bước xem trước trả `409 BULK_ACCEPTANCE_CHANGED`, cần xem lại và xác nhận lại. Gửi lại lần xác nhận đã thành công trả `replayed: true`.
+- DB đang có dữ liệu: chạy riêng khối `BEGIN OJT ENTERPRISE BULK ACCEPTANCE V7` đến `END OJT ENTERPRISE BULK ACCEPTANCE V7` trong `backend/DB`, gồm cả `BEGIN`/`COMMIT`. Khối này cập nhật hàm bảo vệ và marker, không reset dữ liệu. Không chạy toàn bộ `backend/DB` trên DB cần giữ dữ liệu. Nếu thiếu V7, API xác nhận trả `503 BULK_ACCEPTANCE_MIGRATION_REQUIRED`.
+
+Kiểm thử tích hợp dùng DB tạm, có chặn nhầm host/cổng/tên DB và reset DB thử trước khi chạy:
+
+```powershell
+npm run build
+$env:ENTERPRISE_BULK_TEST_DATABASE_URL='postgresql://postgres@127.0.0.1:55441/enterprise_bulk_test'
+node --test tests/enterprise-bulk-acceptance.integration.cjs tests/swagger-startup.test.cjs
+```
+
 ## Kiểm thử
 
 Trong backend:
