@@ -2,7 +2,7 @@ import React from 'react';
 import {
   DashboardGridIcon,
 } from '@/components/common/icons/AppIcons';
-import { Briefcase, Users, CheckSquare, ClipboardCheck } from 'lucide-react';
+import { Bell, Briefcase, Users, CheckSquare, ClipboardCheck } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
 export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
@@ -62,6 +62,17 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
       description: 'Chấm điểm kỹ thuật, thái độ, tính kỷ luật và kỹ năng mềm của sinh viên sau kỳ thực tập OJT.',
       badge: 'Chấm điểm OJT',
       primaryActionLabel: 'Tải phiếu đánh giá',
+    },
+  },
+  {
+    id: 'enterprise-notifications',
+    label: 'Thông báo',
+    path: '/enterprise/notifications',
+    icon: <Bell size={20} />,
+    banner: {
+      title: 'Thông báo',
+      description: 'Theo dõi thông báo được gửi đến tài khoản doanh nghiệp.',
+      badge: 'Doanh nghiệp',
     },
   },
 ];

@@ -209,8 +209,13 @@ export const EnterpriseCandidates: React.FC = () => {
         </div>
       )}
 
+      <section aria-label="Danh sách hồ sơ ứng tuyển" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      {selectable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 bg-orange-50/70 px-4 py-3">
+        <p className="text-sm text-slate-600">Đã chọn <strong>{selected.length}</strong> / {selectable.length} hồ sơ có thể tiếp nhận</p>
+        <button type="button" className={workflowPrimary} disabled={!selected.length||bulkLoading||actionLoading!==null||loading} onClick={()=>previewAcceptance(selected.map(candidate=>candidate.id))}><CheckCircle2 size={16}/>{bulkLoading?'Đang kiểm tra…':`Nhận sinh viên đã chọn (${selected.length})`}</button>
+      </div>}
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-4">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -277,7 +282,7 @@ export const EnterpriseCandidates: React.FC = () => {
         </div>
       </div>
       {periodsError && (
-        <p role="alert" className="text-xs text-rose-700">{periodsError}</p>
+        <p role="alert" className="px-4 py-3 text-xs text-rose-700">{periodsError}</p>
       )}
 
       {/* Loading State — hiển thị khi đang tải profile hoặc dữ liệu ứng viên */}
@@ -294,7 +299,7 @@ export const EnterpriseCandidates: React.FC = () => {
 
       {/* Error State */}
       {error && !loading && (
-        <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-center">
+        <div className="p-6 bg-rose-50 text-center">
           <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
           <p className="text-sm text-rose-700 font-medium">{error}</p>
           <button
@@ -308,7 +313,7 @@ export const EnterpriseCandidates: React.FC = () => {
 
       {/* Empty State */}
       {!loading && !error && filteredCandidates.length === 0 && (
-        <div className="p-12 bg-white rounded-2xl border border-slate-200/80 text-center">
+        <div className="p-12 text-center">
           <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-500">
             {searchTerm || filterStatus !== 'ALL' ? 'Không tìm thấy ứng viên phù hợp.' : 'Chưa có hồ sơ ứng tuyển trực tiếp nào.'}
@@ -319,13 +324,8 @@ export const EnterpriseCandidates: React.FC = () => {
         </div>
       )}
 
-      {selectable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-100 bg-orange-50/70 px-4 py-3">
-        <p className="text-sm text-slate-600">Đã chọn <strong>{selected.length}</strong> / {selectable.length} hồ sơ có thể tiếp nhận</p>
-        <button type="button" className={workflowPrimary} disabled={!selected.length||bulkLoading||actionLoading!==null||loading} onClick={()=>previewAcceptance(selected.map(candidate=>candidate.id))}><CheckCircle2 size={16}/>{bulkLoading?'Đang kiểm tra…':`Nhận sinh viên đã chọn (${selected.length})`}</button>
-      </div>}
       {/* Candidates Table List */}
       {!loading && !error && filteredCandidates.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] table-fixed text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
@@ -414,12 +414,11 @@ export const EnterpriseCandidates: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-3 pt-4">
+        <div className="flex items-center justify-center space-x-3 border-t border-slate-100 p-4">
           <button
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page <= 1}
@@ -439,6 +438,7 @@ export const EnterpriseCandidates: React.FC = () => {
           </button>
         </div>
       )}
+      </section>
 
       {acceptance&&<WorkflowModal wide title={`Xác nhận tiếp nhận ${acceptance.totalSelected} sinh viên`} busy={bulkLoading} onClose={()=>setAcceptance(null)}>
         <form className="space-y-4" onSubmit={event=>{event.preventDefault();void confirmAcceptance();}}>
