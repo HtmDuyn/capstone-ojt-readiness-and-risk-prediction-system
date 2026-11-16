@@ -4,7 +4,11 @@ import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  server: { proxy: { "/api": { target: loadEnv(mode, process.cwd(), "").API_PROXY_TARGET || "http://localhost:3000", changeOrigin: true } } },
+  server: {
+    // Browser-test profiles contain locked files on Windows and are not app sources.
+    watch: { ignored: ['**/.cache/**', '**/.tmp/**'] },
+    proxy: { "/api": { target: loadEnv(mode, process.cwd(), "").API_PROXY_TARGET || "http://localhost:3000", changeOrigin: true } },
+  },
   plugins: [react()],
   resolve: {
     alias: {

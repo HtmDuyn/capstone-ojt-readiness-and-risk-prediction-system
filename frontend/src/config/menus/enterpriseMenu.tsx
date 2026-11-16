@@ -19,7 +19,7 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'enterprise-candidates',
-    label: 'Hồ sơ Sinh viên',
+    label: 'Duyệt Hồ sơ Sinh viên',
     path: '/enterprise/candidates',
     icon: <Users size={20} />,
     banner: {
