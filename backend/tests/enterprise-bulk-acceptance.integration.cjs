@@ -9,6 +9,7 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  await db.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');await db.query(fs.readFileSync(path.join(__dirname,'../DB'),'utf8'));
  const {pool}=require('../dist/config/database');t.after(()=>pool.end());
  const {bulkAcceptance}=require('../dist/modules/enterprise/bulk-acceptance.service');
+ const {enterpriseProfile}=require('../dist/modules/enterprise/enterprise.service');
  const {placementBoard,supplementPlacement}=require('../dist/modules/qhdn/placement.service');
  const users=(await db.query('SELECT "UserID","Username" FROM "Users"')).rows;
  const staff={userId:users.find(u=>u.Username==='ojt.coord01').UserID,roleCode:'OJT_COORD'};
@@ -27,6 +28,8 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  // Exercise the strict student-application capacity guard, not the existing QHDN exception.
  await db.query(`UPDATE "StudentEnterpriseCoordination" SET "Source"='STUDENT_APPLICATION' WHERE "CoordinationID"=ANY($1::int[])`,[candidateIds]);
  const first=await bulkAcceptance({candidateIds},actor);
+ const beforeAcceptance=(await enterpriseProfile(actor)).summary;
+ assert.equal(beforeAcceptance.acceptedInterns,0);assert.equal(beforeAcceptance.pendingCandidates,3);
  assert.equal(first.semesters[0].capacity,1);assert.equal(first.semesters[0].currentCount,0);assert.equal(first.semesters[0].afterCount,3);assert.equal(first.semesters[0].excessCount,2);
  const body={candidateIds,confirmationToken:first.confirmationToken,allowOverCapacity:false,reason:'Company approves additional interns'};
  await assert.rejects(bulkAcceptance(body,actor,true),e=>e.errorCode==='BULK_OVER_CAPACITY_CONFIRMATION_REQUIRED');
@@ -52,5 +55,15 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  assert.equal((await bulkAcceptance({...body,confirmationToken:next.confirmationToken,allowOverCapacity:true},actor,true)).replayed,true);
  const summary=(await placementBoard({ojtSemesterId:semester},staff)).companies.find(c=>c.id===company);
  assert.equal(summary.capacity,2);assert.equal(summary.actualCount,3);assert.equal(summary.actualCount-summary.capacity,1);
+ const afterAcceptance=(await enterpriseProfile(actor)).summary;
+ assert.equal(afterAcceptance.acceptedInterns,summary.actualCount,'Dashboard includes accepted students before an assignment is created');
+ assert.equal(afterAcceptance.pendingCandidates,0);assert.equal(afterAcceptance.completedInterns,0);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "EnterpriseID"=$1',[company])).rows[0].n,0);
+ // Creating an assignment for an already accepted student must not increase intake twice.
+ const assigned=(await db.query(`INSERT INTO "InternshipAssignments" ("CoordinationID","StudentID","EnterpriseID","PositionID","Status") SELECT co."CoordinationID",r."StudentID",co."EnterpriseID",co."PositionID",'ASSIGNED' FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."CoordinationID"=$1 RETURNING "AssignmentID"`,[candidateIds[0]])).rows[0].AssignmentID;
+ assert.equal((await enterpriseProfile(actor)).summary.acceptedInterns,3);
+ await db.query(`UPDATE "InternshipAssignments" SET "Status"='COMPLETED' WHERE "AssignmentID"=$1`,[assigned]);
+ const completed=(await enterpriseProfile(actor)).summary;
+ assert.equal(completed.acceptedInterns,3);assert.equal(completed.completedInterns,1);
  assert.equal((await db.query(`SELECT count(*)::int AS n FROM "AuditLogs" WHERE "Action"='ENTERPRISE_BULK_ACCEPT' AND "EntityID"=$1`,[company])).rows[0].n,1);
 });

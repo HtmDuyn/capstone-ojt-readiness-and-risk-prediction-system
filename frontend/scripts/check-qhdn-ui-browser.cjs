@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const artifacts=path.join(root,'.cache','qhdn-ui-'+process.pid);
 const records=[],errors=[];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let vite,browser,cdp,legacySummary=false,bulkAccepted=false,notificationRead=false;
+let vite,browser,cdp,legacySummary=false,bulkAccepted=false,notificationRead=false,extraAccepted=0,legacyDashboard=false;
 class CDP {
  constructor(url){
   this.socket=new WebSocket(url);this.pending=new Map();this.id=0;
@@ -37,7 +37,7 @@ function fixtures(server){server.middlewares.use('/api',(req,res)=>{
   send(round);
  });return;}
  if(url.pathname==='/auth/me'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({user:{mustChangePassword:false}}));return;}
- if(url.pathname==='/enterprise/profile')return send(enterpriseProfile);
+ if(url.pathname==='/enterprise/profile'){const summary={...enterpriseProfile.summary,pendingCandidates:bulkAccepted?0:3,acceptedInterns:(bulkAccepted?3:0)+extraAccepted,completedInterns:0};if(legacyDashboard){delete summary.acceptedInterns;delete summary.completedInterns;}return send({...enterpriseProfile,summary});}
  if(url.pathname==='/accounts/me/notifications')return send({...paged([{id:1,title:'Đợt tuyển dụng mới',content:'Kiểm tra lịch tiếp nhận sinh viên của doanh nghiệp.',isRead:notificationRead,sentAt:'2026-11-16T09:00:00Z'},{id:2,title:'Hồ sơ đã cập nhật',content:'Thông tin doanh nghiệp đã được lưu.',isRead:true,sentAt:'2026-11-15T09:00:00Z'}]),unreadCount:notificationRead?0:1});
  if(url.pathname==='/enterprise/candidate-periods')return send({items:[]});
  if(url.pathname==='/enterprise/candidates')return send(paged([1,2,3].map(id=>({id,decision:bulkAccepted?'ACCEPTED':'PENDING',isLatestCoordination:true,canRespond:!bulkAccepted,introducedAt:'2026-11-16T00:00:00Z',student:{id,fullName:'Ứng viên '+id,studentCode:'SE18000'+id},position:{id:1,title:'Intern',code:'INTERN'}}))));
@@ -55,7 +55,8 @@ function fixtures(server){server.middlewares.use('/api',(req,res)=>{
 async function main(){
  await fs.mkdir(artifacts,{recursive:true});
  const {createServer}=await import('vite');
- vite=await createServer({root,define:{'import.meta.env.VITE_API_URL':JSON.stringify('/api')},plugins:[{name:'qhdn-ui-fixtures',configureServer:fixtures}],server:{host:'127.0.0.1',port:0,open:false,watch:{ignored:['**/.cache/**']}}});
+ delete process.env.VITE_API_URL;delete process.env.VITE_API_BASE_URL;
+ vite=await createServer({root,envDir:artifacts,plugins:[{name:'qhdn-ui-fixtures',configureServer:fixtures}],server:{host:'127.0.0.1',port:0,open:false,watch:{ignored:['**/.cache/**']}}});
  await vite.listen();const origin='http://127.0.0.1:'+vite.httpServer.address().port;
  const profile=path.join(artifacts,'chrome');
  browser=spawn(process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--no-sandbox','--disable-gpu','--disable-extensions','--no-first-run','--disable-background-networking','--remote-debugging-address=127.0.0.1','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
@@ -67,6 +68,7 @@ async function main(){
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
  await cdp.send('Page.navigate',{url:origin+'/qhdn/evaluations'});
  await waitFor(`document.body.innerText.includes('Nguyễn Minh Anh')`);
+ assert.equal(await evaluate(`import('/src/config/api.ts').then(module=>module.API_BASE_URL)`),'/api','Development defaults to the local API proxy without a test-only URL override');
  assert.equal(await evaluate(`document.querySelectorAll('[role="tab"]').length`),2);
  assert.equal(await evaluate(`document.body.innerText.includes('Phiếu đánh giá')`),false);
  await screenshot('reports-results-desktop');
@@ -143,6 +145,24 @@ async function main(){
  await waitFor(`!document.querySelector('[role="dialog"]')&&document.body.innerText.includes('Số thực nhận và chênh lệch chỉ tiêu đã được cập nhật')`);
  const bulkRequests=records.filter(record=>record.path==='/enterprise/candidates/accept-bulk');
  assert.equal(bulkRequests.length,1);assert.equal(bulkRequests[0].body.allowOverCapacity,true);assert.deepEqual(bulkRequests[0].body.candidateIds,[1,2,3]);
+ const priorProfileLoads=records.filter(record=>record.path==='/enterprise/profile').length;
+ await clickText('Tổng quan');
+ await waitFor(`location.pathname==='/enterprise/dashboard'&&!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 3 sinh viên"]')`);
+ assert.ok(records.filter(record=>record.path==='/enterprise/profile').length>priorProfileLoads,'Returning to dashboard fetches fresh figures instead of cached context');
+ assert.ok(await evaluate(`Array.from(document.querySelectorAll('main a')).find(link=>link.textContent.includes('Sinh viên đã tiếp nhận')).textContent.includes('3sinh viên')`));
+ assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label*="Đã tiếp nhận"]').getAttribute('aria-label').includes('Chờ duyệt: 0 sinh viên')`));
+ await waitFor(`document.querySelector('[role="img"] [title="Đã tiếp nhận: 3 sinh viên"]').getBoundingClientRect().height>100`);
+ await screenshot('enterprise-dashboard-after-acceptance');
+ extraAccepted=1;
+ await waitFor(`!Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='Làm mới số liệu').disabled`);
+ await clickText('Làm mới số liệu');
+ await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 4 sinh viên"]')`);
+ assert.ok(await evaluate(`Array.from(document.querySelectorAll('main a')).find(link=>link.textContent.includes('Sinh viên đã tiếp nhận')).textContent.includes('4sinh viên')`));
+ legacyDashboard=true;await clickText('Làm mới số liệu');
+ await waitFor(`document.body.innerText.includes('Chưa tải được đầy đủ số liệu thống kê')`);
+ assert.equal(await evaluate(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận"]')`),false,'Missing counts produce an error instead of NaN/blank bars');
+ legacyDashboard=false;await clickText('Làm mới số liệu');
+ await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 4 sinh viên"]')`);
  assert.equal(await evaluate(`!!document.querySelector('header button[aria-label^="Thông báo"]')`),false);
  await clickText('Thông báo');
  await waitFor(`location.pathname==='/enterprise/notifications'&&document.body.innerText.includes('Đợt tuyển dụng mới')`);
@@ -167,7 +187,7 @@ async function main(){
  assert.equal(profileUpdate.body.companyId,17);assert.equal('code' in profileUpdate.body,false);
  assert.ok(await evaluate(`document.body.innerText.includes('Mã doanh nghiệp: TECHVIET')`));
  assert.deepEqual(errors,[]);
- console.log('PASS reports, dates, bulk coordination, company summaries, enterprise bulk acceptance, notifications and business-code display with internal-ID updates.');
+ console.log('PASS reports, dates, coordination, bulk acceptance, dashboard intake/refresh, notifications and profile updates.');
  console.log('Screenshots: '+artifacts);
 }
 main().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{if(cdp){try{await cdp.send('Browser.close');}catch{}cdp.socket.close();}if(browser&&!browser.killed)browser.kill();if(vite)await vite.close();});

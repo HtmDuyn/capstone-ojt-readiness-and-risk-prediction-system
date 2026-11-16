@@ -622,7 +622,7 @@ export const EnterpriseInterns: React.FC = () => {
       {/* 1. Page Banner without buttons (as requested) */}
       <PageBanner
         title="Quản lý & Giao Nhiệm vụ Thực tập OJT"
-        description="Theo dõi danh sách sinh viên thực tập, phân công công việc tuần, theo dõi tỷ lệ hoàn thành task và điểm danh làm việc."
+        description="Sinh viên đã được duyệt tiếp nhận đã là thực tập sinh. Phân công ghi nhận thời gian và người hướng dẫn để doanh nghiệp giao task, theo dõi tiến độ và điểm danh."
         badge="Doanh nghiệp tiếp nhận OJT"
       />
 
@@ -1134,8 +1134,9 @@ export const EnterpriseInterns: React.FC = () => {
                 </div>
 
                 <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-800">
-                  Danh sách này chỉ gồm sinh viên đã có phân công thực tập. Sau khi doanh nghiệp chấp nhận hồ sơ,
-                  QHDN/Admin cần tạo phân công thực tập; hồ sơ chưa được phân công sẽ chưa xuất hiện ở đây.
+                  Sinh viên đã được doanh nghiệp duyệt đã thuộc danh sách tiếp nhận. Mục này chỉ hiện sinh viên đã có phân công
+                  (ngày bắt đầu/kết thúc và người hướng dẫn) để giao task, theo dõi và điểm danh. QHDN/Admin tạo hồ sơ phân công;
+                  chưa có phân công thì sinh viên vẫn được tính trong số đã tiếp nhận trên dashboard.
                 </p>
 
                 {/* Search & dropdown filter (No tabs) */}

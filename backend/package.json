@@ -9,6 +9,7 @@
     "docs:api": "node scripts/export-api-inputs.cjs",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
+    "check:db": "node scripts/check-db.cjs",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs"
   },
   "repository": {

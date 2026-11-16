@@ -14,16 +14,15 @@ import {
   AlertCircle,
   Send,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import {
   enterpriseService,
-  type EnterpriseCandidateItem,
-  type EnterpriseInternshipItem,
   type EnterpriseInternshipTask,
   type RecruitmentPost,
 } from '@/services/enterpriseService';
 import { loadAllPages, recruitmentTotals } from '@/components/enterprise/recruitment';
-import { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
+import type { EnterpriseProfileSummary } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -84,8 +83,10 @@ const buildTaskProgress = (tasks: EnterpriseInternshipTask[]): StudentTaskProgre
 };
 
 export const EnterpriseDashboard: React.FC = () => {
-  // Lấy profile và companyId từ EnterpriseContext (đã load sẵn — không gọi API lại)
+  // Context supplies the company scope; dashboard figures are fetched on each visit.
   const { profile, companyId, loading, error: profileError } = useEnterprise();
+  const [summary, setSummary] = useState<EnterpriseProfileSummary | null>(null);
+  const [revision, setRevision] = useState(0);
   const [taskProgress, setTaskProgress] = useState<StudentTaskProgress[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
@@ -115,38 +116,30 @@ export const EnterpriseDashboard: React.FC = () => {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const [posts, candidates, internships] = await Promise.all([
+        const [posts, profileResponse] = await Promise.all([
           loadAllPages<RecruitmentPost>(
             page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
             controller.signal,
             'danh sách tin tuyển dụng',
           ),
-          loadAllPages<EnterpriseCandidateItem>(
-            page => enterpriseService.listCandidates({ page, limit: 100 }, controller.signal),
-            controller.signal,
-            'danh sách hồ sơ sinh viên',
-          ),
-          loadAllPages<EnterpriseInternshipItem>(
-            page => enterpriseService.listInternships({ page, limit: 100 }, controller.signal),
-            controller.signal,
-            'danh sách thực tập sinh',
-          ),
+          enterpriseService.getProfile(controller.signal),
         ]);
         if (controller.signal.aborted) return;
 
         const publishedPosts = posts.filter(post => post.status === 'PUBLISHED');
-        const activeStatuses = new Set(['ASSIGNED', 'ACTIVE', 'IN_PROGRESS']);
-        const completedInterns = internships.filter(
-          internship => internship.status.toUpperCase() === 'COMPLETED',
-        ).length;
+        if (!profileResponse.success || !profileResponse.data?.summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
+        const currentSummary = profileResponse.data.summary;
+        const counts = [currentSummary.pendingCandidates, currentSummary.acceptedInterns, currentSummary.completedInterns, currentSummary.pendingEvaluations];
+        if (!counts.every(count => Number.isSafeInteger(count) && count >= 0)) {
+          throw new Error('Chưa tải được đầy đủ số liệu thống kê. Vui lòng thử lại.');
+        }
+        setSummary(currentSummary);
         setDashboardStats({
           totalRecruitmentPosts: posts.length,
           remainingPositions: recruitmentTotals(publishedPosts).remaining,
-          pendingCandidates: candidates.filter(candidate => candidate.decision === 'PENDING').length,
-          acceptedInterns: internships.filter(
-            internship => activeStatuses.has(internship.status.toUpperCase()),
-          ).length,
-          completedInterns,
+          pendingCandidates: currentSummary.pendingCandidates,
+          acceptedInterns: currentSummary.acceptedInterns,
+          completedInterns: currentSummary.completedInterns,
         });
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
@@ -160,7 +153,13 @@ export const EnterpriseDashboard: React.FC = () => {
 
     void loadDashboardStats();
     return () => controller.abort();
-  }, [companyId, loading, profileError]);
+  }, [companyId, loading, profileError, revision]);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') setRevision(value => value + 1); };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, []);
 
   useEffect(() => {
     if (statsLoading || statsError) {
@@ -175,12 +174,13 @@ export const EnterpriseDashboard: React.FC = () => {
   useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
     if (!companyId) return;
+    const controller = new AbortController();
     const loadTaskProgress = async () => {
       setTasksLoading(true);
       setTasksError(null);
       try {
         // Truyền companyId — bắt buộc để backend scope đúng doanh nghiệp
-        const firstPage = await enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 });
+        const firstPage = await enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 }, controller.signal);
         if (!firstPage?.success || !firstPage.data) {
           throw new Error('Không thể tải dữ liệu tiến độ task');
         }
@@ -188,25 +188,27 @@ export const EnterpriseDashboard: React.FC = () => {
         const tasks = [...firstPage.data.items];
         const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
         for (let page = 2; page <= totalPages; page += 1) {
-          const response = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 });
+          const response = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 }, controller.signal);
           if (!response?.success || !response.data) {
             throw new Error(`Không thể tải dữ liệu task ở trang ${page}`);
           }
           tasks.push(...response.data.items);
         }
 
-        setTaskProgress(buildTaskProgress(tasks));
+        if (!controller.signal.aborted) setTaskProgress(buildTaskProgress(tasks));
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu tiến độ task';
         setTasksError(message);
         console.error('Failed to load enterprise task progress:', err);
       } finally {
-        setTasksLoading(false);
+        if (!controller.signal.aborted) setTasksLoading(false);
       }
     };
 
     void loadTaskProgress();
-  }, [companyId]);
+    return () => controller.abort();
+  }, [companyId, revision]);
 
   const handleSendIncident = (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,7 +218,6 @@ export const EnterpriseDashboard: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const summary = profile?.summary;
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
   const internshipStages = [
     { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: 'bg-amber-500' },
@@ -243,16 +244,19 @@ export const EnterpriseDashboard: React.FC = () => {
               Tiếp nhận ứng viên, theo dõi tiến độ công việc và đồng hành cùng sinh viên trong kỳ thực tập OJT.
             </p>
           </div>
-          <span
-            className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
-              profile?.status === 'ACTIVE'
-                ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                : 'border-white/15 bg-white/10 text-indigo-100'
-            }`}
-          >
-            <span className={`h-2 w-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
-            {profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
-          </span>
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <span
+              className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
+                profile?.status === 'ACTIVE'
+                  ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
+                  : 'border-white/15 bg-white/10 text-indigo-100'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+              {profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
+            </span>
+            <button type="button" onClick={() => setRevision(value => value + 1)} disabled={statsLoading} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />Làm mới số liệu</button>
+          </div>
         </div>
       </section>
 
@@ -275,25 +279,25 @@ export const EnterpriseDashboard: React.FC = () => {
         {[
           {
             label: 'Hồ sơ chờ xét duyệt',
-            value: summary?.pendingCandidates ?? 0,
+            value: dashboardStats.pendingCandidates,
             unit: 'ứng viên',
             detail: 'Ứng tuyển vào doanh nghiệp',
             icon: Users,
             color: 'blue',
             to: '/enterprise/candidates',
-            dataLoading: loading,
-            usesDashboardStats: false,
+            dataLoading: statsLoading,
+            usesDashboardStats: true,
           },
           {
-            label: 'Sinh viên đang thực tập',
-            value: summary?.activeInterns ?? 0,
+            label: 'Sinh viên đã tiếp nhận',
+            value: dashboardStats.acceptedInterns,
             unit: 'sinh viên',
-            detail: 'Đang tham gia kỳ OJT',
+            detail: 'Đã được doanh nghiệp duyệt nhận',
             icon: UserCheck,
             color: 'emerald',
-            to: '/enterprise/interns',
-            dataLoading: loading,
-            usesDashboardStats: false,
+            to: '/enterprise/candidates',
+            dataLoading: statsLoading,
+            usesDashboardStats: true,
           },
           {
             label: 'Đánh giá OJT chờ xử lý',
@@ -303,8 +307,8 @@ export const EnterpriseDashboard: React.FC = () => {
             icon: FileCheck2,
             color: 'violet',
             to: '/enterprise/evaluation',
-            dataLoading: loading,
-            usesDashboardStats: false,
+            dataLoading: statsLoading,
+            usesDashboardStats: true,
           },
           {
             label: 'Tổng tin tuyển dụng',
@@ -372,7 +376,7 @@ export const EnterpriseDashboard: React.FC = () => {
               Tổng quan sinh viên thực tập
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Số lượng hồ sơ chờ duyệt, sinh viên đã nhận và đã hoàn thành kỳ thực tập.
+              Được duyệt là đã tiếp nhận; số đã tiếp nhận bao gồm cả sinh viên đang thực tập và đã hoàn thành.
             </p>
           </div>
           <Link
@@ -572,7 +576,7 @@ export const EnterpriseDashboard: React.FC = () => {
             </div>
 
             <div className="p-5 sm:p-6">
-              {summary && summary.pendingCandidates > 0 ? (
+              {statsLoading ? <p role="status" className="py-6 text-center text-sm text-slate-500">Đang tải số hồ sơ chờ duyệt…</p> : statsError ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được số hồ sơ chờ duyệt. Vui lòng làm mới số liệu.</p> : summary && summary.pendingCandidates > 0 ? (
                 <div className="flex flex-col gap-4 rounded-xl bg-orange-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-orange-600 shadow-sm">

@@ -21,3 +21,9 @@ test('enterprise bulk preview and confirmation are registered under the enterpri
   assert.deepEqual(swaggerSpec.paths[path].post['x-roles'],['ENTERPRISE']);
  }
 });
+test('enterprise profile documents intake and completed student counts',()=>{
+ const response=swaggerSpec.paths['/api/enterprise/profile'].get.responses['200'].content['application/json'].schema;
+ const summary=response.properties.data.properties.summary;
+ assert.equal(summary.properties.acceptedInterns.type,'integer');
+ assert.equal(summary.properties.completedInterns.type,'integer');
+});
