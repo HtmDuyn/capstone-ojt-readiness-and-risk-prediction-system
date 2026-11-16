@@ -2,6 +2,13 @@
 
 Phạm vi code: `src/modules/enterprise`, kiểm thử và tài liệu backend liên quan. Không sửa frontend, DB/schema, route/service của QHDN, sinh viên hoặc các role khác.
 
+## Định danh doanh nghiệp
+
+- `Enterprises.EnterpriseCode` là mã doanh nghiệp duy nhất hiển thị trên hồ sơ, danh sách đối tác và thông tin tài khoản. Mã hiện có như `TECHVIET` được giữ nguyên; doanh nghiệp mới có mã tự sinh dạng `DN000001`. DB đã có ràng buộc duy nhất và index không phân biệt hoa/thường cho mã này.
+- `Enterprises.EnterpriseID` là khóa số nội bộ liên kết tài khoản, tin tuyển dụng, hồ sơ ứng tuyển và sinh viên. Không hiển thị ID số như một mã hồ sơ doanh nghiệp khác. API giữ `id`/`companyId` kiểu số cho các thao tác liên kết và phân quyền; trường `code` dùng để hiển thị.
+- GET và PATCH hồ sơ cùng đọc mã từ `EnterpriseCode`. Cập nhật hồ sơ gửi ID số từ dữ liệu API; không chuyển mã hiển thị thành số, không đổi khóa liên kết và không cấp lại mã cho doanh nghiệp đang có.
+- Quy ước này dùng cấu trúc DB hiện tại, không cần migration dữ liệu hay chạy lại script khởi tạo.
+
 ## API
 
 Tất cả endpoint mới yêu cầu JWT ENTERPRISE. Doanh nghiệp lấy từ tài khoản; không nhận companyId từ client.

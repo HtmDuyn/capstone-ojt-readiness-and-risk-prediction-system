@@ -40,7 +40,9 @@ export interface EnterpriseProfileSummary {
 }
 
 export interface EnterpriseProfileData {
+  /** Internal database key for API requests and relations; not a display identifier. */
   id: number;
+  /** Unique enterprise identifier displayed in profiles and company lists. */
   code: string;
   name: string;
   address: string | null;
