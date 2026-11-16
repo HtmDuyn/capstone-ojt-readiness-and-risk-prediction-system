@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const artifacts=path.join(root,'.cache','qhdn-ui-'+process.pid);
 const records=[],errors=[];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let vite,browser,cdp,legacySummary=false,bulkAccepted=false,extraAccepted=0,legacyDashboard=false;
+let vite,browser,cdp,legacySummary=false,bulkAccepted=false,extraAccepted=0,legacyDashboard=false,qhdnDashboardFixture=false,qhdnEvaluated=1;
 const notificationRead={qhdn:false,enterprise:false};
 class CDP {
  constructor(url){
@@ -24,7 +24,7 @@ const fill=(selector,value)=>evaluate(`(()=>{const input=document.querySelector(
 async function screenshot(name){const result=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await fs.writeFile(path.join(artifacts,name+'.png'),Buffer.from(result.data,'base64'));}
 const period={id:1,academicYearId:1,academicYear:{id:1,code:'2028–2029'},periodCode:'FALL-2028',name:'Fall 2028',kind:'SEMESTER',status:'PLANNED',startDate:'2028-09-01',endDate:'2028-12-31',ojtSemesterId:1};
 const round={id:1,name:'Tuyển dụng Fall 2028',campaignId:1,roundNumber:1,status:'OPEN',currentPhase:'SCHEDULED',startsAt:'2028-11-11T07:40:00Z',endsAt:'2028-11-13T13:00:00Z',postingStartsAt:'2028-11-11T07:40:00Z',postingEndsAt:'2028-11-11T12:40:00Z',applicationStartsAt:'2028-11-12T07:40:00Z',applicationEndsAt:'2028-11-12T12:40:00Z',resultsStartsAt:'2028-11-12T07:40:00Z',resultsEndsAt:'2028-11-13T13:00:00Z',canOpen:false,pendingCount:0};
-const enterpriseProfile={id:17,code:'TECHVIET',name:'TechViet',status:'ACTIVE',industry:'Information Technology',address:null,contactPersonName:'HR Department',contactEmail:'hr@techviet.example',contactPhone:null,createdAt:'2026-10-27T02:54:00Z',representative:{id:1,userId:1,username:'enterprise01',fullName:'TechViet HR',email:'hr@techviet.example',phone:null,positionTitle:'HR'},summary:{scope:'ALL_SEMESTERS',pendingCandidates:3,activeInterns:0,pendingEvaluations:0}};
+const enterpriseProfile={id:17,code:'TECHVIET',name:'TechViet',status:'ACTIVE',industry:'Information Technology',address:null,contactPersonName:'HR Department',contactEmail:'hr@techviet.example',contactPhone:null,createdAt:'2026-10-27T02:54:00Z',representative:{id:1,userId:1,username:'enterprise01',fullName:'TechViet HR',email:'hr@techviet.example',phone:null,positionTitle:'HR'},summary:{scope:'ALL_SEMESTERS',publishedPosts:1,pendingPosts:0,pendingCandidates:3,activeInterns:0,pendingEvaluations:0}};
 function fixtures(server){server.middlewares.use('/api',(req,res)=>{
  const account=req.headers.authorization==='Bearer enterprise-fixture'?'enterprise':'qhdn';
  const url=new URL(req.url,'http://localhost');const record={path:url.pathname,method:req.method,account};records.push(record);
@@ -43,10 +43,18 @@ function fixtures(server){server.middlewares.use('/api',(req,res)=>{
  if(url.pathname==='/accounts/me/notifications')return send({...paged([{id:1,title:'Đợt tuyển dụng mới',content:'Kiểm tra lịch tiếp nhận sinh viên của doanh nghiệp.',isRead:notificationRead[account],sentAt:'2026-11-16T09:00:00Z'},{id:2,title:'Hồ sơ đã cập nhật',content:'Thông tin doanh nghiệp đã được lưu.',isRead:true,sentAt:'2026-11-15T09:00:00Z'}]),unreadCount:notificationRead[account]?0:1});
  if(url.pathname==='/enterprise/candidate-periods')return send({items:[]});
  if(url.pathname==='/enterprise/candidates')return send(paged([1,2,3].map(id=>({id,decision:bulkAccepted?'ACCEPTED':'PENDING',isLatestCoordination:true,canRespond:!bulkAccepted,introducedAt:'2026-11-16T00:00:00Z',student:{id,fullName:'Ứng viên '+id,studentCode:'SE18000'+id},position:{id:1,title:'Intern',code:'INTERN'}}))));
+ if(url.pathname==='/internship-tasks')return send(paged([
+  {id:101,assignmentId:11,studentId:1,name:'Thiết kế API',status:'DONE',student:{id:1,studentCode:'SE180001',fullName:'Ứng viên 1'}},
+  {id:102,assignmentId:11,studentId:1,name:'Viết kiểm thử',status:'IN_PROGRESS',student:{id:1,studentCode:'SE180001',fullName:'Ứng viên 1'}},
+  {id:103,assignmentId:11,studentId:1,name:'Cập nhật tài liệu',status:'TODO',student:{id:1,studentCode:'SE180001',fullName:'Ứng viên 1'}},
+ ]));
  if(url.pathname==='/academic-periods'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({success:true,...paged([period])}));return;}
- if(url.pathname==='/companies')return send(paged([{id:1,name:'Công ty Phần mềm Việt',status:'ACTIVE'}]));
+ if(url.pathname==='/companies')return send(paged([{id:1,code:'TECHVIET',name:'Công ty Phần mềm Việt',status:'ACTIVE'}]));
+ if(url.pathname==='/qhdn/dashboard')return send({assignments:{assigned:0,active:3,completed:0},progress:{completed:qhdnEvaluated,inProgress:3-qhdnEvaluated,evaluated:qhdnEvaluated},results:{total:0,confirmed:0,passed:0}});
+ if(qhdnDashboardFixture&&url.pathname==='/positions')return send(paged([{id:1,companyId:1,companyName:'Công ty Phần mềm Việt',capacity:16,remainingSlots:11,status:'OPEN',ojtSemesterId:1,title:'Intern'}]));
  if(url.pathname==='/recruitment/windows')return send({items:[round],campaigns:[{id:1,name:round.name}],total:1});
  if(url.pathname==='/qhdn/placements'){
+  if(qhdnDashboardFixture)return send({companies:[{id:1,name:'Công ty Phần mềm Việt',capacity:16,actualCount:7}],items:Array.from({length:11},(_,index)=>({id:index+1,decision:index<7?'ACCEPTED':index===7?'PENDING':null,companyId:index<8?1:null,companyName:index<8?'Công ty Phần mềm Việt':null}))});
   if(legacySummary)return send({context:{roundCount:1,unfinished:0},canCoordinate:false,...(legacySummary==='empty'?{companies:[]}:{}),positions:[{id:1,companyName:'TechViet',title:'Backend',capacity:2,actualCount:0},{id:2,companyName:'TechViet',title:'Frontend',capacity:3,actualCount:0}],items:[1,2,3].map(id=>({id,studentCode:'SE25000'+id,fullName:'Đã nhận '+id,companyName:'TechViet',decision:'ACCEPTED',canCoordinate:false,hasAssignment:false}))});
   return send({context:{roundCount:1,unfinished:1,applicationDeadlinePassed:true},canCoordinate:true,positions:[],companies:[{id:1,name:'Công ty Phần mềm Việt',capacity:1,actualCount:2,availableSlots:0}],items:[...[1,2].map(id=>({id,studentCode:'SE18000'+id,fullName:'Sinh viên '+id,canCoordinate:true,hasAssignment:false,decision:'REJECTED'})),{id:3,studentCode:'SE180003',fullName:'Đã được nhận',companyName:'Công ty Phần mềm Việt',canCoordinate:false,hasAssignment:false,decision:'ACCEPTED'},{id:4,studentCode:'SE180004',fullName:'Chưa đăng ký đã quá hạn',canCoordinate:true,hasAssignment:false}]});
  }
@@ -94,6 +102,31 @@ async function main(){
  await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  await screenshot('reports-mobile');
  assert.ok(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'Report fits mobile width');
+ qhdnDashboardFixture=true;
+ await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+ await cdp.send('Page.navigate',{url:origin+'/qhdn/dashboard'});
+ await waitFor(`!!document.querySelector('canvas[aria-label*="Hoàn thành OJT 1"]')`);
+ await evaluate(`document.querySelector('canvas[aria-label^="Tiến độ OJT"]').closest('.qhdn-chart-card').scrollIntoView({block:'center'})`);
+ const dashboardTransform=await vite.transformRequest('/src/pages/qhdn/QhdnDashboard.tsx');
+ const chartModule=dashboardTransform.code.match(/from\s*["']([^"']*chart[^"']*\.js(?:\?[^"']*)?)["']/)?.[1];
+ assert.ok(chartModule,'Chart.js import is available for canvas verification');
+ await evaluate(`import(${JSON.stringify(chartModule)}).then(module=>{window.fixtureChart=module.Chart;})`);
+ const pipeline=`window.fixtureChart.getChart(document.querySelector('canvas[aria-label^="Tiến độ OJT"]'))`;
+ const quota=`window.fixtureChart.getChart(document.querySelector('canvas[aria-label^="Chỉ tiêu doanh nghiệp"]'))`;
+ await waitFor(`!!(${pipeline})&&!!(${quota})`);
+ assert.deepEqual(await evaluate(`${pipeline}.data.labels`),['Bàn giao từ PĐT','Đã chốt DN','Chờ DN duyệt','Đang thực tập','Hoàn thành OJT']);
+ assert.deepEqual(await evaluate(`${pipeline}.data.datasets[0].data`),[11,7,1,2,1]);
+ assert.deepEqual(await evaluate(`${quota}.data.datasets.map(dataset=>dataset.data)`),[[7],[9]],'Quota uses real intake instead of capacity minus clamped legacy remaining slots');
+ assert.equal(await evaluate(`${pipeline}.options.animation.duration`),1150);
+ await waitFor(`${pipeline}.getDatasetMeta(0).data.every(bar=>Math.abs(bar.y-bar.getProps(['y'],true).y)<.5)`);
+ await screenshot('qhdn-dashboard-synced-charts');
+ qhdnEvaluated=2;await clickText('Tải lại');
+ await waitFor(`!!document.querySelector('canvas[aria-label*="Hoàn thành OJT 2"]')&&!!(${pipeline})`);
+ assert.deepEqual(await evaluate(`${pipeline}.data.datasets[0].data`),[11,7,1,1,2]);
+ await cdp.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+ await waitFor(`document.querySelector('.qhdn-chart-card').dataset.motion==='reduced'&&!!(${pipeline})&&${pipeline}.options.animation===false`);
+ await cdp.send('Emulation.setEmulatedMedia',{features:[]});
+ qhdnDashboardFixture=false;
  await cdp.send('Page.navigate',{url:origin+'/qhdn/registration-windows'});
  await waitFor(`document.body.innerText.includes('Sửa lịch')`);await clickText('Sửa lịch');
  await waitFor(`!!document.querySelector('[role="dialog"] input[type="date"]')`);
@@ -175,16 +208,26 @@ async function main(){
  const priorProfileLoads=records.filter(record=>record.path==='/enterprise/profile').length;
  await clickText('Tổng quan');
  await waitFor(`location.pathname==='/enterprise/dashboard'&&!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 3 sinh viên"]')`);
+ await waitFor(`!!document.querySelector('[role="img"][aria-label^="Biểu đồ cột tiến độ task"]')`);
+ assert.equal(await evaluate(`!!document.querySelector('.enterprise-hero a,.enterprise-hero button,.enterprise-hero-stat')`),false,'Hero banner contains only enterprise identity and status');
+ assert.ok(await evaluate(`(()=>{const actions=document.querySelector('.enterprise-dashboard-actions');return actions&&actions.textContent.includes('Duyệt hồ sơ sinh viên')&&actions.textContent.includes('Làm mới số liệu')})()`),'Dashboard actions are placed below the hero');
+ assert.equal(await evaluate(`!!document.querySelector('[data-stat-label="Đánh giá cần xử lý"]')`),false,'Pending evaluation card is removed from dashboard KPIs');
+ assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label^="Biểu đồ cột tiến độ task"]').getAttribute('aria-label').includes('1 hoàn thành')`),'Task chart reports its completion breakdown accessibly');
  assert.ok(records.filter(record=>record.path==='/enterprise/profile').length>priorProfileLoads,'Returning to dashboard fetches fresh figures instead of cached context');
- assert.ok(await evaluate(`Array.from(document.querySelectorAll('main a')).find(link=>link.textContent.includes('Sinh viên đã tiếp nhận')).textContent.includes('3sinh viên')`));
+ assert.ok(await evaluate(`document.querySelector('[data-stat-label="Sinh viên đã tiếp nhận"]').textContent.includes('3')`));
  assert.ok(await evaluate(`document.querySelector('[role="img"][aria-label*="Đã tiếp nhận"]').getAttribute('aria-label').includes('Chờ duyệt: 0 sinh viên')`));
- await waitFor(`document.querySelector('[role="img"] [title="Đã tiếp nhận: 3 sinh viên"]').getBoundingClientRect().height>100`);
+ await waitFor(`document.querySelector('[role="img"] [data-chart-label="Đã tiếp nhận: 3 sinh viên"]').getBoundingClientRect().height>100`);
+ await waitFor(`Array.from(document.querySelectorAll('.enterprise-reveal')).every(element=>getComputedStyle(element).opacity==='1')`);
  await screenshot('enterprise-dashboard-after-acceptance');
+ await cdp.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ await screenshot('enterprise-dashboard-mobile');
+ assert.ok(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'Enterprise dashboard fits mobile width');
+ await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
  extraAccepted=1;
  await waitFor(`!Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='Làm mới số liệu').disabled`);
  await clickText('Làm mới số liệu');
  await waitFor(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận: 4 sinh viên"]')`);
- assert.ok(await evaluate(`Array.from(document.querySelectorAll('main a')).find(link=>link.textContent.includes('Sinh viên đã tiếp nhận')).textContent.includes('4sinh viên')`));
+ assert.ok(await evaluate(`document.querySelector('[data-stat-label="Sinh viên đã tiếp nhận"]').textContent.includes('4')`));
  legacyDashboard=true;await clickText('Làm mới số liệu');
  await waitFor(`document.body.innerText.includes('Chưa tải được đầy đủ số liệu thống kê')`);
  assert.equal(await evaluate(`!!document.querySelector('[role="img"][aria-label*="Đã tiếp nhận"]')`),false,'Missing counts produce an error instead of NaN/blank bars');

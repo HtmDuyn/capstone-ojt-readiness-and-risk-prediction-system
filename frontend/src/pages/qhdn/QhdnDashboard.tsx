@@ -43,10 +43,12 @@ import {
   listCompanies,
   listPositions,
   listCoordinations,
-  getDashboardPlacements,
+  getDashboardPlacementBoard,
   getQhdnDashboardSummary,
 } from "@/services/qhdnService";
-import { placementDashboardStats, type QhdnDashboardSummary } from '@/utils/qhdnDashboard';
+import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdnDashboard';
+import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation } from '@/utils/qhdnDashboardCharts';
+import './QhdnDashboard.css';
 import type {
   CoordinationItem,
   CompanyListItem,
@@ -64,6 +66,7 @@ ChartJS.register(
   Tooltip,
   Legend,
 );
+type DashboardChart = ChartJS<'bar', (number | null)[], string>;
 
 export const QhdnDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -74,7 +77,7 @@ export const QhdnDashboard: React.FC = () => {
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [revision, setRevision] = useState(0);
-  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats> } | null>(null);
+  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats>; companies: DashboardPlacementBoard['companies'] } | null>(null);
   const [internshipStats, setInternshipStats] = useState<{ semesterId: number; data: QhdnDashboardSummary } | null>(null);
   const [internshipError, setInternshipError] = useState('');
   const [eligibleError, setEligibleError] = useState('');
@@ -99,10 +102,29 @@ export const QhdnDashboard: React.FC = () => {
 
   // Canvas references for ChartJS
   const pipelineChartRef = useRef<HTMLCanvasElement | null>(null);
-  const pipelineChartInstance = useRef<ChartJS | null>(null);
+  const pipelineChartInstance = useRef<DashboardChart | null>(null);
 
   const categoryChartRef = useRef<HTMLCanvasElement | null>(null);
-  const categoryChartInstance = useRef<ChartJS | null>(null);
+  const categoryChartInstance = useRef<DashboardChart | null>(null);
+  const pipelineSectionRef = useRef<HTMLDivElement | null>(null);
+  const quotaSectionRef = useRef<HTMLDivElement | null>(null);
+  const [visibleCharts, setVisibleCharts] = useState({ pipeline: false, quota: false });
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(media.matches);
+    media.addEventListener('change', update);
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        const key = entry.target === pipelineSectionRef.current ? 'pipeline' : 'quota';
+        setVisibleCharts(previous => ({ ...previous, [key]: true }));
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: .12 });
+    for (const section of [pipelineSectionRef.current, quotaSectionRef.current]) if (section) observer.observe(section);
+    return () => { observer.disconnect(); media.removeEventListener('change', update); };
+  }, []);
 
   // Count exactly the same students and current decisions as the coordination screen.
   useEffect(() => {
@@ -114,8 +136,8 @@ export const QhdnDashboard: React.FC = () => {
     setEligibleLoading(!!selectedSemesterId);
     if (!selectedSemesterId) return () => { active = false; };
     Promise.allSettled([
-      getDashboardPlacements(selectedSemesterId)
-        .then(items => { if (active) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(items) }); })
+      getDashboardPlacementBoard(selectedSemesterId)
+        .then(board => { if (active) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(board.items), companies: board.companies }); })
         .catch(error => { if (active) setEligibleError(errorMessage(error)); }),
       getQhdnDashboardSummary(selectedSemesterId)
         .then(data => { if (active) setInternshipStats({ semesterId: selectedSemesterId, data }); })
@@ -238,7 +260,8 @@ export const QhdnDashboard: React.FC = () => {
           (sum, p) => sum + (p.remainingSlots || 0),
           0,
         );
-        const acceptedCount = Math.max(0, totalQuota - remainingSlots);
+        const confirmed = placementStats?.semesterId === selectedSemesterId ? placementStats.companies?.find(row => row.id === company.id) : undefined;
+        const acceptedCount = confirmed?.actualCount ?? Math.max(0, totalQuota - remainingSlots);
 
         return {
           id: company.id,
@@ -247,11 +270,11 @@ export const QhdnDashboard: React.FC = () => {
           industry: company.industry || "Chưa cập nhật",
           totalQuota,
           acceptedCount,
-          availableQuota: remainingSlots,
+          availableQuota: Math.max(0,totalQuota-acceptedCount),
         };
       })
       .sort((a, b) => b.totalQuota - a.totalQuota);
-  }, [companies, positions, selectedSemesterId]);
+  }, [companies, positions, selectedSemesterId, placementStats]);
 
   // Top 8 DN có chỉ tiêu lớn nhất
   const top8Partners = useMemo(() => {
@@ -273,8 +296,7 @@ export const QhdnDashboard: React.FC = () => {
   // Keep a failed request distinct from a successful count of zero.
   const kpiStats = useMemo<Record<
     "handedOff" | "assigned" | "rejected" | "waiting" | "partnerCount" |
-    "acceptanceRate" | "inProgress" | "completed" | "totalResults" |
-    "confirmedResults" | "passedResults", number | null>>(() => {
+    "acceptanceRate" | "inProgress" | "completed", number | null>>(() => {
     const roster = placementStats?.semesterId === selectedSemesterId ? placementStats.stats : null;
     const summary = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data : null;
     return {
@@ -284,18 +306,15 @@ export const QhdnDashboard: React.FC = () => {
       waiting: roster?.waiting ?? null,
       partnerCount: companiesLoading ? null : companies.length,
       acceptanceRate: roster?.acceptanceRate ?? null,
-      inProgress: summary ? summary.assignments.assigned + summary.assignments.active : null,
-      completed: summary?.assignments.completed ?? null,
-      totalResults: summary?.results.total ?? null,
-      confirmedResults: summary?.results.confirmed ?? null,
-      passedResults: summary?.results.passed ?? null,
+      inProgress: summary?.progress?.inProgress ?? null,
+      completed: summary?.progress?.completed ?? null,
     };
   }, [placementStats, internshipStats, companies.length, companiesLoading, selectedSemesterId]);
 
   // Render Chart 1: Tiến độ luồng OJT (Phễu điều phối & Thực tập)
   useEffect(() => {
     const canvas = pipelineChartRef.current;
-    if (!canvas) return;
+    if (!canvas || !visibleCharts.pipeline || eligibleLoading) return;
 
     pipelineChartInstance.current?.destroy();
     pipelineChartInstance.current = null;
@@ -310,7 +329,6 @@ export const QhdnDashboard: React.FC = () => {
       "Chờ DN duyệt",
       "Đang thực tập",
       "Hoàn thành OJT",
-      "Đã chuyển PĐT",
     ];
 
     const dataValues = [
@@ -319,33 +337,37 @@ export const QhdnDashboard: React.FC = () => {
       kpiStats.waiting,
       kpiStats.inProgress,
       kpiStats.completed,
-      kpiStats.totalResults,
     ];
 
-    const config: ChartConfiguration = {
+    const config: ChartConfiguration<'bar', (number | null)[], string> = {
       type: "bar",
+      plugins: [dashboardBarLabels],
       data: {
         labels,
         datasets: [
           {
             label: "Số lượng sinh viên",
             data: dataValues,
-            backgroundColor: [
+            backgroundColor: context => dashboardBarGradient(context, [
               "#3b82f6", // Bàn giao PĐT (Blue)
               "#059669", // Đã chốt DN (Emerald)
               "#f59e0b", // Chờ DN (Amber)
               "#6366f1", // Đang thực tập (Indigo)
               "#0f766e", // Hoàn thành (Teal)
-              "#ea580c", // Đã chuyển PĐT (Orange)
-            ],
-            borderRadius: 6,
-            barThickness: 28,
+            ]),
+            borderRadius: 9,
+            maxBarThickness: 44,
+            hoverBorderColor: '#ffffff',
+            hoverBorderWidth: 2,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: dashboardChartAnimation(reducedMotion),
+        layout: { padding: { top: 24, right: 8 } },
+        interaction: { intersect: false, mode: 'index' },
         plugins: {
           legend: {
             display: false,
@@ -356,6 +378,7 @@ export const QhdnDashboard: React.FC = () => {
             cornerRadius: 6,
             callbacks: {
               label: (context) => ` ${context.raw} sinh viên`,
+              afterLabel: context => context.dataIndex === 4 ? 'Đã có điểm tổng kết doanh nghiệp hoặc đã hoàn thành hồ sơ thực tập.' : '',
             },
           },
         },
@@ -386,12 +409,12 @@ export const QhdnDashboard: React.FC = () => {
         pipelineChartInstance.current = null;
       }
     };
-  }, [kpiStats]);
+  }, [kpiStats, visibleCharts.pipeline, eligibleLoading, reducedMotion]);
 
   // Render Chart 2: Top 8 Quota Doanh nghiệp
   useEffect(() => {
     const canvas = categoryChartRef.current;
-    if (quotaViewMode !== "chart" || !canvas) return;
+    if (quotaViewMode !== "chart" || !canvas || !visibleCharts.quota || isLoading || eligibleLoading) return;
 
     categoryChartInstance.current?.destroy();
     categoryChartInstance.current = null;
@@ -404,22 +427,25 @@ export const QhdnDashboard: React.FC = () => {
     const acceptedSlots = top8Partners.map((e) => e.acceptedCount);
     const availableSlots = top8Partners.map((e) => e.availableQuota);
 
-    const config: ChartConfiguration = {
+    const config: ChartConfiguration<'bar', (number | null)[], string> = {
       type: "bar",
+      plugins: [dashboardBarLabels],
       data: {
         labels: entNames.length > 0 ? entNames : ["Chưa có dữ liệu DN"],
         datasets: [
           {
             label: "Đã tiếp nhận",
             data: acceptedSlots.length > 0 ? acceptedSlots : [0],
-            backgroundColor: "#0284c7",
-            borderRadius: 4,
+            backgroundColor: context => dashboardBarGradient(context, ['#0284c7'], true),
+            borderRadius: 8,
+            maxBarThickness: 34,
           },
           {
             label: "Slot còn lại",
             data: availableSlots.length > 0 ? availableSlots : [0],
             backgroundColor: "#e2e8f0",
-            borderRadius: 4,
+            borderRadius: 8,
+            maxBarThickness: 34,
           },
         ],
       },
@@ -427,6 +453,8 @@ export const QhdnDashboard: React.FC = () => {
         indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
+        animation: dashboardChartAnimation(reducedMotion),
+        layout: { padding: { right: 24, top: 8 } },
         plugins: {
           legend: {
             position: "top",
@@ -451,7 +479,7 @@ export const QhdnDashboard: React.FC = () => {
             },
           },
         },
-      } as any,
+      },
     };
 
     const chart = new ChartJS(ctx, config);
@@ -463,7 +491,7 @@ export const QhdnDashboard: React.FC = () => {
         categoryChartInstance.current = null;
       }
     };
-  }, [quotaViewMode, top8Partners]);
+  }, [quotaViewMode, top8Partners, visibleCharts.quota, isLoading, eligibleLoading, reducedMotion]);
 
   return (
     <div className="space-y-6 pb-12 font-sans">
@@ -650,21 +678,20 @@ export const QhdnDashboard: React.FC = () => {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 1: Tiến độ luồng OJT */}
-        <div className="card-glass border border-slate-200/80 p-5 flex flex-col justify-between">
+        <div ref={pipelineSectionRef} data-visible={visibleCharts.pipeline} data-motion={reducedMotion?'reduced':'animated'} className="qhdn-chart-card card-glass border border-slate-200/80 p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
                 Tiến độ Toàn trình OJT ({selectedSemesterName})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Quy trình từ Bàn giao PĐT ⟶ Điều phối ⟶ Đang thực tập ⟶ Chuyển
-                giao kết quả
+                Bàn giao PĐT ⟶ Doanh nghiệp tiếp nhận ⟶ Thực tập ⟶ Có kết quả OJT
               </p>
             </div>
             <TrendingUp className="text-slate-400" size={18} />
           </div>
           <div className="relative w-full h-72">
-            <canvas ref={pipelineChartRef} />
+            <canvas ref={pipelineChartRef} role="img" aria-label={`Tiến độ OJT: Bàn giao ${kpiStats.handedOff??'chưa có dữ liệu'}, Đã chốt DN ${kpiStats.assigned??'chưa có dữ liệu'}, Chờ duyệt ${kpiStats.waiting??'chưa có dữ liệu'}, Đang thực tập ${kpiStats.inProgress??'chưa có dữ liệu'}, Hoàn thành OJT ${kpiStats.completed??'chưa có dữ liệu'}`} />
             {kpiStats.handedOff === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="rounded-xl bg-white/95 px-4 py-2 text-sm text-slate-500">Chưa có dữ liệu thống kê tổng hợp.</p>
             </div>}
@@ -672,7 +699,7 @@ export const QhdnDashboard: React.FC = () => {
         </div>
 
         {/* Chart 2: Quota Doanh nghiệp */}
-        <div className="card-glass border border-slate-200/80 p-5 flex flex-col justify-between">
+        <div ref={quotaSectionRef} data-visible={visibleCharts.quota} data-motion={reducedMotion?'reduced':'animated'} className="qhdn-chart-card card-glass border border-slate-200/80 p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
@@ -720,7 +747,7 @@ export const QhdnDashboard: React.FC = () => {
           {/* View Mode 1: Top 8 Chart */}
           {quotaViewMode === "chart" && (
             <div className="relative w-full h-72">
-              <canvas ref={categoryChartRef} />
+              <canvas ref={categoryChartRef} role="img" aria-label={'Chỉ tiêu doanh nghiệp: '+top8Partners.map(company=>`${company.name}: tiếp nhận ${company.acceptedCount}, chỉ tiêu ${company.totalQuota}, còn ${company.availableQuota}`).join('; ')} />
             </div>
           )}
 
@@ -794,7 +821,7 @@ export const QhdnDashboard: React.FC = () => {
                           <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-orange-500"
-                              style={{ width: `${fill}%` }}
+                              style={{ width: `${Math.min(100,fill)}%` }}
                             />
                           </div>
                         </div>

@@ -12,4 +12,6 @@ Trang QHDN dùng `GET /api/ojt-results?ojtSemesterId=...&includeUntransferred=tr
 
 Thay đổi này không tự chuyển giao hay xác nhận điểm học vụ, không yêu cầu reset hoặc thay đổi schema DB.
 
+Dashboard QHDN lấy `progress` từ `/api/qhdn/dashboard`: `completed` đếm mỗi sinh viên/kỳ OJT có đánh giá `SUBMITTED` với điểm tổng kết (kể cả 0) hoặc hồ sơ thực tập `COMPLETED`; `inProgress` đếm sinh viên đang được phân công/đang thực tập chưa thuộc nhóm này. Bỏ các phân công đã hủy. `evaluated` đếm sinh viên có điểm doanh nghiệp đã gửi. Việc có kết quả không phụ thuộc chuyển giao/xác nhận điểm, và không sửa trạng thái phân công trong DB. Biểu đồ chỉ còn năm cột, không hiển thị cột chuyển PĐT. Số tiếp nhận trên biểu đồ chỉ tiêu dùng cùng tổng thực nhận với bảng điều phối, không suy ngược từ số slot còn lại bị giới hạn ở 0.
+
 Kiểm thử `tests/enterprise-bulk-acceptance.integration.cjs` dùng DB thử cục bộ, bao gồm: doanh nghiệp chấm/cập nhật điểm, QHDN đọc ngay trước chuyển giao, phân quyền đọc, xuất CSV/PDF, không nhân đôi sau chuyển giao và không công bố điểm chưa xác nhận cho sinh viên.
