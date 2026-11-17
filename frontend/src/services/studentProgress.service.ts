@@ -1,6 +1,7 @@
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { apiData, getAllItems, getJson } from "./educationApi";
-import { savedOjtLabel, type SavedOjtEligibility } from '@/utils/savedOjtEligibility';
+import { savedOjtProgressLabel, type SavedOjtEligibility } from '@/utils/savedOjtEligibility';
+import { loadSavedLocalOjtResults } from '@/services/localOjtEligibility.service';
 
 type Row = Record<string, any>;
 const text = (value: unknown) =>
@@ -14,6 +15,7 @@ const number = (value: unknown): number | null =>
 async function loadStudent(
   row: Row,
   curricula: Map<number, Promise<Row>>,
+  savedResults: Map<number, SavedOjtEligibility>,
   signal?: AbortSignal,
 ): Promise<StudentProgress> {
   const profile = apiData<Row>(await getJson(`/students/${row.id}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
@@ -90,15 +92,17 @@ async function loadStudent(
     };
   });
   const official = profile.officialEligibility;
-  const decision = official?.isStale
-    ? "REVIEW_REQUIRED"
-    : profile.officialDecision;
-  const saved = profile.calculatedEligibility as SavedOjtEligibility | null | undefined;
-  const eligibilityStatus: OjtEligibilityStatus = saved ? savedOjtLabel(saved) :
-    decision === "ELIGIBLE"
+  const decision = profile.officialDecision;
+  const saved = savedResults.get(Number(profile.id));
+  const eligibilityStatus: OjtEligibilityStatus = saved ? savedOjtProgressLabel(saved) :
+    official?.isStale
+      ? "Cần xét lại"
+      : decision === "ELIGIBLE"
       ? "Đủ điều kiện"
       : decision === "NOT_ELIGIBLE"
         ? "Chưa đủ điều kiện"
+        : decision === "REVIEW_REQUIRED"
+          ? "Cần đối soát"
         : "Chưa có kết quả";
   return {
     id: String(profile.id),
@@ -119,7 +123,7 @@ async function loadStudent(
     delayTerms: null,
     progressStatus: "Chưa xác định",
     eligibilityStatus,
-    eligibilitySource: saved ? 'FRONTEND' : ['ELIGIBLE', 'NOT_ELIGIBLE'].includes(decision) ? 'OFFICIAL' : null,
+    eligibilitySource: saved ? 'FRONTEND' : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
     subjects,
     dataWarning:
       [
@@ -135,7 +139,9 @@ async function loadStudent(
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
     const curricula = new Map<number, Promise<Row>>();
-    const students = await getAllItems<Row>("/students", {}, signal),
+    const [students, saved] = await Promise.all([getAllItems<Row>("/students", {}, signal), loadSavedLocalOjtResults(signal)]);
+    const savedResults = new Map(saved.map(result => [result.studentId, result]));
+    const
       items: StudentProgress[] = new Array(students.length);
     let next = 0;
     await Promise.all(
@@ -144,7 +150,7 @@ export const studentProgressService = {
           signal?.throwIfAborted();
           const index = next++;
           try {
-            items[index] = await loadStudent(students[index], curricula, signal);
+            items[index] = await loadStudent(students[index], curricula, savedResults, signal);
           } catch (error) {
             signal?.throwIfAborted();
             const row = students[index];
@@ -160,7 +166,9 @@ export const studentProgressService = {
               currentTerm: text(row.currentAcademicPeriod?.name), currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null, gpa: null,
               completedCredits: null, totalCredits: null, plannedOjtTerm: '—',
               currentEstimatedOjtTerm: '—', delayTerms: null, progressStatus: 'Chưa xác định',
-              eligibilityStatus: 'Chưa có kết quả', subjects: [], dataWarning: message, detailsUnavailable: true,
+              eligibilityStatus: savedOjtProgressLabel(savedResults.get(Number(row.id))),
+              eligibilitySource: savedResults.has(Number(row.id)) ? 'FRONTEND' : null,
+              subjects: [], dataWarning: message, detailsUnavailable: true,
             };
           }
         }

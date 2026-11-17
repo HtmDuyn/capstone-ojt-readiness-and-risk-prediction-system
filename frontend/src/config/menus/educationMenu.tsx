@@ -102,18 +102,6 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
           badge: 'Quản lý sinh viên',
         },
       },
-      {
-        id: 'student-status',
-        label: 'Theo dõi trạng thái sinh viên',
-        path: '/education/student-status',
-        icon: <Users size={20} />,
-        banner: {
-          title: 'Theo dõi Trạng thái Sinh viên',
-          description:
-            'Theo dõi trạng thái của sinh viên trong quá trình OJT.',
-          badge: 'Quản lý sinh viên',
-        },
-      },
     ],
   },
 

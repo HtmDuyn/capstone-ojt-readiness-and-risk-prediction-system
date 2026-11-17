@@ -259,6 +259,7 @@ const EducationStudentImport: React.FC = () => {
                       "Số điện thoại",
                       "Lớp",
                       "Chương trình",
+                      "Chuyên ngành",
                       "Trạng thái học vụ",
                       "Khóa",
                       "Nhóm",
@@ -292,6 +293,7 @@ const EducationStudentImport: React.FC = () => {
                           (p) => p.id === row.academic.programId,
                         )?.label ?? row.academic.programId}
                       </td>
+                      <td className="whitespace-nowrap px-4 py-3">{catalogs?.programs.find(p => p.id === row.academic.programId)?.majorCode || '—'}</td>
                       <td className="px-4 py-3">{row.academic.status ? STUDENT_STATUS_LABELS[row.academic.status] : 'Mặc định khi tạo mới; giữ nguyên khi cập nhật'}</td>
                       <td className="px-4 py-3">
                         {catalogs?.cohorts.find(

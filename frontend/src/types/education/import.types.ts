@@ -79,6 +79,7 @@ export interface CatalogOption {
   id: number;
   label: string;
   aliases: string[];
+  majorCode?: string;
   kind?: string;
   groups?: { groupCode: string; entryAcademicPeriodId: number; curriculumPeriods: { semester: number; academicPeriodId: number }[] }[];
 }

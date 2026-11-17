@@ -66,7 +66,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
       const program = asObject(item.program);
 
       // GET /curricula trả id là ProgramID.
-      return buildOption(
+      const option = buildOption(
         positiveId(item.id) ??
           positiveId(item.programId) ??
           positiveId(program?.id),
@@ -80,6 +80,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
           item.programCode,
         ],
       );
+      return option ? { ...option, majorCode: text(item.majorCode ?? program?.majorCode) } : null;
     }),
   );
 

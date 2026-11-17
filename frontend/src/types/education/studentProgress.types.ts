@@ -37,6 +37,7 @@ export interface StudentProgress {
   delayTerms: number | null;
   progressStatus: ProgressStatus;
   eligibilityStatus: OjtEligibilityStatus;
+  handoffStatus?: 'Đã bàn giao' | 'Chưa bàn giao' | 'Chưa xác định';
   eligibilitySource?: 'FRONTEND' | 'OFFICIAL' | null;
   subjects: StudentSubject[];
   dataWarning?: string;

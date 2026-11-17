@@ -72,7 +72,7 @@ const EducationOjtConditions: React.FC = () => {
       })}{!visible.length && <tr><td colSpan={13} className="p-10 text-center text-slate-500">{loading ? 'Đang tải...' : 'Không có sinh viên phù hợp.'}</td></tr>}</tbody></table></div>
       <div className="flex items-center justify-between gap-3 border-t p-4 text-sm text-slate-500"><span>{visible.length} sinh viên · Trang {currentPage}/{pages}</span><div className="flex gap-2"><button disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trước</button><button disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Sau</button></div></div>
     </section>
-    <p className="text-sm text-slate-500">Tra cứu tiếp tại <Link to="/education/student-status" className="text-orange-700 underline">Trạng thái sinh viên</Link>.</p>
+    <p className="text-sm text-slate-500">Tra cứu tiếp tại <Link to="/education/student-progress" className="text-orange-700 underline">Theo dõi tiến độ học tập</Link>.</p>
   </div>;
 };
 export default EducationOjtConditions;

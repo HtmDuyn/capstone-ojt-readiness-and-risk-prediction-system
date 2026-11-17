@@ -18,7 +18,7 @@ test('file mẫu tải xuống có hai sheet, đúng cột và header cố đị
   assert.deepEqual(book.SheetNames, ['Danh sách sinh viên', 'Kết quả học tập']);
   assert.deepEqual(XLSX.utils.sheet_to_json(book.Sheets['Danh sách sinh viên'], { header: 1 })[0], [
     'Họ và tên', 'Mã sinh viên', 'Email', 'Số điện thoại', 'Mã chương trình đào tạo',
-    'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
+    'Chuyên ngành', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
   ]);
   assert.deepEqual(XLSX.utils.sheet_to_json(book.Sheets['Kết quả học tập'], { header: 1 })[0], [
     'Mã sinh viên', 'Mã môn', 'Tên môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
@@ -36,7 +36,7 @@ test('file mẫu tải xuống có hai sheet, đúng cột và header cố đị
     assert.match(sheetXml, /<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"\/>/);
     assert.match(sheetXml, /<c r="A1" s="[1-9]\d*"/);
   }
-  assert.match(xml('xl/worksheets/sheet1.xml'), /sqref="F2:F501".*"Đang học,Bảo lưu,Thôi học"/);
+  assert.match(xml('xl/worksheets/sheet1.xml'), /sqref="G2:G501".*"Đang học,Bảo lưu,Thôi học"/);
 });
 
 test('trạng thái tiếng Việt trong Excel được đổi sang enum Backend', async () => {
@@ -49,11 +49,11 @@ test('trạng thái tiếng Việt trong Excel được đổi sang enum Backend
     const book = XLSX.read(workbookModule.createStudentImportTemplateFile(), { type: 'array' });
     XLSX.utils.sheet_add_aoa(book.Sheets['Danh sách sinh viên'], [[
       'Nguyễn Văn A', 'SE250001', 'student@example.com', '', 'BIT_IS_K19B',
-      input, 'K19', 'A', 'FALL2026',
+      'BIT', input, 'K19', 'A', 'FALL2026',
     ]], { origin: 'A2' });
     const file = new File([XLSX.write(book, { type: 'array', bookType: 'xlsx' })], 'import.xlsx');
     const rows = await workbookModule.parseStudentImportWorkbook(file, {
-      programs: [option(1, 'BIT_IS_K19B')],
+      programs: [{ ...option(1, 'BIT_IS_K19B'), majorCode: 'BIT' }],
       cohorts: [option(2, 'K19')],
       periods: [option(3, 'FALL2026')],
     });
@@ -66,7 +66,7 @@ test('parser đọc được file có tiêu đề mới và tạo payload gồm 
   const book = XLSX.read(workbookModule.createStudentImportTemplateFile(), { type: 'array' });
   XLSX.utils.sheet_add_aoa(book.Sheets['Danh sách sinh viên'], [[
     'Nguyễn Văn A', 'SE250001', 'student@example.com', '0123456789', 'BIT_IS_K19B',
-    'Đang học', 'K19', 'A', 'FALL2026',
+    'BIT', 'Đang học', 'K19', 'A', 'FALL2026',
   ]], { origin: 'A2' });
   XLSX.utils.sheet_add_aoa(book.Sheets['Kết quả học tập'], [[
     'SE250001', 'PRF192', 'Lập trình cơ bản', 'SUMMER2026', 1, 'PASSED', 8,
@@ -74,7 +74,7 @@ test('parser đọc được file có tiêu đề mới và tạo payload gồm 
   const file = new File([XLSX.write(book, { type: 'array', bookType: 'xlsx' })], 'import.xlsx');
   const option = (id, code) => ({ id, label: code, aliases: [code] });
   const rows = await workbookModule.parseStudentImportWorkbook(file, {
-    programs: [option(1, 'BIT_IS_K19B')],
+    programs: [{ ...option(1, 'BIT_IS_K19B'), majorCode: 'BIT' }],
     cohorts: [option(2, 'K19')],
     periods: [option(3, 'FALL2026'), option(4, 'SUMMER2026')],
   });
@@ -84,4 +84,19 @@ test('parser đọc được file có tiêu đề mới và tạo payload gồm 
   assert.deepEqual(rows[0].academic.courseResults, [{
     courseCode: 'PRF192', academicPeriodId: 4, status: 'PASSED', attemptNumber: 1, score: 8,
   }]);
+});
+
+test('parser từ chối mã chuyên ngành không khớp chương trình đào tạo', async () => {
+  const book = XLSX.read(workbookModule.createStudentImportTemplateFile(), { type: 'array' });
+  XLSX.utils.sheet_add_aoa(book.Sheets['Danh sách sinh viên'], [[
+    'Nguyễn Văn A', 'SE250001', 'student@example.com', '', 'BIT_IS_K19B',
+    'OTHER', 'Đang học', 'K19', 'A', 'FALL2026',
+  ]], { origin: 'A2' });
+  const file = new File([XLSX.write(book, { type: 'array', bookType: 'xlsx' })], 'import.xlsx');
+  const option = (id, code) => ({ id, label: code, aliases: [code] });
+  await assert.rejects(() => workbookModule.parseStudentImportWorkbook(file, {
+    programs: [{ ...option(1, 'BIT_IS_K19B'), majorCode: 'BIT' }],
+    cohorts: [option(2, 'K19')],
+    periods: [option(3, 'FALL2026')],
+  }), /Chuyên ngành "OTHER" không khớp mã chuyên ngành BIT/);
 });
