@@ -5,6 +5,7 @@ import { useStudentResource } from '@/hooks/useStudentResource';
 import { allStudentPages, studentGet, studentQuery, type StudentCertificate } from '@/services/studentService';
 import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage, StudentSemesterSelect } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';
+import { StudentJobMatches } from '@/components/student/StudentJobMatches';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import { OjtApplicationDialog } from '@/components/student/OjtApplicationDialog';
 import { explainOjtBlockers, workModeText, type Opportunity, type PartnerCompany } from '@/components/student/ojt';
@@ -89,6 +90,7 @@ function RegistrationContent() {
           <button type="button" onClick={() => openApplication()} disabled={!canApply} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
         </div>
         {!!blockers.length && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{explainOjtBlockers(blockers)} Bạn vẫn có thể xem thông tin doanh nghiệp bên dưới.</p>}
+        {chosenWindow && <StudentJobMatches key={`${scope}:${chosenWindow.id}:${cv?.id??'no-cv'}`} windowId={chosenWindow.id} cvFileId={cv?.id??null} opportunities={opportunities.data?.items??[]} onApply={openApplication}/>}
       <div className="border-t border-slate-200 pt-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div><h3 className="text-lg font-semibold text-slate-900">Doanh nghiệp liên kết</h3>

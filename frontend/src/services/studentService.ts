@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { expireBearerSession } from './authSession';
 import { API_BASE_URL } from '@/config/api';
 
 import { downloadFile } from '@/utils/downloadFile';
@@ -42,7 +43,7 @@ interface StudentRequestConfig {
   timeout?: number;
 }
 interface ErrorBody { success?: boolean; message?: string; errorCode?: string; code?: string }
-interface HttpError { code?: string; response?: { status: number; data?: ErrorBody } }
+interface HttpError { code?: string; config?: { headers?: { Authorization?: unknown } }; response?: { status: number; data?: ErrorBody } }
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number, public readonly code?: string) {
@@ -93,6 +94,7 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
       0, failure.code,
     );
     const { status, data } = failure.response;
+    if (status === 401) expireBearerSession(failure.config?.headers?.Authorization);
     throw new ApiError(data?.message || `Yêu cầu API thất bại (HTTP ${status}).`, status, data?.errorCode ?? data?.code);
   }
 }
