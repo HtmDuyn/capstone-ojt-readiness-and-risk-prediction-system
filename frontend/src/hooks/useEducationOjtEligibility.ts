@@ -24,7 +24,6 @@ export function useEducationOjtEligibility() {
   const [saving, setSaving] = React.useState(false);
   const [rule, setRule] = React.useState<CurrentOjtRule | null>(null);
   const [error, setError] = React.useState('');
-  const [revision, setRevision] = React.useState(0);
   const [savedResults, setSavedResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [pendingResults, setPendingResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [handoffs, setHandoffs] = React.useState<Handoff[]>([]);
@@ -60,12 +59,11 @@ export function useEducationOjtEligibility() {
     }).catch(e => { if (!c.signal.aborted) setError('Không tải đủ dữ liệu để xác định sinh viên cần xét: ' + (e instanceof Error ? e.message : 'Lỗi kết nối.')); })
       .finally(() => { if (!c.signal.aborted) setLoading(false); });
     return () => { c.abort(); activeRequest.current?.abort(); };
-  }, [revision]);
+  }, []);
 
   const handoffByStudent = React.useMemo(() => handoffsByStudent(handoffs), [handoffs]);
   const handoffDisplay = React.useMemo(() => handoffDisplayById(handoffs), [handoffs]);
   const handedOffIds = React.useMemo(() => new Set(handoffByStudent.keys()), [handoffByStudent]);
-  const ready = targets.filter(t => !t.reason);
   const canCheck = !loading && dataLoaded && Boolean(rule);
   const needsCheck = canCheck ? selectAutoCheckTargets(targets, savedResults, pendingResults, handedOffIds) : [];
   const fullCheck = canCheck ? selectFullCheckTargets(targets, handedOffIds) : [];
@@ -152,8 +150,8 @@ export function useEducationOjtEligibility() {
   const visible = targets.filter(t => (!search.trim() || normalize(`${t.student.studentCode} ${t.student.fullName}`).includes(normalize(search)))
     && (filter === 'ALL' || statusByStudent[t.student.id] === filter)
     && matchesHandoffFilter(t.student.id, handoffFilter, handedOffIds));
-  React.useEffect(() => setPage(1), [search, filter, handoffFilter, revision]);
+  React.useEffect(() => setPage(1), [search, filter, handoffFilter]);
   const pages = Math.max(1, Math.ceil(visible.length / 20)), currentPage = Math.min(page, pages);
   const checked = selectPendingSaveResults(pendingResults);
-  return { ready, needsCheck, fullCheck, runNeeded, runAll, runReview, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule };
+  return { needsCheck, fullCheck, runNeeded, runAll, runReview, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule };
 }

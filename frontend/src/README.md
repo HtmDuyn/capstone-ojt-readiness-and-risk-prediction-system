@@ -28,7 +28,7 @@ Kiểm tra sau khi thay đổi: `npm run build`.
 ## Luồng Education hiện tại
 
 - Route Education được khai báo trong `routers/educationRoutes.tsx`, kiểm tra role bằng `PrivateRoute` và tải trang bằng lazy import.
-- `EducationOjtConditions` chỉ hiển thị UI; `useEducationOjtEligibility` điều phối tải hồ sơ, xét tối đa 4 hồ sơ đồng thời và lưu kết quả.
+- `EducationOjtConditions` dùng `useEducationOjtResults` để chỉ đọc kết quả đã lưu, danh sách sinh viên và lịch sử bàn giao. Trang không chạy xét hoặc lưu khi mở. `useEducationOjtEligibility` vẫn giữ luồng xét/lưu thủ công cũ trong mã nguồn để phục vụ chuyển đổi, nhưng không được trang này gọi.
 - `utils/localOjtEligibility.ts` chứa hàm tính thuần và quy tắc dùng chung: 70 tín chỉ, tối đa 2 môn chưa đạt. `localOjtEligibility.service.ts` tải đủ các trang bảng điểm và lưu kết quả tới BE; không chuyển sang API xét điều kiện tại BE.
 - `useEducationOjtHandoff` và `useEducationOjtFinalResults` quản lý trạng thái; `educationOjtWorkflow.service.ts` phụ trách API bàn giao và xác nhận kết quả. Hợp đồng dữ liệu đặt trong `types/education/ojtWorkflow.types.ts`.
 - Import chương trình đào tạo: component quản lý tương tác, `utils/curriculumImportWorkbook.ts` đọc/kiểm tra Excel và tạo file mẫu; `services/curriculumCourseResolver.ts` tra mã môn học. Parser nhận hàm tra cứu qua tham số để không phụ thuộc trực tiếp API.

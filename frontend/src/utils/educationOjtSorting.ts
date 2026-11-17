@@ -3,7 +3,7 @@ import type { LocalOjtResult } from '@/types/education/localEligibility.types';
 import type { OjtDisplayStatus } from './educationOjtReason';
 import { educationOjtReason } from './educationOjtReason';
 
-export type OjtSortKey = 'studentCode' | 'fullName' | 'cohort' | 'group' | 'program' | 'credits' | 'courses' | 'status' | 'reason';
+export type OjtSortKey = 'studentCode' | 'fullName' | 'cohort' | 'group' | 'semester' | 'credits' | 'courses' | 'status' | 'reason';
 export type OjtSortDirection = 'asc' | 'desc';
 type Target = { student: ImportedStudent; reason: string };
 type SortContext = { results: Record<number, LocalOjtResult>; failures: Record<number, string>; statuses: Record<number, OjtDisplayStatus> };
@@ -24,7 +24,7 @@ export function sortOjtTargets<T extends Target>(targets: T[], key: OjtSortKey |
       case 'fullName': return student.fullName;
       case 'cohort': return student.cohort?.code ?? '';
       case 'group': return student.groupCode ?? '';
-      case 'program': return student.program?.code ?? '';
+      case 'semester': return student.currentSemester;
       case 'credits': return result?.earnedCredits ?? null;
       case 'courses': return result?.unpassedCourseCount ?? null;
       case 'status': return statusLabels[context.statuses[student.id]];

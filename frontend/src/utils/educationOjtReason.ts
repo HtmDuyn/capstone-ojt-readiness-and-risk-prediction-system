@@ -10,6 +10,10 @@ export function educationOjtDisplayStatus(result?: ReasonResult, failure?: strin
   return result?.status ?? 'PENDING';
 }
 
+export function savedOjtDisplayStatus(result?: ReasonResult, inactiveReason?: string): OjtDisplayStatus {
+  return result ? educationOjtDisplayStatus(result, undefined, inactiveReason) : 'PENDING';
+}
+
 function readableError(message: string): string {
   if (/Bảng điểm chưa tải đầy đủ|Không tải được đầy đủ bảng điểm/.test(message)) return message;
   if (/Không tải đủ dữ liệu để xét/.test(message)) return message;

@@ -1,7 +1,7 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
-import type { CurrentOjtRule } from '@/services/localOjtEligibility.service';
+import type { LocalOjtRule } from '@/utils/localOjtEligibility';
 
-export function localOjtSavePayload(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule) {
+export function localOjtSavePayload(results: LocalOjtResult[], idempotencyKey: string, rule: LocalOjtRule) {
   return {
     idempotencyKey,
     source: 'FRONTEND' as const,
