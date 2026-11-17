@@ -1,4 +1,5 @@
 import "./config/env";
+import { startRecruitmentExtractionWorker } from './jobs/recruitment-extraction';
 import { startAdvisoryWorker } from './modules/student-portal/advisory.service';
 import { startRecruitmentWorker } from './jobs/recruitment';
 import { startEligibilityWorker } from './jobs/eligibility';
@@ -28,6 +29,7 @@ const startServer =
   async (): Promise<void> => {
     try {
       await testDatabaseConnection();
+      const stopExtraction = startRecruitmentExtractionWorker();
       const stopRecruitment = startRecruitmentWorker();
       const stopAdvisories = process.env.ADVISORY_WORKER_ENABLED !== 'false' ? startAdvisoryWorker() : () => {};
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
@@ -59,6 +61,7 @@ const startServer =
       const shutdown =
         async () => {
           stopJobs();
+          stopExtraction();
           stopRecruitment();
           stopAdvisories();
           stopEligibility();

@@ -11,6 +11,7 @@ import type {
   AuthContextValue,
 } from "../types/auth.types";
 import { authService } from "../services/authService";
+import { expireSession, SESSION_EXPIRED_EVENT, tokenExpiry } from '../services/authSession';
 
 export type { UserRole, AuthUser, AuthContextValue };
 
@@ -42,9 +43,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const storedToken = localStorage.getItem(TOKEN_KEY);
       const storedUser = localStorage.getItem(USER_KEY);
 
-      if (storedToken && storedUser) {
+      if (storedToken && storedUser && tokenExpiry(storedToken) > Date.now()) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser) as AuthUser);
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
       }
     } catch {
       // Dữ liệu lưu trữ bị lỗi — xóa nó
@@ -54,6 +58,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const clearLocalState = () => { setToken(null); setUser(null); };
+    window.addEventListener(SESSION_EXPIRED_EVENT, clearLocalState);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, clearLocalState);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const checkExpiry = () => {
+      clearTimeout(timer);
+      const remaining = tokenExpiry(token) - Date.now();
+      if (remaining <= 0) expireSession(token);
+      else timer = setTimeout(checkExpiry, Math.min(remaining, 2147483647));
+    };
+    checkExpiry();
+    window.addEventListener('focus', checkExpiry);
+    return () => { clearTimeout(timer); window.removeEventListener('focus', checkExpiry); };
+  }, [token]);
 
   /** Được gọi sau khi nhận phản hồi đăng nhập thành công từ API. */
   const login = useCallback((newToken: string, newUser: AuthUser) => {

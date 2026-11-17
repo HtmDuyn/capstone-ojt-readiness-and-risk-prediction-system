@@ -8,6 +8,7 @@ import { applyToPosition, studentOpportunities } from '../students/job-applicati
 import { notifications, readNotification } from './academic.service';
 import { assessOjtRisk } from './ojt-risk.service';
 import { analyzeCurrentCv, matchingProfile, updateMatchingProfile } from './cv-extraction.service';
+import { matchStudentJobs } from './job-matching.service';
 import { taskSubmissions, submitTask } from './task.service';
 
 const router = Router();
@@ -29,6 +30,10 @@ router.get('/students/me/matching-profile', ...read, handle(r => {
 
 router.patch('/students/me/matching-profile', ...own, requireJsonBody,
   handle(r => updateMatchingProfile(r.body, r.user)));
+router.post('/students/me/job-matches', ...own, requireJsonBody, handle(r => {
+  if(Object.keys(r.query).length)throw invalid('Gửi windowId và consent trong JSON body.');
+  return matchStudentJobs(r.body,r.user);
+}));
 
 router.get('/students/me/ojt-risk-assessment', ...read, handle(r => {
   if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');

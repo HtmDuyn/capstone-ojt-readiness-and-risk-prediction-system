@@ -1,0 +1,12 @@
+export function describeJobMatching(spec:Record<string,any>) {
+  spec.paths['/api/students/me/job-matches'] = {post:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    summary:'Cohere Rerank: tối đa 5 vị trí phù hợp với CV đã xác nhận',
+    description:'Chỉ STUDENT, tự lấy CV mới nhất từ JWT. Cần CV CONFIRMED và consent=true để gửi các kỹ năng, vai trò, công nghệ dự án, ngoại ngữ, ngành/bằng cấp trích xuất đến Cohere. Không gửi PDF, contact, summary, mô tả kinh nghiệm hoặc GPA. windowId lấy từ GET /api/ojt-registration-windows, không phải đợt doanh nghiệp đăng tin. Chỉ xếp hạng vị trí chưa ứng tuyển, còn chỗ, tin đang công bố và kết quả đọc JD READY đúng source/schema/model hiện tại. Không đủ vị trí thì trả ít hơn 5; không có thì trả matches:[]. Không thay đổi phân quyền, xét điều kiện hoặc tạo đơn ứng tuyển. Điểm 0–1 chỉ biểu thị mức liên quan. reasons/matchedSkills là đối chiếu tên kỹ năng tại backend, không phải lời giải thích do Cohere sinh. Bộ nhớ đệm 90 giây theo sinh viên/CV/đợt/tập vị trí/model; kiểm tra nguồn trước khi dùng. Giới hạn 1.000 vị trí trong đợt. Cần COHERE_RERANK_ENABLED=true, COHERE_API_KEY, COHERE_RERANK_MODEL. Request gọi provider có timeout 60 giây.',
+    requestBody:{required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,required:['windowId','consent'],properties:{windowId:{type:'integer',minimum:1},consent:{type:'boolean',enum:[true]}}},example:{windowId:1,consent:true}}}},
+    responses:{200:{description:'{success:true,data:{status,windowId,cvFileId,analysisId,cvRevision,candidateCount,blockers,scoreMeaning,model,generatedAt,cached,matches:[{rank,positionId,postId,title,company,location,workMode,remainingSlots,deadlineAt,canApply,blockers,relevanceScore,matchedSkills,requirementsNotEvidenced,reason,reviewNote}]}}. status=READY/NO_READY_POSITIONS/WINDOW_UNAVAILABLE.'},
+      400:{description:'JSON/windowId/consent không hợp lệ'},401:{description:'Cần đăng nhập'},403:{description:'Chỉ sinh viên đang hoạt động'},
+      409:{description:'CV chưa có/chưa xác nhận hoặc nguồn thay đổi trong lúc matching'},422:{description:'Quá giới hạn đầu vào'},429:{description:'Hệ thống bận'},502:{description:'Lỗi Cohere; không tạo kết quả giả'},503:{description:'Chưa bật/cấu hình Cohere hoặc thiếu schema'}}}};
+  const cv=spec.paths['/api/students/me/matching-profile']?.get;
+  if(cv)cv.description=String(cv.description).replace('chức năng matching chưa triển khai.','matching sử dụng POST /api/students/me/job-matches.');
+  return spec;
+}
