@@ -1,6 +1,6 @@
 import React from "react";
 import { DashboardGridIcon } from "@/components/common/icons/AppIcons";
-import { Building2, Handshake, Award, UserCheck } from "lucide-react";
+import { Bell, Building2, Handshake, Award, UserCheck } from "lucide-react";
 import type { NavItem } from "@/types/common.types";
 
 export const QHDN_NAV_ITEMS: NavItem[] = [
@@ -19,7 +19,7 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
   },
   {
     id: "enterprises",
-    label: "Doanh nghiệp & Tuyển dụng",
+    label: "Doanh nghiệp đối tác",
     path: "/qhdn/enterprises",
     icon: <Building2 size={20} />,
     banner: {
@@ -44,7 +44,7 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
       },
       {
         id: "coordination",
-        label: "Theo dõi doanh nghiệp",
+        label: "Điều phối OJT",
         path: "/qhdn/coordination",
         icon: <Handshake size={16} />,
       },
@@ -65,9 +65,20 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     banner: {
       title: "Báo cáo OJT",
       description:
-        "Tổng hợp kết quả đánh giá kỹ năng chuyên môn, thái độ và điểm thực tập OJT từ người hướng dẫn doanh nghiệp.",
+        "Theo dõi kết quả chuyển giao và xuất báo cáo OJT theo học kỳ.",
       badge: "Kết quả OJT",
-      primaryActionLabel: "Tải bảng đánh giá",
+      primaryActionLabel: "Xuất báo cáo",
+    },
+  },
+  {
+    id: "notifications",
+    label: "Thông báo",
+    path: "/qhdn/notifications",
+    icon: <Bell size={20} />,
+    banner: {
+      title: "Thông báo",
+      description: "Theo dõi thông báo được gửi đến tài khoản Quan hệ Doanh nghiệp.",
+      badge: "Phòng QHDN",
     },
   },
 ];

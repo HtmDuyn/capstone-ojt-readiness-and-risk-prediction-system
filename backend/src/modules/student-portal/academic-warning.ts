@@ -36,7 +36,7 @@ export function assessAcademicWarning(input:Input) {
   }else if(input.overdueCredits>0 || (input.maxDebt!==null&&input.debt>input.maxDebt) || input.blockingCourses.length){
     level='MEDIUM';reason('PATHWAY_FOLLOW_UP_REQUIRED','Còn môn theo lộ trình kỳ trước chưa hoàn thành hoặc môn nợ cần được xử lý.');
   }else{
-    level='LOW';reason('ON_TRACK_FOR_CURRENT_STAGE','Tiến độ các kỳ đã hoàn thành phù hợp với lộ trình; chưa đủ 70 tín chỉ ở giai đoạn này không tự tạo mức cao.');
+    level='LOW';reason('ON_TRACK_FOR_CURRENT_STAGE','Tiến độ các kỳ đã hoàn thành phù hợp với lộ trình; chưa đạt ngưỡng tín chỉ OJT ở giai đoạn này không tự tạo mức cao.');
   }
   if(input.available&&input.status!=='ELIGIBLE'){
     if(input.missingCredits!==null&&input.missingCredits>0)reason('CREDIT_SHORTFALL',`Còn thiếu ${input.missingCredits} tín chỉ so với ngưỡng OJT.`);

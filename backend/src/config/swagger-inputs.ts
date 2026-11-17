@@ -203,7 +203,7 @@ export function describeManualInputs(spec: Spec): Spec {
     const media=importBody.content['application/json'];
     media.examples={
       student:{summary:'Nhập sinh viên',value:{kind:'STUDENT',idempotencyKey:'manual-student-import-001',rows:[{code:'SV-MANUAL-001',email:'student@example.invalid',fullName:'Sinh viên mẫu'}]}},
-      enterprise:{summary:'Tạo tài khoản doanh nghiệp liên kết',value:{kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{code:'DN001',email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu'}]}}
+      enterprise:{summary:'Tạo tài khoản doanh nghiệp liên kết',value:{kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{email:'hr@example.invalid',fullName:'Người phụ trách',name:'Doanh nghiệp mẫu'}]}}
     };
   }
   return spec;

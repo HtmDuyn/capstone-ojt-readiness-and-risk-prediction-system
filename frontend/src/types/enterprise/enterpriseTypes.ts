@@ -36,11 +36,17 @@ export interface EnterpriseProfileSummary {
   pendingPosts: number;
   pendingCandidates: number;
   activeInterns: number;
+  /** Unique students received through acceptance, a valid assignment or receipt history. */
+  acceptedInterns: number;
+  /** Unique students with a submitted enterprise evaluation and an overall score. */
+  completedInterns: number;
   pendingEvaluations: number;
 }
 
 export interface EnterpriseProfileData {
+  /** Internal database key for API requests and relations; not a display identifier. */
   id: number;
+  /** Unique enterprise identifier displayed in profiles and company lists. */
   code: string;
   name: string;
   address: string | null;

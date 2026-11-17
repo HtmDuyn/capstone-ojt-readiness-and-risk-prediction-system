@@ -43,9 +43,9 @@ export function EnterpriseJobs() {
   }, [revision]);
 
   useEffect(() => {
-    const next = windows.flatMap(w => [Date.parse(w.startsAt), Date.parse(w.endsAt)]).filter(time => time > now);
+    const next = windows.flatMap(w => [Date.parse(w.postingStartsAt ?? w.startsAt), Date.parse(w.postingDeadlineAt ?? w.endsAt), Date.parse(w.applicationEndsAt ?? w.endsAt), Date.parse(w.resultsEndsAt ?? w.endsAt)]).filter(time => time > now);
     const delay = next.length ? Math.min(30000, Math.min(...next) - now + 20) : 30000;
-    const timer = setTimeout(() => setNow(Date.now()), delay);
+    const timer = setTimeout(() => { setNow(Date.now()); if (next.some(time => time <= Date.now())) setRevision(v => v + 1); }, delay);
     return () => clearTimeout(timer);
   }, [windows, now]);
   const selectedWindow = windows.find(w => w.id === selectedWindowId);
@@ -95,32 +95,6 @@ export function EnterpriseJobs() {
       <AlertCircle size={22} className="mx-auto mb-2 text-rose-600" /><p className="text-sm text-rose-800">{error}</p>
       <button type="button" onClick={refresh} className="mt-3 text-sm font-semibold text-orange-700 hover:underline">Thử lại</button>
     </div> : <>
-      <section aria-label="Đợt và hạn đăng tin" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 lg:max-w-md">
-            <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
-            {windows.length > 0 ? <select id="recruitment-window-view" value={selectedWindowId}
-              onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
-              <option value="0">Tất cả đợt đăng tin</option>
-              {windows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''}</option>)}
-            </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
-          </div>
-          {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.endsAt)}</strong></p>
-              <p className="mt-1 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)} · QHDN quản lý thời hạn</p>
-            </div>
-            <p className={`inline-flex items-center gap-2 text-xs font-medium ${accepts ? 'text-emerald-700' : 'text-slate-500'}`}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current" />{accepts ? 'Đang nhận tin' : 'Hiện không nhận tin'}
-            </p>
-          </div>}
-        </div>
-        {!activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể xem các tin đã đăng.</p>}
-        {selectedWindow?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
-          <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký OJT: tạm khóa chỉnh sửa tin{selectedWindow.studentRegistrationWindow?.endsAt ? ` đến ${formatRecruitmentDate(selectedWindow.studentRegistrationWindow.endsAt)}` : ''}. Bạn vẫn có thể tạo tin mới trong hạn đăng tuyển.
-        </p>}
-      </section>
-
       <dl aria-label="Tổng quan tuyển dụng" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { label: 'Tin tuyển dụng', value: filtered.length, icon: FileText, tone: 'bg-blue-50 text-blue-600' },
@@ -136,6 +110,31 @@ export function EnterpriseJobs() {
       </dl>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section aria-label="Đợt và hạn đăng tin" className="border-b border-slate-100 px-5 py-4 sm:px-7 sm:py-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 lg:max-w-md">
+            <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
+            {windows.length > 0 ? <select id="recruitment-window-view" value={selectedWindowId}
+              onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+              <option value="0">Tất cả đợt đăng tin</option>
+              {windows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''}</option>)}
+            </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
+          </div>
+          {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / sửa tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
+              <p className="mt-1 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)} · QHDN quản lý thời hạn</p>
+            </div>
+            <p className={`inline-flex items-center gap-2 text-xs font-medium ${accepts ? 'text-emerald-700' : 'text-slate-500'}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />{accepts ? 'Đang nhận tin' : 'Hiện không nhận tin'}
+            </p>
+          </div>}
+        </div>
+        {!activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể xem các tin đã đăng.</p>}
+        {selectedWindow?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
+          <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký OJT: tạm khóa chỉnh sửa tin{selectedWindow.studentRegistrationWindow?.endsAt ? ` đến ${formatRecruitmentDate(selectedWindow.studentRegistrationWindow.endsAt)}` : ''}. Bạn vẫn có thể tạo tin mới trong hạn đăng tuyển.
+        </p>}
+      </section>
       <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-7">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

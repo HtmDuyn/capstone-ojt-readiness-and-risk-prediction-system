@@ -2,6 +2,13 @@
 
 Phạm vi code: `src/modules/enterprise`, kiểm thử và tài liệu backend liên quan. Không sửa frontend, DB/schema, route/service của QHDN, sinh viên hoặc các role khác.
 
+## Định danh doanh nghiệp
+
+- `Enterprises.EnterpriseCode` là mã doanh nghiệp duy nhất hiển thị trên hồ sơ, danh sách đối tác và thông tin tài khoản. Mã hiện có như `TECHVIET` được giữ nguyên; doanh nghiệp mới có mã tự sinh dạng `DN000001`. DB đã có ràng buộc duy nhất và index không phân biệt hoa/thường cho mã này.
+- `Enterprises.EnterpriseID` là khóa số nội bộ liên kết tài khoản, tin tuyển dụng, hồ sơ ứng tuyển và sinh viên. Không hiển thị ID số như một mã hồ sơ doanh nghiệp khác. API giữ `id`/`companyId` kiểu số cho các thao tác liên kết và phân quyền; trường `code` dùng để hiển thị.
+- GET và PATCH hồ sơ cùng đọc mã từ `EnterpriseCode`. Cập nhật hồ sơ gửi ID số từ dữ liệu API; không chuyển mã hiển thị thành số, không đổi khóa liên kết và không cấp lại mã cho doanh nghiệp đang có.
+- Quy ước này dùng cấu trúc DB hiện tại, không cần migration dữ liệu hay chạy lại script khởi tạo.
+
 ## API
 
 Tất cả endpoint mới yêu cầu JWT ENTERPRISE. Doanh nghiệp lấy từ tài khoản; không nhận companyId từ client.
@@ -103,6 +110,26 @@ GET windows có accepting/canCreate, canEdit, postingDeadlineAt, deadlineManaged
 Worker trong module doanh nghiệp chạy mỗi phút, chỉ cập nhật tin EnterpriseManaged. Không còn phụ thuộc ReviewedAt để tuyển tiếp các tin công bố trực tiếp. Tin còn chỗ có thể tiếp tục đợt OPEN kế tiếp trong cùng kỳ; giữ ID và lịch sử, ghi audit ENTERPRISE_AUTO_CONTINUE.
 
 Worker không sửa tin trong lúc đợt đăng ký OJT của sinh viên đang hoạt động; không tự mở lại tin QHDN chủ động đóng, tin bị từ chối/lưu trữ hoặc tin import không thuộc EnterpriseManaged. Không sửa hàm DB, schema, worker hay service của role khác.
+
+## Tiếp nhận sinh viên hàng loạt
+
+- `POST /api/enterprise/candidates/acceptance-preview` nhận `candidateIds` (1–200 ID hồ sơ điều phối, không trùng), chỉ cho role `ENTERPRISE` và hồ sơ mới nhất đang chờ của doanh nghiệp đăng nhập.
+- Kết quả gồm `confirmationToken` và số liệu theo từng kỳ: `capacity`, `currentCount`, `selectedCount`, `afterCount`, `excessCount`. Chỉ tiêu là tổng các vị trí chưa xóa/lưu trữ của doanh nghiệp trong kỳ. Số thực nhận đếm mỗi sinh viên một lần từ hồ sơ đã nhận, phân công còn hiệu lực hoặc lịch sử thực nhận, thống nhất với bảng QHDN.
+- `POST /api/enterprise/candidates/accept-bulk` nhận `candidateIds`, `confirmationToken`, `allowOverCapacity` (boolean), `reason`. Khi `afterCount > capacity`, phải gửi `allowOverCapacity: true` sau khi doanh nghiệp xác nhận phần vượt. Còn 0 slot vẫn được nhận nếu đồng ý vượt chỉ tiêu. Giữ nguyên chỉ tiêu; cập nhật trạng thái nhận và số thực nhận/chênh lệch ở QHDN.
+- Toàn bộ danh sách chạy trong một transaction; một hồ sơ lỗi thì không nhận hồ sơ nào. Vẫn kiểm tra quyền, hạn phản hồi, điều kiện bàn giao, nơi thực tập đã xác nhận và phân công hiện có. Số liệu thay đổi sau bước xem trước trả `409 BULK_ACCEPTANCE_CHANGED`, cần xem lại và xác nhận lại. Gửi lại lần xác nhận đã thành công trả `replayed: true`.
+- DB đang có dữ liệu: chạy riêng khối `BEGIN OJT ENTERPRISE BULK ACCEPTANCE V7` đến `END OJT ENTERPRISE BULK ACCEPTANCE V7` trong `backend/DB`, gồm cả `BEGIN`/`COMMIT`. Khối này cập nhật hàm bảo vệ và marker, không reset dữ liệu. Không chạy toàn bộ `backend/DB` trên DB cần giữ dữ liệu. Nếu thiếu V7, API xác nhận trả `503 BULK_ACCEPTANCE_MIGRATION_REQUIRED`.
+
+Dashboard lấy số liệu mới từ `GET /api/enterprise/profile` khi mở trang, khi quay lại cửa sổ hoặc bấm “Làm mới số liệu”. `summary.acceptedInterns` đếm mỗi sinh viên một lần trong doanh nghiệp trên tất cả học kỳ, hợp nhất hồ sơ đã `ACCEPTED`, phân công chưa hủy và lịch sử thực nhận, cùng nguồn dữ liệu với số thực nhận QHDN. Sinh viên vừa được duyệt được tính ngay cả khi chưa có phân công; tạo phân công không tăng số tiếp nhận lần nữa. Card “Sinh viên đã tiếp nhận” dùng số này. `completedInterns` là số sinh viên duy nhất đã có phiếu đánh giá doanh nghiệp ở trạng thái `SUBMITTED` với điểm tổng kết, không phụ thuộc việc phân công đã chuyển sang `COMPLETED` hay chưa. `activeInterns` giữ ý nghĩa số phân công `ACTIVE`/`IN_PROGRESS` để tương thích API hiện có.
+
+Thay đổi thống kê chỉ sửa truy vấn backend và frontend, không cần đổi schema hoặc chạy lại DB.
+
+Kiểm thử tích hợp dùng DB tạm, có chặn nhầm host/cổng/tên DB và reset DB thử trước khi chạy:
+
+```powershell
+npm run build
+$env:ENTERPRISE_BULK_TEST_DATABASE_URL='postgresql://postgres@127.0.0.1:55441/enterprise_bulk_test'
+node --test tests/enterprise-bulk-acceptance.integration.cjs tests/swagger-startup.test.cjs
+```
 
 ## Kiểm thử
 

@@ -15,8 +15,11 @@ export function parseFrontendResults(body: unknown) {
   const input = inputObject(body, ['idempotencyKey', 'source', 'rule', 'results']);
   const idempotencyKey = requiredText(input.idempotencyKey, 'idempotencyKey', 100);
   if (input.source !== 'FRONTEND') throw invalid('source must be FRONTEND.');
-  const rule = inputObject(input.rule, ['minCredits', 'maxUnpassedCourses']);
-  if (rule.minCredits !== 70 || rule.maxUnpassedCourses !== 2) throw invalid('The fixed rule is at least 70 credits and at most 2 unpassed courses.');
+  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses']);
+  if (typeof rule.version !== 'number' || !Number.isSafeInteger(rule.version) || rule.version < 0 ||
+      typeof rule.minCredits !== 'number' || !Number.isFinite(rule.minCredits) || rule.minCredits < 0 ||
+      typeof rule.maxUnpassedCourses !== 'number' || !Number.isSafeInteger(rule.maxUnpassedCourses) || rule.maxUnpassedCourses < 0)
+    throw invalid('Invalid OJT policy snapshot.');
   if (!Array.isArray(input.results) || !input.results.length || input.results.length > 10000) throw invalid('Provide 1 to 10000 results.');
   const seen = new Set<number>();
   const results = input.results.map((raw, index): FrontendEligibilityResult => {
@@ -34,20 +37,24 @@ export function parseFrontendResults(body: unknown) {
       if (!academicIssues.length) throw invalid('REVIEW_REQUIRED requires academicIssues.');
     } else {
       if (earnedCredits === null || academicIssues.length) throw invalid('A conclusive result needs credits and no academicIssues.');
-      if ((status === 'ELIGIBLE') !== (earnedCredits >= 70 && row.unpassedCourseCount <= 2)) throw invalid('status does not match the supplied credits and unpassed course count.');
+      if ((status === 'ELIGIBLE') !== (earnedCredits >= (rule.minCredits as number) && row.unpassedCourseCount <= (rule.maxUnpassedCourses as number))) throw invalid('status does not match the supplied credits and unpassed course count.');
     }
     const rawTime = requiredText(row.checkedAt, 'checkedAt', 40);
     const checkedAt = new Date(rawTime);
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(rawTime) || !Number.isFinite(checkedAt.getTime()) || new Date(rawTime.slice(0,10)).toISOString().slice(0,10) !== rawTime.slice(0,10) || checkedAt.getTime() > Date.now() + 5 * 60_000) throw invalid('checkedAt must be a valid ISO timestamp, not in the future.');
     return { studentId, status, earnedCredits, unpassedCourseCount: row.unpassedCourseCount, reasons, academicIssues, checkedAt: checkedAt.toISOString() };
   }).sort((a, b) => a.studentId - b.studentId);
-  const requestHash = createHash('sha256').update(JSON.stringify({ source: 'FRONTEND', rule: { minCredits: 70, maxUnpassedCourses: 2 }, results })).digest('hex');
-  return { idempotencyKey, results, requestHash };
+  const requestHash = createHash('sha256').update(JSON.stringify({ source: 'FRONTEND', rule, results })).digest('hex');
+  return { idempotencyKey, results, requestHash, rule };
 }
 
 export async function saveFrontendResults(body: unknown, actorId: number) {
   const input = parseFrontendResults(body);
   return academicTransaction(async client => {
+    const policy = (await client.query('SELECT "Version","MinCredits","MaxUnpassedCourses" FROM "OJTConditionPolicies" ORDER BY "Version" DESC LIMIT 1')).rows[0];
+    const active = policy ? { version: policy.Version, minCredits: Number(policy.MinCredits), maxUnpassedCourses: policy.MaxUnpassedCourses } : { version: 0, minCredits: 70, maxUnpassedCourses: 2 };
+    if (input.rule.version !== active.version || input.rule.minCredits !== active.minCredits || input.rule.maxUnpassedCourses !== active.maxUnpassedCourses)
+      throw invalid('OJT policy changed. Recalculate before saving.', 409, 'OJT_POLICY_CHANGED');
     const actor = (await client.query(`SELECT r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID") WHERE u."UserID"=$1 AND u."Status"='ACTIVE' FOR SHARE OF u`, [actorId])).rows[0];
     if (!actor || !['ADMIN', 'ACADEMIC'].includes(actor.RoleCode)) throw invalid('Academic access required.', 403, 'FORBIDDEN');
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`frontend-ojt-results:${actorId}:${input.idempotencyKey}`]);
@@ -72,7 +79,7 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
       [input.idempotencyKey, input.requestHash, actorId, ids.length, JSON.stringify(input.results)])).rows[0];
     const programs = new Map(students.map(row => [row.StudentID, row.ProgramID]));
     // One set-based upsert; no recalculation or per-student write round trips.
-    const records = input.results.map(result => ({ ...result, programId: programs.get(result.studentId) ?? null }));
+    const records = input.results.map(result => ({ ...result, policyVersion: active.version, rule: active, programId: programs.get(result.studentId) ?? null }));
     await client.query(`INSERT INTO "StudentOJTCalculatedResults" ("StudentID","BatchID","ProgramID","Status","Result","CheckedAt","SavedAt","SavedBy")
       SELECT (item->>'studentId')::int,$2,(item->>'programId')::int,item->>'status',item-'programId',(item->>'checkedAt')::timestamptz,$3,$4
       FROM jsonb_array_elements($1::jsonb) item
@@ -86,6 +93,7 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
 
 export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result."Result" || jsonb_build_object('source','FRONTEND','batchId',result."BatchID",'savedAt',result."SavedAt",'savedBy',result."SavedBy",
   'isStale',result."ProgramID" IS DISTINCT FROM ${studentAlias}."ProgramID"
+    OR COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0)
     OR ${studentAlias}."Status"<>'ACTIVE'
     OR EXISTS(SELECT 1 FROM "StudentAcademicPlacements" placement WHERE placement."StudentID"=${studentAlias}."StudentID" AND placement."UpdatedAt">result."CheckedAt")
     OR EXISTS(SELECT 1 FROM "StudentCourseResults" history WHERE history."StudentID"=${studentAlias}."StudentID" AND COALESCE(history."UpdatedAt",history."CreatedAt")>result."CheckedAt"))

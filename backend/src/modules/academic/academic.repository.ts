@@ -71,7 +71,7 @@ export async function listRecords(resource: Resource, params: Record<string, unk
   return { items: await enrichListRows({query},result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r))), page: p.page, limit: allCalendarRecords ? Math.max(1,result.rows[0].total) : p.limit, total: result.rows[0].total };
 }
 
-export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>, existingClient?:PoolClient): Promise<T> {
+export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>, existingClient?:PoolClient, calendarLock: 'wait' | 'try' = 'wait'): Promise<T> {
   if(existingClient)return work(existingClient);
   if (!pool) throw academicError('Database is not configured.', 503, 'DATABASE_UNAVAILABLE');
   const client = await pool.connect();
@@ -82,7 +82,12 @@ export async function academicTransaction<T>(work: (client: PoolClient) => Promi
     // application pool indefinitely. Limits apply only to this transaction.
     await client.query("SET LOCAL lock_timeout = '5s'");
     await client.query("SET LOCAL idle_in_transaction_session_timeout = '60s'");
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
+    if (calendarLock === 'try') {
+      const lock = await client.query("SELECT pg_try_advisory_xact_lock(hashtext('academic-calendar')) AS acquired");
+      if (!lock.rows[0]?.acquired) throw Object.assign(new Error('Academic calendar is busy.'), { code: '55P03' });
+    } else {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('academic-calendar'))");
+    }
     const value = await work(client);
     await client.query('COMMIT');
     return value;

@@ -79,7 +79,7 @@
  *             "minimum": 1,
  *             "maximum": 2147483647,
  *             "nullable": true,
- *             "description": "Required for BLOCK3; null for SEMESTER. Block 3 follows its parent in the same academic year."
+ *             "description": "Required for BLOCK3; null for SEMESTER. Block 3 lies within its parent semester."
  *           },
  *           "startDate": {
  *             "type": "string",

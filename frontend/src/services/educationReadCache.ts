@@ -1,7 +1,7 @@
-// Short-lived, memory-only cache. Never persist student data or tokens to storage.
-const TTL_MS = 60_000;
+// Share concurrent requests only. Once a read finishes, the next read must
+// contact the server again. Never persist student data or tokens to storage.
 const MAX_ENTRIES = 1000;
-interface Entry { expiresAt: number; value: Promise<unknown> }
+interface Entry { value: Promise<unknown> }
 const entries = new Map<string, Entry>();
 let session: string | null | undefined;
 
@@ -14,12 +14,11 @@ export function educationRead<T>(key: string, load: () => Promise<T>, signal?: A
   const token = localStorage.getItem('ojt_auth_token');
   if (session !== token) { entries.clear(); session = token; }
   let entry = entries.get(key);
-  if (entry && entry.expiresAt <= Date.now()) { entries.delete(key); entry = undefined; }
   if (!entry) {
     if (entries.size >= MAX_ENTRIES) entries.delete(entries.keys().next().value!);
-    const created: Entry = { expiresAt: Infinity, value: Promise.resolve().then(load) };
+    const created: Entry = { value: Promise.resolve().then(load) };
     created.value = created.value.then(value => {
-      created.expiresAt = Date.now() + TTL_MS;
+      if (entries.get(key) === created) entries.delete(key);
       return value;
     }, error => {
       if (entries.get(key) === created) entries.delete(key);

@@ -7,17 +7,20 @@ import type { CourseResultStatus, StudentAcademicStatus, StudentCourseResult, St
 type DataObject = Record<string, unknown>;
 
 export const STUDENT_STATUS_LABELS: Record<StudentAcademicStatus, string> = {
-  ACTIVE: 'Đang học', INACTIVE: 'Không hoạt động', SUSPENDED: 'Tạm ngưng', GRADUATED: 'Đã tốt nghiệp', DROPPED_OUT: 'Đã thôi học',
+  ACTIVE: 'Đang học', INACTIVE: 'Không hoạt động', SUSPENDED: 'Bảo lưu', GRADUATED: 'Đã tốt nghiệp', DROPPED_OUT: 'Thôi học',
+};
+
+const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> = {
+  SUSPENDED: ['Tạm ngưng', 'Tạm ngừng học'],
+  DROPPED_OUT: ['Đã thôi học'],
 };
 
 export const STUDENT_IMPORT_COLUMNS = [
-  'Mã sinh viên', 'Họ và tên', 'Email', 'Số điện thoại', 'Lớp',
-  'Chương trình đào tạo', 'Trạng thái học vụ', 'Khóa', 'Nhóm',
-  'Học kỳ hiện tại',
+  'Họ và tên', 'Mã sinh viên', 'Email', 'Số điện thoại',
+  'Mã chương trình đào tạo', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
 ];
 export const COURSE_RESULT_COLUMNS = [
-  'Mã sinh viên', 'Mã môn', 'Học kỳ ghi nhận', 'Lần học', 'Trạng thái',
-  'Điểm số', 'Điểm hệ 4',
+  'Mã sinh viên', 'Mã môn', 'Tên môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
 ];
 
 const text = (value: unknown): string =>
@@ -118,8 +121,8 @@ const readRows = (
     Object.values(row).some((v) => text(v) !== ""),
   );
   const aliases = sheetName === 'Danh sách sinh viên'
-    ? [...STUDENT_IMPORT_COLUMNS, 'Trạng thái sinh viên', 'Học kỳ bắt đầu chuyên ngành', 'Kỳ hiện tại', 'Kỳ bắt đầu chuyên ngành', 'MSSV', 'code', 'Họ tên', 'fullName', 'phone', 'className', 'programId', 'programName', 'status', 'studentStatus', 'cohortId', 'cohortCode', 'groupCode', 'Kỳ nhập học chuyên ngành', 'Kỳ nhập học', 'entryAcademicPeriodId', 'currentAcademicPeriodId']
-    : [...COURSE_RESULT_COLUMNS, 'Điểm chữ', 'Nguồn dữ liệu', 'Kỳ học', 'MSSV', 'code', 'courseCode', 'academicPeriodId', 'attemptNumber', 'status', 'score', 'gradePoints', 'grade', 'sourceReference'];
+    ? [...STUDENT_IMPORT_COLUMNS, 'Mã khung chương trình', 'Chương trình đào tạo', 'Lớp', 'Trạng thái sinh viên', 'Học kỳ bắt đầu chuyên ngành', 'Kỳ hiện tại', 'Kỳ bắt đầu chuyên ngành', 'MSSV', 'code', 'Họ tên', 'fullName', 'phone', 'className', 'programId', 'programName', 'status', 'studentStatus', 'cohortId', 'cohortCode', 'groupCode', 'Kỳ nhập học chuyên ngành', 'Kỳ nhập học', 'entryAcademicPeriodId', 'currentAcademicPeriodId']
+    : [...COURSE_RESULT_COLUMNS, 'Học kỳ ghi nhận', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu', 'MSSV', 'code', 'courseCode', 'academicPeriodId', 'attemptNumber', 'status', 'score', 'gradePoints', 'grade', 'sourceReference'];
   const supported = new Set(aliases.map(normalize));
   const unknown = [...new Set(data.flatMap(row => Object.keys(row).filter(key => !supported.has(normalize(key)) && text(row[key]) !== '')))];
   if (unknown.length) throw new Error(`Sheet ${sheetName}: cột chưa được API import hỗ trợ hoặc sai tên: ${unknown.join(', ')}. Hãy dùng mẫu chuẩn để tránh bỏ sót dữ liệu.`);
@@ -137,13 +140,13 @@ const readRows = (
 export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   const book = XLSX.utils.book_new();
   const sheets: [string, string[], number[], number[]][] = [
-    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [20, 28, 36, 18, 18, 30, 25, 16, 12, 25], STUDENT_IMPORT_COLUMNS.map((_, i) => i)],
-    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [20, 20, 25, 14, 20, 14, 16], [0, 1, 2, 4]],
+    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 20, 12, 24], [1, 3, 4, 6, 7, 8]],
+    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 38, 20, 14, 19, 15], [0, 1, 3, 5]],
   ];
   for (const [name, headers, widths, textColumns] of sheets) {
     const sheet = XLSX.utils.aoa_to_sheet([headers]);
     sheet['!cols'] = widths.map(wch => ({ wch }));
-    sheet['!rows'] = [{ hpt: 28 }];
+    sheet['!rows'] = [{ hpt: 36 }];
     const maxRows = name === 'Danh sách sinh viên' ? 500 : 1000;
     // Text format protects student codes, phone zeroes and calendar codes.
     for (let r = 1; r <= maxRows; r++) for (const c of textColumns)
@@ -154,8 +157,61 @@ export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   return book;
 };
 
-export const downloadStudentImportTemplate = () =>
-  XLSX.writeFile(createStudentImportWorkbook(), 'mau-import-sinh-vien-va-bang-diem-PDT.xlsx', { compression: true });
+// SheetJS Community writes values and widths but not header fonts/fills or frozen panes.
+// Add those presentation details to the generated XLSX package without altering cell data.
+export const createStudentImportTemplateFile = (): Uint8Array => {
+  const bytes = XLSX.write(createStudentImportWorkbook(), { type: 'array', bookType: 'xlsx', compression: true });
+  const archive = XLSX.CFB.read(new Uint8Array(bytes), { type: 'array' });
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  const editPart = (path: string, edit: (xml: string) => string) => {
+    const index = archive.FullPaths.findIndex((value: string) => value.endsWith(`/${path}`));
+    if (index < 0) throw new Error(`Không tạo được file Excel mẫu: thiếu ${path}.`);
+    const part = archive.FileIndex[index];
+    part.content = encoder.encode(edit(decoder.decode(part.content)));
+    part.size = part.content.length;
+  };
+  let headerStyle = -1;
+  editPart('xl/styles.xml', xml => {
+    const appendStyle = (tag: string, item: string) => {
+      const pattern = new RegExp(`<${tag} count="(\\d+)">([\\s\\S]*?)<\\/${tag}>`);
+      const match = xml.match(pattern);
+      if (!match) throw new Error(`Không tạo được định dạng Excel mẫu: thiếu ${tag}.`);
+      const index = Number(match[1]);
+      xml = xml.replace(pattern, `<${tag} count="${index + 1}">${match[2]}${item}</${tag}>`);
+      return index;
+    };
+    const fontId = appendStyle('fonts', '<font><b/><sz val="13"/><color rgb="FF334155"/><name val="Calibri"/></font>');
+    const fillId = appendStyle('fills', '<fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill>');
+    headerStyle = appendStyle('cellXfs', `<xf numFmtId="0" fontId="${fontId}" fillId="${fillId}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>`);
+    return xml;
+  });
+  for (let index = 1; index <= 2; index++) {
+    editPart(`xl/worksheets/sheet${index}.xml`, xml => {
+      const view = '<sheetView workbookViewId="0"/>';
+      if (!xml.includes(view)) throw new Error('Không tạo được file Excel mẫu: thiếu cấu hình cố định hàng tiêu đề.');
+      xml = xml.replace(view, '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>');
+      if (index === 1) {
+        const validation = '<dataValidations count="1"><dataValidation type="list" allowBlank="1" showInputMessage="1" promptTitle="Trạng thái học vụ" prompt="Chọn trạng thái bằng tiếng Việt" sqref="F2:F501"><formula1>"Đang học,Bảo lưu,Thôi học"</formula1></dataValidation></dataValidations>';
+        xml = xml.replace('</worksheet>', `${validation}</worksheet>`);
+      }
+      return xml.replace(/<c r="([A-Z]+)1"([^>]*)>/g, (_cell, column: string, attributes: string) => `<c r="${column}1" s="${headerStyle}"${attributes}>`);
+    });
+  }
+  return new Uint8Array(XLSX.CFB.write(archive, { type: 'array', fileType: 'zip' }));
+};
+
+export const downloadStudentImportTemplate = () => {
+  const file = new Blob([Uint8Array.from(createStudentImportTemplateFile())], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'mau-import-sinh-vien-va-bang-diem-PDT.xlsx';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 export const parseStudentImportWorkbook = async (
   file: File,
@@ -170,7 +226,7 @@ export const parseStudentImportWorkbook = async (
   const emails = new Set<string>();
 
   const students: StudentImportRow[] = rows.map((row, index) => {
-    const number = index + 2;
+    const number = typeof row.__rowNum__ === 'number' ? row.__rowNum__ + 1 : index + 2;
 
     const code = getCell(row, ["Mã sinh viên", "MSSV", "code"]).toUpperCase();
 
@@ -197,7 +253,7 @@ export const parseStudentImportWorkbook = async (
     seen.add(code.trim().toUpperCase());
 
     const programId = resolveOption(
-      getCell(row, ["Chương trình đào tạo", "programId", "programName"]),
+      getCell(row, ["Mã chương trình đào tạo", "Mã khung chương trình", "Chương trình đào tạo", "programId", "programName"]),
       catalogs.programs,
       "chương trình đào tạo",
       number,
@@ -226,8 +282,9 @@ export const parseStudentImportWorkbook = async (
     const entryAcademicPeriodId = entry ? resolveOption(entry, catalogs.periods, 'kỳ bắt đầu chuyên ngành', number) : undefined;
     if (catalogs.periods.find(period => period.id === entryAcademicPeriodId)?.kind === 'BLOCK3') throw new Error(`Dòng ${number}: Kỳ bắt đầu chuyên ngành phải là học kỳ thường, không phải Block 3.`);
     const rawStatus = getCell(row, ['Trạng thái học vụ', 'Trạng thái sinh viên', 'studentStatus', 'status']);
-    const status = rawStatus ? (Object.keys(STUDENT_STATUS_LABELS) as StudentAcademicStatus[]).find(key => normalize(key) === normalize(rawStatus) || normalize(STUDENT_STATUS_LABELS[key]) === normalize(rawStatus)) : undefined;
-    if (rawStatus && !status) throw new Error(`Dòng ${number}: Trạng thái sinh viên phải là ${Object.keys(STUDENT_STATUS_LABELS).join(', ')}.`);
+    const status = rawStatus ? (Object.keys(STUDENT_STATUS_LABELS) as StudentAcademicStatus[]).find(key =>
+      [key, STUDENT_STATUS_LABELS[key], ...(STUDENT_STATUS_ALIASES[key] ?? [])].some(label => normalize(label) === normalize(rawStatus))) : undefined;
+    if (rawStatus && !status) throw new Error(`Dòng ${number}: Trạng thái sinh viên phải là Đang học, Bảo lưu hoặc Thôi học.`);
     const phone = getCell(row, ['Số điện thoại', 'phone']);
     const className = getCell(row, ['Lớp', 'className']);
     if (phone.length > 20 || className.length > 20) throw new Error(`Dòng ${number}: Điện thoại và lớp tối đa 20 ký tự.`);
@@ -259,11 +316,11 @@ export const parseStudentImportWorkbook = async (
   const byCode = new Map(
     students.map((student) => [student.code.trim().toUpperCase(), student]),
   );
-  for (const { code, ...result } of results) {
+  for (const { code, rowNumber, ...result } of results) {
     const student = byCode.get(code.trim().toUpperCase());
     if (!student)
       throw new Error(
-        "Bảng điểm có MSSV " +
+        `Sheet Kết quả học tập, dòng ${rowNumber}: Bảng điểm có MSSV ` +
           code +
           " không thuộc danh sách sinh viên trong tệp.",
       );
@@ -319,18 +376,19 @@ const parseStatus = (raw: string, rowNumber: number): CourseResultStatus => {
 const parseCourseResultImportWorkbook = (
   book: XLSX.WorkBook,
   catalogs: AcademicCatalogs,
-): (StudentCourseResult & { code: string })[] => {
+): (StudentCourseResult & { code: string; rowNumber: number })[] => {
 
   const rows = readRows(book, "Kết quả học tập", true);
 
   const seen = new Set<string>();
 
   return rows.map((row, index) => {
-    const number = index + 2;
+    const number = typeof row.__rowNum__ === 'number' ? row.__rowNum__ + 1 : index + 2;
 
     const code = getCell(row, ["Mã sinh viên", "MSSV", "code"]);
 
     const courseCode = getCell(row, ["Mã môn", "courseCode"]);
+    // Tên môn is for the person filling the sheet; the existing import contract resolves the course by code.
 
     const period = getCell(row, ['Học kỳ ghi nhận', "Kỳ học", "academicPeriodId"]);
 
@@ -392,6 +450,7 @@ const parseCourseResultImportWorkbook = (
 
     return {
       code,
+      rowNumber: number,
       courseCode,
       academicPeriodId,
       status,

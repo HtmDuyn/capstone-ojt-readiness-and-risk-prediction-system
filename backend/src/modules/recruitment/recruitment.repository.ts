@@ -2,12 +2,16 @@ import type { PoolClient } from 'pg';
 import { invalid } from '../students/student.validation';
 import { enterpriseScope } from '../qhdn/catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
-import { currentRoundPhase } from './round-policy';
+import { currentRoundPhase, roundActions, hasPhaseSchedule, phaseIsOpen } from './round-policy';
 
 export { type Actor, type Row };
+export const previousRoundSelect=`EXISTS(SELECT 1 FROM "RecruitmentWindows" previous
+ WHERE previous."OJTSemesterID"=w."OJTSemesterID" AND previous."WindowID"<>w."WindowID"
+ AND previous."StartsAt"<w."StartsAt"
+ AND (previous."EndsAt">clock_timestamp() OR previous."ResultsFinalizedAt" IS NULL)) AS "PreviousRoundPending"`;
 export async function windowRecord(c: PoolClient,id: number) {
  const w=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Kind",p."Status" AS "PeriodStatus",
- p."EndDate" AS "PeriodEndDate",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow"
+ p."EndDate" AS "PeriodEndDate",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow",${previousRoundSelect}
  FROM "RecruitmentWindows" w JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=w."AcademicPeriodID"
  JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID" WHERE w."WindowID"=$1 FOR UPDATE OF w`,[id])).rows[0];
  if (!w) throw invalid('Recruitment window not found.',404,'RECRUITMENT_WINDOW_NOT_FOUND');
@@ -21,7 +25,12 @@ export function assertOpen(w: Row) {
 }
 export const windowApi=(w:Row)=>({id:w.WindowID,ojtSemesterId:w.OJTSemesterID,academicPeriodId:w.AcademicPeriodID,periodCode:w.PeriodCode,
  periodName:w.PeriodName,name:w.Name,startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status,
- campaignId:w.CampaignID,roundNumber:w.RoundNumber,currentPhase:currentRoundPhase(w),
+ campaignId:w.CampaignID,roundNumber:w.RoundNumber,currentPhase:currentRoundPhase(w),...roundActions(w),
+ postingStartsAt:w.PostingStartsAt,postingEndsAt:w.PostingEndsAt,applicationStartsAt:w.ApplicationStartsAt,applicationEndsAt:w.ApplicationEndsAt,
+ resultsStartsAt:w.ResultsStartsAt,resultsEndsAt:w.ResultsEndsAt,
+ canPost:hasPhaseSchedule(w)?phaseIsOpen(w,'POSTING'):currentRoundPhase(w)==='OPEN',
+ canApply:hasPhaseSchedule(w)?phaseIsOpen(w,'APPLICATION'):currentRoundPhase(w)==='OPEN',
+ canRespond:hasPhaseSchedule(w)?phaseIsOpen(w,'RESULTS'):w.Status==='OPEN'&&!w.ResultsFinalizedAt,
 
  resultsFinalizedAt:w.ResultsFinalizedAt,resultsSummary:w.ResultsSummary,
  accepting:w.Status==='OPEN'&&new Date(w.StartsAt)<=new Date(w.DatabaseNow)&&new Date(w.EndsAt)>new Date(w.DatabaseNow)&&!['CLOSED','ARCHIVED'].includes(w.PeriodStatus),
@@ -29,12 +38,13 @@ export const windowApi=(w:Row)=>({id:w.WindowID,ojtSemesterId:w.OJTSemesterID,ac
 
 export const postSelect=`SELECT p.*,w."AcademicPeriodID",ap."PeriodCode",e."Name" AS "CompanyName",
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',pos."PositionID",'code',pos."RecruitmentCode",'title',pos."Title",
- 'description',pos."Description",'requirements',pos."Requirements",'capacity',pos."Capacity",'remainingSlots',GREATEST(0,pos."Capacity"-(SELECT count(*)::int FROM "InternshipAssignments" slot WHERE slot."PositionID"=pos."PositionID" AND COALESCE(UPPER(slot."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))),'status',pos."Status",'location',pos."Location",'workMode',pos."WorkMode") ORDER BY pos."PositionID")
+ 'description',pos."Description",'requirements',pos."Requirements",'capacity',pos."Capacity",'remainingSlots',GREATEST(0,pos."Capacity"-public."RecruitmentOccupiedSlots"(pos."PositionID")),'status',pos."Status",'location',pos."Location",'workMode',pos."WorkMode") ORDER BY pos."PositionID")
  FROM "RecruitmentPostPositions" pp JOIN "InternshipPositions" pos ON pos."PositionID"=pp."PositionID" WHERE pp."PostID"=p."PostID"),'[]'::jsonb) AS positions
  FROM "RecruitmentPosts" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
  LEFT JOIN "RecruitmentWindows" w ON w."WindowID"=p."WindowID"
  LEFT JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=w."AcademicPeriodID"`;
 export const postApi=(p:Row)=>({id:p.PostID,ojtSemesterId:p.OJTSemesterID,windowId:p.WindowID,academicPeriodId:p.AcademicPeriodID,periodCode:p.PeriodCode,
+ sourcePostId:p.SourcePostID??null,
  companyId:p.EnterpriseID,companyName:p.CompanyName,title:p.Title,content:p.Content,benefits:p.Benefits,
  applicationInstructions:p.ApplicationInstructions,status:p.Status==='PUBLISHED'&&p.DeadlineAt&&new Date(p.DeadlineAt).getTime()<=Date.now()?'CLOSED':p.Status,deadlineAt:p.DeadlineAt,publishedAt:p.PublishedAt,
  reviewReason:p.ReviewReason,reviewedAt:p.ReviewedAt,positions:p.positions,createdAt:p.CreatedAt,updatedAt:p.UpdatedAt});

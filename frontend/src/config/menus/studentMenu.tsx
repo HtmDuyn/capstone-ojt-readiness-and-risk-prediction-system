@@ -80,7 +80,7 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
 
   {
     id: 'internship-progress',
-    label: 'Nhiệm vụ thực tập',
+    label: 'Nhiệm vụ OJT',
     path: '/student/internship-progress',
     icon: <InternshipProgressIcon size={20} />,
     banner: {

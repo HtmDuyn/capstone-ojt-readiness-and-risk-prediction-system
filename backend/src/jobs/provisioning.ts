@@ -38,10 +38,24 @@ export async function deliverEmails() {
         if (!delivery.accepted.length) throw new Error('SMTP_REJECTED');
         await query('UPDATE "EmailOutbox" SET "Status"=\'SENT\',"SentAt"=now(),"EncryptedPayload"=NULL,"LeaseUntil"=NULL,"LastError"=NULL WHERE "EmailID"=$1 AND "Status"=\'SENDING\'', [e.EmailID]);
         sent++;
-      } catch {
+      } catch (error: any) {
         // Never persist SMTP responses or email content: they may include credentials.
+        const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS'];
+        const errorCode = knownCodes.includes(error?.code) ? error.code : 'EMAIL_DELIVERY_FAILED';
+        const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
+          ? error.responseCode : undefined;
+        const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
+        // Authentication is shared by every recipient. Pause this batch without
+        // exhausting delivery attempts while an operator repairs SMTP credentials.
+        if (errorCode === 'EAUTH') {
+          await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
+            "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+          console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}. Check SMTP_USER and SMTP_PASSWORD; Gmail requires an app password. Batch paused.`);
+          break;
+        }
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,
-          "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"='EMAIL_DELIVERY_FAILED' WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID]);
+          "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+        console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}.`);
       }
     }
     await query(`UPDATE "EmailOutbox" SET "Status"='FAILED',"LeaseUntil"=NULL,"LastError"='DELIVERY_LEASE_EXPIRED' WHERE "Status"='SENDING' AND "LeaseUntil"<now() AND "Attempts">=5`);
@@ -49,14 +63,21 @@ export async function deliverEmails() {
   return sent;
 }
 
+let wakeProvisioning: (() => void) | undefined;
+
+export function scheduleAccountEmailDelivery() {
+  wakeProvisioning?.();
+}
+
 export function startProvisioningJobs() {
   let busy = false, stopped = false;
+  let requested = false;
   const tick = async () => {
     if (busy || stopped) return;
     busy = true;
     try {
       // Deliver result notifications and account emails independently.
-      for(const [name,job] of [['results',notifyCompletedInternships],['email',deliverEmails]] as const) {
+      for(const [name,job] of [['email',deliverEmails],['results',notifyCompletedInternships]] as const) {
         try { await job(); }
         catch (error: any) {
           // Log codes only: SMTP messages may contain recipient data or credentials.
@@ -67,16 +88,32 @@ export function startProvisioningJobs() {
           console.error(`Provisioning ${name} job failed. Code: ${code}.`,
             code === 'DB_CONNECTION_TIMEOUT' ? `Timed out acquiring a database connection. Pool total=${pool?.totalCount}, idle=${pool?.idleCount}, waiting=${pool?.waitingCount}.` :
             code === 'EMAIL_KEY_INVALID' ? 'EMAIL_OUTBOX_KEY must contain exactly 64 hexadecimal characters.' :
+            ['ENOTFOUND','EAI_AGAIN'].includes(code) ? 'Cannot resolve the database hostname. Check DB_HOST or the connection URL and network DNS. The job will retry on its next scheduled run.' :
             code === '57014' ? 'Database statement timed out.' :
             code === 'XX000' ? 'Database/pooler error; check connection capacity.' :
             name === 'email' ? 'Check database and mail configuration.' : 'Check database connection, locks and schema.');
         }
       }
     }
-    finally { busy = false; }
+    finally {
+      busy = false;
+      if (requested && !stopped) {
+        requested = false;
+        void tick();
+      }
+    }
   };
+  const wake = () => {
+    if (busy) requested = true;
+    else void tick();
+  };
+  wakeProvisioning = wake;
   const timer = setInterval(() => void tick(), 60000);
   timer.unref();
   void tick();
-  return () => { stopped = true; clearInterval(timer); };
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+    if (wakeProvisioning === wake) wakeProvisioning = undefined;
+  };
 }

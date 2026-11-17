@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AccountNotificationBell } from './AccountNotificationBell';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Building2 } from 'lucide-react';
 import {
   SearchIcon,
-  NotificationBellIcon,
   GlobeIcon,
   MenuIcon,
   LogoutIcon,
@@ -103,14 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right: Notification, Language, User profile */}
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Notification Bell */}
-        {showNotifications && <button
-          type="button"
-          className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors cursor-pointer"
-          title="Thông báo"
-        >
-          <NotificationBellIcon size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full ring-2 ring-white animate-pulse" />
-        </button>}
+        {showNotifications && <AccountNotificationBell />}
 
         {/* Language selector */}
         {showLanguage && <button
@@ -123,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden sm:inline">{lang}</span>
         </button>}
 
-        <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />
+        {(showNotifications || showLanguage) && <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />}
 
         {/* User Profile Info & Avatar */}
         <div className="relative" ref={dropdownRef}>
@@ -142,14 +135,17 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="relative">
-              {currentUser.avatar?.trim() ? <img
-                src={currentUser.avatar}
-                alt={currentUser.fullName}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/40 shadow-xs"
-              /> : <span
-                aria-label={currentUser.fullName}
-                className="flex w-9 h-9 sm:w-10 sm:h-10 items-center justify-center rounded-full bg-orange-100 font-bold text-orange-700 ring-2 ring-orange-500/40 shadow-xs"
-              >{currentUser.fullName.trim().slice(0, 1).toUpperCase() || '?'}</span>}
+              {currentUser.avatar?.trim() ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.fullName}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-orange-500/40 shadow-xs"
+                />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700 ring-2 ring-orange-500/40 shadow-xs sm:h-10 sm:w-10" aria-label={currentUser.fullName}>
+                  {currentUser.fullName.trim().charAt(0).toUpperCase() || '?'}
+                </span>
+              )}
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
             </div>
           </button>

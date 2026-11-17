@@ -10,5 +10,6 @@ export type LocalOjtResult = {
   studentId: number; status: EligibilityStatus; earnedCredits: number | null;
   unpassedCourseCount: number; reasons: string[]; academicIssues: string[]; checkedAt: string;
   savedAt?: string; isStale?: boolean;
+  policyVersion?: number;
 };
 

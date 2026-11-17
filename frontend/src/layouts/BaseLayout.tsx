@@ -28,6 +28,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isEducation = user?.role === 'education';
+  const hideHeaderTools = user?.role === 'enterprise' || user?.role === 'qhdn';
   const RoleSidebar = isEducation ? EducationSidebar : Sidebar;
 
   const handleLogout = () => {
@@ -75,11 +76,12 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           {/* Header trên cùng */}
           <Header
             user={resolvedUserSummary}
-            showNotifications={!isEducation}
-            showLanguage={!isEducation}
+            showNotifications={!isEducation && !hideHeaderTools}
+            showLanguage={!isEducation && !hideHeaderTools}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
             showSearch={
+              !hideHeaderTools &&
               brandSubtitle !== "Phòng Đào tạo" &&
               brandSubtitle !== "Quản trị viên"
             }

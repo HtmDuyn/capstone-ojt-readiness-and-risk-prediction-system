@@ -80,6 +80,7 @@ export function Pager({
       </span>
       <div className="flex gap-2">
         <button
+          type="button"
           className={control}
           disabled={busy || page <= 1}
           onClick={() => onChange(page - 1)}
@@ -87,6 +88,7 @@ export function Pager({
           Trước
         </button>
         <button
+          type="button"
           className={control}
           disabled={busy || page >= pages}
           onClick={() => onChange(page + 1)}
@@ -110,7 +112,7 @@ export function Table({
         <thead className="border-b bg-slate-50">
           <tr>
             {headers.map((h) => (
-              <th className="whitespace-nowrap p-3" key={h}>
+              <th scope="col" className={'whitespace-nowrap p-3 ' + (h === 'STT' ? 'w-16 text-center' : '')} key={h}>
                 {h}
               </th>
             ))}

@@ -18,9 +18,9 @@
  *           maxItems: 500
  *           items:
  *             type: object
- *             required: [code, email, fullName]
+ *             required: [email, fullName]
  *             properties:
- *               code: { type: string, maxLength: 20 }
+ *               code: { type: string, maxLength: 20, description: Required for STUDENT. Generated automatically for ENTERPRISE when omitted or blank. }
  *               email: { type: string, format: email, maxLength: 100 }
  *               fullName: { type: string, maxLength: 150 }
  *               name: { type: string, description: Required enterprise name }

@@ -45,6 +45,7 @@ const requestJson = async <T>(
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    cache:'no-store',
     headers,
   });
 

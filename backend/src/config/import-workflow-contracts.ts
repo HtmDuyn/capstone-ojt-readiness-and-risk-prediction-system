@@ -13,15 +13,19 @@ export function describeImportWorkflow(spec: Record<string,any>) {
   }};
   const schema=spec.components.schemas.AccountImportRequest;
   schema.properties.rows.items.properties.academic=academic;
-  schema.properties.rows.items.properties.code.description='Stable enterprise/student business code, distinct from database ID.';
+  schema.oneOf=[
+    {properties:{kind:{enum:['STUDENT']},rows:{items:{type:'object',required:['code','academic']}}}},
+    {properties:{kind:{enum:['ENTERPRISE']},rows:{items:{type:'object',required:['name']}}}},
+  ];
+  schema.properties.rows.items.properties.code.description='Mã sinh viên bắt buộc. Mã doanh nghiệp tự sinh theo dạng DN000001 khi bỏ trống; mã cũ vẫn được chấp nhận để tương thích file đã có.';
   const studentExample={kind:'STUDENT',idempotencyKey:'student-full-001',rows:[{code:'SV001',email:'student@example.com',fullName:'Nguyễn Văn A',academic:{programId:1,className:'SE01',placement:{cohortId:1,groupCode:'A',currentAcademicPeriodId:1},courseResults:[{courseCode:'PRF192',academicPeriodId:1,status:'PASSED',score:8,gradePoints:3.5,grade:'B'}]}}]};
-  const enterpriseExample={kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{code:'DN001',email:'hr@example.com',fullName:'Người phụ trách',name:'Công ty ABC'}]};
+  const enterpriseExample={kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{email:'hr@example.com',fullName:'Người phụ trách',name:'Công ty ABC'}]};
   schema.example=enterpriseExample;
   for(const mode of ['preview','commit']){
     const op=spec.paths[`/api/imports/${mode}`].post;
     op.summary=mode==='preview'?'Kiểm tra import doanh nghiệp hoặc sinh viên':'Import doanh nghiệp (QHDN) hoặc sinh viên (Phòng đào tạo/Admin)';
     op.requestBody={required:true,content:{'application/json':{schema:{$ref:'#/components/schemas/AccountImportRequest'},examples:{enterprise:{summary:'Tạo tài khoản doanh nghiệp liên kết',value:enterpriseExample},student:{summary:'Import sinh viên qua student-imports',value:studentExample}}}}};
-    op.description='Chỉ OJT_COORD được import tài khoản ENTERPRISE. Mỗi dòng gồm code, email, fullName, name; không nhập hồ sơ, JD, vị trí, kỳ hoặc đợt tuyển dụng. Tài khoản mới nhận email mật khẩu tạm và phải đổi mật khẩu trước khi sử dụng. Tài khoản đã tồn tại được báo trùng; dữ liệu cũ được giữ nguyên. Retry dùng cùng idempotencyKey và payload.';
+    op.description='Chỉ OJT_COORD được import tài khoản ENTERPRISE. Mỗi dòng gồm email, fullName, name; mã doanh nghiệp tự sinh khi không gửi code. Không nhập hồ sơ, JD, vị trí, kỳ hoặc đợt tuyển dụng. Mã trong preview là dự kiến; mã chính thức được cấp trong giao dịch tạo tài khoản và gửi trong email. Tài khoản mới nhận email mật khẩu tạm và phải đổi mật khẩu trước khi sử dụng. Tài khoản đã tồn tại được báo trùng; dữ liệu cũ được giữ nguyên. Retry dùng cùng idempotencyKey và payload.';
   }
   spec.paths['/api/enterprise/tasks/bulk']={post:{
     summary:'Giao một hoặc nhiều task cho nhiều thực tập sinh',

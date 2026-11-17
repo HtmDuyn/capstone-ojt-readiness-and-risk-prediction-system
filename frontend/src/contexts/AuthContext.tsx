@@ -10,6 +10,7 @@ import type {
   AuthUser,
   AuthContextValue,
 } from "../types/auth.types";
+import { authService } from "../services/authService";
 import { expireSession, SESSION_EXPIRED_EVENT, tokenExpiry } from '../services/authSession';
 
 export type { UserRole, AuthUser, AuthContextValue };
@@ -86,8 +87,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(newUser);
   }, []);
 
-  /** Xóa tất cả trạng thái xác thực và dữ liệu đã lưu. */
+  /** Gọi API bằng token hiện tại và xóa trạng thái đăng nhập trên máy. */
   const logout = useCallback(() => {
+    const currentToken = localStorage.getItem(TOKEN_KEY);
+    if (currentToken) {
+      // Capture the bearer token before clearing storage. Local sign-out still
+      // completes immediately when the API is unavailable or the token expired.
+      void authService.logout(currentToken).catch(() => {
+        console.warn('Không gọi được API logout. Đã xóa phiên đăng nhập trên trình duyệt.');
+      });
+    }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setToken(null);

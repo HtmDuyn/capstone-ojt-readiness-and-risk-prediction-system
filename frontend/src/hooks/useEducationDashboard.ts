@@ -5,7 +5,8 @@ import { getAllItems, getJson } from '@/services/educationApi';
 import type { AcademicPeriod, AcademicYear, QueryParams } from '@/types/education/dashboard.types';
 import type { Cohort } from '@/types/education/reporting.types';
 import { downloadCourseDemand } from '@/utils/downloadFile';
-import { getErrorMessage, parseAcademicPeriods, parseAcademicYears, parseAlerts, parseCohortProgress, parseCourseDemand, parsePeriodStatistics, readNumber, toApiId } from '@/utils/educationDashboard';
+import { getErrorMessage, isCanceledRequest, parseAcademicPeriods, parseAcademicYears, parseCohortProgress, parseCourseDemand, parsePeriodStatistics, readNumber, toApiId } from '@/utils/educationDashboard';
+import { academicAlertOverview, type AlertRow } from '@/utils/academicAlertOverview';
 import React, { useEffect, useMemo, useState } from 'react';
 
 /* =========================================================
@@ -52,7 +53,7 @@ export function useEducationDashboard() {
 
   const [courseDemandData, setCourseDemandData] = useState<unknown>(null);
 
-  const [alertsData, setAlertsData] = useState<unknown>(null);
+  const [alertsData, setAlertsData] = useState<AlertRow[] | null>(null);
 
   /* ---------------- LOADING ---------------- */
 
@@ -192,9 +193,9 @@ export function useEducationDashboard() {
     const controller = new AbortController();
     setCourseDemandLoading(true); setCourseDemandError(''); setCourseDemandData(null);
     educationRead(`demand:${JSON.stringify(dashboardParams)}`, () =>
-      getJson(API_PATHS.courseDemand, { page: 1, limit: 20, ...dashboardParams }), controller.signal)
+      getAllItems(API_PATHS.courseDemand, dashboardParams), controller.signal)
       .then(data => { if (!controller.signal.aborted) setCourseDemandData(data); })
-      .catch(error => { if (!controller.signal.aborted) setCourseDemandError(getErrorMessage(error)); })
+      .catch(error => { if (!controller.signal.aborted && !isCanceledRequest(error)) setCourseDemandError(`Không tải được nhu cầu học phần: ${getErrorMessage(error)}`); })
       .finally(() => { if (!controller.signal.aborted) setCourseDemandLoading(false); });
     return () => controller.abort();
   }, [dashboardParams, refreshKey]);
@@ -214,22 +215,16 @@ export function useEducationDashboard() {
       setAlertsData(null);
 
       try {
-        const response = await educationRead(`alerts:${JSON.stringify(dashboardParams)}`, () => getJson(
-          API_PATHS.alerts,
-          {
-            page: 1,
-            limit: 10,
-            ...dashboardParams,
-          },
-        ), controller.signal);
+        const response = await educationRead(`alerts:${JSON.stringify(dashboardParams)}`, () =>
+          getAllItems<AlertRow>(API_PATHS.alerts, dashboardParams), controller.signal);
 
         if (controller.signal.aborted) return;
 
         setAlertsData(response);
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || isCanceledRequest(error)) return;
 
-        setAlertsError(getErrorMessage(error));
+        setAlertsError(`Không tải được cảnh báo học vụ: ${getErrorMessage(error)}`);
       } finally {
         if (!controller.signal.aborted) {
           setAlertsLoading(false);
@@ -283,26 +278,14 @@ export function useEducationDashboard() {
     "eligibility.ineligibleStudents",
     "dashboard.ineligibleStudents",
   ]);
+  const reviewRequiredStudents = readNumber(dashboardData, ["summary.insufficientData", "summary.currentEvaluation.reviewRequired"]);
 
-  const alertCount =
-    readNumber(alertsData, [
-      "total",
-      "totalItems",
-      "totalElements",
-      "totalCount",
-      "pagination.total",
-    ]) ??
-    readNumber(dashboardData, [
-      "alertCount",
-      "totalAlerts",
-      "academicAlertCount",
-      "summary.alertCount",
-      "dashboard.alertCount",
-    ]);
+  const alertOverview = useMemo(() => alertsData ? academicAlertOverview(alertsData) : null, [alertsData]);
+  const alertCount = alertOverview?.total ?? null;
 
   const assessedStudents =
-    eligibleStudents !== null && ineligibleStudents !== null
-      ? eligibleStudents + ineligibleStudents
+    eligibleStudents !== null && ineligibleStudents !== null && reviewRequiredStudents !== null
+      ? eligibleStudents + ineligibleStudents + reviewRequiredStudents
       : null;
 
   const eligiblePercent =
@@ -334,7 +317,6 @@ export function useEducationDashboard() {
     [courseDemandData],
   );
 
-  const academicAlerts = useMemo(() => parseAlerts(alertsData), [alertsData]);
 
   const maxPeriodStudents = Math.max(
     1,
@@ -373,5 +355,5 @@ export function useEducationDashboard() {
     } catch (error) { setExportError(getErrorMessage(error)); }
     finally { setExporting(false); }
   };
-  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId,  totalStudents, eligibleStudents, ineligibleStudents, alertCount, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, academicAlerts, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
+  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
 }

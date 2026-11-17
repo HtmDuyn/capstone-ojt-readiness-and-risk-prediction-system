@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { OjtRiskPanel } from '@/components/student/dashboard/OjtRiskPanel';
+import { CreditProgressChart, RiskLevelChart } from '@/components/student/dashboard/DashboardCharts';
 import { RiskInsights } from '@/components/student/ojt-risk/RiskInsights';
 import { LearningRoadmap, RoadmapNotes } from '@/components/student/ojt-risk/LearningRoadmap';
 import { RecommendationSummary } from '@/components/student/ojt-risk/RecommendationSummary';
@@ -46,16 +47,17 @@ export const StudentDashboard = () => {
             <div className="w-full sm:w-60"><StudentSemesterSelect /></div>
           </div>
           <div className="grid gap-5 py-5 lg:grid-cols-3 lg:gap-0">
-            <div className="min-w-0 lg:pr-5"><h3 className={heading}>Đánh giá mức độ rủi ro OJT</h3>
-              {risk ? <><p className={`mt-3 inline-flex rounded-full border px-3 py-1 text-sm font-bold ${riskTheme[risk.risk.level].badge}`}>{riskTheme[risk.risk.level].label}</p>
-                {risk.risk.level !== 'LOW' && <p className="mt-3 text-sm leading-relaxed text-slate-500">{riskTheme[risk.risk.level].description}</p>}
+            <div className="min-w-0 lg:pr-5"><h3 className={heading}>Mức cảnh báo AI về OJT</h3>
+              {risk ? <><RiskLevelChart level={risk.risk.level} />
+                <p className={`mx-auto mt-3 w-fit rounded-full border px-3 py-1 text-sm font-bold ${riskTheme[risk.risk.level].badge}`}>{riskTheme[risk.risk.level].label}</p>
+                <p className="mt-3 text-sm leading-relaxed text-slate-500">{riskTheme[risk.risk.level].description}</p>
                 <p className="mt-2 text-xs text-slate-500">Cập nhật: {dateText(risk.risk.computedAt)}</p></>
                 : <p className="mt-3 text-sm text-slate-500">Đang tải đánh giá rủi ro…</p>}</div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:px-5 lg:pt-0">
               <h3 className={heading}>Tiến độ chương trình đào tạo</h3>
-              <p className="mt-3 text-2xl font-bold text-slate-900">{credits?.earned ?? '—'} / {credits?.total ?? '—'} <span className="text-base font-medium text-slate-500">tín chỉ</span></p>
-              {percent !== null && <><p className="mt-1 text-sm font-semibold text-slate-700">{percent}% hoàn thành</p>
-                <progress className="mt-3 h-2 w-full accent-blue-600" value={credits?.earned ?? 0} max={credits?.total ?? 1} /></>}
+              <CreditProgressChart percent={percent} />
+              <p className="mt-3 text-center text-xl font-bold text-slate-900">{credits?.earned ?? '—'} / {credits?.total ?? '—'} <span className="text-sm font-medium text-slate-500">tín chỉ</span></p>
+              <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" />Đã tích lũy</span><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-200" />Còn lại</span></div>
               <p className="mt-2 text-sm text-slate-500">{statusText(profile?.academicProgress.status)}</p>
               <Link to="/student/academic-profile" className={`${link} mt-3 inline-block`}>Xem bảng điểm và chương trình</Link>
             </div>

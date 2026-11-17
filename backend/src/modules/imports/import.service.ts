@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../../config/database';
 import { encryptEmail, emailKey } from './email.crypto';
 import { fail, validateImport } from './import.validation';
+import { assignEnterpriseCodes } from './enterprise-code';
 import { saveHistory, recordRejected, safeRow } from '../students/academic-import.service';
 
 import { importAcademicProfile } from '../students/complete-import.service';
@@ -40,6 +41,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       if(onCommit&&!preview){await onCommit(client,result);await client.query('COMMIT');}else await client.query('ROLLBACK');
       return result;
     }
+    if (input.kind === 'ENTERPRISE') await assignEnterpriseCodes(client, input.rows);
     const plans: { row: typeof input.rows[number]; userId?: number; entityId?: number; previousCode?: string; action: string }[] = [];
     for (let i = 0; i < input.rows.length; i++) {
       const row = input.rows[i];
@@ -86,17 +88,20 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     }
     const batch = await client.query('INSERT INTO "AccountImportBatches" ("IdempotencyKey","PayloadHash","Kind","OJTSemesterID","ImportedBy","Summary","RecruitmentWindowID") VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING "BatchID"', [input.idempotencyKey, payloadHash, input.kind, input.semesterId ?? null, actorId, summary, input.windowId ?? null]);
     const batchId = batch.rows[0].BatchID;
+    // Preview writes are rolled back. Reuse one valid hash instead of running
+    // the expensive password KDF for every account that will not be kept.
+    const previewPasswordHash = preview && plans.some(p => !p.userId) ? await bcrypt.hash(randomBytes(18).toString('base64url'), 12) : undefined;
     for (let i = 0; i < plans.length; i++) {
       const p = plans[i], row = p.row;
       if (!p.userId) {
-        const password = randomBytes(18).toString('base64url');
+        const password = preview ? '' : randomBytes(18).toString('base64url');
         const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
-        const hash = await bcrypt.hash(password, 12);
+        const hash = previewPasswordHash ?? await bcrypt.hash(password, 12);
         const user = await client.query('INSERT INTO "Users" ("Username","Email","FullName","PasswordHash","RoleID","MustChangePassword","TemporaryPasswordExpiresAt") SELECT $1,$2,$3,$4,"RoleID",true,$5 FROM "Roles" WHERE "RoleCode"=$6 RETURNING "UserID"', [`${input.kind.toLowerCase()}_${row.code}`, row.email, row.fullName, hash, expiresAt, input.kind]);
         if (!user.rows.length) throw fail('Required role is missing.', 503);
         p.userId = user.rows[0].UserID;
         if (!preview) {
-        const payload = encryptEmail({ subject: 'Tài khoản hệ thống OJT', text: `Xin chào ${row.fullName},\nEmail đăng nhập: ${row.email}\nTên tài khoản: ${input.kind.toLowerCase()}_${row.code}\nMật khẩu tạm: ${password}\nĐăng nhập: ${process.env.FRONTEND_LOGIN_URL}\nMật khẩu tạm hết hạn: ${expiresAt.toISOString()}. Bạn phải đổi mật khẩu sau khi đăng nhập.` });
+        const payload = encryptEmail({ subject: 'Tài khoản hệ thống OJT', text: `Xin chào ${row.fullName},\n${input.kind === 'ENTERPRISE' ? `Mã doanh nghiệp: ${row.code}\n` : ''}Email đăng nhập: ${row.email}\nTên tài khoản: ${input.kind.toLowerCase()}_${row.code}\nMật khẩu tạm: ${password}\nĐăng nhập: ${process.env.FRONTEND_LOGIN_URL}\nMật khẩu tạm hết hạn: ${expiresAt.toISOString()}. Bạn phải đổi mật khẩu sau khi đăng nhập.` });
         await client.query('INSERT INTO "EmailOutbox" ("UserID","Recipient","EncryptedPayload","ExpiresAt") VALUES ($1,$2,$3,$4)', [p.userId, row.email, payload, expiresAt]);
         }
       }

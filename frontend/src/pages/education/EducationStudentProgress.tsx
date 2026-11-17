@@ -3,9 +3,7 @@ import { useEducationStudentProgress } from '@/hooks/useEducationStudentProgress
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronRight,
   Circle,
-  Clock3,
   GraduationCap,
   TrendingUp,
   X,
@@ -14,7 +12,7 @@ import {
 import React from "react";
 
 import { PageBanner } from "@/components/common/PageBanner";
-import type { OjtEligibilityStatus, ProgressStatus, StudentProgress, SubjectStatus } from '@/types/education/studentProgress.types';
+import type { OjtEligibilityStatus, StudentProgress, SubjectStatus } from '@/types/education/studentProgress.types';
 
 /* =========================================================
    TYPES
@@ -59,12 +57,9 @@ const SUBJECT_STATUS_STYLES: Record<SubjectStatus, string> = {
   "Chưa xác định": "bg-slate-100 text-slate-500 border-slate-200",
 };
 
-const PROGRESS_STATUS_STYLES: Record<ProgressStatus, string> = {
-  "Đúng tiến độ": "bg-emerald-50 text-emerald-700 border-emerald-200",
-
-  "Chậm tiến độ": "bg-red-50 text-red-700 border-red-200",
-
-  "Chưa xác định": "bg-slate-100 text-slate-600 border-slate-200",
+const SUBJECT_STATUS_LABELS: Partial<Record<SubjectStatus, string>> = {
+  "Not Started": "Chưa học",
+  "Not Passed": "Không đạt",
 };
 
 const OJT_ELIGIBILITY_STYLES: Record<OjtEligibilityStatus, string> = {
@@ -134,25 +129,21 @@ const EducationStudentProgress: React.FC = () => {
 
       {selectedStudent && (
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-slate-950/40 p-3 backdrop-blur-[2px] sm:p-4"
           onClick={handleCloseStudentDetail}
         >
           <div
-            className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[92dvh]"
             onClick={(event) => event.stopPropagation()}
           >
             {/* HEADER */}
 
-            <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
-              <div>
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="min-w-0 pr-3">
                 <h2 className="text-xl font-black text-slate-900">
                   Chi tiết Tiến độ Học tập & Điều kiện OJT
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Theo dõi kết quả học tập, tiến độ và điều kiện tham gia OJT
-                  của sinh viên.
-                </p>
               </div>
 
               <button
@@ -166,19 +157,19 @@ const EducationStudentProgress: React.FC = () => {
 
             {/* BODY */}
 
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-6">
+            <div className="min-h-0 min-w-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto break-words px-4 py-6 sm:px-6">
               {selectedStudent.dataWarning && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">{selectedStudent.dataWarning}</p>}
+              <div className="space-y-4">
               {/* STUDENT INFO */}
 
-              <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-                <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-500">
-                      <GraduationCap size={27} />
+              <section className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:px-5">
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-500 sm:h-12 sm:w-12">
+                      <GraduationCap size={24} />
                     </div>
 
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-800">
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-bold text-slate-800 sm:text-xl">
                         {selectedStudent.fullName}
                       </h2>
 
@@ -186,43 +177,21 @@ const EducationStudentProgress: React.FC = () => {
                         {selectedStudent.studentCode}
                       </p>
 
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-600">
-                          Khóa {selectedStudent.cohort}
-                        </span>
-
-                        <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-600">
-                          Lớp {selectedStudent.studentClass}
-                        </span>
-
-                        <span className="rounded-full bg-blue-50 px-3 py-1.5 font-medium text-blue-700">
-                          {selectedStudent.curriculumCode}
-                        </span>
+                      <div className="mt-2 flex max-w-full flex-wrap gap-x-5 gap-y-1 text-sm">
+                        <p className="min-w-0 break-words text-slate-700">
+                          <span className="font-semibold text-slate-900">Khóa:</span>{' '}{selectedStudent.cohort}
+                        </p>
+                        <p className="min-w-0 break-words text-slate-700">
+                          <span className="font-semibold text-slate-900">Khung chương trình:</span>{' '}{selectedStudent.curriculumCode}
+                        </p>
                       </div>
                     </div>
-                  </div>
-
-                  <span
-                    className={`inline-flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${
-                      PROGRESS_STATUS_STYLES[selectedStudent.progressStatus]
-                    }`}
-                  >
-                    {selectedStudent.progressStatus === "Đúng tiến độ" ? (
-                      <CheckCircle2 size={17} />
-                    ) : selectedStudent.progressStatus === "Chậm tiến độ" ? (
-                      <AlertTriangle size={17} />
-                    ) : (
-                      <Circle size={17} />
-                    )}
-
-                    {selectedStudent.progressStatus}
-                  </span>
                 </div>
               </section>
 
               {/* SUMMARY */}
 
-              <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
                   <p className="text-sm text-slate-500">GPA hiện tại</p>
 
@@ -232,7 +201,6 @@ const EducationStudentProgress: React.FC = () => {
                       : selectedStudent.gpa.toFixed(3)}
                   </p>
 
-                  <p className="mt-1 text-xs text-slate-400">Thang điểm 10</p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -258,46 +226,26 @@ const EducationStudentProgress: React.FC = () => {
                       ? "—"
                       : `Kỳ ${selectedStudent.currentCurriculumSemester}`}
                   </p>
-                  <p className="mt-2 text-sm font-medium text-orange-700">
-                    {selectedStudent.courseSemesterTag == null ? 'Chưa có môn đang học' : `Tag môn đang học: Kỳ ${selectedStudent.courseSemesterTag}`}
-                  </p>
+                  {selectedStudent.courseSemesterTag != null && (
+                    <p className="mt-1 text-sm font-medium text-orange-700">
+                      Tag môn đang học: Kỳ {selectedStudent.courseSemesterTag}
+                    </p>
+                  )}
 
                   <p className="mt-1 text-xs text-slate-400">
                     {selectedStudent.currentTerm}
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                  <p className="text-sm text-slate-500">
-                    Mốc OJT hiện ước tính
-                  </p>
-
-                  <p className="mt-2 text-xl font-bold text-slate-800">
-                    {selectedStudent.currentEstimatedOjtTerm}
-                  </p>
-
-                  {selectedStudent.delayTerms === null ? (
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      Chưa có dữ liệu so sánh tiến độ
-                    </p>
-                  ) : selectedStudent.delayTerms > 0 ? (
-                    <p className="mt-1 text-xs font-semibold text-red-600">
-                      Chậm {selectedStudent.delayTerms} kỳ so với dự kiến
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-xs font-semibold text-emerald-600">
-                      Không thay đổi so với dự kiến
-                    </p>
-                  )}
-                </div>
               </section>
+              </div>
 
               {/* =================================================
                     OJT ELIGIBILITY
                     ================================================= */}
 
               {selectedOjtEligibility && !selectedStudent.detailsUnavailable && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6">
+                <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
                   <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                     <div>
                       <div className="flex items-center gap-3">
@@ -344,17 +292,17 @@ const EducationStudentProgress: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                     {/* CREDIT CONDITION */}
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="h-full rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-slate-500">
                             Tín chỉ tích lũy
                           </p>
 
-                          <p className="mt-2 text-2xl font-bold text-slate-800">
+                          <p className="mt-1 text-2xl font-bold text-slate-800">
                             {selectedStudent.completedCredits ?? "—"}
                           </p>
 
@@ -385,14 +333,14 @@ const EducationStudentProgress: React.FC = () => {
 
                     {/* NOT PASSED CONDITION */}
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="h-full rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-medium text-slate-500">
-                            Số môn Not Passed
+                            Số môn chưa đạt
                           </p>
 
-                          <p className="mt-2 text-2xl font-bold text-slate-800">
+                          <p className="mt-1 text-2xl font-bold text-slate-800">
                             {selectedStudent.subjects.length === 0
                               ? "—"
                               : selectedNotPassedCount}
@@ -430,10 +378,10 @@ const EducationStudentProgress: React.FC = () => {
                     PROGRESS
                     ================================================= */}
 
-              <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+              <section>
                 {/* CURRICULUM PROGRESS */}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
                   <div className="flex items-center gap-3">
                     <TrendingUp size={20} className="text-orange-500" />
 
@@ -442,13 +390,10 @@ const EducationStudentProgress: React.FC = () => {
                         Tiến độ theo khung chương trình
                       </h3>
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        Đối chiếu kết quả học tập với các kỳ trong chương trình.
-                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-6">
+                  <div className="mt-4">
                     <div className="mb-2 flex justify-between text-sm">
                       <span className="font-medium text-slate-600">
                         Tín chỉ đã hoàn thành
@@ -471,7 +416,7 @@ const EducationStudentProgress: React.FC = () => {
 
                   {/* SEMESTERS */}
 
-                  <div className="mt-7 grid grid-cols-5 gap-3 md:grid-cols-10">
+                  <div className="mt-5 grid grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-5 md:grid-cols-10">
                     {Array.from(
                       {
                         length: 10,
@@ -512,7 +457,7 @@ const EducationStudentProgress: React.FC = () => {
                               {semester}
                             </div>
 
-                            <p className="mt-2 text-[11px] text-slate-500">
+                            <p className="mt-1 text-[11px] text-slate-500">
                               Kỳ {semester}
                             </p>
                           </div>
@@ -522,79 +467,13 @@ const EducationStudentProgress: React.FC = () => {
                   </div>
                 </div>
 
-                {/* OJT COMPARISON */}
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                  <div className="flex items-center gap-3">
-                    <Clock3 size={20} className="text-orange-500" />
-
-                    <h3 className="font-semibold text-slate-800">
-                      So sánh mốc OJT
-                    </h3>
-                  </div>
-
-                  <div className="mt-6 space-y-5">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                        Theo lộ trình ban đầu
-                      </p>
-
-                      <p className="mt-1 font-semibold text-slate-800">
-                        {selectedStudent.plannedOjtTerm}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="h-px flex-1 bg-slate-200" />
-
-                      <ChevronRight size={18} className="text-slate-400" />
-
-                      <div className="h-px flex-1 bg-slate-200" />
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                        Hiện tại ước tính
-                      </p>
-
-                      <p
-                        className={`mt-1 font-semibold ${
-                          selectedStudent.delayTerms === null
-                            ? "text-slate-500"
-                            : selectedStudent.delayTerms > 0
-                              ? "text-red-600"
-                              : "text-emerald-600"
-                        }`}
-                      >
-                        {selectedStudent.currentEstimatedOjtTerm}
-                      </p>
-                    </div>
-
-                    {(selectedStudent.delayTerms ?? 0) > 0 && (
-                      <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-                        <div className="flex gap-2">
-                          <AlertTriangle
-                            size={18}
-                            className="mt-0.5 shrink-0 text-red-500"
-                          />
-
-                          <p className="text-sm leading-6 text-red-700">
-                            Tiến độ tín chỉ hiện tại làm mốc OJT ước tính bị lùi{" "}
-                            {selectedStudent.delayTerms} kỳ so với lộ trình ban
-                            đầu.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </section>
 
               {/* =================================================
                     UNFINISHED SUBJECTS
                     ================================================= */}
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6">
+              <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
                 <div className="flex items-center gap-3">
                   <AlertTriangle size={20} className="text-orange-500" />
 
@@ -603,10 +482,6 @@ const EducationStudentProgress: React.FC = () => {
                       Môn chưa hoàn thành
                     </h3>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      Theo dõi các môn chưa đạt hoặc chưa bắt đầu trong dữ liệu
-                      hiện có.
-                    </p>
                   </div>
                 </div>
 
@@ -619,19 +494,19 @@ const EducationStudentProgress: React.FC = () => {
                     Không có môn chưa hoàn thành trong dữ liệu hiện tại.
                   </div>
                 ) : (
-                  <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <div className="mt-4 grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2">
                     {unfinishedSubjects.map((subject) => (
                       <div
                         key={subject.id}
-                        className="rounded-xl border border-[#E2E8F0] bg-white p-4 transition-colors duration-150 hover:bg-[#EAF2FF]"
+                        className="min-w-0 rounded-xl border border-[#E2E8F0] bg-white p-3.5 transition-colors duration-150 hover:bg-[#EAF2FF]"
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="font-semibold text-slate-800">
+                        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="break-all font-semibold text-slate-800">
                               {subject.code}
                             </p>
 
-                            <p className="mt-1 text-sm text-slate-500">
+                            <p className="mt-0.5 break-words text-sm text-slate-500">
                               {subject.name}
                             </p>
                           </div>
@@ -641,12 +516,12 @@ const EducationStudentProgress: React.FC = () => {
                               SUBJECT_STATUS_STYLES[subject.status]
                             }`}
                           >
-                            {subject.status}
+                            {SUBJECT_STATUS_LABELS[subject.status] ?? subject.status}
                           </span>
                         </div>
 
                         {subject.prerequisite.length > 0 && (
-                          <div className="mt-3 border-t border-slate-100 pt-3">
+                          <div className="mt-2 border-t border-slate-100 pt-2">
                             <p className="text-xs text-slate-400">
                               Môn tiên quyết
                             </p>

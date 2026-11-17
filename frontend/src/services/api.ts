@@ -15,6 +15,11 @@ export const API = axios.create({
 // Request Interceptor: Chạy trước khi gửi request (ví dụ: đính kèm token)
 API.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if(['get','head'].includes(config.method?.toLowerCase()??'get')){
+      config.headers??={};
+      config.headers['Cache-Control']='no-cache';
+      config.headers['Pragma']='no-cache';
+    }
     const token = localStorage.getItem('ojt_auth_token');
     if (
       config.url !== '/auth/login' &&
@@ -57,7 +62,7 @@ export async function apiRequest<T>(
   if (token) headers.set('Authorization', 'Bearer ' + token);
   let response: Response;
   try {
-    response = await fetch(API_BASE_URL + path, { ...options, headers });
+    response = await fetch(API_BASE_URL + path, { ...options, headers, cache:'no-store' });
   } catch {
     throw new Error('Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.');
   }

@@ -1,4 +1,6 @@
 import { requireJsonBody } from '../../middleware/json-body';
+import { accountNotifications, readAccountNotification } from './notification.service';
+import { positiveId } from '../students/student.validation';
 import { Router } from "express";
 
 import {
@@ -203,4 +205,10 @@ router.patch(
   updateAccountById,
 );
 
+router.get('/me/notifications',authenticate,async(req,res,next)=>{
+ try{res.json({success:true,data:await accountNotifications(req.query,req.user!.userId)});}catch(error){next(error);}
+});
+router.patch('/me/notifications/:id',authenticate,requireJsonBody,async(req,res,next)=>{
+ try{res.json({success:true,data:await readAccountNotification(positiveId(req.params.id),req.body,req.user!.userId)});}catch(error){next(error);}
+});
 export default router;

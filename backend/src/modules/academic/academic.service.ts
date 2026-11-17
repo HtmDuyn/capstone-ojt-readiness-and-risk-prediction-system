@@ -70,10 +70,12 @@ async function validateCalendar(client: PoolClient) {
   await assertNoRows(client, `SELECT 1 FROM "AcademicPeriods" p JOIN "AcademicYears" y ON y."AcademicYearID"=p."AcademicYearID"
     LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=p."ParentPeriodID"
     WHERE p."StartDate"<y."StartDate" OR p."EndDate">y."EndDate"
-    OR (p."Kind"='BLOCK3' AND (parent."AcademicPeriodID" IS NULL OR parent."Kind"<>'SEMESTER' OR parent."AcademicYearID"<>p."AcademicYearID" OR p."StartDate"<=parent."EndDate")) LIMIT 1`, 'Periods must be within their academic year; Block 3 must start after its parent semester ends.');
+    OR (p."Kind"='BLOCK3' AND (parent."AcademicPeriodID" IS NULL OR parent."Kind"<>'SEMESTER' OR parent."AcademicYearID"<>p."AcademicYearID" OR p."StartDate"<parent."StartDate" OR p."EndDate">parent."EndDate")) LIMIT 1`, 'Periods must be within their academic year, and Block 3 must be within its parent semester.');
   await assertNoRows(client, `SELECT 1 FROM "AcademicPeriods" a JOIN "AcademicPeriods" b ON a."AcademicPeriodID"<b."AcademicPeriodID"
     AND a."AcademicYearID"=b."AcademicYearID"
-    AND a."StartDate"<=b."EndDate" AND b."StartDate"<=a."EndDate" LIMIT 1`, 'Academic periods in the same academic year cannot overlap; Block 3 follows its parent semester.');
+    AND a."ParentPeriodID" IS DISTINCT FROM b."AcademicPeriodID"
+    AND b."ParentPeriodID" IS DISTINCT FROM a."AcademicPeriodID"
+    AND a."StartDate"<=b."EndDate" AND b."StartDate"<=a."EndDate" LIMIT 1`, 'Only a semester and its own Block 3 may overlap.');
   await assertNoRows(client, `SELECT 1 FROM "OJTSemesters" o JOIN "AcademicYears" y ON y."AcademicYearID"=o."AcademicYearID"
     LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=o."AcademicPeriodID"
     WHERE o."StartDate"<y."StartDate" OR o."EndDate">y."EndDate"

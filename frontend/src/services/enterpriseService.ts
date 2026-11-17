@@ -79,6 +79,12 @@ export interface RecruitmentWindow {
   canCreate?: boolean;
   canEdit?: boolean;
   postingDeadlineAt?: string;
+  postingStartsAt?: string;
+  postingEndsAt?: string;
+  applicationStartsAt?: string;
+  applicationEndsAt?: string;
+  resultsStartsAt?: string;
+  resultsEndsAt?: string;
   deadlineManagedBy?: 'QHDN';
   editLockCode?: string | null;
   studentRegistrationWindow?: { id: number; name: string; startsAt: string; endsAt: string } | null;
@@ -203,6 +209,7 @@ export interface EnterpriseCandidateItem {
   decisionAt?: string | null;
   rejectReason?: string | null;
   isLatestCoordination: boolean;
+  canRespond?: boolean;
   application?: Record<string, unknown> | null;
   jobApplication?: Record<string, unknown> | null;
 }
@@ -350,11 +357,16 @@ export interface InternshipTaskListRequest {
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
+export type EnterpriseAcceptancePreview={candidateIds:number[];confirmationToken:string;totalSelected:number;overCapacity:boolean;semesters:{ojtSemesterId:number;name:string;capacity:number;currentCount:number;selectedCount:number;afterCount:number;excessCount:number}[]};
 export const enterpriseService = {
+  previewAcceptance:async(candidateIds:number[]):Promise<EnterpriseAcceptancePreview>=>
+    (await API.post('/enterprise/candidates/acceptance-preview',{candidateIds})).data.data,
+  acceptCandidates:async(preview:EnterpriseAcceptancePreview,allowOverCapacity:boolean,reason:string):Promise<unknown>=>
+    (await API.post('/enterprise/candidates/accept-bulk',{candidateIds:preview.candidateIds,confirmationToken:preview.confirmationToken,allowOverCapacity,reason})).data.data,
   // ── Profile ──────────────────────────────────────────────────────────────
   // Gọi GET /api/enterprise/profile — không cần companyId vì backend lấy từ JWT
-  getProfile: async (): Promise<EnterpriseProfileResponse> => {
-    const response = await API.get<EnterpriseProfileResponse>('/enterprise/profile');
+  getProfile: async (signal?: AbortSignal): Promise<EnterpriseProfileResponse> => {
+    const response = await API.get<EnterpriseProfileResponse>('/enterprise/profile', { signal });
     return response.data;
   },
 

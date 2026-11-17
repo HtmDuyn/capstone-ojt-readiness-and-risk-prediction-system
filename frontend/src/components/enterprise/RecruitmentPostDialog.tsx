@@ -96,8 +96,11 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
               <option value="0" disabled>Chọn đợt đang mở</option>
               {windows.map(w => <option key={w.id} value={w.id} disabled={!windowAcceptsPosts(w, now)}>{w.name} · {w.periodCode} {!windowAcceptsPosts(w, now) ? '— Không nhận tin' : ''}</option>)}
             </select>}
-          {selectedWindow && <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2"><p>Mở đăng tin: <strong>{formatRecruitmentDate(selectedWindow.startsAt)}</strong></p>
-            <p>Hạn đăng / sửa tin: <strong className="text-orange-800">{formatRecruitmentDate(selectedWindow.endsAt)}</strong></p></div>}
+          {selectedWindow && <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2"><p>Mở đăng tin: <strong>{formatRecruitmentDate(selectedWindow.postingStartsAt ?? selectedWindow.startsAt)}</strong></p>
+            <p>Hạn đăng / sửa tin: <strong className="text-orange-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
+            {selectedWindow.applicationStartsAt && <p>Sinh viên bắt đầu ứng tuyển: <strong>{formatRecruitmentDate(selectedWindow.applicationStartsAt)}</strong></p>}
+            {selectedWindow.resultsEndsAt && <p>Hạn hoàn tất phản hồi: <strong>{formatRecruitmentDate(selectedWindow.resultsEndsAt)}</strong></p>}
+          </div>}
           {!accepts && <p role="status" className="text-sm text-rose-700">Đợt này hiện không nhận tin. Không thể gửi hoặc lưu thay đổi.</p>}
           {lockReason && accepts && <p role="status" className="flex items-start gap-2 text-sm text-amber-800"><LockKeyhole size={16} className="shrink-0" />{lockReason}</p>}
         </section>
@@ -115,7 +118,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
           </div>
           <div className="border-l-2 border-slate-200 pl-3">
             <p className="text-sm font-medium text-slate-700">Hạn sinh viên ứng tuyển</p>
-            <p id={inputId('deadline')} className="mt-1 text-sm text-slate-600">{post?.deadlineAt ? formatRecruitmentDate(post.deadlineAt) : 'Hệ thống áp dụng thời hạn do QHDN thiết lập khi đăng tin.'}</p>
+            <p id={inputId('deadline')} className="mt-1 text-sm text-slate-600">{post?.deadlineAt || selectedWindow?.applicationEndsAt ? formatRecruitmentDate(post?.deadlineAt ?? selectedWindow?.applicationEndsAt) : 'Hệ thống áp dụng thời hạn do QHDN thiết lập khi đăng tin.'}</p>
             <p className="mt-1 text-xs text-slate-500">Thời hạn do Phòng Quan hệ doanh nghiệp quản lý. Doanh nghiệp không được chỉnh sửa.</p>
           </div>
         </section>

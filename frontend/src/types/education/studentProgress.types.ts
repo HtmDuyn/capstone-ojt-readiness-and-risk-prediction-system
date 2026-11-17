@@ -28,6 +28,7 @@ export interface StudentProgress {
   currentCurriculumSemester: number | null;
   courseSemesterTag?: number | null;
   currentTerm: string;
+  currentTermStartDate: string | null;
   gpa: number | null;
   completedCredits: number | null;
   totalCredits: number | null;

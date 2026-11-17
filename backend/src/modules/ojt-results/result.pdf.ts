@@ -3,7 +3,7 @@ import path from 'node:path';
 import { resultApi } from './result.service';
 
 // Source assets are copied to dist/assets by the build script.
-export async function resultPdf(items:ReturnType<typeof resultApi>[], semesterId:number):Promise<Buffer> {
+export async function resultPdf(items:ReturnType<typeof resultApi>[], semesterId:number,includeEnterpriseScore=false):Promise<Buffer> {
   const doc=new PDFDocument({size:'A4',margin:42,bufferPages:true,info:{Title:`Kết quả OJT - kỳ ${semesterId}`}});
   const chunks:Buffer[]=[];
   const completed=new Promise<Buffer>((resolve,reject)=>{
@@ -22,7 +22,12 @@ export async function resultPdf(items:ReturnType<typeof resultApi>[], semesterId
   for(const item of items){
     const lines=[`${item.studentCode} - ${item.fullName}`,`Doanh nghiệp: ${item.enterpriseName}`,
       `Kỳ: ${item.semesterCode} | Mã kết quả: ${item.id}`,
-      `Trạng thái: ${item.status}`,`Điểm chính thức: ${item.officialScore ?? '-'} | Kết quả: ${item.outcome ?? '-'}`];
+      `Trạng thái: ${item.status}`,...(includeEnterpriseScore?[
+        `Điểm hoàn thành: ${item.completionScore ?? '-'}`,
+        `Điểm thái độ: ${item.attitudeScore ?? '-'}`,
+        `Điểm kỹ năng: ${item.skillScore ?? '-'}`,
+        `Điểm tổng kết OJT: ${item.overallScore ?? '-'}`,
+      ]:[`Điểm chính thức: ${item.officialScore ?? '-'} | Kết quả: ${item.outcome ?? '-'}`])];
     doc.fontSize(10);
     const height=lines.reduce((sum,line)=>sum+doc.heightOfString(line,{width:511}),0)+16;
     if(doc.y+height>doc.page.height-60){doc.addPage();header();doc.fontSize(10);}

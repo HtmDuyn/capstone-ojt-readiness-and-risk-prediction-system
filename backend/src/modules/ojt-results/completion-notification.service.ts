@@ -3,7 +3,7 @@ import { encryptEmail } from '../imports/email.crypto';
 
 // Persist recipients and the outbox together. Concurrent workers cannot queue a result twice.
 export async function notifyCompletedInternships() {
-  return academicTransaction(async c=>{
+  try { return await academicTransaction(async c=>{
     const evaluations=(await c.query(`SELECT ev.*,result."OfficialScore" AS "ConfirmedScore",s."UserID" AS "StudentUserID",s."StudentCode",u."FullName",e."Name" AS "EnterpriseName"
       FROM "InternshipEvaluations" ev JOIN "OJTResults" result ON result."AssignmentID"=ev."AssignmentID" AND result."Status"='CONFIRMED' JOIN "InternshipAssignments" a ON a."AssignmentID"=ev."AssignmentID"
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
@@ -30,5 +30,10 @@ export async function notifyCompletedInternships() {
       }
     }
     return queued;
-  });
+  }, undefined, 'try'); }
+  catch (error) {
+    // Imports own the same calendar lock. Leave results pending until the next tick.
+    if ((error as { code?: string }).code === '55P03') return 0;
+    throw error;
+  }
 }

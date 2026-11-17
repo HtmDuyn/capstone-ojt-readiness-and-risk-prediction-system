@@ -36,6 +36,9 @@ const sendImportRequest = async <T>(
   try {
     result = await response.json();
   } catch {
+    if (response.status === 404) {
+      throw new Error("Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).");
+    }
     throw new Error(
       `Backend trả về dữ liệu không hợp lệ (HTTP ${response.status}).`,
     );
@@ -55,9 +58,13 @@ const sendImportRequest = async <T>(
   }
 
   if (response.status === 404) {
+    if (body?.errorCode === 'ROUTE_NOT_FOUND') {
+      throw new Error(`Không tìm thấy đường dẫn API ${endpoint} (HTTP 404).`);
+    }
     throw new Error(
-      `API ${endpoint} chưa có trên Backend đang deploy (HTTP 404). ` +
-        "Kiểm tra nhánh đã merge và phiên bản Render.",
+      typeof body?.message === 'string' && body.message.trim()
+        ? body.message
+        : "Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).",
     );
   }
 
@@ -80,9 +87,15 @@ interface StudentImportResource {
   status: string;
   preview: Omit<ImportPreviewResponse, 'success'>;
   result?: Omit<ImportCommitResponse, 'success'>;
+  students?: ImportCommitResponse['students'];
 }
 
 export const importService = {
+  getStudentImport: async (id: number, signal?: AbortSignal): Promise<ImportCommitResponse> => {
+    const resource = apiData<StudentImportResource>(await getJson(`/student-imports/${id}`, {}, signal));
+    if (resource.status !== 'COMMITTED' || !resource.result) throw new Error('Đợt nhập chưa hoàn tất.');
+    return { ...resource.result, importId: resource.id, students: resource.students, success: true };
+  },
   listImportedStudents: (filters: ImportedStudentFilters, page: number, signal?: AbortSignal) =>
     getPage<ImportedStudent>('/students', { ...filters, page, limit: 20 }, signal),
   listStudentImportBatches: (signal?: AbortSignal) =>
@@ -113,6 +126,6 @@ export const importService = {
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'COMMITTED' || !resource.result)
       throw new Error('Backend chưa xác nhận hoàn tất import.');
-    return { ...resource.result, success: true };
+    return { ...resource.result, importId: resource.id, students: resource.students, success: true };
   },
 };

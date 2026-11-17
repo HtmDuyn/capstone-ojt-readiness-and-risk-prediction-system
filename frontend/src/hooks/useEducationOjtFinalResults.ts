@@ -8,7 +8,9 @@ export function useEducationOjtFinalResults() {
   const [data, setData] = React.useState<Page<Result> | null>(null),
     [selected, setSelected] = React.useState<Result | null>(null);
   const [semesterId, setSemesterId] = React.useState('');
-  const { semesters, error: semesterError, reload: reloadSemesters } = useEducationSemesters();
+  const { semesters, error: semesterError } = useEducationSemesters();
+  const [allTotal, setAllTotal] = React.useState<number | null>(null);
+  const [totalError, setTotalError] = React.useState('');
   const [search, setSearch] = React.useState(""),
     [status, setStatus] = React.useState(""),
     [page, setPage] = React.useState(1),
@@ -19,6 +21,16 @@ export function useEducationOjtFinalResults() {
     [notice, setNotice] = React.useState(""),
     [reason, setReason] = React.useState("");
   const keys = React.useRef(new Map<number, { reason: string; key: string }>());
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setAllTotal(null);
+    setTotalError('');
+    educationOjtWorkflowService.getFinalResults({ page: 1, limit: 1 }, controller.signal)
+      .then(result => { if (!controller.signal.aborted) setAllTotal(result.total); })
+      .catch(() => { if (!controller.signal.aborted) setTotalError('Không tải được tổng số kết quả OJT. Vui lòng thử lại sau.'); });
+    return () => controller.abort();
+  }, [refresh]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -64,5 +76,5 @@ export function useEducationOjtFinalResults() {
       setBusy(false);
     }
   }
-  return { data, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, setRefresh, loading, busy, error, setError, notice, reason, setReason, semesters, semesterError, reloadSemesters, confirm };
+  return { data, allTotal, totalError, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, loading, busy, error, setError, notice, reason, setReason, semesters, semesterError, confirm };
 }

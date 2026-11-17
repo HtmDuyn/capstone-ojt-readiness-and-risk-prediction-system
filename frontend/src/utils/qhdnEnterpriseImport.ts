@@ -2,8 +2,37 @@ import * as XLSX from "xlsx";
 import type { EnterpriseImportRow } from "../types/qhdn/qhdnTypes";
 
 const requiredHeaders = [
-  "code", "email", "fullName", "name",
+  "email", "fullName", "name",
 ];
+export const ENTERPRISE_IMPORT_MAX_ROWS = 500;
+export const ENTERPRISE_IMPORT_MAX_BYTES = 8 * 1024 * 1024;
+
+export function enterpriseImportTemplate(): ArrayBuffer {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([['name', 'fullName', 'email']]);
+  sheet['!cols'] = [{ wch: 38 }, { wch: 30 }, { wch: 38 }];
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Doanh nghiep');
+  const instructions = XLSX.utils.aoa_to_sheet([
+    ['Cột / mục', 'Ý nghĩa', 'Giới hạn'],
+    ['name', 'Tên doanh nghiệp.', '200 ký tự'],
+    ['fullName', 'Họ tên người phụ trách nhận tài khoản.', '150 ký tự'],
+    ['email', 'Email đăng nhập và nhận thông tin tài khoản.', '100 ký tự'],
+    ['Mã doanh nghiệp', 'Hệ thống tự sinh mã dạng DN000001 khi tạo tài khoản. Không cần nhập cột code.', 'Mã chính thức được gửi trong email tài khoản'],
+    ['Cách dùng', 'Nhập dữ liệu ở sheet Doanh nghiep, giữ nguyên hàng tiêu đề. Mỗi dòng là một doanh nghiệp.', 'Tối đa 500 doanh nghiệp/lần'],
+    ['Tài khoản', 'Hệ thống tạo mật khẩu tạm và gửi thông tin đăng nhập đến email của từng doanh nghiệp.', 'Không nhập mật khẩu vào file'],
+    ['Trùng dữ liệu', 'Email không được trùng trong file hoặc trùng tài khoản hiện có.', 'Không ghi đè tài khoản cũ'],
+  ]);
+  instructions['!cols'] = [{ wch: 20 }, { wch: 105 }, { wch: 32 }];
+  XLSX.utils.book_append_sheet(workbook, instructions, 'Huong dan');
+  return XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+}
+
+export async function parseEnterpriseImportFile(file: Pick<File, 'name' | 'size' | 'arrayBuffer'>): Promise<EnterpriseImportRow[]> {
+  if (!/\.(xlsx|csv)$/i.test(file.name)) throw new Error('Chỉ hỗ trợ file Excel .xlsx hoặc CSV .csv.');
+  if (!file.size) throw new Error('File trống. Vui lòng chọn file có dữ liệu doanh nghiệp.');
+  if (file.size > ENTERPRISE_IMPORT_MAX_BYTES) throw new Error('File tối đa 8 MB.');
+  return parseEnterpriseImportSheet(await file.arrayBuffer());
+}
 
 /** One spreadsheet row provisions one enterprise account; recruitment is enterprise-managed. */
 export function parseEnterpriseImportSheet(data: ArrayBuffer): EnterpriseImportRow[] {
@@ -26,12 +55,13 @@ export function parseEnterpriseImportSheet(data: ArrayBuffer): EnterpriseImportR
   const namedHeaders = headers.filter(Boolean);
   if (new Set(namedHeaders).size !== namedHeaders.length)
     throw new Error("File có tên cột trùng nhau. Vui lòng kiểm tra hàng tiêu đề.");
-  if (namedHeaders.some(field => !requiredHeaders.includes(field))) throw new Error("Chỉ hỗ trợ 4 cột: code, email, fullName, name. Không nhập JD, vị trí hoặc hồ sơ doanh nghiệp.");
+  if (namedHeaders.some(field => ![...requiredHeaders, 'code'].includes(field))) throw new Error("Chỉ hỗ trợ 3 cột bắt buộc: name, fullName, email; cột code trong file cũ là tùy chọn. Không nhập JD, vị trí hoặc hồ sơ doanh nghiệp.");
   const missing = requiredHeaders.filter((field) => !headers.includes(field));
   if (missing.length)
     throw new Error("File thiếu cột bắt buộc: " + missing.join(", ") + ".");
 
   const groups = new Map<string, EnterpriseImportRow>();
+  const codes = new Set<string>();
   for (let index = 1; index < table.length; index++) {
     const values = table[index];
     if (!values.some((value) => String(value).trim())) continue;
@@ -39,19 +69,26 @@ export function parseEnterpriseImportSheet(data: ArrayBuffer): EnterpriseImportR
     const fail = (message: string): never => {
       throw new Error(`Dòng ${index + 1}: ${message}`);
     };
+    if (values.some((value, column) => String(value).trim() && !headers[column])) fail('có dữ liệu ở cột không có tiêu đề.');
     for (const field of requiredHeaders) {
       if (!get(field)) fail(`thiếu dữ liệu cột ${field}.`);
     }
     const email = get("email").toLowerCase();
+    if (email.length > 100) fail('email tối đa 100 ký tự.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("email không hợp lệ.");
+    const code = get('code').toUpperCase();
     const profile = {
-      code: get("code").toUpperCase(), email,
+      ...(code ? { code } : {}), email,
       fullName: get("fullName"), name: get("name"),
 
     };
-    if (groups.has(email) || [...groups.values()].some(row=>row.code===profile.code)) fail("Trùng mã hoặc email doanh nghiệp.");
+    if (code && (code.length > 20 || !/^[A-Z0-9_-]+$/.test(code))) fail('mã doanh nghiệp chỉ gồm chữ cái, số, dấu gạch ngang hoặc gạch dưới, tối đa 20 ký tự.');
+    if (profile.name.length > 200) fail('tên doanh nghiệp tối đa 200 ký tự.');
+    if (profile.fullName.length > 150) fail('tên người phụ trách tối đa 150 ký tự.');
+    if (groups.has(email) || (code && codes.has(code))) fail("Trùng mã hoặc email doanh nghiệp.");
     groups.set(email, profile);
-    if (groups.size > 500) fail("mỗi lần import chỉ được có tối đa 500 doanh nghiệp.");
+    if (code) codes.add(code);
+    if (groups.size > ENTERPRISE_IMPORT_MAX_ROWS) fail("mỗi lần import chỉ được có tối đa 500 doanh nghiệp.");
   }
   if (!groups.size) throw new Error("File không có dòng dữ liệu doanh nghiệp.");
   return [...groups.values()];

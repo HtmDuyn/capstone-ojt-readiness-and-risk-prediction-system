@@ -7,14 +7,11 @@ import {
   MapPin,
   Calendar,
   Briefcase,
-  Users,
   CheckCircle2,
   ShieldCheck,
   RefreshCw,
   AlertCircle,
   User,
-  Layers,
-  FileCheck2,
   Edit3,
   X,
   Save,
@@ -23,7 +20,6 @@ import {
 import { enterpriseService } from '@/services/enterpriseService';
 import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { useAuth } from '@/hooks/useAuth';
-import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseProfile: React.FC = () => {
@@ -232,7 +228,7 @@ export const EnterpriseProfile: React.FC = () => {
                       {profile.name}
                     </h2>
                     <span className="px-2.5 py-0.5 rounded-lg bg-orange-100 text-orange-700 font-bold text-xs">
-                      Mã: {profile.code}
+                      Mã doanh nghiệp: {profile.code}
                     </span>
                     <span
                       className={`px-2.5 py-0.5 rounded-lg text-xs font-bold flex items-center space-x-1 ${
@@ -288,10 +284,6 @@ export const EnterpriseProfile: React.FC = () => {
                 </h3>
 
                 <div className="space-y-3 bg-slate-50/70 rounded-2xl p-4 border border-slate-100 text-xs">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
-                    <span className="text-slate-500">Mã định danh (ID):</span>
-                    <span className="font-bold text-slate-800">#{profile.id}</span>
-                  </div>
                   <div className="flex items-center justify-between py-1 border-b border-slate-200/50">
                     <span className="text-slate-500">Mã doanh nghiệp:</span>
                     <span className="font-bold text-slate-900">{profile.code}</span>
@@ -385,83 +377,6 @@ export const EnterpriseProfile: React.FC = () => {
             </div>
           </div>
 
-          {/* Section: Số liệu thực tế từ API (summary) */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 md:p-8 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                  <Layers className="w-5 h-5 text-orange-600" />
-                  <span>Tổng quan Hoạt động OJT</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Số liệu cập nhật theo thời gian thực từ cơ sở dữ liệu hệ thống
-                </p>
-              </div>
-              <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold self-start sm:self-auto">
-                Phạm vi: {profile.summary?.scope === 'ALL_SEMESTERS' ? 'Tất cả các học kỳ' : profile.summary?.scope}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-              {/* Pending Candidates */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                  Hồ sơ chờ duyệt
-                </span>
-                <span className="text-2xl font-black text-blue-600 block">
-                  {profile.summary?.pendingCandidates ?? 0}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium block">
-                  Ứng viên mới
-                </span>
-              </div>
-
-              {/* Active Interns */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                  SV đang thực tập
-                </span>
-                <span className="text-2xl font-black text-orange-600 block">
-                  {profile.summary?.activeInterns ?? 0}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium block">
-                  Đang làm việc OJT
-                </span>
-              </div>
-
-              {/* Pending Evaluations */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center space-y-1">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-                  Đánh giá chờ xử lý
-                </span>
-                <span className="text-2xl font-black text-purple-600 block">
-                  {profile.summary?.pendingEvaluations ?? 0}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium block">
-                  Phiếu đánh giá OJT
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Links Section */}
-            <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
-              <span className="text-xs font-semibold text-slate-400">Truy cập nhanh:</span>
-              <Link
-                to="/enterprise/candidates"
-                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center space-x-1 transition-colors"
-              >
-                <Users className="w-3.5 h-3.5 text-slate-500" />
-                <span>Duyệt Hồ sơ Ứng viên</span>
-              </Link>
-              <Link
-                to="/enterprise/interns"
-                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center space-x-1 transition-colors"
-              >
-                <FileCheck2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>Theo dõi & Giao Task Interns</span>
-              </Link>
-            </div>
-          </div>
         </div>
       )}
 

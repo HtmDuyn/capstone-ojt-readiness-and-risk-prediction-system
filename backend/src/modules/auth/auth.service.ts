@@ -124,8 +124,8 @@ export const loginUser = async (
    * Chỉ tài khoản ACTIVE được login.
    */
   if (
-    user.status?.toUpperCase() !==
-    "ACTIVE"
+    user.status?.toUpperCase() !== "ACTIVE" ||
+    (user.role_code === 'ENTERPRISE' && !user.enterpriseActive)
   ) {
     throw createAuthError(
       "This account is currently inactive or locked.",

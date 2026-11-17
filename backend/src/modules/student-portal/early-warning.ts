@@ -6,6 +6,7 @@ type WarningInput = {
   eligibilityStatus: string;
   missingCredits: number | null;
   failedCourseCount: number;
+  maxUnpassedCourses: number | null;
 };
 
 // Early monitoring is separate from the official OJT decision and is not a risk model.
@@ -36,8 +37,8 @@ export function earlyWarning(input: WarningInput) {
   } else {
     const details=[`Bạn đang ở kỳ ${input.currentSemester}, đã tích lũy ${input.earnedCredits} tín chỉ.`];
     if(input.missingCredits!==null && input.missingCredits>0)details.push(`Bạn còn thiếu ${input.missingCredits} tín chỉ so với ngưỡng xét OJT.`);
-    if(input.failedCourseCount>2)details.push(`Bạn còn ${input.failedCourseCount} môn chưa đạt, vượt giới hạn 2 môn còn nợ.`);
-    else details.push(`Số môn chưa đạt hiện tại là ${input.failedCourseCount}, trong giới hạn tối đa 2 môn còn nợ.`);
+    if(input.maxUnpassedCourses!==null && input.failedCourseCount>input.maxUnpassedCourses)details.push(`Bạn còn ${input.failedCourseCount} môn chưa đạt, vượt giới hạn ${input.maxUnpassedCourses} môn còn nợ.`);
+    else if(input.maxUnpassedCourses!==null)details.push(`Số môn chưa đạt hiện tại là ${input.failedCourseCount}, trong giới hạn tối đa ${input.maxUnpassedCourses} môn còn nợ.`);
     details.push('Đây là tiến độ hiện tại, chưa phải kết luận nguy cơ trễ OJT.');
     message=details.join(' ');
   }

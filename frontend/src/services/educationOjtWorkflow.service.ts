@@ -4,8 +4,8 @@ import type { Query } from '@/types/education/api.types';
 import type { Handoff, OjtFinalResult } from '@/types/education/ojtWorkflow.types';
 
 export const educationOjtWorkflowService = {
-  getHandoffs: (ojtSemesterId: number, signal?: AbortSignal) =>
-    getAllItems<Handoff>('/eligible-student-handoffs', { ojtSemesterId }, signal),
+  getHandoffs: (ojtSemesterId?: number, signal?: AbortSignal) =>
+    getAllItems<Handoff>('/eligible-student-handoffs', ojtSemesterId ? { ojtSemesterId } : {}, signal),
   async handoff(payload: { ojtSemesterId: number; studentIds: number[]; reason: string; idempotencyKey: string }) {
     return apiData<{ handoffId: number; total: number; recipientRole: string }>(
       (await API.post('/eligible-student-handoffs', payload)).data,

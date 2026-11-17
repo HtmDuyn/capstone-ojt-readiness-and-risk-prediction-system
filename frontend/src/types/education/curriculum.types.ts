@@ -187,6 +187,7 @@ export interface CurriculumDetail {
 
   code: string;
   name: string;
+  description?: string | null;
 
   version: string | null;
 

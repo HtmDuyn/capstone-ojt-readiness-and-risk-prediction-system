@@ -23,12 +23,14 @@ export function validateImport(body: unknown): ImportInput {
     try {
       if (!raw || typeof raw !== 'object') throw fail('Row must be an object.');
       const r = raw as Record<string, unknown>;
-      const code = text(r.code, 'code', 20).toUpperCase();
-      if (!/^[A-Z0-9_-]+$/.test(code)) throw fail('code must contain letters, digits, underscores or hyphens.');
+      const autoCode = b.kind === 'ENTERPRISE' && (r.code == null || (typeof r.code === 'string' && !r.code.trim()));
+      const code = autoCode ? '' : text(r.code, 'code', 20).toUpperCase();
+      if (code && !/^[A-Z0-9_-]+$/.test(code)) throw fail('code must contain letters, digits, underscores or hyphens.');
       const email = text(r.email, 'email', 100).toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail('Invalid email.');
-      if (codes.has(code) || emails.has(email)) throw fail('Duplicate code or email within the file.');
-      codes.add(code); emails.add(email);
+      if ((code && codes.has(code)) || emails.has(email)) throw fail('Duplicate code or email within the file.');
+      if (code) codes.add(code);
+      emails.add(email);
       const row: ImportRow = { code, email, fullName: text(r.fullName, 'fullName', 150) };
       if (b.kind === 'STUDENT') {
         if (!r.academic || typeof r.academic !== 'object' || Array.isArray(r.academic)) throw fail('academic profile, placement and courseResults are required.');

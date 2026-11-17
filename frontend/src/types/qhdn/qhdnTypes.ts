@@ -30,7 +30,7 @@ export interface ImportCommitResponse extends ImportSummary {
 }
 
 export interface EnterpriseImportRow {
-  code: string;
+  code?: string;
   email: string;
   fullName: string;
   name: string;
@@ -41,6 +41,47 @@ export interface EnterpriseImportPayload {
   kind: "ENTERPRISE";
   idempotencyKey: string;
   rows: EnterpriseImportRow[];
+}
+
+export interface QhdnStudentCv {
+  id: number;
+  studentId: number;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+}
+
+export interface QhdnStudentDossier {
+  id: number;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  className: string | null;
+  status: string;
+  enrollmentYear: number | null;
+  currentSemester: number | null;
+  programCode: string | null;
+  programName: string | null;
+  majorCode: string | null;
+  majorName: string | null;
+  cohortName: string | null;
+  groupCode: string | null;
+  currentPeriodName: string | null;
+  ojtSemesterId: number;
+  semesterName: string;
+  cv: QhdnStudentCv | null;
+  submittedCv: QhdnStudentCv | null;
+  registeredAt: string | null;
+  applicationEmail: string | null;
+  applicationPhone: string | null;
+  companyName: string | null;
+  positionTitle: string | null;
+  decision: string | null;
+  rejectReason: string | null;
+  coverLetter: string | null;
+  certificates: { name: string; url: string }[] | null;
 }
 
 export interface CompanyListItem {
@@ -284,6 +325,7 @@ export interface InternshipEvaluationListResponse {
  */
 export interface OjtResultItem {
   id: number;
+  resultId?: number | null;
   evaluationId?: number;
   assignmentId: number;
   studentId: number;
@@ -295,7 +337,8 @@ export interface OjtResultItem {
   enterpriseName: string;
   ojtSemesterId: number;
   semesterCode?: string;
-  status: "PENDING_ACADEMIC_CONFIRMATION" | "REVISION_REQUESTED" | "CONFIRMED";
+  status: "SUBMITTED" | "PENDING_ACADEMIC_CONFIRMATION" | "REVISION_REQUESTED" | "CONFIRMED";
+  overallScore?: number | null;
   officialScore: number | null;
   completionScore?: number | null;
   attitudeScore?: number | null;

@@ -159,10 +159,16 @@ export const getErrorMessage = (error: unknown): string => {
   }
 
   if (status) {
-    return message || `Backend trả về HTTP ${status}.`;
+    return message || `Máy chủ dữ liệu trả về lỗi HTTP ${status}.`;
   }
 
-  return apiError?.message || "Không thể kết nối Backend.";
+  if (apiError?.message === 'Network Error') return 'Không kết nối được máy chủ dữ liệu.';
+  return apiError?.message || "Không thể kết nối máy chủ dữ liệu.";
+};
+
+export const isCanceledRequest = (error: unknown): boolean => {
+  const value = error as { code?: string; name?: string } | null;
+  return value?.code === 'ERR_CANCELED' || value?.name === 'CanceledError' || value?.name === 'AbortError';
 };
 
 export const parseAcademicYears = (value: unknown): AcademicYear[] => {
@@ -244,7 +250,9 @@ export const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
         "notEligible",
       ]);
 
-      if (!label || (eligible === null && ineligible === null)) {
+      const reviewRequired = readNumber(item, ["reviewRequired", "insufficientData"]);
+
+      if (!label || (eligible === null && ineligible === null && reviewRequired === null)) {
         return null;
       }
 
@@ -252,6 +260,7 @@ export const parsePeriodStatistics = (value: unknown): PeriodStatistic[] => {
         label,
         eligible: eligible ?? 0,
         ineligible: ineligible ?? 0,
+        reviewRequired: reviewRequired ?? 0,
       };
     })
     .filter((item): item is PeriodStatistic => item !== null);
@@ -309,8 +318,13 @@ export const parseCourseDemand = (value: unknown): CourseDemand[] => {
 
       return {
         id: `${readString(item, ["ojtSemesterId"]) ?? ""}:${readString(item, ["academicPeriodId"]) ?? ""}:${readString(item, ["id", "courseId"]) || index}`,
+        courseId: readNumber(item, ["courseId"]),
+        studentIds: Array.isArray(item.students) && item.students.every(student => isObject(student) && Number.isSafeInteger(student.studentId))
+          ? item.students.map(student => Number(student.studentId)) : null,
         code: code || "—",
         name: name || "Chưa có tên học phần",
+        periodName: readString(item, ["academicPeriod.name", "period.name", "periodName", "periodCode"]),
+        ojtSemesterName: readString(item, ["semester.name", "ojtSemester.name"]),
         count: readNumber(item, [
           "studentCount",
           "demandCount",

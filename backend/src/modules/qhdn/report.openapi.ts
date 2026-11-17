@@ -173,6 +173,15 @@
  *                             }
  *                           }
  *                         },
+ *                         "progress": {
+ *                           "type": "object",
+ *                           "description": "Distinct students per OJT semester. Submitted enterprise scores count immediately without academic transfer; cancelled assignments are excluded.",
+ *                           "properties": {
+ *                             "completed": { "type": "integer", "minimum": 0, "description": "Students with a submitted overall score or a completed assignment." },
+ *                             "inProgress": { "type": "integer", "minimum": 0, "description": "Students assigned/active without a completed assignment or submitted evaluation." },
+ *                             "evaluated": { "type": "integer", "minimum": 0, "description": "Students with a submitted enterprise evaluation, including score zero." }
+ *                           }
+ *                         },
  *                         "results": {
  *                           "type": "object",
  *                           "properties": {

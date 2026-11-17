@@ -12,6 +12,7 @@ import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
 import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
 import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
 import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
+import EnterpriseNotifications from "@/pages/enterprise/EnterpriseNotifications";
 import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
 import LoginPage from "@/pages/auth/LoginPage";
 import StudentDashboard from "@/pages/student/StudentDashboard";
@@ -31,6 +32,7 @@ import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
 import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
 import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
 import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
+import QhdnNotifications from "@/pages/qhdn/QhdnNotifications";
 import type { UserRole } from "@/types/auth.types";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -203,6 +205,7 @@ export const router = createBrowserRouter([
           { path: "/qhdn/coordination", element: <QhdnOjtCoordination /> },
           { path: "/qhdn/matching", element: <Navigate to="/qhdn/coordination" replace /> },
           { path: "/qhdn/evaluations", element: <QhdnEnterpriseEvaluations /> },
+          { path: "/qhdn/notifications", element: <QhdnNotifications /> },
           { path: "/qhdn/analytics", element: <Navigate to="/qhdn/dashboard" replace /> },
           { path: "/qhdn/interviews", element: <Navigate to="/qhdn/coordination" replace /> },
         ],
@@ -251,6 +254,10 @@ export const router = createBrowserRouter([
           {
             path: "/enterprise/profile",
             element: <EnterpriseProfile />,
+          },
+          {
+            path: "/enterprise/notifications",
+            element: <EnterpriseNotifications />,
           },
         ],
       },

@@ -18,7 +18,11 @@ const selectUser = `
     r."RoleCode" AS role_code,
     r."RoleName" AS role_name,
     (SELECT s."StudentID" FROM "Students" s WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL) AS "studentId",
-    (SELECT eu."EnterpriseID" FROM "EnterpriseUsers" eu WHERE eu."UserID"=u."UserID" ORDER BY eu."EnterpriseID" LIMIT 1) AS "enterpriseId"
+    (SELECT eu."EnterpriseID" FROM "EnterpriseUsers" eu WHERE eu."UserID"=u."UserID" ORDER BY eu."EnterpriseID" LIMIT 1) AS "enterpriseId",
+    EXISTS (SELECT 1 FROM "EnterpriseUsers" eu JOIN "Enterprises" e ON e."EnterpriseID"=eu."EnterpriseID"
+      WHERE eu."UserID"=u."UserID" AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL
+        AND eu."EnterpriseID"=(SELECT membership."EnterpriseID" FROM "EnterpriseUsers" membership
+          WHERE membership."UserID"=u."UserID" ORDER BY membership."EnterpriseID" LIMIT 1)) AS "enterpriseActive"
   FROM "Users" u
   LEFT JOIN "Roles" r
     ON r."RoleID" = u."RoleID"
