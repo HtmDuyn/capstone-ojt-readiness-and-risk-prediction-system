@@ -1,5 +1,6 @@
 import { EmptyState, ErrorNotice, MetricCard, SectionTitle } from '@/components/education/EducationUi';
 import { OjtResultDonut } from '@/components/education/OjtResultDonut';
+import { PageBanner } from '@/components/common/PageBanner';
 import { courseDemandOverview } from '@/utils/courseDemandOverview';
 import { useEducationDashboard } from '@/hooks/useEducationDashboard';
 import { formatDate, formatNumber, formatPercent } from '@/utils/educationDashboard';
@@ -18,25 +19,24 @@ export const EducationDashboard: React.FC = () => {
   ];
   const demandOverview = courseDemandOverview(courseDemands);
   return (
-    <div className="mx-auto w-full max-w-[1500px]">
+    <div className="mx-auto w-full max-w-[1500px] space-y-6">
+      <PageBanner
+        title="Tổng quan học vụ và OJT"
+        badge="Phòng Đào tạo"
+        description="Theo dõi tình hình học tập, điều kiện thực tập OJT và các chỉ số học vụ của sinh viên."
+      />
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {/* =============================================
-            HEADER
+            FILTERS
             ============================================= */}
 
-        <header className="border-b border-slate-200 px-5 py-5 md:px-7">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
-                Tổng quan học vụ và OJT
-              </h1>
-
-              <p className="mt-2 text-sm text-slate-500">
-                Theo dõi tình hình học tập, điều kiện thực tập OJT và các chỉ số học vụ của sinh viên.
-              </p>
+        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
+          <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+            <div className="flex items-center gap-2">
+              <CalendarDays size={16} className="text-orange-500" />
+              <h2 className="text-sm font-bold text-slate-800">Phạm vi thống kê</h2>
             </div>
-
-            <div className="flex shrink-0 flex-col items-start gap-1 md:items-end">
+            <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
               <button
                 type="button"
                 disabled={exporting || dashboardLoading}
@@ -49,20 +49,6 @@ export const EducationDashboard: React.FC = () => {
               </button>
               <span className="text-xs text-slate-500">CSV nhu cầu học phần</span>
             </div>
-          </div>
-        </header>
-
-        {/* =============================================
-            FILTERS
-            ============================================= */}
-
-        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
-          <div className="mb-4 flex items-center gap-2">
-            <CalendarDays size={16} className="text-orange-500" />
-
-            <h2 className="text-sm font-bold text-slate-800">
-              Phạm vi thống kê
-            </h2>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
