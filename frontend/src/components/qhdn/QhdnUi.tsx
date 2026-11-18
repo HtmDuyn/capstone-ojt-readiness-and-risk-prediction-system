@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Page } from "@/types/qhdn/workflowTypes";
+import { pageNumbers } from '@/utils/qhdnPagination';
 
 export const control =
   "rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";
@@ -57,28 +58,37 @@ export function Panel({
   );
 }
 export function Pager({
-  page,
+  page: requestedPage,
   total,
   limit,
   busy,
   onChange,
+  onLimitChange,
 }: {
   page: number;
   total: number;
   limit: number;
   busy: boolean;
   onChange: (page: number) => void;
+  onLimitChange?: (limit: number) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.max(1, Math.min(requestedPage, pages));
   return (
     <nav
       aria-label="Phân trang"
       className="flex flex-wrap items-center justify-between gap-3 text-sm"
     >
-      <span>
-        {total} bản ghi · Trang {page}/{pages}
-      </span>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-3 text-slate-500">
+        <span aria-live="polite">{total ? (page - 1) * limit + 1 : 0}–{Math.min(page * limit, total)} / {total} bản ghi · Trang {page}/{pages}</span>
+        {onLimitChange && <label className="flex items-center gap-2 text-xs">
+          Số dòng/trang
+          <select aria-label="Số dòng mỗi trang" className={control + ' !py-1.5'} disabled={busy} value={limit} onChange={event => onLimitChange(Number(event.target.value))}>
+            {[10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </label>}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           className={control}
@@ -87,6 +97,11 @@ export function Pager({
         >
           Trước
         </button>
+        {pageNumbers(page, pages).map((number, index) => number === 'ellipsis'
+          ? <span key={`gap-${index}`} className="px-1 text-slate-400" aria-hidden="true">…</span>
+          : <button type="button" key={number} aria-label={`Trang ${number}`} aria-current={number === page ? 'page' : undefined}
+              className={control + (number === page ? ' !border-orange-600 !bg-orange-600 font-semibold text-white' : ' hover:border-orange-300 hover:bg-orange-50')}
+              disabled={busy || number === page} onClick={() => onChange(number)}>{number}</button>)}
         <button
           type="button"
           className={control}

@@ -50,6 +50,22 @@ export function addEnterpriseOperations(spec: Spec) {
   add('get','/api/enterprise/candidates','Danh sách sinh viên được giới thiệu cho doanh nghiệp đang đăng nhập, kèm vị trí và trạng thái tiếp nhận',parameters({...page,academicYearId:{...id,description:'Lọc theo năm học của kỳ OJT, tùy chọn.'},candidateId:{...id,description:'Lọc theo ID lần giới thiệu, tùy chọn.'},decision:{type:'string',enum:['PENDING','ACCEPTED','REJECTED'],description:'Lọc theo trạng thái tiếp nhận, tùy chọn.'}}));
   add('patch','/api/enterprise/candidates/{id}/decision','Tiếp nhận hoặc từ chối ứng viên',candidateId,spec.paths['/api/ojt-coordinations/{id}/decision'].post.requestBody);
   add('get','/api/enterprise/internships','Danh sách đầy đủ sinh viên thực tập thuộc doanh nghiệp đang đăng nhập, kèm phân công, vị trí và đánh giá',parameters({...page,internshipId:{...id,description:'Lọc theo ID phân công thực tập, tùy chọn.'},status:{type:'string',enum:['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED'],description:'Lọc theo trạng thái thực tập, tùy chọn.'}}));
-  add('put','/api/enterprise/internships/{id}/evaluation','Gửi hoặc cập nhật đánh giá thực tập',candidateId,spec.paths['/api/assignments/{id}/internship-evaluation'].put.requestBody);
+  add('put','/api/enterprise/internships/{id}/evaluation','Gửi đánh giá chính thức (điểm trung bình tự tính, đã gửi không thể sửa)',candidateId,spec.paths['/api/assignments/{id}/internship-evaluation'].put.requestBody);
+  const score={type:'number',minimum:0,maximum:10,multipleOf:0.01,nullable:true};
+  add('post','/api/enterprise/internships/evaluations/bulk','Lưu nháp hoặc xác nhận gửi điểm OJT hàng loạt',[],{required:true,content:{'application/json':{schema:{
+    type:'object',additionalProperties:false,required:['items','status','reason'],properties:{
+      status:{type:'string',enum:['DRAFT','SUBMITTED']},
+      confirmed:{type:'boolean',description:'Bắt buộc true khi gửi SUBMITTED sau popup xác nhận.'},
+      reason:{type:'string',minLength:1,maxLength:2000},
+      items:{type:'array',minItems:1,maxItems:300,items:{type:'object',additionalProperties:false,required:['assignmentId','completionScore','skillScore','attitudeScore'],properties:{
+        assignmentId:id,completionScore:{...score,description:'Kỹ năng chuyên ngành; gợi ý task có thể điều chỉnh.'},
+        skillScore:{...score,description:'Kỹ năng mềm.'},attitudeScore:{...score,description:'Thái độ.'},comments:optionalText(5000),
+      }}},
+    },
+  }}}});
+  spec.paths['/api/enterprise/internships/evaluations/bulk'].post.description='Chỉ ENTERPRISE và các phân công thuộc doanh nghiệp đang đăng nhập. DRAFT cho phép điểm null và chỉnh sửa sau; không xuất hiện ở QHDN, EvaluatedAt=null. SUBMITTED cần đủ 3 tiêu chí và confirmed=true; backend tính overallScore=(completionScore+skillScore+attitudeScore)/3, làm tròn 2 chữ số. Gửi thành công hiện ngay ở kết quả QHDN. Đã gửi không thể sửa trực tiếp; retry cùng nội dung an toàn. Toàn bộ batch lưu trong một transaction, lỗi bất kỳ hồ sơ nào sẽ rollback tất cả. Không tự chuyển giao kết quả học vụ.';
+  const singleSchema=spec.paths['/api/enterprise/internships/{id}/evaluation'].put.requestBody.content['application/json'].schema;
+  singleSchema.required=singleSchema.required?.filter((key:string)=>key!=='overallScore');
+  if(singleSchema.properties?.overallScore)singleSchema.properties.overallScore={...singleSchema.properties.overallScore,deprecated:true,description:'Giữ để tương thích; backend luôn tự tính trung bình 3 tiêu chí.'};
   addEnterpriseRecruitmentOperations(spec);
 }

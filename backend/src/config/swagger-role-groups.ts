@@ -104,12 +104,13 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   { roles: ["ADMIN","ACADEMIC","OJT_COORD"], operations: [
     "GET /api/academic-periods",
     "GET /api/ojt-results",
-    "GET /api/ojt-semesters/{id}/eligible-student-handoffs",
     "GET /api/ojt-semesters/{id}/results/export",
+    "GET /api/ojt-semesters/{id}/eligible-student-handoffs",
     "POST /api/imports/commit",
     "POST /api/imports/preview",
   ] },
   { roles: ["ADMIN","OJT_COORD"], operations: [
+    "POST /api/ojt-results/publish",
     "GET /api/assignments",
     "GET /api/companies",
     "GET /api/internship-evaluations",
@@ -162,6 +163,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/enterprise/candidates/acceptance-preview",
     "POST /api/enterprise/candidates/accept-bulk",
     "GET /api/enterprise/internships",
+    "POST /api/enterprise/internships/evaluations/bulk",
     "GET /api/enterprise/profile",
     "PATCH /api/enterprise/profile",
     "PATCH /api/enterprise/candidates/{id}/decision",
@@ -185,14 +187,13 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     access.set(key, group.roles);
   }
   for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
-  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results'])access.set(key,['ADMIN','OJT_COORD']);
+  for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results/publish'])access.set(key,['ADMIN','OJT_COORD']);
   for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign','POST /api/assignments','PATCH /api/assignments/{id}'])access.set(key,['ADMIN']);
   access.set('PATCH /api/companies/{id}', ['ADMIN']);
   access.set('PATCH /api/qhdn/companies/{id}/access', ['ADMIN', 'OJT_COORD']);
   access.set('GET /api/qhdn/students/{id}', ['ADMIN', 'OJT_COORD']);
   access.set('POST /api/ojt-registrations',['ADMIN','STUDENT']);
   for(const key of ['GET /api/ojt-registration-windows','GET /api/ojt-registrations'])access.set(key,['ADMIN','OJT_COORD','STUDENT']);
-  access.set('POST /api/ojt-results/{id}/confirm',['ADMIN','ACADEMIC']);
   access.set('POST /api/auth/logout', ['ADMIN', 'ACADEMIC', 'OJT_COORD', 'ENTERPRISE', 'STUDENT']);
   const used = new Set<string>();
   for (const [path, item] of Object.entries(spec.paths ?? {}) as [string, Spec][]) {

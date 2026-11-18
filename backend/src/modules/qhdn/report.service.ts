@@ -74,15 +74,15 @@ SELECT a.semester_id AS "ojtSemesterId",t."SemesterCode" AS "semesterCode",a."En
  count(*) FILTER (WHERE a.assignment_status='FAILED')::int AS failed,
  count(*) FILTER (WHERE a.assignment_status IN ('CANCELLED','CANCELED'))::int AS cancelled,
  count(DISTINCT a."StudentID") FILTER (WHERE a.assignment_status NOT IN ('CANCELLED','CANCELED'))::int AS "assignedStudents",
- count(r."ResultID")::int AS "totalResults",
- count(r."ResultID") FILTER (WHERE r."Status"='PENDING_ACADEMIC_CONFIRMATION')::int AS "pendingResults",
- count(r."ResultID") FILTER (WHERE r."Status"='REVISION_REQUESTED')::int AS "revisionRequestedResults",
- count(r."ResultID") FILTER (WHERE r."Status"='CONFIRMED')::int AS "confirmedResults",
- count(r."ResultID") FILTER (WHERE r."Status"='CONFIRMED' AND r."Outcome"='PASSED')::int AS "passedResults",
- count(r."ResultID") FILTER (WHERE r."Status"='CONFIRMED' AND r."Outcome"='FAILED')::int AS "failedResults",
- ROUND(AVG(r."OfficialScore") FILTER (WHERE r."Status"='CONFIRMED'),2)::float8 AS "averageOfficialScore"
+ count(ev."EvaluationID")::int AS "totalResults",
+ count(r."ResultID")::int AS "publishedResults",
+ count(ev."EvaluationID") FILTER (WHERE r."ResultID" IS NULL)::int AS "unpublishedResults",
+ ROUND(AVG(ev."OverallScore"),2)::float8 AS "averageOverallScore"
  FROM scoped_assignments a JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID"
- JOIN "OJTSemesters" t ON t."OJTSemesterID"=a.semester_id LEFT JOIN ${officialEvaluationRelation} r ON r."AssignmentID"=a."AssignmentID"
+ JOIN "OJTSemesters" t ON t."OJTSemesterID"=a.semester_id
+ LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID" AND ev."Status"='SUBMITTED'
+   AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL AND a.assignment_status NOT IN ('CANCELLED','CANCELED')
+ LEFT JOIN ${officialEvaluationRelation} r ON r."AssignmentID"=a."AssignmentID"
  GROUP BY a.semester_id,t."SemesterCode",a."EnterpriseID",e."Name"`;
 const feedbackSql=`${assignmentCte}
 SELECT a.semester_id AS "ojtSemesterId",t."SemesterCode" AS "semesterCode",a."EnterpriseID" AS "companyId",e."Name" AS "companyName",
@@ -99,7 +99,7 @@ SELECT a.semester_id AS "ojtSemesterId",t."SemesterCode" AS "semesterCode",a."En
  MAX(v."EvaluatedAt") AS "lastEvaluatedAt"
  FROM scoped_assignments a JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID"
  JOIN "OJTSemesters" t ON t."OJTSemesterID"=a.semester_id
- LEFT JOIN "InternshipEvaluations" v ON v."AssignmentID"=a."AssignmentID" AND v."EvaluatedAt" IS NOT NULL AND v."OverallScore" IS NOT NULL
+ LEFT JOIN "InternshipEvaluations" v ON v."AssignmentID"=a."AssignmentID" AND v."Status"='SUBMITTED' AND v."EvaluatedAt" IS NOT NULL AND v."OverallScore" IS NOT NULL
  LEFT JOIN "Users" u ON u."UserID"=v."EvaluatedBy" LEFT JOIN "Roles" role ON role."RoleID"=u."RoleID"
  WHERE a.assignment_status IN ('ACTIVE','IN_PROGRESS','COMPLETED','FAILED')
  GROUP BY a.semester_id,t."SemesterCode",a."EnterpriseID",e."Name"`;
@@ -159,8 +159,8 @@ export async function dashboard(params:Row,actor:Actor){
    count(*) FILTER (WHERE decision='REJECTED' AND "AssignmentID" IS NULL)::int AS "enterpriseRejected",
    count(*) FILTER (WHERE "CoordinationID" IS NOT NULL AND decision='ACCEPTED' AND "AssignmentID" IS NULL)::int AS "acceptedAwaitingAssignment",
    count(*) FILTER (WHERE "AssignmentID" IS NOT NULL)::int AS assigned FROM handed_off`,args)).rows[0];
-  const totals=(await c.query(`SELECT COALESCE(sum("totalAssignments"),0)::int AS total,COALESCE(sum(assigned),0)::int AS assigned,COALESCE(sum(active),0)::int AS active,COALESCE(sum(completed),0)::int AS completed,COALESCE(sum(failed),0)::int AS failed,COALESCE(sum(cancelled),0)::int AS cancelled,COALESCE(sum("totalResults"),0)::int AS "totalResults",COALESCE(sum("pendingResults"),0)::int AS "pendingResults",COALESCE(sum("revisionRequestedResults"),0)::int AS "revisionRequestedResults",COALESCE(sum("confirmedResults"),0)::int AS "confirmedResults",COALESCE(sum("passedResults"),0)::int AS "passedResults",COALESCE(sum("failedResults"),0)::int AS "failedResults" FROM (${internshipSql}) report`,args)).rows[0];
-  const {totalResults,pendingResults,revisionRequestedResults,confirmedResults,passedResults,failedResults,...assignments}=totals;
+  const totals=(await c.query(`SELECT COALESCE(sum("totalAssignments"),0)::int AS total,COALESCE(sum(assigned),0)::int AS assigned,COALESCE(sum(active),0)::int AS active,COALESCE(sum(completed),0)::int AS completed,COALESCE(sum(failed),0)::int AS failed,COALESCE(sum(cancelled),0)::int AS cancelled,COALESCE(sum("totalResults"),0)::int AS "totalResults",COALESCE(sum("publishedResults"),0)::int AS "publishedResults",COALESCE(sum("unpublishedResults"),0)::int AS "unpublishedResults" FROM (${internshipSql}) report`,args)).rows[0];
+  const {totalResults,publishedResults,unpublishedResults,...assignments}=totals;
   // A submitted company evaluation is visible immediately, without a transfer or
   // assignment-status update. Aggregate once per student and OJT semester.
   const progress=(await c.query(`${assignmentCte}, student_progress AS (
@@ -173,12 +173,12 @@ export async function dashboard(params:Row,actor:Actor){
   ) SELECT count(*) FILTER(WHERE finished)::int AS completed,
    count(*) FILTER(WHERE ongoing AND NOT finished)::int AS "inProgress",
    count(*) FILTER(WHERE evaluated)::int AS evaluated FROM student_progress`,args)).rows[0];
-  return {filters:f,partners,positions,students,assignments,progress,results:{total:totalResults,pending:pendingResults,revisionRequested:revisionRequestedResults,confirmed:confirmedResults,passed:passedResults,failed:failedResults}};
+  return {filters:f,partners,positions,students,assignments,progress,results:{total:totalResults,published:publishedResults,unpublished:unpublishedResults}};
  });
 }
 export const reportColumns:Record<ReportType,string[]>={
  acceptance:['ojtSemesterId','semesterCode','companyId','companyName','currentStudents','pending','accepted','rejected','acceptanceRate','coordinationAttempts','pendingAttempts','acceptedAttempts','rejectedAttempts'],
- internships:['ojtSemesterId','semesterCode','companyId','companyName','totalAssignments','assigned','active','completed','failed','cancelled','assignedStudents','totalResults','pendingResults','revisionRequestedResults','confirmedResults','passedResults','failedResults','averageOfficialScore'],
+ internships:['ojtSemesterId','semesterCode','companyId','companyName','totalAssignments','assigned','active','completed','failed','cancelled','assignedStudents','totalResults','publishedResults','unpublishedResults','averageOverallScore'],
  'enterprise-feedback':['ojtSemesterId','semesterCode','companyId','companyName','eligibleAssignments','evaluationCount','missingEvaluations','evaluationCoverageRate','averageCompletionScore','averageAttitudeScore','averageSkillScore','averageOverallScore','commentsCount','enterpriseSubmittedCount','staffEnteredCount','lastEvaluatedAt']
 };
 export function reportCsv(type:ReportType,items:Row[]){

@@ -65,7 +65,7 @@ export const QHDN_NAV_ITEMS: NavItem[] = [
     banner: {
       title: "Báo cáo OJT",
       description:
-        "Theo dõi kết quả chuyển giao và xuất báo cáo OJT theo học kỳ.",
+        "Công bố điểm cho sinh viên và xuất báo cáo OJT theo học kỳ.",
       badge: "Kết quả OJT",
       primaryActionLabel: "Xuất báo cáo",
     },

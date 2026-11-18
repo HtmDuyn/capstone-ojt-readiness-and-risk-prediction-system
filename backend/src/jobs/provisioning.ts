@@ -1,5 +1,4 @@
 import { academicAlertEmailIsCurrent } from '../modules/academic-reporting/notification.service';
-import { notifyCompletedInternships } from '../modules/ojt-results/completion-notification.service';
 import nodemailer from 'nodemailer';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
@@ -77,7 +76,7 @@ export function startProvisioningJobs() {
     busy = true;
     try {
       // Deliver result notifications and account emails independently.
-      for(const [name,job] of [['email',deliverEmails],['results',notifyCompletedInternships]] as const) {
+      for(const [name,job] of [['email',deliverEmails]] as const) {
         try { await job(); }
         catch (error: any) {
           // Log codes only: SMTP messages may contain recipient data or credentials.

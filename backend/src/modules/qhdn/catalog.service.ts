@@ -61,7 +61,7 @@ export async function list(resource:Resource,params:Row,actor:Actor){
   const chainPaging=pagination({page:params.coordinationPage,limit:params.coordinationLimit},[]);
   if(chainPaging.offset>2147483647)throw invalid('Coordination pagination exceeds allowed range.');
   return readTransaction(async c=>{
-    const args:unknown[]=[],filters:string[]=[];
+    const args:unknown[]=[],filters:string[]=resource==='evaluations'?["t.\"Status\"='SUBMITTED'"]:[];
     const add=(col:string,value:unknown)=>{args.push(value);filters.push(`${col}=$${args.length}`);};
     if(exactKey&&params[exactKey]!==undefined)add(`t."${configs[resource].id}"`,positiveId(params[exactKey],exactKey));
     if(resource==='companies'||resource==='positions')filters.push('t."DeletedAt" IS NULL');
@@ -75,14 +75,14 @@ export async function list(resource:Resource,params:Row,actor:Actor){
       from+=` JOIN "Students" s ON s."StudentID"=r."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "Enterprises" e ON e."EnterpriseID"=${companyColumn}`;
       extras=',s."StudentCode" AS "studentCode",u."FullName" AS "fullName",r."OJTSemesterID" AS "ojtSemesterId",r."StudentID" AS "studentId",e."Name" AS "companyName"';
       if(resource==='assignments'){
-        from+=` JOIN "InternshipPositions" pos ON pos."PositionID"=t."PositionID" LEFT JOIN "Users" supervisor ON supervisor."UserID"=t."AcademicSupervisorID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=t."AssignmentID" LEFT JOIN ${officialEvaluationRelation} outcome ON outcome."AssignmentID"=t."AssignmentID"`;
+        from+=` JOIN "InternshipPositions" pos ON pos."PositionID"=t."PositionID" LEFT JOIN "Users" supervisor ON supervisor."UserID"=t."AcademicSupervisorID" LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=t."AssignmentID" AND ev."Status"='SUBMITTED' LEFT JOIN ${officialEvaluationRelation} outcome ON outcome."AssignmentID"=t."AssignmentID"`;
         extras+=`,pos."Title" AS "positionTitle",
           jsonb_build_object('id',s."StudentID",'studentCode',s."StudentCode",'fullName',u."FullName",'email',u."Email",'phone',u."Phone") AS student,
           jsonb_build_object('id',e."EnterpriseID",'code',e."EnterpriseCode",'name',e."Name",'contactPersonName',e."ContactPersonName",'contactPhone',e."ContactPhone",'contactEmail',e."ContactEmail") AS company,
           jsonb_build_object('id',pos."PositionID",'code',pos."RecruitmentCode",'title',pos."Title",'description',pos."Description",'requirements',pos."Requirements",'location',pos."Location",'workMode',pos."WorkMode",'ojtSemesterId',pos."OJTSemesterID") AS position,
           CASE WHEN supervisor."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',supervisor."UserID",'fullName',supervisor."FullName",'email',supervisor."Email",'phone',supervisor."Phone") END AS "academicSupervisor",
           CASE WHEN ev."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object('id',ev."EvaluationID",'templateId',ev."TemplateID",'scoreDetails',ev."ScoreDetails",'completionScore',ev."CompletionScore",'attitudeScore',ev."AttitudeScore",'skillScore',ev."SkillScore",'overallScore',ev."OverallScore",'comments',ev."Comments",'status',ev."Status",'evaluatedBy',ev."EvaluatedBy",'evaluatedAt',ev."EvaluatedAt") END AS evaluation,
-          CASE WHEN outcome."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'version',outcome."Version",'officialScore',outcome."OfficialScore",'outcome',outcome."Outcome",'confirmedAt',outcome."ConfirmedAt",'evaluationLocked',outcome."Status"='CONFIRMED') END AS result`;
+          CASE WHEN outcome."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',outcome."ResultID",'status',outcome."Status",'version',outcome."Version",'officialScore',outcome."OfficialScore",'outcome',outcome."Outcome",'publishedAt',outcome."PublishedAt",'evaluationLocked',true) END AS result`;
       }
       if(resource==='coordinations'||resource==='evaluations'){
         from+=` JOIN "InternshipPositions" pos ON pos."PositionID"=${resource==='evaluations'?'a':'t'}."PositionID"`;

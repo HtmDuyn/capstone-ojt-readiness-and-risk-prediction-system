@@ -35,8 +35,9 @@ export interface EnterpriseProfileSummary {
   publishedPosts: number;
   pendingPosts: number;
   pendingCandidates: number;
+  /** Unique accepted interns, including those without assignments; ended/graded internships are excluded. */
   activeInterns: number;
-  /** Unique students received through acceptance, a valid assignment or receipt history. */
+  /** Same count as activeInterns; acceptance counts immediately without requiring an assignment. */
   acceptedInterns: number;
   /** Unique students with a submitted enterprise evaluation and an overall score. */
   completedInterns: number;

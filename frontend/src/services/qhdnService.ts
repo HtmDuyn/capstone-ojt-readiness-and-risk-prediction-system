@@ -33,10 +33,11 @@ import type {
   OjtSemesterItem,
   CompanyListResponse,
   PositionListResponse,
-  TransferOjtResultRequest,
   CoordinationListResponse,
   InternshipEvaluationListResponse,
   OjtResultListResponse,
+  PublishOjtResultsRequest,
+  PublishOjtResultsResponse,
   HandoffStudentListResponse,
   AcademicPeriodItem,
   AcademicPeriodListResponse,
@@ -318,25 +319,6 @@ export const listInternshipEvaluations = async (
   return response.data;
 };
 
-/**
- * POST /api/ojt-results
- * Chuyển giao kết quả đánh giá OJT của sinh viên cho phòng đào tạo (ACADEMIC).
- * Yêu cầu: Quyền OJT_COORD hoặc ADMIN, phân công đã COMPLETED và có đánh giá SUBMITTED từ DN.
- */
-export const transferOjtResult = async (
-  payload: TransferOjtResultRequest,
-): Promise<{ success: boolean; data: any }> => {
-  const response = await API.post<{ success: boolean; data: any }>(
-    "/ojt-results",
-    payload,
-  );
-  return response.data;
-};
-
-/**
- * GET /api/ojt-results
- * Danh sách kết quả OJT đã chuyển giao cho phòng đào tạo (và theo dõi trạng thái xác nhận CONFIRMED).
- */
 export const listOjtResults = async (
   params: {
     page?: number;
@@ -352,6 +334,11 @@ export const listOjtResults = async (
   });
   return response.data;
 };
+
+export const publishOjtResults = async (
+  payload: PublishOjtResultsRequest,
+): Promise<PublishOjtResultsResponse> =>
+  (await API.post<PublishOjtResultsResponse>("/ojt-results/publish", payload)).data;
 
 export const updateCompany = async (
   id: number,

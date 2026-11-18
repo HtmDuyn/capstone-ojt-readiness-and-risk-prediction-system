@@ -21,7 +21,7 @@ export const EnterpriseCandidates: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const limit = 20;
+  const limit = 10;
   const [selectedIds,setSelectedIds]=useState<Set<number>>(new Set());
   const [acceptance,setAcceptance]=useState<EnterpriseAcceptancePreview|null>(null);
   const [bulkLoading,setBulkLoading]=useState(false),[allowOverCapacity,setAllowOverCapacity]=useState(false);
@@ -123,11 +123,14 @@ export const EnterpriseCandidates: React.FC = () => {
       return matchesStatus && matchesSearch;
     });
   }, [candidates, filterStatus, searchTerm]);
-  const totalPages = Math.ceil(filteredCandidates.length / limit) || 1;
+  const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / limit));
   const visibleCandidates = useMemo(
     () => filteredCandidates.slice((page - 1) * limit, page * limit),
     [filteredCandidates, page]
   );
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
   const selectable=filteredCandidates.filter(eligible);
   const selected=selectable.filter(candidate=>selectedIds.has(candidate.id));
 
@@ -181,6 +184,7 @@ export const EnterpriseCandidates: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       <PageBanner
+        variant="enterprise"
         title="Hồ sơ sinh viên ứng tuyển"
         description="Chọn hồ sơ để tiếp nhận hàng loạt. Kiểm tra số thực nhận và xác nhận rõ khi nhận vượt chỉ tiêu doanh nghiệp."
         badge="Ứng tuyển OJT"
@@ -417,9 +421,15 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-3 border-t border-slate-100 p-4">
+      {filteredCandidates.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4">
+          <span className="text-xs font-medium text-slate-500">
+            Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, filteredCandidates.length)} trong {filteredCandidates.length} hồ sơ
+          </span>
+          <div className="flex items-center justify-center space-x-3">
           <button
+            type="button"
+            aria-label="Trang trước"
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page <= 1}
             className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -430,12 +440,15 @@ export const EnterpriseCandidates: React.FC = () => {
             Trang <strong>{page}</strong> / <strong>{totalPages}</strong>
           </span>
           <button
+            type="button"
+            aria-label="Trang sau"
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page >= totalPages}
             className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          </div>
         </div>
       )}
       </section>

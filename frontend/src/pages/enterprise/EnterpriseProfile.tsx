@@ -163,6 +163,7 @@ export const EnterpriseProfile: React.FC = () => {
     <div className="space-y-6 pb-16">
       {/* Page Banner without buttons */}
       <PageBanner
+        variant="enterprise"
         title="Hồ sơ Doanh nghiệp Đối tác"
         description="Thông tin định danh pháp lý, người đại diện liên hệ và tổng hợp các số liệu thực tế về tuyển dụng và quản lý sinh viên OJT."
         badge="Thông tin Doanh nghiệp"

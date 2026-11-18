@@ -49,16 +49,24 @@ export async function enterpriseProfile(actor: Actor) {
   return readTransaction(async c => {
     const companyId = await enterpriseScope(c, actor);
     const company = (await c.query('SELECT * FROM "Enterprises" WHERE "EnterpriseID"=$1', [companyId])).rows[0];
-    const summary=(await c.query(`WITH received AS (
-      SELECT r."StudentID" FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."EnterpriseID"=$1 AND co."Decision"='ACCEPTED'
-      UNION SELECT a."StudentID" FROM "InternshipAssignments" a WHERE a."EnterpriseID"=$1 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
-      UNION SELECT receipt."StudentID" FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE co."EnterpriseID"=$1
+    const summary=(await c.query(`WITH active_students AS (
+      SELECT r."StudentID" FROM "StudentEnterpriseCoordination" co
+      JOIN "OJTRegistrations" r USING ("RegistrationID")
+      WHERE co."EnterpriseID"=$1 AND co."Decision"='ACCEPTED'
+        AND NOT EXISTS (SELECT 1 FROM "StudentEnterpriseCoordination" newer
+          WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
+        AND NOT EXISTS (SELECT 1 FROM "InternshipAssignments" a WHERE a."CoordinationID"=co."CoordinationID")
+      UNION
+      SELECT a."StudentID" FROM "InternshipAssignments" a
+      WHERE a."EnterpriseID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') IN ('ASSIGNED','ACTIVE','IN_PROGRESS')
+        AND NOT EXISTS (SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID"
+          AND ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)
     ) SELECT
       (SELECT count(*)::int FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "Status"='PUBLISHED' AND ("DeadlineAt" IS NULL OR "DeadlineAt">clock_timestamp())) AS "publishedPosts",
       (SELECT count(*)::int FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "Status"='PENDING_REVIEW') AS "pendingPosts",
       (SELECT count(*)::int FROM "StudentEnterpriseCoordination" co WHERE co."EnterpriseID"=$1 AND COALESCE(co."Decision",'PENDING')='PENDING' AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")) AS "pendingCandidates",
-      (SELECT count(*)::int FROM "InternshipAssignments" WHERE "EnterpriseID"=$1 AND UPPER("Status") IN ('ACTIVE','IN_PROGRESS')) AS "activeInterns",
-      (SELECT count(*)::int FROM received) AS "acceptedInterns",
+      (SELECT count(*)::int FROM active_students) AS "activeInterns",
+      (SELECT count(*)::int FROM active_students) AS "acceptedInterns",
       (SELECT count(DISTINCT a."StudentID")::int FROM "InternshipAssignments" a JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID" WHERE a."EnterpriseID"=$1 AND ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS "completedInterns",
       (SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."EnterpriseID"=$1 AND UPPER(a."Status") IN ('ACTIVE','IN_PROGRESS','COMPLETED') AND NOT EXISTS(SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID" AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS "pendingEvaluations"`,[companyId])).rows[0];
     return {...api('companies', company),summary:{scope:'ALL_SEMESTERS',...summary}};
@@ -168,8 +176,8 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
         'id',v."EvaluationID",'templateId',v."TemplateID",'scoreDetails',v."ScoreDetails",'evaluatedBy',v."EvaluatedBy",'completionScore',v."CompletionScore",'attitudeScore',v."AttitudeScore",
         'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",
         'status',v."Status",'evaluatedAt',v."EvaluatedAt") END AS evaluation,
-      ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',CASE WHEN result."Status"='CONFIRMED' THEN result."OfficialScore" ELSE NULL END,'outcome',CASE WHEN result."Status"='CONFIRMED' THEN result."Outcome" ELSE NULL END,'confirmedAt',result."ConfirmedAt") END AS result,
-      result."Status" AS "resultStatus",COALESCE(result."Status"='CONFIRMED' AND GREATEST(a."EndDate",(SELECT "EndDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=r."OJTSemesterID")) < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,false) AS "evaluationLocked"
+      ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',result."OfficialScore",'outcome',result."Outcome",'publishedAt',result."PublishedAt") END AS result,
+      result."Status" AS "resultStatus",(COALESCE(v."Status"='SUBMITTED',false) OR result."ResultID" IS NOT NULL) AS "evaluationLocked"
       FROM "InternshipAssignments" a
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
       JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"

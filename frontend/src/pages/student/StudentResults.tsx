@@ -56,12 +56,11 @@ function ResultsContent() {
                   {result.enterpriseName} · {result.semesterCode}
                 </h3>
                 <p className="text-sm">
-                  Điểm chính thức:{' '}
-                  <strong>{result.officialScore ?? 'Chưa có'}</strong> · Kết
-                  quả: {statusText(result.outcome)}
+                  Điểm trung bình OJT:{' '}
+                  <strong>{result.overallScore == null ? 'Chưa có' : result.overallScore.toFixed(2)}</strong>
                 </p>
                 <p className="text-sm text-slate-500">
-                  Công bố: {dateText(result.confirmedAt)}
+                  QHDN công bố: {dateText(result.publishedAt)}
                 </p>
                 <button
                   className={buttonClass}
@@ -99,23 +98,22 @@ function ResultsContent() {
               <Metrics
                 values={[
                   {
-                    label: 'Điểm chính thức',
-                    value: detail.data.officialScore ?? '—',
+                    label: 'Điểm trung bình',
+                    value: detail.data.overallScore == null ? '—' : detail.data.overallScore.toFixed(2),
                   },
                   {
-                    label: 'Hoàn thành công việc',
+                    label: 'Kỹ năng chuyên ngành',
                     value: detail.data.completionScore ?? '—',
                   },
                   { label: 'Thái độ', value: detail.data.attitudeScore ?? '—' },
-                  { label: 'Kỹ năng', value: detail.data.skillScore ?? '—' },
+                  { label: 'Kỹ năng mềm', value: detail.data.skillScore ?? '—' },
                 ]}
               />
               <p className="text-sm whitespace-pre-wrap">
                 Nhận xét: {detail.data.comments || 'Chưa có nhận xét'}
               </p>
               <p className="text-sm">
-                Trạng thái: {statusText(detail.data.status)} ·{' '}
-                {statusText(detail.data.outcome)}
+                Trạng thái: Đã công bố · {dateText(detail.data.publishedAt)}
               </p>
               <button
                 className={buttonClass}
@@ -139,7 +137,7 @@ export const StudentEvaluationResults = () => {
   return (
     <StudentPage
       title="Kết quả đánh giá thực tập OJT"
-      description="Điểm chính thức và nhận xét đã được nhà trường xác nhận, công bố cho sinh viên."
+      description="Điểm và nhận xét từ doanh nghiệp được Phòng Quan hệ doanh nghiệp công bố cho sinh viên."
     >
       {!loading && profile && semesterId && (
         <ResultsContent key={profile.id + ':' + semesterId} />

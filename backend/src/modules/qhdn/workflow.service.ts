@@ -4,7 +4,7 @@ import { assertPublishedPosition } from '../recruitment/recruitment.repository';
 import { assertPostPhase } from '../recruitment/round-policy';
 import { academicTransaction } from '../academic/academic.repository';
 import { dateInput, dateRange } from '../academic/academic.schema';
-import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, score } from '../students/student.validation';
+import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue } from '../students/student.validation';
 import { fingerprint } from '../eligibility/eligibility.service';
 import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
@@ -151,33 +151,13 @@ async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolCl
     if(current===value)return {...api('assignments',before),replayed:true};
     const transitions:Row={ASSIGNED:['ACTIVE','CANCELLED'],ACTIVE:['COMPLETED','CANCELLED'],IN_PROGRESS:['COMPLETED','CANCELLED']};
     if(!transitions[current]?.includes(value))throw invalid('Invalid assignment status transition.',409,'ASSIGNMENT_STATUS_CONFLICT');
-    if(value==='COMPLETED'&&!(await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "OverallScore" IS NOT NULL',[id])).rowCount)throw invalid('Submit an evaluation before completing the assignment.',409,'EVALUATION_REQUIRED');
+    if(value==='COMPLETED'&&!(await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "Status"=\'SUBMITTED\' AND "OverallScore" IS NOT NULL',[id])).rowCount)throw invalid('Submit an evaluation before completing the assignment.',409,'EVALUATION_REQUIRED');
     if(value==='CANCELLED'&&(await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1 UNION ALL SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "Status"=\'SUBMITTED\'',[id])).rowCount)throw invalid('Cannot cancel an assignment with an official result.',409,'ASSIGNMENT_HAS_RESULT');
     await record(c,'positions',before.PositionID);
     const after=await persist(c,'assignments',{Status:value},id);await refreshSlots(c,before.PositionID);await log(c,'assignments',before,after,actor,'ASSIGNMENT_STATUS',reason);return api('assignments',after);
 
 }
-export async function evaluate(id:number,body:unknown,actor:Actor){
-  if(actor.roleCode!=='ENTERPRISE')throw invalid('Only the enterprise may submit official OJT scores.',403,'FORBIDDEN');
-  const b=inputObject(body,['completionScore','attitudeScore','skillScore','overallScore','comments','reason']),reason=requiredText(b.reason,'reason',2000),values:Row={};
-  for(const key of ['completionScore','attitudeScore','skillScore','overallScore']){
-    const value=score(b[key],10,key);if(value===null)throw invalid(`${key} is required.`);values[key[0].toUpperCase()+key.slice(1)]=value;
-  }
-  values.Comments=optionalText(b.comments,'comments',5000);
-  return academicTransaction(async c=>{
-    const a=await record(c,'assignments',id);await assertScope(c,actor,a.EnterpriseID);await mutableAssignment(c,id);
-    if(!['ACTIVE','IN_PROGRESS','COMPLETED'].includes(String(a.Status).toUpperCase()))throw invalid('Only active or completed internships can be evaluated.',409,'ASSIGNMENT_NOT_ACTIVE');
-    const before=(await c.query('SELECT * FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 FOR UPDATE',[id])).rows[0]??null;
-    if(before?.Status==='SUBMITTED') {
-      const closed=(await c.query(`SELECT GREATEST(a."EndDate",t."EndDate") < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS closed
-        FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
-        JOIN "OJTSemesters" t ON t."OJTSemesterID"=co."OJTSemesterID" WHERE a."AssignmentID"=$1`,[id])).rows[0];
-      if(closed?.closed)throw invalid('Official scores are immutable after the OJT period ends.',409,'OJT_SCORE_FINALIZED');
-    }
-    values.AssignmentID=id;values.EvaluatedBy=actor.userId;values.EvaluatedAt=new Date();values.Status='SUBMITTED';
-    const after=await persist(c,'evaluations',values,before?.EvaluationID);await log(c,'evaluations',before,after,actor,before?'UPDATE_EVALUATION':'SUBMIT_EVALUATION',reason);return api('evaluations',after);
-  });
-}
+export { submitEvaluation as evaluate } from '../enterprise/bulk-evaluation.service';
 
 export async function updateAssignment(id:number,body:unknown,actor:Actor) {
  staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','status','reason']);

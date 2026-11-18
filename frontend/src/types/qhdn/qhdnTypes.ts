@@ -183,14 +183,6 @@ export interface EnterpriseDecisionRequest {
   reason: string;
 }
 
-/**
- * Payload cho POST /api/ojt-results (Chuyển giao kết quả OJT cho Phòng Đào tạo)
- */
-export interface TransferOjtResultRequest {
-  assignmentId: number;
-  reason: string;
-  idempotencyKey: string;
-}
 
 /**
  * Thông tin một lượt điều phối OJT
@@ -321,7 +313,7 @@ export interface InternshipEvaluationListResponse {
 }
 
 /**
- * Thông tin kết quả OJT đã chuyển giao cho phòng đào tạo (OJTResults)
+ * Thông tin điểm OJT doanh nghiệp gửi và QHDN công bố cho sinh viên
  */
 export interface OjtResultItem {
   id: number;
@@ -337,7 +329,9 @@ export interface OjtResultItem {
   enterpriseName: string;
   ojtSemesterId: number;
   semesterCode?: string;
-  status: "SUBMITTED" | "PENDING_ACADEMIC_CONFIRMATION" | "REVISION_REQUESTED" | "CONFIRMED";
+  status: "SUBMITTED" | "PUBLISHED";
+  publishedToStudent?: boolean;
+  publishedAt?: string | null;
   overallScore?: number | null;
   officialScore: number | null;
   completionScore?: number | null;
@@ -345,14 +339,28 @@ export interface OjtResultItem {
   skillScore?: number | null;
   comments?: string;
   outcome?: string | null;
-  transferredBy?: number;
-  transferredAt?: string;
-  confirmedBy?: number;
-  confirmedAt?: string;
   student?: any;
   company?: any;
   position?: any;
   program?: any;
+}
+
+export interface PublishOjtResultsRequest {
+  ojtSemesterId: number;
+  evaluationIds?: number[];
+  reason: string;
+}
+
+export interface PublishOjtResultsResponse {
+  success: boolean;
+  data: {
+    ojtSemesterId: number;
+    eligible: number;
+    published: number;
+    alreadyPublished: number;
+    skipped: number;
+    queuedEmails: number;
+  };
 }
 
 export interface OjtResultListResponse {

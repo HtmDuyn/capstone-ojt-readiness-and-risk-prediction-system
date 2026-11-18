@@ -15,8 +15,11 @@ const certificateUrl = (value: string) => {
 };
 
 function ProfileFields({ fields }: { fields: [string, string | number | null | undefined][] }) {
-  return <dl className="grid gap-3 text-sm sm:grid-cols-2">{fields.map(([label, value]) =>
-    <div key={label} className="min-w-0 rounded-xl bg-slate-50 px-4 py-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words font-medium text-slate-800">{display(value)}</dd></div>,
+  return <dl className="grid gap-x-8 text-sm sm:grid-cols-2">{fields.map(([label, value]) =>
+    <div key={label} className="grid min-w-0 grid-cols-[minmax(6.5rem,0.42fr)_minmax(0,1fr)] items-start gap-2 border-b border-slate-100 py-2">
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="break-words text-sm font-semibold text-slate-800">{display(value)}</dd>
+    </div>,
   )}</dl>;
 }
 
@@ -78,27 +81,27 @@ export function StudentProfileModal({ studentId, ojtSemesterId, fullName, onClos
   return <WorkflowModal wide title="Chi tiết hồ sơ sinh viên" subtitle={fullName} onClose={onClose}>
     {loading && <p role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500"><LoaderCircle size={18} className="animate-spin" />Đang tải hồ sơ sinh viên…</p>}
     {error && <div className="space-y-3"><Notice>{error}</Notice><button className={workflowSecondary} onClick={() => setRevision(value => value + 1)}><RefreshCw size={15} />Thử lại</button></div>}
-    {profile && <div className="space-y-6">
-      <section className="space-y-3"><h3 className="flex items-center gap-2 font-semibold text-slate-800"><UserRound size={18} className="text-orange-600" />Thông tin sinh viên</h3>
+    {profile && <div className="max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto pr-1">
+      <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><UserRound size={17} className="text-orange-600" />Thông tin sinh viên</h3>
         <ProfileFields fields={[
           ['Họ và tên', profile.fullName], ['Mã sinh viên', profile.studentCode], ['Email', profile.email], ['Số điện thoại', profile.phone],
           ['Lớp', profile.className], ['Trạng thái học vụ', studentStatuses[profile.status] || profile.status],
         ]} />
       </section>
-      <section className="space-y-3"><h3 className="flex items-center gap-2 font-semibold text-slate-800"><GraduationCap size={18} className="text-orange-600" />Ngành học và chương trình đào tạo</h3>
+      <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><GraduationCap size={17} className="text-orange-600" />Ngành học và chương trình đào tạo</h3>
         <ProfileFields fields={[
           ['Ngành / chuyên ngành', profile.majorName], ['Mã ngành', profile.majorCode], ['Chương trình đào tạo', profile.programName], ['Mã chương trình', profile.programCode],
           ['Khóa', profile.cohortName], ['Nhóm', profile.groupCode], ['Năm nhập học', profile.enrollmentYear], ['Kỳ chuyên ngành thứ', profile.currentSemester],
           ['Học kỳ hiện tại', profile.currentPeriodName], ['Kỳ OJT đang xem', profile.semesterName],
         ]} />
       </section>
-      <section className="space-y-3"><h3 className="flex items-center gap-2 font-semibold text-slate-800"><FileText size={18} className="text-orange-600" />Hồ sơ ứng tuyển</h3>
+      <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><FileText size={17} className="text-orange-600" />Hồ sơ ứng tuyển</h3>
         {profile.registeredAt || profile.companyName ? <>
           <ProfileFields fields={[
             ['Doanh nghiệp', profile.companyName], ['Vị trí', profile.positionTitle], ['Email liên hệ trong hồ sơ', profile.applicationEmail],
             ['Số điện thoại trong hồ sơ', profile.applicationPhone], ['Thời gian nộp hồ sơ', dateTime(profile.registeredAt)],
           ]} />
-          {profile.coverLetter && <div className="rounded-xl bg-slate-50 p-4 text-sm"><p className="font-medium text-slate-800">Thư ứng tuyển</p><p className="mt-2 whitespace-pre-wrap break-words leading-relaxed text-slate-600">{profile.coverLetter}</p></div>}
+          {profile.coverLetter && <div className="border-l-2 border-orange-200 pl-3 text-sm"><p className="font-medium text-slate-800">Thư ứng tuyển</p><p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-slate-600">{profile.coverLetter}</p></div>}
           {profile.rejectReason && <Notice>Lý do doanh nghiệp từ chối: {profile.rejectReason}</Notice>}
           {!!profile.certificates?.length && <div className="space-y-2 text-sm"><p className="font-medium text-slate-700">Chứng chỉ đính kèm</p>{profile.certificates.map((certificate, index) => {
             const href = certificateUrl(certificate.url);
@@ -106,7 +109,7 @@ export function StudentProfileModal({ studentId, ojtSemesterId, fullName, onClos
           })}</div>}
         </> : <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Sinh viên chưa gửi hồ sơ ứng tuyển trong học kỳ này.</p>}
       </section>
-      <section className="space-y-3"><h3 className="font-semibold text-slate-800">CV của sinh viên</h3>
+      <section className="space-y-2"><h3 className="border-b border-slate-100 pb-2 font-semibold text-slate-800">CV của sinh viên</h3>
         {profile.submittedCv && <CvDocument key={'submitted-' + profile.submittedCv.id} studentId={studentId} cv={profile.submittedCv} label={profile.cv?.id === profile.submittedCv.id ? 'CV hiện tại · Đã gửi khi ứng tuyển' : 'CV đã gửi khi ứng tuyển'} />}
         {profile.cv && profile.cv.id !== profile.submittedCv?.id && <CvDocument key={profile.cv.id} studentId={studentId} cv={profile.cv} label="CV hiện tại" />}
         {!profile.cv && !profile.submittedCv && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Sinh viên chưa tải CV lên hệ thống.</p>}

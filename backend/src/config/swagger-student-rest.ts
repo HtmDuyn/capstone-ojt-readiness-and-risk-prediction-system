@@ -22,7 +22,8 @@ export function describeStudentRest(spec: Schema): Schema {
   const context = (name: string) => data('/api/internship-tasks').properties.items.items.properties[name];
   const publishedResult = data('/api/students/me/ojt-results').properties.items.items;
   Object.assign(publishedResult.properties, {
-    source: {type: 'string', enum: ['ACADEMIC_CONFIRMATION']},
+    source: {type: 'string', enum: ['QHDN_PUBLICATION']},
+    status: {type:'string',enum:['PUBLISHED']},publishedToStudent:{type:'boolean',enum:[true]},publishedAt:time,
     templateId: nullable(id), scoreDetails: {type: 'object', nullable: true, additionalProperties: true},
     overallScore: number, evaluatedAt: time,
     template: nullable(object({id, code: text, name: text, version: id, criteria: array({type: 'object', additionalProperties: true})})),
@@ -137,7 +138,7 @@ export function describeStudentRest(spec: Schema): Schema {
   tasksOperation.tags=tasksOperation.tags.filter((tag:string)=>tag!=='Sinh viên');
   spec.paths['/api/students/me/internships']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
     summary:'Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố',
-    description:'Gộp phân công hiện tại, nhiệm vụ và kết quả OJT. Bỏ bộ lọc kỳ: phân công đang hiệu lực mới nhất và lịch sử kết quả của mình. assignmentId chọn phân công lịch sử, resultId chọn kết quả CONFIRMED kèm đúng phân công. Không tìm thấy hoặc không thuộc mình trả 404. Các danh sách có phân trang độc lập.',
+    description:'Gộp phân công hiện tại, nhiệm vụ và kết quả OJT. Bỏ bộ lọc kỳ: phân công đang hiệu lực mới nhất và lịch sử kết quả của mình. assignmentId chọn phân công lịch sử, resultId là EvaluationID chọn kết quả đã được QHDN công bố kèm đúng phân công. Không tìm thấy hoặc không thuộc mình trả 404. Các danh sách có phân trang độc lập.',
     parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
 

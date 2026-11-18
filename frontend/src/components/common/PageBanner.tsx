@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Building2, Sparkles, Users, Handshake, Award, ArrowRight } from 'lucide-react';
 import type { StudentProfile } from '@/types/student/studentDashboardTypes';
 import { getStudentMenuItemById, getStudentMenuItemByPath } from '@/config/menus/studentMenu';
 
@@ -33,6 +34,8 @@ export interface PageBannerProps {
   children?: React.ReactNode;
   /** Class CSS bổ sung cho banner. */
   className?: string;
+  /** Kiểu banner dành riêng cho giao diện doanh nghiệp. */
+  variant?: 'default' | 'enterprise' | 'qhdn';
 
   // Props cũ được giữ lại để tương thích với các màn hình hiện tại.
   onRegisterOjt?: () => void;
@@ -51,11 +54,17 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   extra,
   children,
   className = '',
+  variant = 'default',
   onRegisterOjt,
   onViewRoadmap,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const isEnterprise = variant === 'enterprise';
+  const isQhdn = variant === 'qhdn';
+  const renderedBreadcrumb = breadcrumb ?? (isQhdn ? (
+    <span className="qhdn-hero-eyebrow"><Sparkles size={13} /> TRUNG TÂM ĐIỀU PHỐI OJT</span>
+  ) : null);
 
   // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
   const preset = menuId
@@ -121,31 +130,50 @@ export const PageBanner: React.FC<PageBannerProps> = ({
     };
   }
 
+  const bannerClassName = isEnterprise
+    ? 'enterprise-hero relative overflow-hidden text-white'
+    : isQhdn ? 'qhdn-hero relative overflow-hidden text-white'
+    : 'relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300';
+
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300 ${className}`}
+      className={`${bannerClassName} ${className}`}
     >
-      {/* Hiệu ứng phát sáng trang trí ở hai góc banner. */}
-      <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
-      <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
+      {!isEnterprise && !isQhdn && (
+        <>
+          <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
+          <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
+        </>
+      )}
 
       {/* Khối nội dung chính. */}
-      <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="relative z-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
         <div className="max-w-3xl space-y-3">
+          {isEnterprise && (
+            <div className="qhdn-hero-eyebrow">
+              <Building2 size={13} />
+              <span>ENTERPRISE · OJT CONTROL CENTER</span>
+              <Sparkles size={13} />
+            </div>
+          )}
           {/* Breadcrumb nếu được truyền vào. */}
-          {breadcrumb && <div className="mb-2">{breadcrumb}</div>}
+          {renderedBreadcrumb && <div className="mb-2">{renderedBreadcrumb}</div>}
 
           {/* Tiêu đề và badge. */}
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight text-white flex items-center gap-2">
+            <h1 className={`flex items-center gap-2 tracking-tight text-white ${isEnterprise || isQhdn ? 'font-extrabold' : 'text-xl sm:text-2xl lg:text-[26px] font-extrabold'}`}>
               {renderedTitle}
             </h1>
-            {renderedBadge}
+            {isQhdn && badge !== null ? (
+              <span className="qhdn-hero-badge"><span />{renderedBadge || 'Phòng QHDN'}</span>
+            ) : isEnterprise && renderedBadge ? (
+              <span className="qhdn-hero-badge"><span />{renderedBadge}</span>
+            ) : renderedBadge}
           </div>
 
           {/* Mô tả banner. */}
           {renderedDescription && (
-            <div className="text-xs sm:text-sm text-purple-100 leading-relaxed font-normal">
+            <div className="text-xs font-normal leading-relaxed text-purple-100 sm:text-sm">
               {renderedDescription}
             </div>
           )}
@@ -178,6 +206,13 @@ export const PageBanner: React.FC<PageBannerProps> = ({
           )}
 
           {children}
+          {isQhdn && (
+            <div className="qhdn-hero-flow" aria-label="Luồng điều phối OJT">
+              <span><Users size={14} /> Bàn giao sinh viên</span><ArrowRight size={12} aria-hidden="true" />
+              <span><Handshake size={14} /> Kết nối doanh nghiệp</span><ArrowRight size={12} aria-hidden="true" />
+              <span><Award size={14} /> Hoàn thành OJT</span>
+            </div>
+          )}
         </div>
 
         {/* Khu vực mở rộng bên phải. */}
