@@ -1,4 +1,6 @@
 declare module "axios" {
+  export function isAxiosError<T = unknown>(error: unknown): error is AxiosError<T>;
+
   export type AxiosError<T = unknown> = Error & {
     config?: InternalAxiosRequestConfig;
     response?: {

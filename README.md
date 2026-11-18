@@ -39,6 +39,12 @@ The system supports five main user groups:
 
 # Core Features
 
+## Quên mật khẩu
+
+Tại trang đăng nhập, chọn **Quên mật khẩu?**, nhập email tài khoản và dùng mã 6 chữ số trong email để đặt mật khẩu mới. Mã có hiệu lực trong 10 phút và chỉ dùng được một lần.
+
+Với cơ sở dữ liệu đang chạy, áp dụng riêng khối SQL `20261118_password_reset_codes` ở cuối [backend/DB](backend/DB). Cấu hình `SMTP_HOST`, `SMTP_FROM`, `FRONTEND_LOGIN_URL`, và `EMAIL_OUTBOX_KEY` (64 ký tự hex). Thiết lập `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, và `SMTP_PASSWORD` theo máy chủ thư. Backend cần bật tiến trình gửi email (`PROVISIONING_JOBS_ENABLED` mặc định bật).
+
 ## Student
 
 ### Academic Management

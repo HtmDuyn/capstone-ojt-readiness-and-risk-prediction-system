@@ -21,6 +21,14 @@ export interface CurrentUserResponse {
 }
 
 export const authService = {
+  sendPasswordResetCode: async (email: string) => {
+    const { data } = await API.post<{ message: string }>("/auth/forgot-password", { email });
+    return data;
+  },
+  resetPassword: async (email: string, code: string, newPassword: string) => {
+    const { data } = await API.post<{ message: string }>("/auth/reset-password", { email, code, newPassword });
+    return data;
+  },
   logout: async (token: string) => {
     const response = await API.post<{ success: boolean; message: string }>("/auth/logout", undefined, {
       headers: { Authorization: `Bearer ${token}` },
