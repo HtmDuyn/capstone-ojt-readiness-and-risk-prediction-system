@@ -52,16 +52,16 @@ const EducationOjtConditions: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void runAll()} disabled={loading || busy || saving || !fullCheck.length || selectionLocked}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
-          <CheckCircle2 size={18} />{busy ? 'Đang xét điều kiện...' : `Xét toàn bộ sinh viên (${fullCheck.length})`}
+          <CheckCircle2 size={18} />{saving ? 'Đang lưu kết quả...' : busy ? 'Đang xét điều kiện...' : `Xét toàn bộ sinh viên (${fullCheck.length})`}
         </button>
-        {checked.length > 0 && !busy && <button onClick={() => void saveResults()} disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"><Save size={18} />{saving ? 'Đang lưu kết quả...' : `Lưu kết quả (${checked.length})`}</button>}
+        {checked.length > 0 && !busy && <button onClick={() => void saveResults()} disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"><Save size={18} />{saving ? 'Đang lưu kết quả...' : `Thử lưu lại (${checked.length})`}</button>}
       </div>
       <div className="flex gap-3">
         {checked.length > 0 && <button type="button" disabled={busy || saving} className="text-sm underline"
           onClick={() => { if (window.confirm('Bỏ các kết quả chưa lưu?')) discardPending(); }}>Bỏ kết quả chưa lưu</button>}
       </div>
       {!loading && targets.length > 0 && <p className="text-xs text-slate-500">Hệ thống có thể chưa phát hiện mọi thay đổi cấu hình học vụ; PĐT có thể xét lại sau đối soát khi đã bổ sung dữ liệu.</p>}
-      {checked.length > 0 && <p className="text-xs text-slate-500">Chỉ {checked.length} kết quả vừa xét trong phiên này sẽ được lưu, kể cả kết quả ngoài bộ lọc đang xem. Khi lưu, hệ thống tự bàn giao sinh viên đáp ứng yêu cầu bàn giao.</p>}
+      {checked.length > 0 && <p className="text-xs text-slate-500">{checked.length} kết quả đang chờ lưu. Hệ thống tự bàn giao sinh viên đáp ứng yêu cầu sau khi lưu thành công.</p>}
       {loading && <p role="status" className="text-sm text-slate-500">Đang tải danh sách sinh viên...</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {showNotice && <p role="status" className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>}

@@ -80,6 +80,9 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
       WHERE s."StudentID"=ANY($1::int[]) AND s."DeletedAt" IS NULL ORDER BY s."StudentID" FOR UPDATE OF s FOR SHARE OF u`, [ids])).rows;
     if (students.length !== ids.length) throw invalid('One or more students do not exist or have been deleted.', 409, 'RESULT_STUDENT_NOT_FOUND');
     if (students.some(row => row.Status !== 'ACTIVE' || row.AccountStatus !== 'ACTIVE')) throw invalid('All students and their accounts must be active.', 409, 'RESULT_STUDENT_INACTIVE');
+    const handedOff = await client.query(
+      'SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=ANY($1::int[]) LIMIT 1', [ids]);
+    if (handedOff.rowCount) throw invalid('Có sinh viên đã được bàn giao. Tải lại danh sách trước khi xét lại.', 409, 'STUDENT_ALREADY_HANDED_OFF');
     const inputTimes = new Map(input.results.map(row => [row.studentId, new Date(row.checkedAt).getTime()]));
     if (students.some(row => row.HistoryUpdatedAt && new Date(row.HistoryUpdatedAt).getTime() > inputTimes.get(row.StudentID)!)) throw invalid('Course history changed after calculation. Recalculate before saving.', 409, 'ELIGIBILITY_RESULT_STALE');
     const current = (await client.query('SELECT "StudentID","CheckedAt" FROM "StudentOJTCalculatedResults" WHERE "StudentID"=ANY($1::int[])', [ids])).rows;

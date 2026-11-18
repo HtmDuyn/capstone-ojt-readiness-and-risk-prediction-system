@@ -83,7 +83,8 @@ export function useEducationOjtEligibility() {
     setFailures(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !ids.has(Number(id)))));
     setPendingResults(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !ids.has(Number(id)))));
     saveKey.current = null;
-    let next = 0, completed = 0, failed = 0;
+    const calculated: LocalOjtResult[] = [];
+    let next = 0, failed = 0;
     try {
       const policy = await loadCurrentOjtRule(controller.signal);
       const currentRule = { ...policy, minCredits: selectedThreshold.minCredits, thresholdId: selectedThreshold.id };
@@ -98,8 +99,9 @@ export function useEducationOjtEligibility() {
           try {
             const result = await loadAndCalculateLocalEligibility(target.student.id, currentRule, controller.signal);
             if (controller.signal.aborted) return;
-            completed++;
-            setPendingResults(previous => ({ ...previous, [target.student.id]: { ...result, rule: currentRule } }));
+            const checked = { ...result, rule: currentRule };
+            calculated.push(checked);
+            setPendingResults(previous => ({ ...previous, [target.student.id]: checked }));
           } catch (e) {
             if (controller.signal.aborted) return;
             failed++;
@@ -107,9 +109,9 @@ export function useEducationOjtEligibility() {
           }
         }
       }));
-      if (!controller.signal.aborted) setNotice(failed
-        ? `Đã xét ${completed} sinh viên; ${failed} hồ sơ gặp lỗi. Vui lòng xem lý do ở từng sinh viên và thử xét lại.`
-        : `Đã xét ${completed} sinh viên. Vui lòng lưu kết quả để hoàn tất.`);
+      if (controller.signal.aborted) return;
+      if (calculated.length) await persistResults(calculated, currentRule, failed);
+      else setNotice(`Không xét được ${failed} hồ sơ. Vui lòng kiểm tra lý do ở từng sinh viên.`);
     } catch (e) {
       if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Không tải được điều kiện OJT đang áp dụng.');
     } finally { running.current = false; if (!controller.signal.aborted) setBusy(false); }
@@ -120,22 +122,21 @@ export function useEducationOjtEligibility() {
   async function saveResults() {
     const calculated = selectPendingSaveResults(pendingResults);
     if (running.current || savingRequest.current || !calculated.length || !canCheck || !rule) return;
+    await persistResults(calculated, rule, Object.keys(failures).length);
+  }
+
+  async function persistResults(calculated: LocalOjtResult[], rule: CurrentOjtRule, failed: number) {
     savingRequest.current = true; setSaving(true); setError('');
     saveKey.current ??= crypto.randomUUID();
     try {
-      const latestHandoffs = await educationOjtWorkflowService.getHandoffs();
-      setHandoffs(latestHandoffs);
-      const latestHandedOff = handoffsByStudent(latestHandoffs);
-      if (calculated.some(result => latestHandedOff.has(result.studentId))) {
-        throw new Error('Có sinh viên đã được bàn giao sau khi xét. Vui lòng tải lại trang để kiểm tra; chưa lưu kết quả chờ.');
-      }
       const { handedOffCount } = await saveLocalOjtResults(calculated, saveKey.current, rule);
       setPendingResults({});
       saveKey.current = null;
       const eligibleCount = calculated.filter(result => result.status === 'ELIGIBLE').length;
       const waitingCount = Math.max(0, eligibleCount - handedOffCount);
       setNotice('Đã lưu kết quả xét. Đã tự động bàn giao ' + handedOffCount + ' sinh viên.' +
-        (waitingCount ? ' Còn ' + waitingCount + ' sinh viên đủ tín chỉ chưa đáp ứng yêu cầu bàn giao.' : ''));
+        (waitingCount ? ' Còn ' + waitingCount + ' sinh viên đủ tín chỉ đang chờ bàn giao.' : '') +
+        (failed ? ' Có ' + failed + ' hồ sơ chưa xét được. Xem lý do ở từng sinh viên.' : ''));
       try {
         const [refreshed, updatedHandoffs] = await Promise.all([loadSavedLocalOjtResults(), educationOjtWorkflowService.getHandoffs()]);
         setHandoffs(updatedHandoffs);
