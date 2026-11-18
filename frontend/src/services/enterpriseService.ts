@@ -268,6 +268,23 @@ export interface EnterpriseInternshipEvaluationRequest {
   reason: string;
 }
 
+export interface BulkEvaluationItem {
+  assignmentId: number;
+  completionScore: number | null;
+  skillScore: number | null;
+  attitudeScore: number | null;
+  comments: string | null;
+}
+
+export interface BulkEvaluationResponse {
+  success: boolean;
+  data: {
+    items: Array<InternshipEvaluationData & { assignmentId: number }>;
+    saved: number;
+    status: 'DRAFT' | 'SUBMITTED';
+  };
+}
+
 export interface EnterpriseInternshipTask {
   id: number;
   assignmentId: number;
@@ -472,6 +489,15 @@ export const enterpriseService = {
   },
 
   // ── Internship Evaluation ─────────────────────────────────────────────────
+  saveBulkEvaluations: async (
+    items: BulkEvaluationItem[], status: 'DRAFT' | 'SUBMITTED', confirmed = false,
+  ): Promise<BulkEvaluationResponse> => {
+    const response = await API.post<BulkEvaluationResponse>('/enterprise/internships/evaluations/bulk', {
+      items, status, confirmed,
+      reason: status === 'DRAFT' ? 'Lưu nháp đánh giá OJT hàng loạt' : 'Xác nhận gửi điểm OJT hàng loạt đến QHDN',
+    });
+    return response.data;
+  },
   // Gọi PUT /api/enterprise/internships/{id}/evaluation
   // internshipId = AssignmentID
   evaluateInternship: async (

@@ -177,9 +177,21 @@
  *                           "type": "object",
  *                           "description": "Distinct students per OJT semester. Submitted enterprise scores count immediately without academic transfer; cancelled assignments are excluded.",
  *                           "properties": {
- *                             "completed": { "type": "integer", "minimum": 0, "description": "Students with a submitted overall score or a completed assignment." },
- *                             "inProgress": { "type": "integer", "minimum": 0, "description": "Students assigned/active without a completed assignment or submitted evaluation." },
- *                             "evaluated": { "type": "integer", "minimum": 0, "description": "Students with a submitted enterprise evaluation, including score zero." }
+ *                             "completed": {
+ *                               "type": "integer",
+ *                               "minimum": 0,
+ *                               "description": "Students with a submitted overall score or a completed assignment."
+ *                             },
+ *                             "inProgress": {
+ *                               "type": "integer",
+ *                               "minimum": 0,
+ *                               "description": "Students assigned/active without a completed assignment or submitted evaluation."
+ *                             },
+ *                             "evaluated": {
+ *                               "type": "integer",
+ *                               "minimum": 0,
+ *                               "description": "Students with a submitted enterprise evaluation, including score zero."
+ *                             }
  *                           }
  *                         },
  *                         "results": {
@@ -189,23 +201,11 @@
  *                               "type": "integer",
  *                               "minimum": 0
  *                             },
- *                             "pending": {
+ *                             "published": {
  *                               "type": "integer",
  *                               "minimum": 0
  *                             },
- *                             "revisionRequested": {
- *                               "type": "integer",
- *                               "minimum": 0
- *                             },
- *                             "confirmed": {
- *                               "type": "integer",
- *                               "minimum": 0
- *                             },
- *                             "passed": {
- *                               "type": "integer",
- *                               "minimum": 0
- *                             },
- *                             "failed": {
+ *                             "unpublished": {
  *                               "type": "integer",
  *                               "minimum": 0
  *                             }
@@ -471,30 +471,16 @@
  *                                     "type": "integer",
  *                                     "minimum": 0
  *                                   },
- *                                   "pendingResults": {
+ *                                   "publishedResults": {
  *                                     "type": "integer",
  *                                     "minimum": 0
  *                                   },
- *                                   "revisionRequestedResults": {
+ *                                   "unpublishedResults": {
  *                                     "type": "integer",
  *                                     "minimum": 0
  *                                   },
- *                                   "confirmedResults": {
- *                                     "type": "integer",
- *                                     "minimum": 0
- *                                   },
- *                                   "passedResults": {
- *                                     "type": "integer",
- *                                     "minimum": 0
- *                                   },
- *                                   "failedResults": {
- *                                     "type": "integer",
- *                                     "minimum": 0
- *                                   },
- *                                   "averageOfficialScore": {
+ *                                   "averageOverallScore": {
  *                                     "type": "number",
- *                                     "minimum": 0,
- *                                     "maximum": 10,
  *                                     "nullable": true
  *                                   }
  *                                 }
@@ -909,30 +895,16 @@
  *                                     "type": "integer",
  *                                     "minimum": 0
  *                                   },
- *                                   "pendingResults": {
+ *                                   "publishedResults": {
  *                                     "type": "integer",
  *                                     "minimum": 0
  *                                   },
- *                                   "revisionRequestedResults": {
+ *                                   "unpublishedResults": {
  *                                     "type": "integer",
  *                                     "minimum": 0
  *                                   },
- *                                   "confirmedResults": {
- *                                     "type": "integer",
- *                                     "minimum": 0
- *                                   },
- *                                   "passedResults": {
- *                                     "type": "integer",
- *                                     "minimum": 0
- *                                   },
- *                                   "failedResults": {
- *                                     "type": "integer",
- *                                     "minimum": 0
- *                                   },
- *                                   "averageOfficialScore": {
+ *                                   "averageOverallScore": {
  *                                     "type": "number",
- *                                     "minimum": 0,
- *                                     "maximum": 10,
  *                                     "nullable": true
  *                                   }
  *                                 }

@@ -18,6 +18,7 @@ delete process.env.SUPABASE_DATABASE_URL;
 process.env.LOCAL_DATABASE_URL = target;
 process.env.DB_SSL = 'false';
 process.env.JWT_SECRET = 'student-integration-isolated-local-only';
+process.env.EMAIL_OUTBOX_KEY = '34'.repeat(32);
 delete process.env.ROADMAP_SERVICE_URL;
 const { pool } = require('../dist/config/database');
 const app = require('../dist/app').default;
@@ -188,7 +189,7 @@ test('student flow uses real PostgreSQL schema, enforces ownership and leaves ot
     expect(await request('/accounts/me/profile', token, { method: 'PATCH', body: JSON.stringify({ roleCode: 'ADMIN' }) }), 400, 'role escalation');
     const results = await request(`/students/me/internships?ojtSemesterId=${term}`, token);
     expect(results, 200, 'published results');
-    assert.ok(results.body.data.results.items.every(item => item.status === 'CONFIRMED'));
+    assert.ok(results.body.data.results.items.every(item => item.status === 'PUBLISHED'));
   });
 
   let taskId;
@@ -297,8 +298,7 @@ test('student flow uses real PostgreSQL schema, enforces ownership and leaves ot
     expect(await request(`/students/me/internships?ojtSemesterId=${term}&resultId=2147483647`, token), 404, 'nonexistent published result');
   });
 
-  let academicConfirmationBlocked = false;
-  await t.test('student published-result contract works, with the existing academic confirmation blocker reported', async () => {
+  await t.test('QHDN publication immediately exposes results to the student and the Education read contract', async () => {
     const assignment = (await pool.query('SELECT "AssignmentID" AS id FROM "InternshipAssignments" WHERE "StudentID"=$1 ORDER BY "AssignmentID" LIMIT 1', [intern.studentId])).rows[0];
     const enterprise = accounts.find(account => account.role === 'ENTERPRISE');
     const coordinator = accounts.find(account => account.role === 'OJT_COORD');
@@ -317,54 +317,34 @@ test('student flow uses real PostgreSQL schema, enforces ownership and leaves ot
         comments: 'Isolated student result review', reason: 'Integration evaluation' }),
     });
     expect(evaluation, 200, 'existing enterprise evaluation');
-    const transferred = await request('/ojt-results', sign(coordinator), { method: 'POST', body: JSON.stringify({
-      assignmentId: assignment.id, reason: 'Integration result transfer', idempotencyKey: 'student-review-transfer',
+    const resultId = evaluation.body.data.id;
+    expect(await request(`/students/me/internships?ojtSemesterId=${term}&resultId=${resultId}`, internToken), 404, 'unpublished result hidden');
+    const academicBefore = await request(`/ojt-results?ojtSemesterId=${term}`, sign(academic));
+    expect(academicBefore, 200, 'Education result read before publication');
+    assert.equal(academicBefore.body.data.items.some(item => item.id === resultId), false);
+    const publication = await request('/ojt-results/publish', sign(coordinator), { method: 'POST', body: JSON.stringify({
+      ojtSemesterId: term, evaluationIds: [resultId], reason: 'Integration direct result publication',
     }) });
-    expect(transferred, 201, 'existing QHDN transfer');
-    const resultId = transferred.body.data.resultId;
-    const pending = await request(`/students/me/internships?ojtSemesterId=${term}&resultId=${resultId}`, internToken);
-    expect(pending, 404, 'unconfirmed result hidden');
-    const confirmed = await request(`/ojt-results/${resultId}/confirm`, sign(academic), { method: 'POST', body: JSON.stringify({
-      reason: 'Integration academic confirmation', idempotencyKey: 'student-review-confirm',
-    }) });
-    // Review finding: the pre-existing ACADEMIC write omits SemesterTaken/AcademicYearID.
-    // Do not change another role's implementation. Record the actual blocker explicitly.
-    expect(confirmed, 400, 'known existing academic confirmation constraint failure');
-    assert.equal(confirmed.body.errorCode, 'INVALID_ACADEMIC_INPUT');
-    academicConfirmationBlocked = true;
-    console.log('KNOWN BLOCKER: POST /ojt-results/:id/confirm cannot write OJT202 grade; see docs/student-api-review.md.');
-    // Build a valid confirmed read fixture in the disposable DB, with every constraint enabled.
-    // This verifies the STUDENT read contract, not a successful end-to-end academic confirmation.
-    const fixture = await pool.connect();
-    try {
-      await fixture.query('BEGIN');
-      const mapping = (await fixture.query(`SELECT m.*,p."AcademicYearID" FROM "ProgramOJTGradeMappings" m
-        JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=m."AcademicPeriodID"
-        WHERE m."OJTSemesterID"=$1 AND m."ProgramID"=(SELECT "ProgramID" FROM "Students" WHERE "StudentID"=$2)`, [term, intern.studentId])).rows[0];
-      const band = [...mapping.GradeBands].sort((a, b) => b.minimumScore - a.minimumScore).find(item => 8 >= item.minimumScore);
-      await fixture.query('UPDATE "OJTResults" SET "OfficialScore"=8,"Outcome"=$2,"Version"="Version"+1 WHERE "ResultID"=$1', [resultId, band.outcome]);
-      const grade = (await fixture.query(`INSERT INTO "StudentCourseResults"
-        ("StudentID","CourseID","AcademicPeriodID","AcademicYearID","SemesterTaken","AttemptNumber","Score","Grade","GradePoints","Status","OJTResultID","RecordedBy")
-        VALUES($1,$2,$3,$4,6,1,8,$5,$6,$7,$8,$9) RETURNING "ResultID"`,
-      [intern.studentId, mapping.CourseID, mapping.AcademicPeriodID, mapping.AcademicYearID, band.grade, band.gradePoints, band.outcome, resultId, academic.id])).rows[0];
-      await fixture.query(`UPDATE "OJTResults" SET "Status"='CONFIRMED',"Version"="Version"+1,"ConfirmedBy"=$2,"ConfirmedAt"=now(),
-        "ConfirmationReason"='Isolated STUDENT read-contract fixture; not API confirmation',"CourseResultID"=$3,"GradeMappingID"=$4,"GradeMappingSnapshot"=$5
-        WHERE "ResultID"=$1`, [resultId, academic.id, grade.ResultID, mapping.MappingID, JSON.stringify(mapping)]);
-      await fixture.query('COMMIT');
-    } catch (error) { await fixture.query('ROLLBACK'); throw error; } finally { fixture.release(); }
+    expect(publication, 202, 'QHDN direct publication');
+    assert.equal(publication.body.data.published, 1);
     const published = await request(`/students/me/internships?ojtSemesterId=${term}&resultId=${resultId}`, internToken);
-    expect(published, 200, 'frontend getOjtResult with actual published data');
+    expect(published, 200, 'frontend getOjtResult with published data');
     assert.equal(published.body.data.result.id, resultId);
-    assert.equal(published.body.data.result.officialScore, 8);
-    assert.equal(published.body.data.result.status, 'CONFIRMED');
+    assert.equal(published.body.data.result.overallScore, 8);
+    assert.equal(published.body.data.result.status, 'PUBLISHED');
+    assert.ok(published.body.data.result.publishedAt);
     assert.equal(published.body.data.assignment.id, assignment.id);
     const list = await request(`/students/me/internships?ojtSemesterId=${term}&resultsPage=1&resultsLimit=20`, internToken);
     expect(list, 200, 'frontend getOjtResults');
     assert.ok(list.body.data.results.items.some(item => item.id === resultId));
     expect(await request(`/students/me/internships?resultId=${resultId}`, otherToken), 404, 'foreign published result');
-    const grade = (await pool.query('SELECT "Score","Status" FROM "StudentCourseResults" WHERE "StudentID"=$1 AND "OJTResultID"=$2', [intern.studentId, resultId])).rows[0];
-    assert.equal(Number(grade.Score), 8);
-    assert.equal(grade.Status, 'PASSED');
+    const academicAfter = await request(`/ojt-results?ojtSemesterId=${term}&status=CONFIRMED`, sign(academic));
+    expect(academicAfter, 200, 'Education sees publication without confirming');
+    const recorded = academicAfter.body.data.items.find(item => item.id === resultId);
+    assert.equal(recorded.officialScore, 8);
+    assert.ok(recorded.confirmedAt);
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM "OJTResults" WHERE "AssignmentID"=$1', [assignment.id])).rows[0].n, 0);
+
   });
 
   await t.test('password change revokes the old student token and new credentials can log in', async () => {
@@ -391,7 +371,7 @@ test('student flow uses real PostgreSQL schema, enforces ownership and leaves ot
       database: 'isolated PostgreSQL loaded from backend/DB; not production',
       operationsCovered: report.length, operations: report,
       fullyReadyEndToEnd: false,
-      knownBlockers: academicConfirmationBlocked ? ['ACADEMIC POST /ojt-results/{id}/confirm omits grade semester/year and fails DB constraints. Student read succeeds with a valid DB fixture.'] : [],
+      knownBlockers: [],
       limitations: ['Combo happy path needs an actual combo window/roster.', 'AI test uses a local provider fixture.', 'Production database has not been audited.'],
     }, null, 2));
     console.log(`${report.length}/${studentOperations.length} STUDENT operations exercised over HTTP; coverage report: .local/student-api-review.json`);

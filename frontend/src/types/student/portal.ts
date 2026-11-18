@@ -275,11 +275,13 @@ export interface OjtResult {
   enterpriseName: string;
   semesterCode: string;
   officialScore: number | null;
+  overallScore: number | null;
+  publishedAt: string | null;
+  publishedToStudent: boolean;
   completionScore: number | null;
   attitudeScore: number | null;
   skillScore: number | null;
   comments: string | null;
-  confirmedAt: string | null;
   outcome: string | null;
   status: string;
 }

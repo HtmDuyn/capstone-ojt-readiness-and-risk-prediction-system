@@ -1,6 +1,6 @@
 // Applied after generic Swagger decorators so role/body constraints match the workflow handlers.
 export function describeHandoffWorkflow(spec:Record<string,any>){
- const id={type:'integer',minimum:1,maximum:2147483647},text={type:'string'},security=[{bearerAuth:[]}];
+ const id={type:'integer',minimum:1,maximum:2147483647};
  const body=(properties:Record<string,any>,required:string[])=>({required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,properties,required}}}});
  const responses={200:{description:'Thành công'},400:{description:'Dữ liệu không hợp lệ'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không tìm thấy'},409:{description:'Trạng thái hoặc dữ liệu không đáp ứng quy trình'}};
  const handoff=spec.paths['/api/ojt-semesters/{id}/eligible-student-handoffs'].post;
@@ -44,8 +44,6 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
    }}
   },['windowId','postId','positionId']);
  }
- spec.paths['/api/ojt-results'].post={tags:['OJT results'],summary:'QHDN chốt và chuyển kết quả về Phòng đào tạo',security,requestBody:body({assignmentId:id,reason:text,idempotencyKey:text},['assignmentId','reason','idempotencyKey']),responses:{...responses,201:{description:'PENDING_ACADEMIC_CONFIRMATION'}}};
- spec.paths['/api/ojt-results/{id}/confirm']={post:{tags:['OJT results'],summary:'Phòng đào tạo xác nhận và ghi nhận điểm OJT',description:'Dùng bảng quy đổi điểm đã cấu hình; lưu StudentCourseResults và CONFIRMED trong cùng transaction. Không ghi đè điểm học vụ đang tồn tại.',security,parameters:[{name:'id',in:'path',required:true,schema:id}],requestBody:body({reason:text,idempotencyKey:text},['reason','idempotencyKey']),responses}};
  const describeStates=(node:any):void=>{
   if(!node||typeof node!=='object')return;
   if(node.properties?.status?.enum?.includes('HANDED_OFF')){
@@ -57,12 +55,4 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
   for(const value of Object.values(node))if(value&&typeof value==='object')describeStates(value);
  };
  for(const path of ['/api/qhdn/registered-students','/api/ojt-registrations','/api/ojt-semesters/{id}/students'])describeStates(spec.paths[path]?.get?.responses);
- const result=spec.paths['/api/ojt-results'].get;
- result.summary='Danh sách kết quả OJT đã được QHDN chuyển';result.description='resultId là OJTResults.ResultID. Chỉ kết quả được ACADEMIC xác nhận mới chính thức. Sinh viên chỉ xem CONFIRMED.';
- for(const path of ['/api/ojt-results','/api/ojt-semesters/{id}/results/export','/api/students/me/ojt-results']){
-  const op=spec.paths[path]?.get;if(!op)continue;
-  const status=op.parameters?.find((p:any)=>p.name==='status');if(status)status.schema.enum=['PENDING_ACADEMIC_CONFIRMATION','REVISION_REQUESTED','CONFIRMED'];
-  const item=op.responses?.[200]?.content?.['application/json']?.schema?.properties?.data?.properties?.items?.items;
-  if(item?.properties){item.properties.status={type:'string',enum:['PENDING_ACADEMIC_CONFIRMATION','REVISION_REQUESTED','CONFIRMED']};item.properties.officialScore={type:'number',nullable:true};item.properties.source={type:'string',enum:['ACADEMIC_CONFIRMATION']};item.properties.confirmedBy={...id,nullable:true};item.properties.confirmedAt={type:'string',format:'date-time',nullable:true};item.properties.outcome={type:'string',enum:['PASSED','FAILED'],nullable:true};}
- }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   CheckSquare,
@@ -953,9 +954,9 @@ export const EnterpriseInterns: React.FC = () => {
 
       {/* 4. MODAL: GIAO NHIỆM VỤ HÀNG LOẠT (BULK TASK MODAL) */}
       {/* (No priority, No circular avatars, Clean List format) */}
-      {showAddTaskModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8 max-h-[90vh]">
+      {showAddTaskModal && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div role="dialog" aria-modal="true" aria-labelledby="bulk-task-modal-title" className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[calc(100vh-2rem)]">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-orange-50/50 via-white to-amber-50/40">
               <div className="flex items-center space-x-2.5">
@@ -963,7 +964,7 @@ export const EnterpriseInterns: React.FC = () => {
                   <CheckSquare className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base">
+                  <h3 id="bulk-task-modal-title" className="font-extrabold text-slate-900 text-base">
                     Giao Nhiệm vụ Thực tập OJT
                   </h3>
                   <p className="text-xs text-slate-500">
@@ -980,7 +981,8 @@ export const EnterpriseInterns: React.FC = () => {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleCreateTask} className="flex-1 overflow-y-auto p-6 space-y-5">
+            <form onSubmit={handleCreateTask} className="flex min-h-0 flex-1 flex-col">
+             <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
               {taskSubmitError && (
                 <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
                   {taskSubmitError}
@@ -1242,8 +1244,9 @@ export const EnterpriseInterns: React.FC = () => {
                 )}
               </div>
 
+             </div>
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="shrink-0 px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-xs text-slate-500 font-medium">
                   {modalSelectedInternIds.length > 0 ? (
                     <span className="text-slate-700">
@@ -1293,7 +1296,8 @@ export const EnterpriseInterns: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 5. MODAL: XEM CHI TIẾT TIẾN ĐỘ & QUẢN LÝ NHIỆM VỤ CỦA SINH VIÊN */}

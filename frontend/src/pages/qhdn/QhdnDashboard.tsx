@@ -509,7 +509,7 @@ export const QhdnDashboard: React.FC = () => {
       <PageBanner
         variant="qhdn"
         title="Dashboard Quan hệ Doanh nghiệp"
-        description="Giám sát luồng nhận sinh viên từ Phòng Đào tạo, phân bổ chỉ tiêu doanh nghiệp, tiếp nhận đánh giá và chuyển giao kết quả OJT."
+        description="Giám sát luồng nhận sinh viên từ Phòng Đào tạo, phân bổ chỉ tiêu doanh nghiệp, tiếp nhận đánh giá và công bố kết quả OJT cho sinh viên."
         badge="Phòng QHDN"
       />
 

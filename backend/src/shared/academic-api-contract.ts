@@ -30,7 +30,7 @@ export const academicOperations:Record<string,string[]> = {
   '/students':['get'], '/students/{id}':['get','patch'],
   '/course-results/{id}':['patch'], '/academic-imports':['get'], '/ojt-results':['get'],
   '/ojt-semesters/{id}/results/export':['get'],
-  '/students/{id}/cv':['get'], '/ojt-results/{id}/confirm':['post'],
+  '/students/{id}/cv':['get'],
 };
 const matchers=Object.entries(academicOperations).map(([path,methods])=>({
   pattern:new RegExp('^'+path.replace(/\{[^}]+\}/g,'[^/]+')+'/?$'),methods,

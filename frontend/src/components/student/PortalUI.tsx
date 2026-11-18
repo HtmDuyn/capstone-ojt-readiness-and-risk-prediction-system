@@ -26,6 +26,7 @@ export const statusText = (status?: string | null): string =>
     HANDED_OFF: 'Đã bàn giao',
     LEGACY_REVIEW_REQUIRED: 'Cần rà soát hồ sơ cũ',
     CONFIRMED: 'Đã xác nhận',
+    PUBLISHED: 'Đã công bố',
     OPEN: 'Đang mở',
     CLOSED: 'Đã đóng',
     FINALIZED: 'Đã chốt',

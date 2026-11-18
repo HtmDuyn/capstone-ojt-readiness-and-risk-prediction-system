@@ -176,8 +176,8 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
         'id',v."EvaluationID",'templateId',v."TemplateID",'scoreDetails',v."ScoreDetails",'evaluatedBy',v."EvaluatedBy",'completionScore',v."CompletionScore",'attitudeScore',v."AttitudeScore",
         'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",
         'status',v."Status",'evaluatedAt',v."EvaluatedAt") END AS evaluation,
-      ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',CASE WHEN result."Status"='CONFIRMED' THEN result."OfficialScore" ELSE NULL END,'outcome',CASE WHEN result."Status"='CONFIRMED' THEN result."Outcome" ELSE NULL END,'confirmedAt',result."ConfirmedAt") END AS result,
-      result."Status" AS "resultStatus",COALESCE(result."Status"='CONFIRMED' AND GREATEST(a."EndDate",(SELECT "EndDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=r."OJTSemesterID")) < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,false) AS "evaluationLocked"
+      ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',result."OfficialScore",'outcome',result."Outcome",'publishedAt',result."PublishedAt") END AS result,
+      result."Status" AS "resultStatus",(COALESCE(v."Status"='SUBMITTED',false) OR result."ResultID" IS NOT NULL) AS "evaluationLocked"
       FROM "InternshipAssignments" a
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
       JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
