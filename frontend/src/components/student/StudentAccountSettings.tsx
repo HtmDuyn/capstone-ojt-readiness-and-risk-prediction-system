@@ -12,18 +12,22 @@ export default function StudentAccountSettings({ onProfileSaved, initialProfile 
   const [phoneKnown, setPhoneKnown] = useState(!!initialProfile);
   const [phoneEdited, setPhoneEdited] = useState(false);
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmation: '' });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialProfile);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   useEffect(() => {
-    let active = true;
-    apiRequest<{user: {fullName: string; phone?: string | null}}>('/auth/me').then(({user}) => {
-      if (!active) return;
-      setProfile({ fullName: user.fullName, phone: user.phone === undefined ? initialProfile?.phone ?? '' : user.phone ?? '' });
-      setPhoneKnown(user.phone !== undefined || !!initialProfile);
-    }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Không tải được hồ sơ.'); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    if (initialProfile) return;
+    const controller = new AbortController();
+    Promise.resolve().then(() => {
+      controller.signal.throwIfAborted();
+      return apiRequest<{user: {fullName: string; phone?: string | null}}>('/auth/me', { signal: controller.signal });
+    }).then(({user}) => {
+      if (controller.signal.aborted) return;
+      setProfile({ fullName: user.fullName, phone: user.phone ?? '' });
+      setPhoneKnown(user.phone !== undefined);
+    }).catch(e => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Không tải được hồ sơ.'); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, []);
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault(); if (busy || mustChangePassword) return;

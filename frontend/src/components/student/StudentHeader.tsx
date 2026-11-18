@@ -3,8 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Building2, User } from 'lucide-react';
 import {
   SearchIcon,
-  NotificationBellIcon,
-  GlobeIcon,
   MenuIcon,
   LogoutIcon,
 } from '@/components/common/icons/AppIcons';
@@ -25,10 +23,6 @@ interface HeaderProps {
   onOpenMobileMenu: () => void;
   onLogout?: () => void;
   showSearch?: boolean;
-  showNotifications?: boolean;
-  showLanguage?: boolean;
-  onOpenNotifications?: () => void;
-  unreadCount?: number;
 }
 
 export const StudentHeader: React.FC<HeaderProps> = ({
@@ -37,13 +31,8 @@ export const StudentHeader: React.FC<HeaderProps> = ({
   onOpenMobileMenu,
   onLogout,
   showSearch = true,
-  showNotifications = true,
-  showLanguage = true,
-  onOpenNotifications,
-  unreadCount,
 }) => {
   const [profileOpen, setProfileOpen] = useState(false);
-  const [lang, setLang] = useState<'VI' | 'EN'>('VI');
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -104,32 +93,8 @@ export const StudentHeader: React.FC<HeaderProps> = ({
         )}
       </div>
 
-      {/* Right: Notification, Language, User profile */}
+      {/* Right: User profile */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Notification Bell */}
-        {showNotifications && <button
-          type="button"
-          className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors cursor-pointer"
-          title="Thông báo"
-          onClick={onOpenNotifications}
-        >
-          <NotificationBellIcon size={20} />
-          {!!unreadCount && <span className="absolute -top-1 -right-1 rounded-full bg-orange-500 px-1 text-[10px] text-white">{unreadCount}</span>}
-        </button>}
-
-        {/* Language selector */}
-        {showLanguage && <button
-          type="button"
-          onClick={() => setLang((prev) => (prev === 'VI' ? 'EN' : 'VI'))}
-          className="p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-orange-50 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
-          title="Đổi ngôn ngữ"
-        >
-          <GlobeIcon size={18} />
-          <span className="hidden sm:inline">{lang}</span>
-        </button>}
-
-        <div className="h-6 w-px bg-slate-200/80 hidden sm:block" />
-
         {/* User Profile Info & Avatar */}
         <div className="relative" ref={dropdownRef}>
           <button

@@ -12,8 +12,9 @@ import { detail as curriculumDetail } from '../curriculum/curriculum.repository'
 import { invalid, positiveId, pagination } from '../students/student.validation';
 import { ownStudent, page, publicEligibility, type Row, type Actor } from './shared';
 import { earlyWarning } from './early-warning';
+import type { AssessmentReadContext } from './assessment-read-context';
 
-export async function summaryWithClient(c:PoolClient,studentId:number,semesterId:number,loaded?:AcademicProgressData,eligibilityData?:Row) {
+export async function summaryWithClient(c:PoolClient,studentId:number,semesterId:number,loaded?:AcademicProgressData,eligibilityData?:Row,assessmentReads?:AssessmentReadContext) {
   const source=loaded??await loadAcademicProgress(c,studentId);
   const progress=progressFromData(source);
   const decision=eligibilityData??await eligibility(studentId,{ojtSemesterId:semesterId},c,progress,source);
@@ -37,6 +38,7 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
     COALESCE(jsonb_agg(m."CourseID") FILTER(WHERE m."CourseID" IS NOT NULL),'[]'::jsonb) AS "courseIds"
     FROM "ProgramPrerequisiteGroups" g LEFT JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID"
     WHERE g."ProgramID"=$1 GROUP BY g."GroupID"`,[source.program?.ProgramID])).rows;
+  if(assessmentReads)assessmentReads.prerequisiteGroups=groups;
   const aliasMap=new Map<number,number>(source.aliases.map(a=>[a.SourceCourseID,a.TargetCourseID]));
   const canonical=(id:number)=>{const seen=new Set<number>();while(aliasMap.has(id)){if(seen.has(id))return -1;seen.add(id);id=aliasMap.get(id)!;}return id;};
   const achieved=new Set(source.attempts.filter(a=>['PASSED','RECOGNIZED'].includes(a.status)).map(a=>canonical(a.courseId)));
@@ -54,8 +56,11 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
     blockingCourses:source.program?.PrerequisitesReviewed===true?[...blockingIds].map(id=>current.unpassedCourses.find((r:Row)=>r.courseId===id)?.courseCode??String(id)):null,
     projectedStatus:projected?.status??null,projectedCredits:projected?.earnedCredits??null,projectedDebt:projected?.unpassedCourseCount??null,
     deadline:deadline?.assessmentDeadline?new Date(deadline.assessmentDeadline).toISOString():null});
-  const [data]=await enrichListRows(c,[{studentId,programId:progress.program?.id,ojtSemesterId:semesterId,earnedCredits:current.earnedCredits,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,failedCourses:current.unpassedCourses,outstandingCourses:outstanding,inProgressCredits:potential,currentEligibility:publicEligibility(current),officialEligibility:publicEligibility(official),academicProgress:progress,scenario:{assumption:'ALL_CURRENT_COURSES_PASSED',potentialCredits:potential===null?null:current.earnedCredits+potential,isAiPrediction:false},gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,deadline,computedAt:progress.computedAt}]);
-  return {...data,currentSemester:warning.currentSemester,academicWarning:assessment,earlyWarning:{...warning,riskLevel:assessment.level,assessment},failedCourses:await enrichListRows(c,current.unpassedCourses),outstandingCourses:await enrichListRows(c,outstanding)};
+  const result={studentId,programId:progress.program?.id,ojtSemesterId:semesterId,earnedCredits:current.earnedCredits,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,failedCourses:current.unpassedCourses,outstandingCourses:outstanding,inProgressCredits:potential,currentEligibility:publicEligibility(current),officialEligibility:publicEligibility(official),academicProgress:progress,scenario:{assumption:'ALL_CURRENT_COURSES_PASSED',potentialCredits:potential===null?null:current.earnedCredits+potential,isAiPrediction:false},gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,deadline,computedAt:progress.computedAt};
+  const data=assessmentReads?result:(await enrichListRows(c,[result]))[0];
+  return {...data,currentSemester:warning.currentSemester,academicWarning:assessment,earlyWarning:{...warning,riskLevel:assessment.level,assessment},
+    failedCourses:assessmentReads?current.unpassedCourses:await enrichListRows(c,current.unpassedCourses),
+    outstandingCourses:assessmentReads?outstanding:await enrichListRows(c,outstanding)};
 }
 export async function supplementaryWithClient(c:PoolClient,studentId:number,programId:number,data:Row) {
     const prerequisites=(await c.query('SELECT pc."CourseID" AS "courseId",g."MinimumPassed" AS "minimumPassed",COALESCE(jsonb_agg(m."CourseID") FILTER(WHERE m."CourseID" IS NOT NULL),\'[]\'::jsonb) AS "courseIds" FROM "ProgramPrerequisiteGroups" g JOIN "ProgramCourses" pc ON pc."ProgramCourseID"=g."ProgramCourseID" LEFT JOIN "ProgramPrerequisiteMembers" m ON m."GroupID"=g."GroupID" WHERE g."ProgramID"=$1 GROUP BY pc."CourseID",g."GroupID"',[programId])).rows;

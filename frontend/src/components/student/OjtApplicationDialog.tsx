@@ -7,7 +7,7 @@ import { buttonClass, inputClass } from './PortalUI';
 import { explainOjtBlockers, ojtError, type Opportunity, type PartnerCompany } from './ojt';
 
 export function OjtApplicationDialog({ profile, windowId, companies, opportunities, initialPosition, cv, onUploaded, onSubmitted, onClose }: {
-  profile: Profile; windowId: number; companies: PartnerCompany[]; opportunities: Opportunity[];
+  profile: Pick<Profile, 'phone' | 'email' | 'fullName' | 'studentCode'>; windowId: number; companies: PartnerCompany[]; opportunities: Opportunity[];
   initialPosition?: Opportunity; cv: CV | null; onUploaded: (cv: CV) => void;
   onSubmitted: () => void; onClose: () => void;
 }) {

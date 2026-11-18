@@ -377,7 +377,7 @@ export const EnterpriseCandidates: React.FC = () => {
                     </td>
 
                     <td className="px-3 py-4">
-                      <div className="flex items-center justify-center gap-1.5">
+                      <div className="grid grid-cols-[32px_32px_32px] items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setSelectedCandidate(c)}

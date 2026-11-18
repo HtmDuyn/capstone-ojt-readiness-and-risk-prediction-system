@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { expireBearerSession } from './authSession';
 import { API_BASE_URL } from '@/config/api';
+import { studentReads } from './studentReads';
+import { initializeStudentSnapshots, studentSnapshots } from './studentSnapshots';
 
 import { downloadFile } from '@/utils/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
@@ -11,11 +13,14 @@ import type {
   CourseResult,
   Curriculum,
   Dashboard,
+  DashboardOverview,
+  DashboardSummary,
   Internships,
   OjtResult,
   Opportunities,
   Page,
   Profile,
+  StudentIdentityProfile,
   Registration,
   Supplementary,
   Task,
@@ -26,14 +31,8 @@ import type {
 
 export { API_BASE_URL };
 
-// Keep the student's transport independent of the shared API and legacy Axios
-// declarations used by the other roles. Axios normalizes headers at runtime.
+// Keep the student's transport independent of the shared API singleton.
 type HeaderValue = string | number | boolean | null | undefined;
-interface StudentHeaders {
-  has(name: string): boolean;
-  set(name: string, value: HeaderValue): void;
-  delete(name: string): void;
-}
 interface StudentRequestConfig {
   method?: string;
   data?: unknown;
@@ -60,11 +59,10 @@ export const API = axios.create({
 
 API.interceptors.request.use(config => {
   if(['get','head'].includes(config.method?.toLowerCase()??'get')){
-    config.headers??={};
-    config.headers['Cache-Control']='no-cache';
-    config.headers['Pragma']='no-cache';
+    config.headers.set('Cache-Control', 'no-cache');
+    config.headers.set('Pragma', 'no-cache');
   }
-  const headers = config.headers as unknown as StudentHeaders;
+  const headers = config.headers;
   const token = localStorage.getItem('ojt_auth_token');
   if (config.url !== '/auth/login' && token && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
   if (config.data instanceof FormData) headers.delete('Content-Type');
@@ -84,6 +82,10 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
     if (!body || typeof body !== 'object') throw new ApiError('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.', response.status, 'INVALID_API_RESPONSE');
     const result = body as ErrorBody;
     if (result.success === false) throw new ApiError(result.message || 'Yêu cầu API thất bại.', response.status, result.errorCode ?? result.code);
+    if (!['get', 'head'].includes(options.method?.toLowerCase() ?? 'get')) {
+      studentReads.invalidate();
+      studentSnapshots.invalidate();
+    }
     return body;
   } catch (error) {
     if (isRequestCanceled(error) || error instanceof ApiError) throw error;
@@ -94,7 +96,10 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
       0, failure.code,
     );
     const { status, data } = failure.response;
-    if (status === 401) expireBearerSession(failure.config?.headers?.Authorization);
+    if (status === 401) {
+      studentSnapshots.invalidate();
+      expireBearerSession(failure.config?.headers?.Authorization);
+    }
     throw new ApiError(data?.message || `Yêu cầu API thất bại (HTTP ${status}).`, status, data?.errorCode ?? data?.code);
   }
 }
@@ -112,10 +117,12 @@ export async function studentGet<T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await apiRequest<{ data: T }>(path, { signal });
-  if (!Object.prototype.hasOwnProperty.call(response, 'data'))
-    throw new ApiError('API chưa trả dữ liệu theo hợp đồng. Vui lòng kiểm tra backend.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-  return response.data;
+  return studentReads.read(localStorage.getItem('ojt_auth_token'), path, async sharedSignal => {
+    const response = await apiRequest<{ data: T }>(path, { signal: sharedSignal });
+    if (!Object.prototype.hasOwnProperty.call(response, 'data'))
+      throw new ApiError('API chưa trả dữ liệu theo hợp đồng. Vui lòng kiểm tra backend.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+    return response.data;
+  }, signal);
 }
 export async function studentPost<T>(path: string, body: unknown): Promise<T> {
   return (
@@ -145,6 +152,35 @@ export async function getOwnStudent(
   signal?: AbortSignal,
   expectedUser?: { id: string; email: string },
 ): Promise<Profile> {
+  return resolveOwnStudent(getStudentProfile, signal, expectedUser);
+}
+export async function getOwnStudentIdentity(
+  signal?: AbortSignal,
+  expectedUser?: { id: string; email: string },
+  onCached?: (profile: StudentIdentityProfile) => void,
+): Promise<StudentIdentityProfile> {
+  const token = localStorage.getItem('ojt_auth_token');
+  const ticket = studentSnapshots.scope(token);
+  const restored = initializeStudentSnapshots(token);
+  const profile = await resolveOwnStudent(async (id, requestSignal, user) => {
+    await restored;
+    requestSignal?.throwIfAborted();
+    // Cached personal data opens the portal only after /auth/me verifies its owner.
+    const cached = studentSnapshots.read<StudentIdentityProfile>(ticket, 'portal-profile:' + id)?.data;
+    if (cached?.id === id && cached.userId === user.id && cached.email?.toLowerCase() === user.email.toLowerCase()) onCached?.(cached);
+    return studentGet<StudentIdentityProfile>(
+      `/students/${id}` + studentQuery({ include: 'ojtRegistrations', ojtLimit: 100 }), requestSignal,
+    );
+  }, signal, expectedUser);
+  signal?.throwIfAborted();
+  studentSnapshots.write(ticket, 'portal-profile:' + profile.id, profile);
+  return profile;
+}
+async function resolveOwnStudent<T extends Pick<Profile, 'id' | 'userId'>>(
+  loadProfile: (id: number, signal: AbortSignal | undefined, user: StudentCurrentUserResponse['user']) => Promise<T>,
+  signal?: AbortSignal,
+  expectedUser?: { id: string; email: string },
+): Promise<T> {
   const { user } = await apiRequest<StudentCurrentUserResponse>(
     '/auth/me',
     { signal },
@@ -163,12 +199,12 @@ export async function getOwnStudent(
   // Older deployed /auth/me responses omit studentId. This authenticated
   // endpoint resolves the owner on the server even before an assignment exists.
   if (studentId === undefined) {
-    const own = await studentGet<Pick<Internships, 'studentId'>>('/students/me/internships', signal);
+    const own = await studentGet<Pick<Internships, 'studentId'>>('/students/me/internships?include=identity', signal);
     studentId = own.studentId;
   }
   if (!Number.isSafeInteger(studentId) || studentId <= 0)
     throw new ApiError('Máy chủ chưa xác định được hồ sơ sinh viên của tài khoản. Liên hệ Phòng Đào tạo để kiểm tra liên kết.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-  const profile = await getStudentProfile(studentId, signal);
+  const profile = await loadProfile(studentId, signal, user);
   if (profile.id !== studentId || profile.userId !== user.id)
     throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
   return profile;
@@ -176,14 +212,22 @@ export async function getOwnStudent(
 export const getStudentProfile = (id: number, signal?: AbortSignal) =>
   studentGet<Profile>(
     `/students/${id}` +
-      studentQuery({ include: 'academicProgress,ojtRegistrations' }),
+      studentQuery({ include: 'academicProgress,ojtRegistrations', ojtLimit: 100 }),
     signal,
   );
+export const getStudentAcademicProgress = (id: number, signal?: AbortSignal) =>
+  studentGet<Pick<Profile, 'academicProgress'>>(
+    `/students/${id}` + studentQuery({ include: 'academicProgress' }), signal,
+  ).then(profile => profile.academicProgress);
 export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
   studentGet<Dashboard>(
     '/students/me/dashboard' + studentQuery({ ojtSemesterId: semester }),
     signal,
   );
+export const getStudentDashboardOverview = (semester: number, signal?: AbortSignal) =>
+  studentGet<DashboardOverview>('/students/me/dashboard' + studentQuery({ ojtSemesterId: semester, view: 'overview' }), signal);
+export const getStudentDashboardSummary = (semester: number, signal?: AbortSignal) =>
+  studentGet<DashboardSummary>('/students/me/dashboard' + studentQuery({ ojtSemesterId: semester, view: 'summary' }), signal);
 export async function getAcademicSummary(
   semester: number,
   signal?: AbortSignal,
@@ -218,9 +262,9 @@ export const getCourseResults = (
       }),
     signal,
   ).then((profile) => profile.courseResults);
-// Load every server page before filtering and paginating the transcript locally.
+// Keep every server page available for local filtering; publish each page as it arrives.
 // A semester filter must include matching courses beyond the current API page.
-export async function getAllCourseResults(id: number, signal?: AbortSignal) {
+export async function getAllCourseResults(id: number, signal?: AbortSignal, onPage?: (items: CourseResult[]) => void) {
   const items: CourseResult[] = [];
   for (let page = 1; ; page++) {
     const { courseResults } = await studentGet<{ courseResults: Page<CourseResult> }>(
@@ -230,6 +274,7 @@ export async function getAllCourseResults(id: number, signal?: AbortSignal) {
     if (items.length >= courseResults.total) return items;
     if (!courseResults.items.length)
       throw new ApiError('API chưa trả đủ bảng điểm. Vui lòng tải lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+    onPage?.([...items]);
   }
 }
 export const getRegistrationWindows = (
@@ -273,8 +318,8 @@ export const getApplications = (
     signal,
   );
 export const getAssignment = (semester: number, signal?: AbortSignal) =>
-  studentGet<Internships>(
-    '/students/me/internships' + studentQuery({ ojtSemesterId: semester }),
+  studentGet<Pick<Internships, 'assignment'>>(
+    '/students/me/internships' + studentQuery({ ojtSemesterId: semester, include: 'assignment' }),
     signal,
   ).then((result) => result.assignment);
 export const getTasks = (
@@ -282,15 +327,10 @@ export const getTasks = (
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Internships>(
-    '/students/me/internships' +
-      studentQuery({
-        ojtSemesterId: semester,
-        tasksPage: page,
-        tasksLimit: 20,
-      }),
+  studentGet<Internships['tasks']>(
+    '/students/me/tasks' + studentQuery({ ojtSemesterId: semester, page, limit: 20 }),
     signal,
-  ).then((result) => result.tasks);
+  );
 export const getAssignedTasks = (semester: number, page: number, signal?: AbortSignal) =>
   getTasks(semester, page, signal);
 export const getTaskSubmissions = (taskId: number, page: number, signal?: AbortSignal) =>
@@ -302,12 +342,13 @@ export const getOjtResults = (
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Internships>(
+  studentGet<Pick<Internships, 'results'>>(
     '/students/me/internships' +
       studentQuery({
         ojtSemesterId: semester,
         resultsPage: page,
         resultsLimit: 20,
+        include: 'results',
       }),
     signal,
   ).then((result) => result.results);
@@ -316,9 +357,9 @@ export const getOjtResult = (
   semester: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Internships>(
+  studentGet<Pick<Internships, 'result'>>(
     '/students/me/internships' +
-      studentQuery({ ojtSemesterId: semester, resultId: id }),
+      studentQuery({ ojtSemesterId: semester, resultId: id, include: 'results' }),
     signal,
   ).then((result) => result.result);
 export const submitOjtRegistration = (
@@ -374,12 +415,12 @@ export async function getStudentNotifications(
   page = 1,
   signal?: AbortSignal,
   unread?: boolean,
+  limit = 20,
 ) {
-  const response = await apiRequest<{ data: StudentNotificationPage }>(
-    '/students/me/notifications' + studentQuery({ page, limit: 20, unread }),
-    { signal },
+  return studentGet<StudentNotificationPage>(
+    '/students/me/notifications' + studentQuery({ page, limit, unread }),
+    signal,
   );
-  return response.data;
 }
 export async function markStudentNotificationRead(id: string) {
   return apiRequest<{

@@ -16,18 +16,17 @@ export const API = axios.create({
 API.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if(['get','head'].includes(config.method?.toLowerCase()??'get')){
-      config.headers??={};
-      config.headers['Cache-Control']='no-cache';
-      config.headers['Pragma']='no-cache';
+      config.headers.set('Cache-Control', 'no-cache');
+      config.headers.set('Pragma', 'no-cache');
     }
     const token = localStorage.getItem('ojt_auth_token');
     if (
       !['/auth/login', '/auth/forgot-password', '/auth/reset-password'].includes(config.url ?? '') &&
       token &&
       config.headers &&
-      !config.headers.Authorization
+      !config.headers.get('Authorization')
     ) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.set('Authorization', `Bearer ${token}`);
     }
     return config;
   },
