@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   TrendingUp,
   ChevronRight,
-  Building2,
   BriefcaseBusiness,
   ClipboardCheck,
   ListChecks,
@@ -15,8 +14,8 @@ import {
   RefreshCw,
   Clock3,
   CalendarClock,
-  Sparkles,
 } from 'lucide-react';
+import { PageBanner } from '@/components/common/PageBanner';
 import {
   enterpriseService,
   type EnterpriseCandidateItem,
@@ -369,41 +368,13 @@ export const EnterpriseDashboard: React.FC = () => {
 
   return (
     <div className="enterprise-dashboard space-y-6 pb-12">
-      <section className="enterprise-hero enterprise-reveal relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-[#090d1c] px-5 py-7 text-white shadow-2xl shadow-indigo-950/20 sm:px-8 sm:py-9 lg:px-10">
-        <div className="enterprise-grid-overlay pointer-events-none absolute inset-0 opacity-30" />
-        <div className="enterprise-orb pointer-events-none absolute -right-16 -top-24 h-80 w-80 rounded-full bg-orange-500/25 blur-3xl" />
-        <div className="enterprise-orb enterprise-orb-delay pointer-events-none absolute -bottom-36 left-1/3 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
-        <div className="relative">
-          <div className="max-w-3xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-100 backdrop-blur">
-              <Building2 className="h-3.5 w-3.5 text-orange-300" />
-              <span>Enterprise · OJT control center</span>
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-            </div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200/70">
-              Tổng quan hoạt động doanh nghiệp
-            </p>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-[42px]">
-              {companyName}
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-indigo-100/75">
-              Quản lý tiếp nhận sinh viên, vị trí tuyển dụng, tiến độ thực tập và các đầu việc cần xử lý tại một nơi.
-            </p>
-            <div className="mt-6">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
-                  profile?.status === 'ACTIVE'
-                    ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200'
-                    : 'border-white/15 bg-white/10 text-indigo-100'
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${profile?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
-                {profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PageBanner
+        variant="enterprise"
+        title={companyName}
+        breadcrumb={<span className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100/80">Tổng quan hoạt động doanh nghiệp</span>}
+        description="Quản lý tiếp nhận sinh viên, vị trí tuyển dụng, tiến độ thực tập và các đầu việc cần xử lý tại một nơi."
+        badge={profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
+      />
 
       {toastMessage && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm font-medium flex items-center justify-between animate-fadeIn shadow-sm">

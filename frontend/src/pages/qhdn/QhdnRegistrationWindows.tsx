@@ -63,7 +63,7 @@ export default function QhdnRegistrationWindows() {
   const safePage = Math.min(page, Math.max(1, Math.ceil(windows.length / 10)));
 
   return <div className="space-y-5 pb-10">
-    <PageBanner title="Quản lý các đợt OJT" description="Thiết lập đợt OJT, quản lý lịch tuyển dụng, mở đợt con và chốt tổng hợp kết quả theo học kỳ." badge="Phòng QHDN" />
+    <PageBanner variant="qhdn" title="Quản lý các đợt OJT" description="Thiết lập đợt OJT, quản lý lịch tuyển dụng, mở đợt con và chốt tổng hợp kết quả theo học kỳ." badge="Phòng QHDN" />
     <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
       <AcademicPeriodFilter selection={semester} disabled={busy} />
       <button type="button" className={workflowSecondary} disabled={semester.loading || loading || busy} onClick={refresh}><RefreshCw size={16} />Tải lại các đợt</button>

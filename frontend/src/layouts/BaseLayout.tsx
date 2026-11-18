@@ -50,7 +50,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
 
   return (
     <>
-      <div className={`min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden ${isQhdn ? 'qhdn-shell' : ''}`}>
+      <div className="min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
         {/* Nền xung quanh phù hợp với giao diện (theme) */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <img

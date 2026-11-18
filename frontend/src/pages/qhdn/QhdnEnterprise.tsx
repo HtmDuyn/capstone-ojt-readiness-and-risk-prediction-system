@@ -228,7 +228,7 @@ export default function QhdnEnterpriseManagement() {
   return (
     <div className="space-y-5 pb-10">
 
-      <PageBanner
+      <PageBanner variant="qhdn"
         title="Doanh nghiệp & Tuyển dụng"
         description="Theo dõi đối tác, vị trí tuyển dụng và chỉ tiêu tiếp nhận sinh viên trong một nơi."
         badge="Phòng QHDN"

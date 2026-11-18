@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Bell, Check, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
@@ -14,10 +14,12 @@ export function AccountNotificationsPage({
   description,
   badge,
   bannerVariant = 'default',
+  banner,
 }: {
   description: string;
   badge: string;
-  bannerVariant?: 'default' | 'enterprise';
+  bannerVariant?: 'default' | 'enterprise' | 'qhdn';
+  banner?: ReactNode;
 }) {
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
@@ -69,7 +71,7 @@ export function AccountNotificationsPage({
   const reload = () => { setActionError(''); setRevision(value => value + 1); };
 
   return <div className="space-y-6 pb-12">
-    <PageBanner title="Thông báo" description={description} badge={badge} variant={bannerVariant} />
+    {banner ?? <PageBanner title="Thông báo" description={description} badge={badge} variant={bannerVariant} />}
     <section aria-label="Danh sách thông báo" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:px-6">
         <div>

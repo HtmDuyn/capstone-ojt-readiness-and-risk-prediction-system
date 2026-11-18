@@ -12,7 +12,6 @@ import {
   Clock,
   XCircle,
   FileCheck2,
-  Handshake,
   Calendar,
   Layers,
   Search,
@@ -22,7 +21,6 @@ import {
   Send,
   Award,
   UserCheck,
-  Sparkles,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -49,7 +47,6 @@ import {
 } from "@/services/qhdnService";
 import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdnDashboard';
 import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation, dashboardCinema, dashboardPalette } from '@/utils/qhdnDashboardCharts';
-import './QhdnDashboard.css';
 import type {
   CoordinationItem,
   CompanyListItem,
@@ -510,18 +507,11 @@ export const QhdnDashboard: React.FC = () => {
     }}>
       {/* Banner */}
       <PageBanner
-        className="qhdn-hero"
-        breadcrumb={<span className="qhdn-hero-eyebrow"><Sparkles size={13} /> TRUNG TÂM ĐIỀU PHỐI OJT</span>}
-        title="Dashboard Điều phối Quan hệ Doanh nghiệp"
+        variant="qhdn"
+        title="Dashboard Quan hệ Doanh nghiệp"
         description="Giám sát luồng nhận sinh viên từ Phòng Đào tạo, phân bổ chỉ tiêu doanh nghiệp, tiếp nhận đánh giá và chuyển giao kết quả OJT."
-        badge={<span className="qhdn-hero-badge"><span /> Phòng QHDN</span>}
-      >
-        <div className="qhdn-hero-flow" aria-label="Luồng điều phối OJT">
-          <span><Users size={14} /> Bàn giao sinh viên</span><ArrowRight size={12} aria-hidden="true" />
-          <span><Handshake size={14} /> Kết nối doanh nghiệp</span><ArrowRight size={12} aria-hidden="true" />
-          <span><Award size={14} /> Hoàn thành OJT</span>
-        </div>
-      </PageBanner>
+        badge="Phòng QHDN"
+      />
 
       {/* KPI Cards Grid (5 Cards) */}
       <div className="qhdn-kpis grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">

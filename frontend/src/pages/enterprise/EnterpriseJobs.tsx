@@ -72,9 +72,9 @@ export function EnterpriseJobs() {
 
   return <div className="min-w-0 space-y-6">
     <PageBanner variant="enterprise" title={<><BriefcaseBusiness size={27} className="shrink-0 text-orange-400" />Tin tuyển dụng</>}
-      breadcrumb={<span className="text-xs font-medium text-purple-200">Doanh nghiệp / Tuyển dụng thực tập</span>}
+      breadcrumb={<span className="text-xs font-medium text-cyan-100">Doanh nghiệp / Tuyển dụng thực tập</span>}
       description="Kết nối với sinh viên, tìm kiếm nhân sự phù hợp. Quản lý các vị trí và tin tuyển dụng của doanh nghiệp tại đây."
-      badge={<span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200"><CheckCircle2 size={13} />Công bố trực tiếp</span>} />
+      badge="Công bố trực tiếp" />
 
     <div className="flex flex-wrap items-center justify-end gap-3">
       <button type="button" disabled={loading || !!error || !activeWindows.length}
