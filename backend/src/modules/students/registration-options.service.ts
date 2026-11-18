@@ -34,7 +34,8 @@ const periodFields=`jsonb_build_object('id',p."AcademicPeriodID",'code',p."Perio
 // Student projections deliberately omit cohort rosters, raw Scope and staff summaries.
 export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,existingClient?:PoolClient) {
   if(actor.roleCode!=='STUDENT')throw invalid('Student role required.',403,'FORBIDDEN');
-  const page=pagination(params,kind==='combo'?['phase','status','academicPeriodId']:['status','ojtSemesterId']);
+  const page=pagination(params,kind==='combo'?['phase','status','academicPeriodId']:['status','ojtSemesterId','view']);
+  const catalog=kind==='ojt'&&enumValue(params.view??'full',['full','catalog'],'view')==='catalog';
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const status=params.status===undefined?null:enumValue(params.status,kind==='combo'?['DRAFT','OPEN','CLOSED','FINALIZED']:['DRAFT','OPEN','CLOSED'],'status');
   return readTransaction(async c=>{
@@ -61,10 +62,13 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     const extra=kind==='combo'?`,own."ProgramID" AS "RosterProgramID",own."ScopeSnapshot" AS "RosterSnapshot",
       GREATEST(w."EndsAt",COALESCE((SELECT max(ext."EndsAt") FROM "ComboExtensionStudents" es JOIN "ComboWindowExtensions" ext ON ext."ExtensionID"=es."ExtensionID" WHERE es."WindowID"=w."WindowID" AND es."StudentID"=$1),w."EndsAt")) AS "EffectiveEndsAt",
       (SELECT jsonb_build_object('comboId',ev."ProgramComboID",'courseIds',ev."CourseIDs",'choice',ev."ChoiceSnapshot",'submittedAt',ev."CreatedAt") FROM "StudentComboSelectionEvents" ev WHERE ev."WindowID"=w."WindowID" AND ev."StudentID"=$1 AND ev."EventType"='SUBMITTED' ORDER BY ev."EventID" DESC LIMIT 1) AS selection`:
-      `,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",
+      catalog?'':`,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",
         'latestDecision',(SELECT co."Decision" FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1))
         FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
     const rows=(await c.query(`SELECT w.*,${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
+    if(catalog)return {studentId:s.StudentID,items:rows.map(w=>({id:w.WindowID,name:w.Name,
+      academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,period:w.period,semester:w.semester,
+      startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status})),total,page:page.page,limit:page.limit};
     const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const options=kind==='combo'&&rows.length&&s.ProgramStatus==='PUBLISHED'?(await combos(c,s.ProgramID)).filter(b=>b.coursesReviewed&&b.choiceGroups.length&&purpose({ComboCode:b.code,SelectionGroup:b.selectionGroup})==='SPECIALIZATION'):[];
     const confirmed=kind==='combo'&&rows.length?(await activeChoice(c,s.StudentID,s.ProgramID))[0]??null:null;

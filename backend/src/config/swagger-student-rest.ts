@@ -96,9 +96,16 @@ export function describeStudentRest(spec: Schema): Schema {
     comboWindows: page(window), internship:reference('StudentInternships'), notifications: reference('StudentNotifications'),
     jobApplications: data('/api/job-applications'),
   });
+  const dashboardOverview = object({academic: reference('StudentAcademicSummary'), registrationWindows: page(window),
+    internship: object({assignment: reference('StudentCurrentAssignment')}), notifications: reference('StudentNotifications')});
+  const dashboardSummary = object({academic: object(Object.fromEntries([
+    'studentId','academicProgress','earnedCredits','missingCredits','failedCourseCount','gpa','gpaScale','issues',
+    'currentEligibility','officialEligibility','admissionEligibility','deadline',
+  ].map(key=>[key,academic.properties[key]??{type:'object',nullable:true}]))),
+    internship: object({assignment: reference('StudentCurrentAssignment')})});
   Object.assign(spec.components.schemas, {StudentAcademicSummary: academic, StudentCurrentAssignment: assignment,
     StudentNotifications: notifications, StudentCurriculum: curriculum, StudentSupplementaryCourses: supplementary, StudentDashboard: dashboard,
-    StudentInternships:internship});
+    StudentInternships:internship, StudentDashboardOverview:dashboardOverview, StudentDashboardSummary:dashboardSummary});
   const set = (path: string, schema: Schema, method = 'get') => {
     const operation = spec.paths[path]?.[method];
     if (!operation) throw Error('Missing Student REST operation: ' + method + ' ' + path);
@@ -111,7 +118,13 @@ export function describeStudentRest(spec: Schema): Schema {
   set('/api/students/me/notifications/{id}', object({...notification.properties, unreadCount: {type: 'integer', minimum: 0}}), 'patch');
   set('/api/students/me/assignments/current', reference('StudentCurrentAssignment'));
   set('/api/students/me/ojt-results/{id}', publishedResult);
-  set('/api/students/me/dashboard', reference('StudentDashboard'));
+  set('/api/students/me/dashboard', {anyOf:[reference('StudentDashboard'),reference('StudentDashboardOverview'),reference('StudentDashboardSummary')]});
+  spec.paths['/api/students/me/dashboard'].get.parameters.push({in:'query',name:'view',
+    schema:{type:'string',enum:['full','overview','summary'],default:'full'},
+    description:'summary tải tiến độ, điều kiện OJT và nơi thực tập cho thẻ tổng quan; đợt đăng ký/thông báo tải riêng. overview giữ tổng hợp học vụ. full giữ hợp đồng hiện có.'});
+  spec.paths['/api/ojt-registration-windows'].get.parameters.push({in:'query',name:'view',
+    schema:{type:'string',enum:['full','catalog'],default:'full'},
+    description:'Chỉ dành cho STUDENT: catalog trả danh mục đợt theo đúng phạm vi sinh viên, không tính canSubmit hay trả chi tiết hồ sơ. Mặc định full giữ đầy đủ kiểm tra khi ứng tuyển.'});
   profile.properties.courseResults.properties.items.items = courseResult;
   profile.properties.currentSemester = {type: 'integer', minimum: 0, maximum: 9, nullable: true};
   profile.properties.courseSemesterTag = {type: 'integer', minimum: 0, maximum: 9, nullable: true, description:'Tag kỳ: số kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình được gán, gồm môn combo đã duyệt. Không có môn đang học thì null. Khác currentSemester theo lộ trình khóa.'};
@@ -138,8 +151,9 @@ export function describeStudentRest(spec: Schema): Schema {
   tasksOperation.tags=tasksOperation.tags.filter((tag:string)=>tag!=='Sinh viên');
   spec.paths['/api/students/me/internships']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
     summary:'Hồ sơ thực tập: phân công, nhiệm vụ và kết quả đã công bố',
-    description:'Gộp phân công hiện tại, nhiệm vụ và kết quả OJT. Bỏ bộ lọc kỳ: phân công đang hiệu lực mới nhất và lịch sử kết quả của mình. assignmentId chọn phân công lịch sử, resultId là EvaluationID chọn kết quả đã được QHDN công bố kèm đúng phân công. Không tìm thấy hoặc không thuộc mình trả 404. Các danh sách có phân trang độc lập.',
-    parameters:['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
+    description:'Gộp phân công hiện tại, nhiệm vụ và kết quả OJT. include=all mặc định giữ phản hồi đầy đủ. identity chỉ xác định hồ sơ; assignment/tasks/results chỉ tải phần được yêu cầu. Chi tiết results kèm resultId không tải thêm danh sách hoặc task. Bỏ bộ lọc kỳ: phân công đang hiệu lực mới nhất và lịch sử kết quả của mình. assignmentId chọn phân công lịch sử, resultId là EvaluationID của điểm QHDN đã công bố. Không thuộc mình trả 404. Phân trang độc lập.',
+    parameters:[...['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'].map(name=>({in:'query',name,schema:{...id,...(name.endsWith('Limit')?{maximum:100}:{}),...(name.endsWith('Page')?{default:1}:{})}})),
+      {in:'query',name:'include',schema:{type:'string',enum:['all','identity','assignment','tasks','results'],default:'all'}}],
     responses:{200:envelope(reference('StudentInternships')),400:{description:'Sai bộ lọc hoặc phân trang'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không có kỳ/phân công/kết quả được phép xem'}}}};
 
   spec.paths['/api/students/me/ojt-risk-assessment']={get:{tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],

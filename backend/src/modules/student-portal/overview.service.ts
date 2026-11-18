@@ -5,24 +5,30 @@ import { studentWindows } from '../students/registration-options.service';
 import { listApplications } from '../students/job-application.service';
 import { list as listResults } from '../ojt-results/result.service';
 import { currentAssignment, notifications, summaryWithClient, supplementaryWithClient } from './academic.service';
-import { ownStudent, type Actor, type Row } from './shared';
-import { pagination, positiveId, invalid } from '../students/student.validation';
+import { ownStudent, publicEligibility, type Actor, type Row } from './shared';
+import { loadAcademicProgress, progressFromData } from '../students/academic-progress';
+import { eligibility } from '../eligibility/eligibility.service';
+import { pagination, positiveId, invalid, enumValue } from '../students/student.validation';
 import { enrichStudentTasks, studentTaskProgress } from './task.service';
 import { studentAdmission } from './admission.service';
 
 export async function internships(params:Row,actor:Actor,existingClient?:PoolClient) {
-  const allowed=['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit'];
+  const allowed=['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit','include'];
   pagination(params,allowed);
   if(params.page!==undefined||params.limit!==undefined)throw invalid('Use tasksPage/tasksLimit and resultsPage/resultsLimit.');
   const term=params.ojtSemesterId===undefined?undefined:positiveId(params.ojtSemesterId,'ojtSemesterId');
   const assignmentId=params.assignmentId===undefined?undefined:positiveId(params.assignmentId,'assignmentId');
   const resultId=params.resultId===undefined?undefined:positiveId(params.resultId,'resultId');
+  const include=enumValue(params.include??'all',['all','identity','assignment','tasks','results'],'include');
+  if(include==='identity'&&assignmentId)throw invalid('Identity reads do not select an assignment.');
+  if(resultId&&include!=='all'&&include!=='results')throw invalid('resultId requires include=results or all.');
   const tasksPage=pagination({page:params.tasksPage,limit:params.tasksLimit},[]);
   const resultsPage=pagination({page:params.resultsPage,limit:params.resultsLimit},[]);
   if([tasksPage,resultsPage].some(p=>p.offset>2147483647))throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async c=>{
     const student=await ownStudent(c,actor);
     if(term&&!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[term])).rowCount)throw invalid('OJT semester not found.',404);
+    if(include==='identity')return {studentId:student.StudentID,ojtSemesterId:term??null};
     let selectedTerm=term;
     if(assignmentId){
       const selected=(await c.query(`SELECT co."OJTSemesterID" AS id FROM "InternshipAssignments" a
@@ -38,22 +44,53 @@ export async function internships(params:Row,actor:Actor,existingClient?:PoolCli
       if(!result||(assignmentId&&result.assignmentId!==assignmentId))throw invalid('Published result not found.',404);
       selectedTerm=result.ojtSemesterId;
     }
-    const results=await listResults({ojtSemesterId:selectedTerm,page:resultsPage.page,limit:resultsPage.limit},undefined,false,actor.userId,c);
+    const output:Row={studentId:student.StudentID,ojtSemesterId:selectedTerm??null};
+    if(include==='all'||include==='results'){
+      output.result=result;
+      // A detail lookup already selected its one visible result; do not load the list as well.
+      if(include==='all'||!resultId)output.results=await listResults({ojtSemesterId:selectedTerm,page:resultsPage.page,limit:resultsPage.limit},undefined,false,actor.userId,c);
+    }
+    if(include==='results')return output;
     const assignment=await currentAssignment({ojtSemesterId:selectedTerm,assignmentId:assignmentId??result?.assignmentId},actor,c);
+    output.assignment=assignment;
+    if(include==='assignment')return output;
     const tasks=assignment?await listTasks({studentId:student.StudentID,assignmentId:assignment.id,page:tasksPage.page,limit:tasksPage.limit},actor,c)
       :{items:[],total:0,page:tasksPage.page,limit:tasksPage.limit};
-    return {studentId:student.StudentID,ojtSemesterId:selectedTerm??null,assignment,
-      tasks:{...tasks,items:await enrichStudentTasks(c,tasks.items,student.StudentID),
-        progress:await studentTaskProgress(c,assignment?.id??null,student.StudentID)},results,result};
+    output.tasks={...tasks,items:await enrichStudentTasks(c,tasks.items,student.StudentID),
+      progress:await studentTaskProgress(c,assignment?.id??null,student.StudentID)};
+    return output;
   },existingClient);
 }
 
 export async function dashboard(params:Row,actor:Actor) {
-  for(const key of Object.keys(params))if(key!=='ojtSemesterId')throw invalid('Unknown dashboard parameter: '+key);
+  for(const key of Object.keys(params))if(!['ojtSemesterId','view'].includes(key))throw invalid('Unknown dashboard parameter: '+key);
   const term=positiveId(params.ojtSemesterId,'ojtSemesterId');
+  const view=enumValue(params.view??'full',['full','overview','summary'],'view');
   return readTransaction(async c=>{
     const s=await ownStudent(c,actor);
+    if(view==='summary') {
+      // The overview card needs current credits/eligibility, not scenario,
+      // prerequisite, failed-course enrichment or roadmap calculations.
+      const source=await loadAcademicProgress(c,s.StudentID);
+      const progress=progressFromData(source);
+      const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progress,source);
+      const deadline=(await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[term])).rows[0]??null;
+      return {
+        academic:{studentId:s.StudentID,academicProgress:progress,
+          earnedCredits:decision.current.earnedCredits,missingCredits:decision.current.missingCredits,
+          failedCourseCount:decision.current.unpassedCourseCount,gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,
+          currentEligibility:publicEligibility(decision.current),officialEligibility:publicEligibility(decision.official),
+          admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:decision.official}),deadline},
+        internship:{assignment:await currentAssignment({ojtSemesterId:term},actor,c)},
+      };
+    }
     const academic=await summaryWithClient(c,s.StudentID,term);
+    if(view==='overview')return {
+      academic:{...academic,admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:academic.officialEligibility})},
+      registrationWindows:await studentWindows('ojt',{ojtSemesterId:term,limit:5},actor,c),
+      internship:{assignment:await currentAssignment({ojtSemesterId:term},actor,c)},
+      notifications:await notifications({limit:1},actor,c),
+    };
     const supplementary=await supplementaryWithClient(c,s.StudentID,s.ProgramID,academic);
     return {
       academic:{...academic,supplementaryCourses:supplementary,

@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:student": "node --test tests/student/*.test.mjs",
+    "test:student:ui": "node --test tests/student/ui-loading.browser.mjs",
     "test:education": "node --test --test-isolation=none tests/education/*.test.mjs",
     "test:qhdn": "node --test --test-isolation=none tests/qhdn/*.test.mjs"
   },

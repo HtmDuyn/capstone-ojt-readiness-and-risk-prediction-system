@@ -8,9 +8,10 @@ import { officialEligibilityWithClient,eligibility,history } from '../eligibilit
 import { enrichListRows } from '../../shared/list-context';
 import { invalid, pagination, positiveId, enumValue } from './student.validation';
 import type { Actor } from '../ojt-registration/window.service';
+import type { AssessmentReadContext } from '../student-portal/assessment-read-context';
 
 type Row = Record<string, any>;
-export async function studentProfile(id:number,params:Row,actor:Actor,existingClient?:PoolClient) {
+export async function studentProfile(id:number,params:Row,actor:Actor,existingClient?:PoolClient,assessment?:AssessmentReadContext) {
   const section=enumValue(params.section??'all',['all','academicProgress'],'section');
   const sections=['academicProgress','courseResults','comboSelections','ojtRegistrations','eligibility','eligibilityChecks','comboHistory','academic','curriculum'];
   const allowed=['section','include','resultsPage','resultsLimit','courseId','academicPeriodId','courseStatus','ojtPage','ojtLimit','ojtSemesterId','checksPage','checksLimit','comboPage','comboLimit'];
@@ -33,6 +34,7 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
     if(!['ADMIN','ACADEMIC'].includes(actor.roleCode)&&(actor.roleCode!=='STUDENT'||profile.userId!==actor.userId))throw invalid('You cannot access this student.',403,'FORBIDDEN');
     if(selected&&!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[selected])).rowCount)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
     const source=needsProgress?await loadAcademicProgress(c,id):undefined;
+    if(assessment)assessment.source=source;
     const academicProgress=source?progressFromData(source):undefined;
     const output:Row={...profile};
     if(includes.has('academicProgress'))output.academicProgress=academicProgress;
@@ -93,8 +95,10 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
     if(includes.has('eligibility'))output.eligibility=decision;
     if(includes.has('eligibilityChecks'))output.eligibilityChecks=await history(id,{...(selected?{ojtSemesterId:selected}:{}),page:params.checksPage,limit:params.checksLimit},c);
     if(includes.has('academic')){
-      const academic=semesterId?await summaryWithClient(c,id,semesterId,source,decision??undefined):null;
-      output.academic=academic?{...academic,supplementaryCourses:await supplementaryWithClient(c,id,profile.programId,academic)}:null;
+      const academic=semesterId?await summaryWithClient(c,id,semesterId,source,decision??undefined,assessment):null;
+      // Risk output consumes the assessment and course plan, not the supplementary
+      // course picker or profile display metadata. Default profile reads are unchanged.
+      output.academic=academic?(assessment?academic:{...academic,supplementaryCourses:await supplementaryWithClient(c,id,profile.programId,academic)}):null;
     }
     if(includes.has('curriculum')){
       output.curriculum=profile.program?.status==='PUBLISHED'?await curriculumWithClient(c,id,profile.programId):null;
@@ -110,6 +114,6 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
       const total=(await c.query('SELECT count(*)::int n FROM "StudentComboSelectionEvents" WHERE "StudentID"=$1',[id])).rows[0].n;
       output.comboHistory={items:await enrichListRows(c,comboHistory),total,page:comboPage.page,limit:comboPage.limit};
     }
-    return (await enrichListRows(c,[output]))[0];
+    return assessment?output:(await enrichListRows(c,[output]))[0];
   },existingClient);
 }

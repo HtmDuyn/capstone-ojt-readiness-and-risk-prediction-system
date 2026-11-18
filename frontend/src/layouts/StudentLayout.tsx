@@ -32,8 +32,7 @@ function StudentShell() {
         code:profile?.studentCode, subtitle:[profile?.studentCode,profile?.currentSemester != null ? `Kỳ ${profile.currentSemester}` : null].filter(Boolean).join(' - ') || 'Sinh viên',
         avatar:user?.avatar || '', department:profile?.program?.majorName,
       }} onOpenMobileMenu={() => setMenuOpen(true)} onLogout={handleLogout}
-        showSearch={false}
-        onOpenNotifications={() => navigate('/student/notifications')} unreadCount={portal.unreadCount ?? undefined} />
+        showSearch={false} />
       <main className="relative z-10 mx-auto w-full max-w-[1520px] flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <Suspense fallback={<p role="status" className="py-8 text-center text-sm text-slate-500">Đang tải trang…</p>}>
           <Outlet />
