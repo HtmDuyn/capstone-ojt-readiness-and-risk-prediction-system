@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getAllCourseResults, getCurriculum } from '@/services/studentService';
+import { getAllCourseResults, getCurriculum, getStudentAcademicProgress } from '@/services/studentService';
+import type { CourseResult } from '@/types/student/portal';
 import {
   Empty,
   ResourceState,
@@ -18,17 +19,24 @@ export const StudentAcademicProfile = () => {
   const [studySemester, setStudySemester] = useState('');
   const [activeTab, setActiveTab] = useState<'results' | 'curriculum'>('results');
   const [curriculumRequested, setCurriculumRequested] = useState(false);
-  const results = useStudentResource(
+  const results = useStudentResource<CourseResult[]>(
     !loading && profile
       ? 'courses:' + profile.id + ':' + revision
       : null,
-    (signal) => getAllCourseResults(profile!.id, signal),
+    (signal, publish) => getAllCourseResults(profile!.id, signal, publish),
+    { snapshot: true },
   );
   const curriculum = useStudentResource(
     !loading && profile && curriculumRequested ? 'curriculum:' + profile.id + ':' + revision : null,
     (signal) => getCurriculum(profile!.id, signal),
+    { snapshot: true },
   );
-  const progress = profile?.academicProgress;
+  const academic = useStudentResource(
+    !loading && profile ? 'academic-progress:' + profile.id + ':' + revision : null,
+    signal => getStudentAcademicProgress(profile!.id, signal),
+    { snapshot: true },
+  );
+  const progress = academic.data;
   const semesters = [...new Set((results.data ?? []).flatMap((item) => item.semesterTaken == null ? [] : [item.semesterTaken]))].sort((a, b) => a - b);
   const filtered = (results.data ?? []).filter((item) =>
     (studySemester === '' || String(item.semesterTaken) === studySemester) &&
@@ -43,7 +51,7 @@ export const StudentAcademicProfile = () => {
       showRefreshAction={false}
       showSemesterInBanner={false}
     >
-      {profile && progress && (
+      {profile && (
         <>
           <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -64,15 +72,16 @@ export const StudentAcademicProfile = () => {
                 <div><dt className="text-slate-500">Học kỳ hiện tại</dt><dd className="break-words text-slate-800">{profile.currentAcademicPeriod?.name || profile.currentSemester || 'Chưa cập nhật'}</dd></div>
               </div>
             </dl>
-            <dl className="mt-5 grid grid-cols-2 gap-y-4 border-t border-slate-200 pt-5 lg:grid-cols-4">
+            <ResourceState loading={academic.loading} refreshing={academic.refreshing} error={academic.error} retry={academic.reload} />
+            {progress && <dl className="mt-5 grid grid-cols-2 gap-y-4 border-t border-slate-200 pt-5 lg:grid-cols-4">
               {[
                 { label: 'GPA', value: progress.gpa == null ? 'Chưa có dữ liệu' : progress.gpa + ' / ' + (progress.gpaScale ?? '—') },
                 { label: 'Tín chỉ đã đạt', value: progress.credits.earned },
                 { label: 'Tổng tín chỉ chương trình', value: valueText(progress.credits.total) },
                 { label: 'Tín chỉ còn lại', value: valueText(progress.credits.remaining) },
               ].map((metric, index) => <div key={metric.label} className={`min-w-0 ${index % 2 ? 'border-l border-slate-200 pl-4' : ''} ${index > 1 ? 'lg:border-l lg:pl-5' : ''} ${index === 1 ? 'lg:border-l lg:pl-5' : ''}`}><dt className="text-xs text-slate-500">{metric.label}</dt><dd className="mt-1 text-xl font-bold text-slate-900">{metric.value}</dd></div>)}
-            </dl>
-            {!!progress.issues.length && <div className="mt-5 border-t border-slate-200 pt-4"><h3 className="text-sm font-semibold text-slate-800">Dữ liệu cần đối soát</h3><p className="mt-1 text-sm text-amber-700">{progress.issues.join(' · ')}</p></div>}
+            </dl>}
+            {!!progress?.issues.length && <div className="mt-5 border-t border-slate-200 pt-4"><h3 className="text-sm font-semibold text-slate-800">Dữ liệu cần đối soát</h3><p className="mt-1 text-sm text-amber-700">{progress.issues.join(' · ')}</p></div>}
           </section>
           <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <div role="tablist" aria-label="Dữ liệu học tập" className="flex gap-6 overflow-x-auto border-b border-slate-200">
@@ -82,6 +91,7 @@ export const StudentAcademicProfile = () => {
           <div role="tabpanel" id="results-panel" aria-labelledby="results-tab" hidden={activeTab !== 'results'} className="space-y-4 pt-5">
             <ResourceState
               loading={results.loading}
+              refreshing={results.refreshing}
               error={results.error}
               retry={results.reload}
             />
@@ -139,14 +149,15 @@ export const StudentAcademicProfile = () => {
                     </tbody>
                   </table>
                 </div>
-                {!filtered.length && <Empty>Không có môn học phù hợp.</Empty>}
-                <p className="text-sm text-slate-500">Tổng cộng {filtered.length} bản ghi điểm học tập.</p>
+                {!results.pending && !filtered.length && <Empty>Không có môn học phù hợp.</Empty>}
+                <p className="text-sm text-slate-500">{results.pending ? 'Đã tải' : 'Tổng cộng'} {filtered.length} bản ghi điểm học tập.</p>
               </>
             )}
           </div>
           <div role="tabpanel" id="curriculum-panel" aria-labelledby="curriculum-tab" hidden={activeTab !== 'curriculum'} className="space-y-4 pt-5">
             <ResourceState
               loading={curriculum.loading}
+              refreshing={curriculum.refreshing}
               error={curriculum.error}
               retry={curriculum.reload}
             />
@@ -169,7 +180,7 @@ export const StudentAcademicProfile = () => {
                     </thead>
                     <tbody>
                       {courses.map((course) => {
-                        const requirement = progress.requirements.find(
+                        const requirement = progress?.requirements.find(
                           (item) => item.id === course.id,
                         );
                         return (
@@ -184,7 +195,7 @@ export const StudentAcademicProfile = () => {
                               {course.prerequisiteText || 'Chưa ghi nhận'}
                             </td>
                             <td>
-                              {requirement?.completed
+                              {!progress ? academic.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ' : requirement?.completed
                                 ? 'Đã hoàn thành'
                                 : 'Chưa hoàn thành'}
                             </td>

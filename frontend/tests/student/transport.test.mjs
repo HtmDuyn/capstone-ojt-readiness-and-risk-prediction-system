@@ -32,6 +32,7 @@ globalThis.localStorage = { getItem: key => stored.get(key) ?? null, setItem: (k
 globalThis.window = new EventTarget();
 globalThis.fetch = () => { throw new Error('Student requests must never call fetch'); };
 const student = await import('../../src/services/studentService.ts');
+const { studentSnapshots } = await import('../../src/services/studentSnapshots.ts');
 const { getOjtRiskAssessment } = await import('../../src/services/studentOjtRisk.service.ts');
 const { cvAnalysisApi } = await import('../../src/services/studentCvAnalysis.service.ts');
 const { matchStudentJobs } = await import('../../src/services/studentJobMatching.service.ts');
@@ -51,10 +52,12 @@ test('Student data requests use Axios, bearer auth and only the required API sec
   await student.getOjtResults(1, 1);
   await student.getOjtResult(5, 1);
   await student.getStudentDashboardOverview(1);
+  await student.getStudentDashboardSummary(1);
   assert.match(calls[0].url, /^\/students\/me\/tasks\?.*page=2/);
   assert.ok(calls[1].url.includes('include=results'));
   assert.ok(calls[2].url.includes('resultId=5'));
   assert.ok(calls[3].url.includes('view=overview'));
+  assert.ok(calls[4].url.includes('view=summary'));
   assert.ok(calls.every(config => config.headers.get('Authorization') === 'Bearer student-session'));
 });
 
@@ -91,4 +94,65 @@ test('HTTP failures and expired sessions are handled without signing out a newer
   assert.equal(stored.get('ojt_auth_token'), 'new-session');
   student.API.defaults.adapter = async config => { throw new axios.AxiosError('Timeout', 'ECONNABORTED', config); };
   await assert.rejects(student.apiRequest('/auth/me'), error => error instanceof student.ApiError && error.status === 0 && error.code === 'ECONNABORTED');
+});
+
+test('portal identity opens without academic computation and retains identity/password guards', async () => {
+  stored.set('ojt_auth_token', 'identity-session');
+  const user = { id: 7, studentId: 2, email: 'student@test.test', roleCode: 'STUDENT' };
+  const identity = { id: 2, userId: 7, ojtRegistrations: { items: [], total: 0 } };
+  const calls = [];
+  let responseProfile = identity;
+  student.API.defaults.adapter = async config => {
+    calls.push(config.url);
+    return { data: config.url === '/auth/me' ? { success: true, user }
+      : { success: true, data: config.url.includes('include=academicProgress') ? { academicProgress: { gpa: 3 } } : responseProfile },
+      status: 200, statusText: 'OK', headers: {}, config };
+  };
+  assert.deepEqual(await student.getOwnStudentIdentity(undefined, { id: '7', email: user.email }), identity);
+  assert.equal(calls[0], '/auth/me');
+  assert.equal(calls[1], '/students/2?include=ojtRegistrations&ojtLimit=100');
+  assert.deepEqual(await student.getStudentAcademicProgress(2), { gpa: 3 });
+  responseProfile = { ...identity, userId: 8 };
+  await assert.rejects(student.getOwnStudentIdentity(), { code: 'SESSION_IDENTITY_CHANGED' });
+  user.mustChangePassword = true;
+  const before = calls.length;
+  await assert.rejects(student.getOwnStudentIdentity(), { code: 'PASSWORD_CHANGE_REQUIRED' });
+  assert.equal(calls.length, before + 1, 'No profile request before the password change');
+  user.mustChangePassword = false;
+  await assert.rejects(student.getOwnStudentIdentity(undefined, { id: '9', email: user.email }), { code: 'SESSION_IDENTITY_CHANGED' });
+});
+
+test('transcript publishes early pages without losing later courses needed for local filtering', async () => {
+  let release;
+  const second = new Promise(resolve => { release = resolve; });
+  student.API.defaults.adapter = async config => {
+    const page = Number(new URL(config.url, 'https://student.test').searchParams.get('resultsPage'));
+    if (page === 2) await second;
+    return { data: { success: true, data: { courseResults: { items: [{ id: page }], total: 2 } } },
+      status: 200, statusText: 'OK', headers: {}, config };
+  };
+  let notify;
+  const published = new Promise(resolve => { notify = resolve; });
+  const rows = [];
+  const result = student.getAllCourseResults(2, undefined, data => { rows.push(data); notify(); });
+  await published;
+  assert.deepEqual(rows, [[{ id: 1 }]], 'First page is usable while the second is pending');
+  release();
+  assert.deepEqual(await result, [{ id: 1 }, { id: 2 }]);
+  assert.deepEqual(rows[0], [{ id: 1 }], 'Published pages are immutable snapshots');
+});
+
+test('successful Axios writes invalidate UI snapshots, while failed writes remain retryable', async () => {
+  const token = stored.get('ojt_auth_token');
+  let ticket = studentSnapshots.scope(token);
+  studentSnapshots.write(ticket, 'profile', { name: 'Before' });
+  student.API.defaults.adapter = async config => ({ data: { success: true, data: {} }, status: 200, statusText: 'OK', headers: {}, config });
+  await student.studentPost('/job-applications', {});
+  ticket = studentSnapshots.scope(token);
+  assert.equal(studentSnapshots.read(ticket, 'profile'), undefined);
+  studentSnapshots.write(ticket, 'profile', { name: 'After' });
+  student.API.defaults.adapter = async config => { throw new axios.AxiosError('Conflict', 'ERR_BAD_REQUEST', config, undefined,
+    { status: 409, data: { message: 'Already submitted' }, headers: {}, config }); };
+  await assert.rejects(student.studentPost('/job-applications', {}), { status: 409 });
+  assert.deepEqual(studentSnapshots.read(ticket, 'profile'), { data: { name: 'After' } });
 });

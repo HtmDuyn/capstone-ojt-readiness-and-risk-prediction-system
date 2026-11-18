@@ -2,6 +2,7 @@ import axios from 'axios';
 import { expireBearerSession } from './authSession';
 import { API_BASE_URL } from '@/config/api';
 import { studentReads } from './studentReads';
+import { studentSnapshots } from './studentSnapshots';
 
 import { downloadFile } from '@/utils/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
@@ -13,11 +14,13 @@ import type {
   Curriculum,
   Dashboard,
   DashboardOverview,
+  DashboardSummary,
   Internships,
   OjtResult,
   Opportunities,
   Page,
   Profile,
+  StudentIdentityProfile,
   Registration,
   Supplementary,
   Task,
@@ -86,7 +89,10 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
     if (!body || typeof body !== 'object') throw new ApiError('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.', response.status, 'INVALID_API_RESPONSE');
     const result = body as ErrorBody;
     if (result.success === false) throw new ApiError(result.message || 'Yêu cầu API thất bại.', response.status, result.errorCode ?? result.code);
-    if (!['get', 'head'].includes(options.method?.toLowerCase() ?? 'get')) studentReads.invalidate();
+    if (!['get', 'head'].includes(options.method?.toLowerCase() ?? 'get')) {
+      studentReads.invalidate();
+      studentSnapshots.invalidate();
+    }
     return body;
   } catch (error) {
     if (isRequestCanceled(error) || error instanceof ApiError) throw error;
@@ -97,7 +103,10 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
       0, failure.code,
     );
     const { status, data } = failure.response;
-    if (status === 401) expireBearerSession(failure.config?.headers?.Authorization);
+    if (status === 401) {
+      studentSnapshots.invalidate();
+      expireBearerSession(failure.config?.headers?.Authorization);
+    }
     throw new ApiError(data?.message || `Yêu cầu API thất bại (HTTP ${status}).`, status, data?.errorCode ?? data?.code);
   }
 }
@@ -150,6 +159,21 @@ export async function getOwnStudent(
   signal?: AbortSignal,
   expectedUser?: { id: string; email: string },
 ): Promise<Profile> {
+  return resolveOwnStudent(getStudentProfile, signal, expectedUser);
+}
+export async function getOwnStudentIdentity(
+  signal?: AbortSignal,
+  expectedUser?: { id: string; email: string },
+): Promise<StudentIdentityProfile> {
+  return resolveOwnStudent((id, requestSignal) => studentGet<StudentIdentityProfile>(
+    `/students/${id}` + studentQuery({ include: 'ojtRegistrations', ojtLimit: 100 }), requestSignal,
+  ), signal, expectedUser);
+}
+async function resolveOwnStudent<T extends Pick<Profile, 'id' | 'userId'>>(
+  loadProfile: (id: number, signal?: AbortSignal) => Promise<T>,
+  signal?: AbortSignal,
+  expectedUser?: { id: string; email: string },
+): Promise<T> {
   const { user } = await apiRequest<StudentCurrentUserResponse>(
     '/auth/me',
     { signal },
@@ -173,7 +197,7 @@ export async function getOwnStudent(
   }
   if (!Number.isSafeInteger(studentId) || studentId <= 0)
     throw new ApiError('Máy chủ chưa xác định được hồ sơ sinh viên của tài khoản. Liên hệ Phòng Đào tạo để kiểm tra liên kết.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-  const profile = await getStudentProfile(studentId, signal);
+  const profile = await loadProfile(studentId, signal);
   if (profile.id !== studentId || profile.userId !== user.id)
     throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
   return profile;
@@ -184,6 +208,10 @@ export const getStudentProfile = (id: number, signal?: AbortSignal) =>
       studentQuery({ include: 'academicProgress,ojtRegistrations', ojtLimit: 100 }),
     signal,
   );
+export const getStudentAcademicProgress = (id: number, signal?: AbortSignal) =>
+  studentGet<Pick<Profile, 'academicProgress'>>(
+    `/students/${id}` + studentQuery({ include: 'academicProgress' }), signal,
+  ).then(profile => profile.academicProgress);
 export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
   studentGet<Dashboard>(
     '/students/me/dashboard' + studentQuery({ ojtSemesterId: semester }),
@@ -191,6 +219,8 @@ export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
   );
 export const getStudentDashboardOverview = (semester: number, signal?: AbortSignal) =>
   studentGet<DashboardOverview>('/students/me/dashboard' + studentQuery({ ojtSemesterId: semester, view: 'overview' }), signal);
+export const getStudentDashboardSummary = (semester: number, signal?: AbortSignal) =>
+  studentGet<DashboardSummary>('/students/me/dashboard' + studentQuery({ ojtSemesterId: semester, view: 'summary' }), signal);
 export async function getAcademicSummary(
   semester: number,
   signal?: AbortSignal,
@@ -225,9 +255,9 @@ export const getCourseResults = (
       }),
     signal,
   ).then((profile) => profile.courseResults);
-// Load every server page before filtering and paginating the transcript locally.
+// Keep every server page available for local filtering; publish each page as it arrives.
 // A semester filter must include matching courses beyond the current API page.
-export async function getAllCourseResults(id: number, signal?: AbortSignal) {
+export async function getAllCourseResults(id: number, signal?: AbortSignal, onPage?: (items: CourseResult[]) => void) {
   const items: CourseResult[] = [];
   for (let page = 1; ; page++) {
     const { courseResults } = await studentGet<{ courseResults: Page<CourseResult> }>(
@@ -237,6 +267,7 @@ export async function getAllCourseResults(id: number, signal?: AbortSignal) {
     if (items.length >= courseResults.total) return items;
     if (!courseResults.items.length)
       throw new ApiError('API chưa trả đủ bảng điểm. Vui lòng tải lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+    onPage?.([...items]);
   }
 }
 export const getRegistrationWindows = (
@@ -379,11 +410,10 @@ export async function getStudentNotifications(
   unread?: boolean,
   limit = 20,
 ) {
-  const response = await apiRequest<{ data: StudentNotificationPage }>(
+  return studentGet<StudentNotificationPage>(
     '/students/me/notifications' + studentQuery({ page, limit, unread }),
-    { signal },
+    signal,
   );
-  return response.data;
 }
 export async function markStudentNotificationRead(id: string) {
   return apiRequest<{

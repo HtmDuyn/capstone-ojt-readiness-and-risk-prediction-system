@@ -125,6 +125,10 @@ export interface Profile {
     }[];
   }[];
 }
+// The portal shell does not need to compute academic progress to identify its owner.
+export type StudentIdentityProfile = Omit<Profile,
+  'academicProgress' | 'officialEligibility' | 'officialDecision' | 'courseResults' | 'comboSelections'>;
+
 export interface Window {
   id: number;
   name: string;
@@ -163,6 +167,7 @@ export interface Combo {
 }
 export interface AcademicSummary {
   studentId: number;
+  academicProgress?: AcademicProgress;
   earnedCredits: number;
   missingCredits: number | null;
   failedCourseCount: number;
@@ -208,6 +213,12 @@ export interface DashboardOverview {
   registrationWindows: Page<Window>;
   internship: Pick<Internships, 'assignment'>;
   notifications: Page<PortalNotification> & { unreadCount: number };
+}
+export interface DashboardSummary {
+  academic: Pick<AcademicSummary, 'studentId' | 'academicProgress' | 'earnedCredits' | 'missingCredits' |
+    'failedCourseCount' | 'gpa' | 'gpaScale' | 'issues' | 'currentEligibility' | 'officialEligibility' |
+    'admissionEligibility' | 'deadline'>;
+  internship: Pick<Internships, 'assignment'>;
 }
 export interface Internships {
   studentId: number;

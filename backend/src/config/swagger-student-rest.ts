@@ -98,9 +98,14 @@ export function describeStudentRest(spec: Schema): Schema {
   });
   const dashboardOverview = object({academic: reference('StudentAcademicSummary'), registrationWindows: page(window),
     internship: object({assignment: reference('StudentCurrentAssignment')}), notifications: reference('StudentNotifications')});
+  const dashboardSummary = object({academic: object(Object.fromEntries([
+    'studentId','academicProgress','earnedCredits','missingCredits','failedCourseCount','gpa','gpaScale','issues',
+    'currentEligibility','officialEligibility','admissionEligibility','deadline',
+  ].map(key=>[key,academic.properties[key]??{type:'object',nullable:true}]))),
+    internship: object({assignment: reference('StudentCurrentAssignment')})});
   Object.assign(spec.components.schemas, {StudentAcademicSummary: academic, StudentCurrentAssignment: assignment,
     StudentNotifications: notifications, StudentCurriculum: curriculum, StudentSupplementaryCourses: supplementary, StudentDashboard: dashboard,
-    StudentInternships:internship, StudentDashboardOverview:dashboardOverview});
+    StudentInternships:internship, StudentDashboardOverview:dashboardOverview, StudentDashboardSummary:dashboardSummary});
   const set = (path: string, schema: Schema, method = 'get') => {
     const operation = spec.paths[path]?.[method];
     if (!operation) throw Error('Missing Student REST operation: ' + method + ' ' + path);
@@ -113,10 +118,13 @@ export function describeStudentRest(spec: Schema): Schema {
   set('/api/students/me/notifications/{id}', object({...notification.properties, unreadCount: {type: 'integer', minimum: 0}}), 'patch');
   set('/api/students/me/assignments/current', reference('StudentCurrentAssignment'));
   set('/api/students/me/ojt-results/{id}', publishedResult);
-  set('/api/students/me/dashboard', {anyOf:[reference('StudentDashboard'),reference('StudentDashboardOverview')]});
+  set('/api/students/me/dashboard', {anyOf:[reference('StudentDashboard'),reference('StudentDashboardOverview'),reference('StudentDashboardSummary')]});
   spec.paths['/api/students/me/dashboard'].get.parameters.push({in:'query',name:'view',
-    schema:{type:'string',enum:['full','overview'],default:'full'},
-    description:'overview chỉ tải dữ liệu dashboard đang hiển thị; giữ nguyên tổng hợp học vụ/điều kiện, bỏ task, kết quả, combo, hồ sơ ứng tuyển và môn bổ sung. full giữ hợp đồng hiện có.'});
+    schema:{type:'string',enum:['full','overview','summary'],default:'full'},
+    description:'summary tải tiến độ, điều kiện OJT và nơi thực tập cho thẻ tổng quan; đợt đăng ký/thông báo tải riêng. overview giữ tổng hợp học vụ. full giữ hợp đồng hiện có.'});
+  spec.paths['/api/ojt-registration-windows'].get.parameters.push({in:'query',name:'view',
+    schema:{type:'string',enum:['full','catalog'],default:'full'},
+    description:'Chỉ dành cho STUDENT: catalog trả danh mục đợt theo đúng phạm vi sinh viên, không tính canSubmit hay trả chi tiết hồ sơ. Mặc định full giữ đầy đủ kiểm tra khi ứng tuyển.'});
   profile.properties.courseResults.properties.items.items = courseResult;
   profile.properties.currentSemester = {type: 'integer', minimum: 0, maximum: 9, nullable: true};
   profile.properties.courseSemesterTag = {type: 'integer', minimum: 0, maximum: 9, nullable: true, description:'Tag kỳ: số kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình được gán, gồm môn combo đã duyệt. Không có môn đang học thì null. Khác currentSemester theo lộ trình khóa.'};

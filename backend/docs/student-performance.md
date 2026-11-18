@@ -21,6 +21,44 @@ Changes are limited to the Student frontend, its request coordinator, and Studen
 - `GET /students/me/dashboard?view=overview` returns the academic/admission data, registration windows, assignment, and latest notification displayed by the dashboard. The default `view=full` preserves the existing response. Full academic and admission computations are unchanged, so the risk/roadmap logic is unaffected.
 - The curriculum tab loads on first opening. Subsequent tab switches keep the current component data; refresh still requests the server.
 
+## Student UI follow-up
+
+The follow-up changes only Student frontend files and tests; it does not change backend APIs or AI computation.
+
+- Portal bootstrap now requests `include=ojtRegistrations`, retaining the existing `/auth/me`, role, password-change, and profile-owner checks. Academic progress no longer blocks the shell or the risk/recruitment screens.
+- The dashboard renders its sections before the aggregate or assessment finishes. Its credit chart uses `academic.academicProgress`, already present in the dashboard response, avoiding a second progress computation during bootstrap.
+- Academic profile loads metrics and transcript independently. Transcript pages render progressively, and later pages still participate in semester/search filters. Curriculum remains lazy.
+- Opt-in UI snapshots hold at most 24 completed resources for 60 seconds in memory. Navigating back can display them immediately, but every mount/retry still calls the server. They are scoped to the login token, discarded on successful Student writes, 401 responses, session changes or leaving the Student portal. Late responses begun before invalidation cannot refill snapshots. The HTTP request coordinator still only deduplicates in-flight reads; it does not cache completed HTTP responses.
+- Risk UI can reuse the assessment just displayed on the dashboard while requesting a fresh assessment. Endpoint, consent, cancellation, timeout, model inputs, scores, prompts and roadmap computation are unchanged. A failed refresh retains the previous result with the existing error message.
+- Recruitment opportunities render each page as it arrives. Application actions wait for validation to finish. Application history and the CV panel load when their tab is first opened; history requests only the current 20-row server page. Visiting the hidden tab no longer competes with the initial opportunity load.
+
+`npm run test:student` covers transport, identity guards, progressive transcript reads, cache expiry/bounds, mutation invalidation and session isolation. `npm run test:student:ui` uses installed Chrome/Chromium (or `STUDENT_TEST_CHROME`) with isolated mock Axios responses and the actual React screens. Its eight checks cover immediate cached rendering with revalidation, partial-page rendering, refresh failure, account switching, mutation invalidation, dashboard rendering before aggregate/AI responses, independent academic loads and lazy server-paginated application history. Browser profiles are disposable files under the ignored `frontend/.tmp` folder. No live accounts or production data are used.
+
+These checks establish UI behavior under deliberately delayed responses. They do not establish production response time; hosting, network and database latency still need measurement in the deployed environment.
+
+## Dashboard request and ownership audit
+
+The subsequent audit found redundant work still present in the overview screen:
+
+- Portal bootstrap fetched notification counts that only the notifications page consumed; that page fetched its own count again. Dashboard also received the same latest notification/count in its aggregate. Bootstrap no longer makes that request. Dashboard loads its one-row notification resource independently, so notification failure cannot delay credits or eligibility.
+- Bootstrap fetched fully validated OJT application windows just to populate a semester selector. Dashboard separately fetched five fully validated windows. Bootstrap now uses `GET /ojt-registration-windows?view=catalog`, and dashboard reuses that same scoped catalog for the five timeline entries. Catalog projection uses exactly the same student handoff/scope/status filters as the default projection, omitting registration contents and admission/action computation. The recruitment page still requests the default full projection before permitting an application. Staff handlers and combo projections are unchanged.
+- Dashboard used the full academic summary, including scenarios, prerequisites and enriched outstanding/failed courses also computed by the independent risk route. `GET /students/me/dashboard?view=summary` now calculates only displayed credits, GPA, current/official/admission eligibility, deadline and assignment. It calls the existing progress/eligibility implementations without changing their rules. The older `full` and `overview` responses remain available. Risk/roadmap computation is unchanged.
+- Profile state is associated with the verified token as well as the linked user ID. Switching accounts hides the previous profile immediately, before effect cleanup or the next network response.
+
+Measured on the disposable seeded database (including authentication/transaction SQL):
+
+| Request | SQL statements | JSON response bytes |
+| --- | ---: | ---: |
+| Previous dashboard overview | 41 | approximately 27,923 |
+| Current dashboard summary | 28 | 14,298 |
+| Full OJT windows | 9 | 1,512 |
+| OJT window catalog | 6 | 488 |
+| Independent risk assessment (unchanged) | 46 | 2,521 |
+
+The summary figures describe the main overview request, not the sum of every request on the page. The independent risk endpoint still performs substantial academic reads. A remote database adds round-trip time to sequential queries, so UI changes alone do not guarantee a particular production duration. No hosted timing measurement was made.
+
+Integration tests use two distinct valid student JWTs and real authentication middleware. They verify owner-scoped dashboard/risk/registration/application responses, reject cross-student profile/academic/transcript/curriculum/CV/task-submission reads, prevent foreign notification updates and reject ID/filter injection. Missing, forged, expired and revoked tokens fail with 401; staff tokens fail on Student-only dashboard routes. These tests cover personal Student data; shared curricula, visible recruitment information and company catalogs intentionally remain available according to their existing access rules.
+
 ## Verification and measurements
 
 `tests/student-performance.integration.cjs` resets only the explicitly named disposable database `127.0.0.1:55439/student_performance_test`. It counts actual PostgreSQL statements including authentication, compares full/partial response values, verifies ownership and invalid inputs, and compares risk/roadmap responses before and after ordinary Student reads.

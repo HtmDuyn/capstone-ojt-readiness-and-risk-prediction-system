@@ -9,23 +9,25 @@ import {
 } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { ApiError } from '@/services/studentService';
+import { studentSnapshots } from '@/services/studentSnapshots';
 import {
   allStudentPages,
-  getOwnStudent,
-  getStudentNotifications,
+  getOwnStudentIdentity,
 } from '@/services/studentService';
 import type {
   Named,
-  Profile,
+  StudentIdentityProfile,
   Registration,
   Window,
 } from '@/types/student/portal';
 
 interface PortalContext {
-  profile: Profile | null;
+  profile: StudentIdentityProfile | null;
   loading: boolean;
   error: string;
   warnings: string[];
+  registrationWindows: Window[];
+  windowsLoading: boolean;
   semesters: Named[];
   semesterId: number | null;
   selectSemester: (id: number) => void;
@@ -41,8 +43,12 @@ const Context = createContext<PortalContext | null>(null);
 export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const { user, token, logout } = useAuth();
   const [mustChangePassword, setMustChangePassword] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [ownedProfile, setOwnedProfile] = useState<{ token: string | null; profile: StudentIdentityProfile } | null>(null);
+  // Hide the previous account immediately, before the new session's effects run.
+  const profile = ownedProfile && ownedProfile.token === token && String(ownedProfile.profile.userId) === user?.id
+    ? ownedProfile.profile : null;
   const [windows, setWindows] = useState<Window[]>([]);
+  const [windowsLoading, setWindowsLoading] = useState(true);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,34 +58,40 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
+  // Leaving the Student portal (including logout) releases all displayed snapshots.
+  useEffect(() => () => studentSnapshots.invalidate(), []);
+
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError('');
     setWarnings([]);
-    setProfile(null);
+    setOwnedProfile(null);
     setWindows([]);
+    setWindowsLoading(true);
     setRegistrations([]);
     setUnreadCount(null);
     setMustChangePassword(false);
     Promise.resolve()
       .then(() => {
         controller.signal.throwIfAborted();
-        return getOwnStudent(controller.signal, user ?? undefined);
+        return getOwnStudentIdentity(controller.signal, user ?? undefined);
       })
       .then(async (own) => {
         if (controller.signal.aborted) return;
-        setProfile(own);
-        // Profile and semester are sufficient to open the page. Slow catalogs and
-        // notification counts update in the background instead of blocking every Student route.
+        setOwnedProfile({ token, profile: own });
+        // Profile and semester open the page. The scoped catalog updates separately;
+        // notification contents/counts load only in the screens that display them.
         setLoading(false);
         const results = await Promise.allSettled([
           allStudentPages<Window>(
-            '/ojt-registration-windows',
+            '/ojt-registration-windows?view=catalog',
             controller.signal,
           ).then(items => {
             if (!controller.signal.aborted) setWindows(items);
             return items;
+          }).finally(() => {
+            if (!controller.signal.aborted) setWindowsLoading(false);
           }),
           (own.ojtRegistrations.total <= own.ojtRegistrations.items.length
             ? Promise.resolve(own.ojtRegistrations.items)
@@ -88,17 +100,13 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
             if (!controller.signal.aborted) setRegistrations(items);
             return items;
           }),
-          getStudentNotifications(1, controller.signal, undefined, 1).then(page => {
-            if (!controller.signal.aborted) setUnreadCount(page.unreadCount);
-            return page;
-          }),
         ]);
         if (controller.signal.aborted) return;
         setWarnings(
           results.flatMap((result, index) =>
             result.status === 'rejected'
               ? [
-                  ['Đợt OJT', 'Hồ sơ OJT', 'Thông báo'][index] +
+                  ['Đợt OJT', 'Hồ sơ OJT'][index] +
                     ': ' +
                     (result.reason instanceof Error
                       ? result.reason.message
@@ -131,6 +139,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   }, [token, user?.id, user?.email, logout, revision]);
 
   const semesters = useMemo(() => {
+    if (!profile) return [];
     const values = new Map<number, Named>();
     if (profile?.ojtSemesterId)
       values.set(profile.ojtSemesterId, {
@@ -168,6 +177,8 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         warnings,
+        registrationWindows: profile ? windows : [],
+        windowsLoading,
         semesters,
         semesterId,
         selectSemester: setSemesterId,

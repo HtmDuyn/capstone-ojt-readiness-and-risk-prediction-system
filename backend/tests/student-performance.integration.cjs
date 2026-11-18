@@ -57,10 +57,12 @@ test('Student partial reads reduce real SQL and response size without changing o
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
   const sign = user => jwt.sign({ userId: user.user_id ?? user.id, username: user.username, authVersion: user.version }, process.env.JWT_SECRET);
-  const get = async (route, user = assignment) => {
+  const get = async (route, user = assignment, options = {}) => {
     statements = [];
     const started = performance.now();
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/api${route}`, { headers: { Authorization: 'Bearer ' + sign(user) } });
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api${route}`, {
+      ...options, headers: { Authorization: 'Bearer ' + sign(user), ...options.headers },
+    });
     const text = await response.text();
     const body = JSON.parse(text);
     return { status: response.status, data: body.data, body, bytes: Buffer.byteLength(text),
@@ -71,7 +73,9 @@ test('Student partial reads reduce real SQL and response size without changing o
   const base = `/students/me/internships?ojtSemesterId=${term}`;
   const baseline = await get(base);
   ok(baseline);
-  const riskBefore = ok(await get('/students/me/ojt-risk-assessment'));
+  const riskRead = await get('/students/me/ojt-risk-assessment');
+  const riskBefore = ok(riskRead);
+  console.log(JSON.stringify({ riskAssessment: { queries: riskRead.queries.length, bytes: riskRead.bytes, milliseconds: riskRead.milliseconds } }));
 
   await t.test('tasks, results and identity skip unrelated SQL while preserving the default full response', async () => {
     const tasks = await get(`/students/me/tasks?ojtSemesterId=${term}`);
@@ -115,6 +119,79 @@ test('Student partial reads reduce real SQL and response size without changing o
     assert.ok(overview.bytes < full.bytes);
     console.log(JSON.stringify({ dashboardFull: { queries: full.queries.length, bytes: full.bytes, milliseconds: full.milliseconds },
       dashboardOverview: { queries: overview.queries.length, bytes: overview.bytes, milliseconds: overview.milliseconds } }));
+  });
+
+  await t.test('summary preserves the visible overview values without computing hidden scenarios or duplicated catalogs', async () => {
+    const overview = await get(`/students/me/dashboard?ojtSemesterId=${term}&view=overview`);
+    const summary = await get(`/students/me/dashboard?ojtSemesterId=${term}&view=summary`);
+    ok(overview); ok(summary);
+    for (const field of ['studentId','academicProgress','earnedCredits','missingCredits','failedCourseCount',
+      'gpa','gpaScale','issues','currentEligibility','officialEligibility','admissionEligibility','deadline'])
+      assert.deepEqual(stable(summary.data.academic[field]), stable(overview.data.academic[field]), field);
+    assert.deepEqual(stable(summary.data.internship), stable(overview.data.internship));
+    assert.equal(summary.data.notifications, undefined);
+    assert.equal(summary.data.registrationWindows, undefined);
+    assert.equal(summary.data.academic.scenario, undefined);
+    assert.ok(summary.queries.every(sql => !sql.includes('"OJTRegistrationWindows"') && !sql.includes('FROM "Notifications"')));
+    assert.ok(summary.queries.length < overview.queries.length);
+    assert.ok(summary.bytes < overview.bytes);
+    console.log(JSON.stringify({ overview: { queries: overview.queries.length, bytes: overview.bytes },
+      summary: { queries: summary.queries.length, bytes: summary.bytes, milliseconds: summary.milliseconds } }));
+  });
+
+  await t.test('catalog preserves exactly the visible student windows without reading admission or registration details', async () => {
+    const full = await get('/ojt-registration-windows?limit=100');
+    const catalog = await get('/ojt-registration-windows?view=catalog&limit=100');
+    ok(full); ok(catalog);
+    const fields = ['id','name','academicPeriodId','ojtSemesterId','period','semester','startsAt','endsAt','status'];
+    assert.deepEqual(catalog.data.items, full.data.items.map(row => Object.fromEntries(fields.map(key => [key, row[key]]))));
+    assert.equal(catalog.data.total, full.data.total);
+    assert.ok(catalog.data.items.every(row => row.canSubmit === undefined && row.registration === undefined && row.Scope === undefined));
+    assert.ok(catalog.queries.length < full.queries.length);
+    assert.equal((await get('/ojt-registration-windows?view=invalid')).status, 400);
+    console.log(JSON.stringify({ windowsFull: { queries: full.queries.length, bytes: full.bytes },
+      windowsCatalog: { queries: catalog.queries.length, bytes: catalog.bytes } }));
+  });
+
+  await t.test('two student tokens can read only their own personal data, even with forged IDs and filters', async () => {
+    const otherId = (await db.query('SELECT "StudentID" id FROM "Students" WHERE "UserID"=$1', [other.id])).rows[0].id;
+    for (const [actor, id] of [[assignment, assignment.student_id], [other, otherId]]) {
+      const me = await get('/auth/me', actor);
+      assert.equal(me.body.user.studentId, id);
+      const summary = ok(await get(`/students/me/dashboard?ojtSemesterId=${term}&view=summary`, actor));
+      assert.equal(summary.academic.studentId, id);
+      if (summary.internship.assignment) assert.equal(summary.internship.assignment.studentId, id);
+      assert.equal(ok(await get('/students/me/ojt-risk-assessment', actor)).student.id, id);
+      assert.ok(ok(await get('/job-applications', actor)).items.every(row => row.studentId === id));
+      assert.ok(ok(await get('/ojt-registrations', actor)).items.every(row => row.studentId === id));
+    }
+    for (const include of ['ojtRegistrations','academicProgress','courseResults','curriculum']) {
+      assert.equal((await get(`/students/${assignment.student_id}?include=${include}`, other)).status, 403);
+      assert.equal((await get(`/students/${otherId}?include=${include}`)).status, 403);
+    }
+    assert.equal((await get(`/students/${assignment.student_id}/cv`, other)).status, 403);
+    assert.equal((await get('/students')).status, 403);
+    assert.equal(ok(await get(`/job-applications?studentId=${assignment.student_id}`, other)).total, 0);
+    assert.equal(ok(await get(`/ojt-registrations?studentId=${assignment.student_id}`, other)).total, 0);
+    assert.equal((await get(`/students/me/dashboard?ojtSemesterId=${term}&view=summary&studentId=${otherId}`)).status, 400);
+    assert.equal((await get(`/students/me/ojt-risk-assessment?studentId=${otherId}`)).status, 400);
+    const task = baseline.data.tasks.items[0];
+    assert.ok(task, 'The fixture includes a task to check cross-student access');
+    assert.equal((await get(`/students/me/tasks/${task.id}/submissions`, other)).status, 404);
+    const ownNotification = (await db.query('SELECT "NotificationID" id FROM "Notifications" WHERE "UserID"=$1 LIMIT 1', [assignment.user_id])).rows[0];
+    const otherNotifications = ok(await get('/students/me/notifications?limit=100', other));
+    assert.ok(otherNotifications.items.every(row => row.id !== ownNotification.id));
+    assert.equal((await get(`/students/me/notifications/${ownNotification.id}`, other,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isRead: true }) })).status, 404);
+  });
+
+  await t.test('missing, forged, expired and revoked tokens cannot open the student overview', async () => {
+    const route = `/students/me/dashboard?ojtSemesterId=${term}&view=summary`;
+    for (const token of ['', 'Bearer invalid-token', 'Bearer ' + jwt.sign({ userId: assignment.user_id }, 'wrong-secret'),
+      'Bearer ' + jwt.sign({ userId: assignment.user_id, username: assignment.username, authVersion: assignment.version, exp: 1 }, process.env.JWT_SECRET),
+      'Bearer ' + jwt.sign({ userId: assignment.user_id, username: assignment.username, authVersion: assignment.version + 1 }, process.env.JWT_SECRET)])
+      assert.equal((await get(route, assignment, { headers: { Authorization: token } })).status, 401);
+    assert.equal((await get(route, coordinator)).status, 403);
   });
 
   await t.test('partial reads enforce the same student ownership, role and pagination checks', async () => {

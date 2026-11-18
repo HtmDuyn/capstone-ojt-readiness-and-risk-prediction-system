@@ -8,20 +8,28 @@ import { riskTheme } from '@/components/student/ojt-risk/risk-ui';
 import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentSemesterSelect, statusText } from '@/components/student/PortalUI';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getStudentDashboardOverview } from '@/services/studentService';
+import { getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
 
 const card = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';
 const heading = 'text-sm font-semibold text-slate-800 sm:text-base';
 const link = 'text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm';
 
 export const StudentDashboard = () => {
-  const { profile, semesterId, revision, loading } = useStudentPortal();
+  const { profile, semesterId, revision, loading, registrationWindows, windowsLoading } = useStudentPortal();
   const resource = useStudentResource(
-    !loading && profile && semesterId ? 'dashboard:' + profile.id + ':' + semesterId + ':' + revision : null,
-    (signal) => getStudentDashboardOverview(semesterId!, signal),
+    !loading && profile && semesterId ? 'dashboard-summary:' + profile.id + ':' + semesterId + ':' + revision : null,
+    (signal) => getStudentDashboardSummary(semesterId!, signal),
+    { snapshot: true },
   );
+  const notifications = useStudentResource(
+    !loading && profile ? 'dashboard-notifications:' + profile.id + ':' + revision : null,
+    signal => getStudentNotifications(1, signal, undefined, 1),
+    { snapshot: true },
+  );
+  const windows = registrationWindows.filter(window => window.ojtSemesterId === semesterId).slice(0, 5);
   const data = resource.data;
-  const credits = profile?.academicProgress.credits;
+  const progress = data?.academic.academicProgress;
+  const credits = progress?.credits;
   const assignment = data?.internship.assignment ?? null;
   const complete = !!assignment;
   const admission = data?.academic.admissionEligibility;
@@ -37,13 +45,13 @@ export const StudentDashboard = () => {
   return <StudentPage title={'Xin chào, ' + (profile?.fullName ?? 'bạn') + '!'}
     description="Tổng quan học tập, điều kiện OJT, nhiệm vụ thực tập và thông báo của bạn."
     showRefreshAction={false} showSemesterInBanner={false} compactTopSpacing>
-    <ResourceState loading={resource.loading} error={resource.error} retry={resource.reload} />
+    <ResourceState loading={resource.loading} refreshing={resource.refreshing} error={resource.error} retry={resource.reload} />
     <OjtRiskPanel key={'ojt-risk:' + (profile?.id ?? 'pending') + ':' + revision}
-      showRefreshAction={false} renderDashboard={risk => data && <div className="space-y-4">
+      showRefreshAction={false} renderDashboard={risk => <div className="space-y-4">
         <section className={card} aria-labelledby="student-ojt-overview">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
             <div><h2 id="student-ojt-overview" className="text-lg font-bold text-slate-900 sm:text-xl">Tổng quan OJT</h2>
-              <p className="mt-1 text-sm text-slate-500">{profile?.fullName}{risk?.student.studentCode && <> · {risk.student.studentCode}</>}</p></div>
+              <p className="mt-1 text-sm text-slate-500">{profile?.fullName}{profile?.studentCode && <> · {profile.studentCode}</>}</p></div>
             <div className="w-full sm:w-60"><StudentSemesterSelect /></div>
           </div>
           <div className="grid gap-5 py-5 lg:grid-cols-3 lg:gap-0">
@@ -58,23 +66,23 @@ export const StudentDashboard = () => {
               <CreditProgressChart percent={percent} />
               <p className="mt-3 text-center text-xl font-bold text-slate-900">{credits?.earned ?? '—'} / {credits?.total ?? '—'} <span className="text-sm font-medium text-slate-500">tín chỉ</span></p>
               <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" />Đã tích lũy</span><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-200" />Còn lại</span></div>
-              <p className="mt-2 text-sm text-slate-500">{statusText(profile?.academicProgress.status)}</p>
+              <p className="mt-2 text-sm text-slate-500">{progress ? statusText(progress.status) : resource.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ'}</p>
               <Link to="/student/academic-profile" className={`${link} mt-3 inline-block`}>Xem bảng điểm và chương trình</Link>
             </div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
               <h3 className={heading}>Điều kiện tham gia OJT</h3>
               <dl className="mt-3 space-y-2 text-sm">
-                <div><dt className="text-slate-500">Bàn giao từ Phòng Đào tạo</dt><dd className={eligible ? 'font-bold text-emerald-700' : 'font-semibold text-slate-800'}>{admission ? admission.isStale ? 'Dữ liệu đã thay đổi, cần rà soát' : statusText(admission.status) : 'Chưa có dữ liệu'}</dd></div>
-                <div><dt className="text-slate-500">Kết quả chính thức</dt><dd className="font-semibold text-slate-800">{data.academic.officialEligibility?.isStale ? 'Đã cũ, chờ xét lại' : statusText(data.academic.officialEligibility?.status)}</dd></div>
-                {data.academic.currentEligibility && <div><dt className="text-slate-500">Đối chiếu hiện tại</dt><dd className="font-semibold text-slate-800">{statusText(data.academic.currentEligibility.status)}</dd></div>}
+                <div><dt className="text-slate-500">Bàn giao từ Phòng Đào tạo</dt><dd className={eligible ? 'font-bold text-emerald-700' : 'font-semibold text-slate-800'}>{admission ? admission.isStale ? 'Dữ liệu đã thay đổi, cần rà soát' : statusText(admission.status) : resource.pending ? 'Đang tải…' : 'Chưa có dữ liệu'}</dd></div>
+                <div><dt className="text-slate-500">Kết quả chính thức</dt><dd className="font-semibold text-slate-800">{data?.academic.officialEligibility?.isStale ? 'Đã cũ, chờ xét lại' : data ? statusText(data.academic.officialEligibility?.status) : resource.pending ? 'Đang tải…' : 'Chưa có dữ liệu'}</dd></div>
+                {data?.academic.currentEligibility && <div><dt className="text-slate-500">Đối chiếu hiện tại</dt><dd className="font-semibold text-slate-800">{statusText(data.academic.currentEligibility.status)}</dd></div>}
               </dl>
-              <Blockers values={data.academic.officialEligibility?.reasons ?? data.academic.currentEligibility?.reasons} />
-              {data.academic.currentEligibility?.rule && <p className="mt-3 text-xs leading-relaxed text-slate-500">Ngưỡng theo quy định: {data.academic.currentEligibility.rule.minCredits} tín chỉ, tối đa {data.academic.currentEligibility.rule.maxUnpassedCourses} môn nợ.</p>}
+              <Blockers values={data?.academic.officialEligibility?.reasons ?? data?.academic.currentEligibility?.reasons} />
+              {data?.academic.currentEligibility?.rule && <p className="mt-3 text-xs leading-relaxed text-slate-500">Ngưỡng theo quy định: {data.academic.currentEligibility.rule.minCredits} tín chỉ, tối đa {data.academic.currentEligibility.rule.maxUnpassedCourses} môn nợ.</p>}
             </div>
           </div>
           {eligible && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             <strong className="font-semibold">Hiện đáp ứng đủ tiêu chí để tham gia OJT.</strong>
-            <span>Hạn xét điều kiện OJT: {dateText(data.academic.deadline?.assessmentDeadline)}</span></div>}
+            <span>Hạn xét điều kiện OJT: {dateText(data?.academic.deadline?.assessmentDeadline)}</span></div>}
         </section>
 
         <section className={card} aria-labelledby="student-ojt-roadmap">
@@ -89,8 +97,8 @@ export const StudentDashboard = () => {
             </div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
               <h3 className={heading}>Mốc thời gian quan trọng</h3>
-              {data.academic.deadline?.assessmentDeadline && <p className="mt-3 text-sm text-slate-600">Hạn xét điều kiện: <strong className="text-slate-800">{dateText(data.academic.deadline.assessmentDeadline)}</strong></p>}
-              {data.registrationWindows.items.length ? <div className="mt-3 divide-y divide-slate-100">{data.registrationWindows.items.map(window => <div key={window.id} className="py-2 text-sm"><p className="font-semibold text-slate-800">{window.name}</p><p className="text-slate-500">{dateText(window.startsAt)} – {dateText(window.endsAt)} · {statusText(window.status)}</p></div>)}</div> : <Empty>Chưa có đợt đăng ký.</Empty>}
+              {data?.academic.deadline?.assessmentDeadline && <p className="mt-3 text-sm text-slate-600">Hạn xét điều kiện: <strong className="text-slate-800">{dateText(data.academic.deadline.assessmentDeadline)}</strong></p>}
+              {windows.length ? <div className="mt-3 divide-y divide-slate-100">{windows.map(window => <div key={window.id} className="py-2 text-sm"><p className="font-semibold text-slate-800">{window.name}</p><p className="text-slate-500">{dateText(window.startsAt)} – {dateText(window.endsAt)} · {statusText(window.status)}</p></div>)}</div> : <Empty>{windowsLoading ? 'Đang tải đợt đăng ký…' : 'Chưa có đợt đăng ký.'}</Empty>}
               <Link className={`${link} mt-3 inline-block`} to="/student/ojt-registration">Xem toàn bộ đợt đăng ký</Link>
             </div>
           </div>
@@ -103,9 +111,10 @@ export const StudentDashboard = () => {
 
         <section className={card} aria-labelledby="student-actions">
           <h2 id="student-actions" className="text-lg font-bold text-slate-900 sm:text-xl">Thông tin &amp; hành động</h2>
+          <ResourceState loading={notifications.loading} refreshing={notifications.refreshing} error={notifications.error} retry={notifications.reload} />
           <div className="mt-5 grid gap-5 border-t border-slate-200 pt-5 md:grid-cols-3 md:gap-0">
-            <div className="flex h-full min-w-0 flex-col md:pr-5"><h3 className={heading}>Thông báo gần đây · {data.notifications.unreadCount} chưa đọc</h3>
-              {data.notifications.items.length ? <div className="mt-3 text-sm"><p className={data.notifications.items[0].isRead ? 'text-slate-700' : 'font-semibold text-slate-900'}>{data.notifications.items[0].title}</p><p className="mt-1 text-xs text-slate-500">{dateText(data.notifications.items[0].sentAt)}</p></div> : <Empty>Chưa có thông báo.</Empty>}
+            <div className="flex h-full min-w-0 flex-col md:pr-5"><h3 className={heading}>Thông báo gần đây{notifications.data && <> · {notifications.data.unreadCount} chưa đọc</>}</h3>
+              {notifications.data?.items.length ? <div className="mt-3 text-sm"><p className={notifications.data.items[0].isRead ? 'text-slate-700' : 'font-semibold text-slate-900'}>{notifications.data.items[0].title}</p><p className="mt-1 text-xs text-slate-500">{dateText(notifications.data.items[0].sentAt)}</p></div> : <Empty>{notifications.pending ? 'Đang tải thông báo…' : 'Chưa có thông báo.'}</Empty>}
               <div className="mt-auto pt-3"><Link className={link} to="/student/notifications">Xem tất cả thông báo</Link></div></div>
             <div className="flex h-full min-w-0 flex-col border-t border-slate-200 pt-5 md:border-l md:border-t-0 md:px-5 md:pt-0"><h3 className={heading}>Nhiệm vụ thực tập</h3><p className="mt-3 text-sm leading-relaxed text-slate-600">Xem nhiệm vụ được doanh nghiệp giao và gửi bài làm của bạn.</p><div className="mt-auto pt-3"><Link className={link} to="/student/internship-progress">Xem nhiệm vụ</Link></div></div>
             <div className="flex h-full min-w-0 flex-col border-t border-slate-200 pt-5 md:border-l md:border-t-0 md:pl-5 md:pt-0"><h3 className={heading}>Tư vấn lộ trình</h3><p className="mt-3 text-sm leading-relaxed text-slate-600">Xem các môn cần hoàn thành và yêu cầu tư vấn từ dịch vụ AI.</p><div className="mt-auto pt-3"><Link className={link} to="/student/risk-prediction">Xem phân tích học vụ</Link></div></div>

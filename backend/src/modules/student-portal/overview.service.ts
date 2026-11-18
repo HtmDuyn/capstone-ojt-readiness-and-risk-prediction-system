@@ -5,7 +5,9 @@ import { studentWindows } from '../students/registration-options.service';
 import { listApplications } from '../students/job-application.service';
 import { list as listResults } from '../ojt-results/result.service';
 import { currentAssignment, notifications, summaryWithClient, supplementaryWithClient } from './academic.service';
-import { ownStudent, type Actor, type Row } from './shared';
+import { ownStudent, publicEligibility, type Actor, type Row } from './shared';
+import { loadAcademicProgress, progressFromData } from '../students/academic-progress';
+import { eligibility } from '../eligibility/eligibility.service';
 import { pagination, positiveId, invalid, enumValue } from '../students/student.validation';
 import { enrichStudentTasks, studentTaskProgress } from './task.service';
 import { studentAdmission } from './admission.service';
@@ -63,9 +65,25 @@ export async function internships(params:Row,actor:Actor,existingClient?:PoolCli
 export async function dashboard(params:Row,actor:Actor) {
   for(const key of Object.keys(params))if(!['ojtSemesterId','view'].includes(key))throw invalid('Unknown dashboard parameter: '+key);
   const term=positiveId(params.ojtSemesterId,'ojtSemesterId');
-  const view=enumValue(params.view??'full',['full','overview'],'view');
+  const view=enumValue(params.view??'full',['full','overview','summary'],'view');
   return readTransaction(async c=>{
     const s=await ownStudent(c,actor);
+    if(view==='summary') {
+      // The overview card needs current credits/eligibility, not scenario,
+      // prerequisite, failed-course enrichment or roadmap calculations.
+      const source=await loadAcademicProgress(c,s.StudentID);
+      const progress=progressFromData(source);
+      const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progress,source);
+      const deadline=(await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[term])).rows[0]??null;
+      return {
+        academic:{studentId:s.StudentID,academicProgress:progress,
+          earnedCredits:decision.current.earnedCredits,missingCredits:decision.current.missingCredits,
+          failedCourseCount:decision.current.unpassedCourseCount,gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,
+          currentEligibility:publicEligibility(decision.current),officialEligibility:publicEligibility(decision.official),
+          admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:decision.official}),deadline},
+        internship:{assignment:await currentAssignment({ojtSemesterId:term},actor,c)},
+      };
+    }
     const academic=await summaryWithClient(c,s.StudentID,term);
     if(view==='overview')return {
       academic:{...academic,admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:academic.officialEligibility})},

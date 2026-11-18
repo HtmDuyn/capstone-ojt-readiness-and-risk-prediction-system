@@ -112,10 +112,12 @@ export function Empty({
 }
 export function ResourceState({
   loading,
+  refreshing = false,
   error,
   retry,
 }: {
   loading: boolean;
+  refreshing?: boolean;
   error: string;
   retry: () => void;
 }) {
@@ -126,6 +128,7 @@ export function ResourceState({
           Đang tải dữ liệu...
         </p>
       )}
+      {refreshing && <p role="status" className="py-2 text-xs text-slate-500">Đang cập nhật dữ liệu…</p>}
       {error && (
         <div
           role="alert"
