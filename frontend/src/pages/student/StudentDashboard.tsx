@@ -8,7 +8,7 @@ import { riskTheme } from '@/components/student/ojt-risk/risk-ui';
 import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentSemesterSelect, statusText } from '@/components/student/PortalUI';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
-import { getStudentDashboard } from '@/services/studentService';
+import { getStudentDashboardOverview } from '@/services/studentService';
 
 const card = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';
 const heading = 'text-sm font-semibold text-slate-800 sm:text-base';
@@ -18,7 +18,7 @@ export const StudentDashboard = () => {
   const { profile, semesterId, revision, loading } = useStudentPortal();
   const resource = useStudentResource(
     !loading && profile && semesterId ? 'dashboard:' + profile.id + ':' + semesterId + ':' + revision : null,
-    (signal) => getStudentDashboard(semesterId!, signal),
+    (signal) => getStudentDashboardOverview(semesterId!, signal),
   );
   const data = resource.data;
   const credits = profile?.academicProgress.credits;

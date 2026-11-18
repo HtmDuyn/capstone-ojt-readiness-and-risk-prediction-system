@@ -51,7 +51,7 @@ router.get('/students/me/tasks', ...read, handle(async r => {
   const query = r.query;
   for (const key of Object.keys(query)) if (!['ojtSemesterId','page','limit'].includes(key)) throw invalid('Unknown task parameter: ' + key);
   return (await internships({ ojtSemesterId: positiveId(query.ojtSemesterId, 'ojtSemesterId'),
-    tasksPage: query.page, tasksLimit: query.limit }, r.user)).tasks;
+    tasksPage: query.page, tasksLimit: query.limit, include: 'tasks' }, r.user)).tasks;
 }));
 router.get('/students/me/tasks/:id/submissions', ...read, handle(r => taskSubmissions(positiveId(r.params.id, 'taskId'), r.query, r.user)));
 router.post('/students/me/tasks/:id/submissions', ...own, requireJsonBody, handle(r => {

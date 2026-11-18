@@ -70,23 +70,30 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
       .then(async (own) => {
         if (controller.signal.aborted) return;
         setProfile(own);
+        // Profile and semester are sufficient to open the page. Slow catalogs and
+        // notification counts update in the background instead of blocking every Student route.
+        setLoading(false);
         const results = await Promise.allSettled([
           allStudentPages<Window>(
             '/ojt-registration-windows',
             controller.signal,
-          ),
-          allStudentPages<Registration>(
-            '/ojt-registrations',
-            controller.signal,
-          ),
-          getStudentNotifications(1, controller.signal),
+          ).then(items => {
+            if (!controller.signal.aborted) setWindows(items);
+            return items;
+          }),
+          (own.ojtRegistrations.total <= own.ojtRegistrations.items.length
+            ? Promise.resolve(own.ojtRegistrations.items)
+            : allStudentPages<Registration>('/ojt-registrations', controller.signal)
+          ).then(items => {
+            if (!controller.signal.aborted) setRegistrations(items);
+            return items;
+          }),
+          getStudentNotifications(1, controller.signal, undefined, 1).then(page => {
+            if (!controller.signal.aborted) setUnreadCount(page.unreadCount);
+            return page;
+          }),
         ]);
         if (controller.signal.aborted) return;
-        if (results[0].status === 'fulfilled') setWindows(results[0].value);
-        if (results[1].status === 'fulfilled')
-          setRegistrations(results[1].value);
-        if (results[2].status === 'fulfilled')
-          setUnreadCount(results[2].value.unreadCount);
         setWarnings(
           results.flatMap((result, index) =>
             result.status === 'rejected'

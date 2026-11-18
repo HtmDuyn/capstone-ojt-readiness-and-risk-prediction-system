@@ -17,6 +17,7 @@ export const StudentAcademicProfile = () => {
   const [courseSearch, setCourseSearch] = useState('');
   const [studySemester, setStudySemester] = useState('');
   const [activeTab, setActiveTab] = useState<'results' | 'curriculum'>('results');
+  const [curriculumRequested, setCurriculumRequested] = useState(false);
   const results = useStudentResource(
     !loading && profile
       ? 'courses:' + profile.id + ':' + revision
@@ -24,7 +25,7 @@ export const StudentAcademicProfile = () => {
     (signal) => getAllCourseResults(profile!.id, signal),
   );
   const curriculum = useStudentResource(
-    !loading && profile ? 'curriculum:' + profile.id + ':' + revision : null,
+    !loading && profile && curriculumRequested ? 'curriculum:' + profile.id + ':' + revision : null,
     (signal) => getCurriculum(profile!.id, signal),
   );
   const progress = profile?.academicProgress;
@@ -76,7 +77,7 @@ export const StudentAcademicProfile = () => {
           <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <div role="tablist" aria-label="Dữ liệu học tập" className="flex gap-6 overflow-x-auto border-b border-slate-200">
               <button type="button" role="tab" id="results-tab" aria-controls="results-panel" aria-selected={activeTab === 'results'} onClick={() => setActiveTab('results')} className={`shrink-0 border-b-2 px-1 pb-3 text-sm transition-colors hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeTab === 'results' ? 'border-orange-500 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600'}`}>Bảng điểm học tập</button>
-              <button type="button" role="tab" id="curriculum-tab" aria-controls="curriculum-panel" aria-selected={activeTab === 'curriculum'} onClick={() => setActiveTab('curriculum')} className={`shrink-0 border-b-2 px-1 pb-3 text-sm transition-colors hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeTab === 'curriculum' ? 'border-orange-500 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600'}`}>Chương trình và lộ trình môn học</button>
+              <button type="button" role="tab" id="curriculum-tab" aria-controls="curriculum-panel" aria-selected={activeTab === 'curriculum'} onClick={() => { setActiveTab('curriculum'); setCurriculumRequested(true); }} className={`shrink-0 border-b-2 px-1 pb-3 text-sm transition-colors hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeTab === 'curriculum' ? 'border-orange-500 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600'}`}>Chương trình và lộ trình môn học</button>
             </div>
           <div role="tabpanel" id="results-panel" aria-labelledby="results-tab" hidden={activeTab !== 'results'} className="space-y-4 pt-5">
             <ResourceState

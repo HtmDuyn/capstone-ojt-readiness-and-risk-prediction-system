@@ -1,4 +1,4 @@
-import { apiRequest } from './api';
+import { apiRequest } from './studentService';
 export interface RiskAssessment {
   status:'ASSESSED'|'INSUFFICIENT_DATA';
   student:{id:number;fullName:string;studentCode:string;currentSemester:number|null};
@@ -12,5 +12,5 @@ export interface RiskAssessment {
       prerequisites:{satisfied:boolean;remainingRequired:number;courses:{courseId:number;courseCode:string|null;passed:boolean}[]}[];}[]};
 }
 export async function getOjtRiskAssessment(signal:AbortSignal):Promise<RiskAssessment>{
-  return (await apiRequest<{data:RiskAssessment}>('/students/me/ojt-risk-assessment',{signal})).data;
+  return (await apiRequest<{data:RiskAssessment}>('/students/me/ojt-risk-assessment',{signal,timeout:0})).data;
 }

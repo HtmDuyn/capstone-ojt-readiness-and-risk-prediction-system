@@ -203,6 +203,12 @@ export interface Dashboard {
   notifications: Page<PortalNotification> & { unreadCount: number };
   jobApplications: Page<Application>;
 }
+export interface DashboardOverview {
+  academic: AcademicSummary;
+  registrationWindows: Page<Window>;
+  internship: Pick<Internships, 'assignment'>;
+  notifications: Page<PortalNotification> & { unreadCount: number };
+}
 export interface Internships {
   studentId: number;
   ojtSemesterId: number | null;

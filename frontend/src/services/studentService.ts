@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { expireBearerSession } from './authSession';
 import { API_BASE_URL } from '@/config/api';
+import { studentReads } from './studentReads';
 
 import { downloadFile } from '@/utils/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
@@ -11,6 +12,7 @@ import type {
   CourseResult,
   Curriculum,
   Dashboard,
+  DashboardOverview,
   Internships,
   OjtResult,
   Opportunities,
@@ -84,6 +86,7 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
     if (!body || typeof body !== 'object') throw new ApiError('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.', response.status, 'INVALID_API_RESPONSE');
     const result = body as ErrorBody;
     if (result.success === false) throw new ApiError(result.message || 'Yêu cầu API thất bại.', response.status, result.errorCode ?? result.code);
+    if (!['get', 'head'].includes(options.method?.toLowerCase() ?? 'get')) studentReads.invalidate();
     return body;
   } catch (error) {
     if (isRequestCanceled(error) || error instanceof ApiError) throw error;
@@ -112,10 +115,12 @@ export async function studentGet<T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await apiRequest<{ data: T }>(path, { signal });
-  if (!Object.prototype.hasOwnProperty.call(response, 'data'))
-    throw new ApiError('API chưa trả dữ liệu theo hợp đồng. Vui lòng kiểm tra backend.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-  return response.data;
+  return studentReads.read(localStorage.getItem('ojt_auth_token'), path, async sharedSignal => {
+    const response = await apiRequest<{ data: T }>(path, { signal: sharedSignal });
+    if (!Object.prototype.hasOwnProperty.call(response, 'data'))
+      throw new ApiError('API chưa trả dữ liệu theo hợp đồng. Vui lòng kiểm tra backend.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+    return response.data;
+  }, signal);
 }
 export async function studentPost<T>(path: string, body: unknown): Promise<T> {
   return (
@@ -163,7 +168,7 @@ export async function getOwnStudent(
   // Older deployed /auth/me responses omit studentId. This authenticated
   // endpoint resolves the owner on the server even before an assignment exists.
   if (studentId === undefined) {
-    const own = await studentGet<Pick<Internships, 'studentId'>>('/students/me/internships', signal);
+    const own = await studentGet<Pick<Internships, 'studentId'>>('/students/me/internships?include=identity', signal);
     studentId = own.studentId;
   }
   if (!Number.isSafeInteger(studentId) || studentId <= 0)
@@ -176,7 +181,7 @@ export async function getOwnStudent(
 export const getStudentProfile = (id: number, signal?: AbortSignal) =>
   studentGet<Profile>(
     `/students/${id}` +
-      studentQuery({ include: 'academicProgress,ojtRegistrations' }),
+      studentQuery({ include: 'academicProgress,ojtRegistrations', ojtLimit: 100 }),
     signal,
   );
 export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
@@ -184,6 +189,8 @@ export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
     '/students/me/dashboard' + studentQuery({ ojtSemesterId: semester }),
     signal,
   );
+export const getStudentDashboardOverview = (semester: number, signal?: AbortSignal) =>
+  studentGet<DashboardOverview>('/students/me/dashboard' + studentQuery({ ojtSemesterId: semester, view: 'overview' }), signal);
 export async function getAcademicSummary(
   semester: number,
   signal?: AbortSignal,
@@ -273,8 +280,8 @@ export const getApplications = (
     signal,
   );
 export const getAssignment = (semester: number, signal?: AbortSignal) =>
-  studentGet<Internships>(
-    '/students/me/internships' + studentQuery({ ojtSemesterId: semester }),
+  studentGet<Pick<Internships, 'assignment'>>(
+    '/students/me/internships' + studentQuery({ ojtSemesterId: semester, include: 'assignment' }),
     signal,
   ).then((result) => result.assignment);
 export const getTasks = (
@@ -282,15 +289,10 @@ export const getTasks = (
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Internships>(
-    '/students/me/internships' +
-      studentQuery({
-        ojtSemesterId: semester,
-        tasksPage: page,
-        tasksLimit: 20,
-      }),
+  studentGet<Internships['tasks']>(
+    '/students/me/tasks' + studentQuery({ ojtSemesterId: semester, page, limit: 20 }),
     signal,
-  ).then((result) => result.tasks);
+  );
 export const getAssignedTasks = (semester: number, page: number, signal?: AbortSignal) =>
   getTasks(semester, page, signal);
 export const getTaskSubmissions = (taskId: number, page: number, signal?: AbortSignal) =>
@@ -302,12 +304,13 @@ export const getOjtResults = (
   page: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Internships>(
+  studentGet<Pick<Internships, 'results'>>(
     '/students/me/internships' +
       studentQuery({
         ojtSemesterId: semester,
         resultsPage: page,
         resultsLimit: 20,
+        include: 'results',
       }),
     signal,
   ).then((result) => result.results);
@@ -316,9 +319,9 @@ export const getOjtResult = (
   semester: number,
   signal?: AbortSignal,
 ) =>
-  studentGet<Internships>(
+  studentGet<Pick<Internships, 'result'>>(
     '/students/me/internships' +
-      studentQuery({ ojtSemesterId: semester, resultId: id }),
+      studentQuery({ ojtSemesterId: semester, resultId: id, include: 'results' }),
     signal,
   ).then((result) => result.result);
 export const submitOjtRegistration = (
@@ -374,9 +377,10 @@ export async function getStudentNotifications(
   page = 1,
   signal?: AbortSignal,
   unread?: boolean,
+  limit = 20,
 ) {
   const response = await apiRequest<{ data: StudentNotificationPage }>(
-    '/students/me/notifications' + studentQuery({ page, limit: 20, unread }),
+    '/students/me/notifications' + studentQuery({ page, limit, unread }),
     { signal },
   );
   return response.data;
