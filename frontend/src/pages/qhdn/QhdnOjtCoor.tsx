@@ -242,7 +242,7 @@ export default function QhdnOjtCoordination() {
             {!companies.length&&<p className="text-sm text-amber-700">Chưa có doanh nghiệp tiếp nhận trong học kỳ này.</p>}
             {companies.length>0&&!companies.some(company=>company.id)&&<p className="text-sm text-amber-700">Máy chủ chưa trả mã doanh nghiệp. Cần cập nhật backend để gửi điều phối theo doanh nghiệp.</p>}
           </>:<>
-            <Field label="Danh sách tiếp nhận hồ sơ"><select name="source" className={workflowInput}><option value="QHDN_COORDINATION">Danh sách điều phối của QHDN</option><option value="QHDN_APPLICATION">Danh sách ứng tuyển do QHDN điều phối</option></select></Field>
+            <input type="hidden" name="source" value="QHDN_COORDINATION"/>
             <Field label="Doanh nghiệp và vị trí"><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{data?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>
           </>}
         </>
