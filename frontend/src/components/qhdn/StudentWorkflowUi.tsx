@@ -256,6 +256,8 @@ export function WorkflowModal({
   onClose,
   children,
   wide,
+  scrollable,
+  titleClassName,
 }: {
   title: string;
   subtitle?: string;
@@ -263,6 +265,8 @@ export function WorkflowModal({
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  scrollable?: boolean;
+  titleClassName?: string;
 }) {
   const panel = useRef<HTMLElement>(null),
     close = useRef(onClose);
@@ -280,7 +284,7 @@ export function WorkflowModal({
   // Đưa dialog ra ngoài layout để header/sidebar không che popup trên mobile.
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6"
+      className={'fixed inset-0 z-[100] flex justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6 ' + (scrollable ? 'items-center' : 'items-start')}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) close.current();
       }}
@@ -293,7 +297,8 @@ export function WorkflowModal({
         aria-label={title}
         className={
           "my-3 w-full overflow-hidden rounded-3xl bg-white shadow-2xl outline-none sm:my-6 " +
-          (wide ? "max-w-4xl" : "max-w-2xl")
+          (wide ? "max-w-4xl" : "max-w-2xl") +
+          (scrollable ? " flex max-h-[calc(100dvh-3rem)] flex-col sm:max-h-[calc(100dvh-6rem)]" : "")
         }
         onKeyDown={(e) => {
           if (e.key === "Escape" && !busy) close.current();
@@ -327,9 +332,9 @@ export function WorkflowModal({
           }
         }}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+          <div className="min-w-0 break-words [overflow-wrap:anywhere]">
+            <h2 className={titleClassName || "text-lg font-bold text-slate-900"}>{title}</h2>
             {subtitle && (
               <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
             )}
@@ -337,14 +342,14 @@ export function WorkflowModal({
           <button
             type="button"
             aria-label="Đóng cửa sổ"
-            className={workflowSecondary + " !p-2"}
+            className={workflowSecondary + " shrink-0 !p-2"}
             onClick={onClose}
             disabled={busy}
           >
             <X size={18} />
           </button>
         </header>
-        <div className="p-5 sm:p-6">{children}</div>
+        <div className={'p-5 sm:p-6' + (scrollable ? ' flex min-h-0 flex-col overflow-hidden' : '')}>{children}</div>
       </section>
     </div>,
     document.body,

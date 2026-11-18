@@ -211,7 +211,17 @@ export interface EnterpriseCandidateItem {
   isLatestCoordination: boolean;
   canRespond?: boolean;
   application?: Record<string, unknown> | null;
-  jobApplication?: Record<string, unknown> | null;
+  skills?: { name: string; level?: number | null }[];
+  jobApplication?: {
+    id: number;
+    postId?: number;
+    coverLetter?: string | null;
+    appliedAt?: string | null;
+    status?: string;
+    certificates?: { name: string; url: string }[];
+    skills?: { name: string; category?: string }[];
+    cv?: { id: number; fileName: string; mimeType: string; size: number; uploadedAt?: string } | null;
+  } | null;
 }
 
 export interface EnterpriseCandidatePeriod {
@@ -376,6 +386,8 @@ export interface InternshipTaskListRequest {
 // ─── Service ─────────────────────────────────────────────────────────────────
 export type EnterpriseAcceptancePreview={candidateIds:number[];confirmationToken:string;totalSelected:number;overCapacity:boolean;semesters:{ojtSemesterId:number;name:string;capacity:number;currentCount:number;selectedCount:number;afterCount:number;excessCount:number}[]};
 export const enterpriseService = {
+  getCandidateCv: async (candidateId: number, signal?: AbortSignal): Promise<Blob> =>
+    (await API.get(`/enterprise/candidates/${candidateId}/cv`, { responseType: 'blob', signal })).data,
   previewAcceptance:async(candidateIds:number[]):Promise<EnterpriseAcceptancePreview>=>
     (await API.post('/enterprise/candidates/acceptance-preview',{candidateIds})).data.data,
   acceptCandidates:async(preview:EnterpriseAcceptancePreview,allowOverCapacity:boolean,reason:string):Promise<unknown>=>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
+import { CandidateDetailModal } from '@/components/enterprise/CandidateDetailModal';
 import { Users, Search, CheckCircle2, XCircle, Eye, Check, X, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandidatePeriod, type EnterpriseAcceptancePreview } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -463,94 +464,14 @@ export const EnterpriseCandidates: React.FC = () => {
           <div className="flex justify-end gap-2"><button type="button" className={workflowSecondary} disabled={bulkLoading} onClick={()=>setAcceptance(null)}>Hủy</button><button type="submit" className={workflowPrimary} disabled={bulkLoading||!acceptanceReason.trim()||(acceptance.overCapacity&&!allowOverCapacity)}>{bulkLoading?'Đang tiếp nhận…':acceptance.overCapacity?'Đồng ý nhận vượt chỉ tiêu':'Xác nhận tiếp nhận'}</button></div>
         </form>
       </WorkflowModal>}
-      {/* Candidate Detail Modal */}
-      {selectedCandidate && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-6 border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 font-extrabold flex items-center justify-center text-lg">
-                  {selectedCandidate.student.fullName?.charAt(0) || '?'}
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-lg">
-                    {selectedCandidate.student.fullName}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    MSSV: {selectedCandidate.student.studentCode} • {selectedCandidate.student.programName || selectedCandidate.student.programCode}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setSelectedCandidate(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-slate-400">Vị trí ứng tuyển</span>
-                <p className="font-bold text-slate-900">{selectedCandidate.position.title}</p>
-                <p className="text-[11px] text-slate-500">{selectedCandidate.position.code}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-slate-400">Trạng thái</span>
-                <p className={`font-bold ${selectedCandidate.decision === 'ACCEPTED' ? 'text-emerald-600' : selectedCandidate.decision === 'REJECTED' ? 'text-rose-600' : 'text-amber-600'}`}>
-                  {selectedCandidate.receivedAt?'Đã thực nhận':decisionLabel(selectedCandidate.decision)}
-                </p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-slate-400">Email</span>
-                <p className="font-bold text-slate-900">{selectedCandidate.student.email}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                <span className="text-slate-400">Ngày ứng tuyển</span>
-                <p className="font-bold text-slate-900">
-                  {selectedCandidate.introducedAt ? new Date(selectedCandidate.introducedAt).toLocaleDateString('vi-VN') : '—'}
-                </p>
-              </div>
-            </div>
-
-            {/* Position Details */}
-            <div className="p-4 bg-slate-50 rounded-xl space-y-2">
-              <h4 className="text-xs font-bold text-slate-700">Mô tả vị trí</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">{selectedCandidate.position.description}</p>
-              {selectedCandidate.position.requirements && (
-                <>
-                  <h4 className="text-xs font-bold text-slate-700 pt-2">Yêu cầu</h4>
-                  <p className="text-xs text-slate-600 leading-relaxed">{selectedCandidate.position.requirements}</p>
-                </>
-              )}
-            </div>
-
-            {/* Actions */}
-            {selectedCandidate.decision === 'PENDING' && selectedCandidate.canRespond === false && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Hiện ngoài hạn xét tuyển, phản hồi của đợt. Bạn vẫn có thể xem hồ sơ; quyết định nhận hoặc từ chối chỉ được cập nhật trong hạn phản hồi.</p>}
-            {selectedCandidate.decision === 'PENDING' && selectedCandidate.isLatestCoordination && selectedCandidate.canRespond !== false && (
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <button
-                  onClick={() => handleDecision(selectedCandidate.id, 'REJECTED')}
-                  disabled={actionLoading !== null || bulkLoading}
-                  className="px-4 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-semibold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
-                >
-                  <XCircle className="w-4 h-4" />
-                  <span>Từ chối</span>
-                </button>
-                <button
-                  onClick={() => handleDecision(selectedCandidate.id, 'ACCEPTED')}
-                  disabled={actionLoading !== null || bulkLoading}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Tiếp nhận thực tập OJT</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {selectedCandidate && <CandidateDetailModal
+        key={selectedCandidate.id}
+        candidate={selectedCandidate}
+        busy={actionLoading !== null || bulkLoading}
+        decisionLabel={selectedCandidate.receivedAt ? 'Đã thực nhận' : decisionLabel(selectedCandidate.decision)}
+        onClose={() => setSelectedCandidate(null)}
+        onDecision={decision => handleDecision(selectedCandidate.id, decision)}
+      />}
     </div>
   );
 };

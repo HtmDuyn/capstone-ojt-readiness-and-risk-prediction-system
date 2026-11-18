@@ -1,4 +1,5 @@
 import { cvMetadataSql } from '../students/cv.service';
+import { decryptCv } from '../student-portal/cv.service';
 import { postSelect,postApi } from '../recruitment/recruitment.repository';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
@@ -43,7 +44,36 @@ const cvMetadata = `jsonb_build_object(
     'uploadedAt',cv."CreatedAt"
   )`;
 
-const applicationDetails = `(SELECT jsonb_build_object('id',ja."ApplicationID",'postId',ja."PostID",'coverLetter',ja."CoverLetter",'certificates',${applicationCertificates},'appliedAt',ja."AppliedAt",'status',ja."Status",'cv',CASE WHEN cvfile."CVFileID" IS NOT NULL THEN ${cvMetadataSql('cvfile')} || jsonb_build_object('filename',cvfile."FileName",'sizeBytes',octet_length(cvfile."Content")) WHEN cv."CVID" IS NOT NULL THEN ${cvMetadata} ELSE NULL END) FROM "JobApplications" ja LEFT JOIN "StudentCVFiles" cvfile ON cvfile."CVFileID"=ja."CVFileID" AND cvfile."StudentID"=r."StudentID" LEFT JOIN "StudentCVVersions" cv ON cv."CVID"=ja."CVID" AND cv."StudentID"=r."StudentID" WHERE ja."ApplicationID"=co."ApplicationID")`;
+const applicationDetails = `(SELECT jsonb_build_object('id',ja."ApplicationID",'postId',ja."PostID",'coverLetter',ja."CoverLetter",'certificates',${applicationCertificates},'appliedAt',ja."AppliedAt",'status',ja."Status",
+  'skills',COALESCE((SELECT extraction."Profile"->'skills' FROM "StudentCVExtractions" extraction
+    WHERE extraction."StudentID"=r."StudentID" AND extraction."CVFileID"=ja."CVFileID" AND extraction."Status"='CONFIRMED'
+    ORDER BY extraction."ConfirmedAt" DESC NULLS LAST,extraction."AnalysisID" DESC LIMIT 1),'[]'::jsonb),
+  'cv',CASE WHEN cvfile."CVFileID" IS NOT NULL THEN ${cvMetadataSql('cvfile')} || jsonb_build_object('filename',cvfile."FileName",'sizeBytes',octet_length(cvfile."Content")) WHEN cv."CVID" IS NOT NULL THEN ${cvMetadata} ELSE NULL END)
+  FROM "JobApplications" ja LEFT JOIN "StudentCVFiles" cvfile ON cvfile."CVFileID"=ja."CVFileID" AND cvfile."StudentID"=r."StudentID"
+  LEFT JOIN "StudentCVVersions" cv ON cv."CVID"=ja."CVID" AND cv."StudentID"=r."StudentID"
+  WHERE ja."ApplicationID"=co."ApplicationID" AND ja."StudentID"=r."StudentID" AND ja."EnterpriseID"=co."EnterpriseID")`;
+
+// Resolve the submitted file through the candidate, never through a client-supplied
+// student/file ID or the student's current CV (which may have changed since applying).
+export async function enterpriseCandidateCV(candidateId: number, actor: Actor) {
+  return readTransaction(async c => {
+    const companyId = await enterpriseScope(c, actor);
+    if (companyId === null) throw invalid('Enterprise role required.', 403, 'FORBIDDEN');
+    const file = (await c.query(`SELECT
+      COALESCE(cvfile."FileName",legacy."Filename") AS "FileName",
+      cvfile."Content",legacy."EncryptedContent"
+      FROM "StudentEnterpriseCoordination" co
+      JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
+      JOIN "JobApplications" ja ON ja."ApplicationID"=co."ApplicationID"
+        AND ja."RegistrationID"=r."RegistrationID" AND ja."StudentID"=r."StudentID" AND ja."EnterpriseID"=co."EnterpriseID"
+      LEFT JOIN "StudentCVFiles" cvfile ON cvfile."CVFileID"=ja."CVFileID" AND cvfile."StudentID"=r."StudentID"
+      LEFT JOIN "StudentCVVersions" legacy ON legacy."CVID"=ja."CVID" AND legacy."StudentID"=r."StudentID"
+      WHERE co."CoordinationID"=$1 AND co."EnterpriseID"=$2`, [candidateId, companyId])).rows[0];
+    if (!file || (!file.Content && !file.EncryptedContent))
+      throw invalid('Không tìm thấy CV đã gửi cho doanh nghiệp trong hồ sơ này.', 404, 'CV_NOT_FOUND');
+    return { FileName: file.FileName, Content: file.Content ?? decryptCv(file.EncryptedContent) };
+  });
+}
 
 export async function enterpriseProfile(actor: Actor) {
   return readTransaction(async c => {
@@ -108,7 +138,10 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
     for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','co."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
       if (params.decision!==undefined) add(`COALESCE(co."Decision",'PENDING')=?`,enumValue(params.decision,['PENDING','ACCEPTED','REJECTED'],'decision'));
       if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
-    const sql = `SELECT ${candidateFields},COALESCE((SELECT ja."ApplicationSnapshot"->'application' FROM "JobApplications" ja WHERE ja."ApplicationID"=co."ApplicationID"),r."Application")-'cvUrl' AS application,${applicationDetails} AS "jobApplication" ${candidateFrom} WHERE ${where.join(' AND ')}`;
+    const sql = `SELECT ${candidateFields},COALESCE((SELECT ja."ApplicationSnapshot"->'application' FROM "JobApplications" ja WHERE ja."ApplicationID"=co."ApplicationID"),r."Application")-'cvUrl' AS application,${applicationDetails} AS "jobApplication",
+      COALESCE((SELECT jsonb_agg(jsonb_build_object('name',skill."SkillName",'level',ss."Level") ORDER BY skill."SkillName")
+        FROM "StudentMatchingSkills" ss JOIN "MatchingSkills" skill ON skill."SkillID"=ss."SkillID" WHERE ss."StudentID"=r."StudentID"),'[]'::jsonb) AS skills
+      ${candidateFrom} WHERE ${where.join(' AND ')}`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) candidates`,args)).rows[0].n;
     const items = (await c.query(
       hasPagination
