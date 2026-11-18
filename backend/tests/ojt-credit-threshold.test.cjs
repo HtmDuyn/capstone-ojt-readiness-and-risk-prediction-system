@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const repository = require('../dist/modules/academic/academic.repository');
 const { saveFrontendResults } = require('../dist/modules/eligibility/frontend-results.service');
 const { createCreditThreshold } = require('../dist/modules/eligibility/credit-threshold.service');
+const { handoffPendingStudents } = require('../dist/modules/ojt-registration/handoff.service');
 
 test('creating a credit threshold rejects an existing value and invalid precision', async t => {
   const stored = new Set();
@@ -24,12 +25,16 @@ test('saves eligibility under the selected threshold and rejects a mismatched th
   let saved;
   let handoffItem;
   let savedBatch;
-  t.mock.method(repository, 'academicTransaction', work => work({
+  const client = {
     async query(sql, args) {
       sql = sql.trim();
       if (sql.includes('JOIN LATERAL') && sql.includes('"CohortCurriculumPeriods"')) {
-        assert.deepEqual(args[0], [1]);
-        return { rows: [{ studentId: 1, semesterId: 6 }] };
+        if (Array.isArray(args[0])) {
+          assert.deepEqual(args, [[1], 10]);
+          return { rows: [] }; // No open round at the time of saving.
+        }
+        assert.deepEqual(args, [24, 6]);
+        return { rows: handoffItem ? [] : [{ studentId: 1, batchId: 10, semesterId: 6, roundId: 24, roundName: 'Đợt bổ sung' }] };
       }
       if (sql.startsWith('SELECT count(*)::int AS count FROM "EligibleStudentHandoffItems"')) return { rows: [{ count: handoffItem ? 1 : 0 }] };
       if (sql.startsWith('SELECT * FROM "OJTEligibilityResultBatches"')) return { rows: savedBatch ? [savedBatch] : [] };
@@ -54,7 +59,8 @@ test('saves eligibility under the selected threshold and rejects a mismatched th
       }
       return { rows: [] };
     },
-  }));
+  };
+  t.mock.method(repository, 'academicTransaction', work => work(client));
 
   const payload = {
     idempotencyKey: 'threshold-test',
@@ -63,9 +69,12 @@ test('saves eligibility under the selected threshold and rejects a mismatched th
     results: [{ studentId: 1, status: 'ELIGIBLE', earnedCredits: 75, unpassedCourseCount: 3,
       reasons: [], academicIssues: [], checkedAt: new Date().toISOString() }],
   };
-  assert.deepEqual(await saveFrontendResults(payload, 7), { batchId: 10, savedCount: 1, handedOffCount: 1, replayed: false });
+  assert.deepEqual(await saveFrontendResults(payload, 7), { batchId: 10, savedCount: 1, handedOffCount: 0, replayed: false });
+  assert.equal(await handoffPendingStudents(client, { roundId: 24, semesterId: 6 }, 8), 1);
+  assert.equal(await handoffPendingStudents(client, { roundId: 24, semesterId: 6 }, 8), 0);
   assert.deepEqual(handoffItem.slice(0, 4), [21, 6, 1, 10]);
   assert.deepEqual(JSON.parse(handoffItem[4]).calculatedEligibility.rule, payload.rule);
+  assert.deepEqual(JSON.parse(handoffItem[4]).recruitmentRound, { id: 24, name: 'Đợt bổ sung' });
   assert.deepEqual(await saveFrontendResults(payload, 7), { batchId: 10, savedCount: 1, handedOffCount: 1, replayed: true });
   assert.equal(saved.status, 'ELIGIBLE');
   assert.deepEqual(saved.rule, payload.rule);

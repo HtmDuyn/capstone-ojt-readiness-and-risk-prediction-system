@@ -8,7 +8,9 @@ import { fingerprint } from '../eligibility/eligibility.service';
 import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 import { semester,type Actor,type Row } from './window.service';
 import type { PoolClient } from 'pg';
-export async function handoff(semesterId:number,body:unknown,actor:number,client?:PoolClient) {
+type HandoffRound = { id: number; name: string };
+
+export async function handoff(semesterId:number,body:unknown,actor:number,client?:PoolClient,round?:HandoffRound) {
  const b=inputObject(body,['studentIds','idempotencyKey','reason']);
  const selected=ids(b.studentIds,'studentIds',1000).sort((a,b)=>a-b);
  if(!selected.length)throw invalid('studentIds must be nonempty.');
@@ -39,18 +41,27 @@ export async function handoff(semesterId:number,body:unknown,actor:number,client
    checks.push(check);
   }
   const batch=(await c.query(`INSERT INTO "EligibleStudentHandoffs" ("OJTSemesterID","IdempotencyKey","RequestHash","RegistrationIDs","Reason","CreatedBy") VALUES ($1,$2,$3,'[]',$4,$5) RETURNING *`,[semesterId,key,hash,reason,actor])).rows[0];
-  for(let n=0;n<selected.length;n++)await c.query(`INSERT INTO "EligibleStudentHandoffItems" ("HandoffID","OJTSemesterID","StudentID","CalculatedBatchID","Snapshot") VALUES ($1,$2,$3,$4,$5)`,[batch.HandoffID,semesterId,selected[n],checks[n].batchId,JSON.stringify({studentId:selected[n],currentSemester:5,targetSemester:6,calculatedEligibility:checks[n]})]);
+  for(let n=0;n<selected.length;n++)await c.query(`INSERT INTO "EligibleStudentHandoffItems" ("HandoffID","OJTSemesterID","StudentID","CalculatedBatchID","Snapshot") VALUES ($1,$2,$3,$4,$5)`,[batch.HandoffID,semesterId,selected[n],checks[n].batchId,JSON.stringify({studentId:selected[n],currentSemester:5,targetSemester:6,calculatedEligibility:checks[n],...(round ? { recruitmentRound: round } : {})})]);
   const result={handoffId:batch.HandoffID,ojtSemesterId:semesterId,studentIds:selected,total:selected.length,recipientRole:'OJT_COORD',createdAt:batch.CreatedAt,replayed:false};
   await audit(c,actor,'EligibleStudentHandoffs',batch.HandoffID,'HANDOFF',null,result,reason);return result;
  },client);
 }
 
+type HandoffScope = { batchId: number; studentIds: number[] } | { roundId: number; semesterId: number };
+
 export async function handoffSavedEligibleStudents(client: PoolClient, batchId: number, studentIds: number[], actorId: number) {
  if (!studentIds.length) return 0;
- const { rows } = await client.query<{ studentId: number; semesterId: number }>(`
-   SELECT s."StudentID" AS "studentId", target."semesterId"
+ return handoffPendingStudents(client, { batchId, studentIds }, actorId);
+}
+
+export async function handoffPendingStudents(client: PoolClient, scope: HandoffScope, actorId: number) {
+ const fromBatch = 'batchId' in scope;
+ const { rows } = await client.query<{ studentId: number; batchId: number; semesterId: number; roundId: number; roundName: string }>(`
+   SELECT s."StudentID" AS "studentId", saved."BatchID" AS "batchId", target."semesterId", next_round."roundId", next_round."roundName"
    FROM "Students" s
+   JOIN "Users" holder ON holder."UserID"=s."UserID" AND holder."Status"='ACTIVE'
    JOIN "StudentAcademicPlacements" placement USING ("StudentID")
+   JOIN "StudentOJTCalculatedResults" saved USING ("StudentID")
    JOIN LATERAL (
      SELECT min(term."OJTSemesterID") AS "semesterId"
      FROM "CohortCurriculumPeriods" plan
@@ -60,27 +71,45 @@ export async function handoffSavedEligibleStudents(client: PoolClient, batchId: 
        AND plan."CurriculumSemester"=6
      HAVING count(*)=1 AND bool_and(term."Status" NOT IN ('CLOSED','ARCHIVED'))
    ) target ON true
-   WHERE s."StudentID"=ANY($1::int[]) AND s."CurrentSemester"=5
+   JOIN LATERAL (
+     SELECT w."WindowID" AS "roundId", w."Name" AS "roundName"
+     FROM "RecruitmentWindows" w
+     WHERE w."OJTSemesterID"=target."semesterId"
+       AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
+       AND w."ApplicationEndsAt">GREATEST(saved."CheckedAt",statement_timestamp())
+       AND w."ApplicationStartsAt" IS NOT NULL
+     ORDER BY w."ApplicationStartsAt", w."WindowID"
+     LIMIT 1
+   ) next_round ON true
+   WHERE ${fromBatch
+     ? 's."StudentID"=ANY($1::int[]) AND saved."BatchID"=$2'
+     : 'next_round."roundId"=$1 AND target."semesterId"=$2'}
+     AND saved."Status"='ELIGIBLE' AND s."CurrentSemester"=5
+     AND s."Status"='ACTIVE' AND s."DeletedAt" IS NULL
      AND "StudentCurriculumSemester"(s."StudentID",placement."CurrentAcademicPeriodID")=5
      AND (${calculatedEligibilitySql()}->>'isStale')::boolean IS FALSE
      AND NOT EXISTS (
        SELECT 1 FROM "EligibleStudentHandoffItems" i
        WHERE i."StudentID"=s."StudentID" AND i."OJTSemesterID"=target."semesterId"
      )
-   ORDER BY target."semesterId", s."StudentID"`, [studentIds]);
- const groups = new Map<number, number[]>();
+   ORDER BY target."semesterId", next_round."roundId", s."StudentID"
+   FOR UPDATE OF s FOR SHARE OF holder`, fromBatch ? [scope.studentIds, scope.batchId] : [scope.roundId, scope.semesterId]);
+ const groups = new Map<string, { batchId: number; semesterId: number; round: HandoffRound; ids: number[] }>();
  for (const row of rows) {
-   const ids = groups.get(row.semesterId) ?? [];
-   ids.push(row.studentId);
-   groups.set(row.semesterId, ids);
+   const key = `${row.roundId}:${row.batchId}`;
+   const group = groups.get(key) ?? {
+     batchId: row.batchId, semesterId: row.semesterId, round: { id: row.roundId, name: row.roundName }, ids: [],
+   };
+   group.ids.push(row.studentId);
+   groups.set(key, group);
  }
- for (const [semesterId, ids] of groups) {
+ for (const { batchId, semesterId, round, ids } of groups.values()) {
    for (let offset = 0; offset < ids.length; offset += 1000) {
      await handoff(semesterId, {
        studentIds: ids.slice(offset, offset + 1000),
-       idempotencyKey: `auto-eligibility-${batchId}-${semesterId}-${offset}`,
-       reason: 'Bàn giao tự động sau khi lưu kết quả xét OJT.',
-     }, actorId, client);
+       idempotencyKey: `auto-eligibility-${batchId}-${round.id}-${ids[offset]}`,
+       reason: `Bàn giao tự động vào đợt ${round.name}.`,
+     }, actorId, client, round);
    }
  }
  return rows.length;

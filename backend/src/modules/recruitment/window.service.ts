@@ -1,4 +1,5 @@
 import { academicTransaction, audit } from '../academic/academic.repository';
+import { handoffPendingStudents } from '../ojt-registration/handoff.service';
 import { readTransaction } from '../qhdn/read.repository';
 import { ensureOjtSemesterForPeriod } from '../academic/ojt-semester-link';
 import { actualPeriod, periodBounds } from '../academic/workflow-policy';
@@ -70,8 +71,14 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    }
    await c.query(`UPDATE "RecruitmentWindows" SET "Name"=$2,"Status"=$3,"UpdatedBy"=$4,"UpdatedAt"=now() WHERE "WindowID"=$1`,[id,b.name===undefined?old.Name:requiredText(b.name,'name',150),status,actor]);
    await c.query(`UPDATE "OJTRegistrationWindows" SET "Status"=CASE WHEN $2::text='OPEN' AND "EndsAt"<=clock_timestamp() THEN 'CLOSED' ELSE $2::text END,"UpdatedAt"=now() WHERE "RecruitmentRoundID"=$1`,[id,status]);
-   if(status==='OPEN'&&old.Status!=='OPEN'&&old.PostingStartsAt){await requireLifecycleSchema(c);await c.query('SELECT public."CarryForwardRecruitmentPosts"($1)',[id]);}
-   const after=await windowRecord(c,id);await audit(c,actor,'RecruitmentWindows',id,'UPDATE',old,after,reason);return windowApi(after);
+   let handedOffCount = 0;
+   if(status==='OPEN'&&old.Status!=='OPEN'&&old.PostingStartsAt){
+    await requireLifecycleSchema(c);
+    await c.query('SELECT public."CarryForwardRecruitmentPosts"($1)',[id]);
+    handedOffCount = await handoffPendingStudents(c, { roundId: id, semesterId: old.OJTSemesterID }, actor);
+   }
+   const after=await windowRecord(c,id);await audit(c,actor,'RecruitmentWindows',id,'UPDATE',old,after,reason);
+   return { ...windowApi(after), handedOffCount };
   }
   const periodId=positiveId(b.academicPeriodId,'academicPeriodId'),period=await actualPeriod(c,periodId);
   if(period.Kind!=='SEMESTER'||['CLOSED','ARCHIVED'].includes(period.Status))throw invalid('Chọn học kỳ chính đang hoạt động hoặc đã lên kế hoạch.',409);

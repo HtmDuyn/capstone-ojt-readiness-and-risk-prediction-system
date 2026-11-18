@@ -82,8 +82,11 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
   if(busy||!round.canOpen)return;
   setBusy(true);setError('');setMessage('');
   try{
-   await API.patch(`/recruitment/windows/${round.id}`,{status:'OPEN',reason:'QHDN mở đợt tuyển dụng theo lịch đã thiết lập.'});
-   setRevision(v=>v+1);onChanged?.();setMessage('Đã mở đợt tuyển dụng.');
+   const { data } = await API.patch<{ data: { handedOffCount?: number } }>(
+    `/recruitment/windows/${round.id}`,{status:'OPEN',reason:'QHDN mở đợt tuyển dụng theo lịch đã thiết lập.'});
+   const handedOffCount = data.data.handedOffCount ?? 0;
+   setRevision(v=>v+1);onChanged?.();
+   setMessage(handedOffCount ? `Đã mở đợt và tự động bàn giao ${handedOffCount} sinh viên.` : 'Đã mở đợt tuyển dụng.');
   }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
  };
  const confirm=async(e:FormEvent<HTMLFormElement>)=>{
