@@ -10,7 +10,15 @@ import {
 
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 
-export function AccountNotificationsPage({ description, badge }: { description: string; badge: string }) {
+export function AccountNotificationsPage({
+  description,
+  badge,
+  bannerVariant = 'default',
+}: {
+  description: string;
+  badge: string;
+  bannerVariant?: 'default' | 'enterprise';
+}) {
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<AccountNotificationPage | null>(null);
@@ -61,7 +69,7 @@ export function AccountNotificationsPage({ description, badge }: { description: 
   const reload = () => { setActionError(''); setRevision(value => value + 1); };
 
   return <div className="space-y-6 pb-12">
-    <PageBanner title="Thông báo" description={description} badge={badge} />
+    <PageBanner title="Thông báo" description={description} badge={badge} variant={bannerVariant} />
     <section aria-label="Danh sách thông báo" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:px-6">
         <div>

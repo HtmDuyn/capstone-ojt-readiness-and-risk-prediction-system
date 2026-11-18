@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { useNavigate, Outlet } from "react-router-dom";
+import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { EducationSidebar } from "@/components/education/EducationSidebar";
 import { Sidebar } from "@/components/common/Sidebar";
 import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import type { NavItem } from "@/types/common.types";
+import './QhdnWorkspace.css';
 
 export interface BaseLayoutProps {
   navItems: NavItem[];
@@ -26,8 +27,11 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isEducation = user?.role === 'education';
+  const isEnterprise = user?.role === 'enterprise';
+  const isQhdn = user?.role === 'qhdn';
   const hideHeaderTools = user?.role === 'enterprise' || user?.role === 'qhdn';
   const RoleSidebar = isEducation ? EducationSidebar : Sidebar;
 
@@ -46,7 +50,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
+      <div className={`min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden ${isQhdn ? 'qhdn-shell' : ''}`}>
         {/* Nền xung quanh phù hợp với giao diện (theme) */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <img
@@ -88,8 +92,10 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           />
 
           {/* Container chính thống nhất qua Dashboard & Modules */}
-          <main className="relative z-10 flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1520px] mx-auto space-y-6">
-            {children || <Outlet />}
+          <main className={`relative z-10 flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1520px] mx-auto space-y-6 ${isEnterprise ? 'enterprise-workspace' : isQhdn ? 'qhdn-workspace' : ''}`}>
+            {isEnterprise || isQhdn
+              ? <div key={location.pathname} className={isQhdn ? 'qhdn-page-transition' : 'enterprise-page-transition'}>{children || <Outlet />}</div>
+              : children || <Outlet />}
 
             {/* Footer của Dashboard */}
             <Footer />

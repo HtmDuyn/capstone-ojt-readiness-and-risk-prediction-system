@@ -184,6 +184,7 @@ export const EnterpriseCandidates: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       <PageBanner
+        variant="enterprise"
         title="Hồ sơ sinh viên ứng tuyển"
         description="Chọn hồ sơ để tiếp nhận hàng loạt. Kiểm tra số thực nhận và xác nhận rõ khi nhận vượt chỉ tiêu doanh nghiệp."
         badge="Ứng tuyển OJT"

@@ -606,9 +606,6 @@ export const EnterpriseDashboard: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  <p className="mt-3 rounded-xl bg-indigo-50/70 px-3 py-2.5 text-[10px] leading-relaxed text-indigo-800">
-                    Sinh viên được doanh nghiệp tiếp nhận được tính ngay vào nhóm “Đã nhận”, kể cả chưa tạo phân công. Số lượng này thống nhất với card “Đã tiếp nhận”, không gồm thực tập đã kết thúc.
-                  </p>
                 </>
               )}
             </div>

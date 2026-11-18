@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Building2, Sparkles } from 'lucide-react';
 import type { StudentProfile } from '@/types/student/studentDashboardTypes';
 import { getStudentMenuItemById, getStudentMenuItemByPath } from '@/config/menus/studentMenu';
 
@@ -33,6 +34,8 @@ export interface PageBannerProps {
   children?: React.ReactNode;
   /** Class CSS bổ sung cho banner. */
   className?: string;
+  /** Kiểu banner dành riêng cho giao diện doanh nghiệp. */
+  variant?: 'default' | 'enterprise';
 
   // Props cũ được giữ lại để tương thích với các màn hình hiện tại.
   onRegisterOjt?: () => void;
@@ -51,11 +54,13 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   extra,
   children,
   className = '',
+  variant = 'default',
   onRegisterOjt,
   onViewRoadmap,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const isEnterprise = variant === 'enterprise';
 
   // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
   const preset = menuId
@@ -121,23 +126,43 @@ export const PageBanner: React.FC<PageBannerProps> = ({
     };
   }
 
+  const bannerClassName = isEnterprise
+    ? 'enterprise-hero relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-[#090d1c] px-5 py-7 text-white shadow-2xl shadow-indigo-950/20 sm:px-8 sm:py-9 lg:px-10'
+    : 'relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300';
+
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300 ${className}`}
+      className={`${bannerClassName} ${className}`}
     >
-      {/* Hiệu ứng phát sáng trang trí ở hai góc banner. */}
-      <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
-      <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
+      {isEnterprise ? (
+        <>
+          <div className="enterprise-grid-overlay pointer-events-none absolute inset-0 opacity-30" />
+          <div className="enterprise-orb pointer-events-none absolute -right-16 -top-24 h-80 w-80 rounded-full bg-orange-500/25 blur-3xl" />
+          <div className="enterprise-orb enterprise-orb-delay pointer-events-none absolute -bottom-36 left-1/3 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
+        </>
+      ) : (
+        <>
+          <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
+          <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
+        </>
+      )}
 
       {/* Khối nội dung chính. */}
-      <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className={`relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6 ${isEnterprise ? 'min-h-[154px] sm:min-h-[166px]' : ''}`}>
         <div className="max-w-3xl space-y-3">
+          {isEnterprise && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-100 backdrop-blur">
+              <Building2 className="h-3.5 w-3.5 text-orange-300" />
+              <span>Enterprise · OJT control center</span>
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            </div>
+          )}
           {/* Breadcrumb nếu được truyền vào. */}
           {breadcrumb && <div className="mb-2">{breadcrumb}</div>}
 
           {/* Tiêu đề và badge. */}
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight text-white flex items-center gap-2">
+            <h1 className={`tracking-tight text-white flex items-center gap-2 ${isEnterprise ? 'text-3xl sm:text-4xl lg:text-[42px] font-black' : 'text-xl sm:text-2xl lg:text-[26px] font-extrabold'}`}>
               {renderedTitle}
             </h1>
             {renderedBadge}
@@ -145,7 +170,7 @@ export const PageBanner: React.FC<PageBannerProps> = ({
 
           {/* Mô tả banner. */}
           {renderedDescription && (
-            <div className="text-xs sm:text-sm text-purple-100 leading-relaxed font-normal">
+            <div className={`text-xs sm:text-sm leading-relaxed font-normal ${isEnterprise ? 'text-indigo-100/75' : 'text-purple-100'}`}>
               {renderedDescription}
             </div>
           )}

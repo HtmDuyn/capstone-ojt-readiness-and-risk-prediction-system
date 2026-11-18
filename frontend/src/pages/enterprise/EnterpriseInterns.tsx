@@ -621,6 +621,7 @@ export const EnterpriseInterns: React.FC = () => {
     <div className="space-y-6 pb-16">
       {/* 1. Page Banner without buttons (as requested) */}
       <PageBanner
+        variant="enterprise"
         title="Quản lý & Giao Nhiệm vụ Thực tập OJT"
         description="Sinh viên đã được duyệt tiếp nhận đã là thực tập sinh. Phân công ghi nhận thời gian và người hướng dẫn để doanh nghiệp giao task, theo dõi tiến độ và điểm danh."
         badge="Doanh nghiệp tiếp nhận OJT"

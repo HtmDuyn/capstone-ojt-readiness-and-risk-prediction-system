@@ -475,7 +475,7 @@ body {
   animation-delay: -4s;
 }
 
-.enterprise-dashboard .enterprise-grid-overlay {
+.enterprise-hero .enterprise-grid-overlay {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
@@ -483,10 +483,51 @@ body {
   mask-image: linear-gradient(135deg, #000 0%, transparent 85%);
 }
 
+.enterprise-hero .enterprise-orb {
+  animation: enterpriseGlow 9s ease-in-out infinite alternate;
+}
+
+.enterprise-hero .enterprise-orb-delay {
+  animation-delay: -4s;
+}
+
+@keyframes enterprisePageTransition {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.enterprise-page-transition {
+  animation: enterprisePageTransition 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.enterprise-workspace .enterprise-page-transition :is(section, article, a, div)[class*="bg-white"][class*="shadow"]:not([class*="max-w-"]) {
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.enterprise-workspace .enterprise-page-transition :is(section, article, a, div)[class*="bg-white"][class*="shadow"]:not([class*="max-w-"]):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px -24px rgba(15, 23, 42, 0.48);
+}
+
+.enterprise-workspace .enterprise-page-transition a:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .enterprise-dashboard *,
+  .enterprise-workspace *,
   .enterprise-dashboard *::before,
-  .enterprise-dashboard *::after {
+  .enterprise-dashboard *::after,
+  .enterprise-workspace *::before,
+  .enterprise-workspace *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;

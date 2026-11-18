@@ -240,6 +240,7 @@ export const EnterpriseEvaluation: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       <PageBanner
+        variant="enterprise"
         title="Đánh giá & Chấm điểm Kết quả Thực tập OJT"
         description="Đánh giá điểm hoàn thành, thái độ, kỹ năng và kết quả OJT của sinh viên đang thực tập."
         badge="Chấm điểm OJT"

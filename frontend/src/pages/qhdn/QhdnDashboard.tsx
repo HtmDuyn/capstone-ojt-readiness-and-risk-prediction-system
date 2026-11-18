@@ -22,6 +22,7 @@ import {
   Send,
   Award,
   UserCheck,
+  Sparkles,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -47,7 +48,7 @@ import {
   getQhdnDashboardSummary,
 } from "@/services/qhdnService";
 import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdnDashboard';
-import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation } from '@/utils/qhdnDashboardCharts';
+import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation, dashboardCinema, dashboardPalette } from '@/utils/qhdnDashboardCharts';
 import './QhdnDashboard.css';
 import type {
   CoordinationItem,
@@ -341,24 +342,20 @@ export const QhdnDashboard: React.FC = () => {
 
     const config: ChartConfiguration<'bar', (number | null)[], string> = {
       type: "bar",
-      plugins: [dashboardBarLabels],
+      plugins: [dashboardCinema, dashboardBarLabels],
       data: {
         labels,
         datasets: [
           {
             label: "Số lượng sinh viên",
             data: dataValues,
-            backgroundColor: context => dashboardBarGradient(context, [
-              "#3b82f6", // Bàn giao PĐT (Blue)
-              "#059669", // Đã chốt DN (Emerald)
-              "#f59e0b", // Chờ DN (Amber)
-              "#6366f1", // Đang thực tập (Indigo)
-              "#0f766e", // Hoàn thành (Teal)
-            ]),
-            borderRadius: 9,
-            maxBarThickness: 44,
-            hoverBorderColor: '#ffffff',
-            hoverBorderWidth: 2,
+            backgroundColor: context => dashboardBarGradient(context, dashboardPalette),
+            borderRadius: 12,
+            maxBarThickness: 50,
+            borderColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '55',
+            borderWidth: 1,
+            hoverBackgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + 'e6',
+            hoverBorderColor: '#ffffff', hoverBorderWidth: 2,
           },
         ],
       },
@@ -366,6 +363,7 @@ export const QhdnDashboard: React.FC = () => {
         responsive: true,
         maintainAspectRatio: false,
         animation: dashboardChartAnimation(reducedMotion),
+        transitions: { active: { animation: { duration: reducedMotion ? 0 : 220 } } },
         layout: { padding: { top: 24, right: 8 } },
         interaction: { intersect: false, mode: 'index' },
         plugins: {
@@ -373,9 +371,10 @@ export const QhdnDashboard: React.FC = () => {
             display: false,
           },
           tooltip: {
-            backgroundColor: "#0f172a",
-            padding: 10,
-            cornerRadius: 6,
+            backgroundColor: "rgba(15,23,42,.94)",
+            padding: 14,
+            cornerRadius: 12,
+            displayColors: true,
             callbacks: {
               label: (context) => ` ${context.raw} sinh viên`,
               afterLabel: context => context.dataIndex === 4 ? 'Đã có điểm tổng kết doanh nghiệp hoặc đã hoàn thành hồ sơ thực tập.' : '',
@@ -389,7 +388,8 @@ export const QhdnDashboard: React.FC = () => {
           },
           y: {
             beginAtZero: true,
-            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            grid: { color: "rgba(99,102,241,.07)" },
             ticks: {
               precision: 0,
               font: { family: "Inter, sans-serif", size: 11 },
@@ -429,21 +429,25 @@ export const QhdnDashboard: React.FC = () => {
 
     const config: ChartConfiguration<'bar', (number | null)[], string> = {
       type: "bar",
-      plugins: [dashboardBarLabels],
+      plugins: [dashboardCinema, dashboardBarLabels],
       data: {
         labels: entNames.length > 0 ? entNames : ["Chưa có dữ liệu DN"],
         datasets: [
           {
             label: "Đã tiếp nhận",
             data: acceptedSlots.length > 0 ? acceptedSlots : [0],
-            backgroundColor: context => dashboardBarGradient(context, ['#0284c7'], true),
+            backgroundColor: context => dashboardBarGradient(context, dashboardPalette, true),
+            hoverBackgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + 'e6',
+            borderColor: 'rgba(255,255,255,.6)', borderWidth: 1,
             borderRadius: 8,
             maxBarThickness: 34,
           },
           {
             label: "Slot còn lại",
             data: availableSlots.length > 0 ? availableSlots : [0],
-            backgroundColor: "#e2e8f0",
+            backgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '18',
+            hoverBackgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '30',
+            borderColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '28', borderWidth: 1,
             borderRadius: 8,
             maxBarThickness: 34,
           },
@@ -454,21 +458,23 @@ export const QhdnDashboard: React.FC = () => {
         responsive: true,
         maintainAspectRatio: false,
         animation: dashboardChartAnimation(reducedMotion),
+        transitions: { active: { animation: { duration: reducedMotion ? 0 : 220 } } },
         layout: { padding: { right: 24, top: 8 } },
         plugins: {
           legend: {
             position: "top",
-            labels: { font: { family: "Inter, sans-serif", size: 12 } },
+            labels: { usePointStyle: true, boxWidth: 8, padding: 18, font: { family: "Inter, sans-serif", size: 11 } },
           },
           tooltip: {
-            backgroundColor: "#0f172a",
-            padding: 10,
+            backgroundColor: "rgba(15,23,42,.94)",
+            padding: 14, cornerRadius: 12,
           },
         },
         scales: {
           x: {
             stacked: true,
-            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            grid: { color: "rgba(99,102,241,.07)" },
             ticks: { font: { family: "Inter, sans-serif", size: 11 } },
           },
           y: {
@@ -494,16 +500,31 @@ export const QhdnDashboard: React.FC = () => {
   }, [quotaViewMode, top8Partners, visibleCharts.quota, isLoading, eligibleLoading, reducedMotion]);
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <div className="qhdn-dashboard space-y-6 pb-12 font-sans" onPointerMove={event => {
+      if (event.pointerType === 'touch' || reducedMotion || !(event.target instanceof Element)) return;
+      const card = event.target.closest<HTMLElement>('.card-glass');
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--spot-x', `${event.clientX - rect.left}px`);
+      card.style.setProperty('--spot-y', `${event.clientY - rect.top}px`);
+    }}>
       {/* Banner */}
       <PageBanner
+        className="qhdn-hero"
+        breadcrumb={<span className="qhdn-hero-eyebrow"><Sparkles size={13} /> TRUNG TÂM ĐIỀU PHỐI OJT</span>}
         title="Dashboard Điều phối Quan hệ Doanh nghiệp"
         description="Giám sát luồng nhận sinh viên từ Phòng Đào tạo, phân bổ chỉ tiêu doanh nghiệp, tiếp nhận đánh giá và chuyển giao kết quả OJT."
-        badge="Phòng QHDN"
-      />
+        badge={<span className="qhdn-hero-badge"><span /> Phòng QHDN</span>}
+      >
+        <div className="qhdn-hero-flow" aria-label="Luồng điều phối OJT">
+          <span><Users size={14} /> Bàn giao sinh viên</span><ArrowRight size={12} aria-hidden="true" />
+          <span><Handshake size={14} /> Kết nối doanh nghiệp</span><ArrowRight size={12} aria-hidden="true" />
+          <span><Award size={14} /> Hoàn thành OJT</span>
+        </div>
+      </PageBanner>
 
       {/* KPI Cards Grid (5 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="qhdn-kpis grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* KPI 1: Nhận từ Đào tạo */}
         <div
           onClick={() => navigate('/qhdn/coordination' + (selectedSemesterId ? '?semester=' + selectedSemesterId : ''))}
@@ -634,7 +655,7 @@ export const QhdnDashboard: React.FC = () => {
       </div>
 
       {/* Filter Toolbar: Năm học & Kỳ OJT Selector */}
-      <div className="card-glass border border-slate-200/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="qhdn-filter card-glass border border-slate-200/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
             <Calendar size={18} />
