@@ -4,6 +4,8 @@
 > **FPT University – Information Systems**  
 > **Academic Year: 2025 – 2026**
 
+Deployment: [Render backend and Vercel frontend configuration](backend/docs/deployment.md).
+
 An AI-powered **On-the-Job Training (OJT) Management System** that centralizes internship management while integrating Machine Learning to predict students who are at risk of delaying their internship (OJT). The system supports students, Academic Office, Enterprise Relations Office, and companies through an integrated web platform.
 
 ---
