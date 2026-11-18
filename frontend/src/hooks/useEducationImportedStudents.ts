@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { importService } from '@/services/import.service';
+import { importService } from '@/services/educationService';
 import type { Page } from '@/types/education/api.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult } from '@/types/education/import.types';
 

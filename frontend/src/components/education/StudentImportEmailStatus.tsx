@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { importService } from '@/services/import.service';
+import { importService } from '@/services/educationService';
 import type { ImportCommitResponse } from '@/types/education/import.types';
 
 function statusText(student: NonNullable<ImportCommitResponse['students']>[number]) {

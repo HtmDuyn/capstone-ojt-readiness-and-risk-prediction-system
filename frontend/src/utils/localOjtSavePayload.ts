@@ -1,5 +1,5 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
-import type { CurrentOjtRule } from '@/services/localOjtEligibility.service';
+import type { CurrentOjtRule } from '@/services/educationService';
 
 export function localOjtSavePayload(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule) {
   return {

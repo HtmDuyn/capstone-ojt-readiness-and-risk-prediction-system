@@ -1,8 +1,8 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { ImportedStudents } from '@/components/education/ImportedStudents';
 import { StudentImportEmailStatus } from '@/components/education/StudentImportEmailStatus';
-import { loadAcademicCatalogs } from '@/services/educationCatalog.service';
-import { importService } from '@/services/import.service';
+import { loadAcademicCatalogs } from '@/services/educationService';
+import { importService } from '@/services/educationService';
 import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
 import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
 import React from "react";

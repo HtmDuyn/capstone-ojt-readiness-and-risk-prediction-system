@@ -1,8 +1,8 @@
 import { createCurriculumWorkbookTools, getSemesterLabel } from '@/utils/curriculumImportWorkbook';
-import { resolveCurriculumCourseIds } from '@/services/curriculumCourseResolver';
+import { resolveCurriculumCourseIds } from '@/services/educationService';
 import React from "react";
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Upload, X } from "lucide-react";
-import { curriculumService } from '@/services/curriculum.service';
+import { curriculumService } from '@/services/educationService';
 import type { CurriculumDetail, CurriculumImportPayload, CurriculumImportPreviewResponse, Major } from '@/types/education/curriculum.types';
 
 /* =========================================================

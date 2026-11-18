@@ -1,9 +1,9 @@
-import { educationOjtWorkflowService } from '@/services/educationOjtWorkflow.service';
+import { educationOjtWorkflowService } from '@/services/educationService';
 import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
-import { getAllItems } from '@/services/educationApi';
-import { loadSavedLocalOjtResults } from '@/services/localOjtEligibility.service';
+import { getAllItems } from '@/services/educationService';
+import { loadSavedLocalOjtResults } from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
 import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import { handoffTarget, type HandoffCohort } from '@/utils/ojtHandoff';

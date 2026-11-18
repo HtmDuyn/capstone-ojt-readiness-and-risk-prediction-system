@@ -1,4 +1,4 @@
-import { academicService } from '@/services/academic.service';
+import { academicService } from '@/services/educationService';
 import type { OjtSemester } from '@/types/education/academic.types';
 import { useEffect, useState } from 'react';
 

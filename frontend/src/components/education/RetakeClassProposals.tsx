@@ -1,6 +1,6 @@
 import { useEffect,useState } from 'react';
 import { Info } from 'lucide-react';
-import { academicReportingService as reports } from '@/services/academicReporting.service';
+import { academicReportingService as reports } from '@/services/educationService';
 import type { Cohort,ReportPeriod,RetakeClassReport } from '@/types/education/reporting.types';
 
 export function RetakeClassProposals({periods,cohorts,catalogLoading}:{periods:ReportPeriod[];cohorts:Cohort[];catalogLoading:boolean}){

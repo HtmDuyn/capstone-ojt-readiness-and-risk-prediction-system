@@ -1,10 +1,7 @@
 import React from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
-import API from '@/services/api';
+import { ojtPolicyService, type Policy, type Preview } from '@/services/educationService';
 
-type Policy = { id: number | null; version: number; minCredits: number; maxUnpassedCourses: number; updatedAt: string | null; effectiveAt: string | null; updatedBy: number | null; updatedByName: string | null };
-type Program = { programId: number; code: string; name: string; ojtSemester: number | null; minCredits: number | null; maxCredits: number | null; proposedCredits: number; difference: number | null; status: 'VALID' | 'WARNING' | 'INVALID' | 'INSUFFICIENT_DATA'; reasons: string[] };
-type Preview = { values: { minCredits: number; maxUnpassedCourses: number }; currentVersion: number; allowed: boolean; token: string; programs: Program[] };
 const label = { VALID: 'Hợp lệ', WARNING: 'Cần cảnh báo', INVALID: 'Không hợp lệ', INSUFFICIENT_DATA: 'Chưa đủ dữ liệu để kiểm tra' };
 const dateText = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa cập nhật';
 const errorText = (error: unknown) => (error as { response?: { data?: { message?: string } } })?.response?.data?.message || (error instanceof Error ? error.message : 'Có lỗi khi kết nối.');
@@ -20,7 +17,7 @@ export default function EducationOjtPolicy() {
   const [notice, setNotice] = React.useState('');
   React.useEffect(() => {
     const controller = new AbortController();
-    API.get<{ data: Policy }>('/ojt-condition-policy', { signal: controller.signal }).then(({ data }) => {
+    ojtPolicyService.get(controller.signal).then(({ data }) => {
       if (controller.signal.aborted) return;
       setPolicy(data.data); setCredits(String(data.data.minCredits)); setFailed(String(data.data.maxUnpassedCourses));
     }).catch(reason => { if (!controller.signal.aborted) setError(errorText(reason)); })
@@ -34,7 +31,7 @@ export default function EducationOjtPolicy() {
     if (!validInput || busy) return;
     setBusy(true); setError(''); setNotice(''); setPreview(null);
     try {
-      const { data } = await API.post<{ data: Preview }>('/ojt-condition-policy/preview', values());
+      const { data } = await ojtPolicyService.preview(values());
       setPreview(data.data);
     } catch (reason) { setError(errorText(reason)); }
     finally { setBusy(false); }
@@ -43,7 +40,7 @@ export default function EducationOjtPolicy() {
     if (!preview?.allowed || !policy || busy || !window.confirm('Xác nhận áp dụng điều kiện mới cho tất cả khung chương trình đang công bố?')) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const { data } = await API.post<{ data: Policy }>('/ojt-condition-policy', { ...preview.values, token: preview.token });
+      const { data } = await ojtPolicyService.publish({ ...preview.values, token: preview.token });
       setPolicy(data.data); setPreview(null); setNotice(`Đã áp dụng quy định phiên bản ${data.data.version}. Kết quả xét đã lưu trước đó không bị thay đổi.`);
     } catch (reason) { setError(errorText(reason)); setPreview(null); }
     finally { setBusy(false); }

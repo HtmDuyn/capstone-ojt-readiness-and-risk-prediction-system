@@ -1,10 +1,10 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
 import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
-import { getAllItems } from '@/services/educationApi';
-import { educationOjtWorkflowService } from '@/services/educationOjtWorkflow.service';
-import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/localOjtEligibility.service';
-import type { CurrentOjtRule } from '@/services/localOjtEligibility.service';
+import { getAllItems } from '@/services/educationService';
+import { educationOjtWorkflowService } from '@/services/educationService';
+import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/educationService';
+import type { CurrentOjtRule } from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/educationOjtReason';
 import { handoffsByStudent, matchesHandoffFilter, selectAutoCheckTargets, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/educationOjtCheckQueue';

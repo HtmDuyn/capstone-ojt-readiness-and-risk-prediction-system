@@ -1,4 +1,4 @@
-import { educationOjtWorkflowService } from '@/services/educationOjtWorkflow.service';
+import { educationOjtWorkflowService } from '@/services/educationService';
 import type { OjtFinalResult as Result } from '@/types/education/ojtWorkflow.types';
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
 import type { Page } from '@/types/education/api.types';

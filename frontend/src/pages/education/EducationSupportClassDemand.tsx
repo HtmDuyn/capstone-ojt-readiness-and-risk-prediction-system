@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { RetakeClassProposals } from '@/components/education/RetakeClassProposals';
-import { academicReportingService as reports } from '@/services/academicReporting.service';
+import { academicReportingService as reports } from '@/services/educationService';
 import type { Cohort, ReportPeriod } from '@/types/education/reporting.types';
 
 export default function EducationSupportClassDemand() {

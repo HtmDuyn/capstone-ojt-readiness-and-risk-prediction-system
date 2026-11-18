@@ -1,8 +1,8 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { useEducationSemesters } from '@/hooks/useEducationSemesters';
-import { getAllItems } from '@/services/educationApi';
-import { ojtEligibilityService } from '@/services/ojtEligibility.service';
-import { loadSavedLocalOjtResults } from '@/services/localOjtEligibility.service';
+import { getAllItems } from '@/services/educationService';
+import { ojtEligibilityService } from '@/services/educationService';
+import { loadSavedLocalOjtResults } from '@/services/educationService';
 import { savedOjtLabel, type SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import type { StudentEligibility } from '@/types/education/eligibility.types';
 import { eligibilityReasonLabel, eligibilityStatusLabel } from '@/utils/educationEligibility';

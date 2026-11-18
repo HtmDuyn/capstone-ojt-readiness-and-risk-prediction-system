@@ -1,7 +1,7 @@
 import { PageBanner } from "@/components/common/PageBanner";
 import { CurriculumImportActions } from "@/components/education/CurriculumImportActions";
-import { curriculumService } from '@/services/curriculum.service';
-import { getAllItems } from "@/services/educationApi";
+import { curriculumService } from '@/services/educationService';
+import { getAllItems } from "@/services/educationService";
 import type { CurriculumDetail, CurriculumSummary, Major } from '@/types/education/curriculum.types';
 import React from "react";
 const EducationCurriculumPlan: React.FC = () => {

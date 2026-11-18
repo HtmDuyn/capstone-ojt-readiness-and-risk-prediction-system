@@ -1,4 +1,4 @@
-import { getAllItems } from '@/services/educationApi';
+import { getAllItems } from '@/services/educationService';
 import type { AcademicYear } from '@/types/education/academic.types';
 import type { CurriculumSummary } from '@/types/education/curriculum.types';
 import type { ReportPeriod } from '@/types/education/reporting.types';

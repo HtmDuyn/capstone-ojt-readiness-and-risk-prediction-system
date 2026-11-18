@@ -1,7 +1,7 @@
 import { clearEducationReadCache, educationRead } from '@/services/educationReadCache';
-import { educationOverviewService } from '@/services/educationOverview.service';
-import { academicReportingService } from '@/services/academicReporting.service';
-import { getAllItems, getJson } from '@/services/educationApi';
+import { educationOverviewService } from '@/services/educationService';
+import { academicReportingService } from '@/services/educationService';
+import { getAllItems, getJson } from '@/services/educationService';
 import type { AcademicPeriod, AcademicYear, QueryParams } from '@/types/education/dashboard.types';
 import type { Cohort } from '@/types/education/reporting.types';
 import { downloadCourseDemand } from '@/utils/downloadFile';

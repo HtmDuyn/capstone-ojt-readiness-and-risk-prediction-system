@@ -1,4 +1,4 @@
-import { studentProgressService } from '@/services/studentProgress.service';
+import { studentProgressService } from '@/services/educationService';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
 import React from 'react';
 
