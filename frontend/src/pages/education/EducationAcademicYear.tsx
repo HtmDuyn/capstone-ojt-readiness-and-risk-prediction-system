@@ -3,7 +3,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckCircle2, History, P
 import { PageBanner } from '@/components/common/PageBanner';
 import { AcademicCalendarEditor } from '@/components/education/AcademicCalendarEditor';
 import { useEducationAcademicCalendar } from '@/hooks/useEducationAcademicCalendar';
-import { CALENDAR_TERMS, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, TERM_COLOR, TERM_LABEL } from '@/utils/academicCalendar';
+import { CALENDAR_TERMS, calendarErrors, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, TERM_COLOR, TERM_LABEL } from '@/utils/academicCalendar';
+import type { SemesterDates } from '@/types/education/academic.types';
 
 const stateLabel = { UPCOMING: 'Sắp diễn ra', NOT_STARTED: 'Chưa diễn ra', CURRENT: 'Đang diễn ra', PAST: 'Đã kết thúc' };
 const stateClass = { UPCOMING: 'bg-blue-50 text-blue-700', NOT_STARTED: 'bg-slate-50 text-slate-500', CURRENT: 'bg-green-50 text-green-700', PAST: 'bg-slate-100 text-slate-600' };
@@ -32,6 +33,7 @@ const EducationAcademicYear: React.FC = () => {
   const model = useEducationAcademicCalendar();
   const [startYear, setStartYear] = useState(() => currentCalendarDate().slice(0, 4));
   const [creating, setCreating] = useState(false);
+  const [createRows, setCreateRows] = useState<SemesterDates[]>([]);
   const [editing, setEditing] = useState(false);
   const initializedYear = useRef(false);
   const [historyYear, setHistoryYear] = useState('');
@@ -43,6 +45,20 @@ const EducationAcademicYear: React.FC = () => {
   const yearCode = validYear ? `${year}-${year + 1}` : '';
   const exists = model.years.some(item => item.yearCode === yearCode);
   const defaults = validYear ? defaultSemesters(year) : [];
+  const createErrors = validYear ? calendarErrors(year, createRows) : [];
+  const dateIsValid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  const createRowErrors = createRows.map((row, index) => {
+    const errors: string[] = [];
+    if (!dateIsValid(row.startDate) || !dateIsValid(row.endDate)) errors.push('Nhập đủ ngày bắt đầu và kết thúc hợp lệ.');
+    else if (row.startDate >= row.endDate) errors.push('Ngày bắt đầu phải trước ngày kết thúc.');
+    else if (row.startDate < `${year}-01-01` || row.endDate > `${year}-12-31`) errors.push(`Hai ngày phải nằm trong năm ${year}.`);
+    if (index > 0 && row.startDate && row.startDate <= createRows[index - 1].endDate) errors.push(`Thời gian trùng với ${TERM_LABEL[createRows[index - 1].term]}.`);
+    if (index < createRows.length - 1 && row.endDate && row.endDate >= createRows[index + 1].startDate) errors.push(`Thời gian trùng với ${TERM_LABEL[createRows[index + 1].term]}.`);
+    if (dateIsValid(row.startDate) && dateIsValid(row.endDate) && model.periods.some(period => period.startDate <= row.endDate && period.endDate >= row.startDate && (period.kind === 'SEMESTER' || period.kind === 'BLOCK3'))) errors.push('Thời gian trùng với kỳ học đã tồn tại.');
+    return errors;
+  });
+  const createHasErrors = createErrors.length > 0 || createRowErrors.some(errors => errors.length > 0);
+  const createHasChanges = JSON.stringify(createRows) !== JSON.stringify(defaults);
   const selectedCalendar = exists && model.calendar?.year.yearCode === yearCode ? model.calendar : null;
   const draft = selectedCalendar ? semesterDraft(selectedCalendar) : null;
   const today = currentCalendarDate();
@@ -129,7 +145,7 @@ const EducationAcademicYear: React.FC = () => {
           <datalist id="academic-year-starts">{model.years.map(item => <option key={item.id} value={item.yearCode.slice(0, 4)} />)}</datalist>
         </label>
         <p className="pb-2 text-sm text-slate-600">Năm học: <strong className="text-slate-900">{yearCode || '—'}</strong></p>
-        {validYear && !exists && <button type="button" disabled={model.busy || model.loading || Boolean(model.catalogError)} onClick={() => setCreating(true)} className="ml-auto inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Plus size={17} />Tạo năm học</button>}
+        {validYear && !exists && <button type="button" disabled={model.busy || model.loading || Boolean(model.catalogError)} onClick={() => { setCreateRows(defaultSemesters(year)); setCreating(true); }} className="ml-auto inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Plus size={17} />Tạo năm học</button>}
         {validYear && exists && <button type="button" disabled={model.busy || model.calendarLoading || !draft} onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-2 rounded-lg border border-orange-200 px-4 py-2.5 text-sm font-semibold text-orange-700 disabled:opacity-50"><Pencil size={16} />Chỉnh sửa lịch học kỳ</button>}
       </div>
       {!validYear && <p role="alert" className="text-sm text-red-700">Nhập năm bắt đầu từ 1900 đến 2199.</p>}
@@ -159,17 +175,18 @@ const EducationAcademicYear: React.FC = () => {
     </div>
     {creating && validYear && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="create-year-title" className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl md:p-6">
-        <form className="space-y-5" onSubmit={async event => { event.preventDefault(); if (!model.busy && !exists && await model.create(yearCode)) setCreating(false); }}>
-          <div><h2 id="create-year-title" className="text-lg font-semibold text-slate-900">Tạo năm học {yearCode}</h2><p className="mt-1 text-sm text-slate-600">Xem lịch ba học kỳ sẽ được tạo theo quy định hiện tại.</p></div>
+        <form className="space-y-5" onSubmit={async event => { event.preventDefault(); if (!model.busy && !exists && !createHasErrors && !createHasChanges && await model.create(yearCode)) setCreating(false); }}>
+          <div><h2 id="create-year-title" className="text-lg font-semibold text-slate-900">Tạo năm học {yearCode}</h2><p className="mt-1 text-sm text-slate-600">Điều chỉnh ngày của từng học kỳ trước khi tạo năm học.</p></div>
           <label className="block max-w-56 text-sm font-medium text-slate-700">Năm bắt đầu<input type="number" value={startYear} readOnly className="mt-2 block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800" /></label>
-          <div className="grid gap-4 md:grid-cols-3">{defaults.map((row, index) => <section key={row.term} className={`space-y-3 rounded-xl border p-4 ${TERM_COLOR[row.term]}`}>
+          <div className="grid gap-4 md:grid-cols-3">{createRows.map((row, index) => <section key={row.term} className={`space-y-3 rounded-xl border p-4 ${TERM_COLOR[row.term]}`}>
             <h3 className="font-semibold">{index + 1}. {TERM_LABEL[row.term]} {year}</h3>
-            <p className="text-sm">Ngày bắt đầu: <strong>{formatCalendarDate(row.startDate)}</strong></p>
-            <p className="text-sm">Ngày kết thúc: <strong>{formatCalendarDate(row.endDate)}</strong></p>
+            <label className="block text-sm">Ngày bắt đầu<input required type="date" lang="en-GB" min={`${year}-01-01`} max={`${year}-12-31`} value={row.startDate} onChange={event => setCreateRows(rows => rows.map((item, i) => i === index ? { ...item, startDate: event.target.value } : item))} className="mt-1 block w-full min-w-0 rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /><span className="mt-1 block text-xs opacity-70">{formatCalendarDate(row.startDate)} (dd/MM/yyyy)</span></label>
+            <label className="block text-sm">Ngày kết thúc<input required type="date" lang="en-GB" min={`${year}-01-01`} max={`${year}-12-31`} value={row.endDate} onChange={event => setCreateRows(rows => rows.map((item, i) => i === index ? { ...item, endDate: event.target.value } : item))} className="mt-1 block w-full min-w-0 rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /><span className="mt-1 block text-xs opacity-70">{formatCalendarDate(row.endDate)} (dd/MM/yyyy)</span></label>
+            {createRowErrors[index]?.length > 0 && <ul role="alert" className="list-inside list-disc text-xs text-red-700">{createRowErrors[index].map(error => <li key={error}>{error}</li>)}</ul>}
           </section>)}</div>
-          <p className="text-xs leading-5 text-slate-600">Ngày tạo mới được lưu theo lịch mặc định. Sau khi tạo, bạn có thể chỉnh sửa cả ba kỳ trong một lần lưu.</p>
+          {createHasChanges && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">API tạo năm học hiện chỉ nhận mã năm học và tự tạo lịch mặc định. Chưa thể lưu lịch đã chỉnh sửa khi tạo; cần Backend hỗ trợ nhận ngày của cả ba học kỳ trong cùng yêu cầu tạo.</p>}
           {model.error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{model.error}</p>}
-          <div className="flex justify-end gap-3 border-t border-slate-200 pt-4"><button type="button" disabled={model.busy} onClick={() => setCreating(false)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-50">Hủy</button><button type="submit" disabled={model.busy || exists} className="rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{model.busy ? 'Đang tạo...' : 'Xác nhận tạo'}</button></div>
+          <div className="flex justify-end gap-3 border-t border-slate-200 pt-4"><button type="button" disabled={model.busy} onClick={() => setCreating(false)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 disabled:opacity-50">Hủy</button><button type="submit" disabled={model.busy || exists || createHasErrors || createHasChanges} className="rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{model.busy ? 'Đang tạo...' : 'Xác nhận tạo'}</button></div>
         </form>
       </div>
     </div>}

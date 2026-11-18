@@ -3,11 +3,12 @@ import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
 import { getAllItems } from '@/services/educationService';
 import { educationOjtWorkflowService } from '@/services/educationService';
-import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/educationService';
+import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadOjtCreditThresholds, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/educationService';
+import type { OjtCreditThreshold } from '@/services/educationService';
 import type { CurrentOjtRule } from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/educationOjtReason';
-import { handoffsByStudent, matchesHandoffFilter, selectAutoCheckTargets, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/educationOjtCheckQueue';
+import { handoffsByStudent, matchesHandoffFilter, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/educationOjtCheckQueue';
 import { handoffDisplayById } from '@/utils/educationOjtHandoffDisplay';
 import React from 'react';
 
@@ -23,6 +24,8 @@ export function useEducationOjtEligibility() {
   const [busy, setBusy] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [rule, setRule] = React.useState<CurrentOjtRule | null>(null);
+  const [thresholds, setThresholds] = React.useState<OjtCreditThreshold[]>([]);
+  const [thresholdId, setThresholdId] = React.useState<number | undefined>();
   const [error, setError] = React.useState('');
   const [revision, setRevision] = React.useState(0);
   const [savedResults, setSavedResults] = React.useState<Record<number, LocalOjtResult>>({});
@@ -47,9 +50,11 @@ export function useEducationOjtEligibility() {
       loadSavedLocalOjtResults(c.signal),
       loadCurrentOjtRule(c.signal),
       educationOjtWorkflowService.getHandoffs(undefined, c.signal),
-    ]).then(([students, stored, currentRule, history]) => {
+      loadOjtCreditThresholds(c.signal),
+    ]).then(([students, stored, currentRule, history, options]) => {
       if (c.signal.aborted) return;
       setRule(currentRule);
+      setThresholds(options);
       setTargets(students.map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
       setHandoffs(history);
       setDataLoaded(true);
@@ -65,13 +70,13 @@ export function useEducationOjtEligibility() {
   const handoffByStudent = React.useMemo(() => handoffsByStudent(handoffs), [handoffs]);
   const handoffDisplay = React.useMemo(() => handoffDisplayById(handoffs), [handoffs]);
   const handedOffIds = React.useMemo(() => new Set(handoffByStudent.keys()), [handoffByStudent]);
-  const ready = targets.filter(t => !t.reason);
-  const canCheck = !loading && dataLoaded && Boolean(rule);
-  const needsCheck = canCheck ? selectAutoCheckTargets(targets, savedResults, pendingResults, handedOffIds) : [];
+  const selectedThreshold = thresholds.find(option => option.id === thresholdId);
+  const canCheck = !loading && dataLoaded && Boolean(rule && selectedThreshold);
   const fullCheck = canCheck ? selectFullCheckTargets(targets, handedOffIds) : [];
+  const selectionLocked = loading || busy || saving || Object.keys(pendingResults).length > 0;
 
   async function runTargets(selected: Target[]) {
-    if (running.current || savingRequest.current || !canCheck || !selected.length) return;
+    if (running.current || savingRequest.current || !canCheck || !selectedThreshold || !selected.length) return;
     const controller = new AbortController(); activeRequest.current = controller;
     running.current = true; setBusy(true); setError(''); setNotice('');
     const ids = new Set(selected.map(t => t.student.id));
@@ -80,8 +85,9 @@ export function useEducationOjtEligibility() {
     saveKey.current = null;
     let next = 0, completed = 0, failed = 0;
     try {
-      const currentRule = await loadCurrentOjtRule(controller.signal);
-      if (rule && (rule.version !== currentRule.version || rule.minCredits !== currentRule.minCredits || rule.maxUnpassedCourses !== currentRule.maxUnpassedCourses)) {
+      const policy = await loadCurrentOjtRule(controller.signal);
+      const currentRule = { ...policy, minCredits: selectedThreshold.minCredits, thresholdId: selectedThreshold.id };
+      if (rule && (rule.version !== currentRule.version || rule.minCredits !== currentRule.minCredits || rule.thresholdId !== currentRule.thresholdId)) {
         setPendingResults({});
         setNotice('Quy tắc xét đã thay đổi. Kết quả chưa lưu trước đó không còn được sử dụng.');
       }
@@ -93,7 +99,7 @@ export function useEducationOjtEligibility() {
             const result = await loadAndCalculateLocalEligibility(target.student.id, currentRule, controller.signal);
             if (controller.signal.aborted) return;
             completed++;
-            setPendingResults(previous => ({ ...previous, [target.student.id]: result }));
+            setPendingResults(previous => ({ ...previous, [target.student.id]: { ...result, rule: currentRule } }));
           } catch (e) {
             if (controller.signal.aborted) return;
             failed++;
@@ -109,13 +115,7 @@ export function useEducationOjtEligibility() {
     } finally { running.current = false; if (!controller.signal.aborted) setBusy(false); }
   }
 
-  const runNeeded = () => runTargets(needsCheck);
   const runAll = () => runTargets(fullCheck);
-  const runReview = (studentId: number) => {
-    const target = targets.find(t => t.student.id === studentId);
-    if (!target || target.reason || handedOffIds.has(studentId) || savedResults[studentId]?.status !== 'REVIEW_REQUIRED') return Promise.resolve();
-    return runTargets([target]);
-  };
 
   async function saveResults() {
     const calculated = selectPendingSaveResults(pendingResults);
@@ -155,5 +155,8 @@ export function useEducationOjtEligibility() {
   React.useEffect(() => setPage(1), [search, filter, handoffFilter, revision]);
   const pages = Math.max(1, Math.ceil(visible.length / 20)), currentPage = Math.min(page, pages);
   const checked = selectPendingSaveResults(pendingResults);
-  return { ready, needsCheck, fullCheck, runNeeded, runAll, runReview, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule };
+  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule,
+    thresholds, thresholdId, setThresholdId, selectedThreshold, selectionLocked,
+    discardPending: () => { setPendingResults({}); saveKey.current = null; },
+  };
 }

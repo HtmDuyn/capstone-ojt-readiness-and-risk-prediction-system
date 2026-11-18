@@ -11,5 +11,6 @@ export type LocalOjtResult = {
   unpassedCourseCount: number; reasons: string[]; academicIssues: string[]; checkedAt: string;
   savedAt?: string; isStale?: boolean;
   policyVersion?: number;
+    rule?: { minCredits: number; thresholdId?: number };
 };
 

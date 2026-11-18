@@ -6,18 +6,18 @@ import * as XLSX from 'xlsx';
 
 const profile = (earned = 70, completeConfiguration = true, requirements = []) => ({ academicProgress: { credits: { earned, completeConfiguration }, requirements } });
 const failed = (...ids) => ids.map(courseId => ({ courseId, status: 'FAILED' }));
-const rule = { version: 1, minCredits: 70, maxUnpassedCourses: 2 };
+const rule = { version: 1, minCredits: 70 };
 
-test('accepts the exact credit and failed-course boundaries', () => {
-  const result = calculateLocalOjtEligibility(1, profile(), failed(1, 2), rule);
+test('accepts the exact credit boundary even with outstanding courses', () => {
+  const result = calculateLocalOjtEligibility(1, profile(), failed(1, 2, 3), rule);
   assert.equal(result.status, 'ELIGIBLE');
-  assert.equal(result.unpassedCourseCount, rule.maxUnpassedCourses);
+  assert.equal(result.unpassedCourseCount, 3);
   assert.deepEqual(result.reasons, []);
 });
-test('rejects insufficient credits and excess outstanding courses', () => {
+test('rejects insufficient credits', () => {
   const result = calculateLocalOjtEligibility(1, profile(69.5), failed(1, 2, 3), rule);
   assert.equal(result.status, 'NOT_ELIGIBLE');
-  assert.equal(result.reasons.length, 2);
+  assert.equal(result.reasons.length, 1);
 });
 test('counts repeated failed attempts for a course once', () => {
   assert.equal(calculateLocalOjtEligibility(1, profile(), failed(1, 1, 2), rule).unpassedCourseCount, 2);
@@ -47,8 +47,8 @@ test('calculation preserves input and records student and timestamp', () => {
   assert.deepEqual({ input, attempts }, snapshot);
 });
 test('uses the active policy instead of fixed thresholds', () => {
-  assert.equal(calculateLocalOjtEligibility(1, profile(69), failed(1), { version: 2, minCredits: 68, maxUnpassedCourses: 1 }).status, 'ELIGIBLE');
-  assert.equal(calculateLocalOjtEligibility(1, profile(69), failed(1, 2), { version: 2, minCredits: 68, maxUnpassedCourses: 1 }).status, 'NOT_ELIGIBLE');
+  assert.equal(calculateLocalOjtEligibility(1, profile(69), failed(1), { version: 2, minCredits: 68 }).status, 'ELIGIBLE');
+  assert.equal(calculateLocalOjtEligibility(1, profile(69), failed(1, 2), { version: 2, minCredits: 70 }).status, 'NOT_ELIGIBLE');
 });
 test('workbook parser rejects missing required sheets before API lookup', async () => {
   const workbook = XLSX.utils.book_new();

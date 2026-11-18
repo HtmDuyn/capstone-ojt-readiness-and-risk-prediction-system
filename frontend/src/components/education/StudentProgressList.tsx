@@ -20,6 +20,7 @@ const sortableColumns: { title: string; key?: SortKey }[] = [
   { title: 'Tín chỉ tích lũy', key: 'credits' },
   { title: 'Môn chưa đạt', key: 'failed' },
   { title: 'Điều kiện OJT', key: 'eligibility' },
+  { title: 'Trạng thái bàn giao' },
   { title: 'Thao tác' },
 ];
 const eligibilityOrder: Record<StudentProgress['eligibilityStatus'], number> = {
@@ -54,7 +55,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
       const haystack = normalize(`${s.studentCode} ${s.fullName}`);
       return keywords.every(word => haystack.includes(word))
         && (!filters.term || s.currentTerm === filters.term)
-        && (!filters.eligibility || (!s.detailsUnavailable && s.eligibilityStatus === filters.eligibility));
+        && (!filters.eligibility || s.eligibilityStatus === filters.eligibility);
     });
     return result.sort((a, b) => {
       const byCode = a.studentCode.localeCompare(b.studentCode, 'vi', { numeric: true });
@@ -73,8 +74,8 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
           right = b.subjects.length ? b.subjects.filter(subject => subject.status === 'Not Passed').length : null;
           break;
         case 'eligibility':
-          left = a.detailsUnavailable ? null : eligibilityOrder[a.eligibilityStatus];
-          right = b.detailsUnavailable ? null : eligibilityOrder[b.eligibilityStatus];
+          left = eligibilityOrder[a.eligibilityStatus];
+          right = eligibilityOrder[b.eligibilityStatus];
           break;
       }
       const leftMissing = left === null || left === '' || left === '—';
@@ -104,7 +105,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
     { label: 'Sinh viên trong bộ lọc', value: filtered.length, color: 'text-slate-900', icon: Users },
     { label: 'Có môn chưa đạt', value: filtered.filter(s => s.subjects.some(subject => subject.status === 'Not Passed')).length, color: 'text-rose-600', icon: GraduationCap },
     { label: 'Đủ điều kiện OJT', value: filtered.filter(s => s.eligibilityStatus === 'Đủ điều kiện').length, color: 'text-emerald-700', icon: GraduationCap },
-    { label: 'Chưa có kết quả OJT', value: filtered.filter(s => !s.detailsUnavailable && s.eligibilityStatus === 'Chưa có kết quả').length, color: 'text-slate-600', icon: GraduationCap },
+    { label: 'Chưa có kết quả OJT', value: filtered.filter(s => s.eligibilityStatus === 'Chưa có kết quả').length, color: 'text-slate-600', icon: GraduationCap },
   ];
   return <div className="min-w-0 space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{summaries.map(({ label, value, color, icon: Icon }) => <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -144,7 +145,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
           ? sort.direction === 'asc' ? <ArrowUp size={14} aria-hidden="true" className="text-orange-600" /> : <ArrowDown size={14} aria-hidden="true" className="text-orange-600" />
           : <ArrowUpDown size={14} aria-hidden="true" className="text-slate-400" />)}</span></th>)}</tr></thead>
         <tbody className="divide-y divide-[#E2E8F0]">
-          {loading ? <tr><td colSpan={10} role="status" className="px-5 py-14 text-center text-slate-500">Đang tải danh sách và hồ sơ học tập...</td></tr> : error ? <tr><td colSpan={10} role="alert" className="px-5 py-12 text-center text-red-700"><p>{error}</p><button onClick={onReload} className="mt-3 font-semibold underline">Thử tải lại</button></td></tr> : visible.length ? visible.map((student, index) => {
+          {loading ? <tr><td colSpan={11} role="status" className="px-5 py-14 text-center text-slate-500">Đang tải danh sách và hồ sơ học tập...</td></tr> : error ? <tr><td colSpan={11} role="alert" className="px-5 py-12 text-center text-red-700"><p>{error}</p><button onClick={onReload} className="mt-3 font-semibold underline">Thử tải lại</button></td></tr> : visible.length ? visible.map((student, index) => {
             const complete = student.completedCredits;
             const total = student.totalCredits;
             const failed = student.subjects.filter(s => s.status === 'Not Passed').length;
@@ -158,10 +159,11 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
               <td className="px-4 py-4 font-semibold text-slate-800">{student.gpa?.toFixed(2) ?? '—'}</td>
               <td className="min-w-40 px-4 py-4 align-middle"><span className="font-semibold text-slate-800">{complete ?? '—'}</span><span className="text-sm text-slate-500"> / {total ?? '—'}</span></td>
               <td className="px-4 py-4">{student.subjects.length ? <span className={failed ? 'font-semibold text-rose-600' : 'text-slate-500'}>{failed} môn</span> : <span className="text-slate-400">—</span>}</td>
-              <td className="px-4 py-4"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle}`}>{student.detailsUnavailable ? 'Chưa tải được' : student.eligibilityStatus}</span></td>
+              <td className="px-4 py-4"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle}`}>{student.eligibilityStatus}</span></td>
+              <td className="whitespace-nowrap px-4 py-4 text-slate-700">{student.handoffStatus ?? 'Chưa xác định'}</td>
               <td className="w-20 px-2 py-4 text-center"><button aria-label="Xem chi tiết" title="Xem chi tiết" onClick={() => onSelect(student)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"><Eye size={18} aria-hidden="true" /></button></td>
             </tr>;
-          }) : <tr><td colSpan={10} className="px-5 py-14 text-center"><Users size={30} className="mx-auto text-slate-300" /><p className="mt-3 font-medium text-slate-700">{students.length ? 'Không có sinh viên khớp bộ lọc' : 'Chưa có sinh viên trong hệ thống'}</p><p className="mt-1 text-sm text-slate-500">{students.length ? 'Thử đổi từ khóa hoặc mở rộng phạm vi tìm kiếm.' : 'Sinh viên sẽ xuất hiện sau khi được thêm hoặc import thành công.'}</p>{active.length > 0 && <button onClick={() => setFilters(initialFilters)} className="mt-3 text-sm font-semibold text-orange-700">Xóa tất cả bộ lọc</button>}</td></tr>}
+          }) : <tr><td colSpan={11} className="px-5 py-14 text-center"><Users size={30} className="mx-auto text-slate-300" /><p className="mt-3 font-medium text-slate-700">{students.length ? 'Không có sinh viên khớp bộ lọc' : 'Chưa có sinh viên trong hệ thống'}</p><p className="mt-1 text-sm text-slate-500">{students.length ? 'Thử đổi từ khóa hoặc mở rộng phạm vi tìm kiếm.' : 'Sinh viên sẽ xuất hiện sau khi được thêm hoặc import thành công.'}</p>{active.length > 0 && <button onClick={() => setFilters(initialFilters)} className="mt-3 text-sm font-semibold text-orange-700">Xóa tất cả bộ lọc</button>}</td></tr>}
         </tbody>
       </table></div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 text-xs text-slate-500">

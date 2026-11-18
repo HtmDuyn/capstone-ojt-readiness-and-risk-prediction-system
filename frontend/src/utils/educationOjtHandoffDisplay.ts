@@ -13,3 +13,21 @@ export function handoffDisplayById(history: Handoff[]): Map<number, HandoffDispl
   }
   return display;
 }
+
+export function matchingHandoffStudentIds(handoff: Handoff, students: Map<number, { studentCode: string; fullName: string }>, query: string): Set<number> {
+  const normalized = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLocaleLowerCase('vi').trim();
+  if (!normalized) return new Set();
+  return new Set(handoff.studentIds.filter(id => {
+    const student = students.get(id);
+    return student && `${student.studentCode} ${student.fullName}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLocaleLowerCase('vi').includes(normalized);
+  }));
+}
+
+export function filterHandoffHistory(history: Handoff[], students: Map<number, { studentCode: string; fullName: string }>, query: string, semesterId: string, round: string): Handoff[] {
+  const display = handoffDisplayById(history);
+  const normalized = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLocaleLowerCase('vi').trim();
+  return history.filter(handoff =>
+    (!semesterId || String(handoff.ojtSemesterId) === semesterId) &&
+    (!round || String(display.get(handoff.id)?.roundNumber) === round) &&
+    (!normalized || handoff.reason.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLocaleLowerCase('vi').includes(normalized) || matchingHandoffStudentIds(handoff, students, query).size > 0));
+}

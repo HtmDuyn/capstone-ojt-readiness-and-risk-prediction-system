@@ -20,7 +20,7 @@ import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/localOj
 import { localOjtSavePayload } from '@/utils/localOjtSavePayload';
 import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityBatch, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
-import { savedOjtLabel } from '@/utils/savedOjtEligibility';
+import { savedOjtProgressLabel } from '@/utils/savedOjtEligibility';
 
 export const cleanQuery = (params: Query = {}) =>
   Object.fromEntries(
@@ -665,7 +665,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
       const program = asObject(item.program);
 
       // GET /curricula trả id là ProgramID.
-      return buildOption(
+      const option = buildOption(
         positiveId(item.id) ??
           positiveId(item.programId) ??
           positiveId(program?.id),
@@ -679,6 +679,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
           item.programCode,
         ],
       );
+      return option ? { ...option, majorCode: text(item.majorCode ?? program?.majorCode) } : null;
     }),
   );
 
@@ -897,22 +898,14 @@ export const importService = {
 // Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
 export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
 export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
-export type CurrentOjtRule = LocalOjtRule & { legacyApi?: true };
-export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
-  // The main backend has a fixed 70/2 rule and no policy endpoint yet.
-  if (import.meta.env.VITE_OJT_POLICY_API !== 'true') {
-    return { version: 0, minCredits: 70, maxUnpassedCourses: 2, legacyApi: true };
-  }
-  try {
-    return apiData<LocalOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
-  } catch (error) {
-    const response = (error as { response?: { status?: number; data?: { errorCode?: string } } } | null)?.response;
-    if (response?.status === 404 && response.data?.errorCode === 'ROUTE_NOT_FOUND') {
-      return { version: 0, minCredits: 70, maxUnpassedCourses: 2, legacyApi: true };
-    }
-    throw error;
-  }
-};
+export type CurrentOjtRule = LocalOjtRule & { thresholdId?: number };
+export type OjtCreditThreshold = { id: number; minCredits: number };
+export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
+  apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
+export const createOjtCreditThreshold = async (minCredits: number) =>
+  apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
+export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> =>
+  apiData<CurrentOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
 export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<number> {
   if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
   try {
@@ -1134,6 +1127,7 @@ const number = (value: unknown): number | null =>
 async function loadStudent(
   row: Row,
   curricula: Map<number, Promise<Row>>,
+  savedResults: Map<number, SavedOjtEligibility>,
   signal?: AbortSignal,
 ): Promise<StudentProgress> {
   const profile = apiData<Row>(await getJson(`/students/${row.id}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
@@ -1210,15 +1204,17 @@ async function loadStudent(
     };
   });
   const official = profile.officialEligibility;
-  const decision = official?.isStale
-    ? "REVIEW_REQUIRED"
-    : profile.officialDecision;
-  const saved = profile.calculatedEligibility as SavedOjtEligibility | null | undefined;
-  const eligibilityStatus: OjtEligibilityStatus = saved ? savedOjtLabel(saved) :
-    decision === "ELIGIBLE"
+  const decision = profile.officialDecision;
+  const saved = savedResults.get(Number(profile.id));
+  const eligibilityStatus: OjtEligibilityStatus = saved ? savedOjtProgressLabel(saved) :
+    official?.isStale
+      ? "Cần xét lại"
+      : decision === "ELIGIBLE"
       ? "Đủ điều kiện"
       : decision === "NOT_ELIGIBLE"
         ? "Chưa đủ điều kiện"
+        : decision === "REVIEW_REQUIRED"
+          ? "Cần đối soát"
         : "Chưa có kết quả";
   return {
     id: String(profile.id),
@@ -1239,7 +1235,7 @@ async function loadStudent(
     delayTerms: null,
     progressStatus: "Chưa xác định",
     eligibilityStatus,
-    eligibilitySource: saved ? 'FRONTEND' : ['ELIGIBLE', 'NOT_ELIGIBLE'].includes(decision) ? 'OFFICIAL' : null,
+    eligibilitySource: saved ? 'FRONTEND' : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
     subjects,
     dataWarning:
       [
@@ -1255,8 +1251,9 @@ async function loadStudent(
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
     const curricula = new Map<number, Promise<Row>>();
-    const students = await getAllItems<Row>("/students", {}, signal),
-      items: StudentProgress[] = new Array(students.length);
+    const [students, saved] = await Promise.all([getAllItems<Row>("/students", {}, signal), loadSavedLocalOjtResults(signal)]);
+    const savedResults = new Map(saved.map(result => [result.studentId, result]));
+    const items: StudentProgress[] = new Array(students.length);
     let next = 0;
     await Promise.all(
       Array.from({ length: Math.min(4, students.length) }, async () => {
@@ -1264,7 +1261,7 @@ export const studentProgressService = {
           signal?.throwIfAborted();
           const index = next++;
           try {
-            items[index] = await loadStudent(students[index], curricula, signal);
+            items[index] = await loadStudent(students[index], curricula, savedResults, signal);
           } catch (error) {
             signal?.throwIfAborted();
             const row = students[index];
@@ -1280,7 +1277,9 @@ export const studentProgressService = {
               currentTerm: progressText(row.currentAcademicPeriod?.name), currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null, gpa: null,
               completedCredits: null, totalCredits: null, plannedOjtTerm: '—',
               currentEstimatedOjtTerm: '—', delayTerms: null, progressStatus: 'Chưa xác định',
-              eligibilityStatus: 'Chưa có kết quả', subjects: [], dataWarning: message, detailsUnavailable: true,
+              eligibilityStatus: savedOjtProgressLabel(savedResults.get(Number(row.id))),
+              eligibilitySource: savedResults.has(Number(row.id)) ? 'FRONTEND' : null,
+              subjects: [], dataWarning: message, detailsUnavailable: true,
             };
           }
         }
@@ -1288,14 +1287,4 @@ export const studentProgressService = {
     );
     return items;
   },
-};
-
-export type Policy = { id: number | null; version: number; minCredits: number; maxUnpassedCourses: number; updatedAt: string | null; effectiveAt: string | null; updatedBy: number | null; updatedByName: string | null };
-type Program = { programId: number; code: string; name: string; ojtSemester: number | null; minCredits: number | null; maxCredits: number | null; proposedCredits: number; difference: number | null; status: 'VALID' | 'WARNING' | 'INVALID' | 'INSUFFICIENT_DATA'; reasons: string[] };
-export type Preview = { values: { minCredits: number; maxUnpassedCourses: number }; currentVersion: number; allowed: boolean; token: string; programs: Program[] };
-
-export const ojtPolicyService = {
-  get: (signal: AbortSignal) => API.get<{ data: Policy }>('/ojt-condition-policy', { signal }),
-  preview: (values: Preview['values']) => API.post<{ data: Preview }>('/ojt-condition-policy/preview', values),
-  publish: (values: Preview['values'] & { token: string }) => API.post<{ data: Policy }>('/ojt-condition-policy', values),
 };

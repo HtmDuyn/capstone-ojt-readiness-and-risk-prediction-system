@@ -383,7 +383,7 @@ export const EducationDashboard: React.FC = () => {
               description="Số liệu theo phạm vi thống kê đang chọn."
               iconClass="bg-orange-50 text-orange-600"
             />
-            <Link to="/education/student-status" className="text-sm font-semibold text-orange-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">Xem danh sách sinh viên</Link>
+            <Link to="/education/student-progress" className="text-sm font-semibold text-orange-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">Xem danh sách sinh viên</Link>
           </div>
 
           <div className="bg-white">

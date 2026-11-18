@@ -79,7 +79,7 @@ export const educationRoutes: RouteObject = {
 
           {
             path: "/education/student-status",
-            lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentStatus")).default }),
+            element: <Navigate to="/education/student-progress" replace />,
           },
           {
             path: "/education/ojt-final-results",

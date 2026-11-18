@@ -15,10 +15,13 @@ export function parseFrontendResults(body: unknown) {
   const input = inputObject(body, ['idempotencyKey', 'source', 'rule', 'results']);
   const idempotencyKey = requiredText(input.idempotencyKey, 'idempotencyKey', 100);
   if (input.source !== 'FRONTEND') throw invalid('source must be FRONTEND.');
-  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses']);
+  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses', 'thresholdId']);
+  const thresholdId = rule.thresholdId === undefined ? undefined : positiveId(rule.thresholdId, 'thresholdId');
+  if (thresholdId === undefined && rule.maxUnpassedCourses === undefined)
+    throw invalid('Hãy chọn một mức tín chỉ đã tạo trước khi lưu kết quả xét OJT.');
   if (typeof rule.version !== 'number' || !Number.isSafeInteger(rule.version) || rule.version < 0 ||
       typeof rule.minCredits !== 'number' || !Number.isFinite(rule.minCredits) || rule.minCredits < 0 ||
-      typeof rule.maxUnpassedCourses !== 'number' || !Number.isSafeInteger(rule.maxUnpassedCourses) || rule.maxUnpassedCourses < 0)
+      (rule.maxUnpassedCourses !== undefined && (typeof rule.maxUnpassedCourses !== 'number' || !Number.isSafeInteger(rule.maxUnpassedCourses) || rule.maxUnpassedCourses < 0)))
     throw invalid('Invalid OJT policy snapshot.');
   if (!Array.isArray(input.results) || !input.results.length || input.results.length > 10000) throw invalid('Provide 1 to 10000 results.');
   const seen = new Set<number>();
@@ -37,7 +40,7 @@ export function parseFrontendResults(body: unknown) {
       if (!academicIssues.length) throw invalid('REVIEW_REQUIRED requires academicIssues.');
     } else {
       if (earnedCredits === null || academicIssues.length) throw invalid('A conclusive result needs credits and no academicIssues.');
-      if ((status === 'ELIGIBLE') !== (earnedCredits >= (rule.minCredits as number) && row.unpassedCourseCount <= (rule.maxUnpassedCourses as number))) throw invalid('status does not match the supplied credits and unpassed course count.');
+      if ((status === 'ELIGIBLE') !== (earnedCredits >= (rule.minCredits as number) && (rule.maxUnpassedCourses === undefined || row.unpassedCourseCount <= (rule.maxUnpassedCourses as number)))) throw invalid('status does not match the supplied credits and unpassed course count.');
     }
     const rawTime = requiredText(row.checkedAt, 'checkedAt', 40);
     const checkedAt = new Date(rawTime);
@@ -45,15 +48,20 @@ export function parseFrontendResults(body: unknown) {
     return { studentId, status, earnedCredits, unpassedCourseCount: row.unpassedCourseCount, reasons, academicIssues, checkedAt: checkedAt.toISOString() };
   }).sort((a, b) => a.studentId - b.studentId);
   const requestHash = createHash('sha256').update(JSON.stringify({ source: 'FRONTEND', rule, results })).digest('hex');
-  return { idempotencyKey, results, requestHash, rule };
+  return { idempotencyKey, results, requestHash, rule, thresholdId };
 }
 
 export async function saveFrontendResults(body: unknown, actorId: number) {
   const input = parseFrontendResults(body);
   return academicTransaction(async client => {
     const policy = (await client.query('SELECT "Version","MinCredits","MaxUnpassedCourses" FROM "OJTConditionPolicies" ORDER BY "Version" DESC LIMIT 1')).rows[0];
-    const active = policy ? { version: policy.Version, minCredits: Number(policy.MinCredits), maxUnpassedCourses: policy.MaxUnpassedCourses } : { version: 0, minCredits: 70, maxUnpassedCourses: 2 };
-    if (input.rule.version !== active.version || input.rule.minCredits !== active.minCredits || input.rule.maxUnpassedCourses !== active.maxUnpassedCourses)
+    const defaults = policy ? { version: policy.Version, minCredits: Number(policy.MinCredits), maxUnpassedCourses: policy.MaxUnpassedCourses } : { version: 0, minCredits: 70, maxUnpassedCourses: 2 };
+    const threshold = input.thresholdId === undefined ? undefined : (await client.query(
+      'SELECT "MinCredits" FROM "OJTCreditThresholds" WHERE "ThresholdID"=$1', [input.thresholdId])).rows[0];
+    if (input.thresholdId !== undefined && !threshold)
+      throw invalid('Mức tín chỉ đã chọn không tồn tại.', 409, 'OJT_THRESHOLD_NOT_FOUND');
+    const active = threshold ? { ...defaults, minCredits: Number(threshold.MinCredits), thresholdId: input.thresholdId } : defaults;
+    if (input.rule.version !== active.version || input.rule.minCredits !== active.minCredits || (input.rule.maxUnpassedCourses !== undefined && input.rule.maxUnpassedCourses !== active.maxUnpassedCourses))
       throw invalid('OJT policy changed. Recalculate before saving.', 409, 'OJT_POLICY_CHANGED');
     const actor = (await client.query(`SELECT r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID") WHERE u."UserID"=$1 AND u."Status"='ACTIVE' FOR SHARE OF u`, [actorId])).rows[0];
     if (!actor || !['ADMIN', 'ACADEMIC'].includes(actor.RoleCode)) throw invalid('Academic access required.', 403, 'FORBIDDEN');
@@ -79,7 +87,9 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
       [input.idempotencyKey, input.requestHash, actorId, ids.length, JSON.stringify(input.results)])).rows[0];
     const programs = new Map(students.map(row => [row.StudentID, row.ProgramID]));
     // One set-based upsert; no recalculation or per-student write round trips.
-    const records = input.results.map(result => ({ ...result, policyVersion: active.version, rule: active, programId: programs.get(result.studentId) ?? null }));
+    const { maxUnpassedCourses, ...creditRule } = active;
+    const savedRule = input.rule.maxUnpassedCourses === undefined ? creditRule : { ...creditRule, maxUnpassedCourses };
+    const records = input.results.map(result => ({ ...result, policyVersion: active.version, rule: savedRule, programId: programs.get(result.studentId) ?? null }));
     await client.query(`INSERT INTO "StudentOJTCalculatedResults" ("StudentID","BatchID","ProgramID","Status","Result","CheckedAt","SavedAt","SavedBy")
       SELECT (item->>'studentId')::int,$2,(item->>'programId')::int,item->>'status',item-'programId',(item->>'checkedAt')::timestamptz,$3,$4
       FROM jsonb_array_elements($1::jsonb) item

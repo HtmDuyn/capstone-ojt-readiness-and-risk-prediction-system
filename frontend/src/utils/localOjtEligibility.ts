@@ -1,6 +1,6 @@
 import type { Attempt, Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
 
-export type LocalOjtRule = { version: number; minCredits: number; maxUnpassedCourses: number };
+export type LocalOjtRule = { version: number; minCredits: number };
 
 export function calculateLocalOjtEligibility(studentId: number, profile: Profile, attempts: Attempt[], rule: LocalOjtRule): LocalOjtResult {
   const credits = profile.academicProgress?.credits;
@@ -16,9 +16,8 @@ export function calculateLocalOjtEligibility(studentId: number, profile: Profile
     ? ['Chưa đủ dữ liệu tín chỉ hoặc cấu hình chương trình để kết luận.'] : [];
   const reasons: string[] = [];
   if (earnedCredits !== null && earnedCredits < rule.minCredits) reasons.push(`Còn thiếu ${Math.round((rule.minCredits - earnedCredits) * 100) / 100} tín chỉ so với mức ${rule.minCredits}.`);
-  if (failed.size > rule.maxUnpassedCourses) reasons.push(`Còn ${failed.size} môn chưa đạt, vượt giới hạn ${rule.maxUnpassedCourses} môn.`);
   return { studentId, earnedCredits, unpassedCourseCount: failed.size, reasons, academicIssues,
-    status: academicIssues.length ? 'REVIEW_REQUIRED' : earnedCredits! >= rule.minCredits && failed.size <= rule.maxUnpassedCourses ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+    status: academicIssues.length ? 'REVIEW_REQUIRED' : earnedCredits! >= rule.minCredits ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
     policyVersion: rule.version, checkedAt: new Date().toISOString() };
 }
 

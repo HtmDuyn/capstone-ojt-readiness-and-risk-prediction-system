@@ -22,10 +22,10 @@ export function describeFrontendEligibilityResults(spec: Record<string, any>) {
       requestBody: { required: true, content: { 'application/json': {
         schema: { type: 'object', additionalProperties: false, required: ['idempotencyKey','source','rule','results'], properties: {
           idempotencyKey: { type: 'string', maxLength: 100 }, source: { type: 'string', enum: ['FRONTEND'] },
-          rule: { type: 'object', additionalProperties: false, required: ['version','minCredits','maxUnpassedCourses'], properties: { version: { type: 'integer', minimum: 0 }, minCredits: { type: 'number', minimum: 0 }, maxUnpassedCourses: { type: 'integer', minimum: 0 } } },
+          rule: { type: 'object', additionalProperties: false, required: ['version','minCredits'], properties: { thresholdId: { type: 'integer', minimum: 1 }, version: { type: 'integer', minimum: 0 }, minCredits: { type: 'number', minimum: 0 }, maxUnpassedCourses: { type: 'integer', minimum: 0, deprecated: true } } },
           results: { type: 'array', minItems: 1, maxItems: 10000, items: result },
         } },
-        example: { idempotencyKey: 'fe-ojt-save-unique-key', source: 'FRONTEND', rule: { version: 0, minCredits: 70, maxUnpassedCourses: 2 }, results: [{ studentId: 1, status: 'ELIGIBLE', earnedCredits: 70, unpassedCourseCount: 2, reasons: [], academicIssues: [], checkedAt: '2026-10-27T09:00:00.000Z' }] },
+        example: { idempotencyKey: 'fe-ojt-save-unique-key', source: 'FRONTEND', rule: { version: 0, thresholdId: 1, minCredits: 70 }, results: [{ studentId: 1, status: 'ELIGIBLE', earnedCredits: 70, unpassedCourseCount: 2, reasons: [], academicIssues: [], checkedAt: '2026-10-27T09:00:00.000Z' }] },
       } } },
       responses: {
         201: { description: 'Đã lưu toàn bộ kết quả (hoặc trả lại request đã lưu).', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { batchId: { type: 'integer' }, savedCount: { type: 'integer' }, replayed: { type: 'boolean' } } } } }, example: { success: true, data: { batchId: 1, savedCount: 1, replayed: false } } } } },
@@ -43,6 +43,13 @@ export function describeFrontendEligibilityResults(spec: Record<string, any>) {
       ],
       responses: { 200: response('success/data: items, total, page, limit. Mỗi item có kết quả, studentCode/fullName, source, batchId, savedAt, savedBy, isStale.'), 401: response('Chưa đăng nhập.'), 403: response('Không có quyền tra cứu.') },
     },
+  };
+  const threshold = { type: 'number', minimum: 0, maximum: 9999.99, multipleOf: 0.01 };
+  spec.paths['/api/ojt-credit-thresholds'] = {
+    get: { summary: 'Danh sách mức tín chỉ xét OJT', security: [{ bearerAuth: [] }], responses: { 200: response('Danh sách ID và mức tín chỉ.') } },
+    post: { summary: 'Tạo mức tín chỉ xét OJT', security: [{ bearerAuth: [] }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['minCredits'], properties: { minCredits: threshold } } } } },
+      responses: { 201: response('Đã tạo mức tín chỉ.'), 409: response('Mức tín chỉ đã tồn tại.') } },
   };
   const responsePolicy = (description: string) => ({ description });
   spec.paths['/api/ojt-condition-policy'] = {

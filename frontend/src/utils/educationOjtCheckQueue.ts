@@ -11,6 +11,11 @@ export function handoffsByStudent(handoffs: Handoff[]): Map<number, Handoff[]> {
   return byStudent;
 }
 
+export function progressHandoffStatus(studentId: number, handoffs: Handoff[] | null): 'Đã bàn giao' | 'Chưa bàn giao' | 'Chưa xác định' {
+  if (handoffs === null) return 'Chưa xác định';
+  return handoffs.some(handoff => handoff.studentIds.includes(studentId)) ? 'Đã bàn giao' : 'Chưa bàn giao';
+}
+
 export function selectAutoCheckTargets<T extends Target>(targets: T[], saved: Record<number, Saved>, pending: Record<number, unknown>, handedOff: Set<number>): T[] {
   return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && !pending[student.id] && (!saved[student.id] || saved[student.id].isStale));
 }

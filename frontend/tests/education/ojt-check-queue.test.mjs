@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handoffsByStudent, matchesHandoffFilter, selectAutoCheckTargets, selectFullCheckTargets, selectPendingSaveResults } from '../../src/utils/educationOjtCheckQueue.ts';
+import { handoffsByStudent, matchesHandoffFilter, progressHandoffStatus, selectAutoCheckTargets, selectFullCheckTargets, selectPendingSaveResults } from '../../src/utils/educationOjtCheckQueue.ts';
 
 const targets = Array.from({ length: 7 }, (_, index) => ({ student: { id: index + 1 }, reason: index === 6 ? 'Không hoạt động' : '' }));
 const saved = {
@@ -34,4 +34,10 @@ test('filters handoff status from actual handoff items', () => {
   assert.equal(matchesHandoffFilter(1, 'NOT_HANDED_OFF', handed), true);
   assert.equal(matchesHandoffFilter(5, 'NOT_HANDED_OFF', handed), false);
   assert.equal(matchesHandoffFilter(5, 'ALL', handed), true);
+});
+
+test('shows handoff status only when history is available', () => {
+  assert.equal(progressHandoffStatus(5, history), 'Đã bàn giao');
+  assert.equal(progressHandoffStatus(1, history), 'Chưa bàn giao');
+  assert.equal(progressHandoffStatus(1, null), 'Chưa xác định');
 });
