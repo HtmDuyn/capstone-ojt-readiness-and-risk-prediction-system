@@ -57,25 +57,36 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  const summary=(await placementBoard({ojtSemesterId:semester},staff)).companies.find(c=>c.id===company);
  assert.equal(summary.capacity,2);assert.equal(summary.actualCount,3);assert.equal(summary.actualCount-summary.capacity,1);
  const afterAcceptance=(await enterpriseProfile(actor)).summary;
- assert.equal(afterAcceptance.acceptedInterns,summary.actualCount,'Dashboard includes accepted students before an assignment is created');
+ assert.equal(afterAcceptance.acceptedInterns,3,'Acceptance immediately makes students company interns, even without assignments');
+ assert.equal(afterAcceptance.activeInterns,3);
  assert.equal(afterAcceptance.pendingCandidates,0);assert.equal(afterAcceptance.completedInterns,0);
  assert.equal((await db.query('SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "EnterpriseID"=$1',[company])).rows[0].n,0);
  // Creating an assignment for an already accepted student must not increase intake twice.
  const assigned=(await db.query(`INSERT INTO "InternshipAssignments" ("CoordinationID","StudentID","EnterpriseID","PositionID","Status") SELECT co."CoordinationID",r."StudentID",co."EnterpriseID",co."PositionID",'ASSIGNED' FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."CoordinationID"=$1 RETURNING "AssignmentID"`,[candidateIds[0]])).rows[0].AssignmentID;
- assert.equal((await enterpriseProfile(actor)).summary.acceptedInterns,3);
+ assert.equal((await enterpriseProfile(actor)).summary.acceptedInterns,3,'Creating an assignment must not count an accepted intern twice');
  await db.query(`UPDATE "InternshipAssignments" SET "Status"='COMPLETED' WHERE "AssignmentID"=$1`,[assigned]);
  const completed=(await enterpriseProfile(actor)).summary;
- assert.equal(completed.acceptedInterns,3);assert.equal(completed.completedInterns,0,'Assignment status alone does not count as completion before evaluation');
+ assert.equal(completed.acceptedInterns,2);assert.equal(completed.activeInterns,2);assert.equal(completed.completedInterns,0,'Assignment status alone does not count as completion before evaluation');
  const {evaluate}=require('../dist/modules/qhdn/workflow.service');
  const {list:results,resultCsv}=require('../dist/modules/ojt-results/result.service');
  const {transferResult}=require('../dist/modules/ojt-results/result-workflow.service');
  const {dashboard}=require('../dist/modules/qhdn/report.service');
  await db.query(`UPDATE "InternshipAssignments" SET "Status"='ACTIVE' WHERE "AssignmentID"=$1`,[assigned]);
+ const activeSummary=(await enterpriseProfile(actor)).summary;
+ assert.equal(activeSummary.acceptedInterns,3);assert.equal(activeSummary.activeInterns,3);
+ for(const [status,expected] of [['IN_PROGRESS',3],['ASSIGNED',3],['CANCELLED',2],['COMPLETED',2],['ACTIVE',3]]){
+  await db.query('UPDATE "InternshipAssignments" SET "Status"=$2 WHERE "AssignmentID"=$1',[assigned,status]);
+  const statusSummary=(await enterpriseProfile(actor)).summary;
+  assert.equal(statusSummary.acceptedInterns,expected,`Intake for ${status}`);
+  assert.equal(statusSummary.activeInterns,expected,`Active students for ${status}`);
+ }
  const dashboardScope={ojtSemesterId:semester,companyId:company};
  const beforeGrading=await dashboard(dashboardScope,staff);
  assert.deepEqual(beforeGrading.progress,{completed:0,inProgress:1,evaluated:0});
  const submitted=await evaluate(assigned,{completionScore:8,attitudeScore:9,skillScore:8,overallScore:8.25,comments:'Enterprise assessment',reason:'Integration assessment'},actor);
  assert.equal((await enterpriseProfile(actor)).summary.completedInterns,1,'A submitted score counts the student as completed even while assignment status is active');
+ const gradedSummary=(await enterpriseProfile(actor)).summary;
+ assert.equal(gradedSummary.acceptedInterns,2);assert.equal(gradedSummary.activeInterns,2,'Graded assignments leave the active group; accepted interns without assignments remain');
  const afterGrading=await dashboard(dashboardScope,staff);
  assert.deepEqual(afterGrading.progress,{completed:1,inProgress:0,evaluated:1},'A submitted evaluation completes the dashboard stage before assignment update or transfer');
  assert.equal(afterGrading.assignments.completed,0,'Dashboard does not mutate assignment status');

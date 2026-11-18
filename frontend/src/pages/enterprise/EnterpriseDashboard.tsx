@@ -306,7 +306,7 @@ export const EnterpriseDashboard: React.FC = () => {
     { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: '#f59e0b' },
     {
       label: 'Đã nhận',
-      value: Math.max(0, dashboardStats.acceptedInterns - dashboardStats.completedInterns),
+      value: dashboardStats.activeInterns,
       color: '#6366f1',
     },
     { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: '#10b981' },
@@ -324,9 +324,9 @@ export const EnterpriseDashboard: React.FC = () => {
       tone: 'amber',
     },
     {
-      label: 'Đang thực tập',
+      label: 'Đã tiếp nhận',
       value: dashboardStats.activeInterns,
-      detail: 'Đang có phân công thực tập',
+      detail: 'Đã tiếp nhận và chưa kết thúc thực tập',
       icon: BriefcaseBusiness,
       to: '/enterprise/interns',
       tone: 'emerald',
@@ -402,42 +402,6 @@ export const EnterpriseDashboard: React.FC = () => {
         </div>
       </section>
 
-      <section
-          className="enterprise-dashboard-actions enterprise-reveal flex flex-col gap-4 rounded-2xl border border-white/80 bg-white/95 p-4 shadow-[0_12px_36px_-28px_rgba(15,23,42,0.45)] sm:flex-row sm:items-center sm:justify-between sm:px-5"
-          style={{ animationDelay: '80ms' }}
-      >
-          <div data-stat-label="Sinh viên đã tiếp nhận" className="flex min-w-0 items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
-              <UserCheck className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Sinh viên đã tiếp nhận</p>
-              <p className="mt-0.5 text-2xl font-black leading-none tracking-tight text-slate-900">
-                {statsLoading || statsError ? '—' : dashboardStats.acceptedInterns}
-                <span className="ml-1.5 text-xs font-semibold text-slate-400">sinh viên</span>
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <Link
-              to="/enterprise/candidates"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm shadow-orange-900/15 transition hover:-translate-y-0.5 hover:bg-orange-600"
-            >
-              <UserCheck className="h-4 w-4" />
-              Duyệt hồ sơ sinh viên
-            </Link>
-            <button
-              type="button"
-              onClick={() => setRevision(value => value + 1)}
-              disabled={statsLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
-              Làm mới số liệu
-            </button>
-          </div>
-      </section>
-
       {toastMessage && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm font-medium flex items-center justify-between animate-fadeIn shadow-sm">
           <div className="flex items-center space-x-2">
@@ -452,6 +416,18 @@ export const EnterpriseDashboard: React.FC = () => {
           </button>
         </div>
       )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setRevision(value => value + 1)}
+          disabled={statsLoading || tasksLoading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${statsLoading || tasksLoading ? 'animate-spin' : ''}`} />
+          Làm mới số liệu
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {statCards.map((stat, index) => {
@@ -625,7 +601,7 @@ export const EnterpriseDashboard: React.FC = () => {
                   </div>
                 </div>
                 <p className="mt-3 rounded-xl bg-indigo-50/70 px-3 py-2.5 text-[10px] leading-relaxed text-indigo-800">
-                  Nhóm “Đã nhận” không tính sinh viên đã hoàn thành, giúp các cột thể hiện từng giai đoạn riêng biệt.
+                  Sinh viên được doanh nghiệp tiếp nhận được tính ngay vào nhóm “Đã nhận”, kể cả chưa tạo phân công. Số lượng này thống nhất với card “Đã tiếp nhận”, không gồm thực tập đã kết thúc.
                 </p>
               </>
             )}

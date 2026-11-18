@@ -49,16 +49,24 @@ export async function enterpriseProfile(actor: Actor) {
   return readTransaction(async c => {
     const companyId = await enterpriseScope(c, actor);
     const company = (await c.query('SELECT * FROM "Enterprises" WHERE "EnterpriseID"=$1', [companyId])).rows[0];
-    const summary=(await c.query(`WITH received AS (
-      SELECT r."StudentID" FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."EnterpriseID"=$1 AND co."Decision"='ACCEPTED'
-      UNION SELECT a."StudentID" FROM "InternshipAssignments" a WHERE a."EnterpriseID"=$1 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
-      UNION SELECT receipt."StudentID" FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE co."EnterpriseID"=$1
+    const summary=(await c.query(`WITH active_students AS (
+      SELECT r."StudentID" FROM "StudentEnterpriseCoordination" co
+      JOIN "OJTRegistrations" r USING ("RegistrationID")
+      WHERE co."EnterpriseID"=$1 AND co."Decision"='ACCEPTED'
+        AND NOT EXISTS (SELECT 1 FROM "StudentEnterpriseCoordination" newer
+          WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
+        AND NOT EXISTS (SELECT 1 FROM "InternshipAssignments" a WHERE a."CoordinationID"=co."CoordinationID")
+      UNION
+      SELECT a."StudentID" FROM "InternshipAssignments" a
+      WHERE a."EnterpriseID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') IN ('ASSIGNED','ACTIVE','IN_PROGRESS')
+        AND NOT EXISTS (SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID"
+          AND ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)
     ) SELECT
       (SELECT count(*)::int FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "Status"='PUBLISHED' AND ("DeadlineAt" IS NULL OR "DeadlineAt">clock_timestamp())) AS "publishedPosts",
       (SELECT count(*)::int FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "Status"='PENDING_REVIEW') AS "pendingPosts",
       (SELECT count(*)::int FROM "StudentEnterpriseCoordination" co WHERE co."EnterpriseID"=$1 AND COALESCE(co."Decision",'PENDING')='PENDING' AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")) AS "pendingCandidates",
-      (SELECT count(*)::int FROM "InternshipAssignments" WHERE "EnterpriseID"=$1 AND UPPER("Status") IN ('ACTIVE','IN_PROGRESS')) AS "activeInterns",
-      (SELECT count(*)::int FROM received) AS "acceptedInterns",
+      (SELECT count(*)::int FROM active_students) AS "activeInterns",
+      (SELECT count(*)::int FROM active_students) AS "acceptedInterns",
       (SELECT count(DISTINCT a."StudentID")::int FROM "InternshipAssignments" a JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID" WHERE a."EnterpriseID"=$1 AND ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS "completedInterns",
       (SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."EnterpriseID"=$1 AND UPPER(a."Status") IN ('ACTIVE','IN_PROGRESS','COMPLETED') AND NOT EXISTS(SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID" AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS "pendingEvaluations"`,[companyId])).rows[0];
     return {...api('companies', company),summary:{scope:'ALL_SEMESTERS',...summary}};

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { Award, CheckCircle2, ClipboardCheck, Loader2, AlertCircle, Send, ListChecks } from 'lucide-react';
+import { Award, CheckCircle2, ClipboardCheck, Loader2, AlertCircle, Send, ListChecks, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   enterpriseService,
   type EnterpriseInternshipItem,
@@ -86,6 +86,8 @@ export const EnterpriseEvaluation: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const fetchEvaluations = useCallback(async () => {
     if (profileLoading) return;
@@ -224,10 +226,16 @@ export const EnterpriseEvaluation: React.FC = () => {
   };
 
   const submittedCount = evaluations.filter((item) => item.status === 'SUBMITTED').length;
+  const totalPages = Math.max(1, Math.ceil(evaluations.length / limit));
+  const visibleEvaluations = evaluations.slice((page - 1) * limit, page * limit);
   const selectedProgress = taskProgress[selectedEval?.id ?? -1] ?? { completed: 0, total: 0 };
   const selectedProgressPercent = selectedProgress.total
     ? Math.round((selectedProgress.completed / selectedProgress.total) * 100)
     : 0;
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -287,6 +295,7 @@ export const EnterpriseEvaluation: React.FC = () => {
             </p>
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
@@ -302,7 +311,7 @@ export const EnterpriseEvaluation: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {evaluations.map((item) => (
+                {visibleEvaluations.map((item) => (
                   <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
                     <td className="px-5 py-4">
                       <div className="font-bold text-slate-900">{item.fullName}</div>
@@ -346,6 +355,37 @@ export const EnterpriseEvaluation: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {evaluations.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4">
+              <span className="text-xs font-medium text-slate-500">
+                Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, evaluations.length)} trong {evaluations.length} sinh viên
+              </span>
+              <div className="flex items-center justify-center space-x-3">
+                <button
+                  type="button"
+                  aria-label="Trang trước"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page <= 1}
+                  className="rounded-xl border border-slate-200 p-2 text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-xs font-medium text-slate-600">
+                  Trang <strong>{page}</strong> / <strong>{totalPages}</strong>
+                </span>
+                <button
+                  type="button"
+                  aria-label="Trang sau"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-xl border border-slate-200 p-2 text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </section>
 

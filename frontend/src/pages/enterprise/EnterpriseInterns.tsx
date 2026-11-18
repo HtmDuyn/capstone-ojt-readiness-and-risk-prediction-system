@@ -1136,7 +1136,7 @@ export const EnterpriseInterns: React.FC = () => {
                 <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-800">
                   Sinh viên đã được doanh nghiệp duyệt đã thuộc danh sách tiếp nhận. Mục này chỉ hiện sinh viên đã có phân công
                   (ngày bắt đầu/kết thúc và người hướng dẫn) để giao task, theo dõi và điểm danh. QHDN/Admin tạo hồ sơ phân công;
-                  chưa có phân công thì sinh viên vẫn được tính trong số đã tiếp nhận trên dashboard.
+                  dashboard tính sinh viên vào số đã tiếp nhận/đang thực tập ngay khi được duyệt, kể cả chưa có hồ sơ phân công.
                 </p>
 
                 {/* Search & dropdown filter (No tabs) */}
