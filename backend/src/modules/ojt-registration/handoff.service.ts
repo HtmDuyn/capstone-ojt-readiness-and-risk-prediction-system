@@ -7,7 +7,8 @@ import { ids } from '../combo-registration/combo.validation';
 import { fingerprint } from '../eligibility/eligibility.service';
 import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 import { semester,type Actor,type Row } from './window.service';
-export async function handoff(semesterId:number,body:unknown,actor:number) {
+import type { PoolClient } from 'pg';
+export async function handoff(semesterId:number,body:unknown,actor:number,client?:PoolClient) {
  const b=inputObject(body,['studentIds','idempotencyKey','reason']);
  const selected=ids(b.studentIds,'studentIds',1000).sort((a,b)=>a-b);
  if(!selected.length)throw invalid('studentIds must be nonempty.');
@@ -41,7 +42,48 @@ export async function handoff(semesterId:number,body:unknown,actor:number) {
   for(let n=0;n<selected.length;n++)await c.query(`INSERT INTO "EligibleStudentHandoffItems" ("HandoffID","OJTSemesterID","StudentID","CalculatedBatchID","Snapshot") VALUES ($1,$2,$3,$4,$5)`,[batch.HandoffID,semesterId,selected[n],checks[n].batchId,JSON.stringify({studentId:selected[n],currentSemester:5,targetSemester:6,calculatedEligibility:checks[n]})]);
   const result={handoffId:batch.HandoffID,ojtSemesterId:semesterId,studentIds:selected,total:selected.length,recipientRole:'OJT_COORD',createdAt:batch.CreatedAt,replayed:false};
   await audit(c,actor,'EligibleStudentHandoffs',batch.HandoffID,'HANDOFF',null,result,reason);return result;
- });
+ },client);
+}
+
+export async function handoffSavedEligibleStudents(client: PoolClient, batchId: number, studentIds: number[], actorId: number) {
+ if (!studentIds.length) return 0;
+ const { rows } = await client.query<{ studentId: number; semesterId: number }>(`
+   SELECT s."StudentID" AS "studentId", target."semesterId"
+   FROM "Students" s
+   JOIN "StudentAcademicPlacements" placement USING ("StudentID")
+   JOIN LATERAL (
+     SELECT min(term."OJTSemesterID") AS "semesterId"
+     FROM "CohortCurriculumPeriods" plan
+     JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=plan."AcademicPeriodID" AND period."Kind"='SEMESTER'
+     JOIN "OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
+     WHERE plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode"
+       AND plan."CurriculumSemester"=6
+     HAVING count(*)=1 AND bool_and(term."Status" NOT IN ('CLOSED','ARCHIVED'))
+   ) target ON true
+   WHERE s."StudentID"=ANY($1::int[]) AND s."CurrentSemester"=5
+     AND "StudentCurriculumSemester"(s."StudentID",placement."CurrentAcademicPeriodID")=5
+     AND (${calculatedEligibilitySql()}->>'isStale')::boolean IS FALSE
+     AND NOT EXISTS (
+       SELECT 1 FROM "EligibleStudentHandoffItems" i
+       WHERE i."StudentID"=s."StudentID" AND i."OJTSemesterID"=target."semesterId"
+     )
+   ORDER BY target."semesterId", s."StudentID"`, [studentIds]);
+ const groups = new Map<number, number[]>();
+ for (const row of rows) {
+   const ids = groups.get(row.semesterId) ?? [];
+   ids.push(row.studentId);
+   groups.set(row.semesterId, ids);
+ }
+ for (const [semesterId, ids] of groups) {
+   for (let offset = 0; offset < ids.length; offset += 1000) {
+     await handoff(semesterId, {
+       studentIds: ids.slice(offset, offset + 1000),
+       idempotencyKey: `auto-eligibility-${batchId}-${semesterId}-${offset}`,
+       reason: 'Bàn giao tự động sau khi lưu kết quả xét OJT.',
+     }, actorId, client);
+   }
+ }
+ return rows.length;
 }
 export async function handoffHistory(semesterId:number|null,params:Row) {const p=pagination(params,[]);return academicTransaction(async c=>{if(semesterId!==null)await semester(c,semesterId);const total=(await c.query('SELECT count(*)::int AS n FROM "EligibleStudentHandoffs" WHERE ($1::int IS NULL OR "OJTSemesterID"=$1)',[semesterId])).rows[0].n;const rows=(await c.query(`SELECT "HandoffID" AS id,"OJTSemesterID" AS "ojtSemesterId","RegistrationIDs" AS "registrationIds","RecipientRole" AS "recipientRole","Reason" AS reason,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt",(SELECT count(*)::int FROM "EligibleStudentHandoffItems" i WHERE i."HandoffID"="EligibleStudentHandoffs"."HandoffID") AS "studentCount",(SELECT COALESCE(jsonb_agg(i."StudentID" ORDER BY i."StudentID"),'[]'::jsonb) FROM "EligibleStudentHandoffItems" i WHERE i."HandoffID"="EligibleStudentHandoffs"."HandoffID") AS "studentIds" FROM "EligibleStudentHandoffs" WHERE ($1::int IS NULL OR "OJTSemesterID"=$1) ORDER BY "HandoffID" DESC LIMIT $2 OFFSET $3`,[semesterId,p.limit,p.offset])).rows;return {items:await enrichListRows(c,rows),total,page:p.page,limit:p.limit};});}
 export async function semesterStudents(semesterId:number,params:Row,actor:Actor) {

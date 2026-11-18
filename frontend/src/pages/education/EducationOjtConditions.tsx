@@ -61,7 +61,7 @@ const EducationOjtConditions: React.FC = () => {
           onClick={() => { if (window.confirm('Bỏ các kết quả chưa lưu?')) discardPending(); }}>Bỏ kết quả chưa lưu</button>}
       </div>
       {!loading && targets.length > 0 && <p className="text-xs text-slate-500">Hệ thống có thể chưa phát hiện mọi thay đổi cấu hình học vụ; PĐT có thể xét lại sau đối soát khi đã bổ sung dữ liệu.</p>}
-      {checked.length > 0 && <p className="text-xs text-slate-500">Chỉ {checked.length} kết quả vừa xét trong phiên này sẽ được lưu, kể cả kết quả ngoài bộ lọc đang xem. Kết quả chưa lưu sẽ mất khi tải lại hoặc rời trang.</p>}
+      {checked.length > 0 && <p className="text-xs text-slate-500">Chỉ {checked.length} kết quả vừa xét trong phiên này sẽ được lưu, kể cả kết quả ngoài bộ lọc đang xem. Khi lưu, hệ thống tự bàn giao sinh viên đáp ứng yêu cầu bàn giao.</p>}
       {loading && <p role="status" className="text-sm text-slate-500">Đang tải danh sách sinh viên...</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {showNotice && <p role="status" className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>}

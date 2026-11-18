@@ -1,15 +1,13 @@
 import { useEducationOjtHandoff } from '@/hooks/useEducationOjtHandoff';
-import { Link } from 'react-router-dom';
 import { PageBanner } from '@/components/common/PageBanner';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { filterHandoffHistory, handoffDisplayById, matchingHandoffStudentIds } from '@/utils/educationOjtHandoffDisplay';
 
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
 
 export default function EducationOjtHandoff() {
-  const { candidates, visible, available, allChecked, submit, history, students, results, selected, setSelected, search, setSearch, reason, setReason, loading, saving, error, success, semesterError } = useEducationOjtHandoff();
-  const [activeTab, setActiveTab] = useState<'students' | 'history'>('students');
+  const { history, students, loading, error } = useEducationOjtHandoff();
   const [expandedHandoffId, setExpandedHandoffId] = useState<number | null>(null);
   const [historySearch, setHistorySearch] = useState('');
   const [historySemester, setHistorySemester] = useState('');
@@ -19,32 +17,9 @@ export default function EducationOjtHandoff() {
   const historySemesters = [...new Map(history.map(h => [h.ojtSemesterId, handoffDisplay.get(h.id)?.semesterName ?? '—'])).entries()];
   const historyRounds = [...new Set(history.filter(h => !historySemester || String(h.ojtSemesterId) === historySemester).map(h => handoffDisplay.get(h.id)?.roundNumber).filter((round): round is number => round !== undefined))].sort((a, b) => a - b);
   const filteredHistory = filterHandoffHistory(history, studentsById, historySearch, historySemester, historyRound);
-  useEffect(() => { if (success) setActiveTab('history'); }, [success]);
   return <div className="space-y-4">
-    <PageBanner title="Bàn giao OJT" description="Bàn giao sinh viên đủ điều kiện sang Phòng Quan hệ doanh nghiệp." badge="Phòng Đào tạo" />
-    <div className="grid gap-3 sm:grid-cols-3">
-      {[['Sinh viên có kết quả đủ điều kiện đã lưu', candidates.length], ['Có thể chọn trong bộ lọc', available.length], ['Đã chọn bàn giao', selected.length]].map(([label, count]) => <div key={label} className="flex min-h-24 flex-col justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm"><p className="text-sm leading-5 text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold leading-7 text-orange-600">{count}</p></div>)}
-    </div>
+    <PageBanner title="Lịch sử bàn giao OJT" description="Tra cứu các đợt bàn giao sang Phòng Quan hệ doanh nghiệp theo kỳ OJT." badge="Phòng Đào tạo" />
     <main className="overflow-hidden rounded-2xl bg-white shadow-sm">
-    <div role="tablist" aria-label="Bàn giao OJT" className="flex gap-6 border-b border-slate-200 px-4 sm:px-6">
-      <button type="button" role="tab" id="handoff-students-tab" aria-controls="handoff-students-panel" aria-selected={activeTab === 'students'} onClick={() => setActiveTab('students')} className={`-mb-px border-b-2 py-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${activeTab === 'students' ? 'border-orange-600 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600 hover:text-slate-900'}`}>Bàn giao sinh viên</button>
-      <button type="button" role="tab" id="handoff-history-tab" aria-controls="handoff-history-panel" aria-selected={activeTab === 'history'} onClick={() => setActiveTab('history')} className={`-mb-px border-b-2 py-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${activeTab === 'history' ? 'border-orange-600 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600 hover:text-slate-900'}`}>Lịch sử bàn giao</button>
-    </div>
-    {success && <p role="status" className="rounded-xl bg-green-50 p-3 text-green-700">{success}</p>}
-    <div id="handoff-students-panel" role="tabpanel" aria-labelledby="handoff-students-tab" hidden={activeTab !== 'students'}>
-    <section className="space-y-4 p-4 sm:p-6">
-      <div>
-        <input aria-label="Tìm sinh viên bàn giao" placeholder="Tìm mã, tên sinh viên hoặc chương trình" value={search} onChange={e => setSearch(e.target.value)} className="w-full rounded-xl border border-slate-200 p-3" />
-      </div>
-      {(error || semesterError) && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error || semesterError}</p>}
-      <div className="space-y-3 rounded-xl border border-orange-100 bg-orange-50/40 p-4"><label className="block text-sm font-medium" htmlFor="handoff-reason">Nội dung bàn giao <span className="text-red-600">*</span></label><textarea id="handoff-reason" maxLength={2000} disabled={saving} value={reason} onChange={e => setReason(e.target.value)} placeholder="Nhập nội dung bàn giao cho Phòng Quan hệ doanh nghiệp" className="w-full rounded-xl border border-slate-200 p-3" /><p className="text-xs text-slate-500">Vui lòng kiểm tra danh sách, kỳ OJT và nội dung trước khi gửi. Chỉ kết quả đã lưu, còn hiệu lực và xác định được kỳ OJT mới có thể chọn.</p><button disabled={loading || saving || !selected.length || selected.length > 1000 || !reason.trim()} onClick={submit} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Đang bàn giao...' : `Bàn giao ${selected.length} sinh viên sang Phòng QHDN`}</button></div>
-      {loading ? <p role="status">Đang tải danh sách bàn giao...</p> : <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-sm">
-        <thead className="border-b border-[#D6E4F0] bg-[#EFF6FF] font-semibold text-[#334155]"><tr><th className="p-3"><input type="checkbox" aria-label="Chọn tất cả sinh viên có thể bàn giao trong bộ lọc" checked={allChecked} disabled={saving || !available.length} onChange={e => setSelected(old => e.target.checked ? [...new Set([...old, ...available.map(c => c.student.id)])] : old.filter(id => !available.some(c => c.student.id === id)))} /></th>{['STT', 'Mã sinh viên', 'Họ và tên', 'Khóa / Nhóm', 'Kỳ chương trình', 'Kỳ OJT', 'Tín chỉ đạt', 'Môn / tín chỉ chưa đạt', 'Trạng thái bàn giao'].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
-        <tbody>{visible.map(({ student: s, result: r, blocked, targetName }, index) => <tr key={s.id} className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]"><td className="p-3"><input type="checkbox" aria-label={`Chọn ${s.studentCode}`} checked={selected.includes(s.id)} disabled={saving || Boolean(blocked)} onChange={e => setSelected(old => e.target.checked ? [...old, s.id] : old.filter(id => id !== s.id))} /></td><td className="p-3 tabular-nums">{index + 1}</td><td className="p-3"><Link className="font-semibold text-orange-700" to={`/education/student-import/students/${s.id}`}>{s.studentCode}</Link></td><td className="p-3">{s.fullName}</td><td className="p-3">{s.cohort?.code ?? '—'} / {s.groupCode ?? '—'}</td><td className="p-3">{s.currentSemester == null ? '—' : `Kỳ ${s.currentSemester}`}</td><td className="min-w-36 p-3">{targetName}</td><td className="p-3">{r.earnedCredits ?? '—'}</td><td className="p-3">{r.unpassedCourseCount} môn <span className="block text-xs text-slate-500">Tín chỉ: chưa có dữ liệu</span></td><td className={`p-3 ${blocked ? 'text-amber-700' : 'text-green-700'}`}>{blocked || 'Sẵn sàng bàn giao'}<span className="block text-xs text-slate-500">Lưu: {date(r.checkedAt)}</span></td></tr>)}</tbody>
-      </table>{!visible.length && <p className="p-8 text-center text-slate-500">Không có sinh viên phù hợp.</p>}</div>}
-    </section>
-    </div>
-    <div id="handoff-history-panel" role="tabpanel" aria-labelledby="handoff-history-tab" hidden={activeTab !== 'history'}>
     <section className="space-y-4 p-4 sm:p-6">
       <h2 className="text-lg font-bold">Lịch sử bàn giao</h2>
       <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
@@ -52,7 +27,7 @@ export default function EducationOjtHandoff() {
         <select aria-label="Lọc lịch sử theo kỳ OJT" value={historySemester} onChange={event => { setHistorySemester(event.target.value); setHistoryRound(''); }} className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"><option value="">Tất cả kỳ OJT</option>{historySemesters.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select>
         <select aria-label="Lọc lịch sử theo đợt bàn giao" value={historyRound} onChange={event => setHistoryRound(event.target.value)} className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"><option value="">Tất cả đợt</option>{historyRounds.map(round => <option key={round} value={round}>Đợt {round}</option>)}</select>
       </div>
-      {!history.length ? <p className="text-slate-500">Chưa có đợt bàn giao.</p> : !filteredHistory.length ? <p role="status" className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Không tìm thấy đợt bàn giao phù hợp.</p> : <div className="overflow-x-auto">
+      {loading ? <p role="status">Đang tải lịch sử bàn giao…</p> : error ? <p role="alert" className="text-red-700">{error}</p> : !history.length ? <p className="text-slate-500">Chưa có đợt bàn giao.</p> : !filteredHistory.length ? <p role="status" className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Không tìm thấy đợt bàn giao phù hợp.</p> : <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] font-semibold text-[#334155]"><tr>{['Đợt', 'Kỳ OJT', 'Thời gian', 'Số sinh viên', 'Nội dung', 'Nơi nhận', ''].map((heading, index) => <th key={index} scope="col" className="p-3">{heading}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-200">{filteredHistory.map(h => {
@@ -67,11 +42,10 @@ export default function EducationOjtHandoff() {
                 <h3 className="mb-3 text-sm font-semibold text-slate-800">Danh sách sinh viên bàn giao – Đợt {handoffDisplay.get(h.id)?.roundNumber} ({h.studentCount} sinh viên)</h3>
                 {!Array.isArray(h.studentIds) || h.studentIds.length !== h.studentCount ? <p role="alert" className="mb-3 text-sm text-amber-700">Danh sách sinh viên của đợt chưa tải đầy đủ. Vui lòng tải lại trang.</p> : null}
                 {Array.isArray(h.studentIds) && h.studentIds.length > 0 ? <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                  <table className="w-full min-w-[640px] text-left text-sm"><thead className="bg-slate-200/70 text-xs text-slate-700"><tr>{['STT', 'Mã sinh viên', 'Họ và tên', 'Khung chương trình', 'Tín chỉ đạt', 'Số môn chưa đạt'].map(heading => <th key={heading} scope="col" className="px-3 py-2 font-semibold">{heading}</th>)}</tr></thead>
+                  <table className="w-full min-w-[640px] text-left text-sm"><thead className="bg-slate-200/70 text-xs text-slate-700"><tr>{['STT', 'Mã sinh viên', 'Họ và tên', 'Khung chương trình'].map(heading => <th key={heading} scope="col" className="px-3 py-2 font-semibold">{heading}</th>)}</tr></thead>
                     <tbody className="divide-y divide-slate-200">{h.studentIds.map((studentId, index) => {
                       const student = studentsById.get(studentId);
-                      const result = results[studentId];
-                      return <tr key={studentId} className={`${matchingStudents.has(studentId) ? 'bg-orange-100 font-semibold' : 'odd:bg-white even:bg-slate-50'} hover:!bg-orange-50`}><td className="px-3 py-2 tabular-nums">{index + 1}</td><td className="whitespace-nowrap px-3 py-2 font-medium">{student?.studentCode ?? 'Chưa tải được'}</td><td className="px-3 py-2">{student?.fullName ?? 'Không tải được hồ sơ sinh viên'}</td><td className="px-3 py-2">{student?.program?.name ?? '—'}</td><td className="px-3 py-2 tabular-nums">{result?.earnedCredits ?? '—'}</td><td className="px-3 py-2 tabular-nums">{result?.unpassedCourseCount ?? '—'}</td></tr>;
+                      return <tr key={studentId} className={`${matchingStudents.has(studentId) ? 'bg-orange-100 font-semibold' : 'odd:bg-white even:bg-slate-50'} hover:!bg-orange-50`}><td className="px-3 py-2 tabular-nums">{index + 1}</td><td className="whitespace-nowrap px-3 py-2 font-medium">{student?.studentCode ?? 'Chưa tải được'}</td><td className="px-3 py-2">{student?.fullName ?? 'Không tải được hồ sơ sinh viên'}</td><td className="px-3 py-2">{student?.program?.name ?? '—'}</td></tr>;
                     })}</tbody>
                   </table>
                 </div> : <p className="text-sm text-slate-500">Chưa tải được danh sách sinh viên của đợt này.</p>}
@@ -82,7 +56,6 @@ export default function EducationOjtHandoff() {
         </table>
       </div>}
     </section>
-    </div>
     </main>
   </div>;
 }

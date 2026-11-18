@@ -129,12 +129,16 @@ export function useEducationOjtEligibility() {
       if (calculated.some(result => latestHandedOff.has(result.studentId))) {
         throw new Error('Có sinh viên đã được bàn giao sau khi xét. Vui lòng tải lại trang để kiểm tra; chưa lưu kết quả chờ.');
       }
-      await saveLocalOjtResults(calculated, saveKey.current, rule);
+      const { handedOffCount } = await saveLocalOjtResults(calculated, saveKey.current, rule);
       setPendingResults({});
       saveKey.current = null;
-      setNotice('Đã lưu kết quả xét điều kiện OJT thành công.');
+      const eligibleCount = calculated.filter(result => result.status === 'ELIGIBLE').length;
+      const waitingCount = Math.max(0, eligibleCount - handedOffCount);
+      setNotice('Đã lưu kết quả xét. Đã tự động bàn giao ' + handedOffCount + ' sinh viên.' +
+        (waitingCount ? ' Còn ' + waitingCount + ' sinh viên đủ tín chỉ chưa đáp ứng yêu cầu bàn giao.' : ''));
       try {
-        const refreshed = await loadSavedLocalOjtResults();
+        const [refreshed, updatedHandoffs] = await Promise.all([loadSavedLocalOjtResults(), educationOjtWorkflowService.getHandoffs()]);
+        setHandoffs(updatedHandoffs);
         setSavedResults(normalizeResults(refreshed));
       } catch {
         setSavedResults(previous => ({ ...previous, ...normalizeResults(calculated) }));

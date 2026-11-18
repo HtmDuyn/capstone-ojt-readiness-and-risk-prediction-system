@@ -69,7 +69,9 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
     const existing = (await client.query('SELECT * FROM "OJTEligibilityResultBatches" WHERE "SavedBy"=$1 AND "IdempotencyKey"=$2', [actorId, input.idempotencyKey])).rows[0];
     if (existing) {
       if (existing.RequestHash !== input.requestHash) throw invalid('This idempotency key belongs to different results.', 409, 'IDEMPOTENCY_CONFLICT');
-      return { batchId: existing.BatchID, savedCount: existing.SavedCount, replayed: true };
+      const { rows: [handoff] } = await client.query(
+        'SELECT count(*)::int AS count FROM "EligibleStudentHandoffItems" WHERE "CalculatedBatchID"=$1', [existing.BatchID]);
+      return { batchId: existing.BatchID, savedCount: existing.SavedCount, handedOffCount: handoff.count, replayed: true };
     }
     const ids = input.results.map(result => result.studentId);
     const students = (await client.query(`SELECT s."StudentID",s."ProgramID",s."Status",u."Status" AS "AccountStatus",
@@ -97,7 +99,10 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
         "Result"=EXCLUDED."Result","CheckedAt"=EXCLUDED."CheckedAt","SavedAt"=EXCLUDED."SavedAt","SavedBy"=EXCLUDED."SavedBy"`,
       [JSON.stringify(records), batch.BatchID, batch.SavedAt, actorId]);
     await audit(client, actorId, 'OJTEligibilityResultBatches', batch.BatchID, 'SAVE_FRONTEND_ELIGIBILITY', null, { savedCount: ids.length, studentIds: ids });
-    return { batchId: batch.BatchID, savedCount: ids.length, replayed: false };
+    const { handoffSavedEligibleStudents } = await import('../ojt-registration/handoff.service.js');
+    const eligibleIds = records.filter(result => result.status === 'ELIGIBLE').map(result => result.studentId);
+    const handedOffCount = await handoffSavedEligibleStudents(client, batch.BatchID, eligibleIds, actorId);
+    return { batchId: batch.BatchID, savedCount: ids.length, handedOffCount, replayed: false };
   });
 }
 

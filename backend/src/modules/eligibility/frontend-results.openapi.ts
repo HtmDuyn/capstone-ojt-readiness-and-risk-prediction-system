@@ -28,7 +28,7 @@ export function describeFrontendEligibilityResults(spec: Record<string, any>) {
         example: { idempotencyKey: 'fe-ojt-save-unique-key', source: 'FRONTEND', rule: { version: 0, thresholdId: 1, minCredits: 70 }, results: [{ studentId: 1, status: 'ELIGIBLE', earnedCredits: 70, unpassedCourseCount: 2, reasons: [], academicIssues: [], checkedAt: '2026-10-27T09:00:00.000Z' }] },
       } } },
       responses: {
-        201: { description: 'Đã lưu toàn bộ kết quả (hoặc trả lại request đã lưu).', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { batchId: { type: 'integer' }, savedCount: { type: 'integer' }, replayed: { type: 'boolean' } } } } }, example: { success: true, data: { batchId: 1, savedCount: 1, replayed: false } } } } },
+        201: { description: 'Đã lưu kết quả và bàn giao tự động các sinh viên đủ yêu cầu (hoặc trả lại kết quả đã lưu).', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { batchId: { type: 'integer' }, savedCount: { type: 'integer' }, handedOffCount: { type: 'integer', minimum: 0 }, replayed: { type: 'boolean' } } } } }, example: { success: true, data: { batchId: 1, savedCount: 1, handedOffCount: 1, replayed: false } } } } },
         400: response('Payload không hợp lệ hoặc trạng thái không khớp số liệu FE gửi.'), 401: response('Chưa đăng nhập.'),
         403: response('Không có quyền lưu kết quả.'), 409: response('Khóa bị dùng cho payload khác, sinh viên không hoạt động, hoặc dữ liệu đã cũ.'), 413: response('JSON vượt 10 MB.'),
       },

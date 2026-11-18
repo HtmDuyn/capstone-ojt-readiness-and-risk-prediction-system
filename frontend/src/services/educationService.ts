@@ -906,10 +906,10 @@ export const createOjtCreditThreshold = async (minCredits: number) =>
   apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
 export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> =>
   apiData<CurrentOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
-export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<number> {
+export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<{ savedCount: number; handedOffCount: number }> {
   if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
   try {
-    const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number } }>(
+    const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number; handedOffCount?: number } }>(
       LOCAL_OJT_SAVE_ENDPOINT, localOjtSavePayload(results, idempotencyKey, rule),
     );
     const body = response.data;
@@ -917,7 +917,7 @@ export async function saveLocalOjtResults(results: LocalOjtResult[], idempotency
       throw new Error(body.message || 'Backend chưa xác nhận lưu đầy đủ kết quả. Hãy kiểm tra trạng thái lưu trước khi tiếp tục.');
     }
     clearEducationReadCache();
-    return body.data.savedCount;
+    return { savedCount: body.data.savedCount, handedOffCount: body.data.handedOffCount ?? 0 };
   } catch (error) {
     const response = (error as { response?: { status?: number; data?: { message?: string; errorCode?: string } } } | null)?.response;
     const status = response?.status;
