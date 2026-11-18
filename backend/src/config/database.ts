@@ -61,6 +61,10 @@ const connectionTimeout = Number(process.env.DB_CONNECTION_TIMEOUT_MS ?? 30_000)
 if (!Number.isInteger(connectionTimeout) || connectionTimeout < 1000 || connectionTimeout > 120000) {
   throw new Error('DB_CONNECTION_TIMEOUT_MS must be an integer between 1000 and 120000.');
 }
+const idleTimeout = Number(process.env.DB_IDLE_TIMEOUT_MS ?? 30_000);
+if (!Number.isInteger(idleTimeout) || idleTimeout < 1000 || idleTimeout > 600_000) {
+  throw new Error('DB_IDLE_TIMEOUT_MS must be an integer between 1000 and 600000.');
+}
 
 export const pool = databaseConfig.url
   ? new Pool({
@@ -72,7 +76,7 @@ export const pool = databaseConfig.url
       keepAlive: true,
       keepAliveInitialDelayMillis: 10_000,
 
-      idleTimeoutMillis: 30_000,
+      idleTimeoutMillis: idleTimeout,
 
       connectionTimeoutMillis: connectionTimeout,
     })

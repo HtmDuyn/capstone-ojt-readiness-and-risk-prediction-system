@@ -11,6 +11,20 @@ import {
 
 import type { AuthError, AuthUserRecord } from "./auth.types";
 
+export function publicAuthUser(user: AuthUserRecord) {
+  return {
+    ...(user.role_code === 'STUDENT' ? { studentId: user.studentId } : {}),
+    mustChangePassword: user.must_change_password,
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    fullName: user.full_name,
+    status: user.status,
+    roleCode: user.role_code,
+    roleName: user.role_name,
+  };
+}
+
 const createAuthError = (
   message: string,
   statusCode: number,
@@ -67,6 +81,7 @@ export const loginUser = async (
 ): Promise<{
   token: string;
   mustChangePassword: boolean;
+  user: ReturnType<typeof publicAuthUser>;
 }> => {
   /*
    * Validate email.
@@ -173,6 +188,7 @@ export const loginUser = async (
   return {
     token,
     mustChangePassword: user.must_change_password,
+    user: publicAuthUser(user),
   };
 };
 

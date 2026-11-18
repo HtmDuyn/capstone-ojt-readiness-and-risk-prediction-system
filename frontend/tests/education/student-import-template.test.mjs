@@ -9,7 +9,10 @@ import XLSX from 'xlsx';
 const sourcePath = path.resolve('src/utils/studentImportWorkbook.ts');
 const xlsxUrl = pathToFileURL(path.resolve('node_modules/xlsx/xlsx.js')).href;
 const source = readFileSync(sourcePath, 'utf8');
-const compiled = stripTypeScriptTypes(source).replace('import * as XLSX from "xlsx";', `import XLSX from "${xlsxUrl}";`);
+const statusUrl = new URL('./studentAcademicStatus.ts', pathToFileURL(sourcePath)).href;
+const compiled = stripTypeScriptTypes(source)
+  .replace('import * as XLSX from "xlsx";', `import XLSX from "${xlsxUrl}";`)
+  .replaceAll("'./studentAcademicStatus.ts'", JSON.stringify(statusUrl));
 const workbookModule = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
 test('file mẫu tải xuống có hai sheet, đúng cột và header cố định', () => {

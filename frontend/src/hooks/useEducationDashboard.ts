@@ -24,7 +24,7 @@ const API_PATHS = {
    EDUCATION DASHBOARD
    ========================================================= */
 
-export function useEducationDashboard() {
+export function useEducationDashboard(loadCourseDemand: boolean) {
 
   /* ---------------- FILTER DATA ---------------- */
 
@@ -158,11 +158,10 @@ export function useEducationDashboard() {
     return params;
   }, [selectedOjtSemesterId, selectedPeriod, selectedCohort]);
 
-  // Overview eligibility depends on cohort and OJT semester, not the assessment period.
+  // The saved eligibility overview currently reads the roster scoped by cohort.
   const overviewParams = useMemo<QueryParams>(() => ({
-    ...(selectedOjtSemesterId ? { ojtSemesterId: toApiId(selectedOjtSemesterId) } : {}),
     ...(selectedCohort ? { cohortId: toApiId(selectedCohort) } : {}),
-  }), [selectedOjtSemesterId, selectedCohort]);
+  }), [selectedCohort]);
 
   /* =====================================================
      LOAD DASHBOARD AND COURSE DEMAND
@@ -190,6 +189,7 @@ export function useEducationDashboard() {
   }, [overviewParams, refreshKey]);
 
   useEffect(() => {
+    if (!loadCourseDemand) return;
     const controller = new AbortController();
     setCourseDemandLoading(true); setCourseDemandError(''); setCourseDemandData(null);
     educationRead(`demand:${JSON.stringify(dashboardParams)}`, () =>
@@ -198,7 +198,7 @@ export function useEducationDashboard() {
       .catch(error => { if (!controller.signal.aborted && !isCanceledRequest(error)) setCourseDemandError(`Không tải được nhu cầu học phần: ${getErrorMessage(error)}`); })
       .finally(() => { if (!controller.signal.aborted) setCourseDemandLoading(false); });
     return () => controller.abort();
-  }, [dashboardParams, refreshKey]);
+  }, [dashboardParams, refreshKey, loadCourseDemand]);
 
   /* =====================================================
      LOAD ACADEMIC ALERTS

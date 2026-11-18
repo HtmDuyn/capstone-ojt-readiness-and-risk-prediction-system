@@ -18,7 +18,7 @@ function StudentShell() {
   const handleLogout = () => { logout(); navigate('/login'); };
   return <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 antialiased selection:bg-orange-500 selection:text-white">
     <div className="pointer-events-none fixed inset-0 z-0 select-none overflow-hidden">
-      <img src="/login_bg.jpg" alt="" className="h-full w-full scale-105 object-cover object-center opacity-15 blur-[3px]" />
+      <img src="/login_bg.webp" alt="" decoding="async" className="h-full w-full scale-105 object-cover object-center opacity-15 blur-[3px]" />
       <div className="absolute left-[-5%] top-[-10%] h-[55vw] w-[55vw] rounded-full bg-orange-400/25 blur-[140px]" />
       <div className="absolute right-[-10%] top-[20%] h-[50vw] w-[50vw] rounded-full bg-purple-400/20 blur-[150px]" />
       <div className="absolute bottom-[-10%] left-[15%] h-[50vw] w-[50vw] rounded-full bg-amber-400/20 blur-[140px]" />

@@ -1,6 +1,6 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 import { PrivateRoute } from "@/routers/PrivateRouter";
-import { BaseLayout } from "@/layouts/BaseLayout";
+import { BaseLayout } from "@/routers/routeLayouts";
 import { getMenuByRole } from "@/config";
 
 export const educationRoutes: RouteObject = {

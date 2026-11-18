@@ -1,7 +1,8 @@
 import { apiRequest } from './api';
 export const ROLE_NAMES: Record<string, string> = { ADMIN: 'Quản trị viên', ACADEMIC: 'Phòng Đào tạo', OJT_COORD: 'Phòng Quan hệ Doanh nghiệp', STUDENT: 'Sinh viên', ENTERPRISE: 'Doanh nghiệp' };
 export interface Account { id: number; username: string; full_name: string; email: string; phone: string | null; role_id: number; role_code: string; status: string; created_at?: string; last_login_at?: string; studentId?: number | null; enterpriseId?: number | null }
-export interface Summary { accounts: number; activeAccounts: number; students: number; companies: number; ojtSemesters: number }
+export interface AccountCount { roleCode: string | null; status: string | null; count: number }
+export interface Summary { accounts: number; activeAccounts: number; students: number; companies: number; ojtSemesters: number; accountBreakdown?: AccountCount[] }
 export interface AuditLog { id: number; userId: number | null; entityType: string; entityId: number | null; action: string; createdAt: string; ipAddress: string | null; detail: unknown; rawLog: unknown; user: { fullName: string; username: string; email: string; roleCode: string } | null }
 export interface AuditFilters { page?: number; limit?: number; logId?: number; userId?: number; entityType?: string; entityId?: number; action?: string }
 export const getAccounts = () => apiRequest<{ data: Account[]; total: number }>('/accounts');

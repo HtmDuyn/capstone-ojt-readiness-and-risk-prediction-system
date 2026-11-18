@@ -38,6 +38,7 @@ import {
 import { PageBanner } from "@/components/common/PageBanner";
 import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
 import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
+import { useNearViewport } from "@/hooks/useNearViewport";
 import {
   listCompanies,
   listPositions,
@@ -87,6 +88,9 @@ export const QhdnDashboard: React.FC = () => {
   const [positions, setPositions] = useState<PositionListItem[]>([]);
 
   // Coordinations data for rejected & accepted widgets
+  const { ref: coordinationSection, reached: loadCoordinations } = useNearViewport<HTMLDivElement>();
+  const [coordinationsLoading, setCoordinationsLoading] = useState(true);
+  const [coordinationsError, setCoordinationsError] = useState('');
   const [rejectedCoordinations, setRejectedCoordinations] = useState<
     CoordinationItem[]
   >([]);
@@ -162,80 +166,47 @@ export const QhdnDashboard: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  // 2. Tải toàn bộ dữ liệu Dashboard khi selectedSemesterId thay đổi
   useEffect(() => {
-    if (!selectedSemesterId) {
-      setPositions([]);
-      setRejectedCoordinations([]);
-      setAcceptedCoordinations([]);
-      setIsLoading(false);
-      return;
-    }
     let isActive = true;
-    const fetchDashboardDetails = async () => {
-      setIsLoading(true);
-      setLoadError("");
-      setPositions([]);
-      setRejectedCoordinations([]);
-      setAcceptedCoordinations([]);
-      try {
-        const [posRes, coorRes] = await Promise.allSettled([
-          loadAllPages((page) =>
-            listPositions({
-              page,
-              limit: 100,
-              ojtSemesterId: selectedSemesterId,
-            }).then((r) => r.data),
-          ),
-          loadAllPages((page) =>
-            listCoordinations({
-              page,
-              limit: 100,
-              ojtSemesterId: selectedSemesterId,
-            }).then((r) => r.data),
-          ),
-        ]);
+    setIsLoading(!!selectedSemesterId);
+    setLoadError("");
+    setPositions([]);
+    if (!selectedSemesterId) return;
 
-        if (!isActive) return;
-        const failed = [posRes, coorRes].find(
-          (r) => r.status === "rejected",
-        );
-        if (failed?.status === "rejected") throw failed.reason;
-
-        if (posRes.status === "fulfilled" && posRes.value) {
-          setPositions(posRes.value);
-        }
-
-        if (coorRes.status === "fulfilled" && coorRes.value) {
-          const latest = new Map<number, CoordinationItem>();
-          coorRes.value.forEach((c) => {
-            if (
-              !latest.has(c.registrationId) ||
-              latest.get(c.registrationId)!.id < c.id
-            )
-              latest.set(c.registrationId, c);
-          });
-          const allCoors = Array.from(latest.values());
-          setRejectedCoordinations(
-            allCoors.filter((c) => c.decision === "REJECTED"),
-          );
-          setAcceptedCoordinations(
-            allCoors.filter((c) => c.decision === "ACCEPTED"),
-          );
-        }
-      } catch (err) {
-        if (isActive) setLoadError(errorMessage(err));
-      } finally {
-        if (isActive) setIsLoading(false);
-      }
-    };
-
-    fetchDashboardDetails();
-
-    return () => {
-      isActive = false;
-    };
+    loadAllPages(page => listPositions({ page, limit: 100, ojtSemesterId: selectedSemesterId }).then(r => r.data))
+      .then(items => { if (isActive) setPositions(items); })
+      .catch(error => { if (isActive) setLoadError(errorMessage(error)); })
+      .finally(() => { if (isActive) setIsLoading(false); });
+    return () => { isActive = false; };
   }, [selectedSemesterId, revision]);
+
+  useEffect(() => {
+    setRejectedCoordinations([]);
+    setAcceptedCoordinations([]);
+    setCoordinationsError('');
+    setCoordinationsLoading(!!selectedSemesterId);
+    if (!selectedSemesterId || !loadCoordinations) return;
+
+    const controller = new AbortController();
+    loadAllPages(page => listCoordinations(
+      { page, limit: 100, ojtSemesterId: selectedSemesterId }, controller.signal,
+    ).then(r => r.data)).then(items => {
+      if (controller.signal.aborted) return;
+      const latest = new Map<number, CoordinationItem>();
+      for (const item of items) {
+        const previous = latest.get(item.registrationId);
+        if (!previous || previous.id < item.id) latest.set(item.registrationId, item);
+      }
+      const current = Array.from(latest.values());
+      setRejectedCoordinations(current.filter(item => item.decision === 'REJECTED'));
+      setAcceptedCoordinations(current.filter(item => item.decision === 'ACCEPTED'));
+    }).catch(error => {
+      if (!controller.signal.aborted) setCoordinationsError(errorMessage(error));
+    }).finally(() => {
+      if (!controller.signal.aborted) setCoordinationsLoading(false);
+    });
+    return () => controller.abort();
+  }, [selectedSemesterId, revision, loadCoordinations]);
 
   // Tính toán Quota của từng doanh nghiệp từ vị trí tuyển dụng
   const enterpriseQuotaList = useMemo(() => {
@@ -847,7 +818,8 @@ export const QhdnDashboard: React.FC = () => {
       </div>
 
       {/* Bottom Widgets */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div ref={coordinationSection} className="grid grid-cols-1 xl:grid-cols-2 gap-6" aria-busy={coordinationsLoading}>
+        {coordinationsError && <p role="alert" className="text-sm text-rose-700 xl:col-span-2">{coordinationsError}</p>}
         {/* Widget 1: Sinh viên bị doanh nghiệp từ chối */}
         <div className="card-glass border border-slate-200/80 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -877,7 +849,7 @@ export const QhdnDashboard: React.FC = () => {
           <div className="space-y-2.5">
             {rejectedCoordinations.length === 0 ? (
               <p className="text-center text-slate-400 py-6 text-xs">
-                Hiện không có hồ sơ nào bị doanh nghiệp từ chối.
+                {coordinationsLoading ? 'Đang tải hồ sơ…' : coordinationsError ? 'Không tải được hồ sơ.' : 'Hiện không có hồ sơ nào bị doanh nghiệp từ chối.'}
               </p>
             ) : (
               rejectedCoordinations.slice(0, 4).map((coor, index) => (
@@ -948,7 +920,7 @@ export const QhdnDashboard: React.FC = () => {
           <div className="space-y-2.5">
             {acceptedCoordinations.length === 0 ? (
               <p className="text-center text-slate-400 py-6 text-xs">
-                Chưa có phản hồi tiếp nhận mới từ doanh nghiệp trong kỳ này.
+                {coordinationsLoading ? 'Đang tải hồ sơ…' : coordinationsError ? 'Không tải được hồ sơ.' : 'Chưa có phản hồi tiếp nhận mới từ doanh nghiệp trong kỳ này.'}
               </p>
             ) : (
               acceptedCoordinations.slice(0, 4).map((coor, index) => (

@@ -229,6 +229,7 @@ const options: swaggerJSDoc.Options =
                 description: "Change the temporary password before using protected business APIs.",
                 example: false,
               },
+              user: { $ref: "#/components/schemas/UserResponse" },
             },
           },
 

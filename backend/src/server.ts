@@ -28,7 +28,9 @@ const baseUrl =
 const startServer =
   async (): Promise<void> => {
     try {
+      const databaseCheckStartedAt = performance.now();
       await testDatabaseConnection();
+      const databaseCheckMs = Math.round(performance.now() - databaseCheckStartedAt);
       const stopExtraction = startRecruitmentExtractionWorker();
       const stopRecruitment = startRecruitmentWorker();
       const stopAdvisories = process.env.ADVISORY_WORKER_ENABLED !== 'false' ? startAdvisoryWorker() : () => {};
@@ -42,6 +44,10 @@ const startServer =
           () => {
             logger.info(
               "OJT Backend is running",
+              {
+                startupMs: Math.round(process.uptime() * 1000),
+                databaseCheckMs,
+              },
             );
 
             logger.info(

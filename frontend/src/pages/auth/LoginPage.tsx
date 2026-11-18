@@ -82,8 +82,7 @@ const LoginPage: React.FC = () => {
         email: account.trim(),
         password,
       });
-      const profileResponse = await authService.getCurrentUser(loginResponse.token);
-      const profile = profileResponse.user;
+      const profile = loginResponse.user ?? (await authService.getCurrentUser(loginResponse.token)).user;
       const role = profile.roleCode
         ? roleByCode[profile.roleCode.toUpperCase()]
         : undefined;
@@ -118,8 +117,10 @@ const LoginPage: React.FC = () => {
       {/* Fixed Fullscreen Wallpaper Background */}
       <div className="fixed inset-0 w-screen h-screen z-0 overflow-hidden pointer-events-none select-none">
         <img
-          src="/login_bg.jpg"
-          alt="Campus Background"
+          src="/login_bg.webp"
+          alt=""
+          fetchPriority="high"
+          decoding="async"
           className="w-full h-full object-cover object-center scale-105"
         />
         {/* Fullscreen darkening & translucent color mesh overlay */}

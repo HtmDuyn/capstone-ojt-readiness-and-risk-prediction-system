@@ -11,6 +11,7 @@ import {
 import {
   getUserById,
   loginUser,
+  publicAuthUser,
 } from "./auth.service";
 
 export const login = async (
@@ -39,6 +40,7 @@ export const login = async (
       token:
         result.token,
       mustChangePassword: result.mustChangePassword,
+      user: result.user,
     });
   } catch (error) {
     next(error);
@@ -96,30 +98,7 @@ export const getCurrentUser = async (
       message:
         "User profile retrieved successfully",
 
-      user: {
-        ...(user.role_code === 'STUDENT' ? { studentId: user.studentId } : {}),
-        mustChangePassword: user.must_change_password,
-        id:
-          user.id,
-
-        username:
-          user.username,
-
-        email:
-          user.email,
-
-        fullName:
-          user.full_name,
-
-        status:
-          user.status,
-
-        roleCode:
-          user.role_code,
-
-        roleName:
-          user.role_name,
-      },
+      user: publicAuthUser(user),
     });
   } catch (error) {
     next(error);
