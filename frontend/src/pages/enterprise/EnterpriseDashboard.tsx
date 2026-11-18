@@ -129,6 +129,7 @@ export const EnterpriseDashboard: React.FC = () => {
   const [tasksError, setTasksError] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState(emptyDashboardStats);
   const [recruitmentPosts, setRecruitmentPosts] = useState<RecruitmentPost[]>([]);
+  const [pendingCandidates, setPendingCandidates] = useState<EnterpriseCandidateItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [chartAnimated, setChartAnimated] = useState(false);
@@ -177,7 +178,7 @@ export const EnterpriseDashboard: React.FC = () => {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const [posts, profileResponse, rejectedCandidates] = await Promise.all([
+        const [posts, profileResponse, rejectedCandidates, pendingCandidateList] = await Promise.all([
           loadAllPages<RecruitmentPost>(
             page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
             controller.signal,
@@ -188,6 +189,11 @@ export const EnterpriseDashboard: React.FC = () => {
             page => enterpriseService.listCandidates({ decision: 'REJECTED', page, limit: 100 }, controller.signal),
             controller.signal,
             'danh sách hồ sơ bị từ chối',
+          ),
+          loadAllPages<EnterpriseCandidateItem>(
+            page => enterpriseService.listCandidates({ decision: 'PENDING', page, limit: 100 }, controller.signal),
+            controller.signal,
+            'danh sách hồ sơ chờ duyệt',
           ),
         ]);
         if (controller.signal.aborted) return;
@@ -201,6 +207,18 @@ export const EnterpriseDashboard: React.FC = () => {
             .filter(candidate => candidate.decision === 'REJECTED' && candidate.isLatestCoordination)
             .map(candidate => candidate.studentId)
         );
+        const latestPendingCandidates = pendingCandidateList
+          .filter(candidate =>
+            candidate.decision === 'PENDING'
+            && candidate.isLatestCoordination
+            && !candidate.receivedAt
+          )
+          .sort((a, b) => {
+            const timeA = Date.parse(a.introducedAt || '');
+            const timeB = Date.parse(b.introducedAt || '');
+            return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
+          })
+          .slice(0, 10);
         const counts = [
           currentSummary.pendingCandidates,
           currentSummary.acceptedInterns,
@@ -215,6 +233,7 @@ export const EnterpriseDashboard: React.FC = () => {
         }
         setSummary(currentSummary);
         setRecruitmentPosts(publishedPosts);
+        setPendingCandidates(latestPendingCandidates);
         setDashboardStats({
           totalRecruitmentPosts: posts.length,
           publishedRecruitmentPosts: publishedPosts.length,
@@ -641,23 +660,45 @@ export const EnterpriseDashboard: React.FC = () => {
             </div>
 
             <div className="p-5 sm:p-6">
-              {statsLoading ? <p role="status" className="py-6 text-center text-sm text-slate-500">Đang tải số hồ sơ chờ duyệt…</p> : statsError ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được số hồ sơ chờ duyệt. Vui lòng làm mới số liệu.</p> : summary && summary.pendingCandidates > 0 ? (
-                <div className="flex flex-col gap-4 rounded-xl bg-orange-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-orange-600 shadow-sm">
-                      <Users className="h-5 w-5" />
-                    </span>
-                    <p className="text-sm text-slate-700">
-                      Có <strong>{summary.pendingCandidates}</strong> ứng viên mới cần duyệt hồ sơ.
-                    </p>
-                  </div>
+              {statsLoading ? <p role="status" className="py-6 text-center text-sm text-slate-500">Đang tải danh sách hồ sơ chờ duyệt…</p> : statsError ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được danh sách hồ sơ chờ duyệt. Vui lòng làm mới số liệu.</p> : pendingCandidates.length > 0 ? (
+                <div className="space-y-2">
+                  {pendingCandidates.map((candidate, index) => (
                     <Link
+                      key={candidate.id}
                       to="/enterprise/candidates"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600"
+                      className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 transition hover:border-orange-200 hover:bg-orange-50/40"
                     >
-                      <span>Vào duyệt hồ sơ ngay</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-xs font-bold text-orange-600">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-800">
+                          {candidate.student.fullName}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {candidate.student.studentCode}
+                          {candidate.position.title ? ` · ${candidate.position.title}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-right text-[11px] font-semibold text-slate-400">
+                        {candidate.introducedAt
+                          ? new Date(candidate.introducedAt).toLocaleString('vi-VN', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : 'Mới'}
+                      </span>
                     </Link>
+                  ))}
+                  <Link
+                    to="/enterprise/candidates"
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600"
+                  >
+                    <span>Vào duyệt hồ sơ ngay</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               ) : (
                 <div className="flex flex-col items-center rounded-xl bg-slate-50 px-4 py-7 text-center">
