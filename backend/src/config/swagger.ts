@@ -96,7 +96,7 @@ const options: swaggerJSDoc.Options =
 
         {
           url:
-            "https://capstone-ojt-readiness-and-risk.onrender.com",
+            "https://capstone-ojt.onrender.com",
 
           description:
             "Máy chủ triển khai",
