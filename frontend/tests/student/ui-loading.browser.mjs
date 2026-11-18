@@ -65,6 +65,18 @@ test('Student renders progressively and revalidates session-scoped snapshots in 
   }
   assert.ok(result, 'Browser checks did not complete');
   assert.equal(result.error, undefined, JSON.stringify(result, null, 2));
-  assert.equal(result.checks.length, 8);
+  assert.equal(result.checks.length, 9);
+  for (const check of result.checks) t.diagnostic(check);
+  await command('Page.reload', {}, sessionId);
+  result = null;
+  for (let n = 0; n < 400; n++) {
+    const reply = await command('Runtime.evaluate', { expression: 'window.__studentUiDone ?? null', returnByValue: true }, sessionId);
+    const value = reply.result?.value;
+    if (value?.phase === 'reload' || value?.error) { result = value; break; }
+    await delay(50);
+  }
+  assert.ok(result, 'Full browser reload checks did not complete');
+  assert.equal(result.error, undefined, JSON.stringify(result, null, 2));
+  assert.equal(result.checks.length, 3);
   for (const check of result.checks) t.diagnostic(check);
 });

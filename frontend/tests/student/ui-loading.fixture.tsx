@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AuthContext } from '../../src/contexts/AuthContext';
 import { StudentPortalProvider } from '../../src/contexts/StudentPortalContext';
 import { useStudentResource } from '../../src/hooks/useStudentResource';
-import { studentSnapshots } from '../../src/services/studentSnapshots';
+import { initializeStudentSnapshots, studentSnapshots } from '../../src/services/studentSnapshots';
 import { API, studentPost } from '../../src/services/studentService';
 import StudentDashboard from '../../src/pages/student/StudentDashboard';
 import StudentProfile from '../../src/pages/student/StudentProfile';
@@ -55,6 +55,18 @@ async function run() {
   update.resolve(2);
   await until(() => current.data === 2 && !current.pending, 'Fresh data must replace the snapshot');
   checks.push('cached first paint always revalidates');
+
+  const late = deferred<number>();
+  const lateLoader = () => late.promise;
+  renderProbe('late-restore', lateLoader);
+  await until(() => current.pending, 'The request must already be pending before cache restoration');
+  studentSnapshots.write(studentSnapshots.scope('student-a'), 'late-restore', 55);
+  renderProbe('late-restore', lateLoader);
+  assert(current.data === 55 && current.refreshing, 'Asynchronously restored data must appear during an existing request');
+  late.reject(Error('Refresh unavailable'));
+  await until(() => !!current.error, 'Refresh failure must be visible');
+  assert(current.data === 55, 'A failed refresh must preserve data restored after request dispatch');
+  checks.push('asynchronous restore updates pending resources');
 
   const rest = deferred<number>();
   renderProbe('courses', async (_signal, publish) => { publish(10); return rest.promise; });
@@ -148,7 +160,51 @@ async function run() {
   assert(history.length === 1 && history[0].url.includes('limit=20'), 'History must load one server page rather than every page');
   checks.push('application history is lazy and server-paginated');
   flushSync(() => root.unmount());
+  // Keep real persisted snapshots for a full browser reload (the next test phase).
+  await initializeStudentSnapshots('student-a');
+  const ticket = studentSnapshots.scope('student-a');
+  studentSnapshots.write(ticket, 'portal-profile:2', profile);
+  studentSnapshots.write(ticket, 'dashboard-summary:2:1:0', {
+    academic: { academicProgress: { credits: { earned: 60, total: 120 }, status: 'CALCULATED' } },
+    internship: { assignment: null },
+  });
+  sessionStorage.setItem('student-ui-reload-check', 'ready');
   return checks;
 }
-run().then(checks => { (window as any).__studentUiDone = { checks }; })
+
+async function runReload() {
+  sessionStorage.removeItem('student-ui-reload-check');
+  const identity = deferred<any>();
+  API.defaults.adapter = async config => {
+    requests.push(config);
+    if (config.url === '/auth/me') {
+      return { data: { success: true, user: await identity.promise }, status: 200, statusText: 'OK', headers: {}, config };
+    }
+    // All profile/dashboard/risk responses remain pending for this phase.
+    await new Promise((_resolve, reject) => config.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true }));
+    throw Error('Unreachable');
+  };
+  const render = (value = auth()) => flushSync(() => root.render(
+    <AuthContext.Provider value={value as any}><MemoryRouter><StudentPortalProvider><StudentDashboard/></StudentPortalProvider></MemoryRouter></AuthContext.Provider>,
+  ));
+  render();
+  await until(() => requests.some(r => r.url === '/auth/me') && requests.some(r => r.url === '/students/me/ojt-risk-assessment'), 'Risk should start while identity verification is still pending');
+  assert(!body().includes('SE0002'), 'Persisted personal data must stay hidden before server identity verification');
+  checks.push('risk starts alongside identity verification');
+  identity.resolve({ id: 7, studentId: 2, email: 'student@test.test', roleCode: 'STUDENT' });
+  await until(() => body().includes('60 / 120'), 'After a full reload, cached credits should render without waiting for profile/dashboard responses');
+  assert(body().includes('SE0002'), 'Restored profile must belong to the verified student');
+  assert(requests.filter(r => r.url === '/students/me/ojt-risk-assessment').length === 1, 'Passing a started assessment into the panel must not duplicate it');
+  assert(requests.some(r => r.url.startsWith('/students/2?')) && requests.some(r => r.url.includes('view=summary')), 'Cached profile and dashboard must still revalidate');
+  checks.push('full reload restores verified data while API responses remain pending');
+  localStorage.setItem('ojt_auth_token', 'student-b');
+  render({ ...auth('student-b'), user: { ...auth().user, id: '8', email: 'other@test.test' } });
+  assert(!body().includes('SE0002') && !body().includes('60 / 120'), 'Account switching must immediately hide all restored personal data');
+  assert(!Object.keys(sessionStorage).some(key => key.startsWith('ojt:student-ui:')), 'Leaving the old account must erase its persisted cache');
+  checks.push('account changes hide and erase restored data');
+  flushSync(() => root.unmount());
+  return checks;
+}
+const reload = sessionStorage.getItem('student-ui-reload-check') === 'ready';
+(reload ? runReload() : run()).then(checks => { (window as any).__studentUiDone = { phase: reload ? 'reload' : 'initial', checks }; })
   .catch(error => { (window as any).__studentUiDone = { error: error.stack ?? String(error), checks, body: body(), requests: requests.map(r => r.url), errors }; });

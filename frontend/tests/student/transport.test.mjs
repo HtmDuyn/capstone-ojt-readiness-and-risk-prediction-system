@@ -32,7 +32,7 @@ globalThis.localStorage = { getItem: key => stored.get(key) ?? null, setItem: (k
 globalThis.window = new EventTarget();
 globalThis.fetch = () => { throw new Error('Student requests must never call fetch'); };
 const student = await import('../../src/services/studentService.ts');
-const { studentSnapshots } = await import('../../src/services/studentSnapshots.ts');
+const { studentSnapshots, initializeStudentSnapshots } = await import('../../src/services/studentSnapshots.ts');
 const { getOjtRiskAssessment } = await import('../../src/services/studentOjtRisk.service.ts');
 const { cvAnalysisApi } = await import('../../src/services/studentCvAnalysis.service.ts');
 const { matchStudentJobs } = await import('../../src/services/studentJobMatching.service.ts');
@@ -155,4 +155,49 @@ test('successful Axios writes invalidate UI snapshots, while failed writes remai
     { status: 409, data: { message: 'Already submitted' }, headers: {}, config }); };
   await assert.rejects(student.studentPost('/job-applications', {}), { status: 409 });
   assert.deepEqual(studentSnapshots.read(ticket, 'profile'), { data: { name: 'After' } });
+});
+
+test('a cached profile opens only after server identity verification, while its fresh response is still pending', async () => {
+  stored.set('ojt_auth_token', 'cached-profile-session');
+  const user = { id: 7, studentId: 2, email: 'student@test.test', roleCode: 'STUDENT' };
+  const cached = { id: 2, userId: 7, email: user.email, fullName: 'Cached', ojtRegistrations: { items: [], total: 0 } };
+  studentSnapshots.write(studentSnapshots.scope('cached-profile-session'), 'portal-profile:2', cached);
+  let verify, refresh, announce;
+  const auth = new Promise(resolve => { verify = resolve; });
+  const profile = new Promise(resolve => { refresh = resolve; });
+  const displayed = new Promise(resolve => { announce = resolve; });
+  let published = 0, finished = false;
+  student.API.defaults.adapter = async config => ({
+    data: config.url === '/auth/me' ? { success: true, user: await auth } : { success: true, data: await profile },
+    status: 200, statusText: 'OK', headers: {}, config,
+  });
+  const result = student.getOwnStudentIdentity(undefined, { id: '7', email: user.email }, data => { published++; announce(data); }).then(data => { finished = true; return data; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(published, 0, 'No personal cache is exposed before auth/me completes');
+  verify(user);
+  assert.deepEqual(await displayed, cached);
+  assert.equal(finished, false, 'Cached UI need not wait for the profile refresh');
+  refresh({ ...cached, fullName: 'Fresh' });
+  assert.equal((await result).fullName, 'Fresh');
+
+  studentSnapshots.write(studentSnapshots.scope('cached-profile-session'), 'portal-profile:2', { ...cached, userId: 8 });
+  published = 0;
+  await student.getOwnStudentIdentity(undefined, undefined, () => published++);
+  assert.equal(published, 0, 'A mismatched cached owner is discarded');
+});
+
+test('tab cache keys hash the token and mutations erase persisted snapshots', async () => {
+  const tab = new Map();
+  window.sessionStorage = { getItem: key => tab.get(key) ?? null, setItem: (key, value) => tab.set(key, value), removeItem: key => tab.delete(key) };
+  stored.set('ojt_auth_token', 'private-tab-token');
+  await initializeStudentSnapshots('private-tab-token');
+  studentSnapshots.write(studentSnapshots.scope('private-tab-token'), 'risk', { level: 'LOW' });
+  assert.equal(tab.size, 1);
+  const [key, value] = [...tab][0];
+  assert.match(key, /^ojt:student-ui:v1:[a-f0-9]{64}$/);
+  assert.ok(!key.includes('private-tab-token') && !value.includes('private-tab-token'));
+  student.API.defaults.adapter = async config => ({ data: { success: true, data: {} }, status: 200, statusText: 'OK', headers: {}, config });
+  await student.studentPost('/job-applications', {});
+  assert.equal(tab.size, 0);
+  delete window.sessionStorage;
 });

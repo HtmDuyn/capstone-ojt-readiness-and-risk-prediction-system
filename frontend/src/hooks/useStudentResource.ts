@@ -51,7 +51,8 @@ export function useStudentResource<T>(
           setState(current => ({
             key,
             token,
-            data: current.key === key && current.token === token ? current.data : null,
+            data: current.key === key && current.token === token
+              ? current.data ?? (snapshot ? studentSnapshots.read<T>(requestTicket, key)?.data ?? null : null) : null,
             loading: false,
             error:
               err instanceof Error ? err.message : 'Không tải được dữ liệu.',
@@ -60,7 +61,7 @@ export function useStudentResource<T>(
     return () => controller.abort();
   }, [key, token, retry, snapshot]);
   const current = state.key === key && state.token === token
-    ? state
+    ? { ...state, data: state.data === null && state.loading && cached ? cached.data : state.data }
     : { data: cached ? cached.data : null, loading: key !== null, error: '' };
   return {
     ...current,

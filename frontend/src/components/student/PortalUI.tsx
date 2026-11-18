@@ -191,6 +191,7 @@ export function StudentPage({
       />
       <ResourceState
         loading={portal.loading}
+        refreshing={portal.refreshing}
         error={portal.error}
         retry={portal.refresh}
       />

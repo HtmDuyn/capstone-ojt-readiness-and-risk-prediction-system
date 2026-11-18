@@ -8,6 +8,7 @@ import { riskTheme } from '@/components/student/ojt-risk/risk-ui';
 import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentSemesterSelect, statusText } from '@/components/student/PortalUI';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentRisk } from '@/hooks/useStudentRisk';
 import { getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
 
 const card = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';
@@ -16,6 +17,7 @@ const link = 'text-sm font-medium text-blue-600 hover:text-blue-700 hover:underl
 
 export const StudentDashboard = () => {
   const { profile, semesterId, revision, loading, registrationWindows, windowsLoading } = useStudentPortal();
+  const assessment = useStudentRisk();
   const resource = useStudentResource(
     !loading && profile && semesterId ? 'dashboard-summary:' + profile.id + ':' + semesterId + ':' + revision : null,
     (signal) => getStudentDashboardSummary(semesterId!, signal),
@@ -47,7 +49,7 @@ export const StudentDashboard = () => {
     showRefreshAction={false} showSemesterInBanner={false} compactTopSpacing>
     <ResourceState loading={resource.loading} refreshing={resource.refreshing} error={resource.error} retry={resource.reload} />
     <OjtRiskPanel key={'ojt-risk:' + (profile?.id ?? 'pending') + ':' + revision}
-      showRefreshAction={false} renderDashboard={risk => <div className="space-y-4">
+      assessment={assessment} showRefreshAction={false} renderDashboard={risk => <div className="space-y-4">
         <section className={card} aria-labelledby="student-ojt-overview">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
             <div><h2 id="student-ojt-overview" className="text-lg font-bold text-slate-900 sm:text-xl">Tổng quan OJT</h2>

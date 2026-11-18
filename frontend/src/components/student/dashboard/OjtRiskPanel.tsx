@@ -1,9 +1,8 @@
 import { type ReactNode } from 'react';
 import { CircleAlert,GraduationCap,RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useStudentResource } from '@/hooks/useStudentResource';
-import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
-import { getOjtRiskAssessment,type RiskAssessment } from '@/services/studentOjtRisk.service';
+import { useStudentRisk, type StudentRiskResource } from '@/hooks/useStudentRisk';
+import { type RiskAssessment } from '@/services/studentOjtRisk.service';
 import { RiskOverview } from '../ojt-risk/RiskOverview';
 import { AcademicMetrics } from '../ojt-risk/AcademicMetrics';
 import { RiskInsights } from '../ojt-risk/RiskInsights';
@@ -17,16 +16,10 @@ function AssessmentSkeleton({showSemesterSelector=false}:{showSemesterSelector?:
   return <div role="status" aria-label="Đang tải đánh giá OJT" className="space-y-4"><span className="sr-only">Đang tải dữ liệu học vụ và lộ trình…</span><div className={`${cardClass} space-y-4 p-6`}><div className="flex flex-wrap items-start justify-between gap-4"><div aria-hidden="true" className="h-5 w-2/3 animate-pulse rounded bg-slate-100 motion-reduce:animate-none"/>{showSemesterSelector && <div className="w-full sm:w-60"><StudentSemesterSelect /></div>}</div><div aria-hidden="true" className="space-y-4 animate-pulse motion-reduce:animate-none"><div className="h-8 w-28 rounded-full bg-slate-100"/><div className="h-4 w-full rounded bg-slate-100"/><div className="h-4 w-3/4 rounded bg-slate-100"/></div></div><div aria-hidden="true" className="space-y-4 animate-pulse motion-reduce:animate-none"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[0,1,2,3].map(i=><div key={i} className={`${cardClass} space-y-4 p-5`}><div className="size-10 rounded-xl bg-slate-100"/><div className="h-3 w-3/4 rounded bg-slate-100"/><div className="h-8 w-1/2 rounded bg-slate-100"/></div>)}</div><div className={`${cardClass} h-52 bg-white p-6`}><div className="h-5 w-1/2 rounded bg-slate-100"/><div className="mt-6 h-24 rounded-xl bg-slate-50"/></div></div></div>;
 }
 
-export function OjtRiskPanel({showRefreshAction=true,showSemesterSelector=false,compactTop=false,compactLayout=false,renderDashboard}:{showRefreshAction?:boolean;showSemesterSelector?:boolean;compactTop?:boolean;compactLayout?:boolean;renderDashboard?:(data:RiskAssessment|null)=>ReactNode}){
-  const {token,user}=useAuth();
-  const portal=useOptionalStudentPortal();
-  // Keep the last displayed result between dashboard and risk pages, while
-  // always requesting a fresh assessment. AI computation is unchanged.
-  const resource=useStudentResource(
-    token ? `ojt-risk:${user?.id??''}:${portal?.revision??0}` : null,
-    signal=>getOjtRiskAssessment(signal),
-    {snapshot:true},
-  );
+export function OjtRiskPanel({showRefreshAction=true,showSemesterSelector=false,compactTop=false,compactLayout=false,renderDashboard,assessment}:{showRefreshAction?:boolean;showSemesterSelector?:boolean;compactTop?:boolean;compactLayout?:boolean;renderDashboard?:(data:RiskAssessment|null)=>ReactNode;assessment?:StudentRiskResource}){
+  const {user}=useAuth();
+  const fallback=useStudentRisk(!assessment);
+  const resource=assessment??fallback;
   const {data,error,reload:refresh}=resource;
   const loading=resource.pending;
   return <section id="ojt-risk" aria-label="Rủi ro và lộ trình OJT" aria-busy={loading} className={renderDashboard||compactLayout?'min-w-0 scroll-mt-6 space-y-4':`min-w-0 scroll-mt-6 space-y-5 rounded-[24px] bg-[#F8FAFC] sm:space-y-6 ${compactTop ? 'px-3 pb-3 pt-0 sm:px-5 sm:pb-5 lg:px-6 lg:pb-6' : 'p-3 sm:p-5 lg:p-6'}`}>

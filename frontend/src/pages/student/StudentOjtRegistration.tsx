@@ -24,7 +24,7 @@ type Application = {
 type OpportunityResults = Page<Opportunity> & { blockers: string[] };
 
 function RegistrationContent() {
-  const { profile, semesterId, revision } = useStudentPortal();
+  const { profile, semesterId, revision, refreshing: profileRefreshing } = useStudentPortal();
   const [windowChoice, setWindowChoice] = useState('');
   const [search, setSearch] = useState('');
   const [companyPage, setCompanyPage] = useState(1);
@@ -63,7 +63,7 @@ function RegistrationContent() {
   const applicationItems = applications.data?.items ?? [];
   const cv = savedCv ?? profile?.cv ?? null;
   const blockers = opportunities.data?.blockers ?? [];
-  const canApply = !!chosenWindow && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
+  const canApply = !!chosenWindow && !profileRefreshing && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
   const refreshRecruitment = () => { windows.reload(); opportunities.reload(); applications.reload(); };
   const openApplication = (position?: Opportunity) => {
     if (!canApply) return;

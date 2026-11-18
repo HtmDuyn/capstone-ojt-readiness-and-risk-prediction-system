@@ -24,6 +24,7 @@ import type {
 interface PortalContext {
   profile: StudentIdentityProfile | null;
   loading: boolean;
+  refreshing: boolean;
   error: string;
   warnings: string[];
   registrationWindows: Window[];
@@ -51,6 +52,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [windowsLoading, setWindowsLoading] = useState(true);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [semesterId, setSemesterId] = useState<number | null>(null);
@@ -63,7 +65,9 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    const ticket = studentSnapshots.scope(token);
     setLoading(true);
+    setRefreshing(false);
     setError('');
     setWarnings([]);
     setOwnedProfile(null);
@@ -75,11 +79,19 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
     Promise.resolve()
       .then(() => {
         controller.signal.throwIfAborted();
-        return getOwnStudentIdentity(controller.signal, user ?? undefined);
+        return getOwnStudentIdentity(controller.signal, user ?? undefined, cached => {
+          if (controller.signal.aborted) return;
+          setOwnedProfile({ token, profile: cached });
+          setLoading(false);
+          setRefreshing(true);
+          const catalog = studentSnapshots.read<Window[]>(ticket, 'portal-windows:' + cached.id);
+          if (catalog) setWindows(catalog.data);
+        });
       })
       .then(async (own) => {
         if (controller.signal.aborted) return;
         setOwnedProfile({ token, profile: own });
+        setRefreshing(false);
         // Profile and semester open the page. The scoped catalog updates separately;
         // notification contents/counts load only in the screens that display them.
         setLoading(false);
@@ -88,7 +100,10 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
             '/ojt-registration-windows?view=catalog',
             controller.signal,
           ).then(items => {
-            if (!controller.signal.aborted) setWindows(items);
+            if (!controller.signal.aborted) {
+              studentSnapshots.write(ticket, 'portal-windows:' + own.id, items);
+              setWindows(items);
+            }
             return items;
           }).finally(() => {
             if (!controller.signal.aborted) setWindowsLoading(false);
@@ -133,7 +148,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
           );
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) { setLoading(false); setRefreshing(false); }
       });
     return () => controller.abort();
   }, [token, user?.id, user?.email, logout, revision]);
@@ -175,6 +190,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
       value={{
         profile,
         loading,
+        refreshing,
         error,
         warnings,
         registrationWindows: profile ? windows : [],

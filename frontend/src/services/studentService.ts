@@ -2,7 +2,7 @@ import axios from 'axios';
 import { expireBearerSession } from './authSession';
 import { API_BASE_URL } from '@/config/api';
 import { studentReads } from './studentReads';
-import { studentSnapshots } from './studentSnapshots';
+import { initializeStudentSnapshots, studentSnapshots } from './studentSnapshots';
 
 import { downloadFile } from '@/utils/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
@@ -31,14 +31,8 @@ import type {
 
 export { API_BASE_URL };
 
-// Keep the student's transport independent of the shared API and legacy Axios
-// declarations used by the other roles. Axios normalizes headers at runtime.
+// Keep the student's transport independent of the shared API singleton.
 type HeaderValue = string | number | boolean | null | undefined;
-interface StudentHeaders {
-  has(name: string): boolean;
-  set(name: string, value: HeaderValue): void;
-  delete(name: string): void;
-}
 interface StudentRequestConfig {
   method?: string;
   data?: unknown;
@@ -65,11 +59,10 @@ export const API = axios.create({
 
 API.interceptors.request.use(config => {
   if(['get','head'].includes(config.method?.toLowerCase()??'get')){
-    config.headers??={};
-    config.headers['Cache-Control']='no-cache';
-    config.headers['Pragma']='no-cache';
+    config.headers.set('Cache-Control', 'no-cache');
+    config.headers.set('Pragma', 'no-cache');
   }
-  const headers = config.headers as unknown as StudentHeaders;
+  const headers = config.headers;
   const token = localStorage.getItem('ojt_auth_token');
   if (config.url !== '/auth/login' && token && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
   if (config.data instanceof FormData) headers.delete('Content-Type');
@@ -164,13 +157,27 @@ export async function getOwnStudent(
 export async function getOwnStudentIdentity(
   signal?: AbortSignal,
   expectedUser?: { id: string; email: string },
+  onCached?: (profile: StudentIdentityProfile) => void,
 ): Promise<StudentIdentityProfile> {
-  return resolveOwnStudent((id, requestSignal) => studentGet<StudentIdentityProfile>(
-    `/students/${id}` + studentQuery({ include: 'ojtRegistrations', ojtLimit: 100 }), requestSignal,
-  ), signal, expectedUser);
+  const token = localStorage.getItem('ojt_auth_token');
+  const ticket = studentSnapshots.scope(token);
+  const restored = initializeStudentSnapshots(token);
+  const profile = await resolveOwnStudent(async (id, requestSignal, user) => {
+    await restored;
+    requestSignal?.throwIfAborted();
+    // Cached personal data opens the portal only after /auth/me verifies its owner.
+    const cached = studentSnapshots.read<StudentIdentityProfile>(ticket, 'portal-profile:' + id)?.data;
+    if (cached?.id === id && cached.userId === user.id && cached.email?.toLowerCase() === user.email.toLowerCase()) onCached?.(cached);
+    return studentGet<StudentIdentityProfile>(
+      `/students/${id}` + studentQuery({ include: 'ojtRegistrations', ojtLimit: 100 }), requestSignal,
+    );
+  }, signal, expectedUser);
+  signal?.throwIfAborted();
+  studentSnapshots.write(ticket, 'portal-profile:' + profile.id, profile);
+  return profile;
 }
 async function resolveOwnStudent<T extends Pick<Profile, 'id' | 'userId'>>(
-  loadProfile: (id: number, signal?: AbortSignal) => Promise<T>,
+  loadProfile: (id: number, signal: AbortSignal | undefined, user: StudentCurrentUserResponse['user']) => Promise<T>,
   signal?: AbortSignal,
   expectedUser?: { id: string; email: string },
 ): Promise<T> {
@@ -197,7 +204,7 @@ async function resolveOwnStudent<T extends Pick<Profile, 'id' | 'userId'>>(
   }
   if (!Number.isSafeInteger(studentId) || studentId <= 0)
     throw new ApiError('Máy chủ chưa xác định được hồ sơ sinh viên của tài khoản. Liên hệ Phòng Đào tạo để kiểm tra liên kết.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-  const profile = await loadProfile(studentId, signal);
+  const profile = await loadProfile(studentId, signal, user);
   if (profile.id !== studentId || profile.userId !== user.id)
     throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
   return profile;
