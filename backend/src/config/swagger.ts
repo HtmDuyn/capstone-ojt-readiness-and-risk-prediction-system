@@ -18,7 +18,6 @@ import swaggerJSDoc from "swagger-jsdoc";
 import { describeManualInputs } from './swagger-inputs';
 import { addAdminOperations } from '../modules/admin/admin.openapi';
 import { addPortalOperations } from '../modules/student-portal/portal.openapi';
-import { mergeSharedRoleContracts } from './shared-role-contracts';
 import { addEnterpriseOperations } from '../modules/enterprise/enterprise.openapi';
 import { addRecruitmentOperations } from '../modules/recruitment/recruitment.openapi';
 import { describeRestOperations } from './rest-operations';
@@ -377,9 +376,7 @@ const options: swaggerJSDoc.Options =
   };
 
 const swaggerWithQhdn = swaggerJSDoc(options);
-const qhdnOriginalPaths = structuredClone((swaggerWithQhdn as Record<string, any>).paths ?? {});
 addAdminOperations(swaggerWithQhdn);
-mergeSharedRoleContracts(swaggerWithQhdn, qhdnOriginalPaths);
 addEnterpriseOperations(swaggerWithQhdn as Record<string, any>);
 addRecruitmentOperations(swaggerWithQhdn as Record<string, any>);
 describeOfficialResults(swaggerWithQhdn as Record<string, any>);

@@ -12,18 +12,3 @@ export async function saveCompany(body:unknown,actor:number,id?:number) {
   const row=await write(c,catalogs.companies,values,id);await audit(c,actor,'Enterprises',row.EnterpriseID,id?'UPDATE':'CREATE',old,row);return apiRow(catalogs.companies,row);
  });
 }
-export async function softDelete(kind:'companies'|'positions',id:number,actor:number) {
- return academicTransaction(async c=>{
-  const config=catalogs[kind],old=await record(c,config,id);
-  const active=(await c.query(`SELECT 1 FROM "InternshipAssignments" WHERE "${kind==='companies'?'EnterpriseID':'PositionID'}"=$1 AND COALESCE("Status",'ACTIVE') NOT IN ('COMPLETED','CANCELLED') LIMIT 1`,[id])).rowCount;
-  if(active)throw invalid('Active assignments prevent deletion.',409,'ACTIVE_ASSIGNMENTS');
-  if(kind==='companies'&&(await c.query(`SELECT 1 FROM "InternshipPositions" WHERE "EnterpriseID"=$1 AND "DeletedAt" IS NULL AND "Status"='OPEN' LIMIT 1`,[id])).rowCount)throw invalid('Close or delete open positions first.',409,'OPEN_POSITIONS');
-  const deleted=(await c.query(`UPDATE "${config.table}" SET "DeletedAt"=now(),"Status"=$2 WHERE "${config.id}"=$1 RETURNING *`,[id,kind==='companies'?'INACTIVE':'CLOSED'])).rows[0];
-  await audit(c,actor,config.table,id,'SOFT_DELETE',old,{deleted:true});
-  if(kind==='companies'){
-   const accounts=(await c.query(`SELECT u."UserID" AS id,u."Username" AS username,u."Email" AS email,u."FullName" AS "fullName",u."Status" AS status FROM "Users" u JOIN "EnterpriseUsers" eu ON eu."UserID"=u."UserID" WHERE eu."EnterpriseID"=$1 ORDER BY u."UserID"`,[id])).rows;
-   return {company:{...apiRow(catalogs.companies,deleted),deletedAt:deleted.DeletedAt},accounts};
-  }
-  return {position:{...apiRow(catalogs.positions,deleted),deletedAt:deleted.DeletedAt}};
- });
-}

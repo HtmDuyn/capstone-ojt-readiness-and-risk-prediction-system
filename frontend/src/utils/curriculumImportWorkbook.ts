@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { CurriculumDetail, CurriculumImportPayload, Major } from '@/types/education/curriculum.types';
-import { curriculumImportSheets, downloadCurriculumTemplate } from './curriculumTemplateWorkbook';
+import { curriculumImportSheets, downloadCurriculumTemplate } from './curriculumTemplateWorkbook.ts';
 type ExcelRow = Record<
   string,
   unknown

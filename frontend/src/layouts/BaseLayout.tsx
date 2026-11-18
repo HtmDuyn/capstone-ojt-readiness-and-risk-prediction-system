@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { EducationSidebar } from "@/components/education/EducationSidebar";
@@ -94,8 +94,8 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           {/* Container chính thống nhất qua Dashboard & Modules */}
           <main className={`relative z-10 flex-1 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1520px] mx-auto space-y-6 ${isEnterprise ? 'enterprise-workspace' : isQhdn ? 'qhdn-workspace' : ''}`}>
             {isEnterprise || isQhdn
-              ? <div key={location.pathname} className={isQhdn ? 'qhdn-page-transition' : 'enterprise-page-transition'}>{children || <Outlet />}</div>
-              : children || <Outlet />}
+              ? <div key={location.pathname} className={isQhdn ? 'qhdn-page-transition' : 'enterprise-page-transition'}>{children || <Suspense fallback={<p role="status" className="py-8 text-center text-sm text-slate-500">Đang tải trang…</p>}><Outlet /></Suspense>}</div>
+              : children || <Suspense fallback={<p role="status" className="py-8 text-center text-sm text-slate-500">Đang tải trang…</p>}><Outlet /></Suspense>}
 
             {/* Footer của Dashboard */}
             <Footer />

@@ -4,8 +4,8 @@ import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
-import { list, saveCompany } from './catalog.service';
-import { coordinate, decision, assign, updateAssignment } from './workflow.service';
+import { list } from './catalog.service';
+import { coordinate, decision } from './workflow.service';
 import { registeredStudents } from './registered-students.service';
 import { eligibleStudents } from './eligible-students.service';
 import { studentDossier } from './student-profile.service';
@@ -24,12 +24,9 @@ router.patch('/qhdn/companies/:id/access',...staff,handle(req=>setCompanyAccess(
 for(const [path,resource] of [['companies','companies'],['positions','positions'],['ojt-coordinations','coordinations'],['assignments','assignments'],['internship-evaluations','evaluations']] as const){
   router.get(`/${path}`,...staff,handle(req=>list(resource,req.query,req.user)));
 }
-router.patch('/companies/:id',...admin,handle(req=>saveCompany(req.body,req.user,positiveId(req.params.id))));
 router.post('/ojt-coordinations',...admin,handle(req=>coordinate(req.body,req.user),201));
 router.post('/ojt-coordinations/:id/decision',...admin,handle(req=>decision(positiveId(req.params.id),req.body,req.user)));
 router.post('/ojt-coordinations/:id/reassign',...admin,handle(req=>coordinate(req.body,req.user,positiveId(req.params.id)),201));
-router.post('/assignments',...admin,handle(req=>assign(req.body,req.user),201));
-router.patch('/assignments/:id',...admin,handle(req=>updateAssignment(positiveId(req.params.id),req.body,req.user)));
 router.get('/qhdn/dashboard',...staff,handle(req=>dashboard(req.query,req.user)));
 router.get('/qhdn/reports',...staff,handle(req=>{
  const {type}=reportQuery(req.query,'report');return report(type!,req.query,req.user);

@@ -1,34 +1,8 @@
 import type { PoolClient } from 'pg';
-import { academicTransaction, audit } from '../academic/academic.repository';
-import { metadata, inputObject, requiredText, optionalText, positiveId, credits, boolean, invalid, assertAcyclic } from './curriculum.validation';
+import { metadata, inputObject, requiredText, optionalText, invalid, assertAcyclic } from './curriculum.validation';
 import { detail } from './curriculum.repository';
 import { normalizeCourses, normalizeCombo, normalizePrerequisites, normalizeEquivalences, validateComboCapacity, type Row } from './curriculum.structure';
 
-export async function saveMajor(body:unknown,actorId:number) {
-  const b=inputObject(body,['code','name','parentMajorId']);
-  return academicTransaction(async client=>{
-    const r=(await client.query(`INSERT INTO "Specializations" ("SpecializationCode","SpecializationName","MajorID") VALUES ($1,$2,$3) RETURNING "SpecializationID" AS id,"SpecializationCode" AS code,"SpecializationName" AS name,"MajorID" AS "parentMajorId"`,[requiredText(b.code,'code',20).toUpperCase(),requiredText(b.name,'name',200),positiveId(b.parentMajorId,'parentMajorId')])).rows[0];
-    await audit(client,actorId,'Specializations',r.id,'CREATE_MAJOR',null,r);return r;
-  });
-}
-export async function saveCourse(body:unknown,actorId:number,id?:number) {
-  const b=inputObject(body,['code','name','defaultCredits','isOjtPrerequisite']);
-  const fields:Record<string,unknown>={};
-  if(!id||'code' in b)fields.CourseCode=requiredText(b.code,'code',20).toUpperCase();
-  if(!id||'name' in b)fields.CourseName=requiredText(b.name,'name',200);
-  if('defaultCredits' in b)fields.Credits=b.defaultCredits===null?null:credits(b.defaultCredits);
-  if('isOjtPrerequisite' in b)fields.IsOJTPrerequisite=boolean(b.isOjtPrerequisite,'isOjtPrerequisite');
-  return academicTransaction(async client=>{
-    let before:Row|null=null;
-    if(id){before=(await client.query('SELECT * FROM "Courses" WHERE "CourseID"=$1 FOR UPDATE',[id])).rows[0];if(!before)throw invalid('Course not found.',404,'COURSE_NOT_FOUND');
-      if(fields.CourseCode!==undefined && fields.CourseCode!==before.CourseCode && (await client.query(`SELECT 1 FROM "StudentCourseResults" WHERE "CourseID"=$1 UNION ALL SELECT 1 FROM "ProgramCourses" pc JOIN "TrainingPrograms" p ON p."ProgramID"=pc."ProgramID" WHERE pc."CourseID"=$1 AND p."Status"='PUBLISHED' UNION ALL SELECT 1 FROM "ComboCourses" cc JOIN "ProgramCombos" b ON b."ProgramComboID"=cc."ProgramComboID" JOIN "TrainingPrograms" p ON p."ProgramID"=b."ProgramID" WHERE cc."CourseID"=$1 AND p."Status"='PUBLISHED' LIMIT 1`,[id])).rowCount)throw invalid('A course code with academic history or a published curriculum cannot be renamed.',409,'COURSE_IN_USE');
-    }
-    const entries=Object.entries(fields),args=entries.map(([,v])=>v);
-    const sql=id?`UPDATE "Courses" SET ${entries.map(([k],i)=>`"${k}"=$${i+1}`).join(',')} WHERE "CourseID"=$${args.length+1}`:`INSERT INTO "Courses" (${entries.map(([k])=>`"${k}"`).join(',')}) VALUES (${entries.map((_,i)=>`$${i+1}`).join(',')})`;
-    const r=(await client.query(sql+' RETURNING "CourseID" AS id,"CourseCode" AS code,"CourseName" AS name,"Credits"::float8 AS "defaultCredits","IsOJTPrerequisite" AS "isOjtPrerequisite"',id?[...args,id]:args)).rows[0];
-    await audit(client,actorId,'Courses',r.id,id?'UPDATE_COURSE':'CREATE_COURSE',before,r);return r;
-  });
-}
 export async function writeMetadata(client:PoolClient,body:unknown,actorId:number,id?:number) {
   const value=metadata(body,!!id),fields=value.fields;
   if(fields.SpecializationID!==undefined && !(await client.query('SELECT 1 FROM "Specializations" WHERE "SpecializationID"=$1',[fields.SpecializationID])).rowCount)throw invalid('majorId does not identify an existing specialization.');

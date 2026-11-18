@@ -30,7 +30,6 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/academic/course-demand/export",
     "GET /api/academic/dashboard",
     "GET /api/cohorts",
-    "GET /api/combo-registration-windows/{id}/selections",
     "GET /api/courses",
     "GET /api/curricula",
     "GET /api/curricula/{id}",
@@ -41,9 +40,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "GET /api/students",
     "PATCH /api/academic-years/{id}",
     "PATCH /api/cohorts/{id}",
-    "PATCH /api/combo-registration-windows/{id}",
     "PATCH /api/course-results/{id}",
-    "PATCH /api/courses/{id}",
     "PATCH /api/ojt-registration-windows/{id}",
     "PATCH /api/ojt-rule-sets/{id}",
     "PATCH /api/students/{id}",
@@ -51,15 +48,9 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/academic-years",
     "POST /api/academic/alerts/notifications",
     "POST /api/cohorts",
-    "POST /api/combo-registration-windows",
-    "POST /api/combo-registration-windows/{id}/extensions",
-    "POST /api/combo-registration-windows/{id}/finalize",
-    "POST /api/combo-registration-windows/{id}/reminders",
-    "POST /api/courses",
     "POST /api/curriculum-imports/commit",
     "POST /api/curriculum-imports/preview",
     "POST /api/eligibility-check-runs",
-    "POST /api/majors",
     "POST /api/ojt-registration-windows",
     "POST /api/ojt-registration-windows/{id}/semester-exceptions",
     "POST /api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke",
@@ -74,16 +65,12 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PUT /api/ojt-semesters/{id}/assessment-window",
   ] },
   { roles: ["ADMIN"], operations: [
-    "DELETE /api/companies",
-    "DELETE /api/positions",
-    "DELETE /api/students",
     "GET /api/accounts",
     "POST /api/admin/audit-logs/list",
     "POST /api/admin/dashboard",
 
 
 
-    "POST /api/students/export",
 
 
 
@@ -126,12 +113,10 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "PATCH /api/qhdn/companies/{id}/access",
     "GET /api/qhdn/reports",
     "GET /api/qhdn/reports/export",
-    "PATCH /api/assignments/{id}",
     "PATCH /api/companies/{id}",
     "PATCH /api/recruitment/windows/{id}",
     "GET /api/recruitment/windows",
     "POST /api/recruitment/windows/{id}/finalize",
-    "POST /api/assignments",
     "POST /api/ojt-coordinations",
     "POST /api/ojt-coordinations/{id}/decision",
     "POST /api/ojt-coordinations/{id}/reassign",
@@ -141,14 +126,10 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   ] },
   { roles: ["ADMIN","ACADEMIC","STUDENT"], operations: [
     "GET /api/ojt-registration-windows",
-    "GET /api/combo-registration-windows",
     "GET /api/students/{id}",
-    "GET /api/students/{id}/combo-selections",
     "GET /api/students/{id}/course-results",
     "GET /api/students/{id}/eligibility",
     "GET /api/students/{id}/eligibility-checks",
-    "POST /api/combo-registration-windows/{id}/preview",
-    "POST /api/combo-registration-windows/{id}/selections",
     "POST /api/ojt-registrations",
   ] },
   { roles: [], operations: [
@@ -188,7 +169,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
   }
   for (const key of ['GET /api/academic-years/{id}/calendar', 'PUT /api/academic-years/{id}/calendar']) access.set(key, ['ADMIN', 'ACADEMIC']);
   for(const key of ['POST /api/ojt-registration-windows','PATCH /api/ojt-registration-windows/{id}','POST /api/ojt-results/publish'])access.set(key,['ADMIN','OJT_COORD']);
-  for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign','POST /api/assignments','PATCH /api/assignments/{id}'])access.set(key,['ADMIN']);
+  for(const key of ['POST /api/ojt-registrations/{id}/review','POST /api/ojt-coordinations','POST /api/ojt-coordinations/{id}/decision','POST /api/ojt-coordinations/{id}/reassign'])access.set(key,['ADMIN']);
   access.set('PATCH /api/companies/{id}', ['ADMIN']);
   access.set('PATCH /api/qhdn/companies/{id}/access', ['ADMIN', 'OJT_COORD']);
   access.set('GET /api/qhdn/students/{id}', ['ADMIN', 'OJT_COORD']);
@@ -219,7 +200,7 @@ export function groupSwaggerByRole(spec: Spec): Spec {
     { name: 'Phòng đào tạo', description: 'Quản lý học vụ và xét điều kiện OJT.' },
     { name: 'Phòng QHDN', description: 'Quản lý doanh nghiệp và đợt đăng ký; theo dõi hồ sơ sinh viên gửi trực tiếp và kết quả OJT.' },
     { name: 'Doanh nghiệp', description: 'Quản lý hồ sơ, tuyển dụng và thực tập sinh.' },
-    { name: 'Sinh viên', description: 'Xem học tập, chọn combo và đăng ký OJT.' },
+    { name: 'Sinh viên', description: 'Xem học tập và đăng ký OJT.' },
     { name: 'Auth', description: 'Đăng nhập, thông tin phiên và đổi mật khẩu.' },
   ];
   return spec;

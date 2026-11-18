@@ -14,7 +14,6 @@ import academicRoutes from '../modules/academic/academic.routes';
 import academicRestRoutes from '../modules/academic/rest.routes';
 import studentRoutes from '../modules/students/student.routes';
 import curriculumRoutes from '../modules/curriculum/curriculum.routes';
-import comboRoutes from '../modules/combo-registration/combo.routes';
 
 import authRoutes from "../modules/auth/auth.routes";
 import accountRoutes from "../modules/accounts/account.routes";
@@ -35,7 +34,6 @@ router.use(resultRoutes);
 router.use(workflowRoutes);
 router.use(studentRoutes);
 router.use(curriculumRoutes);
-router.use(comboRoutes);
 router.use(eligibilityRoutes);
 router.use(ojtRegistrationRoutes);
 router.use('/imports', importRoutes);

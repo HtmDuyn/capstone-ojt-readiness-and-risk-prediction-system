@@ -1,39 +1,40 @@
 import { educationRoutes } from './educationRoutes';
-import React from "react";
+import { lazy, type FC } from "react";
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { BaseLayout } from "@/layouts/BaseLayout";
 import StudentLayout from '@/layouts/StudentLayout';
 import { getMenuByRole } from "@/config";
 import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
-import EnterpriseDashboard from "@/pages/enterprise/EnterpriseDashboard";
-import EnterpriseJobs from "@/pages/enterprise/EnterpriseJobs";
-import EnterpriseCandidates from "@/pages/enterprise/EnterpriseCandidates";
-import EnterpriseInterns from "@/pages/enterprise/EnterpriseInterns";
-import EnterpriseEvaluation from "@/pages/enterprise/EnterpriseEvaluation";
-import EnterpriseProfile from "@/pages/enterprise/EnterpriseProfile";
-import EnterpriseNotifications from "@/pages/enterprise/EnterpriseNotifications";
-import StudentOjtRegistration from "@/pages/student/StudentOjtRegistration";
 import LoginPage from "@/pages/auth/LoginPage";
-import StudentDashboard from "@/pages/student/StudentDashboard";
-import StudentAcademicProfile from "@/pages/student/StudentProfile";
-import StudentOjtRisk from '@/pages/student/StudentOjtRisk';
-import StudentOJTProgress from '@/pages/student/StudentOJTProgress';
-import StudentResults from '@/pages/student/StudentResults';
-import StudentNotifications from '@/pages/student/StudentNotifications';
-import StudentAccount from '@/pages/student/StudentAccount';
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import AdminUsers from "@/pages/admin/AdminUsers";
-import AdminSystemMetrics from "@/pages/admin/AdminSystemMetrics";
-import AdminAiConfig from "@/pages/admin/AdminAiConfig";
-import AdminSettings from "@/pages/admin/AdminSettings";
-import QhdnDashboard from "@/pages/qhdn/QhdnDashboard";
-import QhdnEnterpriseManagement from "@/pages/qhdn/QhdnEnterprise";
-import QhdnOjtCoordination from "@/pages/qhdn/QhdnOjtCoor";
-import QhdnEnterpriseEvaluations from "@/pages/qhdn/QhdnEvaluations";
-import QhdnRegistrationWindows from "@/pages/qhdn/QhdnRegistrationWindows";
-import QhdnNotifications from "@/pages/qhdn/QhdnNotifications";
 import type { UserRole } from "@/types/auth.types";
+
+const EnterpriseDashboard = lazy(() => import("@/pages/enterprise/EnterpriseDashboard"));
+const EnterpriseJobs = lazy(() => import("@/pages/enterprise/EnterpriseJobs"));
+const EnterpriseCandidates = lazy(() => import("@/pages/enterprise/EnterpriseCandidates"));
+const EnterpriseInterns = lazy(() => import("@/pages/enterprise/EnterpriseInterns"));
+const EnterpriseEvaluation = lazy(() => import("@/pages/enterprise/EnterpriseEvaluation"));
+const EnterpriseNotifications = lazy(() => import("@/pages/enterprise/EnterpriseNotifications"));
+const EnterpriseProfile = lazy(() => import("@/pages/enterprise/EnterpriseProfile"));
+const StudentOjtRegistration = lazy(() => import("@/pages/student/StudentOjtRegistration"));
+const StudentDashboard = lazy(() => import("@/pages/student/StudentDashboard"));
+const StudentAcademicProfile = lazy(() => import("@/pages/student/StudentProfile"));
+const StudentOjtRisk = lazy(() => import("@/pages/student/StudentOjtRisk"));
+const StudentOJTProgress = lazy(() => import("@/pages/student/StudentOJTProgress"));
+const StudentResults = lazy(() => import("@/pages/student/StudentResults"));
+const StudentNotifications = lazy(() => import("@/pages/student/StudentNotifications"));
+const StudentAccount = lazy(() => import("@/pages/student/StudentAccount"));
+const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
+const AdminUsers = lazy(() => import("@/pages/admin/AdminUsers"));
+const AdminSystemMetrics = lazy(() => import("@/pages/admin/AdminSystemMetrics"));
+const AdminAiConfig = lazy(() => import("@/pages/admin/AdminAiConfig"));
+const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
+const QhdnNotifications = lazy(() => import("@/pages/qhdn/QhdnNotifications"));
+const QhdnDashboard = lazy(() => import("@/pages/qhdn/QhdnDashboard"));
+const QhdnEnterpriseManagement = lazy(() => import("@/pages/qhdn/QhdnEnterprise"));
+const QhdnOjtCoordination = lazy(() => import("@/pages/qhdn/QhdnOjtCoor"));
+const QhdnEnterpriseEvaluations = lazy(() => import("@/pages/qhdn/QhdnEvaluations"));
+const QhdnRegistrationWindows = lazy(() => import("@/pages/qhdn/QhdnRegistrationWindows"));
 
 const ROLE_LABELS: Record<UserRole, string> = {
   student: "Sinh viên",
@@ -44,7 +45,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 // Màn hình tạm thời cho các phân hệ chưa có trang nghiệp vụ riêng.
-const RolePlaceholderPage: React.FC<{ role: UserRole }> = ({ role }) => (
+const RolePlaceholderPage: FC<{ role: UserRole }> = ({ role }) => (
   <div className="card-glass p-8 sm:p-12 text-center min-h-[360px] flex flex-col items-center justify-center">
     <div className="w-16 h-16 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-2xl font-bold">
       {ROLE_LABELS[role].charAt(0)}

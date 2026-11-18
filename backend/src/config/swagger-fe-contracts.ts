@@ -61,7 +61,7 @@ export function describeFeResponses(spec:Schema):void {
   const academicCounts={total:count,eligible:count,notEligible:count,insufficientData:count,awaitingConfirmation:count};
   set('/api/academic/dashboard',obj({scope,computedAt:time,summary:obj({...academicCounts,currentEvaluation:obj({eligible:count,notEligible:count,reviewRequired:count}),staleConfirmations:count}),statistics:obj({groupBy:text,overall:obj(academicCounts),groups:arr(obj({id:{oneOf:[{type:'integer'},{type:'string'}],nullable:true},name:nil(text),...academicCounts})),membershipCountsMayOverlap:{type:'boolean'}})}));
 
-  for(const path of ['/api/ojt-registration-windows','/api/combo-registration-windows'])set(path,{...page(window),properties:{...page(window).properties,studentId:id,student:person},description:'Sinh viên chỉ nhận các đợt thuộc phạm vi của mình; không có danh sách sinh viên khác.'});
+  for(const path of ['/api/ojt-registration-windows'])set(path,{...page(window),properties:{...page(window).properties,studentId:id,student:person},description:'Sinh viên chỉ nhận các đợt thuộc phạm vi của mình; không có danh sách sinh viên khác.'});
   const context={student:person,company,position,template};
   for(const path of ['/api/ojt-coordinations','/api/internship-evaluations']){
     const item=obj({id,...context,studentId:id,companyId:id,positionId:id,ojtSemesterId:id,registrationId:id,assignmentId:id,...fields('studentCode','fullName','companyName','positionTitle','decision','status','comments'),templateId:nil(id),scoreDetails:{type:'object',nullable:true,additionalProperties:true},completionScore:num,attitudeScore:num,skillScore:num,overallScore:num,evaluatedAt:time,evaluatedBy:nil(id),

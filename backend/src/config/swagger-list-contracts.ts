@@ -34,9 +34,7 @@ export function describeListDisplayFields(item:Schema,keys:string[]) {
 const listContexts:Record<string,string[]>={
  '/api/academic-years':[], '/api/academic-periods':['academicYear','semester'], '/api/cohorts':[],
  '/api/academic/alerts':['student','program','cohort'], '/api/accounts':['student','company'],
- '/api/combo-registration-windows':['semester','academicPeriod','createdByUser'],
- '/api/combo-registration-windows/{id}/selections':['student','program','user','combo','courses'],
- '/api/students/{id}/combo-selections':['createdByUser'], '/api/curricula':['createdByUser','publishedByUser'],
+ '/api/curricula':['createdByUser','publishedByUser'],
  '/api/ojt-rule-sets':['program','semester','createdByUser','publishedByUser'],
  '/api/students/{id}/eligibility-checks':['student','semester','ruleSet','checkedByUser'],
  '/api/ojt-registration-windows':['semester','academicPeriod','createdByUser'],

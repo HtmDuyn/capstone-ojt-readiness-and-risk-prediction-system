@@ -79,16 +79,9 @@ describe('/accounts/update', { patch: ['Update account', 'Admin sửa thông tin
 describe('/auth/login', { post: 'Đăng nhập bằng email và mật khẩu' });
 describe('/auth/me', { get: ['Xem tài khoản đang đăng nhập', 'Kèm ID hồ sơ sinh viên hoặc doanh nghiệp liên kết.'] });
 describe('/auth/change-password', { post: ['Đổi mật khẩu', 'Token cũ bị thu hồi; cần đăng nhập lại.'] });
-describe('/combo-registration-windows', { get: ['Danh sách đợt chọn combo', 'Sinh viên chỉ thấy đợt của mình, kèm lựa chọn hợp lệ, hạn gia hạn và lý do chưa thể nộp.'], post: 'Tạo đợt chọn hoặc xác nhận combo' });
-describe('/combo-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt chọn combo', 'Giữ kiểm tra phạm vi, chốt danh sách và hạn đăng ký; status cần reason.'] });
-for (const [action, title] of Object.entries({ extensions: 'Gia hạn chọn combo', reminders: 'Gửi nhắc chọn combo', finalize: 'Chốt lựa chọn combo' }))
-  describe('/combo-registration-windows/{id}/' + action, { post: title });
-describe('/combo-registration-windows/{id}/selections', { get: 'Theo dõi lựa chọn combo', post: 'Gửi lựa chọn combo' });
-describe('/combo-registration-windows/{id}/preview', { post: ['Xem ảnh hưởng của combo dự kiến', 'Tính tín chỉ, môn còn thiếu và điều kiện OJT; không lưu lựa chọn chính thức.'] });
 describe('/students/{id}/combo-selections', { get: 'Lịch sử lựa chọn combo của sinh viên' });
-describe('/majors', { get: 'Danh sách chuyên ngành', post: 'Tạo chuyên ngành' });
-describe('/courses', { get: 'Danh sách môn học', post: 'Tạo môn học' });
-describe('/courses/{id}', { patch: 'Cập nhật môn học' });
+describe('/majors', { get: 'Danh sách chuyên ngành' });
+describe('/courses', { get: 'Danh sách môn học' });
 describe('/curricula', { get: 'Danh sách chương trình đào tạo đã nhập' });
 describe('/curricula/{id}', { get: 'Chi tiết chương trình đào tạo' });
 for (const [resource, name] of Object.entries({ 'curriculum-imports': 'khung chương trình', 'course-result-imports': 'kết quả học tập', imports: 'sinh viên hoặc doanh nghiệp' })) {
@@ -125,14 +118,12 @@ describe('/auth/users/password-reset', { post: ['Đặt lại mật khẩu', 'G�
 describe('/admin/dashboard', { post: ['Tổng quan hệ thống', 'Thống kê tài khoản, sinh viên, doanh nghiệp và kỳ OJT. Gửi {} hoặc section=summary/all.'] });
 describe('/students', { post: ['Tạo hồ sơ sinh viên', 'Liên kết với tài khoản sinh viên đang hoạt động.'] });
 describe('/students', { delete: ['Xóa hồ sơ sinh viên', 'Xóa mềm hồ sơ và vô hiệu hóa tài khoản.'] });
-describe('/students/export', { post: 'Xuất danh sách sinh viên' });
 const sharedWrite = 'Admin và Phòng QHDN dùng chung URL; chọn mẫu dữ liệu theo vai trò trong anyOf.';
 describe('/companies', { get: ['Danh sách và hồ sơ doanh nghiệp', 'Lọc companyId để lấy một hồ sơ kèm lịch sử phân trang.'], post: ['Tạo doanh nghiệp', sharedWrite] });
 describe('/companies/{id}', { patch: ['Cập nhật doanh nghiệp', sharedWrite] });
 describe('/positions', { get: ['Danh sách và hồ sơ vị trí thực tập', 'Lọc positionId để lấy một vị trí kèm lịch sử; có mã, địa điểm và hình thức làm việc.'] });
 describe('/positions', { delete: ['Xóa vị trí thực tập', 'Xóa mềm vị trí theo điều kiện dữ liệu liên quan.'] });
-describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; assignment được tạo tự động khi doanh nghiệp chấp nhận.'], post: ['Phân công dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát; luồng thường tự tạo assignment khi doanh nghiệp chấp nhận.'] });
-describe('/assignments/{id}', { patch: ['Cập nhật assignment dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát assignment đã tồn tại.'] });
+describe('/assignments', { get: ['Danh sách và hồ sơ phân công thực tập', 'Kèm sinh viên, doanh nghiệp, vị trí, đánh giá và kết quả OJT; assignment được tạo tự động khi doanh nghiệp chấp nhận.'] });
 describe('/admin/audit-logs/list', { post: ['Danh sách nhật ký hoạt động chi tiết', 'Nhập bộ lọc JSON. Trả toàn bộ detail và bản ghi rawLog nguyên gốc, không che dữ liệu trong bản demo.'] });
 describe('/ojt-coordinations', { get: ['Danh sách hồ sơ doanh nghiệp đang xử lý', 'Lọc coordinationId để xem hồ sơ, lịch sử và chuỗi điều phối phân trang.'], post: ['Tạo điều phối tương thích dữ liệu cũ', 'Chỉ ADMIN dùng để đối soát; sinh viên hiện gửi hồ sơ trực tiếp đến doanh nghiệp.'] });
 describe('/ojt-coordinations/{id}/decision', { post: ['Ghi nhận quyết định cho dữ liệu cũ', 'Chỉ ADMIN xử lý đối soát; doanh nghiệp quyết định hồ sơ mới qua API candidates.'] });
@@ -161,7 +152,6 @@ const pathEntities: Record<string, string> = {
   'ojt-semesters':'OJTSemesterID',cohorts:'CohortID',curricula:'ProgramID',courses:'CourseID',combos:'ProgramComboID',
   'course-results':'ResultID trong StudentCourseResults','academic-imports':'BatchID trong AcademicImportBatches',
   'ojt-rule-sets':'RuleSetID','eligibility-checks':'CheckID','eligibility-check-runs':'RunID',
-  'combo-registration-windows':'WindowID trong ComboRegistrationWindows',
   'ojt-registration-windows':'WindowID trong OJTRegistrationWindows','ojt-registrations':'RegistrationID',
   'ojt-results':'EvaluationID trong InternshipEvaluations (điểm chính thức doanh nghiệp)'
 };

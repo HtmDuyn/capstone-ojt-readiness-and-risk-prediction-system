@@ -2,8 +2,8 @@ import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from './read.repository';
 import type { PoolClient } from 'pg';
-import { academicTransaction, audit } from '../academic/academic.repository';
-import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue, pagination } from '../students/student.validation';
+import { audit } from '../academic/academic.repository';
+import { invalid, positiveId, requiredText, enumValue, pagination } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { staffContextFields, templateField, registrationField, assignmentField } from './context-fields';
 
@@ -116,21 +116,5 @@ export async function list(resource:Resource,params:Row,actor:Actor){
       }
     }
     return {items:await enrichListRows(c,items),total:count,page:p.page,limit:p.limit};
-  });
-}
-export async function saveCompany(body:unknown,actor:Actor,id?:number){if(actor.roleCode!=='ADMIN')throw invalid('Only enterprises may update their own profile; QHDN has read-only access.',403,'FORBIDDEN');staff(actor);const b=inputObject(body,['code','name','address','industry','contactPersonName','contactPhone','contactEmail','status','reason']);
-  return academicTransaction(async c=>{
-    const before=id?await record(c,'companies',id):null,values:Row={};
-    const reason=requiredText(b.reason,'reason',2000);
-    const lengths:Row={code:20,name:200,address:300,industry:100,contactPersonName:100,contactPhone:20,contactEmail:100};
-    for(const [key,max] of Object.entries(lengths))if(key in b||(!id&&['code','name'].includes(key)))values[(configs.companies.fields as Row)[key]]=['code','name'].includes(key)?requiredText(b[key],key,max as number):optionalText(b[key],key,max as number);
-    if(values.ContactEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.ContactEmail))throw invalid('contactEmail is invalid.');
-    if(!id||'status' in b)values.Status=enumValue(b.status??'ACTIVE',['ACTIVE','INACTIVE'],'status');
-    if(!Object.keys(values).length)throw invalid('Provide an editable field.');
-    if(values.Status==='INACTIVE'){
-      const active=(await c.query(`SELECT 1 FROM "InternshipAssignments" WHERE "EnterpriseID"=$1 AND COALESCE(UPPER("Status"),'ASSIGNED') IN ('ASSIGNED','ACTIVE','IN_PROGRESS') LIMIT 1`,[id])).rowCount;
-      if(active)throw invalid('Cannot deactivate a company with active assignments.',409,'COMPANY_IN_USE');
-    }
-    const after=await persist(c,'companies',values,id);await log(c,'companies',before,after,actor,id?'UPDATE':'CREATE',reason);return api('companies',after);
   });
 }

@@ -62,7 +62,6 @@ export function describeAcademicRest(spec: Spec): Spec {
       summary:object,excludedStudentCount:{type:'integer'},unresolvedAlternativeStudentCount:{type:'integer'},total:{type:'integer'},page:id,limit:id,computedAt:{type:'string',format:'date-time'},limitations:{type:'array',items:{type:'string'}},
       items:{type:'array',items:{type:'object',properties:{courseId:id,courseCode:{type:'string'},courseName:{type:'string'},failedStudentCount:{type:'integer'},status:{type:'string',enum:['PREPARE_CLASSES','MONITORING']},proposedClassCount:{type:'integer'},fullCapacityClassCount:{type:'integer'},additionalClassStudentCount:{type:'integer'},studentsInProposedClasses:{type:'integer'},waitingStudentCount:{type:'integer'},studentsNeededForNextProposal:{type:'integer'},isEarlyPreparation:{type:'boolean'}}}}}}}}}}},
       400:{description:'Thiếu/sai bộ lọc hoặc kỳ không phải BLOCK3'},401:{description:'Chưa đăng nhập'},403:{description:'Chỉ ADMIN/ACADEMIC'},404:{description:'Không tìm thấy kỳ hoặc môn'},409:{description:'Kỳ đã kết thúc hoặc cấu hình Block cần đối soát'}}}};
-  add('/combo-registration-windows/{id}','get','/combo-registration-windows/{id}/selections','get','Chi tiết đợt và các lựa chọn combo');
   const retired: Record<string,string[]> = {
     '/academic/dashboard':['get'], '/academic/alerts':['get'], '/academic/course-demand':['get'], '/academic/course-demand/export':['get'],
     '/academic-periods/{id}/combo-phase-schedules':['get','put'], '/academic-periods/{id}/ojt-advisory-schedule':['get','put'],
@@ -71,7 +70,6 @@ export function describeAcademicRest(spec: Spec): Spec {
     '/academic/alerts/notifications':['post'], '/academic/academic-summary-notifications':['post'], '/academic/eligibility-notifications':['post'],
     '/academic/advisory-runs':['get'], '/academic/advisory-runs/{id}':['get'], '/curriculum-imports/preview':['post'], '/curriculum-imports/commit':['post'],
     '/imports/preview':['post'], '/imports/commit':['post'], '/ojt-semesters/{id}/eligible-student-handoffs':['get','post'],
-    '/combo-registration-windows/{id}/selections':['get'],
     '/students/{id}/course-results':['get'], '/students/{id}/combo-selections':['get'], '/students/{id}/eligibility':['get'], '/students/{id}/eligibility-checks':['get'],
   };
   for (const [path,methods] of Object.entries(retired)) for (const method of methods) {

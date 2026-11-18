@@ -286,9 +286,8 @@ test('student flow uses real PostgreSQL schema, enforces ownership and leaves ot
     expect(semester, 200, 'student semester read');
     assert.ok(semester.body.data.items.every(item => item.studentId === student.studentId));
     const combos = await request('/combo-registration-windows?page=1&limit=20', token);
-    expect(combos, 200, 'combo windows');
-    assert.ok(Array.isArray(combos.body.data.items));
-    // backend/DB does not seed a combo window; verify real route/DB behavior, not fake a successful submission.
+    expect(combos, 404, 'retired combo windows');
+    // Combo registration HTTP endpoints have been retired.
     for (const action of ['preview','selections']) {
       const result = await request(`/combo-registration-windows/2147483647/${action}`, token, {
         method: 'POST', body: JSON.stringify({ comboId: 1, courseIds: [1], reason: 'Integration missing combo' }),

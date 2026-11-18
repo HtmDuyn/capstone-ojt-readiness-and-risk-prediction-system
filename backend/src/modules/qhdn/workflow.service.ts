@@ -3,8 +3,7 @@ import type { PoolClient } from 'pg';
 import { assertPublishedPosition } from '../recruitment/recruitment.repository';
 import { assertPostPhase } from '../recruitment/round-policy';
 import { academicTransaction } from '../academic/academic.repository';
-import { dateInput, dateRange } from '../academic/academic.schema';
-import { invalid, inputObject, positiveId, requiredText, optionalText, enumValue } from '../students/student.validation';
+import { invalid, inputObject, positiveId, requiredText, enumValue } from '../students/student.validation';
 import { fingerprint } from '../eligibility/eligibility.service';
 import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
@@ -112,39 +111,7 @@ export async function decision(id:number,body:unknown,actor:Actor,client?:PoolCl
     await log(c,'coordinations',before,after,actor,'ENTERPRISE_DECISION',reason);return {...api('coordinations',after),replayed:false};
   },client);
 }
-function dateOnly(value:unknown):string{
-  return value instanceof Date
-    ? `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`
-    : String(value).slice(0,10);
-}
-function assignmentDates(b:Row,before?:Row){
-  const start=dateInput(b.startDate??dateOnly(before?.StartDate),'startDate'),end=dateInput(b.endDate??dateOnly(before?.EndDate),'endDate');dateRange(start,end);return {StartDate:start,EndDate:end};
-}
-export async function assign(body:unknown,actor:Actor){staff(actor);const b=inputObject(body,['coordinationId','enterpriseSupervisorName','startDate','endDate','reason']);
-  const coordinationId=positiveId(b.coordinationId,'coordinationId'),reason=requiredText(b.reason,'reason',2000),dates=assignmentDates(b);
-  return academicTransaction(async c=>{
-    const co=await record(c,'coordinations',coordinationId),r=await registration(c,co.RegistrationID);await latest(c,r,coordinationId);
-    if(!accepted(co.Decision))throw invalid('An accepted coordination is required.',409,'COORDINATION_NOT_ACCEPTED');
-    await noAssignment(c,r);
-    if((await c.query('SELECT 1 FROM "InternshipAssignments" WHERE "CoordinationID"=$1',[coordinationId])).rowCount)throw invalid('Coordination already has an assignment.',409,'ASSIGNMENT_EXISTS');
-    const p=await availablePosition(c,co.PositionID,r.OJTSemesterID,true,true);
-    if(p.EnterpriseID!==co.EnterpriseID)throw invalid('Coordination and position company do not match.',409);
-    const after=await persist(c,'assignments',{CoordinationID:coordinationId,StudentID:r.StudentID,EnterpriseID:co.EnterpriseID,PositionID:co.PositionID,EnterpriseSupervisorName:optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100),...dates,Status:'ASSIGNED'});
-    await refreshSlots(c,p.PositionID);await log(c,'assignments',null,after,actor,'ASSIGN',reason);return api('assignments',after);
-  });
-}
-async function updateAssignmentFields(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','reason']),reason=requiredText(b.reason,'reason',2000);
-  if(!['enterpriseSupervisorName','startDate','endDate'].some(k=>k in b))throw invalid('Provide an editable field.');
-  const c=client;
-    const before=await record(c,'assignments',id);await mutableAssignment(c,id);
-    if((await c.query('SELECT 1 FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 AND "Status"=\'SUBMITTED\'',[id])).rowCount)throw invalid('An officially evaluated assignment cannot be edited.',409,'OJT_SCORE_FINALIZED');
-    if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(before.Status).toUpperCase()))throw invalid('Only pending or active assignments can change.',409);
-    const values:Row=assignmentDates(b,before);
-    if('enterpriseSupervisorName' in b)values.EnterpriseSupervisorName=optionalText(b.enterpriseSupervisorName,'enterpriseSupervisorName',100);
-    const after=await persist(c,'assignments',values,id);await log(c,'assignments',before,after,actor,'UPDATE_ASSIGNMENT',reason);return api('assignments',after);
-
-}
-async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['status','reason']),value=enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'),reason=requiredText(b.reason,'reason',2000);
+export async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolClient) {staff(actor);const b=inputObject(body,['status','reason']),value=enumValue(b.status,['ACTIVE','COMPLETED','CANCELLED'],'status'),reason=requiredText(b.reason,'reason',2000);
   const c=client;
     const before=await record(c,'assignments',id);await mutableAssignment(c,id);
     const current=String(before.Status??'ASSIGNED').toUpperCase();
@@ -158,16 +125,3 @@ async function assignmentStatus(id:number,body:unknown,actor:Actor,client:PoolCl
 
 }
 export { submitEvaluation as evaluate } from '../enterprise/bulk-evaluation.service';
-
-export async function updateAssignment(id:number,body:unknown,actor:Actor) {
- staff(actor);const b=inputObject(body,['enterpriseSupervisorName','startDate','endDate','status','reason']);
- const {status,...fields}=b;
- const hasFields=Object.keys(fields).some(key=>key!=='reason');
- if(!hasFields&&status===undefined)throw invalid('Provide a field or status to update.');
- return academicTransaction(async client=>{
-  let result;
-  if(hasFields)result=await updateAssignmentFields(id,fields,actor,client);
-  if(status!==undefined)result=await assignmentStatus(id,{status,reason:b.reason},actor,client);
-  return result;
- });
-}

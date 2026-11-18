@@ -832,54 +832,6 @@
  *             "description": "Publication rejected; inspect data.issues"
  *           }
  *         }
- *       },
- *       "post": {
- *         "tags": [
- *           "Curriculum management"
- *         ],
- *         "summary": "Create majors",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid JSON/reference/rule"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN / ACADEMIC only"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Version conflict, published/in-use curriculum, or reference conflict"
- *           },
- *           "422": {
- *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/MajorCreate"
- *               }
- *             }
- *           }
- *         }
  *       }
  *     },
  *     "/api/courses": {
@@ -946,54 +898,6 @@
  *           },
  *           "422": {
  *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         }
- *       },
- *       "post": {
- *         "tags": [
- *           "Curriculum management"
- *         ],
- *         "summary": "Create courses",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid JSON/reference/rule"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN / ACADEMIC only"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Version conflict, published/in-use curriculum, or reference conflict"
- *           },
- *           "422": {
- *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/CourseCreate"
- *               }
- *             }
  *           }
  *         }
  *       }
@@ -1089,66 +993,6 @@
  *           },
  *           "422": {
  *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         }
- *       }
- *     },
- *     "/api/courses/{id}": {
- *       "patch": {
- *         "tags": [
- *           "Curriculum management"
- *         ],
- *         "summary": "Update course catalog",
- *         "security": [
- *           {
- *             "bearerAuth": []
- *           }
- *         ],
- *         "parameters": [
- *           {
- *             "name": "id",
- *             "in": "path",
- *             "required": true,
- *             "schema": {
- *               "type": "integer",
- *               "minimum": 1
- *             }
- *           }
- *         ],
- *         "responses": {
- *           "200": {
- *             "description": "Success"
- *           },
- *           "201": {
- *             "description": "Created"
- *           },
- *           "400": {
- *             "description": "Invalid JSON/reference/rule"
- *           },
- *           "401": {
- *             "description": "Authentication required"
- *           },
- *           "403": {
- *             "description": "ADMIN / ACADEMIC only"
- *           },
- *           "404": {
- *             "description": "Record not found"
- *           },
- *           "409": {
- *             "description": "Version conflict, published/in-use curriculum, or reference conflict"
- *           },
- *           "422": {
- *             "description": "Publication rejected; inspect data.issues"
- *           }
- *         },
- *         "requestBody": {
- *           "required": true,
- *           "content": {
- *             "application/json": {
- *               "schema": {
- *                 "$ref": "#/components/schemas/CoursePatch"
- *               }
- *             }
  *           }
  *         }
  *       }

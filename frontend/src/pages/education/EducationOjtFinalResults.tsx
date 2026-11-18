@@ -14,13 +14,13 @@ const outcome = (value: string | null) =>
       ? "Không đạt"
       : (value ?? "Chưa có kết quả chính thức");
 const EducationOjtFinalResults: React.FC = () => {
-  const { data, allTotal, totalError, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, loading, busy, error, setError, notice, reason, setReason, semesters, semesterError, confirm } = useEducationOjtFinalResults();
+  const { data, allTotal, totalError, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, loading, error, setError, semesters, semesterError } = useEducationOjtFinalResults();
   const totalPages = data ? Math.max(1, Math.ceil(data.total / 20)) : 1;
   return (
     <div className="space-y-4">
       <PageBanner
         title="Kết quả OJT cuối kỳ"
-        description="Kết quả do QHDN chuyển; điểm và kết quả chính thức do backend quy đổi khi xác nhận."
+        description="Kết quả OJT do Phòng Quan hệ Doanh nghiệp công bố."
         badge="Phòng Đào tạo"
       />
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -73,11 +73,6 @@ const EducationOjtFinalResults: React.FC = () => {
             {error || semesterError}
           </p>
         )}
-        {notice && (
-          <p role="status" className="px-4 pb-3 text-sm text-green-700">
-            {notice}
-          </p>
-        )}
         {loading && <p role="status" className="px-4 pb-5 text-sm text-slate-500">Đang tải kết quả...</p>}
         {data && (
           <>
@@ -103,7 +98,7 @@ const EducationOjtFinalResults: React.FC = () => {
                         <td className="px-4 py-3">{r.semesterCode}</td>
                         <td className="px-4 py-3 tabular-nums">{r.officialScore ?? "—"}</td>
                         <td className="px-4 py-3"><span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${r.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-700' : r.status === 'REVISION_REQUESTED' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>{statuses[r.status] ?? r.status}</span></td>
-                        <td className="px-4 py-3"><button disabled={busy} className="font-medium text-orange-700 hover:underline disabled:opacity-50" onClick={() => { setSelected(r); setReason(''); setError(''); }}>Chi tiết</button></td>
+                        <td className="px-4 py-3"><button className="font-medium text-orange-700 hover:underline disabled:opacity-50" onClick={() => { setSelected(r); setError(''); }}>Chi tiết</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -128,7 +123,7 @@ const EducationOjtFinalResults: React.FC = () => {
         <section className="space-y-3 rounded-2xl bg-white p-6 shadow-sm">
           <button
             className="float-right"
-            disabled={busy}
+
             onClick={() => setSelected(null)}
           >
             Đóng
@@ -151,28 +146,6 @@ const EducationOjtFinalResults: React.FC = () => {
               ? new Date(selected.confirmedAt).toLocaleString("vi-VN")
               : "—"}
           </p>
-          {selected.status === "PENDING_ACADEMIC_CONFIRMATION" && (
-            <>
-              <label className="block">
-                Lý do xác nhận
-                <textarea
-                  aria-label="Lý do xác nhận"
-                  className="mt-2 block w-full rounded border p-2"
-                  maxLength={2000}
-                  value={reason}
-                  disabled={busy}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
-              <button
-                className="rounded bg-orange-500 px-4 py-2 text-white disabled:opacity-50"
-                disabled={busy || !reason.trim()}
-                onClick={() => void confirm()}
-              >
-                {busy ? "Đang xác nhận..." : "Xác nhận và ghi nhận điểm"}
-              </button>
-            </>
-          )}
         </section>
       )}
     </div>

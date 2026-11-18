@@ -1,5 +1,5 @@
-import { academicOperations } from '../shared/academic-api-contract';
 import { describeListDisplayFields } from './swagger-list-contracts';
+import { academicOperations } from '../shared/academic-api-contract';
 type Spec=Record<string,any>;
 const id={type:'integer',minimum:1},text={type:'string'},time={type:'string',format:'date-time'},object={type:'object',additionalProperties:true};
 const array=(items:Spec)=>({type:'array',items});
@@ -30,9 +30,6 @@ export function describeAcademicContracts(spec:Spec) {
   const curricula=item(spec,'/curricula');
   Object.assign(curricula.properties,{courses:array(object),combos:array(object),prerequisites:array(object),equivalences:array(object)});
   const majors=item(spec,'/majors');majors.properties.parentMajor={...object,nullable:true};
-  const history=item(spec,'/students/{id}/combo-selections');
-  Object.assign(history.properties,{comboId:{...id,nullable:true},courseIds:array(id),academicPeriodId:id,ojtSemesterId:id,windowName:text});
-  describeListDisplayFields(history,['combo','courses','academicPeriod','semester']);
   const demand=item(spec,'/academic/course-demand');
   Object.assign(demand.properties,{ojtSemesterId:id,students:array(object)});
   describeListDisplayFields(demand,['semester']);

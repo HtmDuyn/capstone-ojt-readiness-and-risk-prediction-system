@@ -13,14 +13,9 @@ export function useEducationOjtFinalResults() {
   const [totalError, setTotalError] = React.useState('');
   const [search, setSearch] = React.useState(""),
     [status, setStatus] = React.useState(""),
-    [page, setPage] = React.useState(1),
-    [refresh, setRefresh] = React.useState(0);
+    [page, setPage] = React.useState(1);
   const [loading, setLoading] = React.useState(false),
-    [busy, setBusy] = React.useState(false),
-    [error, setError] = React.useState(""),
-    [notice, setNotice] = React.useState(""),
-    [reason, setReason] = React.useState("");
-  const keys = React.useRef(new Map<number, { reason: string; key: string }>());
+    [error, setError] = React.useState("");
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -30,7 +25,7 @@ export function useEducationOjtFinalResults() {
       .then(result => { if (!controller.signal.aborted) setAllTotal(result.total); })
       .catch(() => { if (!controller.signal.aborted) setTotalError('Không tải được tổng số kết quả OJT. Vui lòng thử lại sau.'); });
     return () => controller.abort();
-  }, [refresh]);
+  }, []);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -50,31 +45,6 @@ export function useEducationOjtFinalResults() {
       });
   
   return () => controller.abort();
-  }, [page, search, status, semesterId, refresh]);
-  async function confirm() {
-    if (!selected || busy || !reason.trim()) return;
-    const id = selected.id,
-      trimmed = reason.trim();
-    let attempt = keys.current.get(id);
-    if (!attempt || attempt.reason !== trimmed) {
-      attempt = { reason: trimmed, key: crypto.randomUUID() };
-      keys.current.set(id, attempt);
-    }
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await educationOjtWorkflowService.confirmResult(id, trimmed, attempt.key);
-      setSelected(null);
-      setReason("");
-      setPage(1);
-      setRefresh((v) => v + 1);
-      setNotice("Đã xác nhận và ghi nhận kết quả OJT trên hệ thống.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể xác nhận kết quả.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return { data, allTotal, totalError, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, loading, busy, error, setError, notice, reason, setReason, semesters, semesterError, confirm };
+  }, [page, search, status, semesterId]);
+  return { data, allTotal, totalError, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, loading, error, setError, semesters, semesterError };
 }

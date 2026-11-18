@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { StudentPortalProvider, useStudentPortal } from '@/contexts/StudentPortalContext';
@@ -35,7 +35,9 @@ function StudentShell() {
         showSearch={false}
         onOpenNotifications={() => navigate('/student/notifications')} unreadCount={portal.unreadCount ?? undefined} />
       <main className="relative z-10 mx-auto w-full max-w-[1520px] flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-        <Outlet />
+        <Suspense fallback={<p role="status" className="py-8 text-center text-sm text-slate-500">Đang tải trang…</p>}>
+          <Outlet />
+        </Suspense>
         <Footer />
       </main>
     </div>

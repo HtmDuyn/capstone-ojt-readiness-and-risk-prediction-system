@@ -1,14 +1,11 @@
 import { Router,type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
-import { inputObject,positiveId,pagination } from '../students/student.validation';
+import { inputObject,positiveId } from '../students/student.validation';
 import { assessmentWindows,createAssessment,updateAssessment,updateRule,semesters,semesterDossier,createNotification,notifications } from './rest-resource.service';
 import { createImportRequest,commitImportRequest,importRequests,retryStudentImportEmail } from '../imports/import-request.service';
 import { saveGradeMapping } from './workflow-policy';
 import { handoff,handoffHistory } from '../ojt-registration/handoff.service';
-import { asWindow,windowRecord } from '../combo-registration/combo.repository';
-import { selectionReport } from '../combo-registration/window.service';
-import { academicTransaction } from './academic.repository';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';
 import { enumValue } from '../students/student.validation';
 import { retakeClassProposals } from '../academic-reporting/retake-class.service';
@@ -47,9 +44,4 @@ router.get('/course-demands/export',...staff,async(req,res,next)=>{try{
   if(format==='json'){res.json({success:true,data});return;}
   res.setHeader('Content-Disposition','attachment; filename="academic-course-demand.csv"');res.type('text/csv; charset=utf-8').send(csvReport(data));
 }catch(error){next(error);}});
-router.get('/combo-registration-windows/:id',...staff,handle(async r=>{
-  pagination(r.query,['outcome']);const id=positiveId(r.params.id);
-  const window=await academicTransaction(async c=>asWindow(await windowRecord(c,id)));
-  return {...window,selections:await selectionReport(id,r.query)};
-}));
 export default router;

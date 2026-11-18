@@ -13,7 +13,4 @@ export const educationOjtWorkflowService = {
   },
   getFinalResults: (query: Query, signal?: AbortSignal) =>
     getPage<OjtFinalResult>('/ojt-results', query, signal),
-  async confirmResult(id: number, reason: string, idempotencyKey: string) {
-    apiData((await API.post(`/ojt-results/${id}/confirm`, { reason, idempotencyKey })).data);
-  },
 };
