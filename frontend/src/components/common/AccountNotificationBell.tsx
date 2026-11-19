@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, X } from 'lucide-react';
-import API from '@/services/api';
+import API from '@/services/apiService';
 type Notification={id:number;title:string;content:string;isRead:boolean;sentAt:string};
 export function AccountNotificationBell(){
  const [open,setOpen]=useState(false),[items,setItems]=useState<Notification[]>([]),[unread,setUnread]=useState(0);

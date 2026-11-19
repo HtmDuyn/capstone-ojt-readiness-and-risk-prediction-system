@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AuthContext } from '../../src/contexts/AuthContext';
 import { StudentPortalProvider } from '../../src/contexts/StudentPortalContext';
 import { useStudentResource } from '../../src/hooks/useStudentResource';
-import { initializeStudentSnapshots, studentSnapshots } from '../../src/services/studentSnapshots';
+import { initializeStudentSnapshots, studentSnapshots } from '../../src/utils/student/studentSnapshots';
 import { API, studentPost } from '../../src/services/studentService';
 import StudentDashboard from '../../src/pages/student/StudentDashboard';
 import StudentProfile from '../../src/pages/student/StudentProfile';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, GraduationCap, Building2, CalendarDays } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { getAccounts, getSummary, ROLE_NAMES, type AccountCount, type Summary } from '@/services/admin';
+import { getAccounts, getSummary, ROLE_NAMES, type AccountCount, type Summary } from '@/services/adminService';
 
 export default function AdminDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);

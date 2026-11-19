@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { CandidateDetailModal } from '../../src/components/enterprise/CandidateDetailModal';
-import { API } from '../../src/services/api';
+import { API } from '../../src/services/apiService';
 import type { EnterpriseCandidateItem } from '../../src/services/enterpriseService';
 import '../../src/index.css';
 

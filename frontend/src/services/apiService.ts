@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import { clearEducationReadCache } from './educationReadCache';
-import { expireBearerSession, expireSession } from './authSession';
+import { clearEducationReadCache } from '../utils/education/educationReadCache';
+import { expireBearerSession, expireSession } from '../utils/shared/authSession';
 
 // All roles share one backend/token issuer. Local development uses Vite's API proxy.
 export const API_BASE_URL = (
@@ -88,3 +88,28 @@ export async function apiRequest<T>(
 }
 
 export default API;
+
+export interface AccountNotification {
+  id: number;
+  title: string;
+  content: string | null;
+  isRead: boolean;
+  sentAt: string | null;
+}
+
+export interface AccountNotificationPage {
+  items: AccountNotification[];
+  total: number;
+  unreadCount: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAccountNotifications(page = 1, signal?: AbortSignal): Promise<AccountNotificationPage> {
+  const response = await API.get('/accounts/me/notifications', { params: { page, limit: 20 }, signal });
+  return response.data.data;
+}
+
+export async function markAccountNotificationRead(id: number): Promise<void> {
+  await API.patch(`/accounts/me/notifications/${id}`, { isRead: true });
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { apiRequest } from '@/services/api';
+import { apiRequest } from '@/services/apiService';
 
 export default function AccountSettings() {
   const { updateUser, logout } = useAuth();

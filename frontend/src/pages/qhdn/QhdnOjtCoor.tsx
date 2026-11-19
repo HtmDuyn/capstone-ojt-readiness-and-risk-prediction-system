@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, UserPlus, Eye } from 'lucide-react';
-import API from '@/services/api';
+import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
 import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';

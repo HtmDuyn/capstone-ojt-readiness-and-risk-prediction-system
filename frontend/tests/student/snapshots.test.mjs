@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createStudentSnapshots } from '../../src/services/studentSnapshots.ts';
+import { createStudentSnapshots } from '../../src/utils/student/studentSnapshots.ts';
 
 test('UI snapshots expire, preserve null results, and bound memory usage', () => {
   let clock = 0;

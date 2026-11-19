@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight,BookOpen,CheckCircle2,ChevronDown,ChevronUp,GitBranch,GraduationCap,Info,LockKeyhole } from 'lucide-react';
-import type { RiskAssessment } from '@/services/studentOjtRisk.service';
+import type { RiskAssessment } from '@/services/studentService';
 import { Badge,cardClass,focusClass,SectionTitle } from './risk-ui';
 
 export function LearningRoadmap({roadmap,embedded=false}:{roadmap:RiskAssessment['roadmap'];embedded?:boolean}){

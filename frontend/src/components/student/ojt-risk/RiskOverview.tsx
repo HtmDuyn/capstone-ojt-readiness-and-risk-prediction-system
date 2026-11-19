@@ -1,5 +1,5 @@
 import { AlertTriangle,Check,Clock3,ShieldAlert,ShieldCheck } from 'lucide-react';
-import type { RiskAssessment } from '@/services/studentOjtRisk.service';
+import type { RiskAssessment } from '@/services/studentService';
 import { Badge,cardClass,dateText,riskTheme } from './risk-ui';
 import { StudentSemesterSelect } from '@/components/student/PortalUI';
 

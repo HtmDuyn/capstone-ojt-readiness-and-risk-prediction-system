@@ -10,7 +10,7 @@ const sourceRoot = fileURLToPath(new URL('../../src/', import.meta.url));
 // Load the actual Student services, replacing only Vite's build-time base URL.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === '@/services/api') return { url: 'data:text/javascript,export const API_BASE_URL="https://student.test/api";', shortCircuit: true };
+    if (specifier === '@/services/apiService') return { url: 'data:text/javascript,export const API_BASE_URL="https://student.test/api";', shortCircuit: true };
     if (specifier.startsWith('@/')) return { url: pathToFileURL(resolve(sourceRoot, specifier.slice(2) + '.ts')).href, shortCircuit: true };
     if (specifier.startsWith('.') && context.parentURL?.startsWith(pathToFileURL(sourceRoot).href)) {
       const url = new URL(specifier + '.ts', context.parentURL);
@@ -32,10 +32,10 @@ globalThis.localStorage = { getItem: key => stored.get(key) ?? null, setItem: (k
 globalThis.window = new EventTarget();
 globalThis.fetch = () => { throw new Error('Student requests must never call fetch'); };
 const student = await import('../../src/services/studentService.ts');
-const { studentSnapshots, initializeStudentSnapshots } = await import('../../src/services/studentSnapshots.ts');
-const { getOjtRiskAssessment } = await import('../../src/services/studentOjtRisk.service.ts');
-const { cvAnalysisApi } = await import('../../src/services/studentCvAnalysis.service.ts');
-const { matchStudentJobs } = await import('../../src/services/studentJobMatching.service.ts');
+const { studentSnapshots, initializeStudentSnapshots } = await import('../../src/utils/student/studentSnapshots.ts');
+const { getOjtRiskAssessment } = await import('../../src/services/studentService.ts');
+const { cvAnalysisApi } = await import('../../src/services/studentService.ts');
+const { matchStudentJobs } = await import('../../src/services/studentService.ts');
 assert.equal(student.API.defaults.adapter, 'xhr');
 
 test('Student data requests use Axios, bearer auth and only the required API sections', async () => {

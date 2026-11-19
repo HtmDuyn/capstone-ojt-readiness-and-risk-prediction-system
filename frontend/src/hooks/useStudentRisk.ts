@@ -1,7 +1,7 @@
 import { useAuth } from './useAuth';
 import { useStudentResource } from './useStudentResource';
 import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
-import { getOjtRiskAssessment } from '@/services/studentOjtRisk.service';
+import { getOjtRiskAssessment } from '@/services/studentService';
 
 // The endpoint resolves its owner from the token; it can start while the portal
 // verifies the profile instead of waiting for profile and catalog requests.

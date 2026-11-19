@@ -1,4 +1,4 @@
-import API from './api';
+import API from './apiService';
 import type { EnterpriseProfileData, EnterpriseProfileResponse } from '@/types/enterprise/enterpriseTypes';
 
 export interface EnterpriseProfileUpdateResponse {

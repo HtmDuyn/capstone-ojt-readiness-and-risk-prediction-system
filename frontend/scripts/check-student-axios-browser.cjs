@@ -203,7 +203,7 @@ async function main() {
   const expression = `
     (async () => {
       const { API, apiRequest, ApiError, isRequestCanceled } = await import(${JSON.stringify(origin + '/src/services/studentService.ts')});
-      const { API: sharedAPI } = await import(${JSON.stringify(origin + '/src/services/api.ts')});
+      const { API: sharedAPI } = await import(${JSON.stringify(origin + '/src/services/apiService.ts')});
       API.defaults.baseURL = ${JSON.stringify(origin + '/api')};
       localStorage.setItem('ojt_auth_token', 'fixture-session');
       const checks = [];

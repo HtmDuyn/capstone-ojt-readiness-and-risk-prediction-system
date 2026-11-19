@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { studentSnapshots } from '@/services/studentSnapshots';
+import { studentSnapshots } from '@/utils/student/studentSnapshots';
 
 // A key identifies both the authenticated scope and the selected filters. Old responses
 // are hidden immediately and ignored after navigation, refresh, or semester changes.

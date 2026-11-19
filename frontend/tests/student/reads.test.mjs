@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createStudentReads } from '../../src/services/studentReads.ts';
+import { createStudentReads } from '../../src/utils/student/studentReads.ts';
 
 test('concurrent readers share one request, but completed data is never cached', async () => {
   const pool = createStudentReads();

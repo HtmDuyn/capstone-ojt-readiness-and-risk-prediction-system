@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, Plus, CheckCheck } from 'lucide-react';
-import API from '@/services/api';
+import API from '@/services/apiService';
 import { recruitmentPhases, validateRecruitmentPhases, type PhaseSchedule } from '@/utils/shared/recruitmentSchedule';
 import type { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from './StudentWorkflowUi';

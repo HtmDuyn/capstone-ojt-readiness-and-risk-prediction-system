@@ -1,4 +1,4 @@
-import { clearEducationReadCache, educationRead } from '@/services/educationReadCache';
+import { clearEducationReadCache, educationRead } from '@/utils/education/educationReadCache';
 import { educationOverviewService } from '@/services/educationService';
 import { academicReportingService } from '@/services/educationService';
 import { getAllItems, getJson } from '@/services/educationService';

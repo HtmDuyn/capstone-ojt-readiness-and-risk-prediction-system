@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { expireBearerSession } from './authSession';
-import { API_BASE_URL } from '@/services/api';
-import { studentReads } from './studentReads';
-import { initializeStudentSnapshots, studentSnapshots } from './studentSnapshots';
+import { expireBearerSession } from '../utils/shared/authSession';
+import { API_BASE_URL } from '@/services/apiService';
+import { studentReads } from '../utils/student/studentReads';
+import { initializeStudentSnapshots, studentSnapshots } from '../utils/student/studentSnapshots';
 
 import { downloadFile } from '@/utils/shared/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
@@ -429,4 +429,53 @@ export async function markStudentNotificationRead(id: string) {
     `/students/me/notifications/${encodeURIComponent(id)}`,
     { method: 'PATCH', data: { isRead: true } },
   );
+}
+
+export interface CvEntry {evidence:{page:number;quote:string}|null;[key:string]:string|number|string[]|{page:number;quote:string}|null;}
+export interface CvProfile {summary:string|null;skills:CvEntry[];projects:CvEntry[];experience:CvEntry[];languages:CvEntry[];education:CvEntry[];}
+export interface CvAnalysis {id:number;cvFileId:number;status:'PROCESSING'|'NEEDS_REVIEW'|'CONFIRMED'|'FAILED';revision:number;schemaVersion:string;modelVersion:string;profile:CvProfile|null;error:{code:string;message:string}|null;canRetry:boolean;}
+export interface MatchingProfile {cv:{id:number}|null;status:string;analysis:CvAnalysis|null;usableForMatching:boolean;
+  officialAcademic:{programCode:string|null;major:string|null;gpa:number|null;gpaScale:number|null};discrepancies:string[];message:string;}
+export const cvAnalysisApi={
+ get:async(signal:AbortSignal)=>(await apiRequest<{data:MatchingProfile}>('/students/me/matching-profile',{signal})).data,
+ analyze:async(cvFileId:number,signal:AbortSignal)=>(await apiRequest<{data:{analysis:CvAnalysis;replayed:boolean;reviewMessage?:string|null}}>('/students/me/cv/analyses',{
+  method:'POST',data:{cvFileId,consent:true},signal,timeout:90000,
+ })).data,
+ save:async(analysisId:number,revision:number,profile:CvProfile,confirm:boolean,signal:AbortSignal)=>(await apiRequest<{data:{analysis:CvAnalysis}}>('/students/me/matching-profile',{
+  method:'PATCH',data:{analysisId,revision,profile,confirm},signal,
+ })).data,
+};
+
+export interface JobMatch {
+  rank:number; positionId:number; postId:number; title:string; company:{id:number;name:string};
+  location:string|null; workMode:string|null; remainingSlots:number; deadlineAt:string|null;
+  canApply:boolean; blockers:string[]; relevanceScore:number; matchedSkills:string[];
+  requirementsNotEvidenced:string[]; reason:string; reviewNote:string;
+}
+export interface JobMatchingResult {
+  status:'READY'|'NO_READY_POSITIONS'|'WINDOW_UNAVAILABLE'; windowId:number; cvFileId:number;
+  analysisId:number; cvRevision:number; candidateCount:number; blockers:string[];
+  matches:JobMatch[]; model?:string; generatedAt?:string; cached?:boolean; scoreMeaning:string;
+}
+export async function matchStudentJobs(windowId:number, signal:AbortSignal) {
+  const response = await apiRequest<{data:JobMatchingResult}>('/students/me/job-matches',{
+    method:'POST',data:{windowId,consent:true},signal,timeout:90000,
+  });
+  return response.data;
+}
+
+export interface RiskAssessment {
+  status:'ASSESSED'|'INSUFFICIENT_DATA';
+  student:{id:number;fullName:string;studentCode:string;currentSemester:number|null};
+  risk:{level:'LOW'|'MEDIUM'|'HIGH'|'INSUFFICIENT_DATA';label:string;computedAt:string;
+    reasons:{code:string;message:string}[];limitations:string[];
+    evidence:{earnedCredits:number|null;missingCredits:number|null;failedCourseCount:number;maxUnpassedCourses?:number|null;assessmentDeadline:string|null}};
+  roadmap:{status:'READY'|'NOT_AVAILABLE'|'DATA_INCOMPLETE';targetSemester:number;objective:string;message:string;actions:string[];limitations:string[];
+    items:{courseId:number;courseCode:string|null;name:string|null;recommendedSemester:number;priority:number;action:string;stage:string;
+      canPlan:boolean;explanation:string;isAlternative:boolean;
+      dependentCourses?:{courseId:number;courseCode:string|null;name:string|null;unlocksAfterPassing:boolean;mandatory:boolean}[];
+      prerequisites:{satisfied:boolean;remainingRequired:number;courses:{courseId:number;courseCode:string|null;passed:boolean}[]}[];}[]};
+}
+export async function getOjtRiskAssessment(signal:AbortSignal):Promise<RiskAssessment>{
+  return (await apiRequest<{data:RiskAssessment}>('/students/me/ojt-risk-assessment',{signal,timeout:0})).data;
 }

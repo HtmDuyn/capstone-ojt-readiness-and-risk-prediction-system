@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clearEducationReadCache, educationRead } from '../../src/services/educationReadCache.ts';
+import { clearEducationReadCache, educationRead } from '../../src/utils/education/educationReadCache.ts';
 
 globalThis.localStorage = { getItem: () => 'test-session' };
 test('completed reads are not cached; a refresh always loads the latest server value',async()=>{

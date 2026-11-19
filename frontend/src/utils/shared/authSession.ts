@@ -1,4 +1,4 @@
-import { clearEducationReadCache } from './educationReadCache';
+import { clearEducationReadCache } from '../education/educationReadCache';
 
 export const SESSION_EXPIRED_EVENT = 'ojt:session-expired';
 export function tokenExpiry(token: string): number {

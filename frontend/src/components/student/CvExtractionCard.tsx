@@ -1,6 +1,6 @@
 import { Sparkles, CheckCircle2, FileText, Code2, FolderKanban, BriefcaseBusiness, Languages, GraduationCap, ChevronDown, Save, LoaderCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { useEffect,useRef,useState } from 'react';
-import { cvAnalysisApi,type CvAnalysis,type CvEntry,type CvProfile,type MatchingProfile } from '@/services/studentCvAnalysis.service';
+import { cvAnalysisApi,type CvAnalysis,type CvEntry,type CvProfile,type MatchingProfile } from '@/services/studentService';
 import { buttonClass,inputClass } from './PortalUI';
 import { useAuth } from '@/hooks/useAuth';
 const skillCategories:Record<string,string>={TOOL:'Công cụ',TECHNOLOGY:'Ngôn ngữ lập trình và công nghệ',PROFESSIONAL:'Kỹ năng chuyên môn',SOFT:'Kỹ năng mềm',OTHER:'Chưa phân loại'};

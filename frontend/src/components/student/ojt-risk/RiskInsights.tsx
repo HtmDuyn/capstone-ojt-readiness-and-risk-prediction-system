@@ -1,5 +1,5 @@
 import { BookOpenCheck,CalendarClock,CheckCircle2,GitBranch,Layers3,Route,TriangleAlert,type LucideIcon } from 'lucide-react';
-import type { RiskAssessment } from '@/services/studentOjtRisk.service';
+import type { RiskAssessment } from '@/services/studentService';
 import { Badge,cardClass,SectionTitle } from './risk-ui';
 
 const labels:Record<string,{title:string;icon:LucideIcon}>={

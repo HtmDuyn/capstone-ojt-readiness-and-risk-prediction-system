@@ -9,7 +9,7 @@ import { normalizeEnterpriseImportPreview } from "@/utils/qhdn/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
 import { loadAllPages } from "../utils/shared/loadAllPages";
-import API from "./api";
+import API from "./apiService";
 import type { DashboardPlacementStudent, DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
 
 /** Use the same roster as the OJT coordination screen, including unregistered students. */
