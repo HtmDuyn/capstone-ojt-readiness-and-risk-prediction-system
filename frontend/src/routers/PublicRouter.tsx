@@ -256,6 +256,14 @@ export const router = createBrowserRouter([
             path: "/admin/dashboard",
             element: <AdminDashboard />,
           },
+          {
+            path: "/admin/profile",
+            element: <AdminSettings />,
+          },
+          {
+            path: "/admin/settings",
+            element: <Navigate to="/admin/profile" replace />,
+          },
           ...getMenuByRole("admin")
             .filter((item) => item.path !== "/admin/dashboard")
             .map((item) => ({
@@ -267,8 +275,6 @@ export const router = createBrowserRouter([
                   <AdminSystemMetrics />
                 ) : item.path === "/admin/ai-config" ? (
                   <AdminAiConfig />
-                ) : item.path === "/admin/settings" ? (
-                  <AdminSettings />
                 ) : (
                   <RolePlaceholderPage role="admin" />
                 ),

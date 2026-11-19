@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AccountNotificationBell } from './AccountNotificationBell';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Building2 } from 'lucide-react';
+import { Building2, UserRound } from 'lucide-react';
 import {
   SearchIcon,
   GlobeIcon,
@@ -24,6 +24,7 @@ interface HeaderProps {
   user?: HeaderUserSummary;
   onOpenMobileMenu: () => void;
   onLogout?: () => void;
+  profilePath?: string;
   showSearch?: boolean;
   showNotifications?: boolean;
   showLanguage?: boolean;
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   user,
   onOpenMobileMenu,
   onLogout,
+  profilePath,
   showSearch = true,
   showNotifications = true,
   showLanguage = true,
@@ -194,6 +196,15 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>Hồ sơ Doanh nghiệp</span>
                 </button>
               </div>
+              )}
+
+              {profilePath && (
+                <div className="border-b border-slate-100 p-1">
+                  <button type="button" onClick={() => { setProfileOpen(false); navigate(profilePath); }} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition-colors hover:bg-orange-50 hover:text-orange-600">
+                    <UserRound size={16} className="text-orange-500" />
+                    <span>Hồ sơ cá nhân</span>
+                  </button>
+                </div>
               )}
 
               {onLogout && (

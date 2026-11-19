@@ -5,7 +5,6 @@ import {
 
 import {
   Users,
-  Settings,
   Activity,
   Bot,
 } from 'lucide-react';
@@ -36,7 +35,6 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
       description:
         'Phân quyền 5 nhóm người dùng: Sinh viên, PĐT, QHDN, Doanh nghiệp và Admin.',
       badge: '5 Vai trò',
-      primaryActionLabel: 'Thêm tài khoản',
     },
   },
 
@@ -66,16 +64,4 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
     },
   },
 
-  {
-    id: 'settings',
-    label: 'Cài đặt hệ thống',
-    path: '/admin/settings',
-    icon: <Settings size={20} />,
-    banner: {
-      title: 'Cài đặt hệ thống',
-      description:
-        'Quản lý hồ sơ cá nhân và mật khẩu đăng nhập của bạn.',
-      badge: 'Tài khoản cá nhân',
-    },
-  },
 ];

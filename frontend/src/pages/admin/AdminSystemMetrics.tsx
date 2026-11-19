@@ -42,7 +42,7 @@ export default function AdminSystemMetrics() {
   const page = query.page ?? 1;
   const pages = Math.max(1, Math.ceil(total / 20));
   return <div className="space-y-6">
-    <PageBanner title="Giám sát & Nhật ký hoạt động" description="Tra cứu thao tác thực tế trên hệ thống và xem nội dung nhật ký chi tiết." badge="Nhật ký hệ thống" primaryAction={{ label: 'Làm mới', icon: <RefreshCw size={16} />, onClick: () => setQuery(current => ({ ...current })) }} />
+    <PageBanner title="Giám sát & Nhật ký hoạt động" description="Tra cứu thao tác thực tế trên hệ thống và xem nội dung nhật ký chi tiết." badge="Nhật ký hệ thống" />
     <section className="grid gap-4 sm:grid-cols-3">{[
       { label: 'Nhật ký khớp bộ lọc', value: error ? '—' : loading ? '…' : total, icon: FileText },
       { label: 'Thời gian tải nhật ký', value: duration === null || loading ? '—' : duration + ' ms', icon: Activity },

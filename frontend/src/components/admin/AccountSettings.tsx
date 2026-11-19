@@ -38,7 +38,7 @@ export default function AccountSettings() {
     finally { setBusy(false); }
   };
   return <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-    <h2 className="text-lg font-bold">Tài khoản cá nhân</h2>
+    <h2 className="text-lg font-bold">Thông tin cá nhân</h2>
     {loading && <p role="status" className="mt-3">Đang tải hồ sơ...</p>}
     {error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
     {message && <p role="status" className="mt-3 rounded-xl bg-emerald-50 p-3 text-emerald-700">{message}</p>}

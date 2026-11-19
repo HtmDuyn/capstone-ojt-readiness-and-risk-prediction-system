@@ -57,7 +57,7 @@ interface UserForm {
 
 const ROLE_LABELS: Record<string, UserRole> = { STUDENT: 'Sinh viên', ACADEMIC: 'Phòng Đào tạo', OJT_COORD: 'Phòng Quan hệ Doanh nghiệp', ENTERPRISE: 'Doanh nghiệp', ADMIN: 'Quản trị viên' };
 const mapAccount = (a: Account): UserAccount => ({ raw: a, phone: a.phone ?? '', id: a.id, code: a.username, name: a.full_name, email: a.email, roleId: a.role_id, role: ROLE_LABELS[a.role_code], status: a.status === 'ACTIVE' ? 'Hoạt động' : a.status === 'LOCKED' ? 'Khóa' : 'Ngừng hoạt động' });
-const statusCode = (s: UserStatus) => s === 'Hoạt động' ? 'ACTIVE' : s === 'Khóa' ? 'LOCKED' : 'INACTIVE';
+const statusCode = (s: Exclude<UserStatus, 'Khóa'>) => s === 'Hoạt động' ? 'ACTIVE' : 'INACTIVE';
 
 const EMPTY_FORM: UserForm = {
   code: '',
@@ -115,6 +115,7 @@ const AdminUsers: React.FC = () => {
 
   const [addForm, setAddForm] =
     useState<UserForm>(EMPTY_FORM);
+  const [addError, setAddError] = useState('');
 
   /* =========================
      VIEW
@@ -169,7 +170,7 @@ const AdminUsers: React.FC = () => {
   const handleOpenAddModal = () => {
     const staff = users.find(user => !['Sinh viên', 'Doanh nghiệp'].includes(user.role));
     setAddForm({ ...EMPTY_FORM, role: staff?.role ?? EMPTY_FORM.role });
-    setNotice(''); setIsAddModalOpen(true);
+    setNotice(''); setAddError(''); setIsAddModalOpen(true);
   };
 
   const handleCloseAddModal = () => {
@@ -178,13 +179,21 @@ const AdminUsers: React.FC = () => {
   };
 
   const handleAddUser = async () => {
-    if (saving) return; setSaving(true);
+    if (saving) return;
+    if (!addForm.code.trim()) { setAddError('Vui lòng nhập mã tài khoản.'); return; }
+    if (!addForm.password?.trim()) { setAddError('Vui lòng nhập mật khẩu ban đầu.'); return; }
+    if (addForm.password.length < 8) { setAddError('Mật khẩu cần ít nhất 8 ký tự.'); return; }
+    if (!addForm.name.trim()) { setAddError('Vui lòng nhập họ tên.'); return; }
+    if (!addForm.email.trim()) { setAddError('Vui lòng nhập email.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.email.trim())) { setAddError('Vui lòng nhập email hợp lệ.'); return; }
+    if (!addForm.role) { setAddError('Vui lòng chọn vai trò.'); return; }
+    setAddError(''); setSaving(true);
     try {
       if (['Sinh viên', 'Doanh nghiệp'].includes(addForm.role)) throw new Error('Tài khoản sinh viên và doanh nghiệp phải được tạo qua import.');
       if (!addForm.password || addForm.password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
       await createAccount({ username: addForm.code.trim(), fullName: addForm.name.trim(), email: addForm.email.trim(), password: addForm.password, phone: addForm.phone?.trim() || null, roleId: roleIdFor(addForm.role) });
       handleCloseAddModal(); setNotice('Đã tạo tài khoản.'); await loadUsers();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Tạo tài khoản thất bại.'); }
+    } catch (e) { setAddError(e instanceof Error ? e.message : 'Tạo tài khoản thất bại.'); }
     finally { setSaving(false); }
   };
 
@@ -229,7 +238,7 @@ const AdminUsers: React.FC = () => {
   const handleSaveEditUser = async () => {
     if (!editUser || saving) return; setSaving(true);
     try {
-      await updateAccount({ userId: editUser.id, fullName: editForm.name.trim(), phone: editForm.phone?.trim() || null, email: editForm.email.trim(), status: statusCode(editForm.status), roleId: editForm.role === editUser.role ? editUser.roleId : roleIdFor(editForm.role) });
+      await updateAccount({ userId: editUser.id, fullName: editForm.name.trim(), phone: editForm.phone?.trim() || null, email: editForm.email.trim(), ...(editForm.status === 'Khóa' ? {} : { status: statusCode(editForm.status) }), roleId: editForm.role === editUser.role ? editUser.roleId : roleIdFor(editForm.role) });
       handleCloseEditUser(); setNotice('Đã cập nhật tài khoản.'); await loadUsers();
     } catch (e) { alert(e instanceof Error ? e.message : 'Cập nhật thất bại.'); }
     finally { setSaving(false); }
@@ -280,7 +289,6 @@ const AdminUsers: React.FC = () => {
         title="Quản lý Người dùng & Phân quyền"
         description="Phân quyền 5 nhóm người dùng: Sinh viên, PĐT, QHDN, Doanh nghiệp và Admin."
         badge="5 Vai trò"
-        primaryAction={{ label: 'Thêm tài khoản', onClick: handleOpenAddModal }}
       />
 
       {/* =====================================================
@@ -374,42 +382,42 @@ const AdminUsers: React.FC = () => {
 
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[1050px] border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 text-left">
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Mã
+            <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]">
+              <tr className="text-left">
+                <th className="px-4 py-3 text-xs font-semibold">
+                  STT
                 </th>
 
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 text-xs font-semibold">
                   Họ tên
                 </th>
 
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 text-xs font-semibold">
                   Email
                 </th>
 
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 text-xs font-semibold">
                   Vai trò
                 </th>
 
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 text-xs font-semibold">
                   Trạng thái
                 </th>
 
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3 text-center text-xs font-semibold">
                   Thao tác
                 </th>
               </tr>
             </thead>
 
             <tbody>
-              {filteredUsers.map((user) => (
+              {filteredUsers.map((user, index) => (
                 <tr
                   key={user.id}
                   className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
                 >
                   <td className="px-4 py-4 text-sm font-semibold text-slate-700">
-                    {user.code}
+                    {index + 1}
                   </td>
 
                   <td className="px-4 py-4 text-sm font-semibold text-slate-900">
@@ -428,12 +436,7 @@ const AdminUsers: React.FC = () => {
 
                   <td className="px-4 py-4">
                     <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        user.status ===
-                        'Hoạt động'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-red-50 text-red-600'
-                      }`}
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${user.status === 'Hoạt động' ? 'bg-emerald-50 text-emerald-700' : user.status === 'Khóa' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'}`}
                     >
                       {user.status}
                     </span>
@@ -651,7 +654,7 @@ const AdminUsers: React.FC = () => {
             }
           >
             <div
-              className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl"
               onClick={(e) =>
                 e.stopPropagation()
               }
@@ -800,10 +803,9 @@ const AdminUsers: React.FC = () => {
                     Trạng thái
                   </label>
 
+                  {editUser.status === 'Khóa' && <p className="mb-2 text-xs text-amber-700">Trạng thái hiện tại: Khóa. Chọn trạng thái mới nếu muốn thay đổi.</p>}
                   <select
-                    value={
-                      editForm.status
-                    }
+                    value={editForm.status === 'Khóa' ? '' : editForm.status}
                     onChange={(e) =>
                       setEditForm(
                         (current) => ({
@@ -816,14 +818,12 @@ const AdminUsers: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
+                    <option value="" disabled hidden>Chọn trạng thái mới</option>
                     <option value="Hoạt động">
                       Hoạt động
                     </option>
 
                     <option value="Ngừng hoạt động">Ngừng hoạt động</option>
-                    <option value="Khóa">
-                      Khóa
-                    </option>
                   </select>
                 </div>
               </div>
@@ -861,20 +861,21 @@ const AdminUsers: React.FC = () => {
       {isAddModalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 px-4"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 p-4"
             onClick={
               handleCloseAddModal
             }
           >
             <div
-              className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+              role="dialog" aria-modal="true" aria-label="Thêm tài khoản"
+              className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
               onClick={(e) =>
                 e.stopPropagation()
               }
             >
               {/* HEADER */}
 
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">
                     Thêm tài khoản
@@ -898,16 +899,16 @@ const AdminUsers: React.FC = () => {
 
               {/* BODY */}
 
-              <div className="space-y-4 px-6 py-6">
-                <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Tạo thủ công dành cho cán bộ và quản trị viên. Tài khoản sinh viên, doanh nghiệp được cấp qua import. Vai trò phải có ID trong dữ liệu tài khoản hệ thống.</p>
-                  <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Mật khẩu ban đầu</label><input type="password" autoComplete="new-password" minLength={8} value={addForm.password || ''} onChange={e => setAddForm(current => ({ ...current, password: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+                {addError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{addError}</p>}
+                  <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Mật khẩu ban đầu <span className="text-red-600">*</span></label><input required type="password" autoComplete="new-password" minLength={8} value={addForm.password || ''} onChange={e => setAddForm(current => ({ ...current, password: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
                   <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Mã tài khoản
+                    Mã tài khoản <span className="text-red-600">*</span>
                   </label>
 
                   <input
-                    type="text"
+                    type="text" required
                     value={
                       addForm.code
                     }
@@ -927,11 +928,11 @@ const AdminUsers: React.FC = () => {
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Họ tên
+                    Họ tên <span className="text-red-600">*</span>
                   </label>
 
                   <input
-                    type="text"
+                    type="text" required
                     value={
                       addForm.name
                     }
@@ -952,11 +953,11 @@ const AdminUsers: React.FC = () => {
                 <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Số điện thoại</label><input type="tel" maxLength={20} value={addForm.phone || ''} onChange={e => setAddForm(current => ({...current,phone:e.target.value}))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
                   <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Email
+                    Email <span className="text-red-600">*</span>
                   </label>
 
                   <input
-                    type="email"
+                    type="email" required
                     value={
                       addForm.email
                     }
@@ -976,10 +977,10 @@ const AdminUsers: React.FC = () => {
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Vai trò
+                    Vai trò <span className="text-red-600">*</span>
                   </label>
 
-                  <select
+                  <select required
                     value={
                       addForm.role
                     }
@@ -1035,16 +1036,14 @@ const AdminUsers: React.FC = () => {
                     </option>
 
                     <option value="Ngừng hoạt động">Ngừng hoạt động</option>
-                    <option value="Khóa">
-                      Khóa
-                    </option>
                   </select>
+                  <p className="mt-1 text-xs text-slate-500">Tài khoản mới được tạo ở trạng thái Hoạt động.</p>
                 </div>
               </div>
 
               {/* FOOTER */}
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <div className="flex shrink-0 justify-end gap-3 border-t border-slate-200 px-5 py-4 sm:px-6">
                 <button
                   type="button"
                   onClick={
