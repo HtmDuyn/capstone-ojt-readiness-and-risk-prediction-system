@@ -1,4 +1,4 @@
-import { loadAllPages } from "@/utils/loadAllPages";
+import { loadAllPages } from "@/utils/shared/loadAllPages";
 import { errorMessage, Notice } from "@/components/qhdn/QhdnUi";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -45,8 +45,8 @@ import {
   getDashboardPlacementBoard,
   getQhdnDashboardSummary,
 } from "@/services/qhdnService";
-import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdnDashboard';
-import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation, dashboardCinema, dashboardPalette } from '@/utils/qhdnDashboardCharts';
+import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdn/qhdnDashboard';
+import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation, dashboardCinema, dashboardPalette } from '@/utils/qhdn/qhdnDashboardCharts';
 import type {
   CoordinationItem,
   CompanyListItem,

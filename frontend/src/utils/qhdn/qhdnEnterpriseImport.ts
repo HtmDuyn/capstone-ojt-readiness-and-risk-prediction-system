@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { EnterpriseImportRow } from "../types/qhdn/qhdnTypes";
+import type { EnterpriseImportRow } from "@/types/qhdn/qhdnTypes";
 
 const requiredHeaders = [
   "email", "fullName", "name",

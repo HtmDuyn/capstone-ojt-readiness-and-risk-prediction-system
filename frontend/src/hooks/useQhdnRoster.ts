@@ -3,7 +3,7 @@ import {
   listEligibleStudents,
   listStudentsInSemester,
 } from "@/services/qhdnService";
-import { loadAllPages } from "@/utils/loadAllPages";
+import { loadAllPages } from "@/utils/shared/loadAllPages";
 import { errorMessage } from "@/components/qhdn/QhdnUi";
 import type {
   HandoffStudentItem,

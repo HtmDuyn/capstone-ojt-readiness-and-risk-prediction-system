@@ -1,4 +1,4 @@
-import { formatNumber } from '@/utils/educationDashboard';
+import { formatNumber } from '@/utils/education/educationDashboard';
 import { AlertTriangle, Database, Loader2 } from 'lucide-react';
 import React from 'react';
 

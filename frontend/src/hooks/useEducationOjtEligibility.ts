@@ -1,15 +1,15 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
 import type { Handoff } from '@/types/education/ojtWorkflow.types';
-import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
+import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
 import { getAllItems } from '@/services/educationService';
 import { educationOjtWorkflowService } from '@/services/educationService';
 import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadOjtCreditThresholds, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/educationService';
 import type { OjtCreditThreshold } from '@/services/educationService';
 import type { CurrentOjtRule } from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
-import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/educationOjtReason';
-import { handoffsByStudent, matchesHandoffFilter, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/educationOjtCheckQueue';
-import { handoffDisplayById } from '@/utils/educationOjtHandoffDisplay';
+import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/education/educationOjtReason';
+import { handoffsByStudent, matchesHandoffFilter, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/education/educationOjtCheckQueue';
+import { handoffDisplayById } from '@/utils/education/educationOjtHandoffDisplay';
 import React from 'react';
 
 type Target = { student: ImportedStudent; reason: string };

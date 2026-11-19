@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getAcademicPeriods } from "@/services/qhdnService";
 import { errorMessage } from "@/components/qhdn/QhdnUi";
-import { loadAllPages } from "@/utils/loadAllPages";
-import { academicYears, linkedOjtSemesterId, preferredAcademicPeriod } from "@/utils/qhdnAcademicPeriods";
+import { loadAllPages } from "@/utils/shared/loadAllPages";
+import { academicYears, linkedOjtSemesterId, preferredAcademicPeriod } from "@/utils/qhdn/qhdnAcademicPeriods";
 import type { AcademicPeriodItem } from "@/types/qhdn/qhdnTypes";
 
 export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, semestersOnly = false) {

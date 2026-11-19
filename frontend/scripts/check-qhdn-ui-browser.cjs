@@ -84,7 +84,7 @@ async function main(){
  assert.equal(await evaluate(`!!document.querySelector('header input')`),false,'QHDN header has no search bar');
  assert.equal(await evaluate(`!!document.querySelector('header button[title="Đổi ngôn ngữ"]')`),false,'QHDN header has no language selector');
  assert.equal(await evaluate(`!!document.querySelector('header button[aria-label^="Thông báo"]')`),false,'QHDN header has no notification bell');
- assert.equal(await evaluate(`import('/src/config/api.ts').then(module=>module.API_BASE_URL)`),'/api','Development defaults to the local API proxy without a test-only URL override');
+ assert.equal(await evaluate(`import('/src/services/api.ts').then(module=>module.API_BASE_URL)`),'/api','Development defaults to the local API proxy without a test-only URL override');
  assert.equal(await evaluate(`document.querySelectorAll('[role="tab"]').length`),2);
  assert.equal(await evaluate(`document.body.innerText.includes('Phiếu đánh giá')`),false);
  assert.ok(await evaluate(`document.querySelector('[role="tabpanel"]').textContent.includes('Đã đánh giá · Chưa chuyển giao')`));

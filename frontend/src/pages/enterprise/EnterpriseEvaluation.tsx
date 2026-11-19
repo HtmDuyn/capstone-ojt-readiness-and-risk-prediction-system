@@ -6,7 +6,7 @@ import { enterpriseService, type EnterpriseInternshipItem, type EnterpriseIntern
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { loadAllPages } from '@/components/enterprise/recruitment';
 import { applyEvaluationScore, evaluationAverage, evaluationScoreFields, parseEvaluationScore, taskScoreSuggestion,
-  type EvaluationScoreKey, type EvaluationScores } from '@/utils/enterpriseEvaluation';
+  type EvaluationScoreKey, type EvaluationScores } from '@/utils/enterprise/enterpriseEvaluation';
 
 interface EvaluationRow extends EvaluationScores {
   id: number;

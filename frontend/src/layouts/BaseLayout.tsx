@@ -6,7 +6,6 @@ import { Sidebar } from "@/components/common/Sidebar";
 import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import type { NavItem } from "@/types/common.types";
-import './QhdnWorkspace.css';
 
 export interface BaseLayoutProps {
   navItems: NavItem[];

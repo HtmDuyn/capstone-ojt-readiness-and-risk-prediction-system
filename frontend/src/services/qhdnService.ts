@@ -5,12 +5,12 @@ import type {
   ImportPreviewApiResponse,
   ImportPreviewResponse,
 } from "@/types/qhdn/qhdnTypes";
-import { normalizeEnterpriseImportPreview } from "@/utils/qhdnEnterprise";
+import { normalizeEnterpriseImportPreview } from "@/utils/qhdn/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
-import { loadAllPages } from "../utils/loadAllPages";
+import { loadAllPages } from "../utils/shared/loadAllPages";
 import API from "./api";
-import type { DashboardPlacementStudent, DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdnDashboard';
+import type { DashboardPlacementStudent, DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
 
 /** Use the same roster as the OJT coordination screen, including unregistered students. */
 export const getDashboardPlacements = async (ojtSemesterId: number): Promise<DashboardPlacementStudent[]> => {
@@ -365,7 +365,7 @@ export const getQhdnStudentDossier = async (studentId: number, ojtSemesterId: nu
   return data.data;
 };
 
-// API trả Blob; utils/downloadFile phụ trách lưu file trên trình duyệt.
+// API trả Blob; utils/shared/downloadFile phụ trách lưu file trên trình duyệt.
 export const getCvFile = async (
   studentId: number,
   cvFileId?: number | null,

@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { expireBearerSession } from './authSession';
-import { API_BASE_URL } from '@/config/api';
+import { API_BASE_URL } from '@/services/api';
 import { studentReads } from './studentReads';
 import { initializeStudentSnapshots, studentSnapshots } from './studentSnapshots';
 
-import { downloadFile } from '@/utils/downloadFile';
+import { downloadFile } from '@/utils/shared/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
 import type {
   AcademicSummary,

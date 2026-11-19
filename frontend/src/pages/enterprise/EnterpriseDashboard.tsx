@@ -15,7 +15,7 @@ import {
   Clock3,
   CalendarClock,
 } from 'lucide-react';
-import { displayTaskTime } from '@/utils/taskTime';
+import { displayTaskTime } from '@/utils/shared/taskTime';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   enterpriseService,

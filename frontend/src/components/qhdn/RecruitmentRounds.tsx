@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CalendarDays, Plus, CheckCheck } from 'lucide-react';
 import API from '@/services/api';
-import { recruitmentPhases, validateRecruitmentPhases, type PhaseSchedule } from '@/utils/recruitmentSchedule';
+import { recruitmentPhases, validateRecruitmentPhases, type PhaseSchedule } from '@/utils/shared/recruitmentSchedule';
 import type { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from './StudentWorkflowUi';
 import { Field, Notice, errorMessage } from './QhdnUi';
 import { RecruitmentDateInput } from './RecruitmentDateInput';
-import { emptySchedule,formatScheduleDate as formatDateTime,parseScheduleDate as parseDateTime,updateScheduleDraft,recruitmentScheduleAccess,type ScheduleDraft,type ScheduleField } from '@/utils/qhdnRecruitmentSchedule';
+import { emptySchedule,formatScheduleDate as formatDateTime,parseScheduleDate as parseDateTime,updateScheduleDraft,recruitmentScheduleAccess,type ScheduleDraft,type ScheduleField } from '@/utils/qhdn/qhdnRecruitmentSchedule';
 
 type Round=Partial<PhaseSchedule>&{canEditSchedule?:boolean;canDelete?:boolean;editableScheduleFields?:string[];canPost?:boolean;canApply?:boolean;canRespond?:boolean;id:number;name:string;campaignId?:number;campaignName?:string;roundNumber?:number;status:string;currentPhase:string;startsAt:string;endsAt:string;resultsFinalizedAt?:string;pendingCount:number;canOpen:boolean;openBlockedReason?:string;canFinalize:boolean;resultsSummary?:{total:number;accepted:number;rejected:number;withdrawn:number;pending?:number}};
 type Campaign={id:number;name:string;startsAt?:string;endsAt?:string};

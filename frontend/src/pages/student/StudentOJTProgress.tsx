@@ -5,7 +5,7 @@ import { useStudentResource } from '@/hooks/useStudentResource';
 import { getAssignedTasks, getTaskSubmissions, submitAssignedTask } from '@/services/studentService';
 import type { Task } from '@/types/student/portal';
 import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
-import { displayTaskTime } from '@/utils/taskTime';
+import { displayTaskTime } from '@/utils/shared/taskTime';
 import { buttonClass, Card, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
 
 function ProgressContent() {

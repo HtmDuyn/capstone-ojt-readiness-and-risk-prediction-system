@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Save, X } from 'lucide-react';
 import type { AcademicCalendar, SemesterDates } from '@/types/education/academic.types';
-import { calendarErrors, semesterDraft, TERM_COLOR, TERM_LABEL } from '@/utils/academicCalendar';
+import { calendarErrors, semesterDraft, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
 
 export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
   calendar: AcademicCalendar; busy: boolean; onSave: (rows: SemesterDates[]) => Promise<boolean>; onCancel: () => void;

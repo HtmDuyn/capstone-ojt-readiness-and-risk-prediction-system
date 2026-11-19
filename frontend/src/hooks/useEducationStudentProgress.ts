@@ -1,5 +1,5 @@
 import { studentProgressService, educationOjtWorkflowService } from '@/services/educationService';
-import { progressHandoffStatus } from '@/utils/educationOjtCheckQueue';
+import { progressHandoffStatus } from '@/utils/education/educationOjtCheckQueue';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
 import React from 'react';
 

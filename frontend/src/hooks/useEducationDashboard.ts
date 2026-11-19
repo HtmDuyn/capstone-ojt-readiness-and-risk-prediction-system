@@ -4,9 +4,9 @@ import { academicReportingService } from '@/services/educationService';
 import { getAllItems, getJson } from '@/services/educationService';
 import type { AcademicPeriod, AcademicYear, QueryParams } from '@/types/education/dashboard.types';
 import type { Cohort } from '@/types/education/reporting.types';
-import { downloadCourseDemand } from '@/utils/downloadFile';
-import { getErrorMessage, isCanceledRequest, parseAcademicPeriods, parseAcademicYears, parseCohortProgress, parseCourseDemand, parsePeriodStatistics, readNumber, toApiId } from '@/utils/educationDashboard';
-import { academicAlertOverview, type AlertRow } from '@/utils/academicAlertOverview';
+import { downloadCourseDemand } from '@/utils/shared/downloadFile';
+import { getErrorMessage, isCanceledRequest, parseAcademicPeriods, parseAcademicYears, parseCohortProgress, parseCourseDemand, parsePeriodStatistics, readNumber, toApiId } from '@/utils/education/educationDashboard';
+import { academicAlertOverview, type AlertRow } from '@/utils/education/academicAlertOverview';
 import React, { useEffect, useMemo, useState } from 'react';
 
 /* =========================================================

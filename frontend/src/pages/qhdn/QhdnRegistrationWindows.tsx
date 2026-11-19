@@ -7,7 +7,7 @@ import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, wo
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
 import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
 import { closeRegistrationWindow, listRegistrationWindows, openRegistrationWindow, updateRegistrationWindow } from '@/services/qhdnService';
-import { loadAllPages } from '@/utils/loadAllPages';
+import { loadAllPages } from '@/utils/shared/loadAllPages';
 import type { RegistrationWindowItem } from '@/types/qhdn/qhdnTypes';
 
 const localDate = (value: string) => new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });

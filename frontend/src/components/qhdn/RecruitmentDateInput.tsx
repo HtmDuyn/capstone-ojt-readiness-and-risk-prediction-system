@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, Clock3, LockKeyhole } from 'lucide-react';
-import { parseScheduleDate } from '@/utils/qhdnRecruitmentSchedule';
+import { parseScheduleDate } from '@/utils/qhdn/qhdnRecruitmentSchedule';
 
 const localDate = (date:Date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 const localTime = (date:Date) => `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;

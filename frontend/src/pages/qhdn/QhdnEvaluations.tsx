@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download, Inbox, RefreshCw, Send } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { listOjtResults, exportQhdnReport, exportOjtResults, publishOjtResults } from '@/services/qhdnService';
-import { downloadFile } from '@/utils/downloadFile';
+import { downloadFile } from '@/utils/shared/downloadFile';
 import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { errorMessage, Field, Notice, Pager, Table, usePaged } from '@/components/qhdn/QhdnUi';

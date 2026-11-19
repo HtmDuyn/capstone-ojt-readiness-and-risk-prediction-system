@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Page } from "@/types/qhdn/workflowTypes";
-import { pageNumbers } from '@/utils/qhdnPagination';
+import { pageNumbers } from '@/utils/qhdn/qhdnPagination';
 
 export const control =
   "rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";

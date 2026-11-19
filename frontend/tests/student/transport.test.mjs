@@ -10,7 +10,7 @@ const sourceRoot = fileURLToPath(new URL('../../src/', import.meta.url));
 // Load the actual Student services, replacing only Vite's build-time base URL.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === '@/config/api') return { url: 'data:text/javascript,export const API_BASE_URL="https://student.test/api";', shortCircuit: true };
+    if (specifier === '@/services/api') return { url: 'data:text/javascript,export const API_BASE_URL="https://student.test/api";', shortCircuit: true };
     if (specifier.startsWith('@/')) return { url: pathToFileURL(resolve(sourceRoot, specifier.slice(2) + '.ts')).href, shortCircuit: true };
     if (specifier.startsWith('.') && context.parentURL?.startsWith(pathToFileURL(sourceRoot).href)) {
       const url = new URL(specifier + '.ts', context.parentURL);

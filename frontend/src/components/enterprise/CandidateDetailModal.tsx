@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { CheckCircle2, Download, Eye, FileText, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem } from '@/services/enterpriseService';
 import { WorkflowModal, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
-import { downloadFile } from '@/utils/downloadFile';
+import { downloadFile } from '@/utils/shared/downloadFile';
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value : 'Chưa cập nhật';

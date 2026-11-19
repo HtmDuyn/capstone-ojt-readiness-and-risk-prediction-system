@@ -1,4 +1,4 @@
-import type { PhaseSchedule } from './recruitmentSchedule';
+import type { PhaseSchedule } from '@/utils/shared/recruitmentSchedule';
 
 export type ScheduleField = keyof PhaseSchedule;
 export type ScheduleDraft = Record<ScheduleField,string>;

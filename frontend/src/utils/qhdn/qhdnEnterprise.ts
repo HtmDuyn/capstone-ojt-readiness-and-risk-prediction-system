@@ -6,8 +6,8 @@ import type {
   ImportPreviewResponse,
   ImportPreviewRowResult,
   PositionListItem,
-} from "../types/qhdn/qhdnTypes";
-import type { RecruitmentWindow } from "../types/qhdn/workflowTypes";
+} from "@/types/qhdn/qhdnTypes";
+import type { RecruitmentWindow } from "@/types/qhdn/workflowTypes";
 
 export function enterpriseImportPeriods(
   periods: AcademicPeriodItem[],

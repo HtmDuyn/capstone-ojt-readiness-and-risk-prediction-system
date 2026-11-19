@@ -1,4 +1,4 @@
-import { displayTaskTime } from '@/utils/taskTime';
+import { displayTaskTime } from '@/utils/shared/taskTime';
 import { useMemo, useState } from 'react';
 import { CheckCircle2, ChevronDown, ClipboardList, Search, Trash2, Users } from 'lucide-react';
 import type { InternTask } from '@/types/enterprise/enterpriseTypes';

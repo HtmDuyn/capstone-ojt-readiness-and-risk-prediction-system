@@ -33,14 +33,14 @@ import {
   listPositions,
   setCompanyAccess,
 } from "@/services/qhdnService";
-import { loadAllPages } from "@/utils/loadAllPages";
-import { positionTotals } from "@/utils/qhdnEnterprise";
+import { loadAllPages } from "@/utils/shared/loadAllPages";
+import { positionTotals } from "@/utils/qhdn/qhdnEnterprise";
 import type {
   CompanyListItem,
   PositionListItem,
 } from "@/types/qhdn/qhdnTypes";
 import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
-import { linkedOjtSemesterId } from "@/utils/qhdnAcademicPeriods";
+import { linkedOjtSemesterId } from "@/utils/qhdn/qhdnAcademicPeriods";
 
 const cell = "px-5 py-4 align-middle sm:px-6";
 const filterInput = workflowInput + " h-11 min-w-0 truncate";
