@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   listEligibleStudents,
   listStudentsInSemester,
@@ -15,10 +15,11 @@ export function useQhdnSemesters(initialId = "") {
 }
 
 export function useQhdnRoster(semesterId: string, source: "semester" | "eligible" = "semester") {
-  const [students, setStudents] = useState<HandoffStudentItem[]>([]),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState("");
+  const [students, setStudents] = useState<HandoffStudentItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+
   useEffect(() => {
     let active = true;
     setStudents([]);
@@ -70,5 +71,7 @@ export function useQhdnRoster(semesterId: string, source: "semester" | "eligible
       active = false;
     };
   }, [semesterId, source, revision]);
-  return { students, loading, error, reload: () => setRevision((v) => v + 1) };
+
+  const reload = useCallback(() => setRevision((value) => value + 1), []);
+  return { students, loading, error, reload };
 }

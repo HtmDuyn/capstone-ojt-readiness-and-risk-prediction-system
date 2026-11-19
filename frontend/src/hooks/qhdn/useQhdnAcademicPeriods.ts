@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAcademicPeriods } from "@/services/qhdnService";
 import { errorMessage } from "@/components/qhdn/QhdnUi";
 import { loadAllPages } from "@/utils/shared/loadAllPages";
@@ -30,14 +30,16 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, seme
     filteredPeriods.find((p) => String(p.id) === periodId)
       ?? preferredAcademicPeriod(filteredPeriods, initialOjtId);
   const ojtSemesterId = linkedOjtSemesterId(selectedPeriod);
-  const selectYear = (id: string) => {
+  const selectYear = useCallback((id: string) => {
     setYearId(id);
     setPeriodId(allowAll ? "ALL" : "");
-  };
+  }, [allowAll]);
+
+  const selectPeriod = useCallback((id: string) => setPeriodId(id), []);
   return {
     periods, years, filteredPeriods, yearId, selectYear,
     periodId: allPeriods ? "ALL" : selectedPeriod ? String(selectedPeriod.id) : "",
-    selectPeriod: setPeriodId, selectedPeriod, allPeriods, allowAll,
+    selectPeriod, selectedPeriod, allPeriods, allowAll,
     ojtSemesterId, semesterId: ojtSemesterId === null ? "" : String(ojtSemesterId),
     loading, error, semestersOnly,
   };

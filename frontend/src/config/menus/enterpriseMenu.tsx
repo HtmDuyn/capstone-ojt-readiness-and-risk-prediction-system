@@ -1,10 +1,10 @@
-import React from 'react';
 import {
   DashboardGridIcon,
 } from '@/components/common/icons/AppIcons';
 import { Bell, Briefcase, Users, CheckSquare, ClipboardCheck } from 'lucide-react';
 import type { NavItem } from '@/types/common.types';
 
+// Menu dùng chung cho layout doanh nghiệp; giữ thứ tự theo quy trình hoạt động.
 export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
   {
     id: 'enterprise-dashboard',

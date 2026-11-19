@@ -6,7 +6,7 @@ import { RecruitmentPostDialog } from '@/components/enterprise/RecruitmentPostDi
 import { RecruitmentPostDetailsDialog } from '@/components/enterprise/RecruitmentPostDetailsDialog';
 import { useRecruitmentFeedback } from '@/components/enterprise/RecruitmentNoticeDialog';
 import { RecruitmentPostCard } from '@/components/enterprise/RecruitmentPostCard';
-import { canDeleteRecruitmentPost, canPublishRecruitmentPost, formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts } from '@/components/enterprise/recruitment';
+import { canDeleteRecruitmentPost, canPublishRecruitmentPost, formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts } from '@/utils/enterprise/recruitment';
 import { enterpriseService, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 

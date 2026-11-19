@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 're
 import { createPortal } from 'react-dom';
 import { CalendarDays, Check, Eye, Loader2, LockKeyhole, Plus, Save, Trash2, X } from 'lucide-react';
 import { enterpriseService, type EnterpriseRecruitmentPostInput, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
-import { canEditRecruitmentPost, canPublishRecruitmentPost, formatRecruitmentDate, postEditLockReason, postPublishLockReason, recruitmentError, windowAcceptsPosts } from './recruitment';
+import { canEditRecruitmentPost, canPublishRecruitmentPost, formatRecruitmentDate, postEditLockReason, postPublishLockReason, recruitmentError, windowAcceptsPosts } from '@/utils/enterprise/recruitment';
 import { useRecruitmentFeedback } from './RecruitmentNoticeDialog';
 
 interface PositionDraft {

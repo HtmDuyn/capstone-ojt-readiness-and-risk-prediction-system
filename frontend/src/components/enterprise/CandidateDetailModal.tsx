@@ -13,7 +13,8 @@ const certificateUrl = (value: string) => {
 async function cvError(error: unknown) {
   const data = (error as { response?: { data?: unknown } })?.response?.data;
   if (data instanceof Blob) {
-    try { const body = JSON.parse(await data.text()); if (body.message) return String(body.message); } catch { /* Use fallback below. */ }
+    // Backend có thể trả lỗi JSON dưới dạng Blob khi tải CV.
+    try { const body = JSON.parse(await data.text()); if (body.message) return String(body.message); } catch { /* Dùng thông báo mặc định nếu Blob không phải JSON. */ }
   }
   return error instanceof Error ? error.message : 'Không thể tải CV. Vui lòng thử lại.';
 }
@@ -22,7 +23,7 @@ function Fields({ items }: { items: [string, ReactNode][] }) {
   return <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
     {items.map(([label, value]) => <div key={label} className="min-w-0 rounded-xl bg-slate-50 p-3">
       <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-1 whitespace-pre-wrap break-words font-medium text-slate-800 [overflow-wrap:anywhere]">{value}</dd>
+      <dd className="mt-1 whitespace-pre-wrap font-medium text-slate-800 [overflow-wrap:anywhere]">{value}</dd>
     </div>)}
   </dl>;
 }
@@ -107,20 +108,20 @@ export function CandidateDetailModal({ candidate, busy, decisionLabel, onClose, 
           <div className="min-w-0 space-y-4">
             <section className="border-b border-slate-100 pb-4">
               <h3 className="mb-3 text-sm font-bold text-slate-900">Thư ứng tuyển</h3>
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-600 [overflow-wrap:anywhere]">{submitted?.coverLetter || 'Sinh viên chưa điền thư ứng tuyển.'}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600 [overflow-wrap:anywhere]">{submitted?.coverLetter || 'Sinh viên chưa điền thư ứng tuyển.'}</p>
             </section>
             <section className="border-b border-slate-100 pb-4">
               <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-sm font-bold text-slate-900">Chứng chỉ đính kèm</h3><span className="text-xs text-slate-400">{submitted?.certificates?.length || 0} mục</span></div>
               {submitted?.certificates?.length ? <div className="flex flex-wrap gap-2">{submitted.certificates.map((certificate, index) => {
                 const href = certificateUrl(certificate.url);
                 return href
-                  ? <a key={index} href={href} target="_blank" rel="noopener noreferrer" className="max-w-full break-words rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:border-blue-200 hover:bg-blue-50 [overflow-wrap:anywhere]">{certificate.name}</a>
-                  : <span key={index} className="max-w-full break-words rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500 [overflow-wrap:anywhere]">{certificate.name} · Liên kết không hợp lệ</span>;
+                  ? <a key={index} href={href} target="_blank" rel="noopener noreferrer" className="max-w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:border-blue-200 hover:bg-blue-50 [overflow-wrap:anywhere]">{certificate.name}</a>
+                  : <span key={index} className="max-w-full rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500 [overflow-wrap:anywhere]">{certificate.name} · Liên kết không hợp lệ</span>;
               })}</div> : <p className="text-sm text-slate-500">Không có chứng chỉ đính kèm.</p>}
             </section>
             <section className="text-sm">
               <h3 className="font-bold text-slate-900">Thông tin vị trí ứng tuyển</h3>
-              <div className="mt-3 space-y-3 break-words rounded-xl bg-slate-50 p-4 text-slate-600 [overflow-wrap:anywhere]">
+              <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-4 text-slate-600 [overflow-wrap:anywhere]">
                 <p>Mã vị trí: {candidate.position.code || 'Chưa cập nhật'}</p>
                 <div><h4 className="font-medium text-slate-800">Mô tả</h4><p className="mt-1 whitespace-pre-wrap leading-relaxed">{text(candidate.position.description)}</p></div>
                 <div><h4 className="font-medium text-slate-800">Yêu cầu</h4><p className="mt-1 whitespace-pre-wrap leading-relaxed">{text(candidate.position.requirements)}</p></div>
@@ -138,8 +139,8 @@ export function CandidateDetailModal({ candidate, busy, decisionLabel, onClose, 
             </section>
             <section className="border-t border-slate-100 pt-4"><h3 className="mb-3 text-sm font-bold text-slate-900">Liên hệ trong đơn</h3><dl className="space-y-3 text-sm"><div><dt className="text-xs text-slate-500">Email</dt><dd className="mt-0.5 break-all font-medium text-slate-800">{text(application?.contactEmail)}</dd></div><div><dt className="text-xs text-slate-500">Số điện thoại</dt><dd className="mt-0.5 font-medium text-slate-800">{text(application?.contactPhone)}</dd></div></dl></section>
             <section className="border-t border-slate-100 pt-4"><h3 className="mb-3 text-sm font-bold text-slate-900">Kỹ năng nổi bật</h3>
-              {!!skills.length && <div className="flex flex-wrap gap-2">{skills.map((skill, index) => <span key={index} className="max-w-full break-words rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-800 [overflow-wrap:anywhere]">{skill.name}</span>)}</div>}
-              {!!profileSkills.length && <div className={`flex flex-wrap gap-2 ${skills.length ? 'mt-2' : ''}`}>{profileSkills.map((skill, index) => <span key={index} className="max-w-full break-words rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 [overflow-wrap:anywhere]">{skill.name}{skill.level != null ? ` · Mức ${skill.level}/5` : ''}</span>)}</div>}
+              {!!skills.length && <div className="flex flex-wrap gap-2">{skills.map((skill, index) => <span key={index} className="max-w-full rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-800 [overflow-wrap:anywhere]">{skill.name}</span>)}</div>}
+              {!!profileSkills.length && <div className={`flex flex-wrap gap-2 ${skills.length ? 'mt-2' : ''}`}>{profileSkills.map((skill, index) => <span key={index} className="max-w-full rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 [overflow-wrap:anywhere]">{skill.name}{skill.level != null ? ` · Mức ${skill.level}/5` : ''}</span>)}</div>}
               {!skills.length && !profileSkills.length && <p className="text-sm text-slate-500">Chưa có dữ liệu kỹ năng.</p>}
             </section>
           </aside>

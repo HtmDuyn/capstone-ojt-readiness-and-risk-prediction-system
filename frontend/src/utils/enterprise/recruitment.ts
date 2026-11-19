@@ -1,5 +1,5 @@
 import axios, { type AxiosError } from 'axios';
-import { enterpriseService, type PaginatedResponse, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
+import { enterpriseService, type PaginatedResponse, type RecruitmentPost, type RecruitmentWindow } from '../../services/enterpriseService';
 
 export const recruitmentStatusLabels: Record<RecruitmentPost['status'], string> = {
   DRAFT: 'Bản nháp', PENDING_REVIEW: 'Tin cũ chưa công bố', PUBLISHED: 'Đang tuyển',
@@ -76,11 +76,17 @@ export async function loadAllPages<T extends { id: number }>(
   const first = await fetchPage(1);
   if (!first.success || !first.data || first.data.limit <= 0) throw new Error(`Không thể tải ${dataLabel}.`);
   const items = [...first.data.items];
-  for (let page = 2; page <= Math.ceil(first.data.total / first.data.limit); page++) {
+  const totalPages = Math.ceil(first.data.total / first.data.limit);
+
+  // Tải tối đa hai trang mỗi lượt để giảm thời gian chờ nhưng không gây quá tải API.
+  for (let page = 2; page <= totalPages; page += 2) {
     if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
-    const next = await fetchPage(page);
-    if (!next.success || !next.data) throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
-    items.push(...next.data.items);
+    const pageNumbers = [page, ...(page + 1 <= totalPages ? [page + 1] : [])];
+    const responses = await Promise.all(pageNumbers.map(nextPage => fetchPage(nextPage)));
+    for (const response of responses) {
+      if (!response.success || !response.data) throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
+      items.push(...response.data.items);
+    }
   }
   return uniqueById(items);
 }

@@ -23,6 +23,26 @@ type Application = {
 };
 type OpportunityResults = Page<Opportunity> & { blockers: string[] };
 
+function indexCompanies(items: Opportunity[]) {
+  const byId = new Map<number, {company: PartnerCompany; positions: Opportunity[]; remaining: number}>();
+  for (const item of items) {
+    const group = byId.get(item.company.id);
+    if (group) {
+      group.company = item.company;
+      group.positions.push(item);
+      group.remaining += item.remainingSlots;
+    } else {
+      byId.set(item.company.id, {company: item.company, positions: [item], remaining: item.remainingSlots});
+    }
+  }
+  const groups = Array.from(byId.values(), group => ({
+    ...group,
+    searchText: [group.company.name, group.company.industry, group.company.address,
+      ...group.positions.map(position => position.title)].join(' ').toLocaleLowerCase(),
+  }));
+  return {byId, groups, companies: groups.map(group => group.company)};
+}
+
 function RegistrationContent() {
   const { profile, semesterId, revision, refreshing: profileRefreshing } = useStudentPortal();
   const [windowChoice, setWindowChoice] = useState('');
@@ -54,11 +74,9 @@ function RegistrationContent() {
         publish({ ...result, items: [...items] });
       }
     }, { snapshot: true });
-  const companies = useMemo(() => [...new Map((opportunities.data?.items ?? []).map((item) => [item.company.id, item.company])).values()], [opportunities.data]);
-  const filteredCompanies = companies.filter((company) => {
-    const positions = opportunities.data?.items.filter((item) => item.company.id === company.id) ?? [];
-    return [company.name, company.industry, company.address, ...positions.map((item) => item.title)].join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
-  });
+  const {byId, groups, companies} = useMemo(() => indexCompanies(opportunities.data?.items ?? []), [opportunities.data?.items]);
+  const query = search.trim().toLocaleLowerCase();
+  const filteredCompanies = useMemo(() => groups.filter(group => group.searchText.includes(query)), [groups, query]);
   const currentCompanyPage = Math.min(companyPage, Math.max(1, Math.ceil(filteredCompanies.length / 20)));
   const applicationItems = applications.data?.items ?? [];
   const cv = savedCv ?? profile?.cv ?? null;
@@ -104,12 +122,11 @@ function RegistrationContent() {
         <ResourceState loading={opportunities.loading} refreshing={opportunities.refreshing} error={opportunities.error} retry={opportunities.reload} />
         {!opportunities.pending && !opportunities.error && !filteredCompanies.length && <Empty>{search ? 'Không tìm thấy doanh nghiệp phù hợp.' : 'Chưa có doanh nghiệp công bố tuyển dụng trong đợt này.'}</Empty>}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredCompanies.slice((currentCompanyPage - 1) * 20, currentCompanyPage * 20).map((company) => {
-            const positions = opportunities.data?.items.filter((item) => item.company.id === company.id) ?? [];
+          {filteredCompanies.slice((currentCompanyPage - 1) * 20, currentCompanyPage * 20).map(({company, positions, remaining}) => {
             return <article key={company.id} className="flex h-fit w-full max-w-[420px] flex-col justify-self-start rounded-2xl border border-slate-200 p-5 transition hover:border-orange-200 hover:shadow-md hover:shadow-orange-100/40">
               <div className="mb-4 flex items-start gap-3"><div className="rounded-2xl bg-orange-50 p-3 text-orange-600"><Building2 size={23} /></div><div><h3 className="font-bold text-slate-900">{company.name}</h3><p className="mt-1 text-xs text-slate-500">{company.industry || 'Doanh nghiệp liên kết OJT'}</p></div></div>
               <p className="mb-3 flex items-start gap-2 text-sm text-slate-500"><MapPin size={16} className="mt-0.5 shrink-0" />{company.address || positions[0]?.location || 'Địa điểm chưa cập nhật'}</p>
-              <p className="mb-4 text-sm text-slate-600">{positions.length} vị trí · {positions.reduce((sum, item) => sum + item.remainingSlots, 0)} chỗ còn nhận</p>
+              <p className="mb-4 text-sm text-slate-600">{positions.length} vị trí · {remaining} chỗ còn nhận</p>
               <button type="button" onClick={() => setDetailCompany(company)} className="mt-auto flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700">Xem chi tiết & vị trí tuyển dụng<ChevronRight size={17} /></button>
             </article>;
           })}
@@ -148,7 +165,7 @@ function RegistrationContent() {
             {[['Lĩnh vực', detailCompany.industry], ['Địa chỉ', detailCompany.address], ['Người liên hệ', detailCompany.contactPersonName], ['Email', detailCompany.contactEmail], ['Điện thoại', detailCompany.contactPhone]].map(([label, value]) => <div key={label}><dt className="text-slate-500">{label}</dt><dd className="mt-1 break-words font-medium">{value || 'Chưa cập nhật'}</dd></div>)}
           </dl>
           <h3 className="font-bold">Vị trí đang tuyển</h3>
-          {opportunities.data?.items.filter((item) => item.company.id === detailCompany.id).map((item) => <article key={`${item.postId}:${item.id}`} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+          {byId.get(detailCompany.id)?.positions.map((item) => <article key={`${item.postId}:${item.id}`} className="space-y-3 rounded-2xl border border-slate-200 p-4">
             <div className="flex flex-wrap justify-between gap-2"><h4 className="font-bold">{item.title}</h4><span className="text-sm font-semibold text-emerald-700">{item.remainingSlots} chỗ</span></div>
             <p className="text-xs text-slate-500">{item.location || detailCompany.address || 'Chưa cập nhật địa điểm'} · {workModeText(item.workMode)}</p>
             <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">{item.description || item.post.content}</p>
