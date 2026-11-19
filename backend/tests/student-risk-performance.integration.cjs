@@ -52,7 +52,7 @@ test('assessment query reuse preserves the complete original warning and roadmap
     const after = await measure(() => assessOjtRisk(actor(id), c));
     assert.deepEqual(after.result, before.result, `Entire response changed for student ${id}`);
     assert.ok(after.queries.length < before.queries.length, 'Assessment should issue fewer SQL statements');
-    const sourceReads = after.queries.filter(q => q.sql === 'SELECT * FROM "Students" WHERE "StudentID"=$1');
+    const sourceReads = after.queries.filter(q => q.sql.includes('WITH curriculum AS ('));
     assert.equal(sourceReads.length, 1, 'Academic progress must be loaded once per assessment');
     const prerequisites = after.queries.filter(q => q.sql.includes('AS "requirementId"') && q.sql.includes('FROM "ProgramPrerequisiteGroups"'));
     assert.ok(prerequisites.length <= 1, 'Warning and roadmap must share prerequisite groups');

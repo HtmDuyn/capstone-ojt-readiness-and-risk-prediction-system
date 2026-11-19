@@ -122,6 +122,34 @@ export async function report(type:ReportType,params:Row,actor:Actor,exportAll=fa
   return {type,filters:q.filters,items:await enrichListRows(c,rows),total,...(exportAll?{}:{page:q.page,limit:q.limit})};
  });
 }
+const progressSql=`${assignmentCte}, student_progress AS (
+   SELECT a."StudentID",a.semester_id,
+    bool_or(a.assignment_status='COMPLETED' OR (ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS finished,
+    bool_or(a.assignment_status IN ('ASSIGNED','ACTIVE','IN_PROGRESS')) AS ongoing,
+    bool_or(ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS evaluated
+   FROM scoped_assignments a LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID"
+   WHERE a.assignment_status NOT IN ('CANCELLED','CANCELED') GROUP BY a."StudentID",a.semester_id
+  ) SELECT count(*) FILTER(WHERE finished)::int AS completed,
+   count(*) FILTER(WHERE ongoing AND NOT finished)::int AS "inProgress",
+   count(*) FILTER(WHERE evaluated)::int AS evaluated FROM student_progress`;
+
+export async function dashboardSummary(semesterId:number,actor:Actor) {
+  staff(actor);
+  return readTransaction(async c=>{
+    const {rows:[summary]}=await c.query(`WITH quotas AS (
+      SELECT p."EnterpriseID" AS "companyId",sum(coalesce(p."Capacity",0))::int AS capacity,
+        sum(greatest(0,coalesce(p."Capacity",0)-public."RecruitmentOccupiedSlots"(p."PositionID")))::int AS "remainingSlots"
+      FROM "InternshipPositions" p WHERE p."OJTSemesterID"=$1 AND p."DeletedAt" IS NULL
+      GROUP BY p."EnterpriseID"
+    )
+    SELECT (SELECT row_to_json(progress) FROM (${progressSql}) progress) AS progress,
+      coalesce((SELECT json_agg(quotas ORDER BY "companyId") FROM quotas),'[]') AS quotas
+    FROM "OJTSemesters" WHERE "OJTSemesterID"=$1`,[semesterId,null]);
+    if(!summary)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
+    return summary;
+  });
+}
+
 export async function dashboard(params:Row,actor:Actor){
  staff(actor);const {filters:f}=reportQuery(params,'dashboard');
  return readTransaction(async c=>{
@@ -163,16 +191,7 @@ export async function dashboard(params:Row,actor:Actor){
   const {totalResults,publishedResults,unpublishedResults,...assignments}=totals;
   // A submitted company evaluation is visible immediately, without a transfer or
   // assignment-status update. Aggregate once per student and OJT semester.
-  const progress=(await c.query(`${assignmentCte}, student_progress AS (
-   SELECT a."StudentID",a.semester_id,
-    bool_or(a.assignment_status='COMPLETED' OR (ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS finished,
-    bool_or(a.assignment_status IN ('ASSIGNED','ACTIVE','IN_PROGRESS')) AS ongoing,
-    bool_or(ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS evaluated
-   FROM scoped_assignments a LEFT JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID"
-   WHERE a.assignment_status NOT IN ('CANCELLED','CANCELED') GROUP BY a."StudentID",a.semester_id
-  ) SELECT count(*) FILTER(WHERE finished)::int AS completed,
-   count(*) FILTER(WHERE ongoing AND NOT finished)::int AS "inProgress",
-   count(*) FILTER(WHERE evaluated)::int AS evaluated FROM student_progress`,args)).rows[0];
+  const progress=(await c.query(progressSql,args)).rows[0];
   return {filters:f,partners,positions,students,assignments,progress,results:{total:totalResults,published:publishedResults,unpublished:unpublishedResults}};
  });
 }

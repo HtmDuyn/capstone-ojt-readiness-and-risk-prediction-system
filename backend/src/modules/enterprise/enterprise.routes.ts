@@ -3,13 +3,13 @@ import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
-import { enterpriseProfile, enterpriseCandidates, enterpriseCandidatePeriods, enterpriseInternships, enterpriseCandidateCV } from './enterprise.service';
+import { dashboardCandidates, enterpriseProfile, enterpriseCandidates, enterpriseCandidatePeriods, enterpriseInternships, enterpriseCandidateCV } from './enterprise.service';
 import { decision, evaluate } from '../qhdn/workflow.service';
 import { bulkAcceptance } from './bulk-acceptance.service';
 import { bulkEvaluate } from './bulk-evaluation.service';
 import { enterpriseWindows, enterprisePosts, saveEnterprisePost, deleteEnterprisePost } from './enterprise-recruitment.service';
 import { startEnterpriseRecruitmentWorker } from './enterprise-recruitment.worker';
-import { assignTasks, deleteUnusedTask } from '../qhdn/task.service';
+import { dashboardTasks, assignTasks, deleteUnusedTask } from '../qhdn/task.service';
 
 const router = Router();
 startEnterpriseRecruitmentWorker();
@@ -28,6 +28,8 @@ router.post('/recruitment/posts/:id/publish',handle(req=>saveEnterprisePost({sta
 router.delete('/recruitment/posts/:id',handle(req=>deleteEnterprisePost(positiveId(req.params.id),req.user)));
 router.delete('/tasks/:id',handle(req=>deleteUnusedTask(positiveId(req.params.id),req.user)));
 router.post('/tasks/bulk',handle(req=>assignTasks(req.body,req.user)));
+router.get('/dashboard/tasks',handle(req=>dashboardTasks(req.user)));
+router.get('/dashboard/candidates',handle(req=>dashboardCandidates(req.user)));
 router.get('/candidate-periods',handle(req=>enterpriseCandidatePeriods(req.user)));
 router.get('/candidates',handle(req=>enterpriseCandidates(req.query,req.user)));
 router.get('/candidates/:id/cv', async (req,res,next) => {

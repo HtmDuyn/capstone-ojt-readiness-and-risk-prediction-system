@@ -79,11 +79,44 @@ export async function deleteUnusedTask(taskId:number, actor:Actor) {
   });
 }
 
+const enterpriseTaskStatus = `CASE
+        WHEN EXISTS (SELECT 1 FROM "TaskProgressUpdates" u WHERE u."TaskID"=t."TaskID" AND u."UpdatedByStudentID"=a."StudentID"
+          AND u."PercentComplete"=100 AND COALESCE(u."UpdateDate"<=(to_jsonb(t)->>'DueAt')::timestamp,u."UpdateDate"<(t."DueDate"+1)::timestamp,true)) THEN 'DONE'
+        WHEN COALESCE((to_jsonb(t)->>'DueAt')::timestamp,(t."DueDate"+1)::timestamp-interval '1 microsecond') < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN 'OVERDUE' ELSE 'TODO' END`;
+
+export async function dashboardTasks(actor: Actor) {
+  return readTransaction(async c => {
+    const companyId = await enterpriseScope(c, actor);
+    const {rows: [summary]} = await c.query(`WITH tasks AS (
+      SELECT t."TaskID" AS id, t."TaskName" AS name, a."StudentID", t."DueDate" AS "dueDate",
+        to_jsonb(t)->>'DueAt' AS "dueAt", upper(t."Status") AS status,
+        ${enterpriseTaskStatus} AS "enterpriseStatus",
+        t."DueDate" <= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 7 AS upcoming
+      FROM "InternshipTasks" t JOIN "InternshipAssignments" a USING ("AssignmentID")
+      WHERE a."EnterpriseID"=$1
+    ), attention AS (
+      SELECT id,name,"dueAt","dueDate","enterpriseStatus",u."FullName" AS "fullName"
+      FROM tasks JOIN "Students" s USING ("StudentID") JOIN "Users" u USING ("UserID")
+      WHERE upcoming AND "enterpriseStatus"<>'DONE'
+      ORDER BY coalesce("dueAt"::timestamp,"dueDate"::timestamp),id DESC LIMIT 3
+    )
+    SELECT count(*)::int AS total,
+      count(*) FILTER (WHERE "enterpriseStatus"='DONE')::int AS completed,
+      count(*) FILTER (WHERE status='IN_PROGRESS')::int AS "inProgress",
+      count(*) FILTER (WHERE "enterpriseStatus"<>'DONE' AND status IS DISTINCT FROM 'IN_PROGRESS')::int AS todo,
+      count(*) FILTER (WHERE "enterpriseStatus"='OVERDUE' AND "dueDate" IS NOT NULL)::int AS overdue,
+      count(*) FILTER (WHERE upcoming AND "enterpriseStatus"='TODO')::int AS "dueSoon",
+      (SELECT coalesce(jsonb_agg(to_jsonb(attention) ORDER BY coalesce("dueAt"::timestamp,"dueDate"::timestamp),id DESC),'[]') FROM attention) AS attention
+    FROM tasks`, [companyId]);
+    return summary;
+  });
+}
+
 export async function listTasks(params:Record<string,unknown>, actor:Actor,existingClient?:PoolClient){
   const p=pagination(params,['assignmentId','companyId','studentId','positionId','ojtSemesterId']);
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const id=params.assignmentId===undefined?null:positiveId(params.assignmentId,'assignmentId');
-  return (actor.roleCode==='STUDENT'?readTransaction:academicTransaction)(async c=>{
+  return readTransaction(async c=>{
     const company=params.companyId===undefined?null:positiveId(params.companyId,'companyId');
     const studentId=params.studentId===undefined?null:positiveId(params.studentId,'studentId');
     if(actor.roleCode==='ENTERPRISE'){positiveId(params.companyId,'companyId');await assertScope(c,actor,company!);}
@@ -95,10 +128,7 @@ export async function listTasks(params:Record<string,unknown>, actor:Actor,exist
     const semesterId=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
     const rows=await c.query(`WITH filtered AS (SELECT t."TaskID" AS id,t."AssignmentID" AS "assignmentId",t."TaskName" AS name,t."Description" AS description,t."AssignedDate" AS "assignedDate",t."DueDate" AS "dueDate",t."Status" AS status,
       to_jsonb(t)->>'AssignedAt' AS "assignedAt",to_jsonb(t)->>'DueAt' AS "dueAt",
-      ${actor.roleCode==='ENTERPRISE' ? `CASE
-        WHEN EXISTS (SELECT 1 FROM "TaskProgressUpdates" u WHERE u."TaskID"=t."TaskID" AND u."UpdatedByStudentID"=a."StudentID"
-          AND u."PercentComplete"=100 AND COALESCE(u."UpdateDate"<=(to_jsonb(t)->>'DueAt')::timestamp,u."UpdateDate"<(t."DueDate"+1)::timestamp,true)) THEN 'DONE'
-        WHEN COALESCE((to_jsonb(t)->>'DueAt')::timestamp,(t."DueDate"+1)::timestamp-interval '1 microsecond') < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN 'OVERDUE' ELSE 'TODO' END AS "enterpriseStatus",
+      ${actor.roleCode==='ENTERPRISE' ? `${enterpriseTaskStatus} AS "enterpriseStatus",
         NOT ${hasTaskHistory} AS "canDelete",` : ''}
       a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",co."OJTSemesterID" AS "ojtSemesterId",
       jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate") AS assignment

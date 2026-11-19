@@ -198,6 +198,24 @@ export interface EnterpriseCandidatePosition {
   workMode?: string | null;
 }
 
+export interface DashboardTaskSummary {
+  total: number;
+  completed: number;
+  inProgress: number;
+  todo: number;
+  overdue: number;
+  dueSoon: number;
+  attention: {id: number; name: string; fullName: string; enterpriseStatus: string; dueAt: string | null; dueDate: string}[];
+}
+
+export interface DashboardCandidate {
+  id: number;
+  introducedAt: string | null;
+  fullName: string;
+  studentCode: string;
+  positionTitle: string;
+}
+
 export interface EnterpriseCandidateItem {
   id: number; // CoordinationID
   studentId: number;
@@ -455,9 +473,21 @@ export const enterpriseService = {
     (await API.delete(`/enterprise/recruitment/posts/${id}`)).data,
 
   // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
-  listCandidatePeriods: async (): Promise<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }> => {
-    const response = await API.get<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }>('/enterprise/candidate-periods');
+  listCandidatePeriods: async (signal?: AbortSignal): Promise<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }> => {
+    const response = await API.get<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }>('/enterprise/candidate-periods', {signal});
     return response.data;
+  },
+
+  dashboardTasks: async (signal: AbortSignal) => {
+    const response = await API.get<{success: boolean; data: DashboardTaskSummary}>('/enterprise/dashboard/tasks', {signal});
+    return response.data.data;
+  },
+
+  dashboardCandidates: async (signal: AbortSignal) => {
+    const response = await API.get<{success: boolean; data: {items: DashboardCandidate[]; rejectedCount: number}}>(
+      '/enterprise/dashboard/candidates', {signal},
+    );
+    return response.data.data;
   },
 
   listCandidates: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {

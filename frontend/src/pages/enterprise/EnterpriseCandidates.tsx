@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { CandidateDetailModal } from '@/components/enterprise/CandidateDetailModal';
 import { Users, Search, CheckCircle2, XCircle, Eye, Check, X, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -7,7 +7,7 @@ import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { WorkflowModal,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 
 export const EnterpriseCandidates: React.FC = () => {
-  const { loading: profileLoading, error: profileError } = useEnterprise();
+  const { error: profileError } = useEnterprise();
   const [candidates, setCandidates] = useState<EnterpriseCandidateItem[]>([]);
   const [candidatePeriods, setCandidatePeriods] = useState<EnterpriseCandidatePeriod[]>([]);
   const [periodsLoading, setPeriodsLoading] = useState(true);
@@ -69,48 +69,57 @@ export const EnterpriseCandidates: React.FC = () => {
   );
 
   useEffect(() => {
-    if (profileLoading) return;
-    let active = true;
+    const controller = new AbortController();
     setPeriodsLoading(true);
     setPeriodsError(null);
-    enterpriseService.listCandidatePeriods()
+    Promise.resolve().then(() => {
+      controller.signal.throwIfAborted();
+      return enterpriseService.listCandidatePeriods(controller.signal);
+    })
       .then((response) => {
-        if (active) setCandidatePeriods(response.data.items);
+        if (!controller.signal.aborted) setCandidatePeriods(response.data.items);
       })
       .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Không thể tải danh sách năm học và kỳ OJT';
-        if (active) setPeriodsError(message);
+        setPeriodsError(message);
         console.error('Failed to load enterprise candidate periods:', err);
       })
       .finally(() => {
-        if (active) setPeriodsLoading(false);
+        if (!controller.signal.aborted) setPeriodsLoading(false);
       });
-    return () => { active = false; };
-  }, [profileLoading]);
+    return () => controller.abort();
+  }, []);
 
+  const candidatesRequest = useRef<AbortController | null>(null);
   const fetchCandidates = useCallback(async () => {
-    if (profileLoading) return;
+    candidatesRequest.current?.abort();
+    const controller = new AbortController();
+    candidatesRequest.current = controller;
     setLoading(true);
     setError(null);
     try {
       const res = await enterpriseService.listCandidates({
         ...(selectedYearId ? { academicYearId: Number(selectedYearId) } : {}),
         ...(selectedOjtSemesterId ? { ojtSemesterId: Number(selectedOjtSemesterId) } : {}),
-      });
-      if (res?.success && res.data) {
+      }, controller.signal);
+      if (!controller.signal.aborted && res?.success && res.data) {
         setCandidates(res.data.items || []);
       }
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : 'Không thể tải danh sách ứng viên';
       setError(message);
       console.error('Failed to load candidates:', err);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  }, [profileLoading, selectedYearId, selectedOjtSemesterId]);
+  }, [selectedYearId, selectedOjtSemesterId]);
 
   useEffect(() => {
-    fetchCandidates();
+    let active = true;
+    queueMicrotask(() => { if (active) void fetchCandidates(); });
+    return () => { active = false; candidatesRequest.current?.abort(); };
   }, [fetchCandidates]);
 
   const filteredCandidates = useMemo(() => {
@@ -290,12 +299,12 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Loading State — hiển thị khi đang tải profile hoặc dữ liệu ứng viên */}
-      {(loading || profileLoading) && (
+      {loading && (
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
             <p className="text-xs text-slate-500 font-medium">
-              {profileLoading ? 'Đang xác thực doanh nghiệp...' : 'Đang tải danh sách ứng viên...'}
+              Đang tải danh sách ứng viên...
             </p>
           </div>
         </div>

@@ -6,9 +6,8 @@ export interface DashboardPlacementStudent {
 }
 
 export interface QhdnDashboardSummary {
-  assignments: { assigned: number; active: number; completed: number };
+  quotas: {companyId:number; capacity:number; remainingSlots:number}[];
   progress: { inProgress: number; completed: number; evaluated: number };
-  results: { total: number; confirmed: number; passed: number };
 }
 
 export interface DashboardPlacementBoard {
