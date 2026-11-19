@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { BriefcaseBusiness, CalendarDays, LockKeyhole, MapPin, Pencil, Users, X } from 'lucide-react';
 import type { RecruitmentPost } from '@/services/enterpriseService';
 import { formatRecruitmentDate, recruitmentStatusLabels, recruitmentTotals } from './recruitment';
@@ -21,15 +22,16 @@ export function RecruitmentPostDetailsDialog({ post, lockReason, onClose, onEdit
     return () => element?.close();
   }, []);
 
-  return <dialog ref={dialog} aria-labelledby="recruitment-details-title"
-    className="m-auto max-h-none w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/50 sm:w-[calc(100%-3rem)]"
+  return createPortal(<dialog ref={dialog} aria-labelledby="recruitment-details-title"
+    className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-950/50 backdrop:backdrop-blur-sm sm:w-[calc(100%-3rem)]"
     onCancel={event => { event.preventDefault(); onClose(); }}>
-    <div className="flex max-h-[92dvh] flex-col">
+    <div className="flex max-h-[min(92dvh,calc(100dvh-2rem))] flex-col">
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-7">
         <div className="min-w-0">
           <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-600"><BriefcaseBusiness size={15} />Chi tiết tin tuyển dụng</p>
           <h2 id="recruitment-details-title" className="break-words text-xl font-bold text-slate-900">{post.title}</h2>
           <p className="mt-2 text-xs text-slate-500">{recruitmentStatusLabels[post.status]}{post.periodCode ? ` · ${post.periodCode}` : ''}</p>
+          {post.deletedAt && <p className="mt-1 text-xs text-rose-600">Đã xóa lúc {formatRecruitmentDate(post.deletedAt)}</p>}
         </div>
         <button type="button" aria-label="Đóng chi tiết" onClick={onClose} className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
       </header>
@@ -56,9 +58,9 @@ export function RecruitmentPostDetailsDialog({ post, lockReason, onClose, onEdit
         {lockReason && <p className="flex items-start gap-2 text-xs text-amber-800"><LockKeyhole size={14} className="shrink-0" />{lockReason}</p>}
         <div className="flex justify-end gap-3">
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Đóng</button>
-          <button type="button" disabled={!!lockReason} title={lockReason || 'Chỉnh sửa tin tuyển dụng'} onClick={onEdit} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40"><Pencil size={16} />Chỉnh sửa tin</button>
+          {!post.deleted && post.status !== 'ARCHIVED' && <button type="button" disabled={!!lockReason} title={lockReason || 'Chỉnh sửa tin tuyển dụng'} onClick={onEdit} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40"><Pencil size={16} />Chỉnh sửa tin</button>}
         </div>
       </footer>
     </div>
-  </dialog>;
+  </dialog>, document.body);
 }

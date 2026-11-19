@@ -44,14 +44,14 @@ test('three-phase creation, application-window synchronization and automatic dea
   await saveWindow({status:'OPEN',reason:'Open scheduled round'},staff,round.id);
   const waitUntil = async ms => new Promise(resolve => setTimeout(resolve, Math.max(0,base+ms-Date.now())));
   await waitUntil(1600);
-  const post = await saveEnterprisePost({windowId:round.id,title:'Test vacancy',content:'Test content',positions:[{
+  const post = await saveEnterprisePost({windowId:round.id,status:'PUBLISHED',title:'Test vacancy',content:'Test content',positions:[{
     title:'Intern',description:'Test',requirements:'SQL',capacity:1,
   }]},{userId:enterprise,roleCode:'ENTERPRISE'});
   assert.equal(+new Date(post.deadlineAt), +registration.EndsAt);
   await assert.rejects(assertPostPhase(db,post.id,'APPLICATION'),e=>e.errorCode==='RECRUITMENT_PHASE_CLOSED');
   await waitUntil(4600);
   await assertPostPhase(db,post.id,'APPLICATION'); await assertPostPhase(db,post.id,'RESULTS');
-  await assert.rejects(saveEnterprisePost({title:'Late change'},{userId:enterprise,roleCode:'ENTERPRISE'},post.id),e=>e.errorCode==='RECRUITMENT_PHASE_CLOSED');
+  await assert.rejects(saveEnterprisePost({title:'Late change'},{userId:enterprise,roleCode:'ENTERPRISE'},post.id),e=>e.errorCode==='RECRUITMENT_POST_LOCKED');
   await waitUntil(7100);
   await assert.rejects(assertPostPhase(db,post.id,'APPLICATION'));
   await assertPostPhase(db,post.id,'RESULTS');

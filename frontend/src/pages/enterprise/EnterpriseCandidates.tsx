@@ -4,7 +4,7 @@ import { CandidateDetailModal } from '@/components/enterprise/CandidateDetailMod
 import { Users, Search, CheckCircle2, XCircle, Eye, Check, X, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandidatePeriod, type EnterpriseAcceptancePreview } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
-import { WorkflowModal,workflowInput,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
+import { WorkflowModal,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 
 export const EnterpriseCandidates: React.FC = () => {
   const { loading: profileLoading, error: profileError } = useEnterprise();
@@ -26,7 +26,6 @@ export const EnterpriseCandidates: React.FC = () => {
   const [selectedIds,setSelectedIds]=useState<Set<number>>(new Set());
   const [acceptance,setAcceptance]=useState<EnterpriseAcceptancePreview|null>(null);
   const [bulkLoading,setBulkLoading]=useState(false),[allowOverCapacity,setAllowOverCapacity]=useState(false);
-  const [acceptanceReason,setAcceptanceReason]=useState('Doanh nghiệp đồng ý tiếp nhận sinh viên thực tập.');
   const [acceptanceError,setAcceptanceError]=useState('');
   const eligible=(candidate:EnterpriseCandidateItem)=>candidate.decision==='PENDING'&&candidate.isLatestCoordination&&candidate.canRespond!==false;
   useEffect(()=>{setSelectedIds(new Set());setPage(1);},[selectedYearId,selectedOjtSemesterId,filterStatus,searchTerm]);
@@ -39,10 +38,10 @@ export const EnterpriseCandidates: React.FC = () => {
     finally{setBulkLoading(false);}
   };
   const confirmAcceptance=async()=>{
-    if(!acceptance||bulkLoading||!acceptanceReason.trim()||(acceptance.overCapacity&&!allowOverCapacity))return;
+    if(!acceptance||bulkLoading||(acceptance.overCapacity&&!allowOverCapacity))return;
     setBulkLoading(true);setAcceptanceError('');
     try{
-      await enterpriseService.acceptCandidates(acceptance,allowOverCapacity,acceptanceReason.trim());
+      await enterpriseService.acceptCandidates(acceptance,allowOverCapacity,'Doanh nghiệp đồng ý tiếp nhận sinh viên thực tập.');
       setToastMessage(`Đã tiếp nhận ${acceptance.totalSelected} sinh viên. Số thực nhận và chênh lệch chỉ tiêu đã được cập nhật.`);
       setSelectedIds(new Set());setAcceptance(null);await fetchCandidates();
     }catch(err:any){
@@ -454,14 +453,13 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
       </section>
 
-      {acceptance&&<WorkflowModal wide title={`Xác nhận tiếp nhận ${acceptance.totalSelected} sinh viên`} busy={bulkLoading} onClose={()=>setAcceptance(null)}>
+      {acceptance&&<WorkflowModal wide scrollable title={`Xác nhận tiếp nhận ${acceptance.totalSelected} sinh viên`} busy={bulkLoading} onClose={()=>setAcceptance(null)}>
         <form className="space-y-4" onSubmit={event=>{event.preventDefault();void confirmAcceptance();}}>
           <p className="text-sm text-slate-600">Chỉ tiêu ban đầu được giữ nguyên. Sinh viên được duyệt nhận sẽ được tính vào số thực nhận của doanh nghiệp.</p>
           <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr>{['Kỳ OJT','Chỉ tiêu','Đã nhận','Đang chọn','Sau khi nhận','Vượt chỉ tiêu'].map(label=><th key={label} className="p-2.5">{label}</th>)}</tr></thead><tbody>{acceptance.semesters.map(semester=><tr key={semester.ojtSemesterId} className="border-t border-slate-100"><td className="p-2.5 font-medium">{semester.name}</td><td className="p-2.5 tabular-nums">{semester.capacity}</td><td className="p-2.5 tabular-nums">{semester.currentCount}</td><td className="p-2.5 tabular-nums">{semester.selectedCount}</td><td className="p-2.5 font-semibold tabular-nums">{semester.afterCount}</td><td className={'p-2.5 font-semibold tabular-nums '+(semester.excessCount?'text-orange-700':'text-slate-500')}>{semester.excessCount} sinh viên</td></tr>)}</tbody></table></div>
           {acceptance.overCapacity&&<label className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-900"><input type="checkbox" className="mt-0.5" checked={allowOverCapacity} disabled={bulkLoading} onChange={event=>setAllowOverCapacity(event.target.checked)}/><span>Tôi đồng ý nhận vượt chỉ tiêu theo số lượng chênh lệch hiển thị ở trên.</span></label>}
-          <label className="block text-sm font-medium text-slate-700">Lý do / ghi chú tiếp nhận<textarea className={workflowInput+' mt-1'} required maxLength={2000} value={acceptanceReason} disabled={bulkLoading} onChange={event=>setAcceptanceReason(event.target.value)}/></label>
           {acceptanceError&&<p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{acceptanceError}</p>}
-          <div className="flex justify-end gap-2"><button type="button" className={workflowSecondary} disabled={bulkLoading} onClick={()=>setAcceptance(null)}>Hủy</button><button type="submit" className={workflowPrimary} disabled={bulkLoading||!acceptanceReason.trim()||(acceptance.overCapacity&&!allowOverCapacity)}>{bulkLoading?'Đang tiếp nhận…':acceptance.overCapacity?'Đồng ý nhận vượt chỉ tiêu':'Xác nhận tiếp nhận'}</button></div>
+          <div className="flex justify-end gap-2"><button type="button" className={workflowSecondary} disabled={bulkLoading} onClick={()=>setAcceptance(null)}>Hủy</button><button type="submit" className={workflowPrimary} disabled={bulkLoading||(acceptance.overCapacity&&!allowOverCapacity)}>{bulkLoading?'Đang tiếp nhận…':acceptance.overCapacity?'Đồng ý nhận vượt chỉ tiêu':'Xác nhận tiếp nhận'}</button></div>
         </form>
       </WorkflowModal>}
       {selectedCandidate && <CandidateDetailModal

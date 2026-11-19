@@ -3,7 +3,7 @@ import { enterpriseService, type PaginatedResponse, type RecruitmentPost, type R
 
 export const recruitmentStatusLabels: Record<RecruitmentPost['status'], string> = {
   DRAFT: 'Bản nháp', PENDING_REVIEW: 'Tin cũ chưa công bố', PUBLISHED: 'Đang tuyển',
-  REJECTED: 'Cần chỉnh sửa', CLOSED: 'Đã đóng', ARCHIVED: 'Đã lưu trữ',
+  REJECTED: 'Cần chỉnh sửa', CLOSED: 'Hết hạn', ARCHIVED: 'Đã xóa',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
@@ -20,15 +20,42 @@ export function canEditRecruitmentPost(post: RecruitmentPost, windows: Recruitme
   return !postEditLockReason(post, windows, now);
 }
 
-export function postEditLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
+export function canPublishRecruitmentPost(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
+  return !postPublishLockReason(post, windows, now);
+}
+
+export function postPublishLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
+  const editReason = postEditLockReason(post, windows, now);
+  if (editReason) return editReason;
   const window = windows.find(item => item.id === post.windowId);
-  if (!['DRAFT', 'PENDING_REVIEW', 'REJECTED', 'PUBLISHED'].includes(post.status)) return 'Tin đã đóng hoặc lưu trữ.';
-  if (!windowAcceptsPosts(window, now)) return 'Đợt chưa mở hoặc đã hết hạn đăng / sửa tin.';
-  if (post.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' || window?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION') {
-    const registration = post.studentRegistrationWindow ?? window?.studentRegistrationWindow;
-    return `Tạm khóa chỉnh sửa khi sinh viên đang đăng ký OJT${registration?.endsAt ? `, đến ${formatRecruitmentDate(registration.endsAt)}` : ''}.`;
+  if (!windowAcceptsPosts(window, now) || window?.studentRegistrationWindow
+    || post.studentRegistrationWindow || post.canPublish === false || window?.canEdit === false) {
+    return 'Đã hết hạn đăng tin hoặc sinh viên đang đăng ký, xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.';
   }
-  if (post.canEdit === false || window?.canEdit === false) return 'Hiện chưa được chỉnh sửa. Tải lại để cập nhật quyền và thời hạn.';
+  return '';
+}
+
+export function canDeleteRecruitmentPost(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
+  return !postDeleteLockReason(post, windows, now);
+}
+
+export function postDeleteLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
+  if (post.deleted || post.status === 'ARCHIVED') return 'Tin đã xóa chỉ được xem lại.';
+  if (post.status === 'DRAFT' && post.canDelete !== false) return '';
+  const window = windows.find(item => item.id === post.windowId);
+  if (post.status === 'PUBLISHED') {
+    if (windowAcceptsPosts(window, now) && window?.canEdit !== false && !post.studentRegistrationWindow
+      && !window?.studentRegistrationWindow && post.canDelete !== false) return '';
+    return 'Hạn 1 đã kết thúc hoặc sinh viên đang xét tuyển. Không thể xóa tin đã công bố.';
+  }
+  return 'Không thể xóa tin ở trạng thái hiện tại.';
+}
+
+export function postEditLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], _now = Date.now()) {
+  const window = windows.find(item => item.id === post.windowId);
+  if (post.status === 'PUBLISHED') return 'Tin đã công bố không được chỉnh sửa. Chỉ được xóa mềm trong Hạn 1.';
+  if (post.status !== 'DRAFT') return 'Chỉ tin nháp được chỉnh sửa. Tin đã xóa hoặc hết hạn chỉ được xem.';
+  if (!window) return 'Không tìm thấy đợt của tin nháp. Vui lòng tải lại danh sách.';
   return '';
 }
 
@@ -58,9 +85,9 @@ export async function loadAllPages<T extends { id: number }>(
   return uniqueById(items);
 }
 
-export async function loadRecruitmentData(signal: AbortSignal) {
+export async function loadRecruitmentData(signal: AbortSignal, deleted = false) {
   const [posts, windows] = await Promise.all([
-    loadAllPages(page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
+    loadAllPages(page => deleted ? enterpriseService.listDeletedRecruitmentPosts({ page, limit: 100 }, signal) : enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
     loadAllPages(page => enterpriseService.listRecruitmentWindows({ page, limit: 100 }, signal), signal),
   ]);
   return { posts, windows };
@@ -71,12 +98,14 @@ export function recruitmentError(error: unknown) {
     const apiError = error as AxiosError<{ errorCode?: string; message?: string }>;
     const body = apiError.response?.data;
     const messages: Record<string, string> = {
-      RECRUITMENT_WINDOW_CLOSED: 'Đợt đăng tin đã đóng hoặc hết hạn. Nội dung của bạn vẫn được giữ trong biểu mẫu.',
-      RECRUITMENT_POST_LOCKED: 'Tin đã đóng hoặc lưu trữ nên không còn cho phép chỉnh sửa. Vui lòng tải lại danh sách.',
+      RECRUITMENT_WINDOW_CLOSED: 'Đã hết hạn đăng tin. Bạn vẫn có thể chỉnh sửa và lưu bản nháp, nhưng không thể công bố.',
+      RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa. Tin đã công bố không được sửa; tin đã xóa chỉ được xem lại.',
+      RECRUITMENT_POST_DELETE_DENIED: 'Chỉ được xóa tin nháp hoặc tin Published còn trong Hạn 1.',
+      RECRUITMENT_PHASE_CLOSED: 'Hạn 1 chưa mở hoặc đã kết thúc; sinh viên có thể đang xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',
       RECRUITMENT_POST_NOT_FOUND: 'Không tìm thấy tin tuyển dụng thuộc doanh nghiệp của bạn.',
-      RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION: 'Sinh viên đang đăng ký OJT nên tạm khóa chỉnh sửa tin. Nội dung bạn nhập vẫn được giữ lại.',
+      RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION: 'Sinh viên đang đăng ký hoặc xét tuyển nên không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.',
       IDEMPOTENCY_CONFLICT: 'Yêu cầu tạo tin này đã được xử lý với nội dung khác. Hãy tải lại danh sách để kiểm tra trước khi tạo thêm.',
       POSITION_SHARED: 'Vị trí đang được dùng trong tin khác nên chưa thể chỉnh sửa.',
       POSITION_ARCHIVED: 'Tin có vị trí đã lưu trữ hoặc xóa, không thể công bố.',
