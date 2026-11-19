@@ -57,7 +57,7 @@ export function describeFeResponses(spec:Schema):void {
   set('/api/accounts/update',account,'account','patch');
   spec.paths['/api/accounts'].get.responses['200']={description:'Danh sách hoặc tài khoản theo userId; giữ envelope hiện có.',content:{'application/json':{schema:obj({success:{type:'boolean'},data:arr(account),total:{type:'integer'}})}}};
   const count={type:'integer',minimum:0},scope={type:'object',additionalProperties:true};
-  set('/api/admin/dashboard',obj({summary:obj({scope:{type:'string',enum:['ALL_SYSTEM']},accounts:count,activeAccounts:count,students:count,companies:count,ojtSemesters:count})}),'data','post');
+  set('/api/admin/dashboard',obj({summary:obj({scope:{type:'string',enum:['ALL_SYSTEM']},accounts:count,activeAccounts:count,students:count,companies:count,ojtSemesters:count,accountBreakdown:{type:'array',items:obj({roleCode:{type:'string',nullable:true},status:{type:'string',nullable:true},count})}})}),'data','post');
   const academicCounts={total:count,eligible:count,notEligible:count,insufficientData:count,awaitingConfirmation:count};
   set('/api/academic/dashboard',obj({scope,computedAt:time,summary:obj({...academicCounts,currentEvaluation:obj({eligible:count,notEligible:count,reviewRequired:count}),staleConfirmations:count}),statistics:obj({groupBy:text,overall:obj(academicCounts),groups:arr(obj({id:{oneOf:[{type:'integer'},{type:'string'}],nullable:true},name:nil(text),...academicCounts})),membershipCountsMayOverlap:{type:'boolean'}})}));
 

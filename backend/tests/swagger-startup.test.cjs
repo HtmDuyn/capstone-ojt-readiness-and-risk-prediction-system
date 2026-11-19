@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 
-// Load the complete Swagger pipeline used during startup, including the role
+// Load the complete Swagger pipeline used by the docs routes, including the role
 // coverage check. This catches new routes missing from the role registry.
 const {swaggerSpec}=require('../dist/config/swagger');
 

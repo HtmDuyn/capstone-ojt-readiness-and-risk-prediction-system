@@ -21,7 +21,7 @@ API.interceptors.request.use(
     }
     const token = localStorage.getItem('ojt_auth_token');
     if (
-      config.url !== '/auth/login' &&
+      !['/auth/login', '/auth/forgot-password', '/auth/reset-password'].includes(config.url ?? '') &&
       token &&
       config.headers &&
       !config.headers.get('Authorization')

@@ -54,8 +54,9 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
         {/* Nền xung quanh phù hợp với giao diện (theme) */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
           <img
-            src="/login_bg.jpg"
-            alt="Ambient Wallpaper"
+            src="/login_bg.webp"
+            alt=""
+            decoding="async"
             className="w-full h-full object-cover object-center opacity-15 scale-105 filter blur-[3px]"
           />
           <div className="absolute top-[-10%] left-[-5%] w-[55vw] h-[55vw] rounded-full bg-orange-400/25 blur-[140px]" />

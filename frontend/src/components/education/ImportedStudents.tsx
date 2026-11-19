@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Users, Search, Inbox } from 'lucide-react';
 import { useEducationImportedStudents } from '@/hooks/useEducationImportedStudents';
 import type { AcademicCatalogs, ImportedStudent, StudentAcademicStatus } from '@/types/education/import.types';
-import { STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
+import { STUDENT_STATUS_LABELS } from '@/utils/studentAcademicStatus';
 
 const text = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value);
 const status = (value: string) => STUDENT_STATUS_LABELS[value as StudentAcademicStatus] ?? value;

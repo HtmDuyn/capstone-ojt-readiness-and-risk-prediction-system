@@ -3,12 +3,10 @@ import type { AcademicCatalogs, CatalogOption } from '@/types/education/import.t
 import * as XLSX from "xlsx";
 
 import type { CourseResultStatus, StudentAcademicStatus, StudentCourseResult, StudentImportRow, StudentPlacement } from '@/types/education/import.types';
+import { STUDENT_STATUS_LABELS } from './studentAcademicStatus.ts';
+export { STUDENT_STATUS_LABELS } from './studentAcademicStatus.ts';
 
 type DataObject = Record<string, unknown>;
-
-export const STUDENT_STATUS_LABELS: Record<StudentAcademicStatus, string> = {
-  ACTIVE: 'Đang học', INACTIVE: 'Không hoạt động', SUSPENDED: 'Bảo lưu', GRADUATED: 'Đã tốt nghiệp', DROPPED_OUT: 'Thôi học',
-};
 
 const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> = {
   SUSPENDED: ['Tạm ngưng', 'Tạm ngừng học'],

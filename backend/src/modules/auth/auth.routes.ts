@@ -2,6 +2,7 @@ import { requireJsonBody } from '../../middleware/json-body';
 import { Router } from "express";
 import { changePassword } from './auth.service';
 import { requestPasswordReset } from './password-reset.service';
+import { resetPasswordWithCode, sendPasswordResetCode } from './self-password-reset.service';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId, inputObject, invalid } from '../students/student.validation';
 
@@ -16,6 +17,22 @@ import {
 } from "./auth.controller";
 
 const router = Router();
+router.post('/forgot-password', requireJsonBody, async (req, res, next) => {
+  try {
+    const { email } = inputObject(req.body, ['email']);
+    await sendPasswordResetCode(email);
+    res.status(202).json({ success: true, message: 'Nếu email thuộc tài khoản đang hoạt động, hệ thống sẽ gửi mã xác nhận.' });
+  } catch (error) { next(error); }
+});
+
+router.post('/reset-password', requireJsonBody, async (req, res, next) => {
+  try {
+    const { email, code, newPassword } = inputObject(req.body, ['email', 'code', 'newPassword']);
+    await resetPasswordWithCode(email, code, newPassword);
+    res.json({ success: true, message: 'Đã đặt lại mật khẩu. Bạn có thể đăng nhập bằng mật khẩu mới.' });
+  } catch (error) { next(error); }
+});
+
 router.post('/users/password-reset', authenticate, authorizeRoles('ADMIN'), async (req,res,next) => {
   try {
     if(Object.keys(req.query).length)throw invalid('Provide userId in the JSON body, not query parameters.');

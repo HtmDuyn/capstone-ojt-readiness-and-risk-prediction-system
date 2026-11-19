@@ -1,4 +1,3 @@
-import { createCurriculumWorkbookTools, getSemesterLabel } from '@/utils/curriculumImportWorkbook';
 import { resolveCurriculumCourseIds } from '@/services/educationService';
 import React from "react";
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Upload, X } from "lucide-react";
@@ -134,7 +133,21 @@ export const CurriculumImportActions:
        DOWNLOAD TEMPLATE
        ===================================================== */
 
-    const { handleDownloadTemplate, parseWorkbook } = createCurriculumWorkbookTools(majors, selectedMajorCode, curriculumDetail, codes => resolveCurriculumCourseIds(codes, curriculumDetail));
+    const [templateError, setTemplateError] = React.useState("");
+    const [downloadingTemplate, setDownloadingTemplate] = React.useState(false);
+
+    const handleDownloadTemplate = async () => {
+      setTemplateError("");
+      setDownloadingTemplate(true);
+      try {
+        const { downloadCurriculumTemplate } = await import('@/utils/curriculumTemplateWorkbook');
+        downloadCurriculumTemplate();
+      } catch (error) {
+        setTemplateError(error instanceof Error ? error.message : "Không tải được file mẫu.");
+      } finally {
+        setDownloadingTemplate(false);
+      }
+    };
 
     const handleFileChange =
       (
@@ -211,6 +224,11 @@ export const CurriculumImportActions:
         setPreview(null);
 
         try {
+          const { createCurriculumWorkbookTools } = await import('@/utils/curriculumImportWorkbook');
+          const { parseWorkbook } = createCurriculumWorkbookTools(
+            majors, selectedMajorCode, curriculumDetail,
+            codes => resolveCurriculumCourseIds(codes, curriculumDetail),
+          );
           const parsedPayload =
             await parseWorkbook(
               file,
@@ -348,6 +366,7 @@ export const CurriculumImportActions:
 
         <button
           type="button"
+          disabled={downloadingTemplate}
           onClick={
             handleDownloadTemplate
           }
@@ -359,6 +378,7 @@ export const CurriculumImportActions:
 
           Tải file mẫu
         </button>
+        {templateError && <p role="alert" className="text-sm text-red-600">{templateError}</p>}
 
         <button
           type="button"
@@ -752,9 +772,7 @@ export const CurriculumImportActions:
                                       </td>
 
                                       <td className="px-4 py-3 text-center text-slate-600">
-                                        {getSemesterLabel(
-                                          course.semester,
-                                        )}
+                                        {course.semester === 0 ? "Chuẩn bị" : `Kỳ ${course.semester}`}
                                       </td>
 
                                       <td className="px-4 py-3 text-center text-slate-600">

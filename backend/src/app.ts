@@ -8,15 +8,12 @@ import path from "node:path";
 
 import express from "express";
 
-import swaggerUi from "swagger-ui-express";
-
 import {
   corsMiddleware,
 } from "./config/cors";
 
-import {
-  swaggerSpec,
-} from "./config/swagger";
+import { pool } from "./config/database";
+import { logger } from "./config/logger";
 
 import {
   errorHandler,
@@ -28,6 +25,30 @@ import { apiNoCache } from './middleware/api-no-cache';
 const app = express();
 app.disable('etag');
 app.use('/api',apiNoCache);
+
+const slowRequestMs = Number(process.env.HTTP_SLOW_REQUEST_MS ?? 1000);
+if (Number.isFinite(slowRequestMs) && slowRequestMs > 0) {
+  app.use('/api', (req, res, next) => {
+    const startedAt = performance.now();
+    res.once('finish', () => {
+      const durationMs = Math.round(performance.now() - startedAt);
+      if (durationMs < slowRequestMs) return;
+
+      logger.warn('Slow API request', {
+        method: req.method,
+        route: req.route?.path,
+        status: res.statusCode,
+        durationMs,
+        dbPool: pool && {
+          total: pool.totalCount,
+          idle: pool.idleCount,
+          waiting: pool.waitingCount,
+        },
+      });
+    });
+    next();
+  });
+}
 
 const publicDirectory =
   path.join(
@@ -97,44 +118,33 @@ app.use(
   routes,
 );
 
-app.get('/api-docs/openapi.json', (_req, res) => {
+app.get('/api-docs/openapi.json', async (_req, res) => {
+  const { swaggerSpec } = await import('./config/swagger.js');
   res.json(swaggerSpec);
 });
 
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(
-    swaggerSpec,
-    {
-      customSiteTitle:
-        "OJT Management API",
-
-      customCssUrl:
-        "/swagger-static/swagger-custom.css",
-
+let swaggerRouter: express.Router | undefined;
+app.use('/api-docs', async (req, res, next) => {
+  if (!swaggerRouter) {
+    const [{ default: swaggerUi }, { swaggerSpec }] = await Promise.all([
+      import('swagger-ui-express'),
+      import('./config/swagger.js'),
+    ]);
+    swaggerRouter ??= express.Router().use(swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: 'OJT Management API',
+      customCssUrl: '/swagger-static/swagger-custom.css',
       swaggerOptions: {
-        docExpansion:
-          "list",
-
-        defaultModelsExpandDepth:
-          -1,
-
-        defaultModelExpandDepth:
-          2,
-
-        tryItOutEnabled:
-          true,
-
-        displayRequestDuration:
-          true,
-
-        filter:
-          true,
+        docExpansion: 'list',
+        defaultModelsExpandDepth: -1,
+        defaultModelExpandDepth: 2,
+        tryItOutEnabled: true,
+        displayRequestDuration: true,
+        filter: true,
       },
-    },
-  ),
-);
+    }));
+  }
+  swaggerRouter(req, res, next);
+});
 
 /*
  * Route không tồn tại

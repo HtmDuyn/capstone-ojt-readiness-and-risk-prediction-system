@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PageBanner } from '@/components/common/PageBanner';
 import { useImportedStudentDetail } from '@/hooks/useEducationImportedStudents';
 import type { ImportedRelation, StudentAcademicStatus } from '@/types/education/import.types';
-import { STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
+import { STUDENT_STATUS_LABELS } from '@/utils/studentAcademicStatus';
 import { savedOjtLabel } from '@/utils/savedOjtEligibility';
 
 const text = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value);

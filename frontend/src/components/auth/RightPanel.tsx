@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import PasswordResetForm from "./PasswordResetForm";
 
 interface RightPanelProps {
   animateIn: boolean;
@@ -74,6 +75,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
   errorMessage,
   onSubmit,
 }) => {
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
   const fadeStyle = (delay = 0) => ({
     opacity: animateIn ? 1 : 0,
     transform: animateIn ? "translateY(0)" : "translateY(16px)",
@@ -102,6 +105,19 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
       {/* Main Form Content */}
       <div className="relative z-10 my-auto max-w-md mx-auto w-full py-2">
+        {resetOpen ? (
+          <PasswordResetForm
+            initialEmail={account}
+            onBack={() => setResetOpen(false)}
+            onComplete={(email, message) => {
+              onAccountChange(email);
+              onPasswordChange("");
+              setResetMessage(message);
+              setResetOpen(false);
+            }}
+          />
+        ) : (
+        <>
         {/* Geometric Diamond Emblem */}
         <div className="flex flex-col items-center justify-center mb-5" style={fadeStyle(0)}>
           <div className="relative w-14 h-14 mb-2 flex items-center justify-center">
@@ -126,7 +142,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
         </div>
 
         {/* Form Container */}
-        <form onSubmit={onSubmit} className="auth-form-enter" style={fadeStyle(0.12)}>
+        <form onSubmit={(event) => { setResetMessage(""); onSubmit(event); }} className="auth-form-enter" style={fadeStyle(0.12)}>
           {/* Account */}
           <InputField
             id="login-account"
@@ -183,7 +199,17 @@ const RightPanel: React.FC<RightPanelProps> = ({
             }
           />
 
-          {errorMessage && (
+          <div className="mb-4 text-right">
+            <button type="button" disabled={isLoading} className="text-sm font-semibold text-orange-700 hover:underline"
+              onClick={() => { setResetMessage(""); setResetOpen(true); }}>
+              Quên mật khẩu?
+            </button>
+          </div>
+
+          {resetMessage && (
+            <p role="status" className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{resetMessage}</p>
+          )}
+          {errorMessage && !resetMessage && (
             <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
               {errorMessage}
             </p>
@@ -206,7 +232,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
             )}
           </button>
         </form>
-
+        </>
+        )}
       </div>
 
       {/* Footer text */}

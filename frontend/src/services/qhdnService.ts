@@ -286,10 +286,11 @@ export const listCoordinations = async (
     status?: string;
     search?: string;
   } = { page: 1, limit: 100 },
+  signal?: AbortSignal,
 ): Promise<CoordinationListResponse> => {
   const response = await API.get<CoordinationListResponse>(
     "/ojt-coordinations",
-    { params },
+    { params, signal },
   );
   return response.data;
 };

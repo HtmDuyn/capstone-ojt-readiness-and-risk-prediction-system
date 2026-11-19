@@ -4,7 +4,7 @@ import { StudentImportEmailStatus } from '@/components/education/StudentImportEm
 import { loadAcademicCatalogs } from '@/services/educationService';
 import { importService } from '@/services/educationService';
 import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
-import { downloadStudentImportTemplate, parseStudentImportWorkbook, STUDENT_STATUS_LABELS } from '@/utils/studentImportWorkbook';
+import { STUDENT_STATUS_LABELS } from '@/utils/studentAcademicStatus';
 import React from "react";
 import { Link } from 'react-router-dom';
 import { FileSpreadsheet, Download, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -75,6 +75,7 @@ const EducationStudentImport: React.FC = () => {
         throw new Error("Chọn tệp Excel .xlsx hoặc .xls theo mẫu hai sheet.");
       if (file.size > 8 * 1024 * 1024)
         throw new Error("Tệp Excel không được vượt quá 8 MB.");
+      const { parseStudentImportWorkbook } = await import('@/utils/studentImportWorkbook');
       const parsed = await parseStudentImportWorkbook(file, catalogs);
       setRows(parsed);
       setSearch('');
@@ -197,9 +198,14 @@ const EducationStudentImport: React.FC = () => {
           <button
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-orange-300 hover:text-orange-700 disabled:opacity-50 sm:w-auto"
             disabled={!!busy}
-            onClick={() => {
-              try { downloadStudentImportTemplate(); }
+            onClick={async () => {
+              setBusy("template");
+              try {
+                const { downloadStudentImportTemplate } = await import('@/utils/studentImportWorkbook');
+                downloadStudentImportTemplate();
+              }
               catch(e) { setError(e instanceof Error?e.message:'Không tải được mẫu Excel.'); }
+              finally { setBusy(""); }
             }}
           >
             <Download size={16} /> Tải mẫu Excel

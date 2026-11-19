@@ -25,7 +25,6 @@ import {
 } from '@/services/enterpriseService';
 import { loadAllPages, recruitmentTotals } from '@/components/enterprise/recruitment';
 import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsChart';
-import type { EnterpriseProfileSummary } from '@/types/enterprise/enterpriseTypes';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -107,8 +106,8 @@ const TaskCompletionDonut: React.FC<{
 
 export const EnterpriseDashboard: React.FC = () => {
   // Context supplies the company scope; dashboard figures are fetched on each visit.
-  const { profile, companyId, loading, error: profileError } = useEnterprise();
-  const [summary, setSummary] = useState<EnterpriseProfileSummary | null>(null);
+  const { profile, companyId, loading, error: profileError, reload } = useEnterprise();
+  const summary = profile?.summary;
   const [revision, setRevision] = useState(0);
   const [tasks, setTasks] = useState<EnterpriseInternshipTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
@@ -153,7 +152,7 @@ export const EnterpriseDashboard: React.FC = () => {
 
   useEffect(() => {
     if (loading) return;
-    if (!companyId) {
+    if (profileError || !companyId) {
       setStatsError(profileError || 'Không tìm thấy doanh nghiệp để tải thống kê.');
       setStatsLoading(false);
       return;
@@ -164,13 +163,13 @@ export const EnterpriseDashboard: React.FC = () => {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const [posts, profileResponse, rejectedCandidates, pendingCandidateList] = await Promise.all([
+        if (!summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
+        const [posts, rejectedCandidates, pendingCandidateList] = await Promise.all([
           loadAllPages<RecruitmentPost>(
             page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
             controller.signal,
             'danh sách tin tuyển dụng',
           ),
-          enterpriseService.getProfile(controller.signal),
           loadAllPages<EnterpriseCandidateItem>(
             page => enterpriseService.listCandidates({ decision: 'REJECTED', page, limit: 100 }, controller.signal),
             controller.signal,
@@ -186,8 +185,7 @@ export const EnterpriseDashboard: React.FC = () => {
 
         const publishedPosts = posts.filter(post => post.status === 'PUBLISHED'
           && (!post.deadlineAt || Date.parse(post.deadlineAt) > Date.now()));
-        if (!profileResponse.success || !profileResponse.data?.summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
-        const currentSummary = profileResponse.data.summary;
+        const currentSummary = summary;
         const rejectedStudents = new Set(
           rejectedCandidates
             .filter(candidate => candidate.decision === 'REJECTED' && candidate.isLatestCoordination)
@@ -217,7 +215,6 @@ export const EnterpriseDashboard: React.FC = () => {
         if (!counts.every(count => Number.isSafeInteger(count) && count >= 0)) {
           throw new Error('Chưa tải được đầy đủ số liệu thống kê. Vui lòng thử lại.');
         }
-        setSummary(currentSummary);
         setRecruitmentPosts(publishedPosts);
         setPendingCandidates(latestPendingCandidates);
         setDashboardStats({
@@ -243,13 +240,18 @@ export const EnterpriseDashboard: React.FC = () => {
 
     void loadDashboardStats();
     return () => controller.abort();
-  }, [companyId, loading, profileError, revision]);
+  }, [companyId, loading, profileError, summary]);
+
+  const refreshDashboard = React.useCallback(() => {
+    reload();
+    setRevision(value => value + 1);
+  }, [reload]);
 
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') setRevision(value => value + 1); };
+    const refresh = () => { if (document.visibilityState === 'visible') refreshDashboard(); };
     window.addEventListener('focus', refresh);
     return () => window.removeEventListener('focus', refresh);
-  }, []);
+  }, [refreshDashboard]);
 
   useEffect(() => {
     if (statsLoading || statsError || tasksLoading || tasksError) {
@@ -399,7 +401,7 @@ export const EnterpriseDashboard: React.FC = () => {
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={() => setRevision(value => value + 1)}
+          onClick={refreshDashboard}
           disabled={statsLoading || tasksLoading}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         >

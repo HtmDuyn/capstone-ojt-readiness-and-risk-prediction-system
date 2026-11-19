@@ -3,13 +3,16 @@ import { OjtResultDonut } from '@/components/education/OjtResultDonut';
 import { PageBanner } from '@/components/common/PageBanner';
 import { courseDemandOverview } from '@/utils/courseDemandOverview';
 import { useEducationDashboard } from '@/hooks/useEducationDashboard';
+import { useNearViewport } from '@/hooks/useNearViewport';
 import { formatDate, formatNumber, formatPercent } from '@/utils/educationDashboard';
 import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle2, FileDown, Info, PieChart, Users } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
 
 export const EducationDashboard: React.FC = () => {
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard();
+  const { ref: demandSection, reached: loadCourseDemand } = useNearViewport<HTMLElement>();
+
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
   const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible + period.reviewRequired > 0);
   const chartMax = Math.max(4, Math.ceil(Math.max(0, ...cohortResults.map(period => period.eligible + period.ineligible + period.reviewRequired)) / 4) * 4);
   const ojtGroups = [
@@ -310,7 +313,7 @@ export const EducationDashboard: React.FC = () => {
             ACADEMIC STATISTICS
             ============================================= */}
 
-        <section className="border-b border-slate-200 px-5 py-5 md:px-7">
+        <section ref={demandSection} className="border-b border-slate-200 px-5 py-5 md:px-7">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-slate-900">Thống kê học tập</h2>
             <Link to="/education/ai-class-proposals" className="text-sm font-semibold text-orange-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">Xem chi tiết nhu cầu lớp hỗ trợ</Link>

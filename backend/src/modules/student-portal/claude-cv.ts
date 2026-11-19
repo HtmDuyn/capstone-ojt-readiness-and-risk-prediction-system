@@ -1,5 +1,4 @@
 import { cvExtractionSchema,validateCvProfile } from './cv-profile.schema';
-import { PDFDocument } from 'pdf-lib';
 export class CvProviderError extends Error {
  constructor(public readonly code:string,message:string,public readonly httpStatus?:number,public readonly requestId?:string){super(message);}
 }
@@ -17,6 +16,7 @@ export async function prepareCvPdf(pdf:Buffer):Promise<Buffer>{
  try{
   // Repair the transport copy, including cross-reference offsets. Never trim or
   // overwrite the stored original, which remains the student's uploaded file.
+  const { PDFDocument } = await import('pdf-lib');
   const document=await PDFDocument.load(pdf,{updateMetadata:false,throwOnInvalidObject:true});
   if(document.getPageCount()<1||document.getPageCount()>100)throw new CvProviderError('CV_DOCUMENT_REJECTED','CV cần có từ 1 đến 100 trang.');
   const normalized=Buffer.from(await document.save({useObjectStreams:false,updateFieldAppearances:false}));

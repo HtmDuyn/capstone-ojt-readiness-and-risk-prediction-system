@@ -10,7 +10,25 @@ export function AccountNotificationBell(){
   try{const r=await API.get('/accounts/me/notifications',{params:{page:1,limit:50}});setItems(r.data.data.items);setUnread(r.data.data.unreadCount);setError('');}
   catch{setError('Không tải được thông báo. Vui lòng thử lại.');}
  },[]);
- useEffect(()=>{void load();const timer=window.setInterval(()=>void load(),60000);return()=>window.clearInterval(timer);},[load]);
+ useEffect(() => {
+  if (open) return;
+  const controller = new AbortController();
+  const refreshBadge = async () => {
+   if (document.visibilityState === 'hidden') return;
+   try {
+    const response = await API.get('/accounts/me/notifications', {
+     params: { page: 1, limit: 1 },
+     signal: controller.signal,
+    });
+    if (!controller.signal.aborted) setUnread(response.data.data.unreadCount);
+   } catch {
+    // Opening the bell still reports load errors and offers a retry.
+   }
+  };
+  void refreshBadge();
+  const timer = window.setInterval(() => void refreshBadge(), 60000);
+  return () => { controller.abort(); window.clearInterval(timer); };
+ }, [open]);
  useEffect(()=>{if(!open)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setOpen(false);};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[open]);
  const read=async(item:Notification)=>{
   if(item.isRead||reading.current.has(item.id))return;

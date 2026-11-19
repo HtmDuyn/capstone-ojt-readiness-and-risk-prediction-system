@@ -2,13 +2,13 @@ import { educationRoutes } from './educationRoutes';
 import { lazy, type FC } from "react";
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
-import { BaseLayout } from "@/layouts/BaseLayout";
-import StudentLayout from '@/layouts/StudentLayout';
+import { BaseLayout } from "@/routers/routeLayouts";
 import { getMenuByRole } from "@/config";
-import { EnterpriseProvider } from "@/contexts/EnterpriseContext";
 import LoginPage from "@/pages/auth/LoginPage";
 import type { UserRole } from "@/types/auth.types";
 
+const StudentLayout = lazy(() => import("@/layouts/StudentLayout"));
+const EnterpriseProvider = lazy(() => import("@/contexts/EnterpriseContext").then(({ EnterpriseProvider }) => ({ default: EnterpriseProvider })));
 const EnterpriseDashboard = lazy(() => import("@/pages/enterprise/EnterpriseDashboard"));
 const EnterpriseJobs = lazy(() => import("@/pages/enterprise/EnterpriseJobs"));
 const EnterpriseCandidates = lazy(() => import("@/pages/enterprise/EnterpriseCandidates"));
