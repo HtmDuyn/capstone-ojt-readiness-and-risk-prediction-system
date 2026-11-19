@@ -36,8 +36,8 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
     icon: <Briefcase size={20} />,
     banner: {
       title: 'Thông tin Vị trí Tuyển dụng',
-      description: 'Tra cứu vị trí thực tập, yêu cầu và chỉ tiêu tiếp nhận đã được ghi nhận. Trang này chỉ cung cấp thông tin, không hỗ trợ đăng tuyển.',
-      badge: 'Thông tin chỉ đọc',
+      description: 'Quản lý tin nháp, công bố và xóa mềm tin tuyển dụng trong thời hạn QHDN thiết lập.',
+      badge: 'Tuyển dụng thực tập',
     },
   },
   {

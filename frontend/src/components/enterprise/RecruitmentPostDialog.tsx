@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { CalendarDays, Check, Eye, Loader2, LockKeyhole, Plus, Trash2, X } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { CalendarDays, Check, Eye, Loader2, LockKeyhole, Plus, Save, Trash2, X } from 'lucide-react';
 import { enterpriseService, type EnterpriseRecruitmentPostInput, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
-import { canEditRecruitmentPost, formatRecruitmentDate, postEditLockReason, recruitmentError, windowAcceptsPosts } from './recruitment';
+import { canEditRecruitmentPost, canPublishRecruitmentPost, formatRecruitmentDate, postEditLockReason, postPublishLockReason, recruitmentError, windowAcceptsPosts } from './recruitment';
+import { useRecruitmentFeedback } from './RecruitmentNoticeDialog';
 
 interface PositionDraft {
   key: string; id?: number; title: string; description: string; requirements: string;
@@ -24,7 +26,8 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   const submitting = useRef(false);
   const [idempotencyKey] = useState(() => post ? '' : crypto.randomUUID());
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const feedback = useRecruitmentFeedback();
+  const previousFocus = useRef<HTMLElement | null>(null);
   const [windowId, setWindowId] = useState(post?.windowId ?? initialWindowId ?? windows.find(w => windowAcceptsPosts(w, now))?.id ?? 0);
   const [title, setTitle] = useState(post?.title ?? '');
   const [content, setContent] = useState(post?.content ?? '');
@@ -37,58 +40,81 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   const selectedWindow = windows.find(w => w.id === windowId);
   const accepts = windowAcceptsPosts(selectedWindow, now);
   const lockReason = post ? postEditLockReason(post, windows, now) : '';
-  const canSave = accepts && !lockReason;
+  const canSave = post ? !lockReason : accepts;
   const inputId = (suffix: string) => `recruitment-${suffix}`;
 
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (feedback.open) {
+      if (element.contains(document.activeElement)) previousFocus.current = document.activeElement as HTMLElement;
+      element.close();
+    } else if (!element.open) {
+      element.showModal();
+      previousFocus.current?.focus({ preventScroll: true });
+    }
+  }, [feedback.open]);
   useEffect(() => {
     const element = dialog.current;
-    element?.showModal();
     return () => element?.close();
   }, []);
+
+  const showError = (message: string) => feedback.notify(message, 'Kiểm tra thông tin');
 
   const updatePosition = (key: string, changes: Partial<PositionDraft>) => setPositions(current => current.map(p => p.key === key ? { ...p, ...changes } : p));
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting.current) return;
-    setError('');
-    if (!windowAcceptsPosts(selectedWindow)) { setError('Đợt đăng tin không còn trong thời gian cho phép. Bạn chưa thể gửi tin này.'); return; }
-    if (post && !canEditRecruitmentPost(post, windows)) { setError(postEditLockReason(post, windows)); return; }
+    const status = ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
+    if (!post && !windowAcceptsPosts(selectedWindow)) {
+      const message = 'Đợt đăng tin không còn trong thời gian cho phép. Bạn chưa thể tạo tin mới.';
+      feedback.notify(message, status === 'PUBLISHED' ? 'Không thể công bố tin' : 'Không thể tạo tin');
+      return;
+    }
+    if (post && !canEditRecruitmentPost(post, windows)) { showError(postEditLockReason(post, windows)); return; }
+    if (status === 'PUBLISHED' && post && !canPublishRecruitmentPost(post, windows)) {
+      feedback.notify(postPublishLockReason(post, windows), 'Không thể công bố tin'); return;
+    }
     if (!title.trim() || !content.trim() || positions.some(p => !p.title.trim() || !p.description.trim() || !p.requirements.trim())) {
-      setError('Vui lòng điền tiêu đề, nội dung, mô tả và yêu cầu cho từng vị trí.'); return;
+      showError('Vui lòng điền tiêu đề, nội dung, mô tả và yêu cầu cho từng vị trí.'); return;
     }
     if (positions.some(p => !p.capacity.trim() || !Number.isInteger(Number(p.capacity)) || Number(p.capacity) < p.minimum || Number(p.capacity) > 2147483647)) {
-      setError('Chỉ tiêu phải là số nguyên không âm và không thấp hơn số sinh viên đã nhận.'); return;
+      showError('Chỉ tiêu phải là số nguyên không âm và không thấp hơn số sinh viên đã nhận.'); return;
     }
-    if (!positions.some(p => Number(p.capacity) > 0)) { setError('Cần ít nhất một vị trí có chỉ tiêu lớn hơn 0.'); return; }
+    if (!positions.some(p => Number(p.capacity) > 0)) { showError('Cần ít nhất một vị trí có chỉ tiêu lớn hơn 0.'); return; }
     const nullable = (value: string) => value.trim() || null;
     const payload: EnterpriseRecruitmentPostInput = {
+      status,
       title: title.trim(), content: content.trim(), benefits: nullable(benefits), applicationInstructions: nullable(instructions),
       positions: positions.map(p => ({ ...(p.id ? { id: p.id } : {}), title: p.title.trim(), description: p.description.trim(), requirements: p.requirements.trim(),
         capacity: Number(p.capacity), location: nullable(p.location), workMode: (p.workMode || null) as EnterpriseRecruitmentPostInput['positions'][number]['workMode'] })),
     };
     submitting.current = true;
-    setSaving(true);
     try {
+      if (status === 'PUBLISHED' && !await feedback.confirm({ title: 'Công bố tin tuyển dụng?', message: 'Sinh viên sẽ thấy tin ngay sau khi công bố. Tin không được chỉnh sửa; bạn có thể xóa mềm khi còn Hạn 1.', confirmLabel: 'Công bố tin', tone: 'info' })) return;
+      setSaving(true);
       const response = post ? await enterpriseService.updateRecruitmentPost(post.id, payload)
         : await enterpriseService.createRecruitmentPost({ ...payload, windowId, idempotencyKey });
       if (!response.success || !response.data) throw new Error('Máy chủ chưa xác nhận lưu tin thành công. Vui lòng thử lại.');
       onSaved(response.data);
-    } catch (err) { setError(recruitmentError(err)); }
+    } catch (err) {
+      feedback.notify(recruitmentError(err), status === 'PUBLISHED' ? 'Không thể công bố tin' : 'Chưa lưu được bản nháp');
+    }
     finally { submitting.current = false; setSaving(false); }
   };
 
-  return <dialog ref={dialog} aria-labelledby="recruitment-dialog-title" className="m-auto max-h-none w-[calc(100%-1rem)] max-w-4xl overflow-hidden rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-900/50 sm:w-[calc(100%-3rem)]"
+  return createPortal(<><dialog ref={dialog} aria-labelledby="recruitment-dialog-title" className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-1rem)] max-w-4xl overflow-hidden rounded-2xl border-0 p-0 shadow-2xl backdrop:bg-slate-950/50 backdrop:backdrop-blur-sm sm:w-[calc(100%-3rem)]"
     onCancel={event => { event.preventDefault(); if (!submitting.current) onClose(); }}>
-    <form onSubmit={save} className="flex max-h-[92dvh] flex-col">
+    <form onSubmit={save} noValidate className="flex max-h-[min(92dvh,calc(100dvh-2rem))] flex-col">
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-7">
         <div><p className="mb-1 text-xs font-semibold uppercase tracking-wider text-orange-600">Tuyển dụng thực tập</p>
           <h2 id="recruitment-dialog-title" className="text-xl font-bold text-slate-900">{post ? 'Chỉnh sửa tin tuyển dụng' : 'Tạo tin tuyển dụng'}</h2>
-          <p className="mt-1 text-sm text-slate-500">{post ? 'Nội dung cập nhật hiển thị ngay với sinh viên sau khi lưu.' : 'Một tin có thể tuyển nhiều vị trí. Đăng xong, sinh viên có thể xem ngay.'}</p></div>
+          <p className="mt-1 text-sm text-slate-500">Lưu nháp để tiếp tục chỉnh sửa hoặc công bố cho sinh viên xem ngay trong Hạn 1.</p></div>
         <button type="button" disabled={saving} onClick={onClose} aria-label="Đóng biểu mẫu" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"><X size={20} /></button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <fieldset disabled={saving} className="min-w-0 space-y-7 px-5 py-5 sm:px-7">
+      <fieldset disabled={saving || !canSave} className="min-w-0 space-y-7 px-5 py-5 sm:px-7">
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <label htmlFor={inputId('window')} className="flex items-center gap-2 text-sm font-semibold text-slate-800"><CalendarDays size={17} className="text-orange-600" />Đợt đăng tin <span className="text-rose-600">*</span></label>
           {post ? <p className="text-sm font-medium text-slate-800">{selectedWindow?.name ?? 'Đợt đăng tin không còn khả dụng'}</p>
@@ -97,11 +123,11 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
               {windows.map(w => <option key={w.id} value={w.id} disabled={!windowAcceptsPosts(w, now)}>{w.name} · {w.periodCode} {!windowAcceptsPosts(w, now) ? '— Không nhận tin' : ''}</option>)}
             </select>}
           {selectedWindow && <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2"><p>Mở đăng tin: <strong>{formatRecruitmentDate(selectedWindow.postingStartsAt ?? selectedWindow.startsAt)}</strong></p>
-            <p>Hạn đăng / sửa tin: <strong className="text-orange-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
+            <p>Hạn công bố tin: <strong className="text-orange-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
             {selectedWindow.applicationStartsAt && <p>Sinh viên bắt đầu ứng tuyển: <strong>{formatRecruitmentDate(selectedWindow.applicationStartsAt)}</strong></p>}
             {selectedWindow.resultsEndsAt && <p>Hạn hoàn tất phản hồi: <strong>{formatRecruitmentDate(selectedWindow.resultsEndsAt)}</strong></p>}
           </div>}
-          {!accepts && <p role="status" className="text-sm text-rose-700">Đợt này hiện không nhận tin. Không thể gửi hoặc lưu thay đổi.</p>}
+          {!accepts && <p role="status" className="text-sm text-amber-800">Đã hết hạn đăng tin. Tin nháp vẫn được chỉnh sửa và lưu lại; không thể công bố.</p>}
           {lockReason && accepts && <p role="status" className="flex items-start gap-2 text-sm text-amber-800"><LockKeyhole size={16} className="shrink-0" />{lockReason}</p>}
         </section>
         <section className="space-y-4">
@@ -146,12 +172,15 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
       </fieldset>
       </div>
       <footer className="shrink-0 space-y-3 border-t border-slate-100 bg-white px-5 py-4 sm:px-7">
-        {error && <p role="alert" className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-1.5 text-xs text-slate-500"><Eye size={14} />Hiển thị ngay với sinh viên sau khi lưu.</p>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-1.5 text-xs text-slate-500"><Eye size={14} />Tin nháp chưa hiển thị. Tin Published chỉ được xóa mềm trong Hạn 1.</p>
           <div className="flex justify-end gap-3"><button type="button" disabled={saving} onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-40">Hủy</button>
-            <button type="submit" disabled={saving || !canSave} className="flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
-              {saving ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} />}{saving ? 'Đang lưu...' : post ? 'Lưu thay đổi' : 'Đăng tin tuyển dụng'}</button></div></div>
+            <button type="submit" name="status" value="DRAFT" disabled={saving || !canSave} className="flex items-center gap-2 rounded-xl border border-orange-200 px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50">
+              {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}Lưu nháp</button>
+            <button type="submit" name="status" value="PUBLISHED" disabled={saving || !canSave} className="flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">
+              {saving ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} />}Công bố</button></div></div>
       </footer>
     </form>
-  </dialog>;
+  </dialog>
+    {feedback.dialog}
+  </>, document.body);
 }

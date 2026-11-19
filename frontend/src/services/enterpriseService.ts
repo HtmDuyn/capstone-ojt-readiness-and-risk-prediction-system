@@ -132,6 +132,10 @@ export interface RecruitmentPost {
   reviewedAt?: string | null;
   canEdit?: boolean;
   requiresReview?: boolean;
+  canDelete?: boolean;
+  canPublish?: boolean;
+  deleted?: boolean;
+  deletedAt?: string | null;
   replayed?: boolean;
   postingDeadlineAt?: string | null;
   deadlineManagedBy?: 'QHDN';
@@ -150,6 +154,7 @@ export interface EnterpriseRecruitmentPositionInput {
 }
 
 export interface EnterpriseRecruitmentPostInput {
+  status?: 'DRAFT' | 'PUBLISHED';
   title: string;
   content: string;
   benefits: string | null;
@@ -419,22 +424,31 @@ export const enterpriseService = {
     return response.data;
   },
 
+  listDeletedRecruitmentPosts: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<RecruitmentPost>> =>
+    (await API.get<PaginatedResponse<RecruitmentPost>>('/enterprise/recruitment/deleted-posts', { params, signal })).data,
+
   createRecruitmentPost: async (data: EnterpriseRecruitmentPostCreateInput): Promise<EnterpriseRecruitmentPostResponse> => {
-    const { windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions } = data;
+    const { windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions, status = 'DRAFT' } = data;
     const response = await API.post<EnterpriseRecruitmentPostResponse>('/enterprise/recruitment/posts', {
-      windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions,
+      windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions, status,
     });
     return response.data;
   },
 
   updateRecruitmentPost: async (id: number, data: EnterpriseRecruitmentPostInput): Promise<EnterpriseRecruitmentPostResponse> => {
     // Whitelist enterprise-editable fields so deadlineAt cannot leak into PATCH.
-    const { title, content, benefits, applicationInstructions, positions } = data;
+    const { title, content, benefits, applicationInstructions, positions, status = 'DRAFT' } = data;
     const response = await API.patch<EnterpriseRecruitmentPostResponse>(`/enterprise/recruitment/posts/${id}`, {
-      title, content, benefits, applicationInstructions, positions,
+      title, content, benefits, applicationInstructions, positions, status,
     });
     return response.data;
   },
+
+  publishRecruitmentPost: async (id: number): Promise<EnterpriseRecruitmentPostResponse> =>
+    (await API.post<EnterpriseRecruitmentPostResponse>(`/enterprise/recruitment/posts/${id}/publish`)).data,
+
+  deleteRecruitmentPost: async (id: number): Promise<{ success: boolean; data: { id: number; deleted: boolean } }> =>
+    (await API.delete(`/enterprise/recruitment/posts/${id}`)).data,
 
   // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
   listCandidatePeriods: async (): Promise<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }> => {

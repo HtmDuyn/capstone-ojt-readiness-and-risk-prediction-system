@@ -32,12 +32,24 @@ export function enterpriseWindowApi(w: Row) {
     editLockCode:w.StudentRegistrationWindow ? 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' : null};
 }
 
+export function enterprisePostActions(post: Row, window?: ReturnType<typeof enterpriseWindowApi>) {
+  const active = !!window?.accepting && !post.ArchivedAt;
+  const draft = post.Status === 'DRAFT';
+  const editable = !!window && !post.ArchivedAt && draft;
+  const posting = active && !!window?.canEdit;
+  return {
+    canEdit: editable,
+    canDelete: !post.ArchivedAt && (draft || (post.Status === 'PUBLISHED' && posting)),
+    canPublish: editable && posting,
+  };
+}
+
 export async function assertNoStudentRegistration(c: PoolClient, semesterId: number) {
   // Caller holds academic-calendar, the same transaction lock used when QHDN
   // opens/closes OJT registration windows. Registration opening cannot race this check.
   const active = (await c.query(`SELECT rw."WindowID" FROM "OJTRegistrationWindows" rw
     WHERE rw."OJTSemesterID"=$1 AND ${activeStudentRegistration('rw')} LIMIT 1`,[semesterId])).rows[0];
-  if (active) throw invalid('Đợt đăng ký OJT của sinh viên đang mở. Không được chỉnh sửa tin tuyển dụng trong thời gian này.',409,'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION');
+  if (active) throw invalid('Đã hết thời gian đăng tin: sinh viên đang đăng ký hoặc xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.',409,'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION');
 }
 
 export async function recruitmentDeadline(c: PoolClient, w: Row, before: Row | null) {

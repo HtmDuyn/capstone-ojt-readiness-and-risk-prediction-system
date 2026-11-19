@@ -241,6 +241,10 @@ export const router = createBrowserRouter([
             element: <EnterpriseJobs />,
           },
           {
+            path: "/enterprise/jobs/deleted",
+            element: <Navigate to="/enterprise/jobs?tab=deleted" replace />,
+          },
+          {
             path: "/enterprise/candidates",
             element: <EnterpriseCandidates />,
           },
