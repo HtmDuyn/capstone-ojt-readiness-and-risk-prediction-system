@@ -32,7 +32,7 @@ interface ScoreEditor extends EvaluationScores {
 
 function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask[], tasksAvailable: boolean): EvaluationRow {
   const ev = item.evaluation;
-  const completed = tasks.filter(task => ['DONE', 'COMPLETED'].includes(task.status.toUpperCase())).length;
+  const completed = tasks.filter(task => task.enterpriseStatus === 'DONE').length;
   const suggestion = tasksAvailable ? taskScoreSuggestion(completed, tasks.length) : null;
   const useSuggestion = !ev && suggestion !== null;
   return {
@@ -43,7 +43,8 @@ function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask
     skillScore: ev?.skillScore == null ? '' : String(ev.skillScore),
     attitudeScore: ev?.attitudeScore == null ? '' : String(ev.attitudeScore),
     comments: ev?.comments || '', status: ev?.status === 'SUBMITTED' ? 'SUBMITTED' : ev ? 'DRAFT' : 'NEW',
-    locked: item.evaluationLocked === true || ev?.status === 'SUBMITTED', dirty: false,
+    locked: item.evaluationLocked === true || ev?.status === 'SUBMITTED'
+      || !['ASSIGNED','ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status?.toUpperCase()), dirty: false,
     suggestion, submittedAverage: ev?.overallScore == null ? null : Number(ev.overallScore), fromTask: useSuggestion, tasks,
   };
 }
@@ -81,12 +82,12 @@ export function EnterpriseEvaluation() {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const limit = 20;
 
-  const fetchRows = useCallback(async () => {
-    if (profileLoading) return;
+  const fetchRows = useCallback(async (background = false) => {
+    if (profileLoading || savingRef.current) return;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    setLoading(true); setError(''); setTaskError('');
+    if (!background) { setLoading(true); setError(''); }
     try {
       const internships = await loadAllPages<EnterpriseInternshipItem>(
         page => enterpriseService.listInternships({ page, limit: 100 }, controller.signal), controller.signal, 'sinh viên thực tập');
@@ -104,14 +105,30 @@ export function EnterpriseEvaluation() {
       if (controller.signal.aborted) return;
       const byAssignment = new Map<number, EnterpriseInternshipTask[]>();
       for (const task of tasks) byAssignment.set(task.assignmentId, [...(byAssignment.get(task.assignmentId) || []), task]);
-      setRows(internships.filter(item => ['ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status.toUpperCase()))
-        .map(item => makeRow(item, byAssignment.get(item.id) || [], tasksAvailable)));
-      setSelected(new Set());
+      if (tasksAvailable) setTaskError('');
+      const roster = internships.map(item => makeRow(item, byAssignment.get(item.id) || [], tasksAvailable));
+      setRows(current => {
+        const edits = new Map(current.filter(row => row.dirty).map(row => [row.id, row]));
+        return roster.map(row => {
+          const draft = edits.get(row.id);
+          if (!draft || row.locked || !background) return row;
+          return { ...draft, tasks: row.tasks, suggestion: row.suggestion,
+            completionScore: draft.fromTask && row.suggestion !== null ? String(row.suggestion) : draft.completionScore };
+        });
+      });
+      if (!background) setSelected(new Set());
     } catch (e) { if (!controller.signal.aborted) setError(errorText(e)); }
     finally { if (!controller.signal.aborted) setLoading(false); }
   }, [companyId, profileLoading]);
 
   useEffect(() => { void fetchRows(); return () => requestRef.current?.abort(); }, [fetchRows]);
+  useEffect(() => {
+    if (editor || confirming || busy || loading) return;
+    const refresh = () => { if (!document.hidden) void fetchRows(true); };
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [fetchRows, editor, confirming, busy, loading]);
   const hasUnsaved = rows.some(row => row.dirty);
   useEffect(() => {
     if (!hasUnsaved) return;
@@ -184,6 +201,7 @@ export function EnterpriseEvaluation() {
   };
   const save = async (target: 'DRAFT' | 'SUBMITTED') => {
     if (savingRef.current || !validate(target === 'SUBMITTED')) return;
+    requestRef.current?.abort();
     savingRef.current = true; setBusy(true); setMessage('');
     try {
       const response = await enterpriseService.saveBulkEvaluations(selectedRows.map(row => ({
@@ -235,7 +253,7 @@ export function EnterpriseEvaluation() {
         <p className="text-xs leading-relaxed text-slate-500">Gợi ý chuyên ngành = số task hoàn thành / tổng task × 10. Bạn có thể điều chỉnh điểm hoặc áp dụng điểm hàng loạt. Gợi ý chưa phải điểm chính thức.</p>
       </div>
       {loading ? <div role="status" className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500"><Loader2 size={22} className="animate-spin text-orange-500" />Đang tải sinh viên và tiến độ task…</div>
-        : !rows.length ? <div className="space-y-3 p-12 text-center text-sm text-slate-500"><ClipboardCheck className="mx-auto text-slate-300" size={32} /><p>{error ? 'Không thể tải danh sách đánh giá.' : 'Chưa có sinh viên đang thực tập hoặc đã hoàn thành để đánh giá.'}</p>{error && <button type="button" className={secondaryClass} onClick={() => void fetchRows()}>Thử lại</button>}</div>
+        : !rows.length ? <div className="space-y-3 p-12 text-center text-sm text-slate-500"><ClipboardCheck className="mx-auto text-slate-300" size={32} /><p>{error ? 'Không thể tải danh sách đánh giá.' : 'Chưa có sinh viên trong danh sách thực tập.'}</p>{error && <button type="button" className={secondaryClass} onClick={() => void fetchRows()}>Thử lại</button>}</div>
         : <>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1120px] text-left text-sm">
@@ -248,7 +266,7 @@ export function EnterpriseEvaluation() {
                 <th className="w-36 px-4 py-4 text-right">Thao tác</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">{!visible.length ? <tr><td colSpan={9} className="py-14 text-center text-slate-500">Không có sinh viên phù hợp với bộ lọc.</td></tr> : visible.map(row => {
-                const completed = row.tasks.filter(task => ['DONE', 'COMPLETED'].includes(task.status.toUpperCase())).length;
+                const completed = row.tasks.filter(task => task.enterpriseStatus === 'DONE').length;
                 const average = row.status === 'SUBMITTED' ? row.submittedAverage : evaluationAverage(row);
                 return <tr key={row.id} className={selected.has(row.id) ? 'bg-orange-50/40' : 'hover:bg-slate-50/50'}>
                   <td className="px-4 py-5 align-top"><input type="checkbox" aria-label={`Chọn ${row.fullName} (${row.studentCode})`} className="mt-1 h-4 w-4 accent-orange-500" checked={selected.has(row.id)} disabled={busy || row.locked} onChange={() => toggle(row.id)} /></td>
@@ -314,7 +332,7 @@ export function EnterpriseEvaluation() {
     </StudentDialog>}
     {detail && <StudentDialog title={`Chi tiết task · ${detail.fullName}`} busy={busy} onClose={() => setDetailId(null)}>
       <p className="mb-4 text-sm text-slate-500">{detail.studentCode} · {detail.position}</p>
-      {taskError ? <p className="text-sm text-amber-700">{taskError}</p> : !detail.tasks.length ? <p className="text-sm text-slate-500">Sinh viên chưa có task được giao.</p> : <ul className="max-h-64 divide-y divide-slate-100 overflow-auto rounded-xl border border-slate-200 px-4">{detail.tasks.map(task => <li key={task.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div><p className="font-medium text-slate-800">{task.name}</p>{task.description && <p className="mt-1 whitespace-pre-wrap text-xs text-slate-500">{task.description}</p>}</div><span className="shrink-0 text-xs text-emerald-700">{['DONE', 'COMPLETED'].includes(task.status.toUpperCase()) ? 'Hoàn thành' : 'Chưa hoàn thành'}</span></li>)}</ul>}
+      {taskError ? <p className="text-sm text-amber-700">{taskError}</p> : !detail.tasks.length ? <p className="text-sm text-slate-500">Sinh viên chưa có task được giao.</p> : <ul className="max-h-64 divide-y divide-slate-100 overflow-auto rounded-xl border border-slate-200 px-4">{detail.tasks.map(task => <li key={task.id} className="flex items-start justify-between gap-3 py-3 text-sm"><div><p className="font-medium text-slate-800">{task.name}</p>{task.description && <p className="mt-1 whitespace-pre-wrap text-xs text-slate-500">{task.description}</p>}</div><span className="shrink-0 text-xs text-emerald-700">{task.enterpriseStatus === 'DONE' ? 'Đã xong' : task.enterpriseStatus === 'OVERDUE' ? 'Quá hạn' : 'Chưa làm'}</span></li>)}</ul>}
       <div className="mt-5"><h3 className="text-sm font-semibold text-slate-700">Nhận xét</h3><p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{detail.comments || 'Chưa có nhận xét.'}</p></div>
       <div className="mt-5 flex justify-end"><button type="button" className={secondaryClass} onClick={() => setDetailId(null)}>Đóng</button></div>
     </StudentDialog>}

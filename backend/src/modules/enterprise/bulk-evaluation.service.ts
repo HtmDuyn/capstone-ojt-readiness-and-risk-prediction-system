@@ -26,7 +26,7 @@ function valuesFor(body: unknown, status: EvaluationStatus) {
 async function save(c: PoolClient, id: number, values: Row, status: EvaluationStatus, reason: string, actor: Actor) {
   const assignment = await record(c, 'assignments', id);
   await assertScope(c, actor, assignment.EnterpriseID);
-  if (!['ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(String(assignment.Status).toUpperCase()))
+  if (!['ASSIGNED','ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(String(assignment.Status).toUpperCase()))
     throw invalid('Chỉ có thể chấm điểm sinh viên đang thực tập hoặc đã hoàn thành.', 409, 'ASSIGNMENT_NOT_ACTIVE');
   if ((await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1', [id])).rowCount)
     throw invalid('Điểm đã chuyển giao không thể chỉnh sửa.', 409, 'OJT_RESULT_CONFIRMED');

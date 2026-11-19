@@ -5,6 +5,7 @@ import { useStudentResource } from '@/hooks/useStudentResource';
 import { getAssignedTasks, getTaskSubmissions, submitAssignedTask } from '@/services/studentService';
 import type { Task } from '@/types/student/portal';
 import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
+import { displayTaskTime } from '@/utils/taskTime';
 import { buttonClass, Card, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
 
 function ProgressContent() {
@@ -46,7 +47,7 @@ function ProgressContent() {
                 <h4 className="font-bold text-slate-900">{task.name}</h4>
                 {task.company?.name && <p className="text-xs text-slate-500">{task.company.name}</p>}
                 <p className="whitespace-pre-wrap break-words text-slate-600">{task.description}</p>
-                <div className="space-y-1 text-xs text-slate-500"><p>Ngày giao: {dateText(task.assignedDate)}</p><p>Hạn nộp: {dateText(task.dueDate)}</p></div>
+                <div className="space-y-1 text-xs text-slate-500"><p>Ngày giao: {displayTaskTime(task.assignedAt ?? task.assignedDate)}</p><p>Hạn nộp: {displayTaskTime(task.dueAt ?? task.dueDate)}</p></div>
                 {task.latestSubmission && <p className="rounded-lg bg-emerald-50 p-2 text-xs text-emerald-800">Đã nộp {dateText(task.latestSubmission.submittedAt)}{task.latestSubmission.isLate ? ' · Sau hạn' : ''}</p>}
                 <button type="button" className={task.canSubmit ? buttonClass : 'text-sm font-semibold text-orange-600 underline'} onClick={() => { setMessage(''); setSelectedTask(task); }}>{task.canSubmit ? (task.latestSubmission ? 'Nộp lại / xem bài đã nộp' : 'Nộp nhiệm vụ') : 'Xem bài đã nộp'}</button>
               </article>)}

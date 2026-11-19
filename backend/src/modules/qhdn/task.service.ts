@@ -18,7 +18,11 @@ export async function assignTasks(body: unknown, actor: Actor) {
   if (!Array.isArray(b.tasks) || !b.tasks.length || b.tasks.length>50 || b.tasks.length*ids.length>5000) throw invalid('Provide 1–50 tasks, at most 5000 assignments of tasks.');
   const tasks = b.tasks.map((raw:unknown)=>{
     const t=inputObject(raw,['name','description','dueDate']);
-    return {name:requiredText(t.name,'name',200),description:optionalText(t.description,'description',10000),dueDate:dateInput(t.dueDate,'dueDate')};
+    const dueDate = requiredText(t.dueDate,'dueDate',16);
+    dateInput(dueDate.slice(0,10),'dueDate');
+    if (dueDate.length !== 10 && !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(dueDate))
+      throw invalid('Hạn nộp phải có ngày và giờ hợp lệ theo giờ Việt Nam.');
+    return {name:requiredText(t.name,'name',200),description:optionalText(t.description,'description',10000),dueDate};
   });
   const hash=fingerprint({ids,tasks});
   return academicTransaction(async c=>{
@@ -32,22 +36,46 @@ export async function assignTasks(body: unknown, actor: Actor) {
       if(assignment.EnterpriseID!==companyId)throw invalid('This internship belongs to another enterprise.',403,'FORBIDDEN');
       if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(assignment.Status).toUpperCase()))throw invalid('Tasks require an accepted, ongoing internship.',409);
     }
+    const deadlines=tasks.map(task=>task.dueDate.length===10 ? task.dueDate+'T23:59:59.999999' : task.dueDate);
+    const assignedAt=(await c.query(`SELECT to_char(clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh','YYYY-MM-DD"T"HH24:MI:SS.US') AS instant`)).rows[0].instant;
     const invalidDeadline=await c.query(`SELECT a."AssignmentID" AS "assignmentId"
-      FROM "InternshipAssignments" a CROSS JOIN unnest($2::date[]) AS due_dates("dueDate")
+      FROM "InternshipAssignments" a CROSS JOIN unnest($2::timestamp[]) AS due_dates("dueDate")
       WHERE a."AssignmentID"=ANY($1::int[])
-        AND (due_dates."dueDate" < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
-          OR NOT COALESCE(due_dates."dueDate" BETWEEN a."StartDate" AND a."EndDate",false))
-      LIMIT 1`,[ids,tasks.map(task=>task.dueDate)]);
-    if(invalidDeadline.rowCount)throw invalid('Task due date must be within the internship and not in the past.');
-    const created=(await c.query(`INSERT INTO "InternshipTasks" ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status")
-      SELECT selected."assignmentId",task."name",task."description",(now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,task."dueDate",'TODO'
+        AND (due_dates."dueDate" <= $3::timestamp
+          OR NOT COALESCE(due_dates."dueDate"::date <= a."EndDate",false))
+      LIMIT 1`,[ids,deadlines,assignedAt]);
+    if(invalidDeadline.rowCount)throw invalid('Hạn nộp phải sau thời điểm giao và không vượt ngày kết thúc thực tập của các sinh viên đã chọn.');
+    const {rows:[schema]}=await c.query(`SELECT count(*)=2 AS ready FROM pg_attribute
+      WHERE attrelid='"InternshipTasks"'::regclass AND attname IN ('AssignedAt','DueAt') AND NOT attisdropped`);
+    if(!schema.ready)throw invalid('Cần cập nhật cơ sở dữ liệu internship_task_times_v1 để giao nhiệm vụ theo giờ.',503,'TASK_TIME_MIGRATION_REQUIRED');
+    const created=(await c.query(`INSERT INTO "InternshipTasks" ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status","AssignedAt","DueAt")
+      SELECT selected."assignmentId",task."name",task."description",$5::timestamp::date,task."dueDate"::date,'TODO',$5::timestamp,task."dueDate"
       FROM unnest($1::int[]) AS selected("assignmentId")
-      CROSS JOIN unnest($2::text[],$3::text[],$4::date[]) AS task("name","description","dueDate")
-      RETURNING "TaskID" AS id,"AssignmentID" AS "assignmentId"`,
-      [ids,tasks.map(task=>task.name),tasks.map(task=>task.description),tasks.map(task=>task.dueDate)])).rows;
+      CROSS JOIN unnest($2::text[],$3::text[],$4::timestamp[]) AS task("name","description","dueDate")
+      RETURNING "TaskID" AS id,"AssignmentID" AS "assignmentId",to_char("AssignedAt",'YYYY-MM-DD"T"HH24:MI:SS.US') AS "assignedAt"`,
+      [ids,tasks.map(task=>task.name),tasks.map(task=>task.description),deadlines,assignedAt])).rows;
     const result={created:created.length,tasks:created};
     await audit(c,actor.userId,'InternshipTaskBatch',created[0].id,'ASSIGN_TASKS',null,{key,hash,result});
     return {...result,replayed:false};
+  });
+}
+
+const hasTaskHistory = `(EXISTS (SELECT 1 FROM "TaskProgressUpdates" u WHERE u."TaskID"=t."TaskID")
+  OR EXISTS (SELECT 1 FROM "OJTAlertEvaluations" e WHERE e."TaskID"=t."TaskID"))`;
+
+export async function deleteUnusedTask(taskId:number, actor:Actor) {
+  if(actor.roleCode!=='ENTERPRISE') throw invalid('Enterprise role required.',403);
+  return academicTransaction(async c=>{
+    const company=await enterpriseScope(c,actor);
+    // Student submissions lock this same task before adding an update.
+    const row=(await c.query(`SELECT t.* FROM "InternshipTasks" t JOIN "InternshipAssignments" a USING("AssignmentID")
+      WHERE t."TaskID"=$1 AND a."EnterpriseID"=$2 FOR UPDATE OF t`,[taskId,company])).rows[0];
+    if(!row) throw invalid('Không tìm thấy nhiệm vụ.',404);
+    const activity=await c.query(`SELECT 1 FROM "InternshipTasks" t WHERE t."TaskID"=$1 AND ${hasTaskHistory}`,[taskId]);
+    if(activity.rowCount) throw invalid('Nhiệm vụ đã có hoạt động, không thể xóa.',409);
+    await c.query('DELETE FROM "InternshipTasks" WHERE "TaskID"=$1',[taskId]);
+    await audit(c,actor.userId,'InternshipTasks',taskId,'DELETE_UNUSED_TASK',row,null);
+    return {id:taskId};
   });
 }
 
@@ -66,6 +94,12 @@ export async function listTasks(params:Record<string,unknown>, actor:Actor,exist
     const positionId=params.positionId===undefined?null:positiveId(params.positionId,'positionId');
     const semesterId=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
     const rows=await c.query(`WITH filtered AS (SELECT t."TaskID" AS id,t."AssignmentID" AS "assignmentId",t."TaskName" AS name,t."Description" AS description,t."AssignedDate" AS "assignedDate",t."DueDate" AS "dueDate",t."Status" AS status,
+      to_jsonb(t)->>'AssignedAt' AS "assignedAt",to_jsonb(t)->>'DueAt' AS "dueAt",
+      ${actor.roleCode==='ENTERPRISE' ? `CASE
+        WHEN EXISTS (SELECT 1 FROM "TaskProgressUpdates" u WHERE u."TaskID"=t."TaskID" AND u."UpdatedByStudentID"=a."StudentID"
+          AND u."PercentComplete"=100 AND COALESCE(u."UpdateDate"<=(to_jsonb(t)->>'DueAt')::timestamp,u."UpdateDate"<(t."DueDate"+1)::timestamp,true)) THEN 'DONE'
+        WHEN COALESCE((to_jsonb(t)->>'DueAt')::timestamp,(t."DueDate"+1)::timestamp-interval '1 microsecond') < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh') THEN 'OVERDUE' ELSE 'TODO' END AS "enterpriseStatus",
+        NOT ${hasTaskHistory} AS "canDelete",` : ''}
       a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",co."OJTSemesterID" AS "ojtSemesterId",
       jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate") AS assignment
       FROM "InternshipTasks" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "Students" s ON s."StudentID"=a."StudentID"

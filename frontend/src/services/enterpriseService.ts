@@ -44,7 +44,7 @@ export interface BulkTaskAssignmentResponse {
   success: boolean;
   data: {
     created: number;
-    tasks: Array<{ id: number; assignmentId: number }>;
+    tasks: Array<{ id: number; assignmentId: number; assignedAt?: string }>;
     replayed: boolean;
   };
 }
@@ -256,7 +256,7 @@ export interface EnterpriseInternshipItem {
   endDate?: string | null;
   status: string;
   evaluation?: InternshipEvaluationData | null;
-  academicSupervisor?: Record<string, unknown> | null;
+  academicSupervisor?: { id: number; fullName: string; email?: string | null; phone?: string | null } | null;
   result?: Record<string, unknown> | null;
   evaluationLocked?: boolean;
   application?: Record<string, unknown> | null;
@@ -294,13 +294,17 @@ export interface BulkEvaluationItem {
 export interface BulkEvaluationResponse {
   success: boolean;
   data: {
-    items: Array<InternshipEvaluationData & { assignmentId: number }>;
+    items: Array<InternshipEvaluationData & { assignmentId: number; assignedAt?: string }>;
     saved: number;
     status: 'DRAFT' | 'SUBMITTED';
   };
 }
 
 export interface EnterpriseInternshipTask {
+  assignedAt?: string | null;
+  dueAt?: string | null;
+  enterpriseStatus: 'TODO' | 'DONE' | 'OVERDUE';
+  canDelete: boolean;
   id: number;
   assignmentId: number;
   studentId: number;
@@ -489,6 +493,8 @@ export const enterpriseService = {
     });
     return response.data;
   },
+
+  deleteUnusedTask: (id: string) => API.delete('/enterprise/tasks/' + id),
 
   assignTasksBulk: async (
     assignmentIds: number[],

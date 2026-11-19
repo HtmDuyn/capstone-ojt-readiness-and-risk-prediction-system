@@ -9,13 +9,14 @@ import { ownStudent, type Actor, type Row } from './shared';
 const localDay = `(clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`;
 const canSubmitSql = `COALESCE(UPPER(t."Status") IN ('TODO','PENDING','IN_PROGRESS')
   AND UPPER(a."Status") IN ('ASSIGNED','ACTIVE','IN_PROGRESS')
-  AND (a."StartDate" IS NULL OR a."StartDate"<=${localDay})
+  AND (a."StartDate" IS NULL OR a."StartDate"<=${localDay}
+    OR (t."DueDate"<a."StartDate" AND (to_jsonb(t)->>'AssignedAt')::timestamp <= (clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')))
   AND (a."EndDate" IS NULL OR a."EndDate">=${localDay}),false)`;
 const submissionSelect = `SELECT u."UpdateID" AS id,u."TaskID" AS "taskId",u."UpdatedByStudentID" AS "studentId",
   COALESCE(u."ProgressDescription",'') AS content,
   u."PercentComplete" AS "percentComplete",
   u."UpdateDate" AT TIME ZONE 'Asia/Ho_Chi_Minh' AS "submittedAt",
-  COALESCE(u."UpdateDate">=(submitted_task."DueDate"+1)::timestamp,false) AS "isLate"
+  COALESCE(u."UpdateDate">(to_jsonb(submitted_task)->>'DueAt')::timestamp,u."UpdateDate">=(submitted_task."DueDate"+1)::timestamp,false) AS "isLate"
   FROM "TaskProgressUpdates" u JOIN "InternshipTasks" submitted_task ON submitted_task."TaskID"=u."TaskID"`;
 
 async function taskRecord(client: PoolClient, taskId: number, studentId: number, lock = false) {

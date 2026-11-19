@@ -151,8 +151,8 @@ export function EnterpriseJobs() {
             </p>
           </div>}
         </div>
-        {!deleted && <p className="mt-3 text-xs text-slate-500">Trong Hạn 1, bạn có thể tạo, công bố và xóa tin đã công bố. Sau Hạn 1, bạn vẫn có thể sửa, lưu và xóa bản nháp. Trong Hạn 2, sinh viên chỉ có thể ứng tuyển vào tin đang tuyển.</p>}
-        {!deleted && !activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể xem các tin đã đăng.</p>}
+        {!deleted && <p className="mt-3 text-xs text-slate-500">Bạn có thể tạo, sửa và xóa bản nháp cho đợt đã thiết lập. Chỉ được công bố hoặc xóa tin đã công bố trong Hạn 1. Trong Hạn 2, sinh viên chỉ có thể ứng tuyển vào tin đang tuyển.</p>}
+        {!deleted && windows.length > 0 && !activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể tạo và lưu bản nháp.</p>}
         {!deleted && selectedWindow?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
           <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký hoặc xét tuyển: không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.
         </p>}
@@ -174,7 +174,7 @@ export function EnterpriseJobs() {
           <button type="button" onClick={refresh} disabled={loading} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-40">
             <RefreshCw size={15} /><span>Tải lại</span>
           </button>
-          {!deleted && <button type="button" disabled={!activeWindows.length} onClick={() => setEditor({ post: null })}
+          {!deleted && <button type="button" disabled={!windows.length} onClick={() => setEditor({ post: null })}
             className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
             <Plus size={17} />Tạo tin tuyển dụng
           </button>}
@@ -241,7 +241,7 @@ export function EnterpriseJobs() {
     {feedback.dialog}
     {detailPost && <RecruitmentPostDetailsDialog post={detailPost} lockReason={postEditLockReason(detailPost, windows, now)} onClose={() => setDetailPost(null)}
       onEdit={() => { setDetailPost(null); setEditor({ post: detailPost }); }} />}
-    {editor && <RecruitmentPostDialog windows={windows} initialWindowId={accepts ? selectedWindowId : activeWindows[0]?.id} post={editor.post} now={now} onClose={() => setEditor(null)} onSaved={onSaved} />}
+    {editor && <RecruitmentPostDialog windows={windows} initialWindowId={selectedWindow?.id ?? activeWindows[0]?.id ?? windows[0]?.id} post={editor.post} now={now} onClose={() => setEditor(null)} onSaved={onSaved} />}
   </div>;
 }
 

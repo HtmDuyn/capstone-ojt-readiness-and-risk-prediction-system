@@ -24,7 +24,8 @@ export interface InternTask {
   title: string;
   description: string;
   deadline: string;
-  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+  status: 'TODO' | 'OVERDUE' | 'DONE';
+  canDelete: boolean;
   assignedBy: string;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   createdAt?: string;

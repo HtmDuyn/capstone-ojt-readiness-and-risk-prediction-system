@@ -15,6 +15,7 @@ import {
   Clock3,
   CalendarClock,
 } from 'lucide-react';
+import { displayTaskTime, vietnamTaskMinute } from '@/utils/taskTime';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   enterpriseService,
@@ -57,21 +58,6 @@ interface CandidateStage {
   color: string;
 }
 
-const isTaskComplete = (status: string) => ['DONE', 'COMPLETED'].includes(status.toUpperCase());
-
-const dateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const formatTaskDate = (value: string) => {
-  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
-  return Number.isNaN(date.getTime())
-    ? 'Chưa xác định ngày'
-    : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' }).format(date);
-};
 
 const TaskCompletionDonut: React.FC<{
   completed: number;
@@ -142,24 +128,24 @@ export const EnterpriseDashboard: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const taskSummary = useMemo(() => {
     const today = new Date();
-    const todayKey = dateKey(today);
+
     const dueLimit = new Date(today);
     dueLimit.setDate(dueLimit.getDate() + 7);
-    const dueLimitKey = dateKey(dueLimit);
-    const activeTasks = tasks.filter(task => !isTaskComplete(task.status));
+    const dueLimitKey = vietnamTaskMinute(dueLimit).slice(0,10);
+    const activeTasks = tasks.filter(task => task.enterpriseStatus !== 'DONE');
 
     return {
       total: tasks.length,
-      completed: tasks.filter(task => isTaskComplete(task.status)).length,
+      completed: tasks.filter(task => task.enterpriseStatus === 'DONE').length,
       inProgress: tasks.filter(task => task.status.toUpperCase() === 'IN_PROGRESS').length,
-      todo: tasks.filter(task => !isTaskComplete(task.status) && task.status.toUpperCase() !== 'IN_PROGRESS').length,
-      overdue: activeTasks.filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) < todayKey).length,
+      todo: tasks.filter(task => task.enterpriseStatus !== 'DONE' && task.status.toUpperCase() !== 'IN_PROGRESS').length,
+      overdue: activeTasks.filter(task => Boolean(task.dueDate) && task.enterpriseStatus === 'OVERDUE').length,
       dueSoon: activeTasks
-        .filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) >= todayKey && task.dueDate!.slice(0, 10) <= dueLimitKey)
-        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')),
+        .filter(task => Boolean(task.dueDate) && task.enterpriseStatus !== 'OVERDUE' && task.dueDate!.slice(0, 10) <= dueLimitKey)
+        .sort((a, b) => (a.dueAt || a.dueDate || '').localeCompare(b.dueAt || b.dueDate || '')),
       attention: activeTasks
         .filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) <= dueLimitKey)
-        .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+        .sort((a, b) => (a.dueAt || a.dueDate || '').localeCompare(b.dueAt || b.dueDate || ''))
         .slice(0, 3),
     };
   }, [tasks]);
@@ -618,8 +604,8 @@ export const EnterpriseDashboard: React.FC = () => {
                 {taskSummary.attention.length > 0 ? (
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {taskSummary.attention.map(task => {
-                      const dueDate = (task.dueDate || '').slice(0, 10);
-                      const overdue = dueDate < dateKey(new Date());
+                      const dueDate = task.dueAt ?? task.dueDate;
+                      const overdue = task.enterpriseStatus === 'OVERDUE';
                       return (
                         <div key={task.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-white bg-white px-3 py-2.5">
                           <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${overdue ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -630,7 +616,7 @@ export const EnterpriseDashboard: React.FC = () => {
                             <p className="truncate text-[9px] text-slate-400">{task.student?.fullName || task.fullName || 'Sinh viên'}</p>
                           </div>
                           <span className={`shrink-0 text-[9px] font-bold ${overdue ? 'text-rose-600' : 'text-amber-600'}`}>
-                            {formatTaskDate(dueDate)}
+                            {displayTaskTime(dueDate)}
                           </span>
                         </div>
                       );

@@ -110,12 +110,10 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     const before = id ? await ownPost(c,id,own,true) : null;
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
     if (before && before.Status !== 'DRAFT') throw invalid('Chỉ được chỉnh sửa hoặc công bố tin nháp. Tin đã công bố không được chỉnh sửa.',409,'RECRUITMENT_POST_LOCKED');
-    // Existing private drafts remain editable during student selection. Only
-    // creation/publication changes availability and therefore requires Hạn 1.
-    if (!before || status === 'PUBLISHED') {
+    if (status === 'PUBLISHED') {
       assertOpen(w);
       assertRoundPhase(w,'POSTING');
-      if (status === 'PUBLISHED' && !w.CampaignID) await assertNoStudentRegistration(c,w.OJTSemesterID);
+      if (!w.CampaignID) await assertNoStudentRegistration(c,w.OJTSemesterID);
     }
     if(before&&(await c.query('SELECT 1 FROM "JobApplications" WHERE "PostID"=$1 LIMIT 1',[before.PostID])).rowCount)
       throw invalid('Tin đã có sinh viên ứng tuyển, không thể chỉnh sửa nội dung hoặc chỉ tiêu.',409,'RECRUITMENT_POST_HAS_APPLICATIONS');
@@ -123,7 +121,7 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     const benefits = b.benefits === undefined ? before?.Benefits ?? null : optionalText(b.benefits,'benefits',10000);
     const instructions = b.applicationInstructions === undefined ? before?.ApplicationInstructions ?? null : optionalText(b.applicationInstructions,'applicationInstructions',10000);
     // deadlineAt remains accepted for old clients, but never controls a stored deadline.
-    const deadline = await recruitmentDeadline(c,w,before);
+    const deadline = await recruitmentDeadline(c,w,before,status === 'PUBLISHED');
     if (positions && !positions.some(pos => pos.capacity > 0)) throw invalid('At least one position with positive capacity is required.');
     const row = (await c.query(id ? `UPDATE "RecruitmentPosts" SET "Title"=$1,"Content"=$2,"Benefits"=$3,"ApplicationInstructions"=$4,"DeadlineAt"=$5,
       "Status"=$7,"PublishedAt"=CASE WHEN $7::varchar='PUBLISHED' THEN now() ELSE NULL END,"EnterpriseManaged"=true,"ReviewedBy"=NULL,"ReviewedAt"=NULL,"ReviewReason"=NULL WHERE "PostID"=$6 RETURNING "PostID"`

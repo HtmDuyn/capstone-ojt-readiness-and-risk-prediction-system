@@ -100,6 +100,12 @@ export async function decision(id:number,body:unknown,actor:Actor,client?:PoolCl
       if(position.EnterpriseID!==before.EnterpriseID)throw invalid('Coordination and position company do not match.',409,'POSITION_COMPANY_MISMATCH');
     }
     const after=(await c.query('UPDATE "StudentEnterpriseCoordination" SET "Decision"=$2,"DecisionAt"=now(),"RejectReason"=$3 WHERE "CoordinationID"=$1 RETURNING *',[id,value,value==='REJECTED'?reason:null])).rows[0];
+    if(value==='ACCEPTED'){
+      await c.query(`INSERT INTO "InternshipAssignments"
+        ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
+        SELECT $1,$2,$3,$4,"StartDate","EndDate",'ASSIGNED' FROM "OJTSemesters" WHERE "OJTSemesterID"=$5`,
+        [id,r.StudentID,before.EnterpriseID,before.PositionID,r.OJTSemesterID]);
+    }
     if(before.ApplicationID)await c.query('UPDATE "JobApplications" SET "Status"=$2,"ReviewedBy"=$3,"ReviewNote"=$4 WHERE "ApplicationID"=$1',[before.ApplicationID,value,actor.userId,reason]);
     await refreshSlots(c,before.PositionID);
     if(value==='REJECTED')await c.query(`INSERT INTO "Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt")

@@ -18,6 +18,7 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  const actor={userId:users.find(u=>u.Username==='enterprise01').UserID,roleCode:'ENTERPRISE'};
  const source=(await db.query(`SELECT * FROM "JobApplications" WHERE "Status"='SUBMITTED' ORDER BY "ApplicationID" LIMIT 1`)).rows[0];
  const semester=source.OJTSemesterID;
+ await db.query(`UPDATE "OJTSemesters" SET "EndDate"=greatest("EndDate",current_date+7) WHERE "OJTSemesterID"=$1`,[semester]);
  await db.query(`UPDATE "OJTRegistrationWindows" SET "StartsAt"=clock_timestamp()-interval '2 days',"EndsAt"=clock_timestamp()-interval '1 day',"Status"='CLOSED' WHERE "OJTSemesterID"=$1`,[semester]);
  const students=(await placementBoard({ojtSemesterId:semester},staff)).items.filter(s=>!s.hasAssignment&&!s.hasConfirmedPlace&&!s.receivedAt&&s.isActive!==false&&(!s.registrationId||['SUBMITTED','APPROVED','HANDED_OFF','REJECTED'].includes(s.registrationStatus))).slice(0,3);
  assert.equal(students.length,3);
@@ -58,12 +59,17 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  const summary=(await placementBoard({ojtSemesterId:semester},staff)).companies.find(c=>c.id===company);
  assert.equal(summary.capacity,2);assert.equal(summary.actualCount,3);assert.equal(summary.actualCount-summary.capacity,1);
  const afterAcceptance=(await enterpriseProfile(actor)).summary;
- assert.equal(afterAcceptance.acceptedInterns,3,'Acceptance immediately makes students company interns, even without assignments');
+ assert.equal(afterAcceptance.acceptedInterns,3,'Acceptance immediately makes students company interns');
  assert.equal(afterAcceptance.activeInterns,3);
  assert.equal(afterAcceptance.pendingCandidates,0);assert.equal(afterAcceptance.completedInterns,0);
- assert.equal((await db.query('SELECT count(*)::int AS n FROM "InternshipAssignments" WHERE "EnterpriseID"=$1',[company])).rows[0].n,0);
- // Creating an assignment for an already accepted student must not increase intake twice.
- const assigned=(await db.query(`INSERT INTO "InternshipAssignments" ("CoordinationID","StudentID","EnterpriseID","PositionID","Status") SELECT co."CoordinationID",r."StudentID",co."EnterpriseID",co."PositionID",'ASSIGNED' FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."CoordinationID"=$1 RETURNING "AssignmentID"`,[candidateIds[0]])).rows[0].AssignmentID;
+ const roster=await require('../dist/modules/enterprise/enterprise.service').enterpriseInternships({},actor);
+ assert.equal(roster.total,3);
+ assert.deepEqual(roster.items.map(item=>item.studentId).sort(),students.map(s=>s.id).sort());
+ const assigned=roster.items.find(item=>item.studentId===students[0].id).id;
+ const {assignTasks}=require('../dist/modules/qhdn/task.service');
+ const dueDate=(await db.query(`SELECT to_char(current_date+2,'YYYY-MM-DD') AS due`)).rows[0].due;
+ const batch=await assignTasks({assignmentIds:roster.items.map(item=>item.id),tasks:[{name:'Onboarding',dueDate}],idempotencyKey:'accepted-roster-onboarding'},actor);
+ assert.equal(batch.created,3);
  assert.equal((await enterpriseProfile(actor)).summary.acceptedInterns,3,'Creating an assignment must not count an accepted intern twice');
  await db.query(`UPDATE "InternshipAssignments" SET "Status"='COMPLETED' WHERE "AssignmentID"=$1`,[assigned]);
  const completed=(await enterpriseProfile(actor)).summary;
@@ -82,13 +88,14 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  }
  const dashboardScope={ojtSemesterId:semester,companyId:company};
  const beforeGrading=await dashboard(dashboardScope,staff);
- assert.deepEqual(beforeGrading.progress,{completed:0,inProgress:1,evaluated:0});
+ assert.deepEqual(beforeGrading.progress,{completed:0,inProgress:3,evaluated:0});
+ await db.query(`UPDATE "InternshipAssignments" SET "Status"='ASSIGNED' WHERE "AssignmentID"=$1`,[assigned]);
  const submitted=await evaluate(assigned,{completionScore:8,attitudeScore:9,skillScore:8,overallScore:8.25,comments:'Enterprise assessment',reason:'Integration assessment'},actor);
  assert.equal((await enterpriseProfile(actor)).summary.completedInterns,1,'A submitted score counts the student as completed even while assignment status is active');
  const gradedSummary=(await enterpriseProfile(actor)).summary;
- assert.equal(gradedSummary.acceptedInterns,2);assert.equal(gradedSummary.activeInterns,2,'Graded assignments leave the active group; accepted interns without assignments remain');
+ assert.equal(gradedSummary.acceptedInterns,2);assert.equal(gradedSummary.activeInterns,2,'Graded assignments leave the active group; other accepted interns remain');
  const afterGrading=await dashboard(dashboardScope,staff);
- assert.deepEqual(afterGrading.progress,{completed:1,inProgress:0,evaluated:1},'A submitted evaluation completes the dashboard stage before assignment update or transfer');
+ assert.deepEqual(afterGrading.progress,{completed:1,inProgress:2,evaluated:1},'A submitted evaluation completes the dashboard stage before assignment update or transfer');
  assert.equal(afterGrading.assignments.completed,0,'Dashboard does not mutate assignment status');
  assert.equal(afterGrading.results.total,1,'Dashboard counts submitted enterprise evaluations');
  assert.equal((await dashboard({ojtSemesterId:semester,companyId:foreignCompany},staff)).progress.completed,0,'Other companies do not inherit evaluated students');
@@ -149,7 +156,7 @@ test('bulk acceptance previews exact excess, requires consent, rechecks capacity
  })});
  assert.deepEqual((await replay.json()).data,{ojtSemesterId:semester,eligible:1,published:0,alreadyPublished:1,skipped:0,queuedEmails:0});
  await db.query(`UPDATE "InternshipAssignments" SET "Status"='COMPLETED' WHERE "AssignmentID"=$1`,[assigned]);
- assert.deepEqual((await dashboard(dashboardScope,staff)).progress,{completed:1,inProgress:0,evaluated:1},'Publication keeps the same student count');
+ assert.deepEqual((await dashboard(dashboardScope,staff)).progress,{completed:1,inProgress:2,evaluated:1},'Publication keeps the same student count');
  const publishedResults=await results(resultFilter);
  assert.equal(publishedResults.total,1,'Publication does not duplicate the enterprise assessment');
  assert.equal(publishedResults.items[0].status,'PUBLISHED');

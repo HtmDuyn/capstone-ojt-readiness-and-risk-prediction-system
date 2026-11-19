@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { displayTaskTime, vietnamTaskMinute } from '@/utils/taskTime';
 import { createPortal } from 'react-dom';
+import { AssignedTasks, TaskSummary, taskStatusLabels, useAssignedTasks } from '@/components/enterprise/AssignedTasks';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   CheckSquare,
@@ -8,7 +10,6 @@ import {
   Search,
   Calendar,
   CheckCircle2,
-  Clock,
   AlertTriangle,
   Users,
   Filter,
@@ -38,7 +39,7 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): Enterpri
   fullName: item.student?.fullName || '',
   major: item.student?.programName || item.student?.programCode || '',
   position: item.position?.title || '',
-  mentorName: item.enterpriseSupervisorName || item.academicSupervisor ? (item.academicSupervisor as any)?.fullName || 'Chưa phân công' : 'Chưa phân công',
+  mentorName: item.enterpriseSupervisorName || item.academicSupervisor?.fullName || 'Chưa có người hướng dẫn',
   mentorEmail: item.academicSupervisor ? (item.academicSupervisor as any)?.email || '' : '',
   startDate: item.startDate ? new Date(item.startDate).toLocaleDateString('vi-VN') : '',
   progressPercent: item.evaluation ? ((item.evaluation as any)?.overallScore || 0) : 0,
@@ -52,21 +53,17 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): Enterpri
 });
 
 const mapApiToTask = (item: EnterpriseInternshipTask): InternTask => {
-  const status = item.status.toUpperCase();
-  if (!['TODO', 'IN_PROGRESS', 'DONE', 'COMPLETED'].includes(status)) {
-    throw new Error(`Trạng thái task không được hỗ trợ: ${item.status}`);
-  }
-
   return {
     id: String(item.id),
     internId: String(item.assignmentId),
     internName: item.student?.fullName || item.fullName || 'Sinh viên',
     title: item.name,
     description: item.description || '',
-    deadline: item.dueDate?.slice(0, 10) || '',
-    status: status === 'COMPLETED' ? 'DONE' : status as InternTask['status'],
+    deadline: item.dueAt || item.dueDate?.slice(0, 10) || '',
+    status: item.enterpriseStatus,
+    canDelete: item.canDelete,
     assignedBy: 'Mentor Doanh Nghiệp',
-    createdAt: item.assignedDate?.slice(0, 10),
+    createdAt: item.assignedAt || item.assignedDate?.slice(0, 10),
   };
 };
 
@@ -96,7 +93,9 @@ export const EnterpriseInterns: React.FC = () => {
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const fetchInternships = useCallback(async () => {
+  const loadSequence = useRef(0);
+  const fetchInternships = useCallback(async (silent = false) => {
+    const sequence = ++loadSequence.current;
     if (profileLoading) return;
     if (!companyId) {
       setApiLoading(false);
@@ -104,7 +103,7 @@ export const EnterpriseInterns: React.FC = () => {
       return;
     }
 
-    setApiLoading(true);
+    if (!silent) setApiLoading(true);
     setApiError(null);
     try {
       const [internshipResponse, firstTaskResponse] = await Promise.all([
@@ -128,6 +127,7 @@ export const EnterpriseInterns: React.FC = () => {
         taskItems.push(...taskResponse.data.items);
       }
 
+      if (sequence !== loadSequence.current) return;
       const mappedTasks = taskItems.map(mapApiToTask);
       const taskCounts = new Map<string, { total: number; completed: number }>();
       for (const task of mappedTasks) {
@@ -149,21 +149,29 @@ export const EnterpriseInterns: React.FC = () => {
       }));
       setTasks(mappedTasks);
     } catch (err: unknown) {
+      if (sequence !== loadSequence.current) return;
       const message = getApiErrorMessage(err) ||
         (err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh');
       setApiError(message);
       console.error('Failed to load internships:', err);
     } finally {
-      setApiLoading(false);
+      if (sequence === loadSequence.current) setApiLoading(false);
     }
   }, [companyId, profileLoading]);
 
   useEffect(() => {
-    fetchInternships();
+    void fetchInternships();
+    const refresh = () => { if (!document.hidden) void fetchInternships(true); };
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus',refresh);
+    return () => { loadSequence.current++; window.clearInterval(timer); window.removeEventListener('focus',refresh); };
   }, [fetchInternships]);
 
   // Selected intern for task detail modal
-  const [viewingIntern, setViewingIntern] = useState<EnterpriseIntern | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const viewingIntern = interns.find(intern => intern.id === viewingId);
+  const [taskTab,setTaskTab] = useState<'students'|'assigned'>('students');
+  const taskView = useAssignedTasks(tasks,taskTab === 'assigned');
 
   // Table selection checkboxes (bulk action on main table)
   const [tableSelectedIds, setTableSelectedIds] = useState<string[]>([]);
@@ -193,8 +201,7 @@ export const EnterpriseInterns: React.FC = () => {
   // Filter & Search states for the main table (Using dropdowns instead of tabs)
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ONGOING' | 'RISK'>('ALL');
-  const [positionFilter, setPositionFilter] = useState<string>('ALL');
-  const [taskStatusFilter, setTaskStatusFilter] = useState<'ALL' | 'TODO' | 'IN_PROGRESS' | 'DONE'>('ALL');
+  const [taskStatusFilter, setTaskStatusFilter] = useState<'ALL' | InternTask['status']>('ALL');
 
   // Pagination for main table (optimized for 200+ students)
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,12 +214,6 @@ export const EnterpriseInterns: React.FC = () => {
     count: number;
   } | null>(null);
 
-  // Extract unique positions for filter dropdown
-  const uniquePositions = useMemo(() => {
-    const set = new Set(interns.map((i) => i.position));
-    return Array.from(set);
-  }, [interns]);
-
   // Filtered interns list for main table
   const filteredInterns = useMemo(() => {
     return interns.filter((intern) => {
@@ -222,10 +223,9 @@ export const EnterpriseInterns: React.FC = () => {
         intern.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
         intern.mentorName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === 'ALL' || intern.status === statusFilter;
-      const matchPos = positionFilter === 'ALL' || intern.position === positionFilter;
-      return matchSearch && matchStatus && matchPos;
+      return matchSearch && matchStatus;
     });
-  }, [interns, searchTerm, statusFilter, positionFilter]);
+  }, [interns, searchTerm, statusFilter]);
 
   // Paginated interns
   const totalPages = Math.ceil(filteredInterns.length / pageSize) || 1;
@@ -269,7 +269,7 @@ export const EnterpriseInterns: React.FC = () => {
     setTaskSubmitError(
       selectedIds.length
         ? null
-        : 'Không có sinh viên đang được phân công hoặc thực tập để nhận task.'
+        : 'Chưa có thực tập sinh có thể nhận nhiệm vụ.'
     );
     setModalSearchTerm('');
     setModalStatusFilter('ALL');
@@ -286,18 +286,14 @@ export const EnterpriseInterns: React.FC = () => {
       return { minDate: '', maxDate: '', valid: false };
     }
 
-    const startDates = selectedTaskInterns.map((intern) => intern.assignmentStartDate?.slice(0, 10));
     const endDates = selectedTaskInterns.map((intern) => intern.assignmentEndDate?.slice(0, 10));
-    if (startDates.some((date) => !date) || endDates.some((date) => !date)) {
+    if (endDates.some((date) => !date)) {
       return { minDate: '', maxDate: '', valid: false };
     }
 
-    const availableStartDates = startDates.filter((date): date is string => date !== undefined);
     const availableEndDates = endDates.filter((date): date is string => date !== undefined);
-    const latestStartDate = availableStartDates.reduce((latest, date) => date > latest ? date : latest);
     const earliestEndDate = availableEndDates.reduce((earliest, date) => date < earliest ? date : earliest);
-    const today = localDateString(new Date());
-    const minDate = today > latestStartDate ? today : latestStartDate;
+    const minDate = vietnamTaskMinute().slice(0,10);
 
     return {
       minDate,
@@ -309,8 +305,8 @@ export const EnterpriseInterns: React.FC = () => {
   const taskDeadlineInvalid = modalSelectedInternIds.length > 0 && (
     !taskDeadlineRange.valid ||
     !newTask.deadline ||
-    newTask.deadline < taskDeadlineRange.minDate ||
-    newTask.deadline > taskDeadlineRange.maxDate
+    newTask.deadline <= vietnamTaskMinute() || newTask.deadline.slice(0,10) < taskDeadlineRange.minDate ||
+    newTask.deadline.slice(0,10) > taskDeadlineRange.maxDate
   );
 
   // Quick deadline helper
@@ -323,7 +319,7 @@ export const EnterpriseInterns: React.FC = () => {
     if (deadline > taskDeadlineRange.maxDate) deadline = taskDeadlineRange.maxDate;
     setNewTask((prev) => ({
       ...prev,
-      deadline,
+      deadline: deadline+'T23:59',
     }));
     setTaskSubmitError(null);
   };
@@ -386,23 +382,21 @@ export const EnterpriseInterns: React.FC = () => {
       return;
     }
     if (assignedStudents.some((student) => !isTaskAssignable(student))) {
-      setTaskSubmitError('Chỉ có thể giao task cho sinh viên đang được phân công hoặc thực tập.');
+      setTaskSubmitError('Chỉ có thể giao nhiệm vụ cho thực tập sinh đang hoạt động.');
       return;
     }
 
-    const today = localDateString(new Date());
-    if (newTask.deadline < today) {
-      setTaskSubmitError('Hạn hoàn thành không được ở trong quá khứ.');
+    if (newTask.deadline <= vietnamTaskMinute()) {
+      setTaskSubmitError('Hạn nộp phải sau thời điểm giao nhiệm vụ.');
       return;
     }
     const invalidDeadlineStudents = assignedStudents.filter((student) => {
-      const startDate = student.assignmentStartDate?.slice(0, 10);
       const endDate = student.assignmentEndDate?.slice(0, 10);
-      return !startDate || !endDate || newTask.deadline < startDate || newTask.deadline > endDate;
+      return !endDate || newTask.deadline.slice(0,10) > endDate;
     });
     if (invalidDeadlineStudents.length) {
       setTaskSubmitError(
-        `Hạn hoàn thành phải nằm trong thời gian thực tập của tất cả sinh viên được chọn. Kiểm tra: ${invalidDeadlineStudents.map((student) => student.fullName).join(', ')}.`
+        `Hạn nộp không được vượt ngày kết thúc thực tập của sinh viên: ${invalidDeadlineStudents.map((student) => student.fullName).join(', ')}.`
       );
       return;
     }
@@ -444,8 +438,9 @@ export const EnterpriseInterns: React.FC = () => {
           description: newTask.description.trim(),
           deadline: newTask.deadline,
           status: 'TODO',
+          canDelete: true,
           assignedBy: newTask.assignedBy || 'Mentor Doanh Nghiệp',
-          createdAt: new Date().toISOString().split('T')[0],
+          createdAt: task.assignedAt ?? vietnamTaskMinute(),
         };
       });
       taskRequestRef.current = null;
@@ -477,19 +472,6 @@ export const EnterpriseInterns: React.FC = () => {
       })
     );
 
-    // Update viewingIntern if currently viewed
-    if (viewingIntern && modalSelectedInternIds.includes(viewingIntern.id)) {
-      setViewingIntern((prev) => {
-        if (!prev) return null;
-        const newTotal = prev.totalTasks + 1;
-        return {
-          ...prev,
-          totalTasks: newTotal,
-          progressPercent: Math.round((prev.completedTasks / newTotal) * 100),
-        };
-      });
-    }
-
     // Show toast
     const studentNames = assignedStudents.map((s) => s.fullName).join(', ');
     setToast({
@@ -509,105 +491,14 @@ export const EnterpriseInterns: React.FC = () => {
     });
   };
 
-  // Change task status (TODO -> IN_PROGRESS -> DONE)
-  const handleUpdateTaskStatus = (taskId: string, newStatus: 'TODO' | 'IN_PROGRESS' | 'DONE') => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const oldStatus = task.status;
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-
-    if (oldStatus !== 'DONE' && newStatus === 'DONE') {
-      setInterns((prev) =>
-        prev.map((i) => {
-          if (i.id === task.internId) {
-            const newCompleted = i.completedTasks + 1;
-            return {
-              ...i,
-              completedTasks: newCompleted,
-              progressPercent: Math.round((newCompleted / i.totalTasks) * 100),
-            };
-          }
-          return i;
-        })
-      );
-      if (viewingIntern && viewingIntern.id === task.internId) {
-        setViewingIntern((prev) =>
-          prev
-            ? {
-                ...prev,
-                completedTasks: prev.completedTasks + 1,
-                progressPercent: Math.round(((prev.completedTasks + 1) / prev.totalTasks) * 100),
-              }
-            : null
-        );
-      }
-    } else if (oldStatus === 'DONE' && newStatus !== 'DONE') {
-      setInterns((prev) =>
-        prev.map((i) => {
-          if (i.id === task.internId) {
-            const newCompleted = Math.max(0, i.completedTasks - 1);
-            return {
-              ...i,
-              completedTasks: newCompleted,
-              progressPercent: Math.round((newCompleted / i.totalTasks) * 100),
-            };
-          }
-          return i;
-        })
-      );
-      if (viewingIntern && viewingIntern.id === task.internId) {
-        setViewingIntern((prev) =>
-          prev
-            ? {
-                ...prev,
-                completedTasks: Math.max(0, prev.completedTasks - 1),
-                progressPercent: Math.round((Math.max(0, prev.completedTasks - 1) / prev.totalTasks) * 100),
-              }
-            : null
-        );
-      }
+  const handleDeleteTask = async (task: InternTask) => {
+    if (!task.canDelete || !window.confirm(`Xóa nhiệm vụ “${task.title}”?`)) return;
+    try {
+      await enterpriseService.deleteUnusedTask(task.id);
+    } catch (error) {
+      window.alert(getApiErrorMessage(error) || 'Không thể xóa nhiệm vụ.');
     }
-  };
-
-  // Delete task
-  const handleDeleteTask = (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    if (window.confirm(`Bạn có chắc muốn xóa nhiệm vụ "${task.title}"?`)) {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      setInterns((prev) =>
-        prev.map((i) => {
-          if (i.id === task.internId) {
-            const newTotal = Math.max(1, i.totalTasks - 1);
-            const newCompleted =
-              task.status === 'DONE' ? Math.max(0, i.completedTasks - 1) : i.completedTasks;
-            return {
-              ...i,
-              totalTasks: newTotal,
-              completedTasks: newCompleted,
-              progressPercent: Math.round((newCompleted / newTotal) * 100),
-            };
-          }
-          return i;
-        })
-      );
-      if (viewingIntern && viewingIntern.id === task.internId) {
-        setViewingIntern((prev) => {
-          if (!prev) return null;
-          const newTotal = Math.max(1, prev.totalTasks - 1);
-          const newCompleted =
-            task.status === 'DONE' ? Math.max(0, prev.completedTasks - 1) : prev.completedTasks;
-          return {
-            ...prev,
-            totalTasks: newTotal,
-            completedTasks: newCompleted,
-            progressPercent: Math.round((newCompleted / newTotal) * 100),
-          };
-        });
-      }
-    }
+    await fetchInternships();
   };
 
   // Tasks of viewed intern
@@ -624,10 +515,18 @@ export const EnterpriseInterns: React.FC = () => {
       <PageBanner
         variant="enterprise"
         title="Quản lý & Giao Nhiệm vụ Thực tập OJT"
-        description="Sinh viên đã được duyệt tiếp nhận đã là thực tập sinh. Phân công ghi nhận thời gian và người hướng dẫn để doanh nghiệp giao task, theo dõi tiến độ và điểm danh."
+        description="Giao nhiệm vụ và theo dõi tiến độ của sinh viên đã được doanh nghiệp tiếp nhận."
         badge="Doanh nghiệp tiếp nhận OJT"
       />
 
+      <TaskSummary groups={taskView.groups} ready={!apiLoading && !apiError}/>
+      <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <nav aria-label="Quản lý nhiệm vụ" className="flex gap-6 border-b border-slate-200 px-5">
+        {(['students','assigned'] as const).map(tab => <button type="button" key={tab} aria-current={taskTab===tab?'page':undefined}
+          onClick={()=>setTaskTab(tab)} className={`border-b-2 py-3 text-sm font-semibold ${taskTab===tab?'border-orange-600 text-orange-700':'border-transparent text-slate-600'}`}>
+          {tab==='students'?'Thực tập sinh':'Nhiệm vụ đã giao'}
+        </button>)}
+      </nav>
       {/* Toast Alert */}
       {toast && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-sm font-medium flex items-start justify-between animate-fadeIn shadow-sm">
@@ -665,7 +564,7 @@ export const EnterpriseInterns: React.FC = () => {
           <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
           <p className="text-sm text-rose-700 font-medium">{apiError}</p>
           <button
-            onClick={fetchInternships}
+            onClick={() => void fetchInternships()}
             className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-colors"
           >
             Thử lại
@@ -676,8 +575,9 @@ export const EnterpriseInterns: React.FC = () => {
       {!apiLoading && !apiError && (
       <>
 
+      {taskTab === 'assigned' ? <AssignedTasks view={taskView} onDelete={handleDeleteTask}/> : <>
       {/* 2. Main Action Toolbar (Buttons moved down from banner + Dropdown filters) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-3">
+      <div className="border-b border-slate-100 p-4 space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Left filters: Search + Select Dropdowns (No tabs) */}
           <div className="flex flex-wrap items-center gap-2.5 flex-1">
@@ -713,22 +613,6 @@ export const EnterpriseInterns: React.FC = () => {
               </select>
             </div>
 
-            {/* Dropdown filter: Vị trí thực tập */}
-            <select
-              value={positionFilter}
-              onChange={(e) => {
-                setPositionFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 max-w-[200px] truncate"
-            >
-              <option value="ALL">Tất cả vị trí thực tập</option>
-              {uniquePositions.map((pos) => (
-                <option key={pos} value={pos}>
-                  {pos}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Right: 2 Action Buttons moved down from banner */}
@@ -887,7 +771,7 @@ export const EnterpriseInterns: React.FC = () => {
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
                         <button
-                          onClick={() => setViewingIntern(intern)}
+                          onClick={() => setViewingId(intern.id)}
                           className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-[11px] inline-flex items-center space-x-1 transition-colors"
                           title="Xem chi tiết & quản lý nhiệm vụ"
                         >
@@ -954,6 +838,7 @@ export const EnterpriseInterns: React.FC = () => {
 
       {/* 4. MODAL: GIAO NHIỆM VỤ HÀNG LOẠT (BULK TASK MODAL) */}
       {/* (No priority, No circular avatars, Clean List format) */}
+      </>}
       {showAddTaskModal && createPortal(
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
           <div role="dialog" aria-modal="true" aria-labelledby="bulk-task-modal-title" className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[calc(100vh-2rem)]">
@@ -1031,13 +916,13 @@ export const EnterpriseInterns: React.FC = () => {
                   {/* Hạn hoàn thành */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Hạn hoàn thành (Deadline) <span className="text-rose-500">*</span>
+                      Hạn nộp (giờ Việt Nam) <span className="text-rose-500">*</span>
                     </label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       required
-                      min={taskDeadlineRange.valid ? taskDeadlineRange.minDate : undefined}
-                      max={taskDeadlineRange.valid ? taskDeadlineRange.maxDate : undefined}
+                      min={vietnamTaskMinute(new Date(Date.now()+60000))}
+                      max={taskDeadlineRange.valid ? taskDeadlineRange.maxDate+'T23:59' : undefined}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all"
                       value={newTask.deadline}
                       onChange={(e) => {
@@ -1082,7 +967,7 @@ export const EnterpriseInterns: React.FC = () => {
                     )}
                     {taskDeadlineRange.valid && newTask.deadline && taskDeadlineInvalid && (
                       <p className="mt-1 text-[10px] text-rose-600">
-                        Hạn hoàn thành phải nằm trong khoảng ngày thực tập áp dụng cho tất cả sinh viên đã chọn.
+                        Chọn giờ nộp sau thời điểm hiện tại và không vượt ngày kết thúc thực tập.
                       </p>
                     )}
                   </div>
@@ -1137,9 +1022,7 @@ export const EnterpriseInterns: React.FC = () => {
                 </div>
 
                 <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-800">
-                  Sinh viên đã được doanh nghiệp duyệt đã thuộc danh sách tiếp nhận. Mục này chỉ hiện sinh viên đã có phân công
-                  (ngày bắt đầu/kết thúc và người hướng dẫn) để giao task, theo dõi và điểm danh. QHDN/Admin tạo hồ sơ phân công;
-                  dashboard tính sinh viên vào số đã tiếp nhận/đang thực tập ngay khi được duyệt, kể cả chưa có hồ sơ phân công.
+                  Sinh viên xuất hiện ở đây khi doanh nghiệp xác nhận tiếp nhận. Chọn một hoặc nhiều thực tập sinh để giao nhiệm vụ.
                 </p>
 
                 {/* Search & dropdown filter (No tabs) */}
@@ -1301,14 +1184,14 @@ export const EnterpriseInterns: React.FC = () => {
       )}
 
       {/* 5. MODAL: XEM CHI TIẾT TIẾN ĐỘ & QUẢN LÝ NHIỆM VỤ CỦA SINH VIÊN */}
-      {viewingIntern && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8 max-h-[90vh]">
+      {viewingIntern && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+          <div role="dialog" aria-modal="true" aria-labelledby="intern-progress-title" className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-orange-50/30">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h3 className="font-extrabold text-slate-900 text-base">
+            <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-2 bg-gradient-to-r from-slate-50 via-white to-orange-50/30">
+              <div className="min-w-0 break-words">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 id="intern-progress-title" className="font-extrabold text-slate-900 text-base">
                     {viewingIntern.fullName}
                   </h3>
                   <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs font-bold">
@@ -1331,16 +1214,16 @@ export const EnterpriseInterns: React.FC = () => {
               </div>
 
               <button
-                onClick={() => setViewingIntern(null)}
+                onClick={() => setViewingId(null)}
                 aria-label="Đóng chi tiết sinh viên"
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
+                className="shrink-0 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
               >
                 ✕
               </button>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
               {/* Stats Bar */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
@@ -1386,8 +1269,8 @@ export const EnterpriseInterns: React.FC = () => {
                     className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
                   >
                     <option value="ALL">Tất cả nhiệm vụ</option>
-                    <option value="TODO">Cần làm</option>
-                    <option value="IN_PROGRESS">Đang làm</option>
+                    <option value="TODO">Chưa làm</option>
+                    <option value="OVERDUE">Quá hạn</option>
                     <option value="DONE">Đã xong</option>
                   </select>
                 </div>
@@ -1413,16 +1296,12 @@ export const EnterpriseInterns: React.FC = () => {
                                 className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                   task.status === 'DONE'
                                     ? 'bg-emerald-100 text-emerald-700'
-                                    : task.status === 'IN_PROGRESS'
-                                    ? 'bg-blue-100 text-blue-700'
+                                    : task.status === 'OVERDUE'
+                                    ? 'bg-rose-100 text-rose-700'
                                     : 'bg-amber-100 text-amber-700'
                                 }`}
                               >
-                                {task.status === 'DONE'
-                                  ? 'Đã xong'
-                                  : task.status === 'IN_PROGRESS'
-                                  ? 'Đang làm'
-                                  : 'Chưa làm'}
+                                {taskStatusLabels[task.status]}
                               </span>
                             </div>
                             <p className="text-slate-600 mt-1 leading-relaxed text-[11px]">
@@ -1432,27 +1311,10 @@ export const EnterpriseInterns: React.FC = () => {
 
                           {/* Quick Actions */}
                           <div className="flex items-center space-x-1.5 flex-shrink-0">
-                            {task.status !== 'DONE' ? (
-                              <button
-                                onClick={() => handleUpdateTaskStatus(task.id, 'DONE')}
-                                className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold flex items-center space-x-1 border border-emerald-200"
-                              >
-                                <Check className="w-3 h-3" />
-                                <span>Xong</span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
-                                className="px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-semibold flex items-center space-x-1 border border-amber-200"
-                              >
-                                <Clock className="w-3 h-3" />
-                                <span>Làm lại</span>
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                              title="Xóa nhiệm vụ"
+                            <button disabled={!task.canDelete}
+                              onClick={() => void handleDeleteTask(task)}
+                              className="p-1 rounded-lg text-slate-400 enabled:hover:text-rose-600 disabled:opacity-30"
+                              title={task.canDelete ? "Xóa nhiệm vụ" : "Đã có hoạt động, không thể xóa"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1462,13 +1324,13 @@ export const EnterpriseInterns: React.FC = () => {
                         <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
                           <div className="flex items-center space-x-3">
                             <span>
-                              Hạn chót: <strong className="text-slate-700">{task.deadline}</strong>
+                              Hạn chót: <strong className="text-slate-700">{displayTaskTime(task.deadline)}</strong>
                             </span>
                             <span>
                               Giao bởi: <strong className="text-slate-700">{task.assignedBy}</strong>
                             </span>
                           </div>
-                          {task.createdAt && <span>Ngày tạo: {task.createdAt}</span>}
+                          {task.createdAt && <span>Ngày giao: {displayTaskTime(task.createdAt)}</span>}
                         </div>
                       </div>
                     ))}
@@ -1478,19 +1340,21 @@ export const EnterpriseInterns: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-end bg-slate-50/50">
+            <div className="shrink-0 px-6 py-3 border-t border-slate-100 flex items-center justify-end bg-slate-50/50">
               <button
-                onClick={() => setViewingIntern(null)}
+                onClick={() => setViewingId(null)}
                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 Đóng
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       </>
       )}
+      </section>
     </div>
   );
 };
