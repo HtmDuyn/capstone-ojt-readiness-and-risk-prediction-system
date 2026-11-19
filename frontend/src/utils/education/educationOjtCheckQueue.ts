@@ -31,3 +31,12 @@ export function selectPendingSaveResults<T extends { studentId: number }>(pendin
 export function matchesHandoffFilter(studentId: number, filter: string, handedOff: Set<number>): boolean {
   return filter === 'ALL' || (filter === 'HANDED_OFF') === handedOff.has(studentId);
 }
+
+export function summarizeOjtHandoff(studentIds: number[], saved: Record<number, { status: string; isStale?: boolean }>, handedOff: Set<number>) {
+  const eligible = studentIds.filter(id => saved[id]?.status === 'ELIGIBLE' && !saved[id]?.isStale);
+  return {
+    eligible: eligible.length,
+    handedOff: studentIds.filter(id => handedOff.has(id)).length,
+    waiting: eligible.filter(id => !handedOff.has(id)).length,
+  };
+}

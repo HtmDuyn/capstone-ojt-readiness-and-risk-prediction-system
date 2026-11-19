@@ -897,7 +897,12 @@ export const importService = {
 // Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
 export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
 export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
-export type CurrentOjtRule = LocalOjtRule & { thresholdId?: number; id?: number | null; maxUnpassedCourses: number; updatedAt?: string | null; effectiveAt?: string | null };
+export const loadStudentAcademicCredits = async (studentId: number, signal?: AbortSignal): Promise<number | null> => {
+  const profile = apiData<ImportedStudentProfile>(await getJson(`/students/${studentId}`, { section: 'academicProgress' }, signal));
+  const earned = profile.academicProgress?.credits?.earned;
+  return typeof earned === 'number' && Number.isFinite(earned) ? earned : null;
+};
+export type CurrentOjtRule = LocalOjtRule & { thresholdId?: number; id?: number | null; maxUnpassedCourses: number; updatedAt?: string | null; effectiveAt?: string | null; updatedByName?: string | null };
 export type OjtCreditThreshold = { id: number; minCredits: number };
 export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
   apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
@@ -905,7 +910,7 @@ export const createOjtCreditThreshold = async (minCredits: number) =>
   apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
 export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> =>
   apiData<CurrentOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
-export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; status: string; reasons: string[] }[] };
+export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; code: string; name: string; status: string; reasons: string[] }[] };
 export const previewOjtPolicy = async (minCredits: number, maxUnpassedCourses: number) =>
   apiData<OjtPolicyPreview>((await API.post('/ojt-condition-policy/preview', { minCredits, maxUnpassedCourses })).data);
 export const publishOjtPolicy = async (minCredits: number, maxUnpassedCourses: number, token: string) =>

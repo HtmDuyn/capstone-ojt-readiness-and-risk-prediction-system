@@ -6,7 +6,7 @@ import { educationOjtReason } from './educationOjtReason';
 export type OjtSortKey = 'studentCode' | 'fullName' | 'cohort' | 'group' | 'semester' | 'program' | 'credits' | 'courses' | 'status' | 'reason';
 export type OjtSortDirection = 'asc' | 'desc';
 type Target = { student: ImportedStudent; reason: string };
-type SortContext = { results: Record<number, LocalOjtResult>; failures: Record<number, string>; statuses: Record<number, OjtDisplayStatus> };
+type SortContext = { results: Record<number, LocalOjtResult>; failures: Record<number, string>; statuses: Record<number, OjtDisplayStatus>; academicCredits?: Record<number, number | null> };
 const collator = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
 const statusLabels: Record<OjtDisplayStatus, string> = {
   ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Chưa đủ điều kiện', REVIEW_REQUIRED: 'Cần đối soát',
@@ -26,7 +26,7 @@ export function sortOjtTargets<T extends Target>(targets: T[], key: OjtSortKey |
       case 'group': return student.groupCode ?? '';
       case 'semester': return student.currentSemester;
       case 'program': return student.program?.code ?? '';
-      case 'credits': return result?.earnedCredits ?? null;
+      case 'credits': return context.academicCredits?.[student.id] ?? null;
       case 'courses': return result?.unpassedCourseCount ?? null;
       case 'status': return statusLabels[context.statuses[student.id]];
       case 'reason': return educationOjtReason(result, context.failures[student.id], reason);

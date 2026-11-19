@@ -3,14 +3,14 @@ import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
 import { getAllItems } from '@/services/educationService';
 import { educationOjtWorkflowService } from '@/services/educationService';
-import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadOjtCreditThresholds, loadSavedLocalOjtResults, saveLocalOjtResults } from '@/services/educationService';
-import type { OjtCreditThreshold } from '@/services/educationService';
+import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, loadStudentAcademicCredits, saveLocalOjtResults } from '@/services/educationService';
 import type { CurrentOjtRule } from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/education/educationOjtReason';
 import { handoffsByStudent, matchesHandoffFilter, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/education/educationOjtCheckQueue';
 import { handoffDisplayById } from '@/utils/education/educationOjtHandoffDisplay';
 import React from 'react';
+import { ojtSourceEndpoints, partitionOjtLoad, type OjtLoadIssue, type OjtSourceKey } from '@/utils/education/ojtEligibilityLoad';
 
 type Target = { student: ImportedStudent; reason: string };
 const normalize = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
@@ -20,17 +20,19 @@ const normalizeResults = (rows: (SavedOjtEligibility & { studentId: number })[] 
 export function useEducationOjtEligibility() {
   const [targets, setTargets] = React.useState<Target[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [dataLoaded, setDataLoaded] = React.useState(false);
+  const [sourceLoaded, setSourceLoaded] = React.useState<Record<OjtSourceKey, boolean>>({ students: false, results: false, policy: false, handoffs: false, thresholds: false });
+  const [sourceErrors, setSourceErrors] = React.useState<Partial<Record<OjtSourceKey, OjtLoadIssue>>>({});
+  const [retrying, setRetrying] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [rule, setRule] = React.useState<CurrentOjtRule | null>(null);
-  const [thresholds, setThresholds] = React.useState<OjtCreditThreshold[]>([]);
-  const [thresholdId, setThresholdId] = React.useState<number | undefined>();
   const [error, setError] = React.useState('');
-  const [revision, setRevision] = React.useState(0);
   const [savedResults, setSavedResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [pendingResults, setPendingResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [handoffs, setHandoffs] = React.useState<Handoff[]>([]);
+  const [academicCredits, setAcademicCredits] = React.useState<Record<number, number | null>>({});
+  const [creditFailures, setCreditFailures] = React.useState<number[]>([]);
+  const [loadingCredits, setLoadingCredits] = React.useState(false);
   const [failures, setFailures] = React.useState<Record<number, string>>({});
   const [notice, setNotice] = React.useState('');
   const [search, setSearch] = React.useState('');
@@ -41,42 +43,120 @@ export function useEducationOjtEligibility() {
   const running = React.useRef(false);
   const savingRequest = React.useRef(false);
   const saveKey = React.useRef<string | null>(null);
+  const loadController = React.useRef<AbortController | null>(null);
+  const sourceKeys = React.useMemo(() => (Object.keys(ojtSourceEndpoints) as OjtSourceKey[]).filter(key => key !== 'thresholds'), []);
+
+  const loadSource = React.useCallback((key: OjtSourceKey, signal: AbortSignal) => {
+    switch (key) {
+      case 'students': return getAllItems<ImportedStudent>('/students', {}, signal);
+      case 'results': return loadSavedLocalOjtResults(signal);
+      case 'policy': return loadCurrentOjtRule(signal);
+      case 'handoffs': return educationOjtWorkflowService.getHandoffs(undefined, signal);
+      case 'thresholds': throw new Error('Nguồn mức tín chỉ tùy chọn không còn được sử dụng.');
+    }
+  }, []);
+
+  const applySource = React.useCallback((key: OjtSourceKey, value: unknown) => {
+    switch (key) {
+      case 'students': {
+        const students = value as ImportedStudent[];
+        setTargets(students.map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
+        break;
+      }
+      case 'results': {
+        const stored = value as (SavedOjtEligibility & { studentId: number })[];
+        setSavedResults(normalizeResults(stored));
+        if (stored.some(result => result.isStale)) setNotice('Có kết quả đã cũ; hãy xét lại sinh viên chưa bàn giao trước khi sử dụng.');
+        break;
+      }
+      case 'policy': setRule(value as CurrentOjtRule); break;
+      case 'handoffs': setHandoffs(value as Handoff[]); break;
+      case 'thresholds': break;
+    }
+    setSourceLoaded(previous => ({ ...previous, [key]: true }));
+  }, []);
+
   React.useEffect(() => {
     const c = new AbortController();
-    setLoading(true); setDataLoaded(false); setError(''); setSavedResults({}); setPendingResults({}); setHandoffs([]); setFailures({}); setNotice(''); setTargets([]); activeRequest.current?.abort();
-    setRule(null); saveKey.current = null;
-    Promise.all([
-      getAllItems<ImportedStudent>('/students', {}, c.signal),
-      loadSavedLocalOjtResults(c.signal),
-      loadCurrentOjtRule(c.signal),
-      educationOjtWorkflowService.getHandoffs(undefined, c.signal),
-      loadOjtCreditThresholds(c.signal),
-    ]).then(([students, stored, currentRule, history, options]) => {
+    loadController.current = c;
+    setLoading(true); setError('');
+    Promise.allSettled(sourceKeys.map(key => loadSource(key, c.signal))).then(settled => {
       if (c.signal.aborted) return;
-      setRule(currentRule);
-      setThresholds(options);
-      setTargets(students.map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
-      setHandoffs(history);
-      setDataLoaded(true);
-      const studentIds = new Set(students.map(student => student.id));
-      const restored = stored.filter(result => studentIds.has(result.studentId));
-      setSavedResults(normalizeResults(restored));
-      if (restored.some(result => result.isStale)) setNotice('Có kết quả đã cũ; hãy xét lại sinh viên chưa bàn giao trước khi sử dụng.');
-    }).catch(e => { if (!c.signal.aborted) setError('Không tải đủ dữ liệu để xác định sinh viên cần xét: ' + (e instanceof Error ? e.message : 'Lỗi kết nối.')); })
-      .finally(() => { if (!c.signal.aborted) setLoading(false); });
+      const { values, issues } = partitionOjtLoad(sourceKeys, settled);
+      sourceKeys.forEach(key => { if (key in values) applySource(key, values[key]); });
+      setSourceErrors(issues);
+    }).finally(() => { if (!c.signal.aborted) setLoading(false); });
     return () => { c.abort(); activeRequest.current?.abort(); };
-  }, [revision]);
+  }, [applySource, loadSource, sourceKeys]);
+
+  React.useEffect(() => {
+    if (!sourceLoaded.students) return;
+    const c = new AbortController();
+    const ids = targets.map(target => target.student.id);
+    let next = 0;
+    const failed: number[] = [];
+    setLoadingCredits(true);
+    void Promise.all(Array.from({ length: Math.min(4, ids.length) }, async () => {
+      while (next < ids.length && !c.signal.aborted) {
+        const id = ids[next++];
+        try {
+          const credits = await loadStudentAcademicCredits(id, c.signal);
+          if (!c.signal.aborted) setAcademicCredits(previous => ({ ...previous, [id]: credits }));
+        } catch { if (!c.signal.aborted) failed.push(id); }
+      }
+    })).then(() => {
+      if (!c.signal.aborted) { setCreditFailures(failed); setLoadingCredits(false); }
+    });
+    return () => c.abort();
+  }, [sourceLoaded.students, targets]);
+
+  async function retryCreditFailures() {
+    if (loadingCredits || !creditFailures.length) return;
+    setLoadingCredits(true);
+    const failed: number[] = [];
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(4, creditFailures.length) }, async () => {
+      while (next < creditFailures.length) {
+        const id = creditFailures[next++];
+        try {
+          const credits = await loadStudentAcademicCredits(id);
+          setAcademicCredits(previous => ({ ...previous, [id]: credits }));
+        } catch { failed.push(id); }
+      }
+    }));
+    setCreditFailures(failed);
+    setLoadingCredits(false);
+  }
+
+  async function retryFailedSources() {
+    const keys = sourceKeys.filter(key => sourceErrors[key]);
+    if (!keys.length || retrying || busy || saving) return;
+    loadController.current?.abort();
+    const c = new AbortController(); loadController.current = c;
+    setRetrying(true);
+    try {
+      const settled = await Promise.allSettled(keys.map(key => loadSource(key, c.signal)));
+      if (c.signal.aborted) return;
+      const { values, issues } = partitionOjtLoad(keys, settled);
+      keys.forEach(key => { if (key in values) applySource(key, values[key]); });
+      setSourceErrors(previous => {
+        const next = { ...previous };
+        keys.forEach(key => { if (issues[key]) next[key] = issues[key]; else delete next[key]; });
+        return next;
+      });
+    } finally { if (!c.signal.aborted) setRetrying(false); }
+  }
 
   const handoffByStudent = React.useMemo(() => handoffsByStudent(handoffs), [handoffs]);
   const handoffDisplay = React.useMemo(() => handoffDisplayById(handoffs), [handoffs]);
   const handedOffIds = React.useMemo(() => new Set(handoffByStudent.keys()), [handoffByStudent]);
-  const selectedThreshold = thresholds.find(option => option.id === thresholdId);
-  const canCheck = !loading && dataLoaded && Boolean(rule && selectedThreshold);
+  const dataLoaded = sourceKeys.every(key => sourceLoaded[key]);
+  const canCheck = !loading && !retrying && dataLoaded && Boolean(rule);
   const fullCheck = canCheck ? selectFullCheckTargets(targets, handedOffIds) : [];
-  const selectionLocked = loading || busy || saving || Object.keys(pendingResults).length > 0;
+  const selectionLocked = loading || retrying || busy || saving || Object.keys(pendingResults).length > 0;
 
   async function runTargets(selected: Target[]) {
-    if (running.current || savingRequest.current || !canCheck || !selectedThreshold || !selected.length) return;
+    if (running.current || savingRequest.current || !canCheck || !selected.length) return;
     const controller = new AbortController(); activeRequest.current = controller;
     running.current = true; setBusy(true); setError(''); setNotice('');
     const ids = new Set(selected.map(t => t.student.id));
@@ -87,7 +167,7 @@ export function useEducationOjtEligibility() {
     let next = 0, failed = 0;
     try {
       const policy = await loadCurrentOjtRule(controller.signal);
-      const currentRule = { ...policy, minCredits: selectedThreshold.minCredits, thresholdId: selectedThreshold.id };
+      const currentRule = policy;
       if (rule && (rule.version !== currentRule.version || rule.minCredits !== currentRule.minCredits || rule.thresholdId !== currentRule.thresholdId)) {
         setPendingResults({});
         setNotice('Quy tắc xét đã thay đổi. Kết quả chưa lưu trước đó không còn được sử dụng.');
@@ -132,18 +212,21 @@ export function useEducationOjtEligibility() {
       const { handedOffCount } = await saveLocalOjtResults(calculated, saveKey.current, rule);
       setPendingResults({});
       saveKey.current = null;
-      const eligibleCount = calculated.filter(result => result.status === 'ELIGIBLE').length;
-      const waitingCount = Math.max(0, eligibleCount - handedOffCount);
-      setNotice('Đã lưu kết quả xét. Đã tự động bàn giao ' + handedOffCount + ' sinh viên.' +
-        (waitingCount ? ' Còn ' + waitingCount + ' sinh viên đủ tín chỉ đang chờ bàn giao.' : '') +
+      setNotice('Đã lưu kết quả xét. Backend báo đã bàn giao ' + handedOffCount + ' sinh viên.' +
         (failed ? ' Có ' + failed + ' hồ sơ chưa xét được. Xem lý do ở từng sinh viên.' : ''));
-      try {
-        const [refreshed, updatedHandoffs] = await Promise.all([loadSavedLocalOjtResults(), educationOjtWorkflowService.getHandoffs()]);
-        setHandoffs(updatedHandoffs);
-        setSavedResults(normalizeResults(refreshed));
-      } catch {
-        setSavedResults(previous => ({ ...previous, ...normalizeResults(calculated) }));
-        setError('Đã lưu kết quả nhưng chưa tải lại được danh sách. Vui lòng tải lại trang để kiểm tra.');
+      const refreshed = await Promise.allSettled([loadSavedLocalOjtResults(), educationOjtWorkflowService.getHandoffs()]);
+      const { values, issues } = partitionOjtLoad(['results', 'handoffs'], refreshed);
+      if (values.results) applySource('results', values.results);
+      if (values.handoffs) applySource('handoffs', values.handoffs);
+      setSourceErrors(previous => {
+        const next = { ...previous };
+        if (issues.results) next.results = issues.results; else delete next.results;
+        if (issues.handoffs) next.handoffs = issues.handoffs; else delete next.handoffs;
+        return next;
+      });
+      if (issues.results || issues.handoffs) {
+        setSourceLoaded(previous => ({ ...previous, results: !issues.results, handoffs: !issues.handoffs }));
+        setError('Đã lưu kết quả nhưng chưa tải lại được đầy đủ dữ liệu. Vui lòng thử tải lại nguồn lỗi.');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Chưa lưu được kết quả xét điều kiện OJT.');
@@ -156,12 +239,12 @@ export function useEducationOjtEligibility() {
     { ELIGIBLE: 0, NOT_ELIGIBLE: 0, REVIEW_REQUIRED: 0, PENDING: 0, ERROR: 0, STALE: 0, INACTIVE: 0 } as Record<OjtDisplayStatus, number>);
   const visible = targets.filter(t => (!search.trim() || normalize(`${t.student.studentCode} ${t.student.fullName}`).includes(normalize(search)))
     && (filter === 'ALL' || statusByStudent[t.student.id] === filter)
-    && matchesHandoffFilter(t.student.id, handoffFilter, handedOffIds));
-  React.useEffect(() => setPage(1), [search, filter, handoffFilter, revision]);
+    && (sourceLoaded.handoffs ? matchesHandoffFilter(t.student.id, handoffFilter, handedOffIds) : handoffFilter === 'ALL'));
+  React.useEffect(() => setPage(1), [search, filter, handoffFilter]);
   const pages = Math.max(1, Math.ceil(visible.length / 20)), currentPage = Math.min(page, pages);
   const checked = selectPendingSaveResults(pendingResults);
-  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule,
-    thresholds, thresholdId, setThresholdId, selectedThreshold, selectionLocked,
+  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, academicCredits, creditFailures, loadingCredits, retryCreditFailures, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule,
+    selectionLocked,
     discardPending: () => { setPendingResults({}); saveKey.current = null; },
   };
 }
