@@ -12,8 +12,8 @@ import {
   Mail,
 } from 'lucide-react';
 
-import { useAuth } from '@/hooks/useAuth';
-import { createAccount, getAccounts, updateAccount, resetAccountPassword, resendAccountEmail, formatDate, type Account } from '@/services/admin';
+import { useAuth } from '@/hooks/shared/useAuth';
+import { createAccount, getAccounts, updateAccount, resetAccountPassword, resendAccountEmail, formatDate, type Account } from '@/services/adminService';
 import { PageBanner } from '@/components/common/PageBanner';
 
 /* =========================================================

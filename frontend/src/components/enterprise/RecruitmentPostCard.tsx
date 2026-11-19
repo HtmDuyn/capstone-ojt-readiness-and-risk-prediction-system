@@ -1,6 +1,6 @@
 import { BriefcaseBusiness, Clock3, Eye, Pencil, Send, Trash2 } from 'lucide-react';
 import type { RecruitmentPost, RecruitmentWindow } from '@/services/enterpriseService';
-import { canDeleteRecruitmentPost, canEditRecruitmentPost, postDeleteLockReason, postEditLockReason, recruitmentStatusLabels, recruitmentTotals } from './recruitment';
+import { canDeleteRecruitmentPost, canEditRecruitmentPost, postDeleteLockReason, postEditLockReason, recruitmentStatusLabels, recruitmentTotals } from '@/utils/enterprise/recruitment';
 
 interface Props {
   post: RecruitmentPost;

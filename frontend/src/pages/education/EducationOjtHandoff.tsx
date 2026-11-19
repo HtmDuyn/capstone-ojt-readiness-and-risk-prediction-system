@@ -1,8 +1,8 @@
-import { useEducationOjtHandoff } from '@/hooks/useEducationOjtHandoff';
+import { useEducationOjtHandoff } from '@/hooks/education/useEducationOjtHandoff';
 import { PageBanner } from '@/components/common/PageBanner';
 import { Fragment, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { filterHandoffHistory, handoffDisplayById, matchingHandoffStudentIds } from '@/utils/educationOjtHandoffDisplay';
+import { filterHandoffHistory, handoffDisplayById, matchingHandoffStudentIds } from '@/utils/education/educationOjtHandoffDisplay';
 
 const date = (value: string) => new Date(value).toLocaleString('vi-VN');
 

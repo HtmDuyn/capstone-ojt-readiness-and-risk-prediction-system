@@ -14,7 +14,7 @@ import {
   workflowSecondary,
 } from "./StudentWorkflowUi";
 
-import { positionTotals, recruitmentLabels } from "@/utils/qhdnEnterprise";
+import { positionTotals, recruitmentLabels } from "@/utils/qhdn/qhdnEnterprise";
 import type { CompanyListItem, PositionListItem } from "@/types/qhdn/qhdnTypes";
 
 export function EnterpriseStatus({ status }: { status: string }) {

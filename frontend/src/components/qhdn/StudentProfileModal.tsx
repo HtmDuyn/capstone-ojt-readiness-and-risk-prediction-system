@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download, Eye, FileText, GraduationCap, LoaderCircle, RefreshCw, UserRound } from 'lucide-react';
 import { getCvFile, getQhdnStudentDossier } from '@/services/qhdnService';
 import type { QhdnStudentCv, QhdnStudentDossier } from '@/types/qhdn/qhdnTypes';
-import { downloadFile } from '@/utils/downloadFile';
+import { downloadFile } from '@/utils/shared/downloadFile';
 import { Notice, errorMessage } from './QhdnUi';
 import { WorkflowModal, workflowSecondary } from './StudentWorkflowUi';
 

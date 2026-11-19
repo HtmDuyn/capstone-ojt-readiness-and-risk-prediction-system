@@ -1,26 +1,25 @@
 import type { Page, Query } from '@/types/education/api.types';
-import API from './api';
-import { API_ORIGIN } from '@/config/api';
+import API, { API_ORIGIN } from './apiService';
 import type { AcademicPeriod, AcademicYear, CreateAcademicPeriodPayload, CreateAcademicYearPayload, OjtSemester, SearchAcademicPeriodsPayload, SearchOjtSemestersPayload } from '@/types/education/academic.types';
 import type { AcademicCalendar, SemesterDates } from '@/types/education/academic.types';
 import type { Cohort, CourseDemand, DemandReport, ReportPeriod, ReportScope, RetakeClassReport } from '@/types/education/reporting.types';
 import type { CurriculumDetailResponse, CurriculumImportPayload, CurriculumImportPreviewResponse, SearchCoursesPayload, SearchCoursesResponse, SearchCurriculaPayload, SearchCurriculaResponse, SearchMajorsPayload, SearchMajorsResponse } from '@/types/education/curriculum.types';
 import type { CurriculumDetail } from '@/types/education/curriculum.types';
 import type { AcademicCatalogs, CatalogOption } from '@/types/education/import.types';
-import { dashboardSummary } from '@/utils/educationDashboardSummary';
+import { dashboardSummary } from '@/utils/education/educationDashboardSummary';
 import type { QueryParams } from '@/types/education/dashboard.types';
-import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
-import { educationRead } from './educationReadCache';
+import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
+import { educationRead } from '../utils/education/educationReadCache';
 import type { Handoff, OjtFinalResult } from '@/types/education/ojtWorkflow.types';
 import type { ImportCommitResponse, ImportPreviewResponse, StudentImportPayload } from '@/types/education/import.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult, StudentImportBatch } from '@/types/education/import.types';
-import { clearEducationReadCache } from './educationReadCache';
+import { clearEducationReadCache } from '../utils/education/educationReadCache';
 import type { Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
-import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/localOjtEligibility';
-import { localOjtSavePayload } from '@/utils/localOjtSavePayload';
+import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/education/localOjtEligibility';
+import { localOjtSavePayload } from '@/utils/education/localOjtSavePayload';
 import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityBatch, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
-import { savedOjtProgressLabel } from '@/utils/savedOjtEligibility';
+import { savedOjtProgressLabel } from '@/utils/education/savedOjtEligibility';
 
 export const cleanQuery = (params: Query = {}) =>
   Object.fromEntries(

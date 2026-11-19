@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { BriefcaseBusiness, CalendarDays, LockKeyhole, MapPin, Pencil, Users, X } from 'lucide-react';
 import type { RecruitmentPost } from '@/services/enterpriseService';
-import { formatRecruitmentDate, recruitmentStatusLabels, recruitmentTotals } from './recruitment';
+import { formatRecruitmentDate, recruitmentStatusLabels, recruitmentTotals } from '@/utils/enterprise/recruitment';
 
 const workModes: Record<string, string> = { ONSITE: 'Tại văn phòng', REMOTE: 'Từ xa', HYBRID: 'Kết hợp' };
 

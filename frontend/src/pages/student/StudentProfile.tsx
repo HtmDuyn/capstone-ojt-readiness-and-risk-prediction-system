@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { getAllCourseResults, getCurriculum, getStudentAcademicProgress } from '@/services/studentService';
 import type { CourseResult } from '@/types/student/portal';
 import {
@@ -37,11 +37,14 @@ export const StudentAcademicProfile = () => {
     { snapshot: true },
   );
   const progress = academic.data;
-  const semesters = [...new Set((results.data ?? []).flatMap((item) => item.semesterTaken == null ? [] : [item.semesterTaken]))].sort((a, b) => a - b);
-  const filtered = (results.data ?? []).filter((item) =>
+  const semesters = useMemo(() => [...new Set((results.data ?? []).flatMap(item =>
+    item.semesterTaken == null ? [] : [item.semesterTaken]))].sort((a, b) => a - b), [results.data]);
+  const query = courseSearch.trim().toLocaleLowerCase();
+  const filtered = useMemo(() => (results.data ?? []).filter(item =>
     (studySemester === '' || String(item.semesterTaken) === studySemester) &&
-    (item.courseCode + ' ' + item.courseName).toLocaleLowerCase().includes(courseSearch.trim().toLocaleLowerCase()),
-  );
+    (item.courseCode + ' ' + item.courseName).toLocaleLowerCase().includes(query)
+  ), [results.data, studySemester, query]);
+  const requirementsById = useMemo(() => new Map(progress?.requirements.map(item => [item.id, item])), [progress?.requirements]);
   const courses = curriculum.data?.courses ?? [];
   return (
     <StudentPage
@@ -180,9 +183,7 @@ export const StudentAcademicProfile = () => {
                     </thead>
                     <tbody>
                       {courses.map((course) => {
-                        const requirement = progress?.requirements.find(
-                          (item) => item.id === course.id,
-                        );
+                        const requirement = requirementsById.get(course.id);
                         return (
                           <tr key={course.id} className="border-b border-slate-200 bg-white transition-colors duration-150 hover:bg-slate-50">
                             <td className="p-3">

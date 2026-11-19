@@ -1,4 +1,4 @@
-import type { SavedOjtEligibility } from '@/utils/savedOjtEligibility';
+import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
 
 export type CourseResultStatus =
   "PASSED" | "FAILED" | "IN_PROGRESS" | "WITHDRAWN" | "RECOGNIZED";

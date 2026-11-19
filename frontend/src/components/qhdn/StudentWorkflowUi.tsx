@@ -14,14 +14,14 @@ import {
 import type {
   HandoffStudentItem,
 } from "@/types/qhdn/qhdnTypes";
-import type { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
-import { academicPeriodLabel } from "@/utils/qhdnAcademicPeriods";
+import type { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
+import { academicPeriodLabel } from "@/utils/qhdn/qhdnAcademicPeriods";
 import {
   placementLabels,
   receptionLabels,
   type PlacementStatus,
   type ReceptionStatus,
-} from "@/utils/qhdnStudentStatus";
+} from "@/utils/qhdn/qhdnStudentStatus";
 
 export const workflowInput =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-400";

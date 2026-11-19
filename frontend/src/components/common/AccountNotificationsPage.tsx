@@ -6,7 +6,7 @@ import {
   markAccountNotificationRead,
   type AccountNotification,
   type AccountNotificationPage,
-} from '@/services/accountNotificationService';
+} from '@/services/apiService';
 
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 

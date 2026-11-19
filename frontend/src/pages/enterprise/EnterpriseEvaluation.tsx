@@ -4,9 +4,9 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import { enterpriseService, type EnterpriseInternshipItem, type EnterpriseInternshipTask } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
-import { loadAllPages } from '@/components/enterprise/recruitment';
+import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { applyEvaluationScore, evaluationAverage, evaluationScoreFields, parseEvaluationScore, taskScoreSuggestion,
-  type EvaluationScoreKey, type EvaluationScores } from '@/utils/enterpriseEvaluation';
+  type EvaluationScoreKey, type EvaluationScores } from '@/utils/enterprise/enterpriseEvaluation';
 
 interface EvaluationRow extends EvaluationScores {
   id: number;
@@ -89,24 +89,27 @@ export function EnterpriseEvaluation() {
     requestRef.current = controller;
     if (!background) { setLoading(true); setError(''); }
     try {
-      const internships = await loadAllPages<EnterpriseInternshipItem>(
-        page => enterpriseService.listInternships({ page, limit: 100 }, controller.signal), controller.signal, 'sinh viên thực tập');
-      let tasks: EnterpriseInternshipTask[] = [];
-      let tasksAvailable = true;
-      try {
-        if (!companyId) throw new Error('Không tìm thấy doanh nghiệp để tải task.');
-        tasks = await loadAllPages<EnterpriseInternshipTask>(
-          page => enterpriseService.listInternshipTasks(companyId, { page, limit: 100 }, controller.signal), controller.signal, 'tiến độ task');
-      } catch (e) {
-        if (controller.signal.aborted) return;
-        tasksAvailable = false;
-        setTaskError(`Không tải được tiến độ task. Bạn vẫn có thể nhập điểm thủ công. ${errorText(e)}`);
-      }
+      const [rosterResult, taskResult] = await Promise.allSettled([
+        loadAllPages<EnterpriseInternshipItem>(
+          page => enterpriseService.listInternships({ page, limit: 100 }, controller.signal), controller.signal, 'sinh viên thực tập'),
+        companyId ? loadAllPages<EnterpriseInternshipTask>(
+          page => enterpriseService.listInternshipTasks(companyId, { page, limit: 100 }, controller.signal), controller.signal, 'tiến độ task')
+          : Promise.reject(new Error('Không tìm thấy doanh nghiệp để tải task.')),
+      ] as const);
       if (controller.signal.aborted) return;
+      if (rosterResult.status === 'rejected') throw rosterResult.reason;
       const byAssignment = new Map<number, EnterpriseInternshipTask[]>();
-      for (const task of tasks) byAssignment.set(task.assignmentId, [...(byAssignment.get(task.assignmentId) || []), task]);
-      if (tasksAvailable) setTaskError('');
-      const roster = internships.map(item => makeRow(item, byAssignment.get(item.id) || [], tasksAvailable));
+      if (taskResult.status === 'fulfilled') {
+        setTaskError('');
+        for (const task of taskResult.value) {
+          const group = byAssignment.get(task.assignmentId);
+          if (group) group.push(task);
+          else byAssignment.set(task.assignmentId, [task]);
+        }
+      } else {
+        setTaskError(`Không tải được tiến độ task. Bạn vẫn có thể nhập điểm thủ công. ${errorText(taskResult.reason)}`);
+      }
+      const roster = rosterResult.value.map(item => makeRow(item, byAssignment.get(item.id) || [], taskResult.status === 'fulfilled'));
       setRows(current => {
         const edits = new Map(current.filter(row => row.dirty).map(row => [row.id, row]));
         return roster.map(row => {
@@ -121,7 +124,11 @@ export function EnterpriseEvaluation() {
     finally { if (!controller.signal.aborted) setLoading(false); }
   }, [companyId, profileLoading]);
 
-  useEffect(() => { void fetchRows(); return () => requestRef.current?.abort(); }, [fetchRows]);
+  useEffect(() => {
+    let mounted = true;
+    queueMicrotask(() => { if (mounted) void fetchRows(); });
+    return () => { mounted = false; requestRef.current?.abort(); };
+  }, [fetchRows]);
   useEffect(() => {
     if (editor || confirming || busy || loading) return;
     const refresh = () => { if (!document.hidden) void fetchRows(true); };

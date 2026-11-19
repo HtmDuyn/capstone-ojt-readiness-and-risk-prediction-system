@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { getAssignedTasks, getTaskSubmissions, submitAssignedTask } from '@/services/studentService';
 import type { Task } from '@/types/student/portal';
 import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
-import { displayTaskTime } from '@/utils/taskTime';
+import { displayTaskTime } from '@/utils/shared/taskTime';
 import { buttonClass, Card, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
 
 function ProgressContent() {
@@ -27,7 +27,17 @@ function ProgressContent() {
     document.addEventListener('visibilitychange', refresh);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [selectedTask]);
-  const visible = tasks.data?.items.filter(task => (task.name + ' ' + (task.description ?? '')).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const query = search.trim().toLocaleLowerCase();
+  const columns = useMemo(() => {
+    const groups: Record<'TODO' | 'IN_PROGRESS' | 'DONE', Task[]> = { TODO: [], IN_PROGRESS: [], DONE: [] };
+    for (const task of tasks.data?.items ?? []) {
+      if (!(task.name + ' ' + (task.description ?? '')).toLocaleLowerCase().includes(query)) continue;
+      const status = task.status.toUpperCase();
+      const column = status === 'DONE' || status === 'COMPLETED' ? 'DONE' : status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO';
+      groups[column].push(task);
+    }
+    return Object.entries(groups);
+  }, [tasks.data?.items, query]);
   return <>
     {message && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{message}</p>}
     <Card title="Nhiệm vụ được doanh nghiệp giao">
@@ -37,13 +47,12 @@ function ProgressContent() {
       </div>
       <ResourceState loading={tasks.loading} error={tasks.error} retry={tasks.reload} />
       {tasks.data && <>
-        {!visible?.length && <Empty>{search ? 'Không có nhiệm vụ phù hợp trong trang này.' : 'Bạn chưa được doanh nghiệp giao nhiệm vụ trong đợt này.'}</Empty>}
+        {columns.every(([, items]) => items.length === 0) && <Empty>{search ? 'Không có nhiệm vụ phù hợp trong trang này.' : 'Bạn chưa được doanh nghiệp giao nhiệm vụ trong đợt này.'}</Empty>}
         <div className="grid gap-4 lg:grid-cols-3">
-          {['TODO', 'IN_PROGRESS', 'DONE'].map(status => {
-            const items = visible?.filter(task => status === 'DONE' ? ['DONE', 'COMPLETED'].includes(task.status.toUpperCase()) : status === 'TODO' ? !['IN_PROGRESS', 'DONE', 'COMPLETED'].includes(task.status.toUpperCase()) : task.status.toUpperCase() === status);
+          {columns.map(([status, items]) => {
             return <section key={status} className="space-y-3 rounded-2xl bg-slate-50 p-4">
-              <h3 className="font-bold text-slate-700">{statusText(status)} ({items?.length ?? 0})</h3>
-              {items?.map(task => <article key={task.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-sm">
+              <h3 className="font-bold text-slate-700">{statusText(status)} ({items.length})</h3>
+              {items.map(task => <article key={task.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-sm">
                 <h4 className="font-bold text-slate-900">{task.name}</h4>
                 {task.company?.name && <p className="text-xs text-slate-500">{task.company.name}</p>}
                 <p className="whitespace-pre-wrap break-words text-slate-600">{task.description}</p>

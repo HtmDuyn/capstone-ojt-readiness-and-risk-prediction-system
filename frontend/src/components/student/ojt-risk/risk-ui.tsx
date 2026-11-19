@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react';
 import { useId,type ReactNode } from 'react';
-import type { RiskAssessment } from '@/services/studentOjtRisk.service';
+import type { RiskAssessment } from '@/services/studentService';
 
 export const cardClass='rounded-[20px] border border-slate-200/80 bg-white shadow-sm shadow-slate-200/20';
 export const focusClass='focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2';

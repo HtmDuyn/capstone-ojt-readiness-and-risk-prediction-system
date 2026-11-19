@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Send } from 'lucide-react';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState } from '@/components/student/PortalUI';
 import type { Page, TaskSubmission } from '@/types/student/portal';

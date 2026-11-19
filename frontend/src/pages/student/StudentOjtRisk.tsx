@@ -1,7 +1,7 @@
 import { StudentPage } from '@/components/student/PortalUI';
 import { OjtRiskPanel } from '@/components/student/dashboard/OjtRiskPanel';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentRisk } from '@/hooks/useStudentRisk';
+import { useStudentRisk } from '@/hooks/student/useStudentRisk';
 
 export default function StudentOjtRisk(){
   const {profile,revision}=useStudentPortal();

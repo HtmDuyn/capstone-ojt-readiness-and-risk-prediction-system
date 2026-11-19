@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRightLeft, Clock3, FileText, Globe, UserRound, X } from 'lucide-react';
-import { formatDate, ROLE_NAMES, type AuditLog } from '@/services/admin';
+import { formatDate, ROLE_NAMES, type AuditLog } from '@/services/adminService';
 import { actionLabel, entityLabel, fieldLabel, isRecord, parseLogValue, valuesEqual } from './audit-display';
 
 function LogValue({ value, name = '' }: { value: unknown; name?: string }) {

@@ -11,7 +11,7 @@ import type {
   AuthContextValue,
 } from "../types/auth.types";
 import { authService } from "../services/authService";
-import { expireSession, SESSION_EXPIRED_EVENT, tokenExpiry } from '../services/authSession';
+import { expireSession, SESSION_EXPIRED_EVENT, tokenExpiry } from '../utils/shared/authSession';
 
 export type { UserRole, AuthUser, AuthContextValue };
 

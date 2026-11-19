@@ -4,7 +4,7 @@ import { StudentImportEmailStatus } from '@/components/education/StudentImportEm
 import { loadAcademicCatalogs } from '@/services/educationService';
 import { importService } from '@/services/educationService';
 import type { AcademicCatalogs, ImportCommitResponse, ImportPreviewResponse, StudentImportRow } from '@/types/education/import.types';
-import { STUDENT_STATUS_LABELS } from '@/utils/studentAcademicStatus';
+import { STUDENT_STATUS_LABELS } from '@/utils/student/studentAcademicStatus';
 import React from "react";
 import { Link } from 'react-router-dom';
 import { FileSpreadsheet, Download, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -75,7 +75,7 @@ const EducationStudentImport: React.FC = () => {
         throw new Error("Chọn tệp Excel .xlsx hoặc .xls theo mẫu hai sheet.");
       if (file.size > 8 * 1024 * 1024)
         throw new Error("Tệp Excel không được vượt quá 8 MB.");
-      const { parseStudentImportWorkbook } = await import('@/utils/studentImportWorkbook');
+      const { parseStudentImportWorkbook } = await import('@/utils/student/studentImportWorkbook');
       const parsed = await parseStudentImportWorkbook(file, catalogs);
       setRows(parsed);
       setSearch('');
@@ -201,7 +201,7 @@ const EducationStudentImport: React.FC = () => {
             onClick={async () => {
               setBusy("template");
               try {
-                const { downloadStudentImportTemplate } = await import('@/utils/studentImportWorkbook');
+                const { downloadStudentImportTemplate } = await import('@/utils/student/studentImportWorkbook');
                 downloadStudentImportTemplate();
               }
               catch(e) { setError(e instanceof Error?e.message:'Không tải được mẫu Excel.'); }

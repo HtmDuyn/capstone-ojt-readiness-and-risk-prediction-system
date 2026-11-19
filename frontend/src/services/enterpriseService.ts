@@ -1,4 +1,4 @@
-import API from './api';
+import API from './apiService';
 import type { EnterpriseProfileData, EnterpriseProfileResponse } from '@/types/enterprise/enterpriseTypes';
 
 export interface EnterpriseProfileUpdateResponse {
@@ -49,7 +49,7 @@ export interface BulkTaskAssignmentResponse {
   };
 }
 
-// ─── Shared Types ────────────────────────────────────────────────────────────
+// Các kiểu dùng chung cho request/list phân trang của doanh nghiệp.
 export interface PaginatedRequest {
   page?: number;
   limit?: number;
@@ -66,7 +66,7 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// ─── Recruitment Window Types ────────────────────────────────────────────────
+// Dữ liệu kỳ đăng ký và cửa sổ tuyển dụng do QHDN quản lý.
 export interface RecruitmentWindow {
   id: number;
   academicPeriodId: number;
@@ -95,7 +95,7 @@ export interface RecruitmentWindow {
   updatedAt?: string;
 }
 
-// ─── Recruitment Post Types ──────────────────────────────────────────────────
+// Bài tuyển dụng và vị trí công việc doanh nghiệp được phép tạo hoặc chỉnh sửa.
 export interface RecruitmentPostPosition {
   id: number;
   code: string | null;
@@ -173,7 +173,7 @@ export interface EnterpriseRecruitmentPostResponse {
   data: RecruitmentPost;
 }
 
-// ─── Enterprise Candidate Types ──────────────────────────────────────────────
+// Hồ sơ ứng viên và dữ liệu tổng hợp cho các màn quản lý của doanh nghiệp.
 export interface EnterpriseCandidateStudent {
   id: number;
   studentCode: string;
@@ -259,7 +259,7 @@ export interface EnterpriseCandidatePeriod {
   endDate: string | null;
 }
 
-// ─── Enterprise Internship Types ─────────────────────────────────────────────
+// Bản ghi thực tập và task được liên kết với từng sinh viên.
 export interface EnterpriseInternshipItem {
   id: number; // AssignmentID
   studentId: number;
@@ -410,15 +410,41 @@ export interface InternshipTaskListRequest {
   companyId?: number;
 }
 
-// ─── Service ─────────────────────────────────────────────────────────────────
-export type EnterpriseAcceptancePreview={candidateIds:number[];confirmationToken:string;totalSelected:number;overCapacity:boolean;semesters:{ojtSemesterId:number;name:string;capacity:number;currentCount:number;selectedCount:number;afterCount:number;excessCount:number}[]};
+// Tầng gọi API tập trung để các màn enterprise dùng cùng quy tắc và kiểu dữ liệu.
+export type EnterpriseAcceptancePreview = {
+  candidateIds: number[];
+  confirmationToken: string;
+  totalSelected: number;
+  overCapacity: boolean;
+  semesters: {
+    ojtSemesterId: number;
+    name: string;
+    capacity: number;
+    currentCount: number;
+    selectedCount: number;
+    afterCount: number;
+    excessCount: number;
+  }[];
+};
+
 export const enterpriseService = {
   getCandidateCv: async (candidateId: number, signal?: AbortSignal): Promise<Blob> =>
     (await API.get(`/enterprise/candidates/${candidateId}/cv`, { responseType: 'blob', signal })).data,
-  previewAcceptance:async(candidateIds:number[]):Promise<EnterpriseAcceptancePreview>=>
-    (await API.post('/enterprise/candidates/acceptance-preview',{candidateIds})).data.data,
-  acceptCandidates:async(preview:EnterpriseAcceptancePreview,allowOverCapacity:boolean,reason:string):Promise<unknown>=>
-    (await API.post('/enterprise/candidates/accept-bulk',{candidateIds:preview.candidateIds,confirmationToken:preview.confirmationToken,allowOverCapacity,reason})).data.data,
+  // Xem trước sức chứa trước khi tiếp nhận nhiều ứng viên cùng lúc.
+  previewAcceptance: async (candidateIds: number[]): Promise<EnterpriseAcceptancePreview> =>
+    (await API.post('/enterprise/candidates/acceptance-preview', { candidateIds })).data.data,
+  // Dùng confirmationToken để tránh tình trạng xác nhận tiếp nhận bị lặp.
+  acceptCandidates: async (
+    preview: EnterpriseAcceptancePreview,
+    allowOverCapacity: boolean,
+    reason: string,
+  ): Promise<unknown> =>
+    (await API.post('/enterprise/candidates/accept-bulk', {
+      candidateIds: preview.candidateIds,
+      confirmationToken: preview.confirmationToken,
+      allowOverCapacity,
+      reason,
+    })).data.data,
   // ── Profile ──────────────────────────────────────────────────────────────
   // Gọi GET /api/enterprise/profile — không cần companyId vì backend lấy từ JWT
   getProfile: async (signal?: AbortSignal): Promise<EnterpriseProfileResponse> => {
@@ -524,7 +550,8 @@ export const enterpriseService = {
     return response.data;
   },
 
-  deleteUnusedTask: (id: string) => API.delete('/enterprise/tasks/' + id),
+  // Chỉ xóa task chưa phát sinh hoạt động; id được truyền nguyên vẹn theo route backend.
+  deleteUnusedTask: (id: string) => API.delete(`/enterprise/tasks/${id}`),
 
   assignTasksBulk: async (
     assignmentIds: number[],

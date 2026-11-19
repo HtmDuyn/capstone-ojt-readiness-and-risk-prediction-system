@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import {
   getStudentNotifications,
   markStudentNotificationRead,
@@ -23,7 +23,7 @@ function NotificationsContent() {
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<StudentNotification | null>(null);
-  const [readIds, setReadIds] = useState<number[]>([]);
+  const [readIds, setReadIds] = useState(() => new Set<number>());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const lock = useRef(false);
@@ -33,7 +33,7 @@ function NotificationsContent() {
   );
   useEffect(() => {
     setSelected(null);
-    setReadIds([]);
+    setReadIds(new Set());
   }, [key]);
   useEffect(() => {
     if (!resource.data) return;
@@ -42,7 +42,7 @@ function NotificationsContent() {
     if (page > max) setPage(max);
   }, [resource.data, page, setUnreadCount]);
   const isRead = (item: StudentNotification) =>
-    Boolean(item.isRead) || readIds.includes(item.id);
+    Boolean(item.isRead) || readIds.has(item.id);
   const markRead = async (items: StudentNotification[]) => {
     if (lock.current) return;
     lock.current = true;
@@ -51,7 +51,7 @@ function NotificationsContent() {
     try {
       for (const item of items.filter((row) => !isRead(row))) {
         const response = await markStudentNotificationRead(String(item.id));
-        setReadIds((previous) => [...previous, item.id]);
+        setReadIds(previous => new Set(previous).add(item.id));
         setUnreadCount(response.data.unreadCount);
         setSelected((previous) =>
           previous?.id === item.id ? { ...previous, isRead: true } : previous,
@@ -69,12 +69,13 @@ function NotificationsContent() {
       setSaving(false);
     }
   };
+  const query = search.toLocaleLowerCase();
   const visible = resource.data?.items.filter(
     (item) =>
       (!onlyUnread || !isRead(item)) &&
       (item.title + ' ' + (item.content ?? ''))
         .toLocaleLowerCase()
-        .includes(search.toLocaleLowerCase()),
+        .includes(query),
   );
   return (
     <Card title={'Thông báo của bạn · ' + (unreadCount ?? '—') + ' chưa đọc'}>

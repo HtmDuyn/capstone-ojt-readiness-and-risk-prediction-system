@@ -1,5 +1,5 @@
 import { ChartNoAxesCombined,type LucideIcon } from 'lucide-react';
-import type { RiskAssessment } from '@/services/studentOjtRisk.service';
+import type { RiskAssessment } from '@/services/studentService';
 import { cardClass,HelpTip,numberText } from './risk-ui';
 
 export function AcademicMetrics({data,embedded=false}:{data:RiskAssessment;embedded?:boolean}){

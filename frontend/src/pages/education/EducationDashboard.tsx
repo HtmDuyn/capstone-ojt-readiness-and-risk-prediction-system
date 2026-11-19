@@ -1,10 +1,10 @@
 import { EmptyState, ErrorNotice, MetricCard, SectionTitle } from '@/components/education/EducationUi';
 import { OjtResultDonut } from '@/components/education/OjtResultDonut';
 import { PageBanner } from '@/components/common/PageBanner';
-import { courseDemandOverview } from '@/utils/courseDemandOverview';
-import { useEducationDashboard } from '@/hooks/useEducationDashboard';
-import { useNearViewport } from '@/hooks/useNearViewport';
-import { formatDate, formatNumber, formatPercent } from '@/utils/educationDashboard';
+import { courseDemandOverview } from '@/utils/education/courseDemandOverview';
+import { useEducationDashboard } from '@/hooks/education/useEducationDashboard';
+import { useNearViewport } from '@/hooks/shared/useNearViewport';
+import { formatDate, formatNumber, formatPercent } from '@/utils/education/educationDashboard';
 import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle2, FileDown, Info, PieChart, Users } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';

@@ -9,7 +9,7 @@ import React, {
 import { enterpriseService } from '@/services/enterpriseService';
 import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { apiRequest } from '@/services/studentService';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 import { EnterpriseFirstPassword } from '@/components/enterprise/EnterpriseFirstPassword';
 
 // ─── Enterprise Context ────────────────────────────────────────────────────────

@@ -2,10 +2,10 @@ import { ArrowLeft, UserRound, GraduationCap, BookOpen } from 'lucide-react';
 import { useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PageBanner } from '@/components/common/PageBanner';
-import { useImportedStudentDetail } from '@/hooks/useEducationImportedStudents';
+import { useImportedStudentDetail } from '@/hooks/education/useEducationImportedStudents';
 import type { ImportedRelation, StudentAcademicStatus } from '@/types/education/import.types';
-import { STUDENT_STATUS_LABELS } from '@/utils/studentAcademicStatus';
-import { savedOjtLabel } from '@/utils/savedOjtEligibility';
+import { STUDENT_STATUS_LABELS } from '@/utils/student/studentAcademicStatus';
+import { savedOjtLabel } from '@/utils/education/savedOjtEligibility';
 
 const text = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value);
 const relation = (row: ImportedRelation | null, fallback?: number | null) => row ? [row.code, row.name].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join(' — ') || text(row.id) : text(fallback);

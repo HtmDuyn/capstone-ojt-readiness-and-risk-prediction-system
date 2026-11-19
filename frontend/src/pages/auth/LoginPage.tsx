@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import LeftPanel from "@/components/auth/LeftPanel";
 import RightPanel from "@/components/auth/RightPanel";
 import type { UserRole } from "@/types/auth.types";
-import { useAuth } from "@/hooks/useAuth";
-import { useRoleRedirect } from "@/hooks/useRoleRedirect";
+import { useAuth } from "@/hooks/shared/useAuth";
+import { useRoleRedirect } from "@/hooks/shared/useRoleRedirect";
 import { authService } from "@/services/authService";
 
 const roleByCode: Record<string, UserRole> = {

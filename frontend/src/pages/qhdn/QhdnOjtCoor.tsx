@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, UserPlus, Eye } from 'lucide-react';
-import API from '@/services/api';
+import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
-import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
+import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
 import { StudentProfileModal } from '@/components/qhdn/StudentProfileModal';
-import { placementStatus, placementStatuses, placementStatusLabels, placementStatusColors, type PlacementStatus } from '@/utils/qhdnPlacement';
-import { canSelectForCoordination, coordinateBatch } from '@/utils/qhdnCoordination';
-import { summarizePlacementCompanies } from '@/utils/qhdnCompanySummary';
-import { paginateItems, selectPage } from '@/utils/qhdnPagination';
+import { placementStatus, placementStatuses, placementStatusLabels, placementStatusColors, type PlacementStatus } from '@/utils/qhdn/qhdnPlacement';
+import { canSelectForCoordination, coordinateBatch } from '@/utils/qhdn/qhdnCoordination';
+import { summarizePlacementCompanies } from '@/utils/qhdn/qhdnCompanySummary';
+import { paginateItems, selectPage } from '@/utils/qhdn/qhdnPagination';
 
 type Student = {
   id: number;

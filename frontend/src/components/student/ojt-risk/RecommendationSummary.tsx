@@ -1,5 +1,5 @@
 import { Check,ChevronDown,ChevronUp,ClipboardList,Info } from 'lucide-react';
-import type { RiskAssessment } from '@/services/studentOjtRisk.service';
+import type { RiskAssessment } from '@/services/studentService';
 import { cardClass,focusClass,SectionTitle } from './risk-ui';
 
 export function RecommendationSummary({data,embedded=false}:{data:RiskAssessment;embedded?:boolean}){

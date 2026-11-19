@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { getDashboardByRole } from "@/hooks/useRoleRedirect";
+import { useAuth } from "@/hooks/shared/useAuth";
+import { getDashboardByRole } from "@/hooks/shared/useRoleRedirect";
 import type { UserRole } from "@/types/auth.types";
 
 interface PrivateRouteProps {

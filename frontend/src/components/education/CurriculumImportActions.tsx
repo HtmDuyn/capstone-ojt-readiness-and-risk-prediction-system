@@ -140,7 +140,7 @@ export const CurriculumImportActions:
       setTemplateError("");
       setDownloadingTemplate(true);
       try {
-        const { downloadCurriculumTemplate } = await import('@/utils/curriculumTemplateWorkbook');
+        const { downloadCurriculumTemplate } = await import('@/utils/education/curriculumTemplateWorkbook');
         downloadCurriculumTemplate();
       } catch (error) {
         setTemplateError(error instanceof Error ? error.message : "Không tải được file mẫu.");
@@ -224,7 +224,7 @@ export const CurriculumImportActions:
         setPreview(null);
 
         try {
-          const { createCurriculumWorkbookTools } = await import('@/utils/curriculumImportWorkbook');
+          const { createCurriculumWorkbookTools } = await import('@/utils/education/curriculumImportWorkbook');
           const { parseWorkbook } = createCurriculumWorkbookTools(
             majors, selectedMajorCode, curriculumDetail,
             codes => resolveCurriculumCourseIds(codes, curriculumDetail),

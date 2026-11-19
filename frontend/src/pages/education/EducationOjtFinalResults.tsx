@@ -1,4 +1,4 @@
-import { useEducationOjtFinalResults } from '@/hooks/useEducationOjtFinalResults';
+import { useEducationOjtFinalResults } from '@/hooks/education/useEducationOjtFinalResults';
 import { PageBanner } from "@/components/common/PageBanner";
 import React from "react";
 

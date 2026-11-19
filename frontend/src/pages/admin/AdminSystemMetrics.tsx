@@ -3,7 +3,7 @@ import { Activity, FileText, RefreshCw } from 'lucide-react';
 import AuditLogDetails from '@/components/admin/AuditLogDetails';
 import { AUDIT_ACTIONS, actionLabel, entityLabel } from '@/components/admin/audit-display';
 import { PageBanner } from '@/components/common/PageBanner';
-import { formatDate, getAuditLogs, type AuditFilters, type AuditLog } from '@/services/admin';
+import { formatDate, getAuditLogs, type AuditFilters, type AuditLog } from '@/services/adminService';
 
 export default function AdminSystemMetrics() {
   const [filters, setFilters] = useState({ userId: '', action: '', entityType: '' });

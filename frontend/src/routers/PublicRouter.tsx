@@ -1,11 +1,11 @@
-import { educationRoutes } from './educationRoutes';
 import { lazy, type FC } from "react";
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router-dom";
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
-import { BaseLayout } from "@/routers/routeLayouts";
 import { getMenuByRole } from "@/config";
 import LoginPage from "@/pages/auth/LoginPage";
 import type { UserRole } from "@/types/auth.types";
+
+const BaseLayout = lazy(() => import('@/layouts/BaseLayout').then(({ BaseLayout }) => ({ default: BaseLayout })));
 
 const StudentLayout = lazy(() => import("@/layouts/StudentLayout"));
 const EnterpriseProvider = lazy(() => import("@/contexts/EnterpriseContext").then(({ EnterpriseProvider }) => ({ default: EnterpriseProvider })));
@@ -123,6 +123,102 @@ const studentRoutes: RouteObject = {
     {
       path: "/notifications",
       element: <Navigate to="/student/notifications" replace />,
+    },
+  ],
+};
+
+const educationRoutes: RouteObject = {
+  element: <PrivateRoute allowedRoles={["education"]} />,
+
+  children: [
+    {
+      element: (
+        <BaseLayout
+          navItems={getMenuByRole("education")}
+          homePath="/education/dashboard"
+          brandSubtitle="Phòng Đào tạo"
+        />
+      ),
+
+      children: [
+
+        /* =========================
+           DASHBOARD
+           ========================= */
+
+        {
+          path: "/education",
+          element: <Navigate to="/education/dashboard" replace />,
+        },
+
+        {
+          path: "/education/dashboard",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationDashboard")).default }),
+        },
+
+        /* =========================
+           QUẢN LÝ DỮ LIỆU
+           ========================= */
+
+        {
+          path: "/education/academic-year",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationAcademicYear")).default }),
+        },
+
+        {
+          path: "/education/student-import",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentImport")).default }),
+        },
+        {
+          path: "/education/student-import/students/:studentId",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentDetail")).default }),
+        },
+
+        {
+          path: "/education/curriculum-plan",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationCurriculumPlan")).default }),
+        },
+
+        {
+          path: "/education/ojt-conditions",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtConditions")).default }),
+        },
+        {
+          path: "/education/ojt-policy",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtPolicy")).default }),
+        },
+        {
+          path: "/education/ojt-handoff",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtHandoff")).default }),
+        },
+
+        /* =========================
+           QUẢN LÝ SINH VIÊN
+           ========================= */
+
+        {
+          path: "/education/student-progress",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationStudentProgress")).default }),
+        },
+
+        {
+          path: "/education/student-status",
+          element: <Navigate to="/education/student-progress" replace />,
+        },
+        {
+          path: "/education/ojt-final-results",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtFinalResults")).default }),
+        },
+
+        /* =========================
+           ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
+           ========================= */
+
+        {
+          path: "/education/ai-class-proposals",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationSupportClassDemand")).default }),
+        },
+      ],
     },
   ],
 };

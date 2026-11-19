@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { enterpriseService } from '@/services/enterpriseService';
 import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseProfile: React.FC = () => {

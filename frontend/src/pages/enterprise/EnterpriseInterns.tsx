@@ -1,27 +1,25 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { displayTaskTime, vietnamTaskMinute } from '@/utils/taskTime';
+import { displayTaskTime, vietnamTaskMinute } from '@/utils/shared/taskTime';
 import { createPortal } from 'react-dom';
 import { AssignedTasks, TaskSummary, taskStatusLabels, useAssignedTasks } from '@/components/enterprise/AssignedTasks';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   CheckSquare,
   Square,
-  Plus,
   Search,
-  Calendar,
   CheckCircle2,
   AlertTriangle,
   Users,
   Filter,
   Trash2,
   Check,
-  X,
   Briefcase,
   ListTodo,
   Eye,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   enterpriseService,
@@ -29,22 +27,22 @@ import {
   type EnterpriseInternshipTask,
 } from '@/services/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 // Adapter: map API data to existing UI's expected format
-const mapApiToIntern = (item: EnterpriseInternshipItem, index: number): EnterpriseIntern => ({
+const mapApiToIntern = (item: EnterpriseInternshipItem, total: number, completed: number): EnterpriseIntern => ({
   id: String(item.id),
   studentCode: item.student?.studentCode || '',
   fullName: item.student?.fullName || '',
   major: item.student?.programName || item.student?.programCode || '',
   position: item.position?.title || '',
   mentorName: item.enterpriseSupervisorName || item.academicSupervisor?.fullName || 'Chưa có người hướng dẫn',
-  mentorEmail: item.academicSupervisor ? (item.academicSupervisor as any)?.email || '' : '',
+  mentorEmail: item.academicSupervisor?.email || '',
   startDate: item.startDate ? new Date(item.startDate).toLocaleDateString('vi-VN') : '',
-  progressPercent: item.evaluation ? ((item.evaluation as any)?.overallScore || 0) : 0,
-  completedTasks: 0,
-  totalTasks: 0,
+  progressPercent: total ? Math.round((completed / total) * 100) : 0,
+  completedTasks: completed,
+  totalTasks: total,
   attendanceDays: 0,
   assignmentStatus: item.status?.toUpperCase(),
   assignmentStartDate: item.startDate,
@@ -86,86 +84,95 @@ const getApiErrorMessage = (error: unknown): string | null => {
   return typeof data.message === 'string' ? data.message : null;
 };
 
+type InternStatusFilter = 'ALL' | 'ONGOING' | 'RISK';
+type TaskStatusFilter = 'ALL' | InternTask['status'];
+
+const isInternStatusFilter = (value: string): value is InternStatusFilter =>
+  value === 'ALL' || value === 'ONGOING' || value === 'RISK';
+
+const isTaskStatusFilter = (value: string): value is TaskStatusFilter =>
+  value === 'ALL' || value === 'TODO' || value === 'OVERDUE' || value === 'DONE';
+
 export const EnterpriseInterns: React.FC = () => {
   const { loading: profileLoading, companyId } = useEnterprise();
-  const [interns, setInterns] = useState<EnterpriseIntern[]>([]);
+  const [roster, setRoster] = useState<EnterpriseInternshipItem[]>([]);
   const [tasks, setTasks] = useState<InternTask[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const loadSequence = useRef(0);
+  const interns = useMemo(() => {
+    const counts = new Map<string, {total: number; completed: number}>();
+    for (const task of tasks) {
+      const entry = counts.get(task.internId) ?? {total: 0, completed: 0};
+      entry.total++;
+      if (task.status === 'DONE') entry.completed++;
+      counts.set(task.internId, entry);
+    }
+    return roster.map(item => {
+      const count = counts.get(String(item.id));
+      return mapApiToIntern(item, count?.total ?? 0, count?.completed ?? 0);
+    });
+  }, [roster, tasks]);
+
+  const activeRequest = useRef<AbortController | null>(null);
   const fetchInternships = useCallback(async (silent = false) => {
-    const sequence = ++loadSequence.current;
-    if (profileLoading) return;
+    if (profileLoading || (silent && activeRequest.current)) return;
+    activeRequest.current?.abort();
     if (!companyId) {
       setApiLoading(false);
       setApiError('Không tìm thấy doanh nghiệp để tải danh sách task.');
       return;
     }
 
+    const controller = new AbortController();
+    activeRequest.current = controller;
     if (!silent) setApiLoading(true);
     setApiError(null);
     try {
-      const [internshipResponse, firstTaskResponse] = await Promise.all([
-        enterpriseService.listInternships(),
-        enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 }),
+      const [internshipResponse, taskItems] = await Promise.all([
+        enterpriseService.listInternships({}, controller.signal),
+        loadAllPages(page => enterpriseService.listInternshipTasks(companyId, {page, limit: 100}, controller.signal),
+          controller.signal, 'nhiệm vụ'),
       ]);
+      if (controller.signal.aborted) return;
       if (!internshipResponse?.success || !internshipResponse.data) {
         throw new Error('Không thể tải danh sách thực tập sinh.');
       }
-      if (!firstTaskResponse?.success || !firstTaskResponse.data) {
-        throw new Error('Không thể tải danh sách task đã giao.');
-      }
-
-      const taskItems = [...firstTaskResponse.data.items];
-      const totalPages = Math.ceil(firstTaskResponse.data.total / firstTaskResponse.data.limit);
-      for (let page = 2; page <= totalPages; page += 1) {
-        const taskResponse = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 });
-        if (!taskResponse?.success || !taskResponse.data) {
-          throw new Error(`Không thể tải danh sách task ở trang ${page}.`);
-        }
-        taskItems.push(...taskResponse.data.items);
-      }
-
-      if (sequence !== loadSequence.current) return;
-      const mappedTasks = taskItems.map(mapApiToTask);
-      const taskCounts = new Map<string, { total: number; completed: number }>();
-      for (const task of mappedTasks) {
-        const counts = taskCounts.get(task.internId) || { total: 0, completed: 0 };
-        counts.total += 1;
-        if (task.status === 'DONE') counts.completed += 1;
-        taskCounts.set(task.internId, counts);
-      }
-
-      const mappedInterns = internshipResponse.data.items.map(mapApiToIntern);
-      setInterns(mappedInterns.map((intern) => {
-        const counts = taskCounts.get(intern.id) || { total: 0, completed: 0 };
-        return {
-          ...intern,
-          totalTasks: counts.total,
-          completedTasks: counts.completed,
-          progressPercent: counts.total ? Math.round((counts.completed / counts.total) * 100) : 0,
-        };
-      }));
-      setTasks(mappedTasks);
+      setRoster(internshipResponse.data.items);
+      setTasks(taskItems.map(mapApiToTask));
     } catch (err: unknown) {
-      if (sequence !== loadSequence.current) return;
+      if (controller.signal.aborted) return;
       const message = getApiErrorMessage(err) ||
         (err instanceof Error ? err.message : 'Không thể tải danh sách thực tập sinh');
       setApiError(message);
-      console.error('Failed to load internships:', err);
     } finally {
-      if (sequence === loadSequence.current) setApiLoading(false);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        setApiLoading(false);
+      }
     }
   }, [companyId, profileLoading]);
 
   useEffect(() => {
-    void fetchInternships();
+    let mounted = true;
+    queueMicrotask(() => { if (mounted) void fetchInternships(); });
     const refresh = () => { if (!document.hidden) void fetchInternships(true); };
     const timer = window.setInterval(refresh, 60000);
     window.addEventListener('focus',refresh);
-    return () => { loadSequence.current++; window.clearInterval(timer); window.removeEventListener('focus',refresh); };
+    return () => {
+      mounted = false;
+      activeRequest.current?.abort();
+      activeRequest.current = null;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
   }, [fetchInternships]);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+  }, []);
 
   // Selected intern for task detail modal
   const [viewingId, setViewingId] = useState<string | null>(null);
@@ -180,7 +187,7 @@ export const EnterpriseInterns: React.FC = () => {
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [modalSelectedInternIds, setModalSelectedInternIds] = useState<string[]>([]);
   const [modalSearchTerm, setModalSearchTerm] = useState('');
-  const [modalStatusFilter, setModalStatusFilter] = useState<'ALL' | 'ONGOING' | 'RISK'>('ALL');
+  const [modalStatusFilter, setModalStatusFilter] = useState<InternStatusFilter>('ALL');
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [taskSubmitError, setTaskSubmitError] = useState<string | null>(null);
   const taskRequestRef = useRef<{ signature: string; idempotencyKey: string } | null>(null);
@@ -200,8 +207,8 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Filter & Search states for the main table (Using dropdowns instead of tabs)
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ONGOING' | 'RISK'>('ALL');
-  const [taskStatusFilter, setTaskStatusFilter] = useState<'ALL' | InternTask['status']>('ALL');
+  const [statusFilter, setStatusFilter] = useState<InternStatusFilter>('ALL');
+  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('ALL');
 
   // Pagination for main table (optimized for 200+ students)
   const [currentPage, setCurrentPage] = useState(1);
@@ -211,8 +218,8 @@ export const EnterpriseInterns: React.FC = () => {
   const [toast, setToast] = useState<{
     title: string;
     message: string;
-    count: number;
   } | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   // Filtered interns list for main table
   const filteredInterns = useMemo(() => {
@@ -448,7 +455,6 @@ export const EnterpriseInterns: React.FC = () => {
       const message = getApiErrorMessage(err) ||
         (err instanceof Error ? err.message : 'Không thể giao task. Vui lòng thử lại.');
       setTaskSubmitError(message);
-      console.error('Failed to assign enterprise tasks:', err);
       return;
     } finally {
       setTaskSubmitting(false);
@@ -457,29 +463,14 @@ export const EnterpriseInterns: React.FC = () => {
     // Update tasks state
     setTasks((prev) => [...createdTasks, ...prev]);
 
-    // Update totalTasks count for the selected interns
-    setInterns((prev) =>
-      prev.map((intern) => {
-        if (modalSelectedInternIds.includes(intern.id)) {
-          const newTotal = intern.totalTasks + 1;
-          return {
-            ...intern,
-            totalTasks: newTotal,
-            progressPercent: Math.round((intern.completedTasks / newTotal) * 100),
-          };
-        }
-        return intern;
-      })
-    );
-
     // Show toast
     const studentNames = assignedStudents.map((s) => s.fullName).join(', ');
     setToast({
       title: 'Giao nhiệm vụ thành công!',
       message: `Đã giao nhiệm vụ "${newTask.title.trim()}" cho ${assignedStudents.length} sinh viên: ${studentNames}`,
-      count: assignedStudents.length,
     });
-    setTimeout(() => setToast(null), 5000);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 5000);
 
     // Close and reset
     setShowAddTaskModal(false);
@@ -497,6 +488,7 @@ export const EnterpriseInterns: React.FC = () => {
       await enterpriseService.deleteUnusedTask(task.id);
     } catch (error) {
       window.alert(getApiErrorMessage(error) || 'Không thể xóa nhiệm vụ.');
+      return;
     }
     await fetchInternships();
   };
@@ -602,7 +594,8 @@ export const EnterpriseInterns: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => {
-                  setStatusFilter(e.target.value as any);
+                  const value = e.target.value;
+                  if (isInternStatusFilter(value)) setStatusFilter(value);
                   setCurrentPage(1);
                 }}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -673,8 +666,6 @@ export const EnterpriseInterns: React.FC = () => {
               ) : (
                 paginatedInterns.map((intern, index) => {
                   const isChecked = tableSelectedIds.includes(intern.id);
-                  const studentTasks = tasks.filter((t) => t.internId === intern.id);
-                  const doneTasks = studentTasks.filter((t) => t.status === 'DONE').length;
                   const rowNumber = (currentPage - 1) * pageSize + index + 1;
 
                   return (
@@ -750,7 +741,7 @@ export const EnterpriseInterns: React.FC = () => {
                       {/* Tasks count */}
                       <td className="py-3 px-4 text-center">
                         <span className="font-bold text-slate-800 text-xs">
-                          {doneTasks} / {studentTasks.length}
+                          {intern.completedTasks} / {intern.totalTasks}
                         </span>
                         <div className="text-[10px] text-slate-400">tasks</div>
                       </td>
@@ -1039,7 +1030,10 @@ export const EnterpriseInterns: React.FC = () => {
                   </div>
                   <select
                     value={modalStatusFilter}
-                    onChange={(e) => setModalStatusFilter(e.target.value as any)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (isInternStatusFilter(value)) setModalStatusFilter(value);
+                    }}
                     className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
                     <option value="ALL">Tất cả trạng thái</option>
@@ -1265,7 +1259,10 @@ export const EnterpriseInterns: React.FC = () => {
                   {/* Dropdown filter for tasks */}
                   <select
                     value={taskStatusFilter}
-                    onChange={(e) => setTaskStatusFilter(e.target.value as any)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (isTaskStatusFilter(value)) setTaskStatusFilter(value);
+                    }}
                     className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
                   >
                     <option value="ALL">Tất cả nhiệm vụ</option>

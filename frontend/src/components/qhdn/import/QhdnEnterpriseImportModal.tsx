@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Download, FileSpreadsheet, LoaderCircle, Plus, Trash2, UserPlus } from 'lucide-react';
 import { commitEnterpriseImport, generateIdempotencyKey, previewEnterpriseImport } from '@/services/qhdnService';
 import { errorMessage, Notice, Pager } from '../QhdnUi';
-import { downloadFile } from '@/utils/downloadFile';
+import { downloadFile } from '@/utils/shared/downloadFile';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '../StudentWorkflowUi';
 import type { AcademicPeriodItem, EnterpriseImportRow, EnterpriseImportPayload, ImportPreviewResponse, ImportCommitResponse } from '@/types/qhdn/qhdnTypes';
 import type { RecruitmentWindow } from '@/types/qhdn/workflowTypes';
@@ -20,10 +20,10 @@ export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 
  const loadFile=async(event:ChangeEvent<HTMLInputElement>)=>{
   const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(!file||lock.current)return;
   lock.current=true;setBusy(true);setRows([]);setFileName('');setPage(1);invalidate();
-  try{const {parseEnterpriseImportFile}=await import('@/utils/qhdnEnterpriseImport');setRows(await parseEnterpriseImportFile(file));setFileName(file.name);}catch(error){setError(errorMessage(error));}finally{lock.current=false;setBusy(false);}
+  try{const {parseEnterpriseImportFile}=await import('@/utils/qhdn/qhdnEnterpriseImport');setRows(await parseEnterpriseImportFile(file));setFileName(file.name);}catch(error){setError(errorMessage(error));}finally{lock.current=false;setBusy(false);}
  };
  const template=async()=>{
-  try{const {enterpriseImportTemplate}=await import('@/utils/qhdnEnterpriseImport');await downloadFile(async()=>new Blob([enterpriseImportTemplate()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'mau-import-doanh-nghiep.xlsx');}catch(error){setError(errorMessage(error));}
+  try{const {enterpriseImportTemplate}=await import('@/utils/qhdn/qhdnEnterpriseImport');await downloadFile(async()=>new Blob([enterpriseImportTemplate()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'mau-import-doanh-nghiep.xlsx');}catch(error){setError(errorMessage(error));}
  };
  const check=async(event:FormEvent)=>{
   event.preventDefault();if(lock.current||!rows.length)return;lock.current=true;setBusy(true);setError('');

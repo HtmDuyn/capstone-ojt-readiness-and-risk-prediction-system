@@ -1,12 +1,11 @@
 import React, { Suspense, useState } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/shared/useAuth";
 import { EducationSidebar } from "@/components/education/EducationSidebar";
 import { Sidebar } from "@/components/common/Sidebar";
 import { Header, type HeaderUserSummary } from "@/components/common/Header";
 import { Footer } from "@/components/common/Footer";
 import type { NavItem } from "@/types/common.types";
-import './QhdnWorkspace.css';
 
 export interface BaseLayoutProps {
   navItems: NavItem[];

@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 import { CircleAlert,GraduationCap,RefreshCw } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useStudentRisk, type StudentRiskResource } from '@/hooks/useStudentRisk';
-import { type RiskAssessment } from '@/services/studentOjtRisk.service';
+import { useAuth } from '@/hooks/shared/useAuth';
+import { useStudentRisk, type StudentRiskResource } from '@/hooks/student/useStudentRisk';
+import { type RiskAssessment } from '@/services/studentService';
 import { RiskOverview } from '../ojt-risk/RiskOverview';
 import { AcademicMetrics } from '../ojt-risk/AcademicMetrics';
 import { RiskInsights } from '../ojt-risk/RiskInsights';

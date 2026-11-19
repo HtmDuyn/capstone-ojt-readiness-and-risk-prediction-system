@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -15,7 +15,7 @@ import {
   Clock3,
   CalendarClock,
 } from 'lucide-react';
-import { displayTaskTime } from '@/utils/taskTime';
+import { displayTaskTime } from '@/utils/shared/taskTime';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   enterpriseService,
@@ -23,7 +23,7 @@ import {
   type DashboardTaskSummary,
   type RecruitmentPost,
 } from '@/services/enterpriseService';
-import { loadAllPages, recruitmentTotals } from '@/components/enterprise/recruitment';
+import { loadAllPages, recruitmentTotals } from '@/utils/enterprise/recruitment';
 import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsChart';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -128,6 +128,9 @@ export const EnterpriseDashboard: React.FC = () => {
     description: '',
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  // Tải thống kê bằng hai request song song để dashboard xuất hiện nhanh hơn.
   useEffect(() => {
     if (loading) return;
     if (profileError || !companyId) {
@@ -184,7 +187,6 @@ export const EnterpriseDashboard: React.FC = () => {
         if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Không thể tải thống kê dashboard';
         setStatsError(message);
-        console.error('Failed to load enterprise dashboard statistics:', err);
       } finally {
         if (!controller.signal.aborted) setStatsLoading(false);
       }
@@ -194,7 +196,7 @@ export const EnterpriseDashboard: React.FC = () => {
     return () => controller.abort();
   }, [companyId, loading, profileError, summary]);
 
-  const refreshDashboard = React.useCallback(() => {
+  const refreshDashboard = useCallback(() => {
     reload();
     setRevision(value => value + 1);
   }, [reload]);
@@ -211,6 +213,7 @@ export const EnterpriseDashboard: React.FC = () => {
       return;
     }
 
+    // Kích hoạt animation ở frame kế tiếp để tránh làm giật bố cục ban đầu.
     const frame = window.requestAnimationFrame(() => setChartAnimated(true));
     return () => window.cancelAnimationFrame(frame);
   }, [statsLoading, statsError, tasksLoading, tasksError]);
@@ -229,7 +232,6 @@ export const EnterpriseDashboard: React.FC = () => {
         if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu tiến độ task';
         setTasksError(message);
-        console.error('Failed to load enterprise task progress:', err);
       } finally {
         if (!controller.signal.aborted) setTasksLoading(false);
       }
@@ -244,11 +246,16 @@ export const EnterpriseDashboard: React.FC = () => {
     setToastMessage('Đã gửi báo cáo sự cố về Phòng QHDN Trường FPT thành công!');
     setShowIncidentModal(false);
     setIncidentReport({ studentId: '', severity: 'MEDIUM', title: '', description: '' });
-    setTimeout(() => setToastMessage(null), 4000);
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 4000);
   };
 
+  useEffect(() => () => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+  }, []);
+
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
-  const candidateStages: CandidateStage[] = [
+  const candidateStages = useMemo<CandidateStage[]>(() => [
     { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: '#f59e0b' },
     {
       label: 'Đã nhận',
@@ -257,9 +264,15 @@ export const EnterpriseDashboard: React.FC = () => {
     },
     { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: '#10b981' },
     { label: 'Đã từ chối', value: dashboardStats.rejectedCandidates, color: '#f43f5e' },
-  ];
-  const maxCandidateStage = Math.max(1, ...candidateStages.map(stage => stage.value));
-  const candidateChartLabel = candidateStages.map(stage => `${stage.label}: ${stage.value}`).join(', ');
+  ], [dashboardStats]);
+  const maxCandidateStage = useMemo(
+    () => Math.max(1, ...candidateStages.map(stage => stage.value)),
+    [candidateStages],
+  );
+  const candidateChartLabel = useMemo(
+    () => candidateStages.map(stage => `${stage.label}: ${stage.value}`).join(', '),
+    [candidateStages],
+  );
   const statCards = [
     {
       label: 'Hồ sơ chờ duyệt',

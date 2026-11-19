@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkles, LoaderCircle, RefreshCw, MapPin } from 'lucide-react';
-import { matchStudentJobs, type JobMatchingResult } from '@/services/studentJobMatching.service';
+import { matchStudentJobs, type JobMatchingResult } from '@/services/studentService';
 import { buttonClass, dateText } from './PortalUI';
 import { explainOjtBlockers, workModeText, type Opportunity } from './ojt';
 
