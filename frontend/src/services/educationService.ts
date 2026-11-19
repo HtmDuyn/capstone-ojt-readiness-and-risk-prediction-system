@@ -897,7 +897,7 @@ export const importService = {
 // Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
 export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
 export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
-export type CurrentOjtRule = LocalOjtRule & { thresholdId?: number };
+export type CurrentOjtRule = LocalOjtRule & { thresholdId?: number; id?: number | null; maxUnpassedCourses: number; updatedAt?: string | null; effectiveAt?: string | null };
 export type OjtCreditThreshold = { id: number; minCredits: number };
 export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
   apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
@@ -905,6 +905,11 @@ export const createOjtCreditThreshold = async (minCredits: number) =>
   apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
 export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> =>
   apiData<CurrentOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
+export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; status: string; reasons: string[] }[] };
+export const previewOjtPolicy = async (minCredits: number, maxUnpassedCourses: number) =>
+  apiData<OjtPolicyPreview>((await API.post('/ojt-condition-policy/preview', { minCredits, maxUnpassedCourses })).data);
+export const publishOjtPolicy = async (minCredits: number, maxUnpassedCourses: number, token: string) =>
+  apiData<CurrentOjtRule>((await API.post('/ojt-condition-policy', { minCredits, maxUnpassedCourses, token })).data);
 export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<{ savedCount: number; handedOffCount: number }> {
   if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
   try {
