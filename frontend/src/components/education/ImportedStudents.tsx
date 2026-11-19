@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Users, Search, Inbox } from 'lucide-react';
-import { useEducationImportedStudents } from '@/hooks/useEducationImportedStudents';
+import { useEducationImportedStudents } from '@/hooks/education/useEducationImportedStudents';
 import type { AcademicCatalogs, ImportedStudent, StudentAcademicStatus } from '@/types/education/import.types';
 import { STUDENT_STATUS_LABELS } from '@/utils/student/studentAcademicStatus';
 

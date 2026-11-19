@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, UserPlus, Eye } from 'lucide-react';
 import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
-import { useQhdnAcademicPeriods } from '@/hooks/useQhdnAcademicPeriods';
+import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
 import { StudentProfileModal } from '@/components/qhdn/StudentProfileModal';

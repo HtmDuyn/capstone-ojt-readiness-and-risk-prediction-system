@@ -1,5 +1,5 @@
 import { StudentProgressList } from '@/components/education/StudentProgressList';
-import { useEducationStudentProgress } from '@/hooks/useEducationStudentProgress';
+import { useEducationStudentProgress } from '@/hooks/education/useEducationStudentProgress';
 import {
   AlertTriangle,
   CheckCircle2,

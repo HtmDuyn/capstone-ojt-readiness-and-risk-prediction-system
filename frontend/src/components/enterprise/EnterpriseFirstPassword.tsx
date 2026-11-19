@@ -2,7 +2,7 @@ import { FptLogoIcon } from '@/components/common/icons/AppIcons';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KeyRound, LoaderCircle, ShieldCheck, LockKeyhole, Eye, EyeOff, Check, ArrowRight, AlertCircle, LogOut } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 import { apiRequest } from '@/services/studentService';
 
 export function EnterpriseFirstPassword() {

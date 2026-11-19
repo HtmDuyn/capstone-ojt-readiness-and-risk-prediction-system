@@ -7,8 +7,8 @@ import { RecommendationSummary } from '@/components/student/ojt-risk/Recommendat
 import { riskTheme } from '@/components/student/ojt-risk/risk-ui';
 import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentSemesterSelect, statusText } from '@/components/student/PortalUI';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
-import { useStudentRisk } from '@/hooks/useStudentRisk';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
+import { useStudentRisk } from '@/hooks/student/useStudentRisk';
 import { getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
 
 const card = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';

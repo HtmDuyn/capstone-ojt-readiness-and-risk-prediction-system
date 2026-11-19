@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Building2, ChevronRight, FileText, MapPin, Search, Send, BriefcaseBusiness, Inbox, AlertCircle, RefreshCw } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { ApiError, allStudentPages, studentGet, studentQuery, type StudentCertificate } from '@/services/studentService';
 import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage, StudentSemesterSelect } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { getAllCourseResults, getCurriculum, getStudentAcademicProgress } from '@/services/studentService';
 import type { CourseResult } from '@/types/student/portal';
 import {

@@ -1,6 +1,6 @@
 import React, { Suspense, useState } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/shared/useAuth";
 import { EducationSidebar } from "@/components/education/EducationSidebar";
 import { Sidebar } from "@/components/common/Sidebar";
 import { Header, type HeaderUserSummary } from "@/components/common/Header";

@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthContext } from '../../src/contexts/AuthContext';
 import { StudentPortalProvider } from '../../src/contexts/StudentPortalContext';
-import { useStudentResource } from '../../src/hooks/useStudentResource';
+import { useStudentResource } from '../../src/hooks/student/useStudentResource';
 import { initializeStudentSnapshots, studentSnapshots } from '../../src/utils/student/studentSnapshots';
 import { API, studentPost } from '../../src/services/studentService';
 import StudentDashboard from '../../src/pages/student/StudentDashboard';

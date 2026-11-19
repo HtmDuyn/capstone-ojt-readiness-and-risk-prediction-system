@@ -14,7 +14,7 @@ import {
 import type {
   HandoffStudentItem,
 } from "@/types/qhdn/qhdnTypes";
-import type { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
+import type { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
 import { academicPeriodLabel } from "@/utils/qhdn/qhdnAcademicPeriods";
 import {
   placementLabels,

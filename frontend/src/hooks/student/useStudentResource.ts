@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 import { studentSnapshots } from '@/utils/student/studentSnapshots';
 
 // A key identifies both the authenticated scope and the selected filters. Old responses

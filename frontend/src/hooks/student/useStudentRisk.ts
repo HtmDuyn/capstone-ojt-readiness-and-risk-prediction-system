@@ -1,4 +1,4 @@
-import { useAuth } from './useAuth';
+import { useAuth } from '../shared/useAuth';
 import { useStudentResource } from './useStudentResource';
 import { useOptionalStudentPortal } from '@/contexts/StudentPortalContext';
 import { getOjtRiskAssessment } from '@/services/studentService';

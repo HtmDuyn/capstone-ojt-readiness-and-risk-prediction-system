@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { AuthContext, type AuthContextValue } from "../contexts/AuthContext";
+import { AuthContext, type AuthContextValue } from "@/contexts/AuthContext";
 
 /**
  * Custom hook để truy cập ngữ cảnh xác thực (authentication context).

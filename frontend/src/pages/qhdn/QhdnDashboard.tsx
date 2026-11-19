@@ -37,8 +37,8 @@ import {
 } from "chart.js";
 import { PageBanner } from "@/components/common/PageBanner";
 import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
-import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
-import { useNearViewport } from "@/hooks/useNearViewport";
+import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
+import { useNearViewport } from "@/hooks/shared/useNearViewport";
 import {
   listCompanies,
   listCoordinations,

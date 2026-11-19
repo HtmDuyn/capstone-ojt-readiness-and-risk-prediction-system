@@ -39,7 +39,7 @@ import type {
   CompanyListItem,
   PositionListItem,
 } from "@/types/qhdn/qhdnTypes";
-import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
+import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
 import { linkedOjtSemesterId } from "@/utils/qhdn/qhdnAcademicPeriods";
 
 const cell = "px-5 py-4 align-middle sm:px-6";

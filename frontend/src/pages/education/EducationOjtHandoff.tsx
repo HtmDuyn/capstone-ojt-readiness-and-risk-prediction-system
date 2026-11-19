@@ -1,4 +1,4 @@
-import { useEducationOjtHandoff } from '@/hooks/useEducationOjtHandoff';
+import { useEducationOjtHandoff } from '@/hooks/education/useEducationOjtHandoff';
 import { PageBanner } from '@/components/common/PageBanner';
 import { Fragment, useState } from 'react';
 import { ChevronDown } from 'lucide-react';

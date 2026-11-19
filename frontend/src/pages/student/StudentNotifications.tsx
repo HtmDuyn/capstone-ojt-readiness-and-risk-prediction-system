@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import {
   getStudentNotifications,
   markStudentNotificationRead,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
-import { useStudentResource } from '@/hooks/useStudentResource';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { getAssignedTasks, getTaskSubmissions, submitAssignedTask } from '@/services/studentService';
 import type { Task } from '@/types/student/portal';
 import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';

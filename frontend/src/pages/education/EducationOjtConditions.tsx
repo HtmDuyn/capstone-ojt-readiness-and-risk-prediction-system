@@ -1,4 +1,4 @@
-import { useEducationOjtEligibility } from '@/hooks/useEducationOjtEligibility';
+import { useEducationOjtEligibility } from '@/hooks/education/useEducationOjtEligibility';
 import { PageBanner } from '@/components/common/PageBanner';
 import { educationOjtReason } from '@/utils/education/educationOjtReason';
 import { ojtDisplayStatusLabels, sortOjtTargets, type OjtSortDirection, type OjtSortKey } from '@/utils/education/educationOjtSorting';

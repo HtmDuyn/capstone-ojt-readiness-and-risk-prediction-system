@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 import { ApiError } from '@/services/studentService';
 import { studentSnapshots } from '@/utils/student/studentSnapshots';
 import {

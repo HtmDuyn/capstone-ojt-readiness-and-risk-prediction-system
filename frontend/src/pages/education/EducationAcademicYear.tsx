@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckCircle2, History, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { AcademicCalendarEditor } from '@/components/education/AcademicCalendarEditor';
-import { useEducationAcademicCalendar } from '@/hooks/useEducationAcademicCalendar';
+import { useEducationAcademicCalendar } from '@/hooks/education/useEducationAcademicCalendar';
 import { CALENDAR_TERMS, calendarErrors, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
 import type { SemesterDates } from '@/types/education/academic.types';
 

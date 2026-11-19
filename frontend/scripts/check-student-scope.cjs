@@ -14,7 +14,7 @@ const allowed = file => file.startsWith('frontend/src/pages/student/')
   || [
     'frontend/src/config/menus/studentMenu.tsx','frontend/src/routers/PublicRouter.tsx',
     'frontend/src/services/studentApi.ts','frontend/src/services/studentService.ts',
-    'frontend/src/contexts/StudentPortalContext.tsx','frontend/src/hooks/useStudentResource.ts',
+    'frontend/src/contexts/StudentPortalContext.tsx','frontend/src/hooks/student/useStudentResource.ts',
     'frontend/src/layouts/StudentLayout.tsx','frontend/docs/student-api-integration.md',
     'frontend/src/layouts/BaseLayout.tsx', 'frontend/src/components/common/AIConsultModal.tsx',
     'frontend/scripts/check-student-scope.cjs','frontend/scripts/check-student-axios-browser.cjs',

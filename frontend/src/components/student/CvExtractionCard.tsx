@@ -2,7 +2,7 @@ import { Sparkles, CheckCircle2, FileText, Code2, FolderKanban, BriefcaseBusines
 import { useEffect,useRef,useState } from 'react';
 import { cvAnalysisApi,type CvAnalysis,type CvEntry,type CvProfile,type MatchingProfile } from '@/services/studentService';
 import { buttonClass,inputClass } from './PortalUI';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 const skillCategories:Record<string,string>={TOOL:'Công cụ',TECHNOLOGY:'Ngôn ngữ lập trình và công nghệ',PROFESSIONAL:'Kỹ năng chuyên môn',SOFT:'Kỹ năng mềm',OTHER:'Chưa phân loại'};
 type Section=Exclude<keyof CvProfile,'summary'>;
 const sections:{key:Section;label:string;fields:{key:string;label:string;kind?:'list'|'number'|'paragraph'|'category'}[]}[]=[

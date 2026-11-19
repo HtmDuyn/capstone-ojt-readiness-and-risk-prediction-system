@@ -1,6 +1,6 @@
 import { Suspense, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/shared/useAuth';
 import { StudentPortalProvider, useStudentPortal } from '@/contexts/StudentPortalContext';
 import { Sidebar } from '@/components/common/Sidebar';
 import { Footer } from '@/components/common/Footer';
