@@ -22,11 +22,11 @@ export function enterpriseWindowApi(w: Row) {
   if(w.CampaignID){
     const posting=(hasPhaseSchedule(w)?phaseIsOpen(w,'POSTING'):currentRoundPhase(w)==='OPEN')
       && w.Kind==='SEMESTER' && w.LinkedPeriodID===w.AcademicPeriodID && !['CLOSED','ARCHIVED'].includes(w.PeriodStatus);
-    return {...window,accepting:posting,canCreate:posting,canEdit:posting,postingDeadlineAt:w.PostingEndsAt??w.EndsAt,
+    return {...window,accepting:posting,canCreate:true,canEdit:posting,postingDeadlineAt:w.PostingEndsAt??w.EndsAt,
       deadlineManagedBy:'QHDN',studentRegistrationWindow:null,editLockCode:posting?null:'RECRUITMENT_PHASE_CLOSED'};
   }
   const accepting = window.accepting && w.Kind === 'SEMESTER' && w.LinkedPeriodID === w.AcademicPeriodID;
-  return {...window,accepting,canCreate:accepting,canEdit:accepting && !w.StudentRegistrationWindow,
+  return {...window,accepting,canCreate:true,canEdit:accepting && !w.StudentRegistrationWindow,
     postingDeadlineAt:w.EndsAt,deadlineManagedBy:'QHDN',
     studentRegistrationWindow:w.StudentRegistrationWindow ?? null,
     editLockCode:w.StudentRegistrationWindow ? 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' : null};
@@ -52,14 +52,14 @@ export async function assertNoStudentRegistration(c: PoolClient, semesterId: num
   if (active) throw invalid('Đã hết thời gian đăng tin: sinh viên đang đăng ký hoặc xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.',409,'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION');
 }
 
-export async function recruitmentDeadline(c: PoolClient, w: Row, before: Row | null) {
+export async function recruitmentDeadline(c: PoolClient, w: Row, before: Row | null, publishing: boolean) {
   if(w.CampaignID)return w.ApplicationEndsAt??w.EndsAt;
   // Existing deadlines belong to QHDN. Do not validate them against the separate
   // enterprise intake deadline or rewrite them during content/position changes.
-  if (before) return before.DeadlineAt;
+  if (before && (!publishing || (before.DeadlineAt && new Date(before.DeadlineAt) > new Date(w.DatabaseNow)))) return before.DeadlineAt;
   // QHDN's student application period controls application expiry. Before one
   // is configured, use the linked semester's end so a newly published vacancy is visible.
   const deadline = (await c.query('SELECT public."EnterpriseRecruitmentDeadline"($1) AS deadline',[w.OJTSemesterID])).rows[0].deadline;
-  if (!deadline || deadline <= new Date(w.DatabaseNow)) throw invalid('Học kỳ không còn thời hạn tuyển dụng khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
+  if (publishing && (!deadline || deadline <= new Date(w.DatabaseNow))) throw invalid('Học kỳ không còn thời hạn tuyển dụng khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
   return deadline;
 }

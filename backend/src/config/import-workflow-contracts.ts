@@ -29,7 +29,7 @@ export function describeImportWorkflow(spec: Record<string,any>) {
   }
   spec.paths['/api/enterprise/tasks/bulk']={post:{
     summary:'Giao một hoặc nhiều task cho nhiều thực tập sinh',
-    description:'assignmentIds là ID phân công thực tập (AssignmentID), không phải studentId. Mỗi task trong tasks được giao cho mọi phân công đã chọn. Chấp nhận tối đa 500 phân công và 50 task (tổng tối đa 5000 task). Toàn bộ giao dịch thất bại nếu có phân công không thuộc doanh nghiệp trong token, không ở trạng thái đang thực tập, hoặc dueDate nằm ngoài thời gian thực tập.',
+    description:'assignmentIds là ID phân công thực tập (AssignmentID), không phải studentId. Mỗi task trong tasks được giao cho mọi phân công đã chọn. Chấp nhận tối đa 500 phân công và 50 task (tổng tối đa 5000 task). Toàn bộ giao dịch thất bại nếu có phân công không thuộc doanh nghiệp trong token, không ở trạng thái đang thực tập, hoặc hạn nộp không sau giờ giao hay vượt ngày kết thúc thực tập.',
     security:[{bearerAuth:[]}],
     requestBody:{required:true,content:{'application/json':{schema:{
       type:'object',additionalProperties:false,required:['assignmentIds','tasks','idempotencyKey'],
@@ -39,7 +39,7 @@ export function describeImportWorkflow(spec: Record<string,any>) {
         tasks:{type:'array',minItems:1,maxItems:50,items:{type:'object',additionalProperties:false,required:['name','dueDate'],properties:{
           name:{type:'string',minLength:1,maxLength:200},
           description:{type:'string',maxLength:10000},
-          dueDate:{type:'string',format:'date'},
+          dueDate:{type:'string',example:'2027-01-12T15:30',description:'Ngày giờ Việt Nam (YYYY-MM-DDTHH:mm), phải sau thời điểm giao. Payload cũ chỉ có ngày dùng hạn cuối ngày.'},
         }}},
       },
     }}}},

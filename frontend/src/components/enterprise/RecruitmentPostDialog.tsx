@@ -28,7 +28,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   const [saving, setSaving] = useState(false);
   const feedback = useRecruitmentFeedback();
   const previousFocus = useRef<HTMLElement | null>(null);
-  const [windowId, setWindowId] = useState(post?.windowId ?? initialWindowId ?? windows.find(w => windowAcceptsPosts(w, now))?.id ?? 0);
+  const [windowId, setWindowId] = useState(post?.windowId ?? initialWindowId ?? windows.find(w => windowAcceptsPosts(w, now))?.id ?? windows[0]?.id ?? 0);
   const [title, setTitle] = useState(post?.title ?? '');
   const [content, setContent] = useState(post?.content ?? '');
   const [benefits, setBenefits] = useState(post?.benefits ?? '');
@@ -40,7 +40,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   const selectedWindow = windows.find(w => w.id === windowId);
   const accepts = windowAcceptsPosts(selectedWindow, now);
   const lockReason = post ? postEditLockReason(post, windows, now) : '';
-  const canSave = post ? !lockReason : accepts;
+  const canSave = post ? !lockReason : !!selectedWindow;
   const inputId = (suffix: string) => `recruitment-${suffix}`;
 
   useLayoutEffect(() => {
@@ -67,9 +67,9 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
     event.preventDefault();
     if (submitting.current) return;
     const status = ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
-    if (!post && !windowAcceptsPosts(selectedWindow)) {
-      const message = 'Đợt đăng tin không còn trong thời gian cho phép. Bạn chưa thể tạo tin mới.';
-      feedback.notify(message, status === 'PUBLISHED' ? 'Không thể công bố tin' : 'Không thể tạo tin');
+    if (!post && status === 'PUBLISHED' && (!windowAcceptsPosts(selectedWindow) || selectedWindow?.canEdit === false)) {
+      const message = 'Đợt này chưa cho phép công bố. Bạn vẫn có thể lưu bản nháp.';
+      feedback.notify(message, 'Không thể công bố tin');
       return;
     }
     if (post && !canEditRecruitmentPost(post, windows)) { showError(postEditLockReason(post, windows)); return; }
@@ -119,15 +119,15 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
           <label htmlFor={inputId('window')} className="flex items-center gap-2 text-sm font-semibold text-slate-800"><CalendarDays size={17} className="text-orange-600" />Đợt đăng tin <span className="text-rose-600">*</span></label>
           {post ? <p className="text-sm font-medium text-slate-800">{selectedWindow?.name ?? 'Đợt đăng tin không còn khả dụng'}</p>
             : <select id={inputId('window')} className={fieldClass} value={windowId} required onChange={e => setWindowId(Number(e.target.value))}>
-              <option value="0" disabled>Chọn đợt đang mở</option>
-              {windows.map(w => <option key={w.id} value={w.id} disabled={!windowAcceptsPosts(w, now)}>{w.name} · {w.periodCode} {!windowAcceptsPosts(w, now) ? '— Không nhận tin' : ''}</option>)}
+              <option value="0" disabled>Chọn đợt đăng tin</option>
+              {windows.map(w => <option key={w.id} value={w.id}>{w.name} · {w.periodCode} {!windowAcceptsPosts(w, now) ? '— Chỉ lưu nháp' : ''}</option>)}
             </select>}
           {selectedWindow && <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2"><p>Mở đăng tin: <strong>{formatRecruitmentDate(selectedWindow.postingStartsAt ?? selectedWindow.startsAt)}</strong></p>
             <p>Hạn công bố tin: <strong className="text-orange-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
             {selectedWindow.applicationStartsAt && <p>Sinh viên bắt đầu ứng tuyển: <strong>{formatRecruitmentDate(selectedWindow.applicationStartsAt)}</strong></p>}
             {selectedWindow.resultsEndsAt && <p>Hạn hoàn tất phản hồi: <strong>{formatRecruitmentDate(selectedWindow.resultsEndsAt)}</strong></p>}
           </div>}
-          {!accepts && <p role="status" className="text-sm text-amber-800">Đã hết hạn đăng tin. Tin nháp vẫn được chỉnh sửa và lưu lại; không thể công bố.</p>}
+          {!accepts && <p role="status" className="text-sm text-amber-800">Ngoài Hạn 1, bạn vẫn có thể tạo, chỉnh sửa và lưu bản nháp.</p>}
           {lockReason && accepts && <p role="status" className="flex items-start gap-2 text-sm text-amber-800"><LockKeyhole size={16} className="shrink-0" />{lockReason}</p>}
         </section>
         <section className="space-y-4">

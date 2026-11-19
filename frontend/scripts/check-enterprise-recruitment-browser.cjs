@@ -255,7 +255,9 @@ async function main() {
  assert.equal((await postByTitle('E2E Nội dung chưa lưu')).Status,'DRAFT');
  await clickText('Tải lại');
  await waitFor(`document.body.innerText.includes('Chưa có đợt nào đang nhận tin')`,'phase 2 loaded');
- assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Tạo tin tuyển dụng').disabled`),true);
+ assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Tạo tin tuyển dụng').disabled`),false);
+ await fillPost('E2E Nháp sau Hạn 1');await clickText('Lưu nháp');await finishSuccess();
+ assert.equal((await postByTitle('E2E Nháp sau Hạn 1')).Status,'DRAFT');
  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(article(direct.PostID)+' [data-delete-post]')}).disabled`),true);
  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(article(boundary.PostID)+' [data-delete-post]')}).disabled`),false);
  assert.equal(await evaluate(`document.querySelector(${JSON.stringify(article(boundary.PostID)+' [data-edit-post]')}).disabled`),false);

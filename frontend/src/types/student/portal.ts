@@ -271,6 +271,8 @@ export interface Task {
   assignmentId: number;
   name: string;
   description: string | null;
+  assignedAt?: string | null;
+  dueAt?: string | null;
   assignedDate: string | null;
   dueDate: string | null;
   status: string;

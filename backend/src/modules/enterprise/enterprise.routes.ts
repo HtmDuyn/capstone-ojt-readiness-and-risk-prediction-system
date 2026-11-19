@@ -9,7 +9,7 @@ import { bulkAcceptance } from './bulk-acceptance.service';
 import { bulkEvaluate } from './bulk-evaluation.service';
 import { enterpriseWindows, enterprisePosts, saveEnterprisePost, deleteEnterprisePost } from './enterprise-recruitment.service';
 import { startEnterpriseRecruitmentWorker } from './enterprise-recruitment.worker';
-import { assignTasks } from '../qhdn/task.service';
+import { assignTasks, deleteUnusedTask } from '../qhdn/task.service';
 
 const router = Router();
 startEnterpriseRecruitmentWorker();
@@ -26,6 +26,7 @@ router.post('/recruitment/posts',handle(req=>saveEnterprisePost(req.body,req.use
 router.patch('/recruitment/posts/:id',handle(req=>saveEnterprisePost(req.body,req.user,positiveId(req.params.id))));
 router.post('/recruitment/posts/:id/publish',handle(req=>saveEnterprisePost({status:'PUBLISHED'},req.user,positiveId(req.params.id))));
 router.delete('/recruitment/posts/:id',handle(req=>deleteEnterprisePost(positiveId(req.params.id),req.user)));
+router.delete('/tasks/:id',handle(req=>deleteUnusedTask(positiveId(req.params.id),req.user)));
 router.post('/tasks/bulk',handle(req=>assignTasks(req.body,req.user)));
 router.get('/candidate-periods',handle(req=>enterpriseCandidatePeriods(req.user)));
 router.get('/candidates',handle(req=>enterpriseCandidates(req.query,req.user)));

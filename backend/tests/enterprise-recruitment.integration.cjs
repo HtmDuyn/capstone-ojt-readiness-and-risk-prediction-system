@@ -213,7 +213,7 @@ test('enterprise drafts and Published soft deletion with a separate deleted list
     const round = campaign.rounds[0];
     await saveWindow({ status: 'OPEN', reason: 'Open Hạn 1' }, staff.UserID, round.id);
     const postBody = { ...body, windowId: round.id };
-    expect(await req('POST', '/enterprise/recruitment/posts', postBody), 409);
+    assert.equal(expect(await req('POST', '/enterprise/recruitment/posts', postBody), 201).status, 'DRAFT');
     await new Promise(resolve => setTimeout(resolve, Math.max(0, baseTime + 1100 - Date.now())));
     const saved = expect(await req('POST', '/enterprise/recruitment/posts', postBody), 201);
     const live = expect(await req('POST', '/enterprise/recruitment/posts', { ...postBody, status: 'PUBLISHED' }), 201);
@@ -226,8 +226,9 @@ test('enterprise drafts and Published soft deletion with a separate deleted list
     assert.ok(inPhase1.items.every(p => !p.canApply));
     const before = (await db.query('SELECT * FROM "RecruitmentPosts" WHERE "PostID"=ANY($1::int[]) ORDER BY "PostID"', [[saved.id, live.id]])).rows;
     await new Promise(resolve => setTimeout(resolve, Math.max(0, baseTime + 7100 - Date.now())));
+    const lateDraft = expect(await req('POST', '/enterprise/recruitment/posts', postBody), 201);
+    assert.equal(lateDraft.status, 'DRAFT');
     for (const [method, url, payload] of [
-      ['POST', '/enterprise/recruitment/posts', postBody],
       ['POST', '/enterprise/recruitment/posts', { ...postBody, status: 'PUBLISHED' }],
       ['PATCH', `/enterprise/recruitment/posts/${saved.id}`, { status: 'PUBLISHED' }],
       ['POST', `/enterprise/recruitment/posts/${saved.id}/publish`],

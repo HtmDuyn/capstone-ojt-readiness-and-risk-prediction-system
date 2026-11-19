@@ -9394,3 +9394,31 @@ END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('ojt_credit_thresholds_v1') ON CONFLICT DO NOTHING;
 COMMIT;
 -- END INCREMENTAL UPDATE: ojt_credit_thresholds_v1
+
+-- BEGIN INCREMENTAL UPDATE: internship_task_times_v1 (Vietnam local time)
+BEGIN;
+ALTER TABLE public."InternshipTasks"
+  ADD COLUMN IF NOT EXISTS "AssignedAt" timestamp,
+  ADD COLUMN IF NOT EXISTS "DueAt" timestamp;
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('internship_task_times_v1') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: internship_task_times_v1
+
+-- BEGIN INCREMENTAL UPDATE: accepted_intern_roster_v1
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+INSERT INTO public."InternshipAssignments"
+  ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
+SELECT co."CoordinationID",r."StudentID",co."EnterpriseID",co."PositionID",s."StartDate",s."EndDate",'ASSIGNED'
+FROM public."StudentEnterpriseCoordination" co
+JOIN public."OJTRegistrations" r USING ("RegistrationID")
+JOIN public."OJTSemesters" s ON s."OJTSemesterID"=co."OJTSemesterID"
+WHERE co."Decision"='ACCEPTED'
+  AND NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" newer
+    WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
+  AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" a JOIN public."StudentEnterpriseCoordination" old USING ("CoordinationID")
+    WHERE a."CoordinationID"=co."CoordinationID" OR (a."StudentID"=r."StudentID" AND old."OJTSemesterID"=co."OJTSemesterID"
+      AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')));
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('accepted_intern_roster_v1') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: accepted_intern_roster_v1
