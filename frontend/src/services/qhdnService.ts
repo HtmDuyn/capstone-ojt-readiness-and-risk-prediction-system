@@ -23,7 +23,7 @@ export const getDashboardPlacementBoard = async (ojtSemesterId: number): Promise
 };
 
 export const getQhdnDashboardSummary = async (ojtSemesterId: number): Promise<QhdnDashboardSummary> => {
-  const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard', { params: { ojtSemesterId } });
+  const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard/summary', { params: { ojtSemesterId } });
   if (!response.data.success) throw new Error('Không tải được thống kê thực tập OJT.');
   const progress=response.data.data?.progress;
   if(!progress||![progress.completed,progress.inProgress,progress.evaluated].every(count=>Number.isSafeInteger(count)&&count>=0))throw new Error('Chưa tải được đầy đủ thống kê kết quả OJT. Vui lòng thử lại.');
@@ -65,8 +65,9 @@ export const listCompanies = async (
     search?: string;
     status?: string;
   } = { page: 1, limit: 100 },
+  signal?: AbortSignal,
 ): Promise<CompanyListResponse> => {
-  const response = await API.get<CompanyListResponse>("/companies", { params });
+  const response = await API.get<CompanyListResponse>("/companies", { params, signal });
   return response.data;
 };
 

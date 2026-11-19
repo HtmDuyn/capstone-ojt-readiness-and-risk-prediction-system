@@ -41,7 +41,6 @@ import { useQhdnAcademicPeriods } from "@/hooks/useQhdnAcademicPeriods";
 import { useNearViewport } from "@/hooks/useNearViewport";
 import {
   listCompanies,
-  listPositions,
   listCoordinations,
   getDashboardPlacementBoard,
   getQhdnDashboardSummary,
@@ -51,7 +50,6 @@ import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation, dash
 import type {
   CoordinationItem,
   CompanyListItem,
-  PositionListItem,
 } from "@/types/qhdn/qhdnTypes";
 
 ChartJS.register(
@@ -74,7 +72,6 @@ export const QhdnDashboard: React.FC = () => {
   const catalog = useQhdnAcademicPeriods();
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [revision, setRevision] = useState(0);
   const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats>; companies: DashboardPlacementBoard['companies'] } | null>(null);
   const [internshipStats, setInternshipStats] = useState<{ semesterId: number; data: QhdnDashboardSummary } | null>(null);
@@ -85,7 +82,8 @@ export const QhdnDashboard: React.FC = () => {
   // Enterprise Quota calculation data
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
-  const [positions, setPositions] = useState<PositionListItem[]>([]);
+  const quotas = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.quotas : undefined;
+  const isLoading = !!selectedSemesterId && !quotas && !internshipError;
 
   // Coordinations data for rejected & accepted widgets
   const { ref: coordinationSection, reached: loadCoordinations } = useNearViewport<HTMLDivElement>();
@@ -157,28 +155,17 @@ export const QhdnDashboard: React.FC = () => {
 
   // The company catalog is independent of the selected OJT semester.
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     setCompaniesLoading(true);
-    loadAllPages(page => listCompanies({ page, limit: 100 }).then(r => r.data))
-      .then(items => { if (active) setCompanies(items); })
-      .catch(err => { if (active) setLoadError(errorMessage(err)); })
-      .finally(() => { if (active) setCompaniesLoading(false); });
-    return () => { active = false; };
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      loadAllPages(page => listCompanies({page, limit: 100}, controller.signal).then(r => r.data))
+        .then(items => { if (!controller.signal.aborted) setCompanies(items); })
+        .catch(err => { if (!controller.signal.aborted) setLoadError(errorMessage(err)); })
+        .finally(() => { if (!controller.signal.aborted) setCompaniesLoading(false); });
+    });
+    return () => controller.abort();
   }, []);
-
-  useEffect(() => {
-    let isActive = true;
-    setIsLoading(!!selectedSemesterId);
-    setLoadError("");
-    setPositions([]);
-    if (!selectedSemesterId) return;
-
-    loadAllPages(page => listPositions({ page, limit: 100, ojtSemesterId: selectedSemesterId }).then(r => r.data))
-      .then(items => { if (isActive) setPositions(items); })
-      .catch(error => { if (isActive) setLoadError(errorMessage(error)); })
-      .finally(() => { if (isActive) setIsLoading(false); });
-    return () => { isActive = false; };
-  }, [selectedSemesterId, revision]);
 
   useEffect(() => {
     setRejectedCoordinations([]);
@@ -210,27 +197,16 @@ export const QhdnDashboard: React.FC = () => {
 
   // Tính toán Quota của từng doanh nghiệp từ vị trí tuyển dụng
   const enterpriseQuotaList = useMemo(() => {
-    if (!selectedSemesterId) return [];
-    const positionMap = new Map<number, PositionListItem[]>();
-    positions.forEach((pos) => {
-      const list = positionMap.get(pos.companyId) || [];
-      list.push(pos);
-      positionMap.set(pos.companyId, list);
-    });
-
+    if (!selectedSemesterId || !quotas) return [];
+    const byCompany = new Map(quotas?.map(row => [row.companyId, row]));
+    const confirmedCounts = new Map(placementStats?.semesterId === selectedSemesterId
+      ? placementStats.companies?.map(row => [row.id, row.actualCount]) : []);
     return companies
       .map((company) => {
-        const compPositions = positionMap.get(company.id) || [];
-        const totalQuota = compPositions.reduce(
-          (sum, p) => sum + (p.capacity || 0),
-          0,
-        );
-        const remainingSlots = compPositions.reduce(
-          (sum, p) => sum + (p.remainingSlots || 0),
-          0,
-        );
-        const confirmed = placementStats?.semesterId === selectedSemesterId ? placementStats.companies?.find(row => row.id === company.id) : undefined;
-        const acceptedCount = confirmed?.actualCount ?? Math.max(0, totalQuota - remainingSlots);
+        const quota = byCompany.get(company.id);
+        const totalQuota = quota?.capacity ?? 0;
+        const remainingSlots = quota?.remainingSlots ?? 0;
+        const acceptedCount = confirmedCounts.get(company.id) ?? Math.max(0, totalQuota - remainingSlots);
 
         return {
           id: company.id,
@@ -243,7 +219,7 @@ export const QhdnDashboard: React.FC = () => {
         };
       })
       .sort((a, b) => b.totalQuota - a.totalQuota);
-  }, [companies, positions, selectedSemesterId, placementStats]);
+  }, [companies, quotas, selectedSemesterId, placementStats]);
 
   // Top 8 DN có chỉ tiêu lớn nhất
   const top8Partners = useMemo(() => {
@@ -584,7 +560,7 @@ export const QhdnDashboard: React.FC = () => {
           <p className="mt-2 text-xs text-slate-500">
             Tổng sức chứa:{" "}
             <strong className="text-slate-800 font-bold">
-              {isLoading || !selectedSemesterId || loadError ? "—" : positions.reduce((total, position) => total + (position.capacity || 0), 0)}
+              {quotas ? quotas.reduce((total, row) => total + row.capacity, 0) : "—"}
             </strong>{" "}
             slot
           </p>

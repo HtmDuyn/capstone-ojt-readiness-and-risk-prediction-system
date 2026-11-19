@@ -1,5 +1,5 @@
 import { placementBoard, supplementPlacement, recordActualReceipt } from './placement.service';
-import { dashboard, report, reportQuery, reportCsv } from './report.service';
+import { dashboardSummary, dashboard, report, reportQuery, reportCsv } from './report.service';
 import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
@@ -27,6 +27,7 @@ for(const [path,resource] of [['companies','companies'],['positions','positions'
 router.post('/ojt-coordinations',...admin,handle(req=>coordinate(req.body,req.user),201));
 router.post('/ojt-coordinations/:id/decision',...admin,handle(req=>decision(positiveId(req.params.id),req.body,req.user)));
 router.post('/ojt-coordinations/:id/reassign',...admin,handle(req=>coordinate(req.body,req.user,positiveId(req.params.id)),201));
+router.get('/qhdn/dashboard/summary',...staff,handle(req=>dashboardSummary(positiveId(req.query.ojtSemesterId,'ojtSemesterId'),req.user)));
 router.get('/qhdn/dashboard',...staff,handle(req=>dashboard(req.query,req.user)));
 router.get('/qhdn/reports',...staff,handle(req=>{
  const {type}=reportQuery(req.query,'report');return report(type!,req.query,req.user);

@@ -107,18 +107,54 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
 export async function loadAcademicProgress(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
-    const s=(await client.query('SELECT * FROM "Students" WHERE "StudentID"=$1',[studentId])).rows[0];
-    if (!s) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
-    const program=(await client.query('SELECT * FROM "TrainingPrograms" WHERE "ProgramID"=$1',[s.ProgramID])).rows[0];
-    const courses=(await client.query('SELECT pc.*,c."CourseCode" FROM "ProgramCourses" pc JOIN "Courses" c ON c."CourseID"=pc."CourseID" WHERE pc."ProgramID"=$1 ORDER BY pc."ProgramCourseID"',[s.ProgramID])).rows;
+    const {rows:[curriculum]}=await client.query<{
+      program: Row | null; policy: Row | null; courses: Row[]; aliases: Row[];
+      options: Row[]; invalidGroups: number[]; gradeWeights: Row[];
+    }>(`WITH curriculum AS (
+      SELECT "ProgramID" FROM "Students" WHERE "StudentID"=$1
+    ), courses AS (
+      SELECT pc.*, c."CourseCode" FROM "ProgramCourses" pc JOIN curriculum USING ("ProgramID")
+      JOIN "Courses" c USING ("CourseID")
+    ), selections AS (
+      SELECT "SelectionID","SelectionPurpose","ProgramID","ProgramComboID"
+      FROM "StudentComboSelections" WHERE "StudentID"=$1 AND "ConfirmedAt" IS NOT NULL
+        AND ($2::int IS NULL OR "SelectionPurpose"<>'SPECIALIZATION')
+    ), options AS (
+      SELECT sc."SelectionPurpose", opt."ProgramCourseID", cc."CourseID", cc."Credits"::text AS "Credits"
+      FROM selections sc JOIN "StudentComboCourseSelections" choice USING ("SelectionID")
+      JOIN "ComboCourses" cc USING ("ComboCourseID")
+      JOIN "ProgramSlotOptions" opt ON opt."ProgramID"=sc."ProgramID"
+        AND opt."ProgramComboID"=sc."ProgramComboID" AND opt."ComboCourseID"=cc."ComboCourseID"
+      WHERE sc."ProgramID"=(SELECT "ProgramID" FROM curriculum)
+      UNION ALL
+      SELECT 'SPECIALIZATION', opt."ProgramCourseID",cc."CourseID",cc."Credits"::text
+      FROM "ProgramSlotOptions" opt JOIN "ComboCourses" cc USING ("ComboCourseID")
+      WHERE opt."ProgramID"=(SELECT "ProgramID" FROM curriculum) AND opt."ProgramComboID"=$2 AND cc."CourseID"=ANY($3::int[])
+    ), invalid_groups AS (
+      SELECT g."ChoiceGroupID" FROM selections sc
+      JOIN "ComboCourseChoiceGroups" g USING ("ProgramComboID")
+      LEFT JOIN "ComboCourseChoiceMembers" m USING ("ChoiceGroupID")
+      LEFT JOIN "StudentComboCourseSelections" choice ON choice."SelectionID"=sc."SelectionID" AND choice."ComboCourseID"=m."ComboCourseID"
+      GROUP BY g."ChoiceGroupID",g."MinCourses",g."MaxCourses"
+      HAVING count(choice."ComboCourseID") NOT BETWEEN g."MinCourses" AND g."MaxCourses"
+    ), weights AS (
+      SELECT cc."CourseID",cc."Credits"::text AS "Credits" FROM "ComboCourses" cc JOIN "ProgramCombos" c USING ("ProgramComboID")
+      WHERE c."ProgramID"=(SELECT "ProgramID" FROM curriculum) AND c."CoursesReviewed"=true
+    )
+    SELECT (SELECT row_to_json(p) FROM "TrainingPrograms" p WHERE p."ProgramID"=curriculum."ProgramID") AS program,
+      (SELECT row_to_json(p) FROM "AcademicGradingPolicies" p WHERE p."ProgramID"=curriculum."ProgramID") AS policy,
+      coalesce((SELECT json_agg(courses ORDER BY "ProgramCourseID") FROM courses),'[]') AS courses,
+      coalesce((SELECT json_agg(eq ORDER BY eq."SourceCourseID") FROM "ProgramCourseEquivalences" eq
+        WHERE eq."ProgramID"=curriculum."ProgramID"),'[]') AS aliases,
+      coalesce((SELECT json_agg(options) FROM options),'[]') AS options,
+      ARRAY(SELECT "ChoiceGroupID" FROM invalid_groups ORDER BY "ChoiceGroupID") AS "invalidGroups",
+      coalesce((SELECT json_agg(weights) FROM weights),'[]') AS "gradeWeights" FROM curriculum`,
+      [studentId,prospective?.comboId??null,prospective?.courseIds??[]]);
+    if (!curriculum) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
+    const {courses,aliases,options,invalidGroups,gradeWeights}=curriculum;
+    const program=curriculum.program??undefined, policy=curriculum.policy??undefined;
     const attempts=(await client.query(`${resultSelect} WHERE r."StudentID"=$1`,[studentId])).rows;
-    const aliases=(await client.query('SELECT * FROM "ProgramCourseEquivalences" WHERE "ProgramID"=$1',[s.ProgramID])).rows;
-    const policy=(await client.query('SELECT * FROM "AcademicGradingPolicies" WHERE "ProgramID"=$1',[s.ProgramID])).rows[0];
-    let options=(await client.query(`SELECT sc."SelectionPurpose",opt."ProgramCourseID",cc."CourseID",cc."Credits" FROM "StudentComboSelections" sc JOIN "StudentComboCourseSelections" choice ON choice."SelectionID"=sc."SelectionID" JOIN "ComboCourses" cc ON cc."ComboCourseID"=choice."ComboCourseID" JOIN "ProgramSlotOptions" opt ON opt."ProgramID"=sc."ProgramID" AND opt."ProgramComboID"=sc."ProgramComboID" AND opt."ComboCourseID"=cc."ComboCourseID" WHERE sc."StudentID"=$1 AND sc."ProgramID"=$2 AND sc."ConfirmedAt" IS NOT NULL`,[studentId,s.ProgramID])).rows;
-    if(prospective){options=options.filter(o=>o.SelectionPurpose!=='SPECIALIZATION');options.push(...(await client.query(`SELECT opt."ProgramCourseID",cc."CourseID",cc."Credits" FROM "ProgramSlotOptions" opt JOIN "ComboCourses" cc ON cc."ComboCourseID"=opt."ComboCourseID" WHERE opt."ProgramID"=$1 AND opt."ProgramComboID"=$2 AND cc."CourseID"=ANY($3::int[])`,[s.ProgramID,prospective.comboId,prospective.courseIds])).rows);}
-    const invalidGroups=(await client.query(`SELECT g."ChoiceGroupID" FROM "StudentComboSelections" sc JOIN "ComboCourseChoiceGroups" g ON g."ProgramComboID"=sc."ProgramComboID" LEFT JOIN "ComboCourseChoiceMembers" m ON m."ChoiceGroupID"=g."ChoiceGroupID" LEFT JOIN "StudentComboCourseSelections" c ON c."SelectionID"=sc."SelectionID" AND c."ComboCourseID"=m."ComboCourseID" WHERE sc."StudentID"=$1 AND sc."ConfirmedAt" IS NOT NULL AND (NOT $2::boolean OR sc."SelectionPurpose"<>'SPECIALIZATION') GROUP BY g."ChoiceGroupID",g."MinCourses",g."MaxCourses" HAVING count(c."ComboCourseID")<g."MinCourses" OR count(c."ComboCourseID")>g."MaxCourses"`,[studentId,!!prospective])).rows;
-    const issues=invalidGroups.map(r=>`COMBO_CHOICE_GROUP_INVALID:${r.ChoiceGroupID}`);
-    const gradeWeights=(await client.query(`SELECT cc."CourseID",cc."Credits" FROM "ComboCourses" cc JOIN "ProgramCombos" c ON c."ProgramComboID"=cc."ProgramComboID" WHERE c."ProgramID"=$1 AND c."CoursesReviewed"=true`,[s.ProgramID])).rows;
+    const issues=invalidGroups.map(id=>`COMBO_CHOICE_GROUP_INVALID:${id}`);
     return {studentId,program,courses,attempts,aliases,options:invalidGroups.length?[]:options,policy,issues,gradeWeights};
 }
 

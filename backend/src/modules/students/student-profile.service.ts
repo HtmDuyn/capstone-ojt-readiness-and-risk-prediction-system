@@ -57,6 +57,7 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
       WHERE sc."StudentID"=$1 AND sc."ProgramID"=$2 AND sc."ConfirmedAt" IS NOT NULL ORDER BY sc."SelectionID"`,[id,profile.programId])).rows;
     output.comboSelections=comboSelections;
     }
+    let registrationSemester: number | null | undefined;
     if(includes.has('ojtRegistrations')){
     const totalOjt=(await c.query('SELECT count(*)::int AS n FROM "OJTRegistrations" WHERE "StudentID"=$1 AND ($2::int IS NULL OR "OJTSemesterID"=$2)',[id,selected])).rows[0].n;
     const registrations=(await c.query(`SELECT r."RegistrationID" AS id,r."OJTSemesterID" AS "ojtSemesterId",r."WindowID" AS "windowId",r."Status" AS status,r."Application" AS application,r."RegisteredAt" AS "registeredAt",
@@ -76,12 +77,13 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
       const {cvUrl,...application}=registration.application??{};
       registration.application={...application,cv:profile.cv};
     }
+    if (!selected && ojtPage.offset===0) registrationSemester=registrations[0]?.ojtSemesterId ?? null;
     output.ojtRegistrations={items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit};
     }
     // The selected semester is independent of historical-registration pagination.
     // Before registration exists, resolve curriculum stage 6 through the cohort calendar mapping;
     // the current period can still be semester 5 while preparing for the upcoming OJT.
-    const semesterId=selected??(await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID??
+    const semesterId=selected??(registrationSemester !== undefined ? registrationSemester : (await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID)??
       (await c.query(`SELECT o."OJTSemesterID" FROM "StudentAcademicPlacements" placement
        JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID" AND entry."Kind"='SEMESTER'
        JOIN "AcademicPeriods" target ON target."Kind"='SEMESTER' AND target."StartDate">=entry."StartDate"

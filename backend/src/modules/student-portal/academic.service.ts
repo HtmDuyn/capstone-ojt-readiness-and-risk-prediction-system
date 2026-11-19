@@ -10,7 +10,7 @@ import { detail as curriculumDetail } from '../curriculum/curriculum.repository'
 
 
 import { invalid, positiveId, pagination } from '../students/student.validation';
-import { ownStudent, page, publicEligibility, type Row, type Actor } from './shared';
+import { ownStudent, publicEligibility, type Row, type Actor } from './shared';
 import { earlyWarning } from './early-warning';
 import type { AssessmentReadContext } from './assessment-read-context';
 
@@ -74,7 +74,27 @@ export async function curriculumWithClient(c:PoolClient,studentId:number,program
 }
 export async function notifications(params:Row,actor:Actor,existingClient?:PoolClient) {
   if(params.unread!==undefined&&!['true','false'].includes(params.unread))throw invalid('unread must be true or false.');
-  return readTransaction(async c=>{await ownStudent(c,actor);const list=await page(c,'SELECT "NotificationID" AS id,"Title" AS title,"Content" AS content,"SentAt" AS "sentAt","IsRead" AS "isRead","Channel" AS channel,"TemplateID" AS "templateId","RelatedEntityType" AS "relatedEntityType","RelatedEntityID" AS "relatedEntityId" FROM "Notifications" WHERE "UserID"=$1 AND ($2::boolean IS NULL OR COALESCE("IsRead",false)=NOT $2)',[actor.userId,params.unread===undefined?null:params.unread==='true'],params,['unread']);return {...list,unreadCount:(await c.query('SELECT count(*)::int AS n FROM "Notifications" WHERE "UserID"=$1 AND COALESCE("IsRead",false)=false',[actor.userId])).rows[0].n};},existingClient);
+  const {page, limit, offset} = pagination(params, ['unread']);
+  if (offset > 2147483647) throw invalid('Pagination exceeds allowed range.');
+  return readTransaction(async c => {
+    await ownStudent(c, actor);
+    const unread = params.unread === undefined ? null : params.unread === 'true';
+    const {rows: [result]} = await c.query(`WITH counts AS (
+      SELECT count(*)::int AS total,
+        count(*) FILTER (WHERE NOT COALESCE("IsRead", false))::int AS unread
+      FROM "Notifications" WHERE "UserID"=$1
+    ), items AS (
+      SELECT "NotificationID" AS id, "Title" AS title, "Content" AS content, "SentAt" AS "sentAt",
+        "IsRead" AS "isRead", "Channel" AS channel, "TemplateID" AS "templateId",
+        "RelatedEntityType" AS "relatedEntityType", "RelatedEntityID" AS "relatedEntityId"
+      FROM "Notifications" WHERE "UserID"=$1 AND ($2::boolean IS NULL OR COALESCE("IsRead",false)=NOT $2)
+      ORDER BY "NotificationID" DESC LIMIT $3 OFFSET $4
+    )
+    SELECT CASE WHEN $2 IS NULL THEN total WHEN $2 THEN unread ELSE total-unread END AS total,
+      unread AS "unreadCount", (SELECT COALESCE(jsonb_agg(to_jsonb(items) ORDER BY id DESC),'[]') FROM items) AS items
+    FROM counts`, [actor.userId, unread, limit, offset]);
+    return {...result, items: await enrichListRows(c, result.items), page, limit};
+  }, existingClient);
 }
 export async function readNotification(id:number,actor:Actor,isRead:boolean) {return academicTransaction(async c=>{await ownStudent(c,actor);const r=(await c.query('UPDATE "Notifications" SET "IsRead"=$3 WHERE "NotificationID"=$1 AND "UserID"=$2 RETURNING "NotificationID" AS id,"Title" AS title,"Content" AS content,"SentAt" AS "sentAt","IsRead" AS "isRead","Channel" AS channel,"TemplateID" AS "templateId","RelatedEntityType" AS "relatedEntityType","RelatedEntityID" AS "relatedEntityId"',[id,actor.userId,isRead])).rows[0];if(!r)throw invalid('Notification not found.',404);return {...r,unreadCount:(await c.query('SELECT count(*)::int AS n FROM "Notifications" WHERE "UserID"=$1 AND COALESCE("IsRead",false)=false',[actor.userId])).rows[0].n};});}
 export async function currentAssignment(params:Row,actor:Actor,existingClient?:PoolClient) {

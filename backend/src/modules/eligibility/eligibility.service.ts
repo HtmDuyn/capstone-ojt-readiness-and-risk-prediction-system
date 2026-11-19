@@ -37,9 +37,9 @@ export async function publishRule(id:number,actorId:number,existingClient?:PoolC
  const previous=(await c.query('SELECT r."Version" FROM "OJTActiveRuleSets" a JOIN "OJTRuleSets" r ON r."RuleSetID"=a."RuleSetID" WHERE a."ProgramID"=$1 AND a."ScopeSemesterID"=$2',[r.ProgramID,r.OJTSemesterID??0])).rows[0];if(previous&&previous.Version>=r.Version)throw invalid('A new active rule must have a greater version.',409,'RULE_VERSION_CONFLICT');
  const saved=(await c.query(`UPDATE "OJTRuleSets" SET "Status"='PUBLISHED',"PublishedBy"=$2,"PublishedAt"=now() WHERE "RuleSetID"=$1 RETURNING *`,[id,actorId])).rows[0];await c.query(`INSERT INTO "OJTActiveRuleSets" VALUES ($1,$2,$3) ON CONFLICT ("ProgramID","ScopeSemesterID") DO UPDATE SET "RuleSetID"=EXCLUDED."RuleSetID"`,[r.ProgramID,r.OJTSemesterID??0,id]);await audit(c,actorId,'OJTRuleSets',id,'PUBLISH',ruleApi(r),ruleApi(saved));return ruleApi(saved);},existingClient);}
 // The source snapshot contains academic data only; no account credentials or personal contact details.
-async function inputSnapshot(c:PoolClient,studentId:number,semesterId:number,pinnedRule?:Row|null,prospectiveProgress?:Row,lockSource=true,loaded?:AcademicProgressData) {
+async function inputSnapshot(c:PoolClient,studentId:number,semesterId:number,pinnedRule?:Row|null,prospectiveProgress?:Row,lockSource=true,loaded?:AcademicProgressData,knownTerm?:Row) {
  const s=(await c.query(`SELECT s."StudentID",s."ProgramID",s."Status",u."Status" AS "AccountStatus" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."StudentID"=$1${lockSource?' FOR UPDATE OF s,u':''}`,[studentId])).rows[0];if(!s)throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
- const term=await semester(c,semesterId);const rule=pinnedRule===undefined?await activeRule(c,s.ProgramID,semesterId):pinnedRule;
+ const term=knownTerm??await semester(c,semesterId);const rule=pinnedRule===undefined?await activeRule(c,s.ProgramID,semesterId):pinnedRule;
  if(rule&&(rule.ProgramID!==s.ProgramID||(rule.OJTSemesterID!==null&&rule.OJTSemesterID!==semesterId)||rule.Status!=='PUBLISHED'))throw invalid('Rule does not match the student curriculum and semester.',409,'RULE_SCOPE_CHANGED');
  const progress=prospectiveProgress??await academicProgressWithClient(c,studentId);const {computedAt,...stableProgress}=progress as Row;
  const attempts=loaded?.attempts??(await c.query(`${resultSelect} WHERE r."StudentID"=$1 ORDER BY r."ResultID"`,[studentId])).rows;
@@ -81,14 +81,21 @@ export async function eligibility(id:number,params:Row,existingClient?:PoolClien
  for(const key of Object.keys(params))if(key!=='ojtSemesterId')throw invalid(`Unknown query parameter: ${key}.`);
  const selected=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
  return academicTransaction(async c=>{
-  if(!(await c.query('SELECT 1 FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL',[id])).rowCount)throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
-  const semesters=(await c.query('SELECT "OJTSemesterID" FROM "OJTSemesters" WHERE ($1::int IS NULL OR "OJTSemesterID"=$1) ORDER BY "OJTSemesterID" DESC',[selected])).rows;
+  const scope=await c.query(`SELECT term.* FROM "Students" student
+    LEFT JOIN "OJTSemesters" term ON ($2::int IS NULL OR term."OJTSemesterID"=$2)
+    WHERE student."StudentID"=$1 AND student."DeletedAt" IS NULL ORDER BY term."OJTSemesterID" DESC`,[id,selected]);
+  if(!scope.rows.length)throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
+  const semesters=scope.rows.filter(term=>term.OJTSemesterID!==null);
   if(selected&&!semesters.length)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
   const items:Row[]=[];
   for(const term of semesters){
-   const sid=term.OJTSemesterID,input=await inputSnapshot(c,id,sid,undefined,progress,!existingClient,loaded),hash=fingerprint(input);
-   const latest=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 ORDER BY e."CheckID" DESC LIMIT 1`,[id,sid])).rows[0];
-   const official=(await c.query(`${checkSelect} WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2 AND f."CheckID" IS NOT NULL ORDER BY f."ConfirmedAt" DESC,e."CheckID" DESC LIMIT 1`,[id,sid])).rows[0];
+   const sid=term.OJTSemesterID,input=await inputSnapshot(c,id,sid,undefined,progress,!existingClient,loaded,term),hash=fingerprint(input);
+   const scopedChecks=checkSelect+' WHERE e."StudentID"=$1 AND e."OJTSemesterID"=$2';
+   const checks=await c.query(`SELECT latest.*,false AS official FROM (
+     ${scopedChecks} ORDER BY e."CheckID" DESC LIMIT 1) latest
+     UNION ALL SELECT confirmed.*,true AS official FROM (
+     ${scopedChecks} AND f."CheckID" IS NOT NULL ORDER BY f."ConfirmedAt" DESC,e."CheckID" DESC LIMIT 1) confirmed`,[id,sid]);
+   const latest=checks.rows.find(row=>!row.official),official=checks.rows.find(row=>row.official);
    items.push({studentId:id,ojtSemesterId:sid,current:evaluateEligibility(input),latest:latest?{...checkApi(latest),isStale:latest.SourceHash!==hash}:null,official:official?{...checkApi(official),isStale:official.SourceHash!==hash||!await assessmentCurrent(c,official)}:null});
   }
   const enriched=await enrichListRows(c,items);

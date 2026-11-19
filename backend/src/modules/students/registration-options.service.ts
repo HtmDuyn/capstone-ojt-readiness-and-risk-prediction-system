@@ -58,18 +58,19 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       if(params.ojtSemesterId!==undefined)add('w."OJTSemesterID"=?',positiveId(params.ojtSemesterId,'ojtSemesterId'));
     }
     from+=' JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=w."AcademicPeriodID" JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID"';
-    const filter=' WHERE '+where.join(' AND '),total=(await c.query('SELECT count(*)::int AS n '+from+filter,args)).rows[0].n;
+    const filter=' WHERE '+where.join(' AND ');
     const extra=kind==='combo'?`,own."ProgramID" AS "RosterProgramID",own."ScopeSnapshot" AS "RosterSnapshot",
       GREATEST(w."EndsAt",COALESCE((SELECT max(ext."EndsAt") FROM "ComboExtensionStudents" es JOIN "ComboWindowExtensions" ext ON ext."ExtensionID"=es."ExtensionID" WHERE es."WindowID"=w."WindowID" AND es."StudentID"=$1),w."EndsAt")) AS "EffectiveEndsAt",
       (SELECT jsonb_build_object('comboId',ev."ProgramComboID",'courseIds',ev."CourseIDs",'choice',ev."ChoiceSnapshot",'submittedAt',ev."CreatedAt") FROM "StudentComboSelectionEvents" ev WHERE ev."WindowID"=w."WindowID" AND ev."StudentID"=$1 AND ev."EventType"='SUBMITTED' ORDER BY ev."EventID" DESC LIMIT 1) AS selection`:
       catalog?'':`,(SELECT jsonb_build_object('id',r."RegistrationID",'status',r."Status",'application',r."Application",'registeredAt',r."RegisteredAt",
         'latestDecision',(SELECT co."Decision" FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1))
         FROM "OJTRegistrations" r WHERE r."StudentID"=$1 AND r."OJTSemesterID"=w."OJTSemesterID") AS registration`;
-    const rows=(await c.query(`SELECT w.*,${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
+    const rows=(await c.query(`SELECT count(*) OVER()::int AS "totalRows",clock_timestamp() AS "checkedAt",w.*,${periodFields}${extra} ${from}${filter} ORDER BY w."WindowID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,page.limit,page.offset])).rows;
+    const total=rows[0]?.totalRows ?? (page.offset ? (await c.query('SELECT count(*)::int AS n '+from+filter,args)).rows[0].n : 0);
     if(catalog)return {studentId:s.StudentID,items:rows.map(w=>({id:w.WindowID,name:w.Name,
       academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,period:w.period,semester:w.semester,
       startsAt:w.StartsAt,endsAt:w.EndsAt,status:w.Status})),total,page:page.page,limit:page.limit};
-    const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
+    const now=rows[0]?.checkedAt;
     const options=kind==='combo'&&rows.length&&s.ProgramStatus==='PUBLISHED'?(await combos(c,s.ProgramID)).filter(b=>b.coursesReviewed&&b.choiceGroups.length&&purpose({ComboCode:b.code,SelectionGroup:b.selectionGroup})==='SPECIALIZATION'):[];
     const confirmed=kind==='combo'&&rows.length?(await activeChoice(c,s.StudentID,s.ProgramID))[0]??null:null;
     const items:Row[]=[];

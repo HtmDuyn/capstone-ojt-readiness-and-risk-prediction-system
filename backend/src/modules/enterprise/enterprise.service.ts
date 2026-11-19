@@ -120,6 +120,31 @@ const candidateFields = `CASE WHEN co."Decision"<>'PENDING' THEN false ELSE NOT 
   co."DecisionAt" AS "decisionAt",co."RejectReason" AS "rejectReason",
   NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID") AS "isLatestCoordination"`;
 
+export async function dashboardCandidates(actor: Actor) {
+  return readTransaction(async c => {
+    const companyId = await enterpriseScope(c, actor);
+    const {rows: [summary]} = await c.query(`WITH latest AS (
+      SELECT co."CoordinationID", co."PositionID", co."CoordinatedAt", co."Decision", r."StudentID"
+      FROM "StudentEnterpriseCoordination" co
+      JOIN "OJTRegistrations" r USING ("RegistrationID")
+      WHERE co."EnterpriseID"=$1 AND NOT EXISTS (
+        SELECT 1 FROM "StudentEnterpriseCoordination" newer
+        WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
+    ), pending AS (
+      SELECT l."CoordinationID" AS id, l."CoordinatedAt" AS "introducedAt",
+        u."FullName" AS "fullName", s."StudentCode" AS "studentCode", p."Title" AS "positionTitle"
+      FROM latest l JOIN "Students" s USING ("StudentID")
+      JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipPositions" p USING ("PositionID")
+      WHERE COALESCE(l."Decision",'PENDING')='PENDING' AND NOT EXISTS (
+        SELECT 1 FROM "OJTActualReceipts" receipt WHERE receipt."CoordinationID"=l."CoordinationID" AND receipt."ReceivedAt" IS NOT NULL)
+      ORDER BY l."CoordinatedAt" DESC NULLS LAST, id DESC LIMIT 10
+    )
+    SELECT (SELECT count(DISTINCT "StudentID")::int FROM latest WHERE "Decision"='REJECTED') AS "rejectedCount",
+      COALESCE(jsonb_agg(to_jsonb(pending) ORDER BY "introducedAt" DESC NULLS LAST,id DESC),'[]') AS items FROM pending`, [companyId]);
+    return summary;
+  });
+}
+
 export async function enterpriseCandidates(params: Row, actor: Actor) {
   const hasPagination = params.page !== undefined || params.limit !== undefined;
   const page = pagination(params,['studentId','candidateId','academicYearId','ojtSemesterId','positionId','decision','search']);

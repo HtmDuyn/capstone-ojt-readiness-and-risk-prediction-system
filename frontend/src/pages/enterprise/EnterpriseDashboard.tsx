@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -15,12 +15,12 @@ import {
   Clock3,
   CalendarClock,
 } from 'lucide-react';
-import { displayTaskTime, vietnamTaskMinute } from '@/utils/taskTime';
+import { displayTaskTime } from '@/utils/taskTime';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   enterpriseService,
-  type EnterpriseCandidateItem,
-  type EnterpriseInternshipTask,
+  type DashboardCandidate,
+  type DashboardTaskSummary,
   type RecruitmentPost,
 } from '@/services/enterpriseService';
 import { loadAllPages, recruitmentTotals } from '@/components/enterprise/recruitment';
@@ -109,12 +109,14 @@ export const EnterpriseDashboard: React.FC = () => {
   const { profile, companyId, loading, error: profileError, reload } = useEnterprise();
   const summary = profile?.summary;
   const [revision, setRevision] = useState(0);
-  const [tasks, setTasks] = useState<EnterpriseInternshipTask[]>([]);
+  const [taskSummary, setTaskSummary] = useState<DashboardTaskSummary>({
+    total: 0, completed: 0, inProgress: 0, todo: 0, overdue: 0, dueSoon: 0, attention: [],
+  });
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState(emptyDashboardStats);
   const [recruitmentPosts, setRecruitmentPosts] = useState<RecruitmentPost[]>([]);
-  const [pendingCandidates, setPendingCandidates] = useState<EnterpriseCandidateItem[]>([]);
+  const [pendingCandidates, setPendingCandidates] = useState<DashboardCandidate[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [chartAnimated, setChartAnimated] = useState(false);
@@ -126,30 +128,6 @@ export const EnterpriseDashboard: React.FC = () => {
     description: '',
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const taskSummary = useMemo(() => {
-    const today = new Date();
-
-    const dueLimit = new Date(today);
-    dueLimit.setDate(dueLimit.getDate() + 7);
-    const dueLimitKey = vietnamTaskMinute(dueLimit).slice(0,10);
-    const activeTasks = tasks.filter(task => task.enterpriseStatus !== 'DONE');
-
-    return {
-      total: tasks.length,
-      completed: tasks.filter(task => task.enterpriseStatus === 'DONE').length,
-      inProgress: tasks.filter(task => task.status.toUpperCase() === 'IN_PROGRESS').length,
-      todo: tasks.filter(task => task.enterpriseStatus !== 'DONE' && task.status.toUpperCase() !== 'IN_PROGRESS').length,
-      overdue: activeTasks.filter(task => Boolean(task.dueDate) && task.enterpriseStatus === 'OVERDUE').length,
-      dueSoon: activeTasks
-        .filter(task => Boolean(task.dueDate) && task.enterpriseStatus !== 'OVERDUE' && task.dueDate!.slice(0, 10) <= dueLimitKey)
-        .sort((a, b) => (a.dueAt || a.dueDate || '').localeCompare(b.dueAt || b.dueDate || '')),
-      attention: activeTasks
-        .filter(task => Boolean(task.dueDate) && task.dueDate!.slice(0, 10) <= dueLimitKey)
-        .sort((a, b) => (a.dueAt || a.dueDate || '').localeCompare(b.dueAt || b.dueDate || ''))
-        .slice(0, 3),
-    };
-  }, [tasks]);
-
   useEffect(() => {
     if (loading) return;
     if (profileError || !companyId) {
@@ -164,45 +142,19 @@ export const EnterpriseDashboard: React.FC = () => {
       setStatsError(null);
       try {
         if (!summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
-        const [posts, rejectedCandidates, pendingCandidateList] = await Promise.all([
+        const [posts, candidates] = await Promise.all([
           loadAllPages<RecruitmentPost>(
             page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
             controller.signal,
             'danh sách tin tuyển dụng',
           ),
-          loadAllPages<EnterpriseCandidateItem>(
-            page => enterpriseService.listCandidates({ decision: 'REJECTED', page, limit: 100 }, controller.signal),
-            controller.signal,
-            'danh sách hồ sơ bị từ chối',
-          ),
-          loadAllPages<EnterpriseCandidateItem>(
-            page => enterpriseService.listCandidates({ decision: 'PENDING', page, limit: 100 }, controller.signal),
-            controller.signal,
-            'danh sách hồ sơ chờ duyệt',
-          ),
+          enterpriseService.dashboardCandidates(controller.signal),
         ]);
         if (controller.signal.aborted) return;
 
         const publishedPosts = posts.filter(post => post.status === 'PUBLISHED'
           && (!post.deadlineAt || Date.parse(post.deadlineAt) > Date.now()));
         const currentSummary = summary;
-        const rejectedStudents = new Set(
-          rejectedCandidates
-            .filter(candidate => candidate.decision === 'REJECTED' && candidate.isLatestCoordination)
-            .map(candidate => candidate.studentId)
-        );
-        const latestPendingCandidates = pendingCandidateList
-          .filter(candidate =>
-            candidate.decision === 'PENDING'
-            && candidate.isLatestCoordination
-            && !candidate.receivedAt
-          )
-          .sort((a, b) => {
-            const timeA = Date.parse(a.introducedAt || '');
-            const timeB = Date.parse(b.introducedAt || '');
-            return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
-          })
-          .slice(0, 10);
         const counts = [
           currentSummary.pendingCandidates,
           currentSummary.acceptedInterns,
@@ -210,13 +162,13 @@ export const EnterpriseDashboard: React.FC = () => {
           currentSummary.activeInterns,
           currentSummary.pendingPosts,
           currentSummary.publishedPosts,
-          rejectedStudents.size,
+          candidates.rejectedCount,
         ];
         if (!counts.every(count => Number.isSafeInteger(count) && count >= 0)) {
           throw new Error('Chưa tải được đầy đủ số liệu thống kê. Vui lòng thử lại.');
         }
         setRecruitmentPosts(publishedPosts);
-        setPendingCandidates(latestPendingCandidates);
+        setPendingCandidates(candidates.items);
         setDashboardStats({
           totalRecruitmentPosts: posts.length,
           publishedRecruitmentPosts: publishedPosts.length,
@@ -224,7 +176,7 @@ export const EnterpriseDashboard: React.FC = () => {
           remainingPositions: recruitmentTotals(publishedPosts).remaining,
           pendingCandidates: currentSummary.pendingCandidates,
           acceptedInterns: currentSummary.acceptedInterns,
-          rejectedCandidates: rejectedStudents.size,
+          rejectedCandidates: candidates.rejectedCount,
           activeInterns: currentSummary.activeInterns,
           completedInterns: currentSummary.completedInterns,
         });
@@ -271,23 +223,8 @@ export const EnterpriseDashboard: React.FC = () => {
       setTasksLoading(true);
       setTasksError(null);
       try {
-        // Truyền companyId — bắt buộc để backend scope đúng doanh nghiệp
-        const firstPage = await enterpriseService.listInternshipTasks(companyId, { page: 1, limit: 100 }, controller.signal);
-        if (!firstPage?.success || !firstPage.data) {
-          throw new Error('Không thể tải dữ liệu tiến độ task');
-        }
-
-        const tasks = [...firstPage.data.items];
-        const totalPages = Math.ceil(firstPage.data.total / firstPage.data.limit);
-        for (let page = 2; page <= totalPages; page += 1) {
-          const response = await enterpriseService.listInternshipTasks(companyId, { page, limit: 100 }, controller.signal);
-          if (!response?.success || !response.data) {
-            throw new Error(`Không thể tải dữ liệu task ở trang ${page}`);
-          }
-          tasks.push(...response.data.items);
-        }
-
-        if (!controller.signal.aborted) setTasks(tasks);
+        const data = await enterpriseService.dashboardTasks(controller.signal);
+        if (!controller.signal.aborted) setTaskSummary(data);
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu tiến độ task';
@@ -326,7 +263,7 @@ export const EnterpriseDashboard: React.FC = () => {
   const statCards = [
     {
       label: 'Hồ sơ chờ duyệt',
-      value: dashboardStats.pendingCandidates,
+      value: profileError ? undefined : summary?.pendingCandidates,
       detail: 'Ứng viên đang chờ phản hồi',
       icon: Users,
       to: '/enterprise/candidates',
@@ -334,7 +271,7 @@ export const EnterpriseDashboard: React.FC = () => {
     },
     {
       label: 'Đã tiếp nhận',
-      value: dashboardStats.activeInterns,
+      value: profileError ? undefined : summary?.activeInterns,
       detail: 'Đã tiếp nhận và chưa kết thúc thực tập',
       icon: BriefcaseBusiness,
       to: '/enterprise/interns',
@@ -342,7 +279,7 @@ export const EnterpriseDashboard: React.FC = () => {
     },
     {
       label: 'Đã hoàn thành',
-      value: dashboardStats.completedInterns,
+      value: profileError ? undefined : summary?.completedInterns,
       detail: 'Sinh viên đã được chấm điểm OJT',
       icon: CheckCircle2,
       to: '/enterprise/interns',
@@ -350,7 +287,7 @@ export const EnterpriseDashboard: React.FC = () => {
     },
     {
       label: 'Tin tuyển dụng',
-      value: dashboardStats.totalRecruitmentPosts,
+      value: statsLoading || statsError ? undefined : dashboardStats.totalRecruitmentPosts,
       detail: `${dashboardStats.publishedRecruitmentPosts} tin đang hiển thị${dashboardStats.pendingRecruitmentPosts ? ` · ${dashboardStats.pendingRecruitmentPosts} chờ duyệt` : ''}`,
       icon: BriefcaseBusiness,
       to: '/enterprise/jobs',
@@ -358,7 +295,7 @@ export const EnterpriseDashboard: React.FC = () => {
     },
     {
       label: 'Vị trí còn trống',
-      value: dashboardStats.remainingPositions,
+      value: statsLoading || statsError ? undefined : dashboardStats.remainingPositions,
       detail: 'Trong các tin đang tuyển',
       icon: ClipboardCheck,
       to: '/enterprise/jobs',
@@ -428,7 +365,7 @@ export const EnterpriseDashboard: React.FC = () => {
                     {stat.label}
                   </p>
                   <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">
-                    {statsLoading ? '—' : statsError ? '—' : stat.value}
+                    {stat.value ?? '—'}
                   </p>
                 </div>
                 <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${statTones[stat.tone]}`}>
@@ -598,7 +535,7 @@ export const EnterpriseDashboard: React.FC = () => {
                     <span className={taskSummary.overdue > 0 ? 'text-rose-600' : 'text-slate-500'}>
                       {taskSummary.overdue} task quá hạn
                     </span>
-                    <span className="text-amber-600">{taskSummary.dueSoon.length} sắp đến hạn</span>
+                    <span className="text-amber-600">{taskSummary.dueSoon} sắp đến hạn</span>
                   </div>
                 </div>
                 {taskSummary.attention.length > 0 ? (
@@ -613,7 +550,7 @@ export const EnterpriseDashboard: React.FC = () => {
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[10px] font-bold text-slate-700">{task.name}</p>
-                            <p className="truncate text-[9px] text-slate-400">{task.student?.fullName || task.fullName || 'Sinh viên'}</p>
+                            <p className="truncate text-[9px] text-slate-400">{task.fullName || 'Sinh viên'}</p>
                           </div>
                           <span className={`shrink-0 text-[9px] font-bold ${overdue ? 'text-rose-600' : 'text-amber-600'}`}>
                             {displayTaskTime(dueDate)}
@@ -661,11 +598,11 @@ export const EnterpriseDashboard: React.FC = () => {
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold text-slate-800">
-                          {candidate.student.fullName}
+                          {candidate.fullName}
                         </p>
                         <p className="truncate text-xs text-slate-500">
-                          {candidate.student.studentCode}
-                          {candidate.position.title ? ` · ${candidate.position.title}` : ''}
+                          {candidate.studentCode}
+                          {candidate.positionTitle ? ` · ${candidate.positionTitle}` : ''}
                         </p>
                       </div>
                       <span className="shrink-0 text-right text-[11px] font-semibold text-slate-400">
