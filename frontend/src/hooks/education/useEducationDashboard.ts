@@ -1,4 +1,4 @@
-import { clearEducationReadCache, educationRead } from '@/utils/education/educationReadCache';
+import { clearSharedReads, sharedRead } from '@/utils/shared/sharedRead';
 import { educationOverviewService } from '@/services/educationService';
 import { academicReportingService } from '@/services/educationService';
 import { getAllItems, getJson } from '@/services/educationService';
@@ -92,9 +92,9 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
       setFiltersError("");
 
       const results = await Promise.allSettled([
-        educationRead('catalog:years', () => getAllItems(API_PATHS.years), controller.signal),
-        educationRead('catalog:periods', () => getAllItems(API_PATHS.periods), controller.signal),
-        educationRead('catalog:cohorts', () => academicReportingService.cohorts(), controller.signal),
+        sharedRead('catalog:years', () => getAllItems(API_PATHS.years), controller.signal),
+        sharedRead('catalog:periods', () => getAllItems(API_PATHS.periods), controller.signal),
+        sharedRead('catalog:cohorts', () => academicReportingService.cohorts(), controller.signal),
       ]);
 
       if (controller.signal.aborted) return;
@@ -192,7 +192,7 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
     if (!loadCourseDemand) return;
     const controller = new AbortController();
     setCourseDemandLoading(true); setCourseDemandError(''); setCourseDemandData(null);
-    educationRead(`demand:${JSON.stringify(dashboardParams)}`, () =>
+    sharedRead(`demand:${JSON.stringify(dashboardParams)}`, () =>
       getAllItems(API_PATHS.courseDemand, dashboardParams), controller.signal)
       .then(data => { if (!controller.signal.aborted) setCourseDemandData(data); })
       .catch(error => { if (!controller.signal.aborted && !isCanceledRequest(error)) setCourseDemandError(`Không tải được nhu cầu học phần: ${getErrorMessage(error)}`); })
@@ -215,7 +215,7 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
       setAlertsData(null);
 
       try {
-        const response = await educationRead(`alerts:${JSON.stringify(dashboardParams)}`, () =>
+        const response = await sharedRead(`alerts:${JSON.stringify(dashboardParams)}`, () =>
           getAllItems<AlertRow>(API_PATHS.alerts, dashboardParams), controller.signal);
 
         if (controller.signal.aborted) return;
@@ -331,7 +331,7 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
      ===================================================== */
 
   const handleRefresh = () => {
-    clearEducationReadCache();
+    clearSharedReads();
     setRefreshKey((current) => current + 1);
   };
 

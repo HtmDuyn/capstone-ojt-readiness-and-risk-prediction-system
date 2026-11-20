@@ -1,15 +1,15 @@
 // Share concurrent requests only. Once a read finishes, the next read must
-// contact the server again. Never persist student data or tokens to storage.
+// contact the server again. Keep results out of persistent storage.
 const MAX_ENTRIES = 1000;
 interface Entry { value: Promise<unknown> }
 const entries = new Map<string, Entry>();
 let session: string | null | undefined;
 
-export function clearEducationReadCache() {
+export function clearSharedReads() {
   entries.clear();
 }
 
-export function educationRead<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+export function sharedRead<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   signal?.throwIfAborted();
   const token = localStorage.getItem('ojt_auth_token');
   if (session !== token) { entries.clear(); session = token; }

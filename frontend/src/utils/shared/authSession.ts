@@ -1,4 +1,4 @@
-import { clearEducationReadCache } from '../education/educationReadCache';
+import { clearSharedReads } from './sharedRead';
 
 export const SESSION_EXPIRED_EVENT = 'ojt:session-expired';
 export function tokenExpiry(token: string): number {
@@ -13,7 +13,7 @@ export function expireSession(rejectedToken: string | null) {
   if (!rejectedToken || localStorage.getItem('ojt_auth_token') !== rejectedToken) return;
   localStorage.removeItem('ojt_auth_token');
   localStorage.removeItem('ojt_auth_user');
-  clearEducationReadCache();
+  clearSharedReads();
   window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 }
 export function expireBearerSession(authorization: unknown) {

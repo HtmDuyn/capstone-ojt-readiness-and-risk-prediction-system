@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios';
 import { enterpriseService, type PaginatedResponse, type RecruitmentPost, type RecruitmentWindow } from '../../services/enterpriseService';
+import { loadAllPages as loadPages } from '../shared/loadAllPages';
 
 export const recruitmentStatusLabels: Record<RecruitmentPost['status'], string> = {
   DRAFT: 'Bản nháp', PENDING_REVIEW: 'Tin cũ chưa công bố', PUBLISHED: 'Đang tuyển',
@@ -72,23 +73,27 @@ export async function loadAllPages<T extends { id: number }>(
   signal: AbortSignal,
   dataLabel = 'dữ liệu tuyển dụng',
 ) {
-  if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
-  const first = await fetchPage(1);
-  if (!first.success || !first.data || first.data.limit <= 0) throw new Error(`Không thể tải ${dataLabel}.`);
-  const items = [...first.data.items];
-  const totalPages = Math.ceil(first.data.total / first.data.limit);
+  return uniqueById(await loadPages(async page => {
+    const response = await fetchPage(page);
+    if (!response.success || !response.data || response.data.limit <= 0)
+      throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
+    return response.data;
+  }, signal));
+}
 
-  // Tải tối đa hai trang mỗi lượt để giảm thời gian chờ nhưng không gây quá tải API.
-  for (let page = 2; page <= totalPages; page += 2) {
-    if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
-    const pageNumbers = [page, ...(page + 1 <= totalPages ? [page + 1] : [])];
-    const responses = await Promise.all(pageNumbers.map(nextPage => fetchPage(nextPage)));
-    for (const response of responses) {
-      if (!response.success || !response.data) throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
-      items.push(...response.data.items);
-    }
-  }
-  return uniqueById(items);
+export async function loadRecruitmentOverview(publishedCount: number, signal: AbortSignal) {
+  const label = 'danh sách tin tuyển dụng';
+  const first = await enterpriseService.listRecruitmentPosts({ page: 1, limit: 100 }, signal);
+  if (!first.success || !first.data || first.data.limit <= 0) throw new Error(`Không thể tải ${label}.`);
+  const { items, total, limit } = first.data;
+  const useStatusFilter = Math.max(1, Math.ceil(publishedCount / limit)) < Math.ceil(total / limit);
+  const posts = total <= limit ? items : await loadAllPages(page => {
+    if (page === 1 && !useStatusFilter) return Promise.resolve(first);
+    return enterpriseService.listRecruitmentPosts({ page, limit, ...(useStatusFilter ? { status: 'PUBLISHED' } : {}) }, signal);
+  }, signal, label);
+  const now = Date.now();
+  return { total, publishedPosts: posts.filter(post => post.status === 'PUBLISHED'
+    && (!post.deadlineAt || Date.parse(post.deadlineAt) > now)) };
 }
 
 export async function loadRecruitmentData(signal: AbortSignal, deleted = false) {

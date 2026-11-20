@@ -33,9 +33,9 @@ export function sortOjtTargets<T extends Target>(targets: T[], key: OjtSortKey |
     }
   };
   const factor = direction === 'asc' ? 1 : -1;
-  return [...targets].sort((a, b) => {
-    const left = value(a), right = value(b);
+  return targets.map(target => ({ target, value: value(target) })).sort((a, b) => {
+    const left = a.value, right = b.value;
     if (left === null || right === null) return left === right ? 0 : (left === null ? 1 : -1);
     return factor * (typeof left === 'number' && typeof right === 'number' ? left - right : collator.compare(String(left), String(right)));
-  });
+  }).map(item => item.target);
 }

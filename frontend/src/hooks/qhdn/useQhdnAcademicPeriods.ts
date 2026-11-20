@@ -2,25 +2,27 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAcademicPeriods } from "@/services/qhdnService";
 import { errorMessage } from "@/components/qhdn/QhdnUi";
 import { loadAllPages } from "@/utils/shared/loadAllPages";
+import { sharedRead } from "@/utils/shared/sharedRead";
 import { academicYears, linkedOjtSemesterId, preferredAcademicPeriod } from "@/utils/qhdn/qhdnAcademicPeriods";
 import type { AcademicPeriodItem } from "@/types/qhdn/qhdnTypes";
 
 export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, semestersOnly = false) {
-  const [periods, setPeriods] = useState<AcademicPeriodItem[]>([]);
+  const [catalog, setCatalog] = useState<AcademicPeriodItem[]>([]);
   const [yearId, setYearId] = useState("");
   const [periodId, setPeriodId] = useState(allowAll ? "ALL" : "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let active = true;
-    loadAllPages((page) => getAcademicPeriods({ page, limit: 100 }))
-      .then((items) => { if (active) setPeriods(semestersOnly ? items.filter(period => period.kind === 'SEMESTER') : items); })
-      .catch((e) => { if (active) setError(errorMessage(e)); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [semestersOnly]);
+    const controller = new AbortController();
+    sharedRead('catalog:qhdn-periods', () => loadAllPages(page => getAcademicPeriods({ page, limit: 100 })), controller.signal)
+      .then((items) => { if (!controller.signal.aborted) setCatalog(items); })
+      .catch((e) => { if (!controller.signal.aborted) setError(errorMessage(e)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, []);
 
+  const periods = useMemo(() => semestersOnly ? catalog.filter(period => period.kind === 'SEMESTER') : catalog, [catalog, semestersOnly]);
   const years = useMemo(() => academicYears(periods), [periods]);
   const filteredPeriods = useMemo(() => periods.filter((p) =>
     !yearId || String(p.academicYearId) === yearId,

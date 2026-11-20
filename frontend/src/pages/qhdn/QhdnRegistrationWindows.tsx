@@ -25,15 +25,17 @@ export default function QhdnRegistrationWindows() {
   const refresh = () => setRevision(value => value + 1);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     setWindows([]); setError('');
     if (!semester.semesterId) { setLoading(false); return; }
     setLoading(true);
-    loadAllPages(page => listRegistrationWindows({ ojtSemesterId: Number(semester.semesterId), page, limit: 100 }).then(response => response.data))
-      .then(items => { if (active) setWindows(items.filter(window => !window.recruitmentRoundId)); })
-      .catch(error => { if (active) setError(errorMessage(error)); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    Promise.resolve().then(() => loadAllPages(page => listRegistrationWindows(
+      { ojtSemesterId: Number(semester.semesterId), page, limit: 100 }, controller.signal,
+    ).then(response => response.data), controller.signal))
+      .then(items => { if (!controller.signal.aborted) setWindows(items.filter(window => !window.recruitmentRoundId)); })
+      .catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [semester.semesterId, revision]);
 
   useEffect(() => { setTask(null); setTaskError(''); setPage(1); setMessage(''); }, [semester.periodId]);

@@ -91,7 +91,11 @@ export default function QhdnEnterpriseManagement() {
   const scopeOjtIds = useMemo(() => new Set(catalog.filteredPeriods
     .map(linkedOjtSemesterId).filter((id): id is number => id !== null)), [catalog.filteredPeriods]);
   const [companies, setCompanies] = useState<CompanyListItem[]>([]),
-    [positions, setPositions] = useState<PositionListItem[]>([]);
+    [positionCatalog, setPositions] = useState<PositionListItem[]>([]);
+  const positions = useMemo(() => catalog.allPeriods
+    ? positionCatalog.filter(position => scopeOjtIds.has(position.ojtSemesterId)) : positionCatalog,
+    [catalog.allPeriods, positionCatalog, scopeOjtIds]);
+  const loadPositions = !catalog.loading && (catalog.allPeriods ? scopeOjtIds.size > 0 : !!semester);
   const [loading, setLoading] = useState(true),
     [positionsLoading, setPositionsLoading] = useState(true);
   const [error, setError] = useState(""),
@@ -129,62 +133,56 @@ export default function QhdnEnterpriseManagement() {
   };
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    const { signal } = controller;
     setLoading(true);
     setError("");
-    loadAllPages((p) =>
-        listCompanies({ page: p, limit: 100 }).then((r) => r.data),
-      )
+    Promise.resolve().then(() => loadAllPages(
+      page => listCompanies({ page, limit: 100 }, signal).then(response => response.data), signal,
+    ))
       .then((c) => {
-        if (active) {
+        if (!signal.aborted) {
           setCompanies(c);
         }
       })
       .catch((e) => {
-        if (active) {
+        if (!signal.aborted) {
           setError(errorMessage(e));
           setCompanies([]);
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!signal.aborted) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, [revision]);
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    const { signal } = controller;
     setPositions([]);
     setPositionsLoading(true);
     setPositionsError("");
-    if (catalog.loading || (!catalog.allPeriods && !semester) ||
-      (catalog.allPeriods && !scopeOjtIds.size)) {
+    if (!loadPositions) {
       setPositionsLoading(catalog.loading);
       return;
     }
     // Tải chung vị trí cho toàn bảng, không gọi lặp theo từng doanh nghiệp.
-    loadAllPages((p) =>
+    Promise.resolve().then(() => loadAllPages(page =>
       listPositions({
-        page: p,
+        page,
         limit: 100,
         ...(semester ? { ojtSemesterId: Number(semester) } : {}),
-      }).then((r) => r.data),
-    )
-      .then((p) => {
-        if (active) setPositions(catalog.allPeriods
-          ? p.filter((position) => scopeOjtIds.has(position.ojtSemesterId)) : p);
-      })
+      }, signal).then(response => response.data), signal,
+    ))
+      .then(items => { if (!signal.aborted) setPositions(items); })
       .catch((e) => {
-        if (active) setPositionsError(errorMessage(e));
+        if (!signal.aborted) setPositionsError(errorMessage(e));
       })
       .finally(() => {
-        if (active) setPositionsLoading(false);
+        if (!signal.aborted) setPositionsLoading(false);
       });
-    return () => {
-      active = false;
-    };
-  }, [revision, semester, catalog.loading, catalog.allPeriods, catalog.yearId, scopeOjtIds]);
+    return () => controller.abort();
+  }, [revision, semester, catalog.loading, loadPositions]);
   useEffect(() => setPage(1), [search, status, recruiting, catalog.periodId, catalog.yearId]);
   const scope = catalog.selectedPeriod?.name ||
     (catalog.yearId ? "Năm học " + catalog.years.find((y) => String(y.id) === catalog.yearId)?.code : "Tất cả học kỳ chính");

@@ -39,6 +39,7 @@ import { PageBanner } from "@/components/common/PageBanner";
 import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
 import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
 import { useNearViewport } from "@/hooks/shared/useNearViewport";
+import { subscribeVisibleRefresh } from "@/utils/shared/visibleRefresh";
 import {
   listCompanies,
   listCoordinations,
@@ -78,6 +79,7 @@ export const QhdnDashboard: React.FC = () => {
   const [internshipError, setInternshipError] = useState('');
   const [eligibleError, setEligibleError] = useState('');
   const [eligibleLoading, setEligibleLoading] = useState(false);
+  const dashboardRequest = useRef<AbortController | null>(null);
 
   // Enterprise Quota calculation data
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
@@ -128,29 +130,37 @@ export const QhdnDashboard: React.FC = () => {
 
   // Count exactly the same students and current decisions as the coordination screen.
   useEffect(() => {
-    let active = true;
     setPlacementStats(null);
     setInternshipStats(null);
     setEligibleError('');
     setInternshipError('');
     setEligibleLoading(!!selectedSemesterId);
-    if (!selectedSemesterId) return () => { active = false; };
-    Promise.allSettled([
-      getDashboardPlacementBoard(selectedSemesterId)
-        .then(board => { if (active) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(board.items), companies: board.companies }); })
-        .catch(error => { if (active) setEligibleError(errorMessage(error)); }),
-      getQhdnDashboardSummary(selectedSemesterId)
-        .then(data => { if (active) setInternshipStats({ semesterId: selectedSemesterId, data }); })
-        .catch(error => { if (active) setInternshipError(errorMessage(error)); }),
-    ])
-      .finally(() => { if (active) setEligibleLoading(false); });
-    return () => { active = false; };
+    if (!selectedSemesterId) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    dashboardRequest.current = controller;
+    queueMicrotask(() => {
+      if (signal.aborted) return;
+      void Promise.allSettled([
+        getDashboardPlacementBoard(selectedSemesterId, signal)
+          .then(board => { if (!signal.aborted) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(board.items), companies: board.companies }); })
+          .catch(error => { if (!signal.aborted) setEligibleError(errorMessage(error)); }),
+        getQhdnDashboardSummary(selectedSemesterId, signal)
+          .then(data => { if (!signal.aborted) setInternshipStats({ semesterId: selectedSemesterId, data }); })
+          .catch(error => { if (!signal.aborted) setInternshipError(errorMessage(error)); }),
+      ]).finally(() => {
+        if (dashboardRequest.current === controller) dashboardRequest.current = null;
+        if (!signal.aborted) setEligibleLoading(false);
+      });
+    });
+    return () => {
+      controller.abort();
+      if (dashboardRequest.current === controller) dashboardRequest.current = null;
+    };
   }, [selectedSemesterId, revision]);
 
   useEffect(() => {
-    const refresh = () => setRevision(value => value + 1);
-    window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
+    return subscribeVisibleRefresh(() => setRevision(value => value + 1), { canRefresh: () => !dashboardRequest.current });
   }, []);
 
   // The company catalog is independent of the selected OJT semester.
@@ -159,7 +169,7 @@ export const QhdnDashboard: React.FC = () => {
     setCompaniesLoading(true);
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
-      loadAllPages(page => listCompanies({page, limit: 100}, controller.signal).then(r => r.data))
+      loadAllPages(page => listCompanies({page, limit: 100}, controller.signal).then(r => r.data), controller.signal)
         .then(items => { if (!controller.signal.aborted) setCompanies(items); })
         .catch(err => { if (!controller.signal.aborted) setLoadError(errorMessage(err)); })
         .finally(() => { if (!controller.signal.aborted) setCompaniesLoading(false); });
@@ -177,7 +187,7 @@ export const QhdnDashboard: React.FC = () => {
     const controller = new AbortController();
     loadAllPages(page => listCoordinations(
       { page, limit: 100, ojtSemesterId: selectedSemesterId }, controller.signal,
-    ).then(r => r.data)).then(items => {
+    ).then(r => r.data), controller.signal).then(items => {
       if (controller.signal.aborted) return;
       const latest = new Map<number, CoordinationItem>();
       for (const item of items) {

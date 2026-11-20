@@ -4,6 +4,7 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { listOjtResults, exportQhdnReport, exportOjtResults, publishOjtResults } from '@/services/qhdnService';
 import { downloadFile } from '@/utils/shared/downloadFile';
 import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
+import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { errorMessage, Field, Notice, Pager, Table, usePaged } from '@/components/qhdn/QhdnUi';
 import type { ReportType } from '@/types/qhdn/workflowTypes';
@@ -30,15 +31,11 @@ export default function QhdnEnterpriseEvaluations(){
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const [publishBusy,setPublishBusy]=useState(false);
  const [limit,setLimit]=useState(10);
- const results=usePaged(page=>listOjtResults({ojtSemesterId:Number(semesterId),page,limit}).then(r=>r.data),`${semesterId}:${limit}`,!!semesterId&&tab==='results');
+ const results=usePaged((page,signal)=>listOjtResults({ojtSemesterId:Number(semesterId),page,limit},signal).then(r=>r.data),`${semesterId}:${limit}`,!!semesterId&&tab==='results');
  useEffect(()=>{
-  if(tab!=='results'||!semesterId)return;
-  const refresh=()=>{if(document.visibilityState==='visible')results.reload();};
-  window.addEventListener('focus',refresh);
-  document.addEventListener('visibilitychange',refresh);
-  const timer=window.setInterval(refresh,30000);
-  return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);window.clearInterval(timer);};
- },[tab,semesterId]);
+  if(tab!=='results'||!semesterId||results.busy||publishBusy)return;
+  return subscribeVisibleRefresh(results.reload, { interval: 30_000 });
+ },[tab,semesterId,results.busy,results.reload,publishBusy]);
  useEffect(()=>{setMessage('');setError('');},[catalog.periodId,type,tab]);
  const run=async(work:()=>Promise<unknown>,success:string)=>{
   if(busy||publishBusy||!semesterId)return;
