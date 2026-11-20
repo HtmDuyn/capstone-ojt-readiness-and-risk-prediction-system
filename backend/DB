@@ -9448,7 +9448,6 @@ COMMIT;
 -- END INCREMENTAL UPDATE: 20261118_password_reset_codes
 
 -- BEGIN INCREMENTAL UPDATE: 20261120_system_notifications
--- Existing deployments may run backend/migrations/20261120_system_notifications.sql instead.
 BEGIN;
 ALTER TABLE public."Notifications" ADD COLUMN IF NOT EXISTS "EventKey" text;
 CREATE UNIQUE INDEX IF NOT EXISTS "Notifications_EventKey_key" ON public."Notifications" ("EventKey");
