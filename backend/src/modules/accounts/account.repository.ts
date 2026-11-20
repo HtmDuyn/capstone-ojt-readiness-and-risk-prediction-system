@@ -126,9 +126,10 @@ export const createAccount = async (
   fullName: string,
   phone: string | null,
   roleId: number,
+  client?: PoolClient,
 ): Promise<AccountRecord> => {
   const result =
-    await query<{ id: number }>(
+    await (client ? client.query.bind(client) : query)<{ id: number }>(
       `
         INSERT INTO "Users" (
           "Username",
@@ -175,6 +176,7 @@ export const createAccount = async (
   const account =
     await findAccountById(
       userId,
+      client,
     );
 
   if (!account) {

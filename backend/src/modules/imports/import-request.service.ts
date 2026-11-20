@@ -73,15 +73,16 @@ export async function commitImportRequest(kind:ImportKind,body:unknown,actor:Act
   };
   const payload={...row.Payload,idempotencyKey:'rest-'+kind.toLowerCase()+'-import-'+id};
   const result=kind==='STUDENT'?await importAccounts(payload,actor.userId,false,onCommit):await importCurriculum(payload,actor.userId,false,onCommit);
-  if (kind === 'STUDENT' && result.created > 0 && !result.replayed) scheduleAccountEmailDelivery();
-  return {...await importRequests(kind,{},actor,id),replayed:result.replayed};
+  const resource=await importRequests(kind,{},actor,id);
+  if('result' in resource&&'emailDelivery' in result)resource.result={...resource.result,emailDelivery:result.emailDelivery};
+  return {...resource,replayed:result.replayed};
 }
 
 // Preserve the existing ADMIN-only retry policy; scope the target to this import batch.
 export async function retryStudentImportEmail(id:number,body:unknown,actor:Actor){
   if(actor.roleCode!=='ADMIN')throw invalid('Only ADMIN can retry account emails.',403,'FORBIDDEN');
   const b=inputObject(body,['email']),email=requiredText(b.email,'email',100).toLowerCase();
-  return academicTransaction(async c=>{
+  const result = await academicTransaction(async c=>{
     const allowed=(await c.query(`SELECT 1 FROM "AcademicImportRequests" i JOIN "AccountImportRows" r ON r."BatchID"=i."AccountBatchID"
       JOIN "Users" u ON u."UserID"=r."UserID" WHERE i."ImportID"=$1 AND i."Kind"='STUDENT' AND i."Status"='COMMITTED' AND lower(u."Email")=$2 AND r."Action"='CREATED'`,[id,email])).rowCount;
     if(!allowed)throw invalid('No newly created account with this email belongs to the committed import.',404,'IMPORT_ACCOUNT_NOT_FOUND');
@@ -93,4 +94,6 @@ export async function retryStudentImportEmail(id:number,body:unknown,actor:Actor
     await audit(c,actor.userId,'AcademicImportRequests',id,'RETRY_ACCOUNT_EMAIL',null,{email,emailId:result.rows[0].id});
     return {id:result.rows[0].id,email,status:'PENDING',studentImportId:id};
   });
+  scheduleAccountEmailDelivery();
+  return result;
 }

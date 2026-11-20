@@ -10,6 +10,9 @@ import { extendWindow, requireLifecycleSchema } from './lifecycle.service';
 import { requireRecruitmentSchema, requireThreePhaseSchema, expireRecruitmentResponses } from './round-policy';
 import { schedulePermissions } from './schedule-policy';
 import { requireScheduleEditingSchema } from './schedule.service';
+import { notifyRecruitmentSchedule } from './notification.service';
+import { noticeFingerprint } from '../../shared/notification.service';
+import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
 
 export function validateCampaignSchedule(body:Row) {
  const start=new Date(timestamp(body.startsAt,'startsAt')),end=new Date(timestamp(body.endsAt,'endsAt'));
@@ -78,6 +81,12 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
     handedOffCount = await handoffPendingStudents(c, { roundId: id, semesterId: old.OJTSemesterID }, actor);
    }
    const after=await windowRecord(c,id);await audit(c,actor,'RecruitmentWindows',id,'UPDATE',old,after,reason);
+   if(noticeFingerprint(old)!==noticeFingerprint(after)){
+    const title=status==='CLOSED'?'Đóng đợt tuyển dụng: '
+      :status==='OPEN'&&old.Status!=='OPEN'?'Mở đợt tuyển dụng: ':'Cập nhật lịch đợt tuyển dụng: ';
+    await notifyRecruitmentSchedule(c,after,title,'SCHEDULE','ALL',
+      status==='CLOSED'?new Date(Date.now()+86400000):new Date(after.EndsAt));
+   }
    return { ...windowApi(after), handedOffCount };
   }
   const periodId=positiveId(b.academicPeriodId,'academicPeriodId'),period=await actualPeriod(c,periodId);
@@ -113,11 +122,12 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    await c.query(`INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","AcademicPeriodID","Name","Scope","StartsAt","EndsAt","CreatedBy","RecruitmentRoundID")
     VALUES ($1,$2,$3,'{}'::jsonb,$4,$5,$6,$7)`,[semesterId,periodId,r.name,r.applicationStartsAt,r.applicationEndsAt,actor,row.WindowID]);
    const after=await windowRecord(c,row.WindowID);children.push(windowApi(after));
+   await notifyRecruitmentSchedule(c,after,'Lịch tuyển dụng OJT mới: ');
    await audit(c,actor,'RecruitmentWindows',row.WindowID,'CREATE',null,after,reason);
   }
   await audit(c,actor,'RecruitmentCampaigns',campaign.CampaignID,'CREATE',null,{...campaign,rounds:children},reason);
   return {id:campaign.CampaignID,name:b.name,startsAt:schedule.start,endsAt:schedule.end,rounds:children};
- });
+ }).then(wakeEmailAfterCommit);
 }
 export async function finalizeWindow(id:number,body:unknown,actor:number){
  const reason=requiredText(inputObject(body,['reason']).reason,'reason',2000);

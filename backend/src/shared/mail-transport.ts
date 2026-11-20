@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { mailConfig, type MailConfig } from '../config/mail';
+import { frontendLoginUrl } from '../config/frontend';
 
 export type MailMessage = { to: string; subject: string; text: string; html?: string; reference: string };
 export type MailTransport = { send(message: MailMessage): Promise<void>; verify(): Promise<void>; close(): void };
@@ -19,7 +20,7 @@ export function createMailTransport(config: MailConfig = mailConfig()): MailTran
     connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000 });
   return {
     async send(message) {
-      const hostname = new URL(process.env.FRONTEND_LOGIN_URL!).hostname;
+      const hostname = new URL(frontendLoginUrl()).hostname;
       const delivery = await smtp.sendMail({ from: config.from, to: message.to, subject: message.subject,
         text: message.text, html: message.html, messageId: `<ojt-${message.reference}@${hostname}>` });
       if (!delivery.accepted.length) throw deliveryError('EMAIL_REJECTED');

@@ -3,6 +3,9 @@ import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from '../academic/academic.repository';
 import { inputObject,invalid,positiveId,requiredText,pagination,enumValue,optionalText } from '../students/student.validation';
 import { timestamp,ids } from '../combo-registration/combo.validation';
+import { notifyRegistrationSchedule } from '../recruitment/notification.service';
+import { noticeFingerprint } from '../../shared/notification.service';
+import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
 export type Row=Record<string,any>;
 export type Actor={userId:number;roleCode:string;studentId?:number|null};
 export function registrationScope(value:unknown) {
@@ -50,9 +53,14 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
  if(id&&!hasFields&&status===undefined)throw invalid('Provide a field or status to update.');
  const target=status===undefined?undefined:enumValue(status,['OPEN','CLOSED'],'status');
  return academicTransaction(async client=>{
+  const before=id?await windowRecord(client,id):undefined;
   let result;
   if(!id||hasFields)result=await saveWindowFields(fields,actor,id,client);
   if(target!==undefined)result=await changeWindow(id!,target==='OPEN'?'open':'close',{reason:b.reason},actor,client);
+  const after=await windowRecord(client,id??result!.id);
+  if(!before||noticeFingerprint(before)!==noticeFingerprint(after))await notifyRegistrationSchedule(client,after,
+    after.Status==='CLOSED'?'Đóng đăng ký OJT: ':'Lịch đăng ký OJT: ','SCHEDULE',
+    after.Status==='CLOSED'?new Date(Date.now()+86400000):new Date(after.EndsAt));
   return result;
- });
+ }).then(wakeEmailAfterCommit);
 }

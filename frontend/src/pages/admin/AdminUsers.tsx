@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/hooks/shared/useAuth';
 import { createAccount, getAccounts, updateAccount, resetAccountPassword, resendAccountEmail, formatDate, type Account } from '@/services/adminService';
 import { PageBanner } from '@/components/common/PageBanner';
+import { emailDeliveryMessage } from '@/utils/shared/emailDelivery';
 
 /* =========================================================
    TYPES
@@ -182,8 +183,8 @@ const AdminUsers: React.FC = () => {
     try {
       if (['Sinh viên', 'Doanh nghiệp'].includes(addForm.role)) throw new Error('Tài khoản sinh viên và doanh nghiệp phải được tạo qua import.');
       if (!addForm.password || addForm.password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
-      await createAccount({ username: addForm.code.trim(), fullName: addForm.name.trim(), email: addForm.email.trim(), password: addForm.password, phone: addForm.phone?.trim() || null, roleId: roleIdFor(addForm.role) });
-      handleCloseAddModal(); setNotice('Đã tạo tài khoản.'); await loadUsers();
+      const result = await createAccount({ username: addForm.code.trim(), fullName: addForm.name.trim(), email: addForm.email.trim(), password: addForm.password, phone: addForm.phone?.trim() || null, roleId: roleIdFor(addForm.role) });
+      handleCloseAddModal(); setNotice('Đã tạo tài khoản. ' + emailDeliveryMessage(result.emailDelivery)); await loadUsers();
     } catch (e) { alert(e instanceof Error ? e.message : 'Tạo tài khoản thất bại.'); }
     finally { setSaving(false); }
   };

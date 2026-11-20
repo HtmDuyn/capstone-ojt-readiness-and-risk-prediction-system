@@ -8,6 +8,8 @@ import { registrationScope, validateScope, semester } from '../ojt-registration/
 import { fingerprint, officialEligibilityWithClient } from '../eligibility/eligibility.service';
 import { summaryWithClient } from './academic.service';
 import { inScope, page, type Actor, type Row } from './shared';
+import { queueNotice } from '../../shared/notification.service';
+import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
 
 function staff(actor:Actor) {if(!['ADMIN','ACADEMIC'].includes(actor.roleCode))throw invalid('Academic access required.',403,'FORBIDDEN');}
 export async function schedule(periodId:number,actor:Actor,body?:unknown,existingClient?:PoolClient) {
@@ -55,14 +57,17 @@ export async function processAdvisoryItem() {
   return academicTransaction(async c=>{
     const item=(await c.query('SELECT i.*,r."Kind",r."Request",r."CreatedBy" FROM "OJTAdvisoryRunItems" i JOIN "OJTAdvisoryRuns" r ON r."RunID"=i."RunID" WHERE i."Status"=\'PENDING\' ORDER BY i."RunID",i."StudentID" LIMIT 1 FOR UPDATE OF i SKIP LOCKED')).rows[0];if(!item)return false;
     await c.query('SAVEPOINT advisory_item');try{
-      const s=(await c.query('SELECT s.*,u."Status" AS "AccountStatus" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."StudentID"=$1',[item.StudentID])).rows[0];if(!s||s.DeletedAt||s.Status!=='ACTIVE'||s.AccountStatus!=='ACTIVE')throw invalid('Student inactive.',409,'STUDENT_INACTIVE');
+      const s=(await c.query('SELECT s.*,u."Email",u."Status" AS "AccountStatus" FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID" WHERE s."StudentID"=$1',[item.StudentID])).rows[0];if(!s||s.DeletedAt||s.Status!=='ACTIVE'||s.AccountStatus!=='ACTIVE')throw invalid('Student inactive.',409,'STUDENT_INACTIVE');
       let snapshot:Row,title:string,text:string;
       if(item.Kind==='SUMMARY'){snapshot=await summaryWithClient(c,item.StudentID,item.Request.ojtSemesterId);title='Tiến độ học tập giữa kỳ 5';text=`Tín chỉ đã đạt: ${snapshot.earnedCredits}; còn thiếu: ${snapshot.missingCredits??'chờ đối soát'}; môn nợ: ${snapshot.failedCourseCount}. Môn chưa hoàn thành: ${snapshot.outstandingCourses.map((r:Row)=>r.courseCode??r.name).join(', ')}. Đây là số liệu giữa kỳ, chưa phải quyết định chính thức.`;}
       else{const official=await officialEligibilityWithClient(c,item.StudentID,item.Request.ojtSemesterId);snapshot={official,status:!official||official.isStale?'REVIEW_REQUIRED':official.status};title='Kết quả xét điều kiện OJT';text=snapshot.status==='ELIGIBLE'?'Bạn đã được xác nhận đủ điều kiện OJT.':snapshot.status==='NOT_ELIGIBLE'?'Bạn chưa đủ điều kiện OJT. Xem chi tiết tín chỉ và môn nợ.':'Hồ sơ đang chờ đối soát, chưa có kết quả chính thức còn hiệu lực.';}
-      const n=(await c.query('INSERT INTO "Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt") VALUES ($1,$2,$3,\'IN_APP\',\'OJT_ADVISORY_RUN\',$4,now()) RETURNING "NotificationID"',[s.UserID,title,text,item.RunID])).rows[0];await c.query('UPDATE "OJTAdvisoryRunItems" SET "Status"=\'COMPLETED\',"Snapshot"=$3,"NotificationID"=$4 WHERE "RunID"=$1 AND "StudentID"=$2',[item.RunID,item.StudentID,JSON.stringify(snapshot),n.NotificationID]);await c.query('RELEASE SAVEPOINT advisory_item');
+      const notificationId=await queueNotice(c,{userId:s.UserID,email:s.Email,title,text,
+        entityType:'OJT_ADVISORY_RUN',entityId:item.RunID,eventKey:`advisory:${item.RunID}:${item.StudentID}`,
+        expiresAt:new Date(Date.now()+7*86400000)});
+      await c.query('UPDATE "OJTAdvisoryRunItems" SET "Status"=\'COMPLETED\',"Snapshot"=$3,"NotificationID"=$4 WHERE "RunID"=$1 AND "StudentID"=$2',[item.RunID,item.StudentID,JSON.stringify(snapshot),notificationId]);await c.query('RELEASE SAVEPOINT advisory_item');
     }catch(e:any){await c.query('ROLLBACK TO SAVEPOINT advisory_item');if(e.code&&!e.statusCode)throw e;await c.query('UPDATE "OJTAdvisoryRunItems" SET "Status"=\'FAILED\',"ErrorCode"=$3 WHERE "RunID"=$1 AND "StudentID"=$2',[item.RunID,item.StudentID,e.errorCode??'ADVISORY_FAILED']);}
     await c.query('UPDATE "OJTAdvisoryRuns" r SET "Status"=CASE WHEN EXISTS(SELECT 1 FROM "OJTAdvisoryRunItems" i WHERE i."RunID"=r."RunID" AND i."Status"=\'FAILED\') THEN \'COMPLETED_WITH_ERRORS\' ELSE \'COMPLETED\' END,"CompletedAt"=now() WHERE r."RunID"=$1 AND NOT EXISTS(SELECT 1 FROM "OJTAdvisoryRunItems" i WHERE i."RunID"=r."RunID" AND i."Status"=\'PENDING\')',[item.RunID]);return true;
-  });
+  }).then(wakeEmailAfterCommit);
 }
 export async function queueDueAdvisories() {
   const schedules=await academicTransaction(c=>c.query('SELECT * FROM "OJTAdvisorySchedules" WHERE "Enabled" AND "SendAt"<=now() AND "AssessmentDeadline">now() ORDER BY "AcademicPeriodID" LIMIT 10'));

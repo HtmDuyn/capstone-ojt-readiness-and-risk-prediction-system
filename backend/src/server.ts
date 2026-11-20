@@ -36,6 +36,8 @@ const startServer =
       const stopAdvisories = process.env.ADVISORY_WORKER_ENABLED !== 'false' ? startAdvisoryWorker() : () => {};
       const stopEligibility = process.env.ELIGIBILITY_WORKER_ENABLED !== 'false' ? startEligibilityWorker() : () => {};
       const stopJobs = process.env.PROVISIONING_JOBS_ENABLED !== 'false' ? startProvisioningJobs() : () => {};
+      if (process.env.PROVISIONING_JOBS_ENABLED === 'false') logger.warn('Email delivery and deadline reminders are disabled: PROVISIONING_JOBS_ENABLED=false.');
+      if (process.env.ADVISORY_WORKER_ENABLED === 'false') logger.warn('Scheduled academic notifications are disabled: ADVISORY_WORKER_ENABLED=false.');
 
       const server =
         app.listen(
