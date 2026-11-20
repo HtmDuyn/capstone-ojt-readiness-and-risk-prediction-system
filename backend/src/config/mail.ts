@@ -1,24 +1,27 @@
 export type MailConfig = {
-  provider: 'mailjet'; apiKey: string; secretKey: string; fromEmail: string; fromName: string;
+  provider: 'brevo';
+  apiKey: string; fromEmail: string; fromName: string;
 } | {
-  provider: 'smtp'; host: string; port: number; secure: boolean; from: string;
+  provider: 'smtp';
+  host: string; port: number; secure: boolean; from: string;
   user?: string; password?: string;
 };
 
 export function mailConfig(): MailConfig {
   const provider = process.env.MAIL_PROVIDER?.trim().toLowerCase() || 'smtp';
-  if (provider === 'mailjet') {
-    const apiKey = process.env.MAILJET_API_KEY?.trim();
-    const secretKey = process.env.MAILJET_SECRET_KEY?.trim();
-    const fromEmail = process.env.MAIL_FROM_EMAIL?.trim();
-    const fromName = process.env.MAIL_FROM_NAME?.trim() || 'Hệ thống OJT';
-    if (!apiKey || !secretKey || !fromEmail) throw configError('MAILJET_NOT_CONFIGURED',
-      'Configure MAILJET_API_KEY, MAILJET_SECRET_KEY and MAIL_FROM_EMAIL.');
-    if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(fromEmail) || /[\r\n]/.test(fromName))
-      throw configError('MAIL_SENDER_INVALID', 'Configure a valid Mailjet sender email and name.');
-    return { provider, apiKey, secretKey, fromEmail, fromName };
+  if (provider === 'brevo') {
+    const apiKey = process.env.BREVO_API_KEY?.trim();
+    const fromEmail = process.env.BREVO_FROM_EMAIL?.trim();
+    const fromName = process.env.BREVO_FROM_NAME?.trim() || 'Hệ thống OJT';
+    if (!apiKey || !fromEmail)
+      throw configError('BREVO_NOT_CONFIGURED', 'Configure BREVO_API_KEY and BREVO_FROM_EMAIL.');
+    if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(fromEmail))
+      throw configError('BREVO_SENDER_INVALID', 'Configure a valid BREVO_FROM_EMAIL.');
+    return { provider, apiKey, fromEmail, fromName };
   }
-  if (provider !== 'smtp') throw configError('MAIL_PROVIDER_INVALID', 'MAIL_PROVIDER must be mailjet or smtp.');
+  if (provider !== 'smtp')
+    throw configError('MAIL_PROVIDER_INVALID', 'Set MAIL_PROVIDER to brevo or smtp.');
+
   const host = process.env.SMTP_HOST?.trim(), from = process.env.SMTP_FROM?.trim();
   if (!host || !from) throw configError('SMTP_NOT_CONFIGURED', 'Configure SMTP_HOST and SMTP_FROM.');
   const port = Number(process.env.SMTP_PORT || 587);

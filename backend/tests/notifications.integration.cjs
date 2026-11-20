@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
+const nodemailer = require('nodemailer');
 const target = process.env.NOTIFICATIONS_TEST_DATABASE_URL;
 if (!target) throw Error('Set NOTIFICATIONS_TEST_DATABASE_URL to the disposable notification_test database.');
 const address = new URL(target);
@@ -12,9 +13,9 @@ delete process.env.DATABASE_URL; delete process.env.SUPABASE_DATABASE_URL;
 process.env.LOCAL_DATABASE_URL = target; process.env.DB_SSL = 'false';
 process.env.EMAIL_OUTBOX_KEY = 'ab'.repeat(32);
 process.env.FRONTEND_LOGIN_URL = 'https://ojt.example.test/login';
-process.env.MAIL_PROVIDER = 'mailjet';
-process.env.MAILJET_API_KEY = 'test-api-key'; process.env.MAILJET_SECRET_KEY = 'test-secret-key';
-process.env.MAIL_FROM_EMAIL = 'ojt@example.test';
+process.env.JWT_SECRET = 'notifications-integration-test';
+process.env.SMTP_HOST = 'smtp.example.test';
+process.env.SMTP_FROM = 'ojt@example.test';
 
 test('account and deadline notifications persist atomically, deduplicate and retire stale email in PostgreSQL', async t => {
   const db = new Client({ connectionString: target }); await db.connect(); t.after(() => db.end());
@@ -34,13 +35,14 @@ test('account and deadline notifications persist atomically, deduplicate and ret
   const { notifyRecruitmentSchedule, notifyRegistrationSchedule, queueDueDeadlineNotices } = require('../dist/modules/recruitment/notification.service');
   const { deliverEmails } = require('../dist/jobs/provisioning');
   const sent = [];
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
-    assert.equal(url, 'https://api.mailjet.com/v3.1/send');
-    const [message] = JSON.parse(options.body).Messages;
-    const to = message.To[0].Email;
-    sent.push({ to, text: message.TextPart });
-    return Response.json({ Messages: [{ Status: 'success', To: [{ Email: to, MessageID: sent.length }] }] });
-  });
+  t.mock.method(nodemailer, 'createTransport', options => ({
+    close() {},
+    async sendMail(message) {
+      assert.equal(options.host, 'smtp.example.test');
+      sent.push({ to: message.to, text: message.text });
+      return { accepted: [message.to] };
+    },
+  }));
   const users = (await db.query(`SELECT u."UserID",u."Email",u."RoleID",r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID")`)).rows;
   const staff = users.find(u => u.RoleCode === 'OJT_COORD');
   const admin = users.find(u => u.RoleCode === 'ADMIN');
@@ -131,6 +133,15 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     const delivered = sent.length; await deliverEmails(); assert.equal(sent.length, delivered);
     assert.equal((await db.query(`SELECT count(*)::int AS n FROM "EmailOutbox" WHERE "Status" IN ('SENT','CANCELLED') AND "EncryptedPayload" IS NOT NULL`)).rows[0].n, 0);
   });
+  await t.test('password reset queues and sends its code using SMTP configuration', async () => {
+    const { sendPasswordResetCode } = require('../dist/modules/auth/self-password-reset.service');
+    await sendPasswordResetCode(admin.Email);
+    const email = (await db.query(`SELECT "EmailID","Status" FROM "EmailOutbox" WHERE "UserID"=$1 AND "Kind"='PASSWORD_RESET'`, [admin.UserID])).rows[0];
+    assert.equal(email.Status, 'PENDING');
+    assert.equal(await deliverEmails({ emailIds: [email.EmailID] }), 1);
+    assert.equal(sent.at(-1).to, admin.Email);
+    assert.match(sent.at(-1).text, /\b\d{6}\b/);
+  });
   await t.test('deadline ticks are idempotent and continue to include registered students on the legacy round', async () => {
     await queueDueDeadlineNotices();
     const after = await count('Notifications'); await queueDueDeadlineNotices(); assert.equal(await count('Notifications'), after);
@@ -147,35 +158,62 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     }
     assert.ok(admin.UserID);
   });
-  await t.test('Mailjet authentication failure keeps the account and explains why delivery is pending', async child => {
+  await t.test('SMTP authentication failure keeps the account and explains why delivery is pending', async child => {
     const errors = [];
     child.mock.method(console, 'error', message => errors.push(message));
     let attempts = 0, authorized = false;
-    child.mock.method(globalThis, 'fetch', async (_url, options) => {
-      attempts++;
-      if (!authorized) return Response.json({ ErrorCode: 'mj-0001' }, { status: 401 });
-      const to = JSON.parse(options.body).Messages[0].To[0].Email;
-      return Response.json({ Messages: [{ Status: 'success', To: [{ Email: to, MessageID: attempts }] }] });
-    });
+    child.mock.method(nodemailer, 'createTransport', () => ({
+      close() {},
+      async sendMail(message) {
+        attempts++;
+        if (!authorized) throw Object.assign(new Error('Authentication failed'), { code: 'EAUTH', responseCode: 535 });
+        return { accepted: [message.to] };
+      },
+    }));
     const created = await createNewAccount({ username: 'smtp.failure.staff', fullName: 'SMTP Failure', email: 'smtp-failure@example.test', password: 'Test-only-Password2', roleId: staff.RoleID });
     assert.equal(created.emailDelivery.status, 'PENDING'); assert.equal(created.emailDelivery.sent, 0);
     assert.equal(created.emailDelivery.issue, 'AUTH');
     assert.equal((await db.query('SELECT count(*)::int AS n FROM "Users" WHERE "UserID"=$1', [created.id])).rows[0].n, 1);
     const email = (await db.query('SELECT * FROM "EmailOutbox" WHERE "UserID"=$1', [created.id])).rows[0];
     assert.equal(email.Status, 'PENDING'); assert.equal(email.Attempts, 0); assert.ok(email.EncryptedPayload);
-    assert.equal(email.LastError, 'MAILJET_KEY_SUSPENDED_401');
+    assert.equal(email.LastError, 'EAUTH_535');
     assert.equal(await deliverEmails({ emailIds: [email.EmailID] }), 0);
     assert.equal(errors.length, 1);
-    assert.match(errors[0], /mj-0001/);
+    assert.match(errors[0], /EAUTH_535/);
 
     // Simulate an email deferred by the previous version before deploying this worker.
     await db.query(`UPDATE "EmailOutbox" SET "NextAttemptAt"=now()+interval '5 minutes' WHERE "EmailID"=$1`, [email.EmailID]);
     authorized = true;
-    const imported = await importAccounts({ kind: 'ENTERPRISE', idempotencyKey: 'mailjet-auth-paused',
+    const imported = await importAccounts({ kind: 'ENTERPRISE', idempotencyKey: 'smtp-auth-retry',
       rows: [{ name: 'Paused Company', email: 'paused-company@example.test', fullName: 'Test HR' }] }, staff.UserID);
     assert.equal(imported.created, 1);
     assert.equal(imported.emailDelivery.status, 'SENT');
     assert.equal(await deliverEmails({ emailIds: [email.EmailID] }), 1);
     assert.equal(attempts, 4);
+  });
+  await t.test('creating an account with Brevo selected sends its queued email through the API', async child => {
+    const env = { MAIL_PROVIDER: 'brevo', BREVO_API_KEY: 'test-brevo-api-key', BREVO_FROM_EMAIL: 'ojt@example.test' };
+    const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+    Object.assign(process.env, env);
+    child.after(() => {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+    const recipient = 'brevo-staff@example.test';
+    const request = child.mock.method(globalThis, 'fetch', async (url, options) => {
+      assert.equal(String(url), 'https://api.brevo.com/v3/smtp/email');
+      assert.deepEqual(JSON.parse(options.body).to, [{ email: recipient }]);
+      return Response.json({ messageId: '<test@example.test>' }, { status: 201 });
+    });
+    const created = await createNewAccount({
+      username: 'brevo.staff', fullName: 'Brevo Staff', email: recipient,
+      password: 'Test-only-Password3', roleId: staff.RoleID,
+    });
+    const email = (await db.query('SELECT "Status" FROM "EmailOutbox" WHERE "UserID"=$1', [created.id])).rows[0];
+    assert.equal(created.emailDelivery.status, 'SENT');
+    assert.equal(email.Status, 'SENT');
+    assert.equal(request.mock.callCount(), 1);
   });
 });

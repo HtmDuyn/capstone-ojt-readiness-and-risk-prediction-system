@@ -14,7 +14,6 @@ process.env.EMAIL_OUTBOX_KEY = randomBytes(32).toString('hex');
 process.env.FRONTEND_LOGIN_URL = 'https://ojt.example.test/login';
 process.env.SMTP_HOST = 'smtp.example.test';
 process.env.SMTP_FROM = 'ojt@example.test';
-process.env.MAIL_PROVIDER = 'smtp';
 const { pool } = require('../dist/config/database');
 const { importAccounts } = require('../dist/modules/imports/import.service');
 const { decryptEmail } = require('../dist/modules/imports/email.crypto');
