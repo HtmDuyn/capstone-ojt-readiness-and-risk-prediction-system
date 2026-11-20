@@ -3,6 +3,7 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { CandidateDetailModal } from '@/components/enterprise/CandidateDetailModal';
 import { Users, Search, CheckCircle2, XCircle, Eye, Check, X, Filter, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandidatePeriod, type EnterpriseAcceptancePreview } from '@/services/enterpriseService';
+import { describeApiError } from '@/services/apiService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { WorkflowModal,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 
@@ -81,7 +82,7 @@ export const EnterpriseCandidates: React.FC = () => {
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
-        const message = err instanceof Error ? err.message : 'Không thể tải danh sách năm học và kỳ OJT';
+        const message = describeApiError(err, 'Không thể tải danh sách năm học và kỳ OJT');
         setPeriodsError(message);
         console.error('Failed to load enterprise candidate periods:', err);
       })
@@ -108,7 +109,7 @@ export const EnterpriseCandidates: React.FC = () => {
       }
     } catch (err: unknown) {
       if (controller.signal.aborted) return;
-      const message = err instanceof Error ? err.message : 'Không thể tải danh sách ứng viên';
+      const message = describeApiError(err, 'Không thể tải danh sách ứng viên');
       setError(message);
       console.error('Failed to load candidates:', err);
     } finally {
@@ -298,8 +299,8 @@ export const EnterpriseCandidates: React.FC = () => {
         <p role="alert" className="px-4 py-3 text-xs text-rose-700">{periodsError}</p>
       )}
 
-      {/* Loading State — hiển thị khi đang tải profile hoặc dữ liệu ứng viên */}
-      {loading && (
+      {/* Keep previously loaded rows visible while refreshing or recovering from an API error. */}
+      {loading && candidates.length === 0 && (
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
@@ -311,17 +312,25 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Error State */}
-      {error && !loading && (
+      {error && (
         <div className="p-6 bg-rose-50 text-center">
           <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
           <p className="text-sm text-rose-700 font-medium">{error}</p>
+          {candidates.length > 0 && <p className="mt-1 text-xs text-rose-700">Đang giữ danh sách đã tải trước đó để bạn tiếp tục xem.</p>}
           <button
             onClick={fetchCandidates}
+            disabled={loading}
             className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-colors"
           >
-            Thử lại
+            {loading ? 'Đang tải lại…' : 'Thử lại'}
           </button>
         </div>
+      )}
+
+      {loading && candidates.length > 0 && (
+        <p role="status" className="border-b border-slate-100 bg-orange-50/70 px-4 py-2 text-xs text-orange-800">
+          Đang cập nhật danh sách; dữ liệu đã tải vẫn được giữ trên màn hình.
+        </p>
       )}
 
       {/* Empty State */}
@@ -338,7 +347,7 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Candidates Table List */}
-      {!loading && !error && filteredCandidates.length > 0 && (
+      {filteredCandidates.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] table-fixed text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">

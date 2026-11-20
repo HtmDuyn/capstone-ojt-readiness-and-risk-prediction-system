@@ -13,6 +13,33 @@ export const API_BASE_URL = (
 export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, "");
 export const API_URL = API_BASE_URL;
 
+type ApiErrorPayload = { message?: unknown; errorCode?: unknown; code?: unknown };
+
+/** Format an HTTP failure with the backend's message and the request that failed. */
+export function describeApiError(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError<ApiErrorPayload>(error))
+    return error instanceof Error ? error.message : fallback;
+
+  const status = error.response?.status;
+  const payload = error.response?.data;
+  const backendMessage = typeof payload?.message === 'string' ? payload.message : '';
+  const errorCode = typeof payload?.errorCode === 'string'
+    ? payload.errorCode
+    : typeof payload?.code === 'string' ? payload.code : '';
+  const method = error.config?.method?.toUpperCase() ?? 'GET';
+  const path = error.config?.url ?? '';
+  const params = error.config?.params;
+  const query = params && typeof params === 'object'
+    ? new URLSearchParams(Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => [key, String(value)] as [string, string])).toString()
+    : '';
+  const endpoint = path ? `${method} ${path}${query ? `?${query}` : ''}` : method;
+  const details = [status ? `HTTP ${status}` : '', errorCode, endpoint].filter(Boolean).join(' · ');
+  const message = backendMessage || error.message || fallback;
+  return details ? `${message} (${details})` : message;
+}
+
 // Axios instance dùng chung cho toàn bộ service để đồng nhất baseURL và token.
 export const API = axios.create({
   baseURL: API_BASE_URL,

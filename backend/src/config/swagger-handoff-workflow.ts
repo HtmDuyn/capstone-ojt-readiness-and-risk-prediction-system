@@ -27,7 +27,6 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
   }
  }
  spec.paths['/api/ojt-registrations'].post.description='Endpoint tương thích cho hồ sơ đăng ký OJT cũ; luồng mới STUDENT chọn vị trí và gửi trực tiếp bằng POST /api/job-applications. STUDENT chỉ nộp hồ sơ của mình; ADMIN có thể nhập thay. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN, trong thời hạn và đúng scope.';
- spec.paths['/api/ojt-registrations/{id}/review'].post.description='Chỉ ADMIN xử lý dữ liệu hồ sơ cũ. Đây không còn là bước duyệt của Phòng QHDN trong luồng đăng ký trực tiếp.';
  if(spec.paths['/api/students/me/opportunities']?.get){
   spec.paths['/api/students/me/opportunities'].get.summary='Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp';
   spec.paths['/api/students/me/opportunities'].get.description='Bắt buộc windowId của đợt đăng ký đang mở. Chỉ trả về vị trí phù hợp kỳ OJT; canApply và blockers phản ánh kết quả bàn giao, eligibility, scope, trạng thái hồ sơ và chỉ tiêu.';

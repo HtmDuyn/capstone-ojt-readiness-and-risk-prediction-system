@@ -100,7 +100,11 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
       studentSnapshots.invalidate();
       expireBearerSession(failure.config?.headers?.Authorization);
     }
-    throw new ApiError(data?.message || `Yêu cầu API thất bại (HTTP ${status}).`, status, data?.errorCode ?? data?.code);
+    const method = failure.config?.method?.toUpperCase() ?? 'GET';
+    const path = failure.config?.url ?? 'API';
+    const errorCode = data?.errorCode ?? data?.code;
+    const details = [method + ' ' + path, `HTTP ${status}`, errorCode].filter(Boolean).join(' · ');
+    throw new ApiError(`${data?.message || 'Yêu cầu API thất bại.'} (${details})`, status, errorCode);
   }
 }
 
