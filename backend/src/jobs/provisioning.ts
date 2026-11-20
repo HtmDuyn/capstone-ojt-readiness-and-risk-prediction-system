@@ -46,7 +46,7 @@ export async function deliverEmails(options: { emailIds?: string[]; maxMessages?
           continue;
         }
         const message = decryptEmail(e.EncryptedPayload);
-        if (message.guard && !(await scheduleEmailIsCurrent(message.guard))) {
+        if (message.guard && !(await scheduleEmailIsCurrent(message.guard, e.UserID, message.subject))) {
           await query(`UPDATE "EmailOutbox" SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID]);
           continue;
         }

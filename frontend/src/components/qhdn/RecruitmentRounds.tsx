@@ -60,7 +60,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    if(editing)await API.patch(`/recruitment/windows/${editing.id}/schedule`,{name,...schedule,reason:String(f.get('reason'))});
    else await API.post('/recruitment/windows',{academicPeriodId:catalog.selectedPeriod?.id,name,
     startsAt:schedule.postingStartsAt,endsAt:schedule.resultsEndsAt,rounds:[{name,...schedule}],supplemental:isSupplemental});
-   setCreating(false);setRevision(v=>v+1);onChanged?.();setMessage(editing?'Đã cập nhật lịch đợt tuyển dụng.':'Đã tạo đợt tuyển dụng với ba hạn. Bạn có thể mở đợt theo lịch đã thiết lập.');setEditing(null);
+   setCreating(false);setRevision(v=>v+1);onChanged?.();setMessage(editing?'Đã cập nhật lịch đợt tuyển dụng.':'Đã tạo đợt tuyển dụng. Hệ thống sẽ gửi thông báo đến doanh nghiệp đang hoạt động.');setEditing(null);
   }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
  };
  const extend=async(e:FormEvent<HTMLFormElement>)=>{
@@ -75,7 +75,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    }
    if(!Object.keys(patch).length)throw new Error('Chọn thời hạn mới dài hơn hiện tại.');
    await API.patch('/recruitment/windows/'+extending.id,patch);
-   setExtending(null);setRevision(v=>v+1);onChanged?.();setMessage('Đã gia hạn và gửi thông báo đến sinh viên, doanh nghiệp và QHDN.');
+   setExtending(null);setRevision(v=>v+1);onChanged?.();setMessage('Đã gia hạn đợt tuyển dụng.');
   }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
  };
  const openRound=async(round:Round)=>{
@@ -122,7 +122,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    {editing&&<Field label="Lý do sửa lịch"><textarea name="reason" className={workflowInput} required maxLength={2000}/></Field>}
    <div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={()=>setCreating(false)}>Đóng</button>{(!!editing||!isSupplemental||canSupplement)&&<button className={workflowPrimary} disabled={busy||migrationRequired}>{busy?'Đang lưu…':editing?'Lưu lịch':isSupplemental?'Tạo đợt bổ sung':'Tạo đợt tuyển dụng'}</button>}</div>
   </form></WorkflowModal>}
-  {extending&&<WorkflowModal title="Gia hạn đợt tuyển dụng" busy={busy} onClose={()=>setExtending(null)}><form className="space-y-4" onSubmit={extend}>{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">Chỉ kéo dài thời điểm kết thúc của giai đoạn đang mở. Không mở lại ứng tuyển đã đóng. Hệ thống thông báo các bên sau khi gia hạn.</p>{recruitmentPhases.filter(phase=>phase.key==='posting'?extending.canPost:phase.key==='application'?extending.canApply:extending.canRespond).map(phase=><RecruitmentDateInput key={phase.key} name={phase.key} label={'Kết thúc mới: '+phase.label} defaultValue={fmt(extending[(phase.key+'EndsAt') as keyof PhaseSchedule])}/>)}<button className={workflowPrimary} disabled={busy}>{busy?'Đang cập nhật…':'Xác nhận gia hạn'}</button></form></WorkflowModal>}
+  {extending&&<WorkflowModal title="Gia hạn đợt tuyển dụng" busy={busy} onClose={()=>setExtending(null)}><form className="space-y-4" onSubmit={extend}>{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">Chỉ kéo dài thời điểm kết thúc của giai đoạn đang mở. Không mở lại ứng tuyển đã đóng.</p>{recruitmentPhases.filter(phase=>phase.key==='posting'?extending.canPost:phase.key==='application'?extending.canApply:extending.canRespond).map(phase=><RecruitmentDateInput key={phase.key} name={phase.key} label={'Kết thúc mới: '+phase.label} defaultValue={fmt(extending[(phase.key+'EndsAt') as keyof PhaseSchedule])}/>)}<button className={workflowPrimary} disabled={busy}>{busy?'Đang cập nhật…':'Xác nhận gia hạn'}</button></form></WorkflowModal>}
   {action&&<WorkflowModal title={action.type==='delete'?'Xóa đợt chưa mở':'Chốt tổng hợp kết quả'} busy={busy} onClose={()=>setAction(null)}><form onSubmit={confirm} className="space-y-4">{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">{action.round.name} · {fmt(action.round.startsAt)} – {fmt(action.round.endsAt)}</p>{action.type==='delete'&&<Notice>Chỉ xóa đợt chưa từng mở và chưa có dữ liệu liên quan. Thao tác sẽ xóa cả lịch ứng tuyển đi kèm.</Notice>}<Field label="Lý do xác nhận"><textarea name="reason" className={workflowInput} required maxLength={2000}/></Field><button className={workflowPrimary} disabled={busy}>{busy?'Đang xử lý…':'Xác nhận'}</button></form></WorkflowModal>}
  </section>;
 }

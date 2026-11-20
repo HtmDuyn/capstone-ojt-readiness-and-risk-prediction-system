@@ -54,27 +54,27 @@ test('immediate creation email prioritizes its own message and reports actual SM
     assert.ok(scopes.every(scope => scope.length === 1 && scope[0] === '2'));
     assert.equal(messages[1].EncryptedPayload, null);
     assert.equal((await deliverAccountEmailsNow({ batchId: '44' })).status, 'SENT');
-    assert.equal(sends, 1); assert.equal(wakeups, 2);
+    assert.equal(sends, 1); assert.equal(wakeups, 0);
   });
   await t.test('SMTP rejection preserves the committed account email for retry without claiming success', async child => {
     const { messages } = outbox(child);
     child.mock.method(console, 'error', () => {});
     child.mock.method(nodemailer, 'createTransport', () => ({ close() {}, async sendMail() { throw { code: 'EAUTH', responseCode: 535 }; } }));
-    const result = await deliverAccountEmailsNow({ userId: 88 });
+    const result = await deliverAccountEmailsNow({ emailId: '2' });
     assert.equal(result.status, 'PENDING'); assert.equal(result.sent, 0); assert.equal(result.pending, 1);
     assert.equal(messages[1].Attempts, 0); assert.ok(messages[1].EncryptedPayload);
   });
   await t.test('a message leased by another worker is not duplicated or reported sent prematurely', async child => {
     outbox(child, 'SENDING');
     child.mock.method(nodemailer, 'createTransport', () => ({ close() {}, async sendMail() { assert.fail('A leased email must not be sent twice'); } }));
-    const result = await deliverAccountEmailsNow({ userId: 88 });
+    const result = await deliverAccountEmailsNow({ emailId: '2' });
     assert.equal(result.status, 'PENDING'); assert.equal(result.sent, 0);
   });
   await t.test('database failures after commit return unknown delivery status and safe logs', async child => {
     const logs = [];
     child.mock.method(console, 'error', line => logs.push(line));
     child.mock.method(pool, 'query', async () => { throw Object.assign(new Error('Private credentials'), { code: 'ECONNRESET' }); });
-    assert.equal((await deliverAccountEmailsNow({ userId: 88 })).status, 'UNKNOWN');
+    assert.equal((await deliverAccountEmailsNow({ emailId: '2' })).status, 'UNKNOWN');
     assert.ok(logs[0].includes('ECONNRESET')); assert.ok(!logs[0].includes('Private'));
   });
 });

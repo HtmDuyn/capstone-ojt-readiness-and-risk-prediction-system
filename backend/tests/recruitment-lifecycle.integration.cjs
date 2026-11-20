@@ -36,7 +36,7 @@ test('extension, notifications, supplemental carry-over, shared capacity and imm
  await saveWindow({status:'OPEN',reason:'Open'},staff,primary.id);
  await assert.rejects(saveWindow({...body,supplemental:true},staff),e=>e.errorCode==='PREVIOUS_ROUND_NOT_FINALIZED');
  await wait(1600);
- const extension=await saveWindow({postingEndsAt:at(4000)},staff,primary.id);assert.ok(extension.notificationsCreated>0);
+ const extension=await saveWindow({postingEndsAt:at(4000)},staff,primary.id);assert.equal(extension.notificationsCreated,0);
  const notes=await accountNotifications({},ent);assert.ok(notes.items.some(n=>n.title.includes('Primary')));
  const note=notes.items[0];await assert.rejects(readAccountNotification(note.id,{isRead:true},a.id),e=>e.statusCode===404);await readAccountNotification(note.id,{isRead:true},ent);
  const post=await saveEnterprisePost({windowId:primary.id,status:'PUBLISHED',title:'Shared slots',content:'First round content',positions:[{title:'Intern',description:'Work',requirements:'SQL',capacity:2}]},actor);

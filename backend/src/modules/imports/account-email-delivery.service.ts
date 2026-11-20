@@ -1,6 +1,5 @@
 import { query } from '../../config/database';
 import { deliverEmails } from '../../jobs/provisioning';
-import { scheduleAccountEmailDelivery } from '../../jobs/email-wakeup';
 import { mailIsConfigured } from '../../config/mail';
 
 export type EmailDeliveryResult = {
@@ -9,25 +8,22 @@ export type EmailDeliveryResult = {
   issue?: 'AUTH' | 'PERMISSION' | 'RATE_LIMIT' | 'CONFIGURATION';
 };
 
-// Run only after the account transaction commits. SMTP failures must not turn a
+// Run only after the account transaction commits. Mail failures must not turn a
 // successfully created account into a failed creation response.
-export async function deliverAccountEmailsNow(target: { batchId: string | number } | { userId: number }): Promise<EmailDeliveryResult> {
+export async function deliverAccountEmailsNow(target: { batchId: string | number } | { emailId?: string }): Promise<EmailDeliveryResult> {
   let total = 0;
   try {
-    const emails = 'batchId' in target
-      ? await query<{ id: string }>(`SELECT e."EmailID"::text AS id FROM "EmailOutbox" e
+    const emailIds = 'batchId' in target
+      ? (await query<{ id: string }>(`SELECT e."EmailID"::text AS id FROM "EmailOutbox" e
           JOIN "AccountImportRows" r ON r."UserID"=e."UserID" AND r."Action"='CREATED'
           JOIN "AccountImportBatches" b ON b."BatchID"=r."BatchID"
-          WHERE r."BatchID"=$1 AND e."Kind"='ACCOUNT' AND e."CreatedAt"=b."CreatedAt"`, [target.batchId])
-      : await query<{ id: string }>(`SELECT "EmailID"::text AS id FROM "EmailOutbox"
-          WHERE "UserID"=$1 AND "Kind"='SYSTEM_NOTIFICATION'`, [target.userId]);
-    const emailIds = emails.rows.map(row => row.id);
+          WHERE r."BatchID"=$1 AND e."Kind"='ACCOUNT' AND e."CreatedAt"=b."CreatedAt"`, [target.batchId])).rows.map(row => row.id)
+      : target.emailId ? [target.emailId] : [];
     total = emailIds.length;
     if (!total) return { status: 'UNKNOWN', total: 0, sent: 0, pending: 0, failed: 0, cancelled: 0 };
     const configured = mailIsConfigured();
     try {
-      // Bound foreground work for bulk imports. The worker immediately handles
-      // the remainder; a single-account creation waits for its SMTP result.
+      // Bound foreground work for bulk imports. The periodic worker handles the remainder.
       if (configured) await deliverEmails({ emailIds, maxMessages: 20, deadlineAt: Date.now() + 15000 });
     } catch (error) { logDeliveryError(error); }
     const rows = (await query<{ Status: string; LastError: string | null }>(
@@ -54,7 +50,7 @@ export async function deliverAccountEmailsNow(target: { batchId: string | number
   } catch (error) {
     logDeliveryError(error);
     return { status: 'UNKNOWN', total, sent: 0, pending: 0, failed: 0, cancelled: 0 };
-  } finally { scheduleAccountEmailDelivery(); }
+  }
 }
 
 function logDeliveryError(error: unknown) {

@@ -32,7 +32,9 @@ test('account and deadline notifications persist atomically, deduplicate and ret
   const { importAccounts } = require('../dist/modules/imports/import.service');
   const { saveWindow } = require('../dist/modules/recruitment/window.service');
   const { editWindowSchedule } = require('../dist/modules/recruitment/schedule.service');
-  const { notifyRecruitmentSchedule, notifyRegistrationSchedule, queueDueDeadlineNotices } = require('../dist/modules/recruitment/notification.service');
+  const { notifyRecruitmentCreated, notifyRegistrationSchedule, queueDueDeadlineNotices } = require('../dist/modules/recruitment/notification.service');
+  const { noticeFingerprint } = require('../dist/shared/notification.service');
+  const { encryptEmail } = require('../dist/modules/imports/email.crypto');
   const { deliverEmails } = require('../dist/jobs/provisioning');
   const sent = [];
   t.mock.method(nodemailer, 'createTransport', options => ({
@@ -92,21 +94,44 @@ test('account and deadline notifications persist atomically, deduplicate and ret
 
   let round;
   const schedule = { postingStartsAt: '2031-01-02T00:00:00Z', postingEndsAt: '2031-01-03T00:00:00Z', applicationStartsAt: '2031-01-03T00:00:00Z', applicationEndsAt: '2031-01-10T00:00:00Z', resultsStartsAt: '2031-01-04T00:00:00Z', resultsEndsAt: '2031-01-10T00:00:00Z' };
-  await t.test('creating a schedule notifies enterprises and excludes students in other semesters', async () => {
+  await t.test('QHDN creating a round queues one notice per active enterprise account', async () => {
+    await db.query(`UPDATE "Users" SET "Status"='LOCKED' WHERE "Email"='company@example.test'`);
     const year = (await db.query(`INSERT INTO "AcademicYears" ("YearCode","StartDate","EndDate","Status") VALUES ('NOTICE-2031','2031-01-01','2031-12-31','PLANNED') RETURNING "AcademicYearID"`)).rows[0].AcademicYearID;
     const period = (await db.query(`INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","StartDate","EndDate","Status") VALUES ($1,'NOTICE-2031-SEM','Notices','SEMESTER','2031-01-01','2031-06-30','PLANNED') RETURNING "AcademicPeriodID"`, [year])).rows[0].AcademicPeriodID;
     round = (await saveWindow({ academicPeriodId: period, name: 'Notice Round', startsAt: schedule.postingStartsAt, endsAt: schedule.resultsEndsAt, rounds: [{ name: 'Notice Round', ...schedule }] }, staff.UserID)).rounds[0];
     const notices = (await db.query(`SELECT n.*,r."RoleCode" FROM "Notifications" n JOIN "Users" u USING("UserID") JOIN "Roles" r USING("RoleID") WHERE n."RelatedEntityType"='RECRUITMENT_WINDOW' AND n."RelatedEntityID"=$1`, [round.id])).rows;
-    assert.ok(notices.some(n => n.UserID === enterprise.UserID)); assert.ok(!notices.some(n => n.RoleCode === 'STUDENT'));
+    const recipients = (await db.query(`SELECT DISTINCT u."UserID" FROM "Users" u
+      JOIN "EnterpriseUsers" eu USING("UserID") JOIN "Enterprises" e USING("EnterpriseID") JOIN "Roles" r USING("RoleID")
+      WHERE u."Status"='ACTIVE' AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL AND r."RoleCode"='ENTERPRISE'`)).rows;
+    assert.ok(notices.some(n => n.UserID === enterprise.UserID));
+    assert.deepEqual(new Set(notices.map(n => n.UserID)), new Set(recipients.map(n => n.UserID)));
+    assert.equal(notices.length, recipients.length);
     const row = (await db.query('SELECT * FROM "RecruitmentWindows" WHERE "WindowID"=$1', [round.id])).rows[0];
-    assert.equal(await notifyRecruitmentSchedule(db, row, 'Lịch tuyển dụng OJT mới: '), 0);
+    assert.equal(await notifyRecruitmentCreated(db, row), 0);
   });
-  await t.test('editing deadlines queues a new schedule once and unchanged saves stay quiet', async () => {
-    const edit = { ...schedule, name: 'Notice Round Updated', reason: 'Correct deadline', applicationEndsAt: '2031-01-09T00:00:00Z', resultsEndsAt: '2031-01-09T00:00:00Z' };
-    const emails = await count('EmailOutbox');
-    await editWindowSchedule(round.id, edit, staff.UserID); assert.ok(await count('EmailOutbox') > emails);
-    const after = await count('EmailOutbox'); await editWindowSchedule(round.id, edit, staff.UserID);
-    assert.equal(await count('EmailOutbox'), after);
+  await t.test('opening a round and importing a later enterprise do not send that enterprise the old schedule', async () => {
+    const emails = await count('EmailOutbox'), notices = await count('Notifications');
+    await saveWindow({ status: 'OPEN', reason: 'Open round' }, staff.UserID, round.id);
+    assert.equal(await count('EmailOutbox'), emails);
+    assert.equal(await count('Notifications'), notices);
+    const beforeSend = sent.length;
+    const imported = await importAccounts({ kind: 'ENTERPRISE', idempotencyKey: 'enterprise-after-round',
+      rows: [{ name: 'Late Company', email: 'late-company@example.test', fullName: 'Late HR' }] }, staff.UserID);
+    assert.equal(imported.emailDelivery.status, 'SENT');
+    assert.deepEqual(sent.slice(beforeSend).map(message => message.to), ['late-company@example.test']);
+    await queueDueDeadlineNotices();
+    const late = (await db.query(`SELECT "UserID","Email" FROM "Users" WHERE "Email"='late-company@example.test'`)).rows[0];
+    const ownNotices = (await db.query('SELECT "RelatedEntityType" FROM "Notifications" WHERE "UserID"=$1', [late.UserID])).rows;
+    assert.deepEqual(ownNotices.map(notice => notice.RelatedEntityType), ['ACCOUNT_CREATED']);
+
+    const row = (await db.query('SELECT * FROM "RecruitmentWindows" WHERE "WindowID"=$1', [round.id])).rows[0];
+    const legacyPayload = encryptEmail({ subject: 'Lịch đợt tuyển dụng OJT: Notice Round', text: 'Legacy schedule',
+      guard: { table: 'RecruitmentWindows', id: round.id, fingerprint: noticeFingerprint(row) } });
+    const legacy = (await db.query(`INSERT INTO "EmailOutbox" ("UserID","Recipient","EncryptedPayload","ExpiresAt","Kind")
+      VALUES ($1,$2,$3,$4,'SYSTEM_NOTIFICATION') RETURNING "EmailID"`, [late.UserID, late.Email, legacyPayload, row.EndsAt])).rows[0];
+    assert.equal(await deliverEmails({ emailIds: [legacy.EmailID] }), 0);
+    assert.equal((await db.query('SELECT "Status" FROM "EmailOutbox" WHERE "EmailID"=$1', [legacy.EmailID])).rows[0].Status, 'CANCELLED');
+
     // Exercise the legacy registration recipient query against the real schema.
     const registration = (await db.query('SELECT * FROM "OJTRegistrationWindows" WHERE "RecruitmentRoundID"=$1', [round.id])).rows[0];
     assert.equal(await notifyRegistrationSchedule(db, registration, 'Lịch đăng ký: '), 0);
@@ -127,8 +152,8 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     await deliverEmails();
     assert.ok(sent.some(message => message.to === 'company@example.test'));
     assert.ok(sent.some(message => message.to === 'student-notice@example.test'));
-    assert.ok(sent.some(message => message.to === enterprise.Email && message.text.includes('Notice Round Updated')));
-    assert.ok(!sent.some(message => message.text.includes('Đợt: Notice Round.')));
+    assert.equal(sent.filter(message => message.to === enterprise.Email && message.text.includes('Đợt: Notice Round.')).length, 1);
+    assert.ok(!sent.some(message => message.to === 'late-company@example.test' && message.text.includes('Notice Round')));
     assert.ok((await db.query(`SELECT 1 FROM "EmailOutbox" WHERE "Status"='CANCELLED' AND "Kind"='SYSTEM_NOTIFICATION'`)).rowCount);
     const delivered = sent.length; await deliverEmails(); assert.equal(sent.length, delivered);
     assert.equal((await db.query(`SELECT count(*)::int AS n FROM "EmailOutbox" WHERE "Status" IN ('SENT','CANCELLED') AND "EncryptedPayload" IS NOT NULL`)).rows[0].n, 0);
@@ -142,21 +167,15 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     assert.equal(sent.at(-1).to, admin.Email);
     assert.match(sent.at(-1).text, /\b\d{6}\b/);
   });
-  await t.test('deadline ticks are idempotent and continue to include registered students on the legacy round', async () => {
+  await t.test('editing deadlines and periodic jobs do not reannounce a recruitment round', async () => {
+    const edit = { ...schedule, name: 'Notice Round Updated', reason: 'Correct deadline', applicationEndsAt: '2031-01-09T00:00:00Z', resultsEndsAt: '2031-01-09T00:00:00Z' };
+    const emails = await count('EmailOutbox'), notices = await count('Notifications');
+    await editWindowSchedule(round.id, edit, staff.UserID);
+    assert.equal(await count('EmailOutbox'), emails);
+    assert.equal(await count('Notifications'), notices);
     await queueDueDeadlineNotices();
     const after = await count('Notifications'); await queueDueDeadlineNotices(); assert.equal(await count('Notifications'), after);
-    const legacy = (await db.query(`SELECT * FROM "RecruitmentWindows" WHERE "CampaignID" IS NULL ORDER BY "WindowID" LIMIT 1`)).rows[0];
-    if (legacy) {
-      await notifyRecruitmentSchedule(db, legacy, 'Test audience: ', 'TEST_AUDIENCE', 'STUDENT', new Date('2031-01-01'));
-      const notices = (await db.query(`SELECT n."UserID" FROM "Notifications" n WHERE n."RelatedEntityType"='RECRUITMENT_WINDOW' AND n."RelatedEntityID"=$1 AND n."Title" LIKE 'Test audience:%'`, [legacy.WindowID])).rows;
-      assert.ok(notices.length > 0);
-      assert.ok(notices.every(n => users.some(u => u.UserID === n.UserID && u.RoleCode === 'STUDENT')));
-      const lockedId = notices[0].UserID;
-      await db.query('UPDATE "Users" SET "Status"=\'LOCKED\' WHERE "UserID"=$1', [lockedId]);
-      await notifyRecruitmentSchedule(db, legacy, 'Active audience: ', 'TEST_ACTIVE_AUDIENCE', 'STUDENT', new Date('2031-01-01'));
-      assert.equal((await db.query(`SELECT count(*)::int AS n FROM "Notifications" WHERE "UserID"=$1 AND "Title" LIKE 'Active audience:%'`, [lockedId])).rows[0].n, 0);
-    }
-    assert.ok(admin.UserID);
+    assert.equal((await db.query(`SELECT count(*)::int AS n FROM "Notifications" WHERE "RelatedEntityType"='RECRUITMENT_WINDOW' AND "Title" NOT LIKE 'Lịch tuyển dụng OJT mới:%'`)).rows[0].n, 0);
   });
   await t.test('SMTP authentication failure keeps the account and explains why delivery is pending', async child => {
     const errors = [];
