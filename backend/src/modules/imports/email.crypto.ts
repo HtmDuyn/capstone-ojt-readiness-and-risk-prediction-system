@@ -9,7 +9,7 @@ export function encryptEmail(value: object): string {
   const data = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()]);
   return [iv, cipher.getAuthTag(), data].map(b => b.toString('base64')).join('.');
 }
-export function decryptEmail(value: string): { subject: string; text: string } {
+export function decryptEmail(value: string): { subject: string; text: string; html?: string } {
   const [iv, tag, data] = value.split('.').map(s => Buffer.from(s, 'base64'));
   const cipher = createDecipheriv('aes-256-gcm', emailKey(), iv);
   cipher.setAuthTag(tag);
