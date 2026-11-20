@@ -27,7 +27,8 @@ export async function importRequests(kind:ImportKind,params:Row,actor:Actor,id?:
     if(kind==='STUDENT'&&result.accountImportId){
       const students=(await c.query(`SELECT r."RowNumber" AS "rowNumber",r."SourceCode" AS "studentCode",r."UserID" AS "userId",s."StudentID" AS "studentId",s."Status" AS "studentStatus",ojt."OJTSemesterID" AS "ojtSemesterId",r."Action" AS action,
         u."FullName" AS "fullName",u."Email" AS email,u."Status" AS "accountStatus",u."MustChangePassword" AS "mustChangePassword",u."TemporaryPasswordExpiresAt" AS "temporaryPasswordExpiresAt",
-        mail."EmailID"::text AS "emailId",CASE WHEN r."Action"='CREATED' THEN COALESCE(mail."Status",'NOT_QUEUED') ELSE 'NOT_QUEUED' END AS "emailStatus",mail."SentAt" AS "emailSentAt",mail."LastError" AS "emailLastError"
+        mail."EmailID"::text AS "emailId",CASE WHEN r."Action"='CREATED' THEN COALESCE(mail."Status",'NOT_QUEUED') ELSE 'NOT_QUEUED' END AS "emailStatus",mail."SentAt" AS "emailSentAt",
+        mail."LastError" AS "emailLastError"
         FROM "AccountImportRows" r JOIN "Users" u ON u."UserID"=r."UserID" LEFT JOIN "Students" s ON s."UserID"=r."UserID"
         LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
         LEFT JOIN "CohortCurriculumPeriods" target ON target."CohortID"=placement."CohortID" AND target."GroupCode"=placement."GroupCode" AND target."CurriculumSemester"=6

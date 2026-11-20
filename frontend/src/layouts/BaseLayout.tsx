@@ -80,7 +80,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           {/* Header trên cùng */}
           <Header
             user={resolvedUserSummary}
-            showNotifications={!isEducation && !hideHeaderTools}
+            showNotifications={!hideHeaderTools}
             showLanguage={!isEducation && !hideHeaderTools}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}

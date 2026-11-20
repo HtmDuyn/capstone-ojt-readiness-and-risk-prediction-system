@@ -69,7 +69,8 @@ async function mailjetRequest(config: Extract<MailConfig, { provider: 'mailjet' 
 }
 
 function mailjetError(status: number, providerCode?: unknown) {
-  const code = status === 401 ? 'EAUTH'
+  const code = status === 401 && providerCode === 'mj-0001' ? 'MAILJET_KEY_SUSPENDED'
+    : status === 401 ? 'EAUTH'
     : status === 403 && ['send-0007', 'send-0008'].includes(String(providerCode)) ? 'MAILJET_SENDER_NOT_VERIFIED'
     : status === 403 ? 'MAILJET_FORBIDDEN'
     : status === 429 ? 'MAILJET_RATE_LIMIT'
