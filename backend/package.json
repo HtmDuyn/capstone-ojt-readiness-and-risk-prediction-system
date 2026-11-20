@@ -27,6 +27,7 @@
   },
   "homepage": "https://github.com/hana353/Project-Capstone---Fall2026#readme",
   "dependencies": {
+    "@getbrevo/brevo": "^6.2.0",
     "@types/pdfkit": "^0.17.6",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

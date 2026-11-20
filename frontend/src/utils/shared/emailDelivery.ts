@@ -5,7 +5,7 @@ export interface EmailDeliveryResult {
   pending: number;
   failed: number;
   cancelled: number;
-  issue?: 'AUTH' | 'CONFIGURATION';
+  issue?: 'AUTH' | 'PERMISSION' | 'RATE_LIMIT' | 'CONFIGURATION';
 }
 
 export function emailDeliveryMessage(result?: EmailDeliveryResult): string {
@@ -26,5 +26,7 @@ export function emailDeliveryMessage(result?: EmailDeliveryResult): string {
 
 export function deliveryIssue(issue: EmailDeliveryResult['issue']): string | undefined {
   if (issue === 'AUTH') return 'Gửi email bị từ chối xác thực. Quản trị viên cần kiểm tra cấu hình nhà cung cấp email.';
+  if (issue === 'PERMISSION') return 'Dịch vụ gửi email từ chối quyền gửi. Quản trị viên cần kiểm tra cấu hình.';
+  if (issue === 'RATE_LIMIT') return 'Đã chạm giới hạn gửi email. Hệ thống sẽ thử lại.';
   if (issue === 'CONFIGURATION') return 'Chưa cấu hình dịch vụ gửi email. Quản trị viên cần kiểm tra backend.';
 }

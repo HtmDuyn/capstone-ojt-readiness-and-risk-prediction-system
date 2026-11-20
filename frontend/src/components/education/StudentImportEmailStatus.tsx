@@ -5,8 +5,12 @@ import { deliveryIssue } from '@/utils/shared/emailDelivery';
 
 function statusText(student: NonNullable<ImportCommitResponse['students']>[number]) {
   if (student.action !== 'CREATED') return 'Tài khoản đã tồn tại: cập nhật hồ sơ, không gửi lại email cấp tài khoản.';
-  if (student.emailStatus === 'PENDING' && /^EAUTH(?:_|$)/.test(student.emailLastError ?? ''))
-    return deliveryIssue('AUTH');
+  if (student.emailStatus === 'PENDING') {
+    const code = student.emailLastError ?? '';
+    if (/^EAUTH(?:_|$)/.test(code)) return deliveryIssue('AUTH');
+    if (/^BREVO_FORBIDDEN(?:_|$)/.test(code)) return deliveryIssue('PERMISSION');
+    if (/^BREVO_RATE_LIMIT(?:_|$)/.test(code)) return deliveryIssue('RATE_LIMIT');
+  }
   switch (student.emailStatus) {
     case 'SENT': return 'Đã được máy chủ email tiếp nhận. Sinh viên kiểm tra Hộp thư đến và Thư rác.';
     case 'PENDING': return 'Đang chờ gửi email cấp tài khoản.';

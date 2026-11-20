@@ -191,4 +191,29 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     assert.equal(await deliverEmails({ emailIds: [email.EmailID] }), 1);
     assert.equal(attempts, 4);
   });
+  await t.test('creating an account with Brevo selected sends its queued email through the API', async child => {
+    const env = { MAIL_PROVIDER: 'brevo', BREVO_API_KEY: 'test-brevo-api-key', BREVO_FROM_EMAIL: 'ojt@example.test' };
+    const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+    Object.assign(process.env, env);
+    child.after(() => {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+    const recipient = 'brevo-staff@example.test';
+    const request = child.mock.method(globalThis, 'fetch', async (url, options) => {
+      assert.equal(String(url), 'https://api.brevo.com/v3/smtp/email');
+      assert.deepEqual(JSON.parse(options.body).to, [{ email: recipient }]);
+      return Response.json({ messageId: '<test@example.test>' }, { status: 201 });
+    });
+    const created = await createNewAccount({
+      username: 'brevo.staff', fullName: 'Brevo Staff', email: recipient,
+      password: 'Test-only-Password3', roleId: staff.RoleID,
+    });
+    const email = (await db.query('SELECT "Status" FROM "EmailOutbox" WHERE "UserID"=$1', [created.id])).rows[0];
+    assert.equal(created.emailDelivery.status, 'SENT');
+    assert.equal(email.Status, 'SENT');
+    assert.equal(request.mock.callCount(), 1);
+  });
 });

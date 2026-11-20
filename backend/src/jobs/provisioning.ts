@@ -53,27 +53,31 @@ export async function deliverEmails(options: { emailIds?: string[]; maxMessages?
         await transport.send({ to: e.Recipient, subject: message.subject, text: message.text, html: message.html, reference: String(e.EmailID) });
         logger.info('Email accepted by provider.', {
           emailId: String(e.EmailID),
-          provider: 'smtp',
+          provider: config.provider,
           runtime: process.env.RENDER === 'true' ? 'render' : 'non-render',
           pid: process.pid,
         });
         await query('UPDATE "EmailOutbox" SET "Status"=\'SENT\',"SentAt"=now(),"EncryptedPayload"=NULL,"LeaseUntil"=NULL,"LastError"=NULL WHERE "EmailID"=$1 AND "Status"=\'SENDING\'', [e.EmailID]);
         sent++;
       } catch (error: any) {
-        // Never persist SMTP responses or email content: they may include credentials.
+        // Never persist provider responses or email content: they may include credentials.
         const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE',
-          'EMESSAGE', 'EDNS', 'EMAIL_REJECTED'];
+          'EMESSAGE', 'EDNS', 'EMAIL_REJECTED', 'BREVO_FORBIDDEN', 'BREVO_RATE_LIMIT',
+          'BREVO_UNAVAILABLE', 'BREVO_REJECTED', 'BREVO_INVALID_RESPONSE'];
         const errorCode = knownCodes.includes(error?.code) ? error.code : 'EMAIL_DELIVERY_FAILED';
         const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
           ? error.responseCode : undefined;
         const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
-        // Authentication failures affect all recipients.
+        // Provider authentication, permissions and rate limits affect all recipients.
         // End this pass without exhausting attempts. The next pass can retry immediately.
-        if (errorCode === 'EAUTH') {
+        if (['EAUTH', 'BREVO_FORBIDDEN', 'BREVO_RATE_LIMIT'].includes(errorCode)) {
           await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
             "LeaseUntil"=NULL,"NextAttemptAt"=now(),"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
           if (lastError !== e.LastError) {
-            console.error(`Email delivery failed. EmailID=${e.EmailID}, provider=smtp, code=${lastError}. Check SMTP authentication. Will retry on the next email worker run.`);
+            const guidance = errorCode === 'BREVO_RATE_LIMIT' ? 'Brevo rate limit reached.'
+              : config.provider === 'brevo' ? 'Check the Brevo API key and transactional email permissions.'
+                : 'Check SMTP authentication.';
+            console.error(`Email delivery failed. EmailID=${e.EmailID}, provider=${config.provider}, code=${lastError}. ${guidance} Will retry on the next email worker run.`);
           }
           break;
         }

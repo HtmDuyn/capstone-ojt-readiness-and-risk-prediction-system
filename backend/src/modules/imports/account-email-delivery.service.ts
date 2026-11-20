@@ -6,7 +6,7 @@ import { mailIsConfigured } from '../../config/mail';
 export type EmailDeliveryResult = {
   status: 'SENT' | 'PENDING' | 'PARTIAL' | 'FAILED' | 'UNKNOWN';
   total: number; sent: number; pending: number; failed: number; cancelled: number;
-  issue?: 'AUTH' | 'CONFIGURATION';
+  issue?: 'AUTH' | 'PERMISSION' | 'RATE_LIMIT' | 'CONFIGURATION';
 };
 
 // Run only after the account transaction commits. SMTP failures must not turn a
@@ -43,6 +43,8 @@ export async function deliverAccountEmailsNow(target: { batchId: string | number
       if (row.Status === 'PENDING' || row.Status === 'FAILED') {
         const code = row.LastError ?? '';
         if (/^EAUTH(?:_|$)/.test(code)) result.issue = 'AUTH';
+        else if (!result.issue && /^BREVO_FORBIDDEN(?:_|$)/.test(code)) result.issue = 'PERMISSION';
+        else if (!result.issue && /^BREVO_RATE_LIMIT(?:_|$)/.test(code)) result.issue = 'RATE_LIMIT';
       }
     }
     result.status = rows.length !== total ? 'UNKNOWN' : result.sent === total ? 'SENT'
