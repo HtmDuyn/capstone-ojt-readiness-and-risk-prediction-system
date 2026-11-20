@@ -9,10 +9,16 @@ import { saveHistory, recordRejected, safeRow } from '../students/academic-impor
 import { importAcademicProfile } from '../students/complete-import.service';
 import { audit } from '../academic/academic.repository';
 import type { PoolClient } from 'pg';
+import { deliverAccountEmailsNow } from './account-email-delivery.service';
+import { accountEmail } from '../../shared/account-email';
+import { frontendLoginUrl } from '../../config/frontend';
 export type ImportCommitHook=(client:PoolClient,result:Record<string,any>)=>Promise<void>;
 
 export async function importAccounts(body: unknown, actorId: number, preview = false,onCommit?:ImportCommitHook) {
-  try { return await performAccountImport(body,actorId,preview,onCommit); }
+  let result;
+  try {
+    result = await performAccountImport(body,actorId,preview,onCommit);
+  }
   catch(error:any) {
     if (!preview && (body as any)?.kind==='STUDENT') {
       try { error.importBatchId=await recordRejected(body,actorId,'STUDENT',error); }
@@ -20,6 +26,11 @@ export async function importAccounts(body: unknown, actorId: number, preview = f
     }
     throw error;
   }
+  if (!preview && result.created > 0) {
+    const emailDelivery = await deliverAccountEmailsNow({ batchId: result.batchId });
+    return { ...result, emailDelivery };
+  }
+  return result;
 }
 async function performAccountImport(body: unknown, actorId: number, preview = false,onCommit?:ImportCommitHook) {
   const input = validateImport(body);
@@ -83,8 +94,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     }
     if (summary.created && !preview) {
       emailKey();
-      const url = new URL(process.env.FRONTEND_LOGIN_URL ?? '');
-      if (!['http:', 'https:'].includes(url.protocol)) throw fail('Configure FRONTEND_LOGIN_URL.', 503);
+      frontendLoginUrl();
     }
     const batch = await client.query('INSERT INTO "AccountImportBatches" ("IdempotencyKey","PayloadHash","Kind","OJTSemesterID","ImportedBy","Summary","RecruitmentWindowID") VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING "BatchID"', [input.idempotencyKey, payloadHash, input.kind, input.semesterId ?? null, actorId, summary, input.windowId ?? null]);
     const batchId = batch.rows[0].BatchID;
@@ -101,8 +111,13 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
         if (!user.rows.length) throw fail('Required role is missing.', 503);
         p.userId = user.rows[0].UserID;
         if (!preview) {
-        const payload = encryptEmail({ subject: 'Tài khoản hệ thống OJT', text: `Xin chào ${row.fullName},\n${input.kind === 'ENTERPRISE' ? `Mã doanh nghiệp: ${row.code}\n` : ''}Email đăng nhập: ${row.email}\nTên tài khoản: ${input.kind.toLowerCase()}_${row.code}\nMật khẩu tạm: ${password}\nĐăng nhập: ${process.env.FRONTEND_LOGIN_URL}\nMật khẩu tạm hết hạn: ${expiresAt.toISOString()}. Bạn phải đổi mật khẩu sau khi đăng nhập.` });
+        const payload = encryptEmail(accountEmail({ fullName: row.fullName, email: row.email,
+          username: `${input.kind.toLowerCase()}_${row.code}`, roleCode: input.kind, code: row.code,
+          companyName: row.name, temporary: { password, expiresAt } }));
         await client.query('INSERT INTO "EmailOutbox" ("UserID","Recipient","EncryptedPayload","ExpiresAt") VALUES ($1,$2,$3,$4)', [p.userId, row.email, payload, expiresAt]);
+        await client.query(`INSERT INTO "Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt")
+          VALUES ($1,'Tài khoản hệ thống OJT đã được tạo',$2,'IN_APP','ACCOUNT_CREATED',$1,now())`,
+          [p.userId, 'Thông tin đăng nhập đã được xếp hàng gửi đến email của bạn. Vui lòng đổi mật khẩu tạm sau khi đăng nhập.']);
         }
       }
       if (input.kind === 'STUDENT') {

@@ -19,6 +19,8 @@ const { createMailTransport } = require('../dist/shared/mail-transport');
   } finally { transport.close(); }
 })().catch(error => {
   const code = String(error.code || 'MAIL_CHECK_FAILED').replace(/[^A-Za-z0-9_]/g, '').slice(0,80);
-  console.error(`Mail configuration check failed. Code: ${code}.`);
+  const status = Number.isInteger(error.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
+    ? `_${error.responseCode}` : '';
+  console.error(`Mail configuration check failed. Code: ${code}${status}.`);
   process.exitCode = 1;
 });

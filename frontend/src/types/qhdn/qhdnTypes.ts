@@ -1,3 +1,5 @@
+import type { EmailDeliveryResult } from '@/utils/shared/emailDelivery';
+
 export interface ImportPreviewRowResult {
   rowNumber: number;
   code: string;
@@ -27,6 +29,7 @@ export interface ImportPreviewResponse extends ImportPreviewApiResponse {
 export interface ImportCommitResponse extends ImportSummary {
   batchId: number;
   replayed: boolean;
+  emailDelivery?: EmailDeliveryResult;
 }
 
 export interface EnterpriseImportRow {
