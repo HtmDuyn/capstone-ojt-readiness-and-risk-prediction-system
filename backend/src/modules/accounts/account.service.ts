@@ -1,4 +1,7 @@
 import bcrypt from "bcryptjs";
+import { queueNotice } from '../../shared/notification.service';
+import { deliverAccountEmailsNow, type EmailDeliveryResult } from '../imports/account-email-delivery.service';
+import { accountEmail } from '../../shared/account-email';
 
 import type {
   RoleCode,
@@ -153,7 +156,7 @@ export const getAccounts = async (
 
 export const createNewAccount = async (
   input: CreateAccountInput,
-): Promise<AccountRecord> => {
+): Promise<AccountRecord & { emailDelivery: EmailDeliveryResult }> => {
   const username =
     normalizeRequiredString(
       input.username,
@@ -242,14 +245,21 @@ export const createNewAccount = async (
       10,
     );
 
-  return createAccount(
-    username,
-    passwordHash,
-    email,
-    fullName,
-    phone,
-    roleId,
-  );
+  const account = await accountTransaction(async client => {
+    const created = await createAccount(
+      username, passwordHash, email, fullName, phone, roleId, client,
+    );
+    await queueNotice(client, {
+      userId: created.id, email, title: 'Tài khoản hệ thống OJT đã được tạo',
+      text: 'Tài khoản của bạn đã được tạo. Thông tin tài khoản và hướng dẫn đăng nhập đã được xếp hàng gửi đến email của bạn.',
+      emailContent: accountEmail({ fullName, email, username, roleCode: role.code }),
+      entityType: 'ACCOUNT_CREATED', entityId: created.id, eventKey: `account-created:${created.id}`,
+      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+    });
+    return created;
+  });
+  const emailDelivery = await deliverAccountEmailsNow({ userId: account.id });
+  return { ...account, emailDelivery };
 };
 
 export const updateAccount = async (

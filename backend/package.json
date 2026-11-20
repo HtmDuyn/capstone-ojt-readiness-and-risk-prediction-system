@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "check:db": "node scripts/check-db.cjs",
-    "jobs:provisioning": "node scripts/provisioning-jobs.cjs"
+    "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
+    "check:notifications": "node scripts/check-notifications.cjs"
   },
   "repository": {
     "type": "git",

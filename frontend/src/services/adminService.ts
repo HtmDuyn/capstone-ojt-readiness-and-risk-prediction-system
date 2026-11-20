@@ -1,4 +1,5 @@
 import { apiRequest } from './apiService';
+import type { EmailDeliveryResult } from '@/utils/shared/emailDelivery';
 export const ROLE_NAMES: Record<string, string> = { ADMIN: 'Quản trị viên', ACADEMIC: 'Phòng Đào tạo', OJT_COORD: 'Phòng Quan hệ Doanh nghiệp', STUDENT: 'Sinh viên', ENTERPRISE: 'Doanh nghiệp' };
 export interface Account { id: number; username: string; full_name: string; email: string; phone: string | null; role_id: number; role_code: string; status: string; created_at?: string; last_login_at?: string; studentId?: number | null; enterpriseId?: number | null }
 export interface AccountCount { roleCode: string | null; status: string | null; count: number }
@@ -12,7 +13,7 @@ export const formatDate = (value?: string | null) => value ? new Date(value).toL
 
 export interface CreateAccountInput { username: string; fullName: string; email: string; password: string; phone?: string | null; roleId: number }
 export interface UpdateAccountInput { userId: number; fullName?: string; phone?: string | null; email?: string; status?: 'ACTIVE' | 'LOCKED' | 'INACTIVE'; roleId?: number }
-export const createAccount = (input: CreateAccountInput) => apiRequest('/accounts', { method: 'POST', body: JSON.stringify(input) });
+export const createAccount = (input: CreateAccountInput) => apiRequest<{ account: Account; emailDelivery?: EmailDeliveryResult }>('/accounts', { method: 'POST', body: JSON.stringify(input) });
 export const updateAccount = (input: UpdateAccountInput) => apiRequest('/accounts/update', { method: 'PATCH', body: JSON.stringify(input) });
 export const resetAccountPassword = (userId: number) => apiRequest('/auth/users/password-reset', { method: 'POST', body: JSON.stringify({userId}) });
 export const resendAccountEmail = (email: string) => apiRequest('/imports/emails/resend', { method: 'POST', body: JSON.stringify({email}) });

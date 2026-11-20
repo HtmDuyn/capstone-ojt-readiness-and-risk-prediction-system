@@ -5,6 +5,7 @@ import { authorizeRoles } from '../../middleware/authorize';
 import { importAccounts } from './import.service';
 import { query } from '../../config/database';
 import { fail } from './import.validation';
+import { scheduleAccountEmailDelivery } from '../../jobs/email-wakeup';
 const router = Router();
 router.use(authenticate, authorizeRoles('ADMIN', 'ACADEMIC', 'OJT_COORD'));
 for (const path of ['/preview', '/commit']) {
@@ -30,6 +31,7 @@ router.post('/emails/resend', authorizeRoles('ADMIN'), async (req, res, next) =>
       AND e."Status"='FAILED' AND e."ExpiresAt">now() AND e."EncryptedPayload" IS NOT NULL
       AND EXISTS (SELECT 1 FROM "Users" u WHERE u."UserID"=e."UserID" AND u."MustChangePassword" AND u."TemporaryPasswordExpiresAt">now() AND u."Status"='ACTIVE' AND lower(u."Email")=lower(e."Recipient")) RETURNING "EmailID"`, [email]);
     if (!result.rowCount) throw fail('Only unexpired failed emails can be retried.', 409, 'EMAIL_NOT_RETRYABLE');
+    scheduleAccountEmailDelivery();
     res.json({ success: true, emailId: result.rows[0].EmailID, email });
   } catch (error) { next(error); }
 });
