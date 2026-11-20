@@ -1,4 +1,4 @@
-// Does not drain the outbox. Mailjet SandboxMode validates without sending mail.
+// Verifies SMTP connectivity and authentication without sending email.
 require('../dist/config/env');
 const { mailConfig } = require('../dist/config/mail');
 const { emailKey } = require('../dist/modules/imports/email.crypto');
@@ -10,21 +10,18 @@ const { createMailTransport } = require('../dist/shared/mail-transport');
   try { login = new URL(process.env.FRONTEND_LOGIN_URL || ''); } catch { /* Report only a safe code below. */ }
   if (!login || !['https:', 'http:'].includes(login.protocol))
     throw Object.assign(new Error(), { code: 'FRONTEND_LOGIN_URL_INVALID' });
-  console.log('Mail provider:', config.provider);
-  console.log('Sender:', config.provider === 'mailjet' ? config.fromEmail : 'configured');
+  console.log('Mail transport: SMTP');
   const transport = createMailTransport(config);
   try {
     await transport.verify();
-    console.log(config.provider === 'mailjet' ? 'Mailjet Sandbox verification OK. No email sent.' : 'SMTP verification OK. No email sent.');
+    console.log('SMTP verification OK. No email sent.');
   } finally { transport.close(); }
 })().catch(error => {
   const code = String(error.code || 'MAIL_CHECK_FAILED').replace(/[^A-Za-z0-9_]/g, '').slice(0,80);
   const status = Number.isInteger(error.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
     ? `_${error.responseCode}` : '';
   console.error(`Mail configuration check failed. Code: ${code}${status}.`);
-  if (code === 'MAILJET_KEY_SUSPENDED')
-    console.error('Mailjet suspended this API key (mj-0001). Contact Mailjet Support to restore sending.');
-  else if (code === 'EAUTH' && process.env.MAIL_PROVIDER?.trim().toLowerCase() === 'mailjet')
-    console.error('Mailjet rejected authentication. Check that MAILJET_API_KEY and MAILJET_SECRET_KEY are the active pair for the same Mailjet account or subaccount.');
+  if (code === 'EAUTH')
+    console.error('SMTP rejected authentication. Check SMTP_USER and SMTP_PASSWORD.');
   process.exitCode = 1;
 });

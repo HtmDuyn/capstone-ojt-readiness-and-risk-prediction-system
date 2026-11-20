@@ -5,13 +5,8 @@ import { deliveryIssue } from '@/utils/shared/emailDelivery';
 
 function statusText(student: NonNullable<ImportCommitResponse['students']>[number]) {
   if (student.action !== 'CREATED') return 'Tài khoản đã tồn tại: cập nhật hồ sơ, không gửi lại email cấp tài khoản.';
-  if (student.emailStatus === 'PENDING') {
-    const code = student.emailLastError ?? '';
-    if (/^(EAUTH|MAILJET_KEY_SUSPENDED)(?:_|$)/.test(code)) return deliveryIssue('AUTH');
-    if (code.startsWith('MAILJET_SENDER_NOT_VERIFIED')) return deliveryIssue('SENDER');
-    if (code.startsWith('MAILJET_FORBIDDEN')) return deliveryIssue('PERMISSION');
-    if (code.startsWith('MAILJET_RATE_LIMIT')) return deliveryIssue('RATE_LIMIT');
-  }
+  if (student.emailStatus === 'PENDING' && /^EAUTH(?:_|$)/.test(student.emailLastError ?? ''))
+    return deliveryIssue('AUTH');
   switch (student.emailStatus) {
     case 'SENT': return 'Đã được máy chủ email tiếp nhận. Sinh viên kiểm tra Hộp thư đến và Thư rác.';
     case 'PENDING': return 'Đang chờ gửi email cấp tài khoản.';

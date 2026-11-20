@@ -5,7 +5,6 @@ delete process.env.DATABASE_URL; delete process.env.SUPABASE_DATABASE_URL;
 process.env.LOCAL_DATABASE_URL = 'postgresql://postgres@127.0.0.1:1/unused';
 process.env.EMAIL_OUTBOX_KEY = 'ab'.repeat(32);
 process.env.SMTP_HOST = 'smtp.example.test'; process.env.SMTP_FROM = 'ojt@example.test';
-process.env.MAIL_PROVIDER = 'smtp';
 process.env.FRONTEND_LOGIN_URL = 'https://ojt.example.test/login';
 const { pool } = require('../dist/config/database');
 const { encryptEmail } = require('../dist/modules/imports/email.crypto');

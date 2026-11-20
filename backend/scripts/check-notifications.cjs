@@ -3,11 +3,8 @@ require('../dist/config/env');
 const { pool } = require('../dist/config/database');
 const { emailKey } = require('../dist/modules/imports/email.crypto');
 async function main() {
-  const provider = process.env.MAIL_PROVIDER?.trim().toLowerCase() || 'smtp';
-  console.log('Mail provider:', provider);
-  for (const key of provider === 'mailjet'
-    ? ['MAILJET_API_KEY','MAILJET_SECRET_KEY','MAIL_FROM_EMAIL','FRONTEND_LOGIN_URL']
-    : ['SMTP_HOST','SMTP_FROM','FRONTEND_LOGIN_URL'])
+  console.log('Mail transport: SMTP');
+  for (const key of ['SMTP_HOST','SMTP_FROM','FRONTEND_LOGIN_URL'])
     console.log(`${key}: ${process.env[key]?.trim() ? 'configured' : 'missing'}`);
   try { emailKey(); console.log('EMAIL_OUTBOX_KEY: valid'); }
   catch { console.log('EMAIL_OUTBOX_KEY: missing or invalid'); process.exitCode = 1; }
