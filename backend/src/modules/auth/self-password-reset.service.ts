@@ -6,6 +6,7 @@ import { pool } from '../../config/database';
 import { scheduleAccountEmailDelivery } from '../../jobs/provisioning';
 import { encryptEmail } from '../imports/email.crypto';
 import { invalid } from '../students/student.validation';
+import { mailIsConfigured } from '../../config/mail';
 
 function normalizeEmail(value: unknown) {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -54,7 +55,7 @@ async function cancelResetEmails(client: PoolClient, userId: number, includeTemp
 
 export async function sendPasswordResetCode(value: unknown) {
   const email = normalizeEmail(value);
-  if (!process.env.SMTP_HOST || !process.env.SMTP_FROM
+  if (!mailIsConfigured()
     || !/^https?:\/\//i.test(process.env.FRONTEND_LOGIN_URL ?? '')
     || !/^[a-f0-9]{64}$/i.test(process.env.EMAIL_OUTBOX_KEY ?? '')) {
     throw invalid('Dịch vụ gửi mã qua email hiện chưa khả dụng.', 503, 'RESET_NOT_CONFIGURED');

@@ -1,5 +1,6 @@
 import { academicAlertEmailIsCurrent } from '../modules/academic-reporting/notification.service';
-import nodemailer from 'nodemailer';
+import { mailConfig } from '../config/mail';
+import { createMailTransport } from '../shared/mail-transport';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
 
@@ -9,13 +10,15 @@ export async function deliverEmails() {
     WHERE e."EncryptedPayload" IS NOT NULL AND (e."ExpiresAt"<=now() OR EXISTS (
       SELECT 1 FROM "Users" u WHERE u."UserID"=e."UserID" AND (u."Status"<>'ACTIVE' OR lower(u."Email")<>lower(e."Recipient") OR (e."Kind"='ACCOUNT' AND (NOT u."MustChangePassword" OR u."TemporaryPasswordExpiresAt" IS NULL OR u."TemporaryPasswordExpiresAt"<=now()))))
       OR (e."Kind"='COMBO_REMINDER' AND EXISTS (SELECT 1 FROM "ComboReminderDeliveries" d JOIN "ComboRegistrationWindows" w ON w."WindowID"=d."WindowID" JOIN "ComboReminderBatches" b ON b."BatchID"=d."BatchID" WHERE d."EmailID"=e."EmailID" AND (w."Status"<>'OPEN' OR (b."Summary"->>'target'='MISSING' AND EXISTS (SELECT 1 FROM "StudentComboSelectionEvents" s WHERE s."WindowID"=d."WindowID" AND s."StudentID"=d."StudentID" AND s."EventType"='SUBMITTED'))))))`);
-  if (!process.env.SMTP_HOST || !process.env.SMTP_FROM) return 0;
+  let config;
+  try { config = mailConfig(); }
+  catch (error) {
+    const code = String((error as {code?: string})?.code ?? 'MAIL_NOT_CONFIGURED').replace(/[^A-Za-z0-9_]/g, '').slice(0,80);
+    console.error(`Email delivery is not configured. Code: ${code}. Pending email is retained.`);
+    return 0;
+  }
   emailKey();
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true',
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
-    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000,
-  });
+  const transport = createMailTransport(config);
   let sent = 0;
   try {
     for (let i = 0; i < 20; i++) {
@@ -33,23 +36,24 @@ export async function deliverEmails() {
           continue;
         }
         const message = decryptEmail(e.EncryptedPayload);
-        const delivery = await transport.sendMail({ from: process.env.SMTP_FROM, to: e.Recipient, ...message, messageId: `<ojt-${e.EmailID}@${new URL(process.env.FRONTEND_LOGIN_URL!).hostname}>` });
-        if (!delivery.accepted.length) throw new Error('SMTP_REJECTED');
+        await transport.send({ to: e.Recipient, subject: message.subject, text: message.text, html: message.html, reference: String(e.EmailID) });
         await query('UPDATE "EmailOutbox" SET "Status"=\'SENT\',"SentAt"=now(),"EncryptedPayload"=NULL,"LeaseUntil"=NULL,"LastError"=NULL WHERE "EmailID"=$1 AND "Status"=\'SENDING\'', [e.EmailID]);
         sent++;
       } catch (error: any) {
         // Never persist SMTP responses or email content: they may include credentials.
-        const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS'];
+        const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS',
+          'EMAIL_REJECTED', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT',
+          'MAILJET_UNAVAILABLE', 'MAILJET_REJECTED', 'MAILJET_INVALID_RESPONSE'];
         const errorCode = knownCodes.includes(error?.code) ? error.code : 'EMAIL_DELIVERY_FAILED';
         const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
           ? error.responseCode : undefined;
         const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
-        // Authentication is shared by every recipient. Pause this batch without
-        // exhausting delivery attempts while an operator repairs SMTP credentials.
-        if (errorCode === 'EAUTH') {
+        // Credentials, sender permissions and rate limits affect all recipients.
+        // Pause the batch without exhausting each message's delivery attempts.
+        if (['EAUTH', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT'].includes(errorCode)) {
           await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
             "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
-          console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}. Check SMTP_USER and SMTP_PASSWORD; Gmail requires an app password. Batch paused.`);
+          console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}. Check mail provider credentials, verified sender and sending limits. Batch paused.`);
           break;
         }
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,

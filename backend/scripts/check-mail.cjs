@@ -1,0 +1,24 @@
+// Does not drain the outbox. Mailjet SandboxMode validates without sending mail.
+require('../dist/config/env');
+const { mailConfig } = require('../dist/config/mail');
+const { emailKey } = require('../dist/modules/imports/email.crypto');
+const { createMailTransport } = require('../dist/shared/mail-transport');
+(async () => {
+  const config = mailConfig();
+  emailKey();
+  let login;
+  try { login = new URL(process.env.FRONTEND_LOGIN_URL || ''); } catch { /* Report only a safe code below. */ }
+  if (!login || !['https:', 'http:'].includes(login.protocol))
+    throw Object.assign(new Error(), { code: 'FRONTEND_LOGIN_URL_INVALID' });
+  console.log('Mail provider:', config.provider);
+  console.log('Sender:', config.provider === 'mailjet' ? config.fromEmail : 'configured');
+  const transport = createMailTransport(config);
+  try {
+    await transport.verify();
+    console.log(config.provider === 'mailjet' ? 'Mailjet Sandbox verification OK. No email sent.' : 'SMTP verification OK. No email sent.');
+  } finally { transport.close(); }
+})().catch(error => {
+  const code = String(error.code || 'MAIL_CHECK_FAILED').replace(/[^A-Za-z0-9_]/g, '').slice(0,80);
+  console.error(`Mail configuration check failed. Code: ${code}.`);
+  process.exitCode = 1;
+});
