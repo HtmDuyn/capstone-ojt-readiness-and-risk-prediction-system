@@ -22,7 +22,6 @@ export default defineConfig(({ mode }) => ({
       '@utils': path.resolve(import.meta.dirname, './src/utils'),
       '@config': path.resolve(import.meta.dirname, './src/config'),
       '@services': path.resolve(import.meta.dirname, './src/services'),
-      '@data': path.resolve(import.meta.dirname, './src/data'),
     },
   },
   optimizeDeps: {

@@ -1,4 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import type { NoticeGuard } from '../../shared/notification.service';
+import type { EmailContent } from '../../shared/account-email';
 export function emailKey(): Buffer {
   const value = process.env.EMAIL_OUTBOX_KEY ?? '';
   if (!/^[a-f0-9]{64}$/i.test(value)) throw new Error('EMAIL_OUTBOX_KEY must be a 32-byte hexadecimal key.');
@@ -9,7 +11,7 @@ export function encryptEmail(value: object): string {
   const data = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final()]);
   return [iv, cipher.getAuthTag(), data].map(b => b.toString('base64')).join('.');
 }
-export function decryptEmail(value: string): { subject: string; text: string } {
+export function decryptEmail(value: string): EmailContent & { guard?: NoticeGuard } {
   const [iv, tag, data] = value.split('.').map(s => Buffer.from(s, 'base64'));
   const cipher = createDecipheriv('aes-256-gcm', emailKey(), iv);
   cipher.setAuthTag(tag);

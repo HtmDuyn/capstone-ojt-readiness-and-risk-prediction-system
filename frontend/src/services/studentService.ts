@@ -42,7 +42,6 @@ interface StudentRequestConfig {
   timeout?: number;
 }
 interface ErrorBody { success?: boolean; message?: string; errorCode?: string; code?: string }
-interface HttpError { code?: string; config?: { headers?: { Authorization?: unknown } }; response?: { status: number; data?: ErrorBody } }
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number, public readonly code?: string) {
@@ -89,8 +88,8 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
     return body;
   } catch (error) {
     if (isRequestCanceled(error) || error instanceof ApiError) throw error;
-    if (!axios.isAxiosError(error)) throw error;
-    const failure = error as HttpError;
+    if (!axios.isAxiosError<ErrorBody>(error)) throw error;
+    const failure = error;
     if (!failure.response) throw new ApiError(
       ['ECONNABORTED', 'ETIMEDOUT'].includes(failure.code ?? '') ? 'Yêu cầu API hết thời gian chờ. Vui lòng thử lại.' : 'Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.',
       0, failure.code,
@@ -100,7 +99,11 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
       studentSnapshots.invalidate();
       expireBearerSession(failure.config?.headers?.Authorization);
     }
-    throw new ApiError(data?.message || `Yêu cầu API thất bại (HTTP ${status}).`, status, data?.errorCode ?? data?.code);
+    const method = failure.config?.method?.toUpperCase() ?? 'GET';
+    const path = failure.config?.url ?? 'API';
+    const errorCode = data?.errorCode ?? data?.code;
+    const details = [method + ' ' + path, `HTTP ${status}`, errorCode].filter(Boolean).join(' · ');
+    throw new ApiError(`${data?.message || 'Yêu cầu API thất bại.'} (${details})`, status, errorCode);
   }
 }
 

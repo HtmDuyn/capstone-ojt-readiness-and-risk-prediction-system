@@ -14,6 +14,7 @@ process.env.EMAIL_OUTBOX_KEY = randomBytes(32).toString('hex');
 process.env.FRONTEND_LOGIN_URL = 'https://ojt.example.test/login';
 process.env.SMTP_HOST = 'smtp.example.test';
 process.env.SMTP_FROM = 'ojt@example.test';
+process.env.MAIL_PROVIDER = 'smtp';
 const { pool } = require('../dist/config/database');
 const { importAccounts } = require('../dist/modules/imports/import.service');
 const { decryptEmail } = require('../dist/modules/imports/email.crypto');
@@ -21,12 +22,22 @@ const { encryptEmail } = require('../dist/modules/imports/email.crypto');
 const { deliverEmails } = require('../dist/jobs/provisioning');
 const { assignEnterpriseCodes } = require('../dist/modules/imports/enterprise-code');
 const { validateImport } = require('../dist/modules/imports/import.validation');
+const { registerEmailWakeup, scheduleAccountEmailDelivery } = require('../dist/jobs/email-wakeup');
+const accountDelivery = require('../dist/modules/imports/account-email-delivery.service');
 
 test('bulk enterprise import provisions accounts and delivers encrypted outbox messages', async t => {
-  let state = { batches: [], users: [], enterprises: [], memberships: [], rows: [], emails: [] };
+  let state = { batches: [], users: [], enterprises: [], memberships: [], rows: [], emails: [], notifications: [] };
   let transaction;
   let existingAccount = null;
   let allocationReads = 0;
+  let wakeups = 0;
+  // Immediate delivery is covered separately with SMTP and outbox simulation.
+  t.mock.method(accountDelivery, 'deliverAccountEmailsNow', async () => {
+    assert.equal(transaction, undefined, 'delivery starts after commit');
+    scheduleAccountEmailDelivery();
+    return { status: 'PENDING', total: state.emails.length, sent: 0, pending: state.emails.length, failed: 0, cancelled: 0 };
+  });
+  t.after(registerEmailWakeup(() => { assert.equal(transaction, undefined, 'wake only after commit and release'); wakeups++; }));
   const client = { release() {}, async query(sql, args = []) {
     if (sql === 'BEGIN') { transaction = structuredClone(state); return { rows: [] }; }
     if (sql === 'ROLLBACK') { transaction = undefined; return { rows: [] }; }
@@ -53,6 +64,7 @@ test('bulk enterprise import provisions accounts and delivers encrypted outbox m
       transaction.emails.push({ EmailID: transaction.emails.length + 1, UserID: args[0], Recipient: args[1], EncryptedPayload: args[2], ExpiresAt: args[3], Status: 'PENDING', Kind: 'ACCOUNT', Attempts: 0 });
       return { rows: [] };
     }
+    if (sql.startsWith('INSERT INTO "Notifications"')) { transaction.notifications.push(args); return { rows: [], rowCount: 1 }; }
     if (sql.startsWith('INSERT INTO "Enterprises"')) {
       const enterprise = { id: transaction.enterprises.length + 500, code: args[0], name: args[1], email: args[3] };
       transaction.enterprises.push(enterprise); return { rows: [{ EnterpriseID: enterprise.id }] };
@@ -75,6 +87,7 @@ test('bulk enterprise import provisions accounts and delivers encrypted outbox m
     assert.equal(preview.total, 2);
     assert.equal(state.users.length, 0);
     assert.equal(state.emails.length, 0);
+    assert.equal(wakeups, 0);
     assert.deepEqual(preview.rows.map(row => row.code), ['DN000001', 'DN000002']);
   });
   await t.test('commit creates two enterprise identities with unique temporary credentials and one email each', async () => {
@@ -85,6 +98,8 @@ test('bulk enterprise import provisions accounts and delivers encrypted outbox m
     assert.equal(state.enterprises.length, 2);
     assert.equal(state.memberships.length, 2);
     assert.equal(state.emails.length, 2);
+    assert.equal(state.notifications.length, 2);
+    assert.equal(wakeups, 1, 'enterprise imports wake the delivery worker');
     assert.deepEqual(state.enterprises.map(enterprise => enterprise.code), ['DN000001', 'DN000002']);
     assert.deepEqual(state.users.map(user => user.username), ['enterprise_DN000001', 'enterprise_DN000002']);
     const passwords = [];
@@ -101,6 +116,10 @@ test('bulk enterprise import provisions accounts and delivers encrypted outbox m
       assert.ok(content.text.includes(process.env.FRONTEND_LOGIN_URL));
       assert.ok(content.text.includes('đổi mật khẩu'));
       assert.ok(content.text.includes('Mã doanh nghiệp: ' + user.username.slice('enterprise_'.length)));
+      assert.ok(content.html.includes('Đăng nhập hệ thống'));
+      assert.ok(content.html.includes(process.env.FRONTEND_LOGIN_URL));
+      assert.match(content.text, /Mật khẩu tạm hết hạn vào: \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2} \(giờ Việt Nam, UTC\+7\)/);
+      assert.ok(!content.text.includes(new Date(user.expiresAt).toISOString()));
       assert.ok(!email.EncryptedPayload.includes(password));
     }
     assert.equal(new Set(passwords).size, 2);
@@ -159,6 +178,7 @@ test('bulk enterprise import provisions accounts and delivers encrypted outbox m
     assert.equal(await deliverEmails(), 2);
     assert.deepEqual(sent.map(message => message.to), ['hr_a@example.test', 'hr_b@example.test']);
     assert.ok(sent.every(message => message.text.includes('Mật khẩu tạm:') && message.from === 'ojt@example.test'));
+    assert.ok(sent.every(message => message.html.includes('Đăng nhập hệ thống')));
     assert.ok(state.emails.every(email => email.Status === 'SENT' && email.EncryptedPayload === null));
     assert.equal(closed, true);
   });

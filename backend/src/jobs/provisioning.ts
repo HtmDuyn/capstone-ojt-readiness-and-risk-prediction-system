@@ -1,71 +1,92 @@
 import { academicAlertEmailIsCurrent } from '../modules/academic-reporting/notification.service';
-import nodemailer from 'nodemailer';
+import { mailConfig } from '../config/mail';
+import { createMailTransport } from '../shared/mail-transport';
 import { pool, query } from '../config/database';
 import { decryptEmail, emailKey } from '../modules/imports/email.crypto';
+import { queueDueDeadlineNotices, scheduleEmailIsCurrent } from '../modules/recruitment/notification.service';
+import { registerEmailWakeup } from './email-wakeup';
+export { scheduleAccountEmailDelivery } from './email-wakeup';
 
-export async function deliverEmails() {
+const providerWideErrors = ['EAUTH', 'MAILJET_KEY_SUSPENDED', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT'];
+
+export async function deliverEmails(options: { emailIds?: string[]; maxMessages?: number; deadlineAt?: number } = {}) {
   // Retire secrets even if SMTP is unavailable.
   await query(`UPDATE "EmailOutbox" e SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL
     WHERE e."EncryptedPayload" IS NOT NULL AND (e."ExpiresAt"<=now() OR EXISTS (
       SELECT 1 FROM "Users" u WHERE u."UserID"=e."UserID" AND (u."Status"<>'ACTIVE' OR lower(u."Email")<>lower(e."Recipient") OR (e."Kind"='ACCOUNT' AND (NOT u."MustChangePassword" OR u."TemporaryPasswordExpiresAt" IS NULL OR u."TemporaryPasswordExpiresAt"<=now()))))
       OR (e."Kind"='COMBO_REMINDER' AND EXISTS (SELECT 1 FROM "ComboReminderDeliveries" d JOIN "ComboRegistrationWindows" w ON w."WindowID"=d."WindowID" JOIN "ComboReminderBatches" b ON b."BatchID"=d."BatchID" WHERE d."EmailID"=e."EmailID" AND (w."Status"<>'OPEN' OR (b."Summary"->>'target'='MISSING' AND EXISTS (SELECT 1 FROM "StudentComboSelectionEvents" s WHERE s."WindowID"=d."WindowID" AND s."StudentID"=d."StudentID" AND s."EventType"='SUBMITTED'))))))`);
-  if (!process.env.SMTP_HOST || !process.env.SMTP_FROM) return 0;
+  let config;
+  try { config = mailConfig(); }
+  catch (error) {
+    const code = String((error as {code?: string})?.code ?? 'MAIL_NOT_CONFIGURED').replace(/[^A-Za-z0-9_]/g, '').slice(0,80);
+    console.error(`Email delivery is not configured. Code: ${code}. Pending email is retained.`);
+    return 0;
+  }
   emailKey();
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true',
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
-    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000,
-  });
+  const transport = createMailTransport(config);
   let sent = 0;
+  const attemptedIds: string[] = [];
   try {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < (options.maxMessages ?? 20); i++) {
+      if (options.deadlineAt !== undefined && Date.now() >= options.deadlineAt) break;
       const row = await query(`WITH candidate AS (
         SELECT "EmailID" FROM "EmailOutbox" WHERE "ExpiresAt">now() AND "Attempts"<5
-        AND (("Status"='PENDING' AND "NextAttemptAt"<=now()) OR ("Status"='SENDING' AND "LeaseUntil"<now()))
+        AND ($1::bigint[] IS NULL OR "EmailID"=ANY($1::bigint[]))
+        AND NOT ("EmailID"=ANY($2::bigint[]))
+        AND (("Status"='PENDING' AND ("NextAttemptAt"<=now() OR "LastError" IS NOT NULL))
+          OR ("Status"='SENDING' AND "LeaseUntil"<now()))
         ORDER BY "EmailID" FOR UPDATE SKIP LOCKED LIMIT 1
       ) UPDATE "EmailOutbox" e SET "Status"='SENDING',"Attempts"="Attempts"+1,"LeaseUntil"=now()+interval '5 minutes'
-        FROM candidate c WHERE e."EmailID"=c."EmailID" RETURNING e.*`);
+        FROM candidate c WHERE e."EmailID"=c."EmailID" RETURNING e.*`, [options.emailIds ?? null, attemptedIds]);
       if (!row.rows.length) break;
       const e = row.rows[0];
+      attemptedIds.push(String(e.EmailID));
       try {
         if (e.Kind === 'ACADEMIC_ALERT' && !(await academicAlertEmailIsCurrent(e.EmailID))) {
           await query(`UPDATE "EmailOutbox" SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL WHERE "EmailID"=$1`,[e.EmailID]);
           continue;
         }
         const message = decryptEmail(e.EncryptedPayload);
-        const delivery = await transport.sendMail({ from: process.env.SMTP_FROM, to: e.Recipient, ...message, messageId: `<ojt-${e.EmailID}@${new URL(process.env.FRONTEND_LOGIN_URL!).hostname}>` });
-        if (!delivery.accepted.length) throw new Error('SMTP_REJECTED');
+        if (message.guard && !(await scheduleEmailIsCurrent(message.guard))) {
+          await query(`UPDATE "EmailOutbox" SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID]);
+          continue;
+        }
+        await transport.send({ to: e.Recipient, subject: message.subject, text: message.text, html: message.html, reference: String(e.EmailID) });
         await query('UPDATE "EmailOutbox" SET "Status"=\'SENT\',"SentAt"=now(),"EncryptedPayload"=NULL,"LeaseUntil"=NULL,"LastError"=NULL WHERE "EmailID"=$1 AND "Status"=\'SENDING\'', [e.EmailID]);
         sent++;
       } catch (error: any) {
         // Never persist SMTP responses or email content: they may include credentials.
-        const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS'];
+        const knownCodes = [...providerWideErrors, 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS',
+          'EMAIL_REJECTED',
+          'MAILJET_UNAVAILABLE', 'MAILJET_REJECTED', 'MAILJET_INVALID_RESPONSE'];
         const errorCode = knownCodes.includes(error?.code) ? error.code : 'EMAIL_DELIVERY_FAILED';
         const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
           ? error.responseCode : undefined;
         const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
-        // Authentication is shared by every recipient. Pause this batch without
-        // exhausting delivery attempts while an operator repairs SMTP credentials.
-        if (errorCode === 'EAUTH') {
+        // Credentials, sender permissions and rate limits affect all recipients.
+        // End this pass without exhausting attempts. The next pass can retry immediately.
+        if (providerWideErrors.includes(errorCode)) {
           await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
-            "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
-          console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}. Check SMTP_USER and SMTP_PASSWORD; Gmail requires an app password. Batch paused.`);
+            "LeaseUntil"=NULL,"NextAttemptAt"=now(),"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+          if (lastError !== e.LastError) {
+            const guidance = errorCode === 'MAILJET_KEY_SUSPENDED'
+              ? 'Mailjet suspended this API key (mj-0001). Contact Mailjet Support.'
+              : errorCode === 'EAUTH'
+                ? config.provider === 'mailjet' ? 'Check MAILJET_API_KEY and MAILJET_SECRET_KEY.' : 'Check SMTP authentication.'
+                : errorCode === 'MAILJET_RATE_LIMIT' ? 'Mailjet rate limit reached.'
+                : 'Check Mailjet sending permissions and sender verification.';
+            console.error(`Email delivery failed. EmailID=${e.EmailID}, provider=${config.provider}, code=${lastError}. ${guidance} Will retry on the next email worker run.`);
+          }
           break;
         }
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,
-          "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+          "LeaseUntil"=NULL,"NextAttemptAt"=now(),"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
         console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}.`);
       }
     }
     await query(`UPDATE "EmailOutbox" SET "Status"='FAILED',"LeaseUntil"=NULL,"LastError"='DELIVERY_LEASE_EXPIRED' WHERE "Status"='SENDING' AND "LeaseUntil"<now() AND "Attempts">=5`);
   } finally { transport.close(); }
   return sent;
-}
-
-let wakeProvisioning: (() => void) | undefined;
-
-export function scheduleAccountEmailDelivery() {
-  wakeProvisioning?.();
 }
 
 export function startProvisioningJobs() {
@@ -75,9 +96,11 @@ export function startProvisioningJobs() {
     if (busy || stopped) return;
     busy = true;
     try {
-      // Deliver result notifications and account emails independently.
-      for(const [name,job] of [['email',deliverEmails]] as const) {
-        try { await job(); }
+      for(const [name,job] of [['deadline',queueDueDeadlineNotices],['email',deliverEmails]] as const) {
+        try {
+          const delivered = await job();
+          if (name === 'email' && delivered >= 20) requested = true;
+        }
         catch (error: any) {
           // Log codes only: SMTP messages may contain recipient data or credentials.
           const category = /timeout exceeded when trying to connect|connection timeout/i.test(String(error?.message ?? ''))
@@ -106,13 +129,13 @@ export function startProvisioningJobs() {
     if (busy) requested = true;
     else void tick();
   };
-  wakeProvisioning = wake;
+  const unregister = registerEmailWakeup(wake);
   const timer = setInterval(() => void tick(), 60000);
   timer.unref();
   void tick();
   return () => {
     stopped = true;
     clearInterval(timer);
-    if (wakeProvisioning === wake) wakeProvisioning = undefined;
+    unregister();
   };
 }

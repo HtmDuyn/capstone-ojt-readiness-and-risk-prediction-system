@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -9,7 +9,6 @@ import {
   ListChecks,
   Loader2,
   AlertCircle,
-  Send,
   AlertTriangle,
   RefreshCw,
   Clock3,
@@ -23,6 +22,7 @@ import {
   type DashboardTaskSummary,
   type RecruitmentPost,
 } from '@/services/enterpriseService';
+import { describeApiError } from '@/services/apiService';
 import { loadAllPages, recruitmentTotals } from '@/utils/enterprise/recruitment';
 import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsChart';
 import { Link } from 'react-router-dom';
@@ -120,15 +120,6 @@ export const EnterpriseDashboard: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [chartAnimated, setChartAnimated] = useState(false);
-  const [showIncidentModal, setShowIncidentModal] = useState(false);
-  const [incidentReport, setIncidentReport] = useState({
-    studentId: '',
-    severity: 'MEDIUM',
-    title: '',
-    description: '',
-  });
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimerRef = useRef<number | null>(null);
 
   // Tải thống kê bằng hai request song song để dashboard xuất hiện nhanh hơn.
   useEffect(() => {
@@ -185,7 +176,7 @@ export const EnterpriseDashboard: React.FC = () => {
         });
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
-        const message = err instanceof Error ? err.message : 'Không thể tải thống kê dashboard';
+        const message = describeApiError(err, 'Không thể tải thống kê dashboard');
         setStatsError(message);
       } finally {
         if (!controller.signal.aborted) setStatsLoading(false);
@@ -230,7 +221,7 @@ export const EnterpriseDashboard: React.FC = () => {
         if (!controller.signal.aborted) setTaskSummary(data);
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
-        const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu tiến độ task';
+        const message = describeApiError(err, 'Không thể tải dữ liệu tiến độ task');
         setTasksError(message);
       } finally {
         if (!controller.signal.aborted) setTasksLoading(false);
@@ -240,19 +231,6 @@ export const EnterpriseDashboard: React.FC = () => {
     void loadTaskProgress();
     return () => controller.abort();
   }, [companyId, revision]);
-
-  const handleSendIncident = (e: React.FormEvent) => {
-    e.preventDefault();
-    setToastMessage('Đã gửi báo cáo sự cố về Phòng QHDN Trường FPT thành công!');
-    setShowIncidentModal(false);
-    setIncidentReport({ studentId: '', severity: 'MEDIUM', title: '', description: '' });
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 4000);
-  };
-
-  useEffect(() => () => {
-    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-  }, []);
 
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
   const candidateStages = useMemo<CandidateStage[]>(() => [
@@ -332,21 +310,6 @@ export const EnterpriseDashboard: React.FC = () => {
         description="Quản lý tiếp nhận sinh viên, vị trí tuyển dụng, tiến độ thực tập và các đầu việc cần xử lý tại một nơi."
         badge={profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
       />
-
-      {toastMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm font-medium flex items-center justify-between animate-fadeIn shadow-sm">
-          <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="text-emerald-500 hover:text-emerald-700 font-bold"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       <div className="flex justify-end">
         <button
@@ -656,109 +619,6 @@ export const EnterpriseDashboard: React.FC = () => {
         </div>
       </section>
 
-      {/* Incident Report Modal */}
-      {showIncidentModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2 text-rose-600">
-                <AlertTriangle className="w-5 h-5" />
-                <span>Báo cáo Sự cố Phát sinh về Phòng QHDN</span>
-              </h3>
-              <button
-                onClick={() => setShowIncidentModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSendIncident} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mã hoặc Tên sinh viên phát sinh sự cố
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: SE170012 - Phạm Minh Tuấn"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  value={incidentReport.studentId}
-                  onChange={(e) =>
-                    setIncidentReport({ ...incidentReport, studentId: e.target.value })
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mức độ sự cố
-                </label>
-                <select
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  value={incidentReport.severity}
-                  onChange={(e) =>
-                    setIncidentReport({ ...incidentReport, severity: e.target.value })
-                  }
-                >
-                  <option value="LOW">Thấp (Nhắc nhở nội bộ)</option>
-                  <option value="MEDIUM">Trung bình (Vắng 3 ngày không phép / Chậm tiến độ)</option>
-                  <option value="HIGH">Nghiêm trọng (Vi phạm bảo mật / Tự ý bỏ thực tập)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tiêu đề báo cáo
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: Sinh viên nghỉ tự do 3 ngày liên tiếp không lý do"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  value={incidentReport.title}
-                  onChange={(e) =>
-                    setIncidentReport({ ...incidentReport, title: e.target.value })
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mô tả chi tiết sự việc
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Mô tả hoàn cảnh, thái độ và đề xuất phương án xử lý từ phía Doanh nghiệp..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  value={incidentReport.description}
-                  onChange={(e) =>
-                    setIncidentReport({ ...incidentReport, description: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowIncidentModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Gửi báo cáo sự cố</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

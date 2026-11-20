@@ -98,7 +98,6 @@ describe('/imports/emails/resend', { post: 'Resend email' });
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
 describe('/ojt-registrations', { get: 'Danh sách hồ sơ đăng ký OJT', post: 'Nộp hồ sơ đăng ký OJT' });
-describe('/ojt-registrations/{id}/review', { post: 'Duyệt hoặc từ chối hồ sơ OJT' });
 describe('/students/me/opportunities', { get: ['Danh sách vị trí OJT có thể ứng tuyển', 'Bắt buộc truyền windowId của đợt đăng ký; kết quả kèm canApply và blockers.'] });
 describe('/job-applications', {
   get: 'Sinh viên xem lịch sử hồ sơ đã nộp; QHDN xem danh sách hồ sơ theo quyền.',

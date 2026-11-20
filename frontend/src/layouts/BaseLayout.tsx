@@ -81,7 +81,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           <Header
             user={resolvedUserSummary}
             profilePath={user?.role === 'admin' ? '/admin/profile' : undefined}
-            showNotifications={!isEducation && !hideHeaderTools}
+            showNotifications={!hideHeaderTools}
             showLanguage={!isEducation && !hideHeaderTools}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}

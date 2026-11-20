@@ -34,6 +34,7 @@ import {
   setCompanyAccess,
 } from "@/services/qhdnService";
 import { loadAllPages } from "@/utils/shared/loadAllPages";
+import { emailDeliveryMessage } from '@/utils/shared/emailDelivery';
 import { positionTotals } from "@/utils/qhdn/qhdnEnterprise";
 import type {
   CompanyListItem,
@@ -650,10 +651,10 @@ export default function QhdnEnterpriseManagement() {
           periodsLoading={catalog.loading}
           initialAcademicPeriodId={catalog.selectedPeriod?.kind === "SEMESTER" ? catalog.selectedPeriod.id : undefined}
           onClose={() => setImporting(null)}
-          onImported={() => {
+          onImported={(result) => {
             setRevision((v) => v + 1);
             setMessage(
-              "Đã tạo tài khoản doanh nghiệp và đưa thông tin đăng nhập vào hàng chờ gửi email.",
+              'Đã tạo tài khoản doanh nghiệp. ' + emailDeliveryMessage(result.emailDelivery),
             );
           }}
         />

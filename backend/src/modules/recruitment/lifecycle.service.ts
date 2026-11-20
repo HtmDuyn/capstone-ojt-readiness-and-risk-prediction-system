@@ -5,6 +5,8 @@ import { extendedSchedule } from './extension-policy';
 import { periodBounds } from '../academic/workflow-policy';
 import type { PoolClient } from 'pg';
 import type { Row } from './recruitment.repository';
+import { notifyRecruitmentSchedule } from './notification.service';
+import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
 
 export async function requireLifecycleSchema(c:PoolClient){
  if(!(await c.query(`SELECT to_regprocedure('public."CarryForwardRecruitmentPosts"(integer)') IS NOT NULL AS ready`)).rows[0].ready)
@@ -26,16 +28,8 @@ export async function extendWindow(id:number,body:unknown,actor:number){
   const notificationsCreated=await notifyScheduleChange(c,after);
   await audit(c,actor,'RecruitmentWindows',id,'EXTEND_PHASES',before,after,'Gia hạn giai đoạn đang mở.');
   return {...windowApi(await windowRecord(c,id)),notificationsCreated};
- });
+ }).then(wakeEmailAfterCommit);
 }
 export async function notifyScheduleChange(c:PoolClient,after:Row,prefix='Gia hạn đợt tuyển dụng: '){
-  const title=prefix+after.Name;
-  const fmt=(value:unknown)=>new Date(value as string).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'});
-  const content=`Hạn đăng tin: ${fmt(after.PostingEndsAt)}. Hạn ứng tuyển: ${fmt(after.ApplicationEndsAt)}. Hạn phản hồi: ${fmt(after.ResultsEndsAt)}.`;
-  const notified=await c.query(`INSERT INTO "Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt")
-   SELECT DISTINCT u."UserID",$2::text,$3::text,'IN_APP','RECRUITMENT_WINDOW',$1::int,now() FROM "Users" u JOIN "Roles" role USING("RoleID")
-   WHERE u."Status"='ACTIVE' AND (role."RoleCode" IN ('ADMIN','OJT_COORD')
-    OR EXISTS(SELECT 1 FROM "EnterpriseUsers" eu JOIN "Enterprises" e USING("EnterpriseID") WHERE eu."UserID"=u."UserID" AND e."Status"='ACTIVE' AND e."DeletedAt" IS NULL)
-    OR EXISTS(SELECT 1 FROM "Students" s JOIN "EligibleStudentHandoffItems" h USING("StudentID") WHERE s."UserID"=u."UserID" AND h."OJTSemesterID"=$4))`,[after.WindowID,title,content,after.OJTSemesterID]);
-  return notified.rowCount??0;
+  return notifyRecruitmentSchedule(c,after,prefix);
 }

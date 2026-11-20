@@ -1632,7 +1632,7 @@ ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHand
 ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_RecipientRole_check" CHECK ((("RecipientRole")::text = 'OJT_COORD'::text));
 ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_RegistrationIDs_check" CHECK ((jsonb_typeof("RegistrationIDs") = 'array'::text));
 ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_pkey" PRIMARY KEY ("HandoffID");
-ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check" CHECK (("Kind" = ANY (ARRAY['ACCOUNT'::text, 'COMBO_REMINDER'::text, 'ACADEMIC_ALERT'::text, 'OJT_RESULT'::text])));
+ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check" CHECK (("Kind" = ANY (ARRAY['ACCOUNT'::text, 'COMBO_REMINDER'::text, 'ACADEMIC_ALERT'::text, 'OJT_RESULT'::text, 'PASSWORD_RESET'::text, 'SYSTEM_NOTIFICATION'::text])));
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'SENDING'::text, 'SENT'::text, 'FAILED'::text, 'CANCELLED'::text])));
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_check" CHECK ((("Status" <> ALL (ARRAY['PENDING'::text, 'SENDING'::text])) OR ("EncryptedPayload" IS NOT NULL)));
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_pkey" PRIMARY KEY ("EmailID");
@@ -9442,7 +9442,19 @@ DO $$ BEGIN
 END $$;
 ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
-  CHECK ("Kind" IN ('ACCOUNT', 'COMBO_REMINDER', 'ACADEMIC_ALERT', 'OJT_RESULT', 'PASSWORD_RESET'));
+  CHECK ("Kind" IN ('ACCOUNT', 'COMBO_REMINDER', 'ACADEMIC_ALERT', 'OJT_RESULT', 'PASSWORD_RESET', 'SYSTEM_NOTIFICATION'));
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261118_password_reset_codes') ON CONFLICT DO NOTHING;
 COMMIT;
 -- END INCREMENTAL UPDATE: 20261118_password_reset_codes
+
+-- BEGIN INCREMENTAL UPDATE: 20261120_system_notifications
+-- Existing deployments may run backend/migrations/20261120_system_notifications.sql instead.
+BEGIN;
+ALTER TABLE public."Notifications" ADD COLUMN IF NOT EXISTS "EventKey" text;
+CREATE UNIQUE INDEX IF NOT EXISTS "Notifications_EventKey_key" ON public."Notifications" ("EventKey");
+ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
+ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
+  CHECK ("Kind" IN ('ACCOUNT','COMBO_REMINDER','ACADEMIC_ALERT','OJT_RESULT','PASSWORD_RESET','SYSTEM_NOTIFICATION'));
+INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261120_system_notifications') ON CONFLICT DO NOTHING;
+COMMIT;
+-- END INCREMENTAL UPDATE: 20261120_system_notifications

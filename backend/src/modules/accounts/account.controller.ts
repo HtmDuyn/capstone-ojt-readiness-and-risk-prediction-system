@@ -58,11 +58,13 @@ export const createAccount = async (
         ),
       );
 
+    const { emailDelivery, ...created } = account;
     res.status(201).json({
       success: true,
       message:
         "Account created successfully.",
-      account,
+      account: created,
+      emailDelivery,
     });
   } catch (error) {
     next(error);

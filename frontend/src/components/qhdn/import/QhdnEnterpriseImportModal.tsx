@@ -6,9 +6,10 @@ import { downloadFile } from '@/utils/shared/downloadFile';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '../StudentWorkflowUi';
 import type { AcademicPeriodItem, EnterpriseImportRow, EnterpriseImportPayload, ImportPreviewResponse, ImportCommitResponse } from '@/types/qhdn/qhdnTypes';
 import type { RecruitmentWindow } from '@/types/qhdn/workflowTypes';
+import { emailDeliveryMessage } from '@/utils/shared/emailDelivery';
 const emptyRow = (): EnterpriseImportRow => ({ name: '', fullName: '', email: '' });
 export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 'manual' }: {
- isOpen:boolean;onClose:()=>void;onImported:()=>void;mode?:'manual'|'file';periods?:AcademicPeriodItem[];periodsLoading?:boolean;initialAcademicPeriodId?:number;initialWindow?:RecruitmentWindow|null;
+ isOpen:boolean;onClose:()=>void;onImported:(result:ImportCommitResponse)=>void;mode?:'manual'|'file';periods?:AcademicPeriodItem[];periodsLoading?:boolean;initialAcademicPeriodId?:number;initialWindow?:RecruitmentWindow|null;
 }) {
  const [rows,setRows]=useState<EnterpriseImportRow[]>(mode === 'file' ? [] : [emptyRow()]);
  const [fileName,setFileName]=useState(''),[page,setPage]=useState(1);
@@ -37,7 +38,7 @@ export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 
  };
  const commit=async()=>{
   if(lock.current||!payload||!preview?.canCommit||!confirmed)return;lock.current=true;setBusy(true);setError('');
-  try{setResult(await commitEnterpriseImport(payload));onImported();}catch(e){setError(errorMessage(e));}finally{lock.current=false;setBusy(false);}
+  try{const committed=await commitEnterpriseImport(payload);setResult(committed);onImported(committed);}catch(e){setError(errorMessage(e));}finally{lock.current=false;setBusy(false);}
  };
  if(!isOpen)return null;
  const step=result?3:preview?2:1;
@@ -47,7 +48,7 @@ export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 
  return <WorkflowModal wide title={mode==='file'?'Import danh sách doanh nghiệp':'Tạo tài khoản doanh nghiệp'} subtitle={mode==='file'?'Tạo tài khoản hàng loạt từ Excel/CSV và gửi thông tin đăng nhập đến email từng doanh nghiệp.':'Nhập trực tiếp thông tin đối tác, kiểm tra và xác nhận trước khi tạo tài khoản.'} busy={busy} onClose={onClose}>
   <ol className="mb-5 grid grid-cols-3 gap-2">{[mode==='file'?'Chọn file':'Nhập thông tin','Kiểm tra & xác nhận','Hoàn tất'].map((label,i)=><li key={label} className={'flex items-center gap-2 rounded-xl p-3 text-xs font-semibold sm:text-sm '+(step===i+1?'bg-orange-50 text-orange-700':'bg-slate-50 text-slate-500')}><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white">{i+1}</span>{label}</li>)}</ol>
   {error&&<div role="alert" className="mb-4"><Notice>{error}</Notice></div>}
-  {result?<div className="space-y-5 py-4 text-center"><CheckCircle2 size={44} className="mx-auto text-emerald-600"/><h3 className="text-xl font-semibold text-slate-800">Đã tạo tài khoản doanh nghiệp</h3><p className="text-sm leading-relaxed text-slate-500">Đã xử lý {result.total} doanh nghiệp, tạo mới {result.created} tài khoản. Thông tin đăng nhập được đưa vào hàng chờ gửi email. Doanh nghiệp cần đổi mật khẩu trước khi cập nhật hồ sơ và đăng tuyển.</p><button type="button" className={workflowPrimary} onClick={onClose}>Hoàn tất & về danh sách</button></div>:!preview?<form onSubmit={check} className="space-y-5">
+  {result?<div className="space-y-5 py-4 text-center"><CheckCircle2 size={44} className="mx-auto text-emerald-600"/><h3 className="text-xl font-semibold text-slate-800">Đã tạo tài khoản doanh nghiệp</h3><p className="text-sm leading-relaxed text-slate-500">Đã xử lý {result.total} doanh nghiệp, tạo mới {result.created} tài khoản. {emailDeliveryMessage(result.emailDelivery)} Doanh nghiệp cần đổi mật khẩu trước khi cập nhật hồ sơ và đăng tuyển.</p><button type="button" className={workflowPrimary} onClick={onClose}>Hoàn tất & về danh sách</button></div>:!preview?<form onSubmit={check} className="space-y-5">
    {mode==='file'?<div className="space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl bg-blue-50 p-4"><p className="max-w-lg text-sm leading-relaxed text-blue-800">Mỗi dòng gồm 3 cột bắt buộc: <strong>name, fullName, email</strong>. Mã doanh nghiệp được tự động sinh khi tạo tài khoản. Email dùng để đăng nhập và nhận tài khoản. Tối đa 500 doanh nghiệp/lần, file 8 MB; chỉ đọc sheet đầu tiên.</p><button type="button" className={workflowSecondary+' whitespace-nowrap'} disabled={busy} onClick={template}><Download size={15}/>Tải file mẫu</button></div>
     <label className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-5 text-center transition hover:border-orange-300"><FileSpreadsheet size={30} className="text-orange-600"/><span className="text-sm font-semibold text-slate-700">Chọn file Excel (.xlsx) hoặc CSV (.csv)</span><input type="file" aria-label="Chọn file danh sách doanh nghiệp" accept=".xlsx,.csv" disabled={busy} onChange={loadFile} className="block max-w-full text-sm text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-orange-700"/>{fileName&&<span className="break-all text-xs text-slate-600">{fileName} · {rows.length} doanh nghiệp hợp lệ</span>}{busy&&<span role="status" className="text-sm text-slate-500">Đang xử lý…</span>}</label>
@@ -67,7 +68,7 @@ export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 
    {rowsTable}
    {!preview.canCommit&&<Notice>{preview.errors.join(' ')||'Thông tin chưa hợp lệ. Vui lòng quay lại kiểm tra.'}</Notice>}
    <label className="flex items-start gap-3 rounded-xl bg-orange-50 p-4 text-sm leading-relaxed text-slate-700"><input type="checkbox" className="mt-1 accent-orange-600" checked={confirmed} disabled={busy||!preview.canCommit} onChange={e=>setConfirmed(e.target.checked)}/><span>Tôi đã kiểm tra thông tin và đồng ý tạo tài khoản cho các doanh nghiệp trên.</span></label>
-   <footer className="flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4"><button type="button" disabled={busy} className={workflowSecondary} onClick={()=>{setPreview(null);setConfirmed(false);}}><ArrowLeft size={16}/>Sửa thông tin</button><button type="button" disabled={busy||!confirmed||!preview.canCommit} className={workflowPrimary} onClick={commit}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<UserPlus size={17}/>}Tạo tài khoản</button></footer>
+   <footer className="flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4"><button type="button" disabled={busy} className={workflowSecondary} onClick={()=>{setPreview(null);setConfirmed(false);}}><ArrowLeft size={16}/>Sửa thông tin</button><button type="button" disabled={busy||!confirmed||!preview.canCommit} className={workflowPrimary} onClick={commit}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<UserPlus size={17}/>} {busy?'Đang tạo tài khoản và gửi email…':'Tạo tài khoản'}</button></footer>
   </div>}
  </WorkflowModal>;
 }
