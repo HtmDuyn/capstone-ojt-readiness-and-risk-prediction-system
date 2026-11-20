@@ -7,7 +7,7 @@ function statusText(student: NonNullable<ImportCommitResponse['students']>[numbe
   if (student.action !== 'CREATED') return 'Tài khoản đã tồn tại: cập nhật hồ sơ, không gửi lại email cấp tài khoản.';
   if (student.emailStatus === 'PENDING') {
     const code = student.emailLastError ?? '';
-    if (/^EAUTH(?:_|$)/.test(code)) return deliveryIssue('AUTH');
+    if (/^(EAUTH|MAILJET_KEY_SUSPENDED)(?:_|$)/.test(code)) return deliveryIssue('AUTH');
     if (code.startsWith('MAILJET_SENDER_NOT_VERIFIED')) return deliveryIssue('SENDER');
     if (code.startsWith('MAILJET_FORBIDDEN')) return deliveryIssue('PERMISSION');
     if (code.startsWith('MAILJET_RATE_LIMIT')) return deliveryIssue('RATE_LIMIT');

@@ -7,7 +7,7 @@ import { queueDueDeadlineNotices, scheduleEmailIsCurrent } from '../modules/recr
 import { registerEmailWakeup } from './email-wakeup';
 export { scheduleAccountEmailDelivery } from './email-wakeup';
 
-const providerWideErrors = ['EAUTH', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT'];
+const providerWideErrors = ['EAUTH', 'MAILJET_KEY_SUSPENDED', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT'];
 
 export async function deliverEmails(options: { emailIds?: string[]; maxMessages?: number; deadlineAt?: number } = {}) {
   // Retire secrets even if SMTP is unavailable.
@@ -56,8 +56,8 @@ export async function deliverEmails(options: { emailIds?: string[]; maxMessages?
         sent++;
       } catch (error: any) {
         // Never persist SMTP responses or email content: they may include credentials.
-        const knownCodes = ['EAUTH', 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS',
-          'EMAIL_REJECTED', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT',
+        const knownCodes = [...providerWideErrors, 'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ETLS', 'EENVELOPE', 'EMESSAGE', 'EDNS',
+          'EMAIL_REJECTED',
           'MAILJET_UNAVAILABLE', 'MAILJET_REJECTED', 'MAILJET_INVALID_RESPONSE'];
         const errorCode = knownCodes.includes(error?.code) ? error.code : 'EMAIL_DELIVERY_FAILED';
         const responseCode = Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
@@ -68,11 +68,15 @@ export async function deliverEmails(options: { emailIds?: string[]; maxMessages?
         if (providerWideErrors.includes(errorCode)) {
           await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
             "LeaseUntil"=NULL,"NextAttemptAt"=now(),"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
-          const guidance = errorCode === 'EAUTH'
-            ? config.provider === 'mailjet' ? 'Check MAILJET_API_KEY and MAILJET_SECRET_KEY.' : 'Check SMTP authentication.'
-            : errorCode === 'MAILJET_RATE_LIMIT' ? 'Mailjet rate limit reached.'
-            : 'Check Mailjet sending permissions and sender verification.';
-          console.error(`Email delivery failed. EmailID=${e.EmailID}, provider=${config.provider}, code=${lastError}. ${guidance} Will retry on the next email worker run.`);
+          if (lastError !== e.LastError) {
+            const guidance = errorCode === 'MAILJET_KEY_SUSPENDED'
+              ? 'Mailjet suspended this API key (mj-0001). Contact Mailjet Support.'
+              : errorCode === 'EAUTH'
+                ? config.provider === 'mailjet' ? 'Check MAILJET_API_KEY and MAILJET_SECRET_KEY.' : 'Check SMTP authentication.'
+                : errorCode === 'MAILJET_RATE_LIMIT' ? 'Mailjet rate limit reached.'
+                : 'Check Mailjet sending permissions and sender verification.';
+            console.error(`Email delivery failed. EmailID=${e.EmailID}, provider=${config.provider}, code=${lastError}. ${guidance} Will retry on the next email worker run.`);
+          }
           break;
         }
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,

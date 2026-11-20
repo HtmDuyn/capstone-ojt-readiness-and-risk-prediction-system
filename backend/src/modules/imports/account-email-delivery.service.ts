@@ -42,7 +42,7 @@ export async function deliverAccountEmailsNow(target: { batchId: string | number
       else result.pending++;
       if (row.Status === 'PENDING' || row.Status === 'FAILED') {
         const code = row.LastError ?? '';
-        if (/^EAUTH(?:_|$)/.test(code)) result.issue = 'AUTH';
+        if (/^(EAUTH|MAILJET_KEY_SUSPENDED)(?:_|$)/.test(code)) result.issue = 'AUTH';
         else if (!result.issue && /^MAILJET_SENDER_NOT_VERIFIED/.test(code)) result.issue = 'SENDER';
         else if (!result.issue && /^MAILJET_FORBIDDEN/.test(code)) result.issue = 'PERMISSION';
         else if (!result.issue && /^MAILJET_RATE_LIMIT/.test(code)) result.issue = 'RATE_LIMIT';

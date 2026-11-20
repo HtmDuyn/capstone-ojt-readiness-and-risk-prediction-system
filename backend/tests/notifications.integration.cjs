@@ -148,11 +148,12 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     assert.ok(admin.UserID);
   });
   await t.test('Mailjet authentication failure keeps the account and explains why delivery is pending', async child => {
-    child.mock.method(console, 'error', () => {});
+    const errors = [];
+    child.mock.method(console, 'error', message => errors.push(message));
     let attempts = 0, authorized = false;
     child.mock.method(globalThis, 'fetch', async (_url, options) => {
       attempts++;
-      if (!authorized) return Response.json({ ErrorCode: 'mj-0015' }, { status: 401 });
+      if (!authorized) return Response.json({ ErrorCode: 'mj-0001' }, { status: 401 });
       const to = JSON.parse(options.body).Messages[0].To[0].Email;
       return Response.json({ Messages: [{ Status: 'success', To: [{ Email: to, MessageID: attempts }] }] });
     });
@@ -162,7 +163,10 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     assert.equal((await db.query('SELECT count(*)::int AS n FROM "Users" WHERE "UserID"=$1', [created.id])).rows[0].n, 1);
     const email = (await db.query('SELECT * FROM "EmailOutbox" WHERE "UserID"=$1', [created.id])).rows[0];
     assert.equal(email.Status, 'PENDING'); assert.equal(email.Attempts, 0); assert.ok(email.EncryptedPayload);
-    assert.equal(email.LastError, 'EAUTH_401');
+    assert.equal(email.LastError, 'MAILJET_KEY_SUSPENDED_401');
+    assert.equal(await deliverEmails({ emailIds: [email.EmailID] }), 0);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /mj-0001/);
 
     // Simulate an email deferred by the previous version before deploying this worker.
     await db.query(`UPDATE "EmailOutbox" SET "NextAttemptAt"=now()+interval '5 minutes' WHERE "EmailID"=$1`, [email.EmailID]);
@@ -172,6 +176,6 @@ test('account and deadline notifications persist atomically, deduplicate and ret
     assert.equal(imported.created, 1);
     assert.equal(imported.emailDelivery.status, 'SENT');
     assert.equal(await deliverEmails({ emailIds: [email.EmailID] }), 1);
-    assert.equal(attempts, 3);
+    assert.equal(attempts, 4);
   });
 });
