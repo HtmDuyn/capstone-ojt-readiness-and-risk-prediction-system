@@ -4,9 +4,6 @@ import { windowRecord, windowApi } from './recruitment.repository';
 import { extendedSchedule } from './extension-policy';
 import { periodBounds } from '../academic/workflow-policy';
 import type { PoolClient } from 'pg';
-import type { Row } from './recruitment.repository';
-import { notifyRecruitmentSchedule } from './notification.service';
-import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
 
 export async function requireLifecycleSchema(c:PoolClient){
  if(!(await c.query(`SELECT to_regprocedure('public."CarryForwardRecruitmentPosts"(integer)') IS NOT NULL AS ready`)).rows[0].ready)
@@ -25,11 +22,7 @@ export async function extendWindow(id:number,body:unknown,actor:number){
   await c.query(`UPDATE "RecruitmentWindows" SET "PostingEndsAt"=$2,"ApplicationEndsAt"=$3,"ResultsEndsAt"=$4,"EndsAt"=$4,"UpdatedBy"=$5,"UpdatedAt"=now() WHERE "WindowID"=$1`,[id,after.PostingEndsAt,after.ApplicationEndsAt,after.ResultsEndsAt,actor]);
   await c.query(`UPDATE "OJTRegistrationWindows" SET "EndsAt"=$2,"UpdatedAt"=now() WHERE "RecruitmentRoundID"=$1`,[id,after.ApplicationEndsAt]);
   await c.query(`UPDATE "RecruitmentPosts" SET "DeadlineAt"=$2,"UpdatedAt"=now() WHERE "WindowID"=$1 AND "Status"='PUBLISHED'`,[id,after.ApplicationEndsAt]);
-  const notificationsCreated=await notifyScheduleChange(c,after);
   await audit(c,actor,'RecruitmentWindows',id,'EXTEND_PHASES',before,after,'Gia hạn giai đoạn đang mở.');
-  return {...windowApi(await windowRecord(c,id)),notificationsCreated};
- }).then(wakeEmailAfterCommit);
-}
-export async function notifyScheduleChange(c:PoolClient,after:Row,prefix='Gia hạn đợt tuyển dụng: '){
-  return notifyRecruitmentSchedule(c,after,prefix);
+  return {...windowApi(await windowRecord(c,id)),notificationsCreated:0};
+ });
 }

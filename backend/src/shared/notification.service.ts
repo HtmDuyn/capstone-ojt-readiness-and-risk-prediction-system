@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { encryptEmail } from '../modules/imports/email.crypto';
 import type { EmailContent } from './account-email';
 
-export type NoticeGuard = { table: 'RecruitmentWindows' | 'OJTRegistrationWindows'; id: number; fingerprint: string };
+export type NoticeGuard = { table: 'RecruitmentWindows' | 'OJTRegistrationWindows'; id: number; fingerprint: string; event?: 'CREATED' };
 type Notice = {
   title: string; text: string; entityType: string; entityId: number; eventKey: string;
   expiresAt: Date; guard?: NoticeGuard; emailContent?: EmailContent;
@@ -34,15 +34,16 @@ export async function queueNotices(client: PoolClient, recipients: Recipient[], 
     const email = emailByUser.get(UserID);
     return email ? [{ userId: UserID, email }] : [];
   });
-  if (deliveries.length) {
-    const content = notice.emailContent ?? { subject: notice.title, text: notice.text };
-    const payload = encryptEmail({ ...content, guard: notice.guard });
-    await client.query(`INSERT INTO "EmailOutbox" ("UserID","Recipient","EncryptedPayload","ExpiresAt","Kind")
+  const emails = deliveries.length
+    ? (await client.query<{ UserID: number; emailId: string }>(`INSERT INTO "EmailOutbox" ("UserID","Recipient","EncryptedPayload","ExpiresAt","Kind")
       SELECT delivery.id,delivery.email,$3,$4,'SYSTEM_NOTIFICATION'
-      FROM unnest($1::int[], $2::text[]) AS delivery(id,email)`,
-      [deliveries.map(d => d.userId), deliveries.map(d => d.email), payload, notice.expiresAt]);
-  }
-  return rows;
+      FROM unnest($1::int[], $2::text[]) AS delivery(id,email)
+      RETURNING "UserID","EmailID"::text AS "emailId"`,
+      [deliveries.map(d => d.userId), deliveries.map(d => d.email),
+        encryptEmail({ ...(notice.emailContent ?? { subject: notice.title, text: notice.text }), guard: notice.guard }), notice.expiresAt])).rows
+    : [];
+  const emailIdByUser = new Map(emails.map(row => [row.UserID, row.emailId]));
+  return rows.map(row => ({ ...row, emailId: emailIdByUser.get(row.UserID) }));
 }
 
 export async function queueNotice(client: PoolClient, input: Notice & Recipient) {

@@ -4,9 +4,6 @@ import { actualPeriod,periodBounds } from '../academic/workflow-policy';
 import { inputObject,invalid,requiredText } from '../students/student.validation';
 import { windowRecord,windowApi } from './recruitment.repository';
 import { editedSchedule,scheduleColumns,schedulePermissions } from './schedule-policy';
-import { notifyScheduleChange } from './lifecycle.service';
-import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
-import { noticeFingerprint } from '../../shared/notification.service';
 
 export async function requireScheduleEditingSchema(c:PoolClient) {
  if(!(await c.query(`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='RecruitmentWindows' AND column_name='OpenedAt') AS ready`)).rows[0].ready)
@@ -36,11 +33,9 @@ export async function editWindowSchedule(id:number,body:unknown,actor:number) {
   await c.query(`UPDATE "RecruitmentPosts" SET "DeadlineAt"=$2,"UpdatedAt"=now() WHERE "WindowID"=$1 AND "Status" IN ('PUBLISHED','DRAFT','PENDING_REVIEW')`,[id,after.ApplicationEndsAt]);
   await c.query(`UPDATE "RecruitmentCampaigns" SET "StartsAt"=(SELECT min("StartsAt") FROM "RecruitmentWindows" WHERE "CampaignID"=$1),"EndsAt"=(SELECT max("EndsAt") FROM "RecruitmentWindows" WHERE "CampaignID"=$1) WHERE "CampaignID"=$1`,[before.CampaignID]);
   const updated=await windowRecord(c,id);
-  if(noticeFingerprint(before)!==noticeFingerprint(updated))
-   await notifyScheduleChange(c,updated,'Cập nhật lịch đợt tuyển dụng: ');
   await audit(c,actor,'RecruitmentWindows',id,'EDIT_SCHEDULE',before,updated,reason);
   return {...windowApi(updated),...schedulePermissions(updated)};
- }).then(wakeEmailAfterCommit);
+ });
 }
 
 export async function deleteDraftWindow(id:number,body:unknown,actor:number) {
