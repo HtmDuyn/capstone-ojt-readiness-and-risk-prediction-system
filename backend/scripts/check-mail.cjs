@@ -22,5 +22,7 @@ const { createMailTransport } = require('../dist/shared/mail-transport');
   const status = Number.isInteger(error.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
     ? `_${error.responseCode}` : '';
   console.error(`Mail configuration check failed. Code: ${code}${status}.`);
+  if (code === 'EAUTH' && process.env.MAIL_PROVIDER?.trim().toLowerCase() === 'mailjet')
+    console.error('Mailjet rejected authentication. Check that MAILJET_API_KEY and MAILJET_SECRET_KEY are the active pair for the same Mailjet account or subaccount.');
   process.exitCode = 1;
 });

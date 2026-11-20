@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { importService } from '@/services/educationService';
 import type { ImportCommitResponse } from '@/types/education/import.types';
+import { deliveryIssue } from '@/utils/shared/emailDelivery';
 
 function statusText(student: NonNullable<ImportCommitResponse['students']>[number]) {
   if (student.action !== 'CREATED') return 'Tài khoản đã tồn tại: cập nhật hồ sơ, không gửi lại email cấp tài khoản.';
-  if (student.emailLastError?.startsWith('EAUTH')) return 'Chưa gửi được: máy chủ email từ chối đăng nhập. Quản trị viên cần kiểm tra cấu hình gửi mail.';
+  if (student.emailStatus === 'PENDING') {
+    const code = student.emailLastError ?? '';
+    if (/^EAUTH(?:_|$)/.test(code)) return deliveryIssue('AUTH');
+    if (code.startsWith('MAILJET_SENDER_NOT_VERIFIED')) return deliveryIssue('SENDER');
+    if (code.startsWith('MAILJET_FORBIDDEN')) return deliveryIssue('PERMISSION');
+    if (code.startsWith('MAILJET_RATE_LIMIT')) return deliveryIssue('RATE_LIMIT');
+  }
   switch (student.emailStatus) {
     case 'SENT': return 'Đã được máy chủ email tiếp nhận. Sinh viên kiểm tra Hộp thư đến và Thư rác.';
     case 'PENDING': return 'Đang chờ gửi email cấp tài khoản.';

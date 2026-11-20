@@ -7,6 +7,8 @@ import { queueDueDeadlineNotices, scheduleEmailIsCurrent } from '../modules/recr
 import { registerEmailWakeup } from './email-wakeup';
 export { scheduleAccountEmailDelivery } from './email-wakeup';
 
+const providerWideErrors = ['EAUTH', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT'];
+
 export async function deliverEmails(options: { emailIds?: string[]; maxMessages?: number; deadlineAt?: number } = {}) {
   // Retire secrets even if SMTP is unavailable.
   await query(`UPDATE "EmailOutbox" e SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL
@@ -23,18 +25,22 @@ export async function deliverEmails(options: { emailIds?: string[]; maxMessages?
   emailKey();
   const transport = createMailTransport(config);
   let sent = 0;
+  const attemptedIds: string[] = [];
   try {
     for (let i = 0; i < (options.maxMessages ?? 20); i++) {
       if (options.deadlineAt !== undefined && Date.now() >= options.deadlineAt) break;
       const row = await query(`WITH candidate AS (
         SELECT "EmailID" FROM "EmailOutbox" WHERE "ExpiresAt">now() AND "Attempts"<5
         AND ($1::bigint[] IS NULL OR "EmailID"=ANY($1::bigint[]))
-        AND (("Status"='PENDING' AND "NextAttemptAt"<=now()) OR ("Status"='SENDING' AND "LeaseUntil"<now()))
+        AND NOT ("EmailID"=ANY($2::bigint[]))
+        AND (("Status"='PENDING' AND ("NextAttemptAt"<=now() OR "LastError" IS NOT NULL))
+          OR ("Status"='SENDING' AND "LeaseUntil"<now()))
         ORDER BY "EmailID" FOR UPDATE SKIP LOCKED LIMIT 1
       ) UPDATE "EmailOutbox" e SET "Status"='SENDING',"Attempts"="Attempts"+1,"LeaseUntil"=now()+interval '5 minutes'
-        FROM candidate c WHERE e."EmailID"=c."EmailID" RETURNING e.*`, [options.emailIds ?? null]);
+        FROM candidate c WHERE e."EmailID"=c."EmailID" RETURNING e.*`, [options.emailIds ?? null, attemptedIds]);
       if (!row.rows.length) break;
       const e = row.rows[0];
+      attemptedIds.push(String(e.EmailID));
       try {
         if (e.Kind === 'ACADEMIC_ALERT' && !(await academicAlertEmailIsCurrent(e.EmailID))) {
           await query(`UPDATE "EmailOutbox" SET "Status"='CANCELLED',"EncryptedPayload"=NULL,"LeaseUntil"=NULL WHERE "EmailID"=$1`,[e.EmailID]);
@@ -58,15 +64,19 @@ export async function deliverEmails(options: { emailIds?: string[]; maxMessages?
           ? error.responseCode : undefined;
         const lastError = responseCode ? `${errorCode}_${responseCode}` : errorCode;
         // Credentials, sender permissions and rate limits affect all recipients.
-        // Pause the batch without exhausting each message's delivery attempts.
-        if (['EAUTH', 'MAILJET_SENDER_NOT_VERIFIED', 'MAILJET_FORBIDDEN', 'MAILJET_RATE_LIMIT'].includes(errorCode)) {
+        // End this pass without exhausting attempts. The next pass can retry immediately.
+        if (providerWideErrors.includes(errorCode)) {
           await query(`UPDATE "EmailOutbox" SET "Status"='PENDING',"Attempts"=GREATEST("Attempts"-1,0),
-            "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
-          console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}. Check mail provider credentials, verified sender and sending limits. Batch paused.`);
+            "LeaseUntil"=NULL,"NextAttemptAt"=now(),"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+          const guidance = errorCode === 'EAUTH'
+            ? config.provider === 'mailjet' ? 'Check MAILJET_API_KEY and MAILJET_SECRET_KEY.' : 'Check SMTP authentication.'
+            : errorCode === 'MAILJET_RATE_LIMIT' ? 'Mailjet rate limit reached.'
+            : 'Check Mailjet sending permissions and sender verification.';
+          console.error(`Email delivery failed. EmailID=${e.EmailID}, provider=${config.provider}, code=${lastError}. ${guidance} Will retry on the next email worker run.`);
           break;
         }
         await query(`UPDATE "EmailOutbox" SET "Status"=CASE WHEN "Attempts">=5 THEN 'FAILED' ELSE 'PENDING' END,
-          "LeaseUntil"=NULL,"NextAttemptAt"=now()+interval '5 minutes',"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
+          "LeaseUntil"=NULL,"NextAttemptAt"=now(),"LastError"=$2 WHERE "EmailID"=$1 AND "Status"='SENDING'`, [e.EmailID, lastError]);
         console.error(`Email delivery failed. EmailID=${e.EmailID}, code=${lastError}.`);
       }
     }
