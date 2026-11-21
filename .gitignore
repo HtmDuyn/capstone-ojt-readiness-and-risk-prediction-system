@@ -130,3 +130,11 @@ tmp/
 temp/
 uploads/
 # Serverless directories
+
+# QA local credentials and raw execution artifacts
+qa/accounts.local.json
+qa/templates/
+qa/results/
+frontend/playwright-report/
+frontend/test-results/
+.vitest/

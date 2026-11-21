@@ -1,0 +1,11 @@
+{
+  "name": "ojt-quality-assurance",
+  "private": true,
+  "scripts": {
+    "test": "node qa/run.cjs --unit",
+    "test:all": "node qa/run.cjs --live --browser",
+    "test:live": "node qa/run.cjs --live",
+    "qa:report": "node qa/report.cjs",
+    "qa:verify": "node qa/report.cjs --verify"
+  }
+}

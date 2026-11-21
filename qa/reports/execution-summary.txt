@@ -1,0 +1,22 @@
+OJT-RPA | Run 2026-11-21T10-55-25-734Z-live | 21/11/2026 (Asia/Ho_Chi_Minh)
+{
+  "API integration": {
+    "Passed": 47
+  },
+  "Browser E2E": {
+    "Passed": 9,
+    "Blocked": 1
+  },
+  "Component": {
+    "Passed": 33
+  },
+  "Database read-only": {
+    "Passed": 4
+  },
+  "Unit": {
+    "Passed": 171
+  }
+}
+Reference plan cases: 123; all remain Pending.
+Code coverage applies only to selected source files; see Code Coverage sheet.
+Database integration: read-only. No production data reset, workflow writes, real mail delivery or AI model accuracy claimed.

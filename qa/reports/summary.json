@@ -1,0 +1,47 @@
+{
+  "runId": "2026-11-21T10-55-25-734Z-live",
+  "executionDateVietnam": "21/11/2026",
+  "total": 388,
+  "automated": {
+    "Passed": 264,
+    "Blocked": 1
+  },
+  "plannedReference": 123,
+  "allStatuses": {
+    "Passed": 264,
+    "Blocked": 1,
+    "Pending": 123
+  },
+  "byLevel": {
+    "API integration": {
+      "Passed": 47
+    },
+    "Browser E2E": {
+      "Passed": 9,
+      "Blocked": 1
+    },
+    "Component": {
+      "Passed": 33
+    },
+    "Database read-only": {
+      "Passed": 4
+    },
+    "Unit": {
+      "Passed": 171
+    }
+  },
+  "builds": {
+    "backend-build": 0,
+    "frontend-build": 0
+  },
+  "files": [
+    {
+      "name": "OJT_RPA_Test_Report_Current.xlsx",
+      "sha256": "8e1a45c0a4e8f0eabc26abf86884e1fdfe2665ddc2b5f15c46883aaebc9f52f3"
+    },
+    {
+      "name": "OJT_RPA_Unit_Test_Current.xlsx",
+      "sha256": "09f7dd752e311996a1c52dcfee9db61053ce257723421ba97d6088df927994fe"
+    }
+  ]
+}

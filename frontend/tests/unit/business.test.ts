@@ -1,0 +1,31 @@
+import { expect, test } from 'vitest';
+import { createRequire } from 'node:module';
+import { calculateLocalOjtEligibility } from '../../src/utils/education/localOjtEligibility';
+import { parseEvaluationScore, evaluationAverage, taskScoreSuggestion, applyEvaluationScore } from '../../src/utils/enterprise/enterpriseEvaluation';
+import { displayTaskTime, vietnamTaskMinute } from '../../src/utils/shared/taskTime';
+const register = createRequire(import.meta.url)('../../../qa/register-case.cjs');
+const eligibility = register(test, { group: 'OJT Eligibility', source: 'frontend/src/utils/education/localOjtEligibility.ts', role: 'ACADEMIC', precondition: 'In-memory academic profile; rule minCredits70/version3. Local calculation is not official confirmation.' });
+const rule = { minCredits: 70, version: 3 };
+for (const [credit, status] of [[69.99, 'NOT_ELIGIBLE'], [70, 'ELIGIBLE'], [70.01, 'ELIGIBLE']] as const) eligibility({ id: `ELIG-CREDIT-${String(credit).replace('.', '-')}`, type: 'B', title: `Eligibility credit threshold ${credit}`, input: `${credit} credits; complete configuration.`, expected: `${status}; preserves policyVersion3 and studentId1.` }, () => expect(calculateLocalOjtEligibility(1, { academicProgress: { credits: { earned: credit, completeConfiguration: true } } }, [], rule)).toMatchObject({ studentId: 1, status, policyVersion: 3, earnedCredits: credit }));
+for (const [i, profile] of [{}, { academicProgress: { credits: { earned: 100, completeConfiguration: false } } }, { academicProgress: { credits: { earned: -1, completeConfiguration: true } } }, { academicProgress: { credits: { earned: NaN, completeConfiguration: true } } }].entries()) eligibility({ id: `ELIG-REVIEW-${i + 1}`, type: 'A', title: `Incomplete academic data requires review ${i + 1}`, input: JSON.stringify(profile), expected: 'REVIEW_REQUIRED; academicIssues nonempty.' }, () => {
+  const result = calculateLocalOjtEligibility(1, profile, [], rule); expect(result.status).toBe('REVIEW_REQUIRED'); expect(result.academicIssues.length).toBeGreaterThan(0);
+});
+eligibility({ id: 'ELIG-RETAKE', title: 'Passed retake clears previously failed course and duplicates count once', input: 'Course1 failed twice then passed; course2 failed twice.', expected: 'unpassedCourseCount1; eligibility based on current credit policy.' }, () => {
+  expect(calculateLocalOjtEligibility(1, { academicProgress: { credits: { earned: 70, completeConfiguration: true } } }, [{ courseId: 1, status: 'FAILED' }, { courseId: 1, status: 'PASSED' }, { courseId: 2, status: 'FAILED' }, { courseId: 2, status: 'FAILED' }], rule)).toMatchObject({ unpassedCourseCount: 1, status: 'ELIGIBLE' });
+});
+eligibility({ id: 'ELIG-EQUIVALENCE', title: 'Completed equivalent curriculum requirement clears failed source subject', input: 'Completed COURSE requirement choices[1,2]; course1 failed.', expected: 'unpassedCourseCount0.' }, () => {
+  const profile = { academicProgress: { credits: { earned: 70, completeConfiguration: true }, requirements: [{ kind: 'COURSE', completed: true, choices: [1, 2], credits: 3 }] } };
+  expect(calculateLocalOjtEligibility(1, profile, [{ courseId: 1, status: 'FAILED' }], rule).unpassedCourseCount).toBe(0);
+});
+
+const evaluation = register(test, { group: 'Evaluation & Reporting', source: 'frontend/src/utils/enterprise/enterpriseEvaluation.ts', role: 'ENTERPRISE', precondition: 'Pure score functions; no evaluation saved or published.' });
+for (const [i, value, expected] of [['0', 0], ['10', 10], ['8.25', 8.25], ['8.255', null], ['-0.01', null], ['10.01', null], ['', null], ['NaN', null], ['Infinity', null]].map((v, i) => [i + 1, ...v] as const)) evaluation({ id: `EVAL-SCORE-${i}`, type: 'B', title: `Evaluation score validation ${i}`, input: JSON.stringify(value), expected: `parseEvaluationScore=${expected}.` }, () => expect(parseEvaluationScore(value as string)).toBe(expected));
+evaluation({ id: 'EVAL-AVERAGE', title: 'Average three valid scores with two decimal rounding', input: '8/8/9.', expected: '8.33.' }, () => expect(evaluationAverage({ completionScore: '8', skillScore: '8', attitudeScore: '9' })).toBe(8.33));
+evaluation({ id: 'EVAL-AVERAGE-INCOMPLETE', type: 'A', title: 'Incomplete score set cannot produce final average', input: '8/empty/9.', expected: 'null.' }, () => expect(evaluationAverage({ completionScore: '8', skillScore: '', attitudeScore: '9' })).toBeNull());
+evaluation({ id: 'EVAL-TASK-SUGGESTION', type: 'B', title: 'Task score suggestion handles no tasks and clamps completion ratio', input: '0/0; 1/3; 4/3; -1/3.', expected: 'null;3.33;10;0.' }, () => { expect(taskScoreSuggestion(0, 0)).toBeNull(); expect(taskScoreSuggestion(1, 3)).toBe(3.33); expect(taskScoreSuggestion(4, 3)).toBe(10); expect(taskScoreSuggestion(-1, 3)).toBe(0); });
+evaluation({ id: 'EVAL-APPLY', title: 'Apply score to all columns without mutating the existing row', input: '8/7/6; all=9.', expected: 'New row9/9/9; original8/7/6.' }, () => { const original = { completionScore: '8', skillScore: '7', attitudeScore: '6' }; expect(applyEvaluationScore(original, 'all', '9')).toEqual({ completionScore: '9', skillScore: '9', attitudeScore: '9' }); expect(original.skillScore).toBe('7'); });
+
+const time = register(test, { group: 'Placement & Tasks', source: 'frontend/src/utils/shared/taskTime.ts', role: 'ENTERPRISE / STUDENT' });
+time({ id: 'TASK-TIME-VIETNAM', title: 'Task date input uses Vietnam time regardless of host timezone', input: '2026-11-21T00:00:00Z.', expected: '2026-11-21T07:00.' }, () => expect(vietnamTaskMinute(new Date('2026-11-21T00:00:00Z'))).toBe('2026-11-21T07:00'));
+time({ id: 'TASK-TIME-ROLLOVER', type: 'B', title: 'Vietnam task date rolls to next day at UTC17:00', input: '2026-11-21T17:00:00Z.', expected: '2026-11-22T00:00.' }, () => expect(vietnamTaskMinute(new Date('2026-11-21T17:00:00Z'))).toBe('2026-11-22T00:00'));
+time({ id: 'TASK-TIME-DISPLAY', title: 'Display stored local task timestamp without changing its wall clock', input: '2026-11-21T14:15:27 (local timestamp).', expected: '21/11/2026 14:15; missing timestamp displays em dash.' }, () => { expect(displayTaskTime('2026-11-21T14:15:27')).toBe('21/11/2026 14:15'); expect(displayTaskTime(null)).toBe('—'); });

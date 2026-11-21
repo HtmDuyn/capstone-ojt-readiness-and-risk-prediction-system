@@ -1,0 +1,13 @@
+{
+  "source": "OJT_RPA_Test_Report_Demo.xlsx (user-provided reference)",
+  "classification": "Historical workbook claims only; not current execution evidence",
+  "items": [
+    { "topic": "Prior unit/integration counts", "reported": "71 unit PASS; integration 76 total/69 PASS/7 FAIL before reset", "currentAction": "Do not carry these counts into current statistics. Current automated IDs and run artifacts are authoritative." },
+    { "topic": "Cross-role application and task DEMO02", "reported": "Student/enterprise UI previously reported passing before reset", "currentAction": "Browser navigation does not repeat application submission, acceptance, task assignment/submission/completion. Keep workflow retest pending until isolated write fixtures are available." },
+    { "topic": "Enterprise viewing task submissions/feedback", "reported": "Previously BLOCKED; UI not found", "currentAction": "Requires a task with a submission and explicit enterprise UI checkpoints. Do not mark PASS from navigation alone." },
+    { "topic": "Seven-hour timestamp discrepancy", "reported": "Previously NEEDS_REVIEW; acceptance vs submission timestamps", "currentAction": "Pure task-time formatter tests verify Vietnam input and local wall-clock rendering only. Cross-API timezone consistency remains a separate pending check." },
+    { "topic": "Task auto-completion allegation", "reported": "WITHDRAWN because student separately marked completed", "currentAction": "Do not create a confirmed defect from the withdrawn allegation." },
+    { "topic": "CV identity mismatch", "reported": "Tester uploaded a different person's demo CV", "currentAction": "Test-data note only; not a confirmed application defect." },
+    { "topic": "AI prediction accuracy", "reported": "UI risk and roadmap checks", "currentAction": "Current earlyWarning tests validate deterministic progress guidance. They do not measure model accuracy or external AI service quality." }
+  ]
+}

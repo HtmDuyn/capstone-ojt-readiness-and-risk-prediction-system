@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "id": "QA-ENV-001",
+      "classification": "Environment limitation / source-confirmed",
+      "affected": "UI-PAGES-ACADEMIC; GET /api/academic-years/:id/calendar",
+      "observation": "HTTP500 in read-only QA sessions: PostgreSQL25006 cannot execute SELECT FOR UPDATE in a read-only transaction.",
+      "source": "backend/src/modules/academic/calendar.service.ts:getYearCalendar -> snapshot -> academic.repository.ts:findRecord (FOR UPDATE)",
+      "nextStep": "Retest on an isolated writable database with the current schema and academic calendar fixtures. Current observation is not proof of a production failure."
+    }
+  ]
+}

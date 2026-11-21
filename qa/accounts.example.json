@@ -1,0 +1,7 @@
+[
+  { "role": "ADMIN", "email": "admin@ojtrpa.edu.vn", "password": "REPLACE_LOCALLY", "frontendRole": "admin" },
+  { "role": "ACADEMIC", "email": "academic@ojtrpa.edu.vn", "password": "REPLACE_LOCALLY", "frontendRole": "education" },
+  { "role": "OJT_COORD", "email": "ojt.coord@ojtrpa.edu.vn", "password": "REPLACE_LOCALLY", "frontendRole": "qhdn" },
+  { "role": "STUDENT", "email": "student01@student.edu.vn", "password": "REPLACE_LOCALLY", "frontendRole": "student" },
+  { "role": "ENTERPRISE", "email": "hr@techviet.example", "password": "REPLACE_LOCALLY", "frontendRole": "enterprise" }
+]
