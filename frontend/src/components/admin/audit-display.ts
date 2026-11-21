@@ -80,6 +80,11 @@ const FIELD_NAMES: Record<string, string> = {
 };
 
 export const actionLabel = (action: string) => AUDIT_ACTIONS[action] || action;
+export const accountActionLabel = (action: string) => ({
+  CREATE: 'Tạo tài khoản', UPDATE: 'Chỉnh sửa tài khoản',
+  UPDATE_ACCOUNT: 'Chỉnh sửa tài khoản', SOFT_DELETE: 'Ngừng hoạt động tài khoản',
+  REQUEST_PASSWORD_RESET: 'Gửi yêu cầu đặt lại mật khẩu',
+} as Record<string, string>)[action] || actionLabel(action);
 export const fieldLabel = (key: string) => FIELD_NAMES[key.replace(/_/g, '').toLowerCase()]
   || key.replace(/([a-z\d])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
 export const isRecord = (value: unknown): value is Record<string, unknown> =>

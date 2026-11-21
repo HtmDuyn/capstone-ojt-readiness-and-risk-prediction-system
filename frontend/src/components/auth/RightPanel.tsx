@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PasswordResetForm from "./PasswordResetForm";
 
 interface RightPanelProps {
@@ -75,7 +75,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
   errorMessage,
   onSubmit,
 }) => {
-  const [resetOpen, setResetOpen] = useState(false);
+  const [{ linkEmail, linkToken }] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { linkEmail: params.get('resetEmail') || '', linkToken: params.get('resetToken') || '' };
+  });
+  useEffect(() => {
+    if (linkToken) window.history.replaceState(null, '', window.location.pathname);
+  }, [linkToken]);
+  const [resetOpen, setResetOpen] = useState(Boolean(linkEmail && linkToken));
   const [resetMessage, setResetMessage] = useState("");
   const fadeStyle = (delay = 0) => ({
     opacity: animateIn ? 1 : 0,
@@ -107,12 +114,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
       <div className="relative z-10 my-auto max-w-md mx-auto w-full py-2">
         {resetOpen ? (
           <PasswordResetForm
-            initialEmail={account}
-            onBack={() => setResetOpen(false)}
+            initialEmail={linkEmail || account}
+            initialToken={linkToken}
+            onBack={() => { window.history.replaceState(null, '', window.location.pathname); setResetOpen(false); }}
             onComplete={(email, message) => {
               onAccountChange(email);
               onPasswordChange("");
               setResetMessage(message);
+              window.history.replaceState(null, '', window.location.pathname);
               setResetOpen(false);
             }}
           />

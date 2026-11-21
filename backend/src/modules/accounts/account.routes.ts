@@ -1,6 +1,7 @@
 import { requireJsonBody } from '../../middleware/json-body';
 import { accountNotifications, readAccountNotification } from './notification.service';
 import { positiveId } from '../students/student.validation';
+import { listAccountRoles } from '../system/roles/role.repository';
 import { Router } from "express";
 
 import {
@@ -19,6 +20,11 @@ import {
 } from "./account.controller";
 
 const router = Router();
+
+router.get('/roles', authenticate, authorizeRoles('ADMIN'), async (_req, res, next) => {
+  try { res.json({ success: true, data: await listAccountRoles() }); }
+  catch (error) { next(error); }
+});
 
 /**
  * @swagger
@@ -67,22 +73,20 @@ router.get(
  *           schema:
  *             type: object
  *             required:
- *               - username
  *               - email
- *               - password
  *               - fullName
  *               - roleId
  *             properties:
  *               username:
  *                 type: string
- *                 example: student05
+ *                 description: Optional for existing API clients. If omitted, a unique staff code is generated.
  *               email:
  *                 type: string
  *                 format: email
  *                 example: student05@student.edu.vn
  *               password:
  *                 type: string
- *                 example: Student@123
+ *                 description: Optional for existing API clients. If omitted, a temporary password is generated and emailed to the new account.
  *               fullName:
  *                 type: string
  *                 example: Nguyen Van A
