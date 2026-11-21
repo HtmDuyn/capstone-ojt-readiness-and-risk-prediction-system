@@ -1,128 +1,32 @@
--- OJT | Một file cho Supabase SQL Editor. Dán toàn bộ file, chọn Run.
--- SYNC: cập nhật email student02, bổ sung phân công demo còn thiếu, tính lại slot và kiểm tra.
--- RESET_DEMO: tạo lại toàn bộ dữ liệu OJT demo. Chỉ dùng trên DB demo đã đánh dấu
--- hoặc DB mới có public trống. Những thay đổi sau lần seed trước sẽ bị xóa trong các bảng OJT.
--- Chế độ được chọn ở dòng SET LOCAL dưới đây. Luôn chạy cả file trong một lượt.
+-- OJT | FULL DATABASE TONG HOP | 2026-11-21
+-- Nguon: Pasted text.txt (full schema, seeds, triggers, RLS, migrations)
+-- Ket hop bo sung: OJT_DB_TONG_HOP_MIGRATION_SAFE.sql
+-- MUC DICH: Tao MOI database OJT tu dau tren Supabase project/DB trong.
+-- KHONG CHAY TREN DATABASE DANG CO BANG OJT HOAC DU LIEU CAN GIU.
+-- File nay KHONG chua khoi DROP/RESET_DEMO pha huy schema tu file goc.
+-- Giu cac bang nghiep vu doc lap; them cot vao BANG CU, khong tao bang thay the.
+-- BAO GOM DATA DEMO TU SQL GOC: hay xem du lieu seed truoc khi chay.
+-- KHONG PHAI database dump tu live Supabase; la script dung tu SQL do ban cung cap.
+-- Quan trong: chua test thuc thi voi Postgres/Supabase runtime. Test tren project moi.
+
 BEGIN;
-SET LOCAL ojt.run_mode = 'SYNC';
-SET LOCAL lock_timeout = '5s';
-SET LOCAL search_path = public, pg_catalog;
-SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
-
-DO $ojt_dispatch$
-BEGIN
-  IF current_setting('ojt.run_mode') = 'RESET_DEMO' THEN
-    EXECUTE $ojt_schema_seed$
-DO $guard$
-BEGIN
- IF to_regnamespace('ojt_demo_reset') IS NULL THEN
-   IF EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace
-     AND c.relkind IN ('r','p','v','m','S','f') AND NOT EXISTS (
-       SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e'))
-     OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND NOT EXISTS (
-       SELECT 1 FROM pg_depend d WHERE d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.deptype='e')) THEN
-     RAISE EXCEPTION 'DB đang có dữ liệu/cấu trúc. Hãy dùng project demo trống.';
-   END IF;
-   CREATE SCHEMA ojt_demo_reset;
-   REVOKE ALL ON SCHEMA ojt_demo_reset FROM PUBLIC;
-   CREATE TABLE ojt_demo_reset.instance(db_oid oid PRIMARY KEY, purpose text NOT NULL);
-   INSERT INTO ojt_demo_reset.instance SELECT oid,'OJT_DEMO_ONLY_V1' FROM pg_database WHERE datname=current_database();
- END IF;
- IF NOT EXISTS (SELECT 1 FROM ojt_demo_reset.instance i JOIN pg_database d ON d.oid=i.db_oid
-   WHERE d.datname=current_database() AND i.purpose='OJT_DEMO_ONLY_V1') THEN
-   RAISE EXCEPTION 'Thiếu định danh database demo.';
- END IF;
-END $guard$;
-SET LOCAL TIME ZONE 'Asia/Bangkok';
+SET LOCAL lock_timeout='5s';
 SET LOCAL search_path=public,pg_catalog;
--- Serialize the destructive bootstrap with academic/OJT transactions before taking relation locks.
-SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
+SELECT pg_advisory_xact_lock(hashtext('ojt_full_fresh_build_20261121'));
 
--- 1. Remove only application-owned objects; reject external dependencies.
-CREATE TEMP TABLE _ojt_reset_targets ON COMMIT DROP AS
-WITH RECURSIVE roots AS (
- SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('OJTActualReceipts','OJTEligibilityResultBatches','StudentOJTCalculatedResults','StudentCVFiles','RecruitmentCampaigns','RecruitmentWindows','OJTCompletionDeliveries','StudentCVVersions','CVAnalysisJobs','ApplicationEvents','CompanyImportBatches','CompanyImportRows','OJTAdvisorySchedules','OJTAdvisoryRuns','OJTAdvisoryRunItems','OJTRegistrationExceptions','ComboPhaseSchedules','OJTAssessmentWindows','ProgramOJTGradeMappings','OJTResults','OJTResultEvents','ComboWindowStudents','ComboWindowExtensions','ComboExtensionStudents','StudentAcademicRecalculations','ComboReminderBatches','ComboReminderDeliveries','AcademicGradingPolicies','ProgramCourseEquivalences','AcademicImportBatches','AcademicImportRows','AcademicPeriods','Cohorts','CohortGroups','StudentAcademicPlacements','AccountImportBatches','AccountImportRows','EmailOutbox','RecruitmentArchiveRuns','AIModelConfig','AIModels','AcademicMajors','AcademicYears','AuditLogs','ComboCourseChoiceGroups','ComboCourseChoiceMembers','ComboCourses','ComboRegistrationWindows','CoursePrerequisites','Courses','Curricula','CurriculumComboCourses','CurriculumCourses','CurriculumPrerequisiteOptions','CurriculumRuleReviews','EligibilityRequiredCourses','EmbeddingConfigurations','EnterpriseUsers','Enterprises','ImportBatches','ImportRows','IncidentReports','InternshipAssignments','InternshipEvaluations','InternshipPositions','InternshipTasks','JobApplications','JobRoles','MatchingAPICalls','MatchingCandidates','MatchingEmbeddings','MatchingProfileCourses','MatchingProfileJobRoles','MatchingProfileMajors','MatchingProfileSkills','MatchingProfileSpecializations','MatchingRecommendationFeedback','MatchingRecommendations','MatchingRuns','MatchingSkills','NotificationTemplates','Notifications','OJTAlertCheckRuns','OJTAlertDeliveries','OJTAlertEvaluations','OJTAlertEvents','OJTAlertRules','OJTAlertTargets','OJTAlerts','OJTEligibilityConditions','OJTEnterpriseImportBatches','OJTEnterpriseImportRows','OJTHistoricalOutcomes','OJTMatchingProfiles','OJTRegistrationPolicies','OJTRegistrations','OJTRuleSets','OJTSemesters','PathwayRecommendationItems','PathwayRecommendations','Permissions','PositionSpecializations','ProgramCombos','ProgramCourses','ProgramPrerequisiteGroups','ProgramPrerequisiteMembers','ProgramSlotOptions','RecruitmentPostPositions','RecruitmentPosts','RiskPredictions','RolePermissions','Roles','SchemaMigrations','Specializations','StudentAcademicSnapshot','StudentCareerInterests','StudentCareerProfiles','StudentComboCourseSelections','StudentComboSelectionEvents','StudentComboSelections','StudentCourseResults','StudentEnterpriseCoordination','StudentMatchingSkills','StudentOJTEligibility','Students','SupportClassAISuggestions','SupportClassRegistrations','SupportClassSuggestionStudents','SupportClasses','SupportRequestFiles','SupportRequestMessages','SupportRequests','SystemSettings','TaskProgressUpdates','TrainingPrograms','UserSessions','Users','academicmajors','academicyears','aimodelconfig','aimodels','auditlogs','combocoursechoicegroups','combocoursechoicemembers','combocourses','comboregistrationwindows','courseprerequisites','courses','curricula','curriculumcombocourses','curriculumcourses','curriculumprerequisiteoptions','curriculumrulereviews','eligibilityrequiredcourses','embeddingconfigurations','enterprises','enterpriseusers','importbatches','importrows','incidentreports','internshipassignments','internshipevaluations','internshippositions','internshiptasks','jobapplications','jobroles','matchingapicalls','matchingcandidates','matchingembeddings','matchingprofilecourses','matchingprofilejobroles','matchingprofilemajors','matchingprofileskills','matchingprofilespecializations','matchingrecommendationfeedback','matchingrecommendations','matchingruns','matchingskills','notifications','notificationtemplates','ojtalertcheckruns','ojtalertdeliveries','ojtalertevaluations','ojtalertevents','ojtalertrules','ojtalerts','ojtalerttargets','ojteligibilityconditions','ojtenterpriseimportbatches','ojtenterpriseimportrows','ojthistoricaloutcomes','ojtmatchingprofiles','ojtregistrationpolicies','ojtregistrations','ojtrulesets','ojtsemesters','pathwayrecommendationitems','pathwayrecommendations','permissions','positionspecializations','programcombos','programcourses','programprerequisitegroups','programprerequisitemembers','programslotoptions','recruitmentpostpositions','recruitmentposts','riskpredictions','rolepermissions','roles','schemamigrations','specializations','studentacademicsnapshot','studentcareerinterests','studentcareerprofiles','studentcombocourseselections','studentcomboselectionevents','studentcomboselections','studentcourseresults','studententerprisecoordination','studentmatchingskills','studentojteligibility','students','supportclassaisuggestions','supportclasses','supportclassregistrations','supportclasssuggestionstudents','supportrequestfiles','supportrequestmessages','supportrequests','systemsettings','taskprogressupdates','trainingprograms','users','usersessions','InternshipPositionAvailability','internshippositionavailability','OJTActiveRuleSets','EligibilityCheckRuns','EligibilityChecks','EligibilityConfirmations','EligibilityRunStudents','OJTRegistrationWindows','OJTRegistrationEvents','EligibleStudentHandoffs','EligibleStudentHandoffItems','AcademicAlertNotificationBatches','AcademicAlertNotificationDeliveries','AssessmentTemplates','PredictionModels','PredictionJobs','PredictionJobItems','Predictions','RiskAlerts','StudentInterventions','AcademicImportRequests','CohortCurriculumPeriods','TrainingProgramCohorts','StudentCVExtractions')
- -- Include tables created by incremental updates and the legacy JD extraction table.
- -- Keep this list explicit so unrelated dependent tables still stop the reset.
- UNION SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
- WHERE n.nspname='public' AND c.relname IN ('PasswordResetCodes','OJTCreditThresholds','OJTConditionPolicies','ojtconditionpolicies','RecruitmentPostExtractions','recruitmentpostextractions')
- UNION SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='RecruitmentPostExtractions'
-), edges AS (
- SELECT confrelid AS parent,conrelid AS child FROM pg_constraint WHERE contype='f'
- UNION
- SELECT d.refobjid,r.ev_class FROM pg_depend d JOIN pg_rewrite r ON r.oid=d.objid
- JOIN pg_class v ON v.oid=r.ev_class AND v.relkind IN ('v','m')
- WHERE d.classid='pg_rewrite'::regclass AND d.refclassid='pg_class'::regclass
- AND d.refobjid<>r.ev_class
- UNION
- SELECT inhparent,inhrelid FROM pg_inherits
-), reachable(oid) AS (
- SELECT oid FROM roots UNION SELECT e.child FROM edges e JOIN reachable r ON e.parent=r.oid
-)
-SELECT c.oid,n.nspname,c.relname,c.relkind,EXISTS(SELECT 1 FROM roots owned WHERE owned.oid=c.oid) AS application_owned FROM reachable r
-JOIN pg_class c ON c.oid=r.oid JOIN pg_namespace n ON n.oid=c.relnamespace;
-DO $reset$
-DECLARE obj record; names text;
+-- Fail closed if ANY preexisting user-created objects in public schema.
+DO $fresh_only$
 BEGIN
- SELECT string_agg(format('%I.%I',t.nspname,t.relname),', ') INTO names
- FROM pg_temp._ojt_reset_targets t
- WHERE NOT t.application_owned OR t.nspname<>'public' OR t.relkind NOT IN ('r','p','v','m')
- OR EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass
-   AND d.objid=t.oid AND d.deptype='e');
- IF names IS NOT NULL THEN
-  RAISE EXCEPTION 'Reset stopped: protected or unsupported dependent objects: %',names;
+ IF EXISTS (
+   SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f')
+     AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass
+         AND d.objid=c.oid AND d.deptype='e')
+ ) THEN
+   RAISE EXCEPTION 'PUBLIC schema is not empty. This FULL BUILD is only for a new empty OJT database. Use the separate additive migration on an existing DB.';
  END IF;
- -- Remove outermost views first, including materialized views and nested view chains.
- LOOP
-  SELECT t.* INTO obj FROM pg_temp._ojt_reset_targets t
-  WHERE t.relkind IN ('v','m') AND NOT EXISTS (
-   SELECT 1 FROM pg_depend d JOIN pg_rewrite rw ON rw.oid=d.objid
-   JOIN pg_temp._ojt_reset_targets child ON child.oid=rw.ev_class
-   WHERE d.classid='pg_rewrite'::regclass AND d.refclassid='pg_class'::regclass
-   AND d.refobjid=t.oid AND rw.ev_class<>t.oid
-  ) ORDER BY t.oid LIMIT 1;
-  EXIT WHEN NOT FOUND;
-  EXECUTE format('DROP %s %I.%I',CASE WHEN obj.relkind='m' THEN 'MATERIALIZED VIEW' ELSE 'VIEW' END,
-   obj.nspname,obj.relname);
-  DELETE FROM pg_temp._ojt_reset_targets WHERE oid=obj.oid;
- END LOOP;
- IF EXISTS (SELECT 1 FROM pg_temp._ojt_reset_targets WHERE relkind IN ('v','m')) THEN
-  RAISE EXCEPTION 'Reset stopped: unresolved view dependency cycle';
- END IF;
- -- One statement removes every table in the closure, including mutually referencing tables.
- SELECT string_agg(format('%I.%I',nspname,relname),', ' ORDER BY oid) INTO names
- FROM pg_temp._ojt_reset_targets;
- IF names IS NOT NULL THEN EXECUTE 'DROP TABLE ' || names; END IF;
-END; $reset$;
-
-DROP FUNCTION IF EXISTS public."GuardRecruitmentRound"();
-DROP FUNCTION IF EXISTS public."StudentCourseSemesterTag"(student_id integer);
-DROP FUNCTION IF EXISTS public."GuardStudentProgramCohort"();
-DROP FUNCTION IF EXISTS public."CurriculumCohortCodes"(program_code text);
-DROP FUNCTION IF EXISTS public."GuardStudentStudyHistory"();
-DROP FUNCTION IF EXISTS public."ValidateStudentStudyHistory"(student_id integer);
-DROP FUNCTION IF EXISTS public."GuardFixedOJTSemester6"();
-DROP FUNCTION IF EXISTS public."AssertStudentOJTTerm6"(student_id integer, semester_id integer);
-DROP FUNCTION IF EXISTS public."StudentCurriculumSemester"(student_id integer, period_id integer);
-DROP FUNCTION IF EXISTS public."GuardPredictionModelVersion"();
-DROP FUNCTION IF EXISTS public."GuardAssessmentTemplate"();
-DROP FUNCTION IF EXISTS public."GuardWorkflowPeriod"();
-DROP FUNCTION IF EXISTS public."GuardUsedOJTMapping"();
-DROP FUNCTION IF EXISTS public."GuardOJTGradeLink"();
-DROP FUNCTION IF EXISTS public."GuardOfficialOJTGrade"();
-DROP FUNCTION IF EXISTS public."GuardOJTResult"();
-DROP FUNCTION IF EXISTS public."GuardHandedOffRegistration"();
-DROP FUNCTION IF EXISTS public."GuardAcademicHandoff"();
-DROP FUNCTION IF EXISTS public."CheckActiveOJTRule"();
-DROP FUNCTION IF EXISTS public."GuardOJTRuleSet"();
-DROP FUNCTION IF EXISTS public."GuardComboHistory"();
-DROP FUNCTION IF EXISTS public."CheckOJTAlertTaskContext"();
-DROP FUNCTION IF EXISTS public."ReclassifyComboSelections"();
-DROP FUNCTION IF EXISTS public."ClassifyStudentCombo"();
-DROP FUNCTION IF EXISTS public."TouchUpdatedAt"();
-DROP FUNCTION IF EXISTS public."CheckCoordinationContext"();
-DROP FUNCTION IF EXISTS public."CheckProgramSlot"();
+END $fresh_only$;
 
 -- 2. Create each table directly with its final columns, types and defaults.
 CREATE SEQUENCE public."EligibilityCheckRuns_RunID_seq" AS integer START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1;
@@ -9468,121 +9372,107 @@ INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261118_password_rese
 -- END INCREMENTAL UPDATE: 20261118_password_reset_codes
 
 
-$ojt_schema_seed$;
-  ELSIF current_setting('ojt.run_mode') <> 'SYNC' THEN
-    RAISE EXCEPTION 'Chế độ hợp lệ: SYNC hoặc RESET_DEMO.';
-  ELSIF to_regclass('public."Users"') IS NULL THEN
-    RAISE EXCEPTION 'Chưa có schema OJT. Với DB demo trống, chọn RESET_DEMO.';
+
+-- Consolidated additive columns: attached to ORIGINAL tables (no replacement tables).
+-- Idempotent on the latest source schema, including when incremental steps added columns already.
+-- PRECHECK: chi tac dong tren schema OJT, dung neu thieu bang cot loi.
+DO $precheck$
+DECLARE tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'Roles','Users','Students','EnterpriseUsers',
+    'AccountImportBatches','AccountImportRows',
+    'EligibleStudentHandoffItems','RecruitmentPosts','RecruitmentWindows',
+    'OJTRegistrationWindows','JobApplications','StudentEnterpriseCoordination',
+    'InternshipTasks'
+  ] LOOP
+    IF to_regclass(format('public.%I', tbl)) IS NULL THEN
+      RAISE EXCEPTION 'Thieu bang public.%, migration bi huy; khong tu tao bang thay the.', tbl;
+    END IF;
+  END LOOP;
+END $precheck$;
+
+-- MODULE 1: Users la bang tai khoan DUY NHAT. Neu cot da co thi bo qua.
+ALTER TABLE public."Users"
+  ADD COLUMN IF NOT EXISTS "MustChangePassword" boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "TemporaryPasswordExpiresAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "PasswordChangedAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "AuthVersion" integer NOT NULL DEFAULT 0;
+
+-- MODULE 2/3: Can cu phap ly hai nguon ket qua eligibility; bang cu duoc bo sung cot.
+-- FK chi them neu bang dich da ton tai (o schema moi nhat co bang nay).
+DO $eligibility$
+BEGIN
+  IF to_regclass('public."OJTEligibilityResultBatches"') IS NULL THEN
+    RAISE EXCEPTION 'Thieu OJTEligibilityResultBatches: can ap dung migration nghiep vu eligibility truoc.';
   END IF;
-END $ojt_dispatch$;
+END $eligibility$;
+ALTER TABLE public."EligibleStudentHandoffItems"
+  ADD COLUMN IF NOT EXISTS "CalculatedBatchID" integer
+    REFERENCES public."OJTEligibilityResultBatches"("BatchID");
+-- KHONG tu dong DROP NOT NULL cua CheckID hoac them CHECK o day: can kiem tra
+-- trigger/du lieu va hanh vi API; migration nghiep vu goc da xu ly viec nay.
 
-UPDATE public."Users" AS u
-SET "Email" = 'duyenhtmse180688@fpt.edu.vn'
-FROM public."Roles" AS r
-WHERE u."Username" = 'student02'
-  AND r."RoleID" = u."RoleID"
-  AND r."RoleCode" = 'STUDENT' AND u."Email" IS DISTINCT FROM 'duyenhtmse180688@fpt.edu.vn';
-DO $email_check$
+-- MODULE 4/5: Tuyen dung; nhung thuoc tinh cua dot duoc them vao bang dot CU.
+DO $recruitment$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public."Users" u JOIN public."Roles" r USING ("RoleID")
-    WHERE u."Username"='student02' AND r."RoleCode"='STUDENT' AND u."Email"='duyenhtmse180688@fpt.edu.vn') THEN
-    RAISE EXCEPTION 'Thiếu tài khoản sinh viên student02. Đã hủy đồng bộ.';
+  IF to_regclass('public."RecruitmentCampaigns"') IS NULL THEN
+    RAISE EXCEPTION 'Thieu RecruitmentCampaigns: day la thuc the chien dich rieng, phai tao bang theo migration goc truoc.';
   END IF;
-END $email_check$;
+END $recruitment$;
+ALTER TABLE public."RecruitmentPosts"
+  ADD COLUMN IF NOT EXISTS "EnterpriseManaged" boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "SourcePostID" integer
+    REFERENCES public."RecruitmentPosts"("PostID");
 
-DO $sync$
-DECLARE
-  position_id integer;
-BEGIN
-  SELECT p."PositionID" INTO STRICT position_id
-  FROM public."InternshipPositions" p
-  JOIN public."OJTSemesters" s USING ("OJTSemesterID")
-  JOIN public."Enterprises" e USING ("EnterpriseID")
-  WHERE s."SemesterCode"='DEMO-OJT-S6' AND e."EnterpriseCode"='TECHVIET'
-    AND p."RecruitmentCode"='DEMO-TV-WEB-01' AND p."Capacity" IS NOT NULL
-    AND p."DeletedAt" IS NULL
-  FOR UPDATE OF p;
+ALTER TABLE public."RecruitmentWindows"
+  ADD COLUMN IF NOT EXISTS "CampaignID" integer
+    REFERENCES public."RecruitmentCampaigns"("CampaignID"),
+  ADD COLUMN IF NOT EXISTS "RoundNumber" integer,
+  ADD COLUMN IF NOT EXISTS "PostingStartsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "PostingEndsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ApplicationStartsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ApplicationEndsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ResultsStartsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ResultsEndsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ResultsFinalizedAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ResultsFinalizedBy" integer
+    REFERENCES public."Users"("UserID"),
+  ADD COLUMN IF NOT EXISTS "ResultsSummary" jsonb,
+  ADD COLUMN IF NOT EXISTS "OpenedAt" timestamptz;
 
-  -- Bổ sung phân công còn thiếu cho hồ sơ demo có quyết định nhận cuối cùng.
-  INSERT INTO public."InternshipAssignments"
-    ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
-  SELECT c."CoordinationID",r."StudentID",c."EnterpriseID",p."PositionID",s."StartDate",s."EndDate",'ASSIGNED'
-  FROM public."StudentEnterpriseCoordination" c
-  JOIN public."OJTRegistrations" r USING ("RegistrationID","OJTSemesterID")
-  JOIN public."InternshipPositions" p USING ("PositionID","EnterpriseID","OJTSemesterID")
-  JOIN public."OJTSemesters" s USING ("OJTSemesterID")
-  JOIN public."JobApplications" j USING ("ApplicationID","RegistrationID","PositionID","EnterpriseID","OJTSemesterID","StudentID")
-  WHERE p."PositionID"=position_id AND r."Application"->>'demoFixture'='enterprise-flow'
-    AND r."Application"->>'fixtureStage' IN ('ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
-    AND c."Decision"='ACCEPTED' AND j."Status"='ACCEPTED'
-    AND NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" newer
-      WHERE newer."RegistrationID"=c."RegistrationID" AND newer."CoordinationID">c."CoordinationID")
-    AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" a
-      JOIN public."StudentEnterpriseCoordination" old USING ("CoordinationID")
-      WHERE a."StudentID"=r."StudentID" AND old."OJTSemesterID"=c."OJTSemesterID");
+ALTER TABLE public."RecruitmentCampaigns"
+  ADD COLUMN IF NOT EXISTS "StartsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "EndsAt" timestamptz,
+  ADD COLUMN IF NOT EXISTS "ScheduleVersion" integer NOT NULL DEFAULT 1;
 
-  UPDATE public."InternshipPositions" p
-  SET "RemainingSlots"=greatest(0,p."Capacity"-public."RecruitmentOccupiedSlots"(position_id))
-  WHERE p."PositionID"=position_id AND p."RemainingSlots" IS DISTINCT FROM
-    greatest(0,p."Capacity"-public."RecruitmentOccupiedSlots"(position_id));
-END $sync$;
+ALTER TABLE public."OJTRegistrationWindows"
+  ADD COLUMN IF NOT EXISTS "RecruitmentRoundID" integer
+    REFERENCES public."RecruitmentWindows"("WindowID");
 
-DO $verify$
-DECLARE n int; accepted int; rejected int; pending int; assigned int; tasks int;
-BEGIN
- IF current_setting('ojt.run_mode') <> 'RESET_DEMO' THEN RETURN; END IF;
- SELECT count(*),count(*) FILTER (WHERE c."Decision"='ACCEPTED'),
-   count(*) FILTER (WHERE c."Decision"='REJECTED'),count(*) FILTER (WHERE c."Decision"='PENDING'),
-   count(a."AssignmentID"),sum((SELECT count(*) FROM public."InternshipTasks" t WHERE t."AssignmentID"=a."AssignmentID"))
- INTO n,accepted,rejected,pending,assigned,tasks
- FROM public."OJTRegistrations" r
- JOIN public."OJTSemesters" s USING ("OJTSemesterID")
- JOIN public."StudentEnterpriseCoordination" c USING ("RegistrationID")
- LEFT JOIN public."InternshipAssignments" a USING ("CoordinationID")
- WHERE s."SemesterCode"='DEMO-OJT-S6' AND r."Application"->>'demoFixture'='enterprise-flow';
- IF ROW(n,accepted,rejected,pending,assigned,tasks) IS DISTINCT FROM ROW(10,2,2,6,2,3) THEN
-   RAISE EXCEPTION 'Sai baseline (hồ sơ/nhận/từ chối/chờ/phân công/task): %',ROW(n,accepted,rejected,pending,assigned,tasks);
- END IF;
-END $verify$;
+-- MODULE 6: Bo sung vao bang ung tuyen va dieu phoi CU.
+ALTER TABLE public."JobApplications"
+  ADD COLUMN IF NOT EXISTS "CertificateLinks" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS "ApplicationSnapshot" jsonb;
+ALTER TABLE public."StudentEnterpriseCoordination"
+  ADD COLUMN IF NOT EXISTS "Source" text NOT NULL DEFAULT 'STUDENT_APPLICATION',
+  ADD COLUMN IF NOT EXISTS "CoordinationReason" text;
 
+-- MODULE 7: Bo sung cot moc thoi gian vao bang task CU.
+ALTER TABLE public."InternshipTasks"
+  ADD COLUMN IF NOT EXISTS "AssignedAt" timestamp,
+  ADD COLUMN IF NOT EXISTS "DueAt" timestamp;
 
-WITH demo AS (
-  SELECT r."RegistrationID", u."Username", c."Decision", j."Status" AS app_status,
-    c."CoordinationID", j."ApplicationID"
-  FROM public."OJTRegistrations" r
-  JOIN public."Students" st USING ("StudentID")
-  JOIN public."Users" u USING ("UserID")
-  JOIN public."OJTSemesters" s USING ("OJTSemesterID")
-  LEFT JOIN LATERAL (
-    SELECT x.* FROM public."StudentEnterpriseCoordination" x
-    WHERE x."RegistrationID"=r."RegistrationID" ORDER BY x."CoordinationID" DESC LIMIT 1
-  ) c ON true
-  LEFT JOIN public."JobApplications" j ON j."ApplicationID"=c."ApplicationID"
-    AND j."RegistrationID"=r."RegistrationID" AND j."StudentID"=st."StudentID"
-    AND j."PositionID"=c."PositionID" AND j."EnterpriseID"=c."EnterpriseID"
-    AND j."OJTSemesterID"=s."OJTSemesterID"
-  WHERE r."Application"->>'demoFixture'='enterprise-flow' AND s."SemesterCode"='DEMO-OJT-S6'
-), measures(label,actual,baseline) AS (
-  SELECT 'Demo • Hồ sơ',count(*),10 FROM demo
-  UNION ALL SELECT 'Demo • Nhận',count(*),2 FROM demo WHERE "Decision"='ACCEPTED'
-  UNION ALL SELECT 'Demo • Từ chối',count(*),2 FROM demo WHERE "Decision"='REJECTED'
-  UNION ALL SELECT 'Demo • Chờ duyệt',count(*),6 FROM demo WHERE "Decision"='PENDING'
-  UNION ALL SELECT 'Demo • Lỗi liên kết hoặc lệch trạng thái hồ sơ',count(*),0 FROM demo
-    WHERE "ApplicationID" IS NULL OR app_status IS DISTINCT FROM CASE WHEN "Decision"='PENDING' THEN 'SUBMITTED' ELSE "Decision" END
-  UNION ALL SELECT 'Demo • Nhận nhưng thiếu phân công đúng sinh viên/vị trí',count(*),0 FROM demo d
-    WHERE d."Decision"='ACCEPTED' AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" a
-      JOIN public."JobApplications" j ON j."ApplicationID"=d."ApplicationID"
-      WHERE a."CoordinationID"=d."CoordinationID" AND a."StudentID"=j."StudentID"
-        AND a."PositionID"=j."PositionID" AND a."EnterpriseID"=j."EnterpriseID"
-        AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))
-  UNION ALL SELECT 'Demo • Vị trí có bộ đếm slot lệch',count(*),0 FROM public."InternshipPositions" p
-    JOIN public."OJTSemesters" s USING ("OJTSemesterID") JOIN public."Enterprises" e USING ("EnterpriseID")
-    WHERE s."SemesterCode"='DEMO-OJT-S6' AND e."EnterpriseCode"='TECHVIET' AND p."RecruitmentCode"='DEMO-TV-WEB-01'
-      AND p."RemainingSlots" IS DISTINCT FROM greatest(0,p."Capacity"-public."RecruitmentOccupiedSlots"(p."PositionID"))
-  UNION ALL SELECT 'Hệ thống • Tài khoản sinh viên active thiếu hồ sơ',count(*),0 FROM public."Users" u
-    JOIN public."Roles" r USING ("RoleID") WHERE u."Status"='ACTIVE' AND r."RoleCode"='STUDENT'
-      AND NOT EXISTS (SELECT 1 FROM public."Students" s WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL)
-) SELECT label AS "Chỉ số",actual AS "Hiện tại",baseline AS "Mốc đối chiếu",
-  CASE WHEN actual=baseline THEN 'Khớp' ELSE 'Cần đối chiếu' END AS "Kết quả" FROM measures ORDER BY label;
+-- MODULE 8: CV extraction, JD extraction, email outbox, matching la cac thuc the
+-- rieng. Khong gop ket qua nhieu lan AI phan tich vao mot cot Users/Students.
+-- Vi schema goc da co bang chuyen biet va migrations worker/RLS, khong tu tao
+-- hoac thay the o day. Can kiem tra migration ma nguon dang su dung.
+
 
 COMMIT;
+
+-- Read-only final overview
+SELECT table_name, COUNT(*) AS column_count
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name NOT LIKE 'pg_%'
+GROUP BY table_name ORDER BY table_name;
