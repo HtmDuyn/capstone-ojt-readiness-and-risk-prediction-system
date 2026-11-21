@@ -1,6 +1,6 @@
 -- OJT DATABASE FULL | Schema + curriculum seed | Supabase PostgreSQL
--- Chi dung tren project/DB MOI co public schema trong. KHONG chay tren DB dang co du lieu.
--- Giu nguyen cau lenh SQL, rut gon comment va dong trong; chua kiem chung thuc thi Supabase.
+-- Script cai dat lai schema OJT: cac bang ung dung cu se duoc xoa truoc khi tao moi.
+-- Chay mot lan trong PostgreSQL/Supabase SQL Editor; toan bo nam trong mot transaction.
 -- Khong seed tai khoan/sinh vien/doanh nghiep demo; giu du lieu khung chuong trinh.
 
 BEGIN;
@@ -9,17 +9,124 @@ SET LOCAL search_path=public,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 SELECT pg_advisory_xact_lock(hashtext('ojt_full_fresh_build_20261121'));
 
-DO $fresh_only$
+-- Reset only the application tables owned by this OJT system. All existing rows in these tables are removed.
+DO $reset_ojt_tables$
+DECLARE table_name text;
+        application_tables text[] := ARRAY[
+    'AcademicAlertNotificationBatches',
+    'AcademicAlertNotificationDeliveries',
+    'AcademicGradingPolicies',
+    'AcademicImportBatches',
+    'AcademicImportRequests',
+    'AcademicImportRows',
+    'AcademicMajors',
+    'AcademicPeriods',
+    'AcademicYears',
+    'AccountImportBatches',
+    'AccountImportRows',
+    'ApplicationEvents',
+    'AssessmentTemplates',
+    'AuditLogs',
+    'CohortCurriculumPeriods',
+    'CohortGroups',
+    'Cohorts',
+    'ComboCourseChoiceGroups',
+    'ComboCourseChoiceMembers',
+    'ComboCourses',
+    'ComboExtensionStudents',
+    'ComboPhaseSchedules',
+    'ComboRegistrationWindows',
+    'ComboReminderBatches',
+    'ComboReminderDeliveries',
+    'ComboWindowExtensions',
+    'ComboWindowStudents',
+    'Courses',
+    'CVAnalysisJobs',
+    'EligibilityCheckRuns',
+    'EligibilityChecks',
+    'EligibilityConfirmations',
+    'EligibilityRunStudents',
+    'EligibleStudentHandoffItems',
+    'EligibleStudentHandoffs',
+    'EmailOutbox',
+    'Enterprises',
+    'EnterpriseUsers',
+    'InternshipAssignments',
+    'InternshipEvaluations',
+    'InternshipPositions',
+    'InternshipTasks',
+    'JobApplications',
+    'JobRoles',
+    'MatchingSkills',
+    'Notifications',
+    'NotificationTemplates',
+    'OJTActiveRuleSets',
+    'OJTActualReceipts',
+    'OJTAdvisoryRunItems',
+    'OJTAdvisoryRuns',
+    'OJTAdvisorySchedules',
+    'OJTAlertCheckRuns',
+    'OJTAlertEvaluations',
+    'OJTAlertRules',
+    'OJTAlertTargets',
+    'OJTAssessmentWindows',
+    'OJTConditionPolicies',
+    'OJTCreditThresholds',
+    'OJTEligibilityResultBatches',
+    'OJTRegistrationEvents',
+    'OJTRegistrationExceptions',
+    'OJTRegistrations',
+    'OJTRegistrationWindows',
+    'OJTResults',
+    'OJTRuleSets',
+    'OJTSemesters',
+    'PasswordResetCodes',
+    'PredictionJobs',
+    'PredictionModels',
+    'ProgramCombos',
+    'ProgramCourseEquivalences',
+    'ProgramCourses',
+    'ProgramOJTGradeMappings',
+    'ProgramPrerequisiteGroups',
+    'ProgramPrerequisiteMembers',
+    'ProgramSlotOptions',
+    'RecruitmentCampaigns',
+    'RecruitmentPostExtractions',
+    'RecruitmentPostPositions',
+    'RecruitmentPosts',
+    'RecruitmentWindows',
+    'Roles',
+    'SchemaMigrations',
+    'Specializations',
+    'StudentAcademicPlacements',
+    'StudentAcademicRecalculations',
+    'StudentCareerProfiles',
+    'StudentComboCourseSelections',
+    'StudentComboSelectionEvents',
+    'StudentComboSelections',
+    'StudentCourseResults',
+    'StudentCVExtractions',
+    'StudentCVFiles',
+    'StudentCVVersions',
+    'StudentEnterpriseCoordination',
+    'StudentMatchingSkills',
+    'StudentOJTCalculatedResults',
+    'StudentOJTEligibility',
+    'Students',
+    'TaskProgressUpdates',
+    'TrainingPrograms',
+    'Users'
+        ];
 BEGIN
- IF EXISTS (
-   SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-   WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f')
-     AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass
-         AND d.objid=c.oid AND d.deptype='e')
- ) THEN
-   RAISE EXCEPTION 'PUBLIC schema is not empty. This FULL BUILD is only for a new empty OJT database. Use the separate additive migration on an existing DB.';
- END IF;
-END $fresh_only$;
+  FOREACH table_name IN ARRAY application_tables LOOP
+    IF to_regclass(format('public.%I', table_name)) IS NOT NULL THEN
+      EXECUTE format('DROP TABLE public.%I CASCADE', table_name);
+    END IF;
+  END LOOP;
+  DROP SEQUENCE IF EXISTS public."EligibilityCheckRuns_RunID_seq" CASCADE;
+  DROP SEQUENCE IF EXISTS public."EligibilityChecks_CheckID_seq" CASCADE;
+  DROP SEQUENCE IF EXISTS public."OJTRuleSets_RuleSetID_seq" CASCADE;
+END $reset_ojt_tables$;
 
 CREATE SEQUENCE public."EligibilityCheckRuns_RunID_seq" AS integer START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1;
 CREATE SEQUENCE public."EligibilityChecks_CheckID_seq" AS integer START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1;
@@ -377,37 +484,6 @@ CREATE TABLE public."ComboWindowStudents" (
   CONSTRAINT "ComboWindowStudents_Outcome_check" CHECK (("Outcome" = ANY (ARRAY['APPLIED'::text, 'UNSELECTED'::text]))),
   CONSTRAINT "ComboWindowStudents_pkey" PRIMARY KEY ("WindowID", "StudentID")
 );
-CREATE TABLE public."CompanyImportBatches" (
-  "BatchID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."CompanyImportBatches_BatchID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "OJTSemesterID" integer,
-  "IdempotencyKey" character varying(100) NOT NULL,
-  "RequestHash" text NOT NULL,
-  "SourceName" character varying(200),
-  "Mapping" jsonb,
-  "Status" text NOT NULL,
-  "Summary" jsonb NOT NULL,
-  "CreatedBy" integer NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "CompanyImportBatches_Status_check" CHECK (("Status" = ANY (ARRAY['COMPLETED'::text, 'REJECTED'::text]))),
-  CONSTRAINT "CompanyImportBatches_pkey" PRIMARY KEY ("BatchID")
-);
-CREATE TABLE public."CompanyImportRows" (
-  "BatchID" integer NOT NULL,
-  "RowNumber" integer NOT NULL,
-  "EnterpriseID" integer,
-  "SourceCode" text,
-  "Action" text NOT NULL,
-  "Errors" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "PositionIDs" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  CONSTRAINT "CompanyImportRows_pkey" PRIMARY KEY ("BatchID", "RowNumber")
-);
-CREATE TABLE public."CoursePrerequisites" (
-  "CourseID" integer NOT NULL,
-  "PrerequisiteCourseID" integer NOT NULL,
-  CONSTRAINT "CHK_CoursePrerequisites_Self" CHECK (("CourseID" <> "PrerequisiteCourseID")),
-  CONSTRAINT "PK_CoursePrerequisites" PRIMARY KEY ("CourseID", "PrerequisiteCourseID")
-);
-COMMENT ON TABLE public."CoursePrerequisites" IS 'Legacy global AND edges. New cohort-specific rules belong to ProgramPrerequisiteGroups.';
 CREATE TABLE public."Courses" (
   "CourseID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."Courses_CourseID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "CourseCode" character varying(20) NOT NULL,
@@ -461,13 +537,6 @@ CREATE TABLE public."EligibilityConfirmations" (
   "Reason" character varying(1000) NOT NULL,
   "AssessmentSnapshot" jsonb,
   CONSTRAINT "EligibilityConfirmations_pkey" PRIMARY KEY ("CheckID")
-);
-CREATE TABLE public."EligibilityRequiredCourses" (
-  "ConditionID" integer NOT NULL,
-  "CourseID" integer NOT NULL,
-  "MinimumScore" numeric(4,2),
-  CONSTRAINT "EligibilityRequiredCourses_MinimumScore_check" CHECK ((("MinimumScore" >= (0)::numeric) AND ("MinimumScore" <= (10)::numeric))),
-  CONSTRAINT "EligibilityRequiredCourses_pkey" PRIMARY KEY ("ConditionID", "CourseID")
 );
 CREATE TABLE public."EligibilityRunStudents" (
   "RunID" integer NOT NULL,
@@ -528,19 +597,6 @@ CREATE TABLE public."EmailOutbox" (
   CONSTRAINT "EmailOutbox_check" CHECK ((("Status" <> ALL (ARRAY['PENDING'::text, 'SENDING'::text])) OR ("EncryptedPayload" IS NOT NULL))),
   CONSTRAINT "EmailOutbox_pkey" PRIMARY KEY ("EmailID")
 );
-CREATE TABLE public."EmbeddingConfigurations" (
-  "EmbeddingConfigID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."EmbeddingConfigurations_EmbeddingConfigID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "Provider" text NOT NULL,
-  "ModelName" text NOT NULL,
-  "ModelVersion" text NOT NULL,
-  "Dimensions" integer NOT NULL,
-  "PreprocessingVersion" text NOT NULL,
-  "IsActive" boolean DEFAULT true NOT NULL,
-  CONSTRAINT "EmbeddingConfigurations_Dimensions_check" CHECK (("Dimensions" > 0)),
-  CONSTRAINT "EmbeddingConfigurations_EmbeddingConfigID_Dimensions_key" UNIQUE ("EmbeddingConfigID", "Dimensions"),
-  CONSTRAINT "EmbeddingConfigurations_Provider_ModelName_ModelVersion_Dim_key" UNIQUE ("Provider", "ModelName", "ModelVersion", "Dimensions", "PreprocessingVersion"),
-  CONSTRAINT "EmbeddingConfigurations_pkey" PRIMARY KEY ("EmbeddingConfigID")
-);
 CREATE TABLE public."EnterpriseUsers" (
   "EnterpriseUserID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."EnterpriseUsers_EnterpriseUserID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "UserID" integer NOT NULL,
@@ -565,18 +621,6 @@ CREATE TABLE public."Enterprises" (
   "DeletedAt" timestamp with time zone,
   CONSTRAINT "Enterprises_EnterpriseCode_key" UNIQUE ("EnterpriseCode"),
   CONSTRAINT "Enterprises_pkey" PRIMARY KEY ("EnterpriseID")
-);
-CREATE TABLE public."IncidentReports" (
-  "IncidentID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."IncidentReports_IncidentID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "AssignmentID" integer NOT NULL,
-  "ReportedBy" integer NOT NULL,
-  "ReportedAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-  "Description" text,
-  "Severity" character varying(10),
-  "Status" character varying(20),
-  "ResolvedAt" timestamp without time zone,
-  "ResolutionNote" character varying(500),
-  CONSTRAINT "IncidentReports_pkey" PRIMARY KEY ("IncidentID")
 );
 CREATE TABLE public."InternshipAssignments" (
   "AssignmentID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."InternshipAssignments_AssignmentID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
@@ -674,169 +718,6 @@ CREATE TABLE public."JobRoles" (
   CONSTRAINT "JobRoles_RoleCode_key" UNIQUE ("RoleCode"),
   CONSTRAINT "JobRoles_pkey" PRIMARY KEY ("JobRoleID")
 );
-CREATE TABLE public."MatchingAPICalls" (
-  "CallID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."MatchingAPICalls_CallID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "RunID" bigint NOT NULL,
-  "BatchNumber" integer NOT NULL,
-  "AttemptNumber" integer NOT NULL,
-  "Provider" text NOT NULL,
-  "ModelName" text NOT NULL,
-  "ProviderRequestID" text,
-  "RequestHash" text NOT NULL,
-  "Status" text DEFAULT 'PENDING'::text NOT NULL,
-  "HTTPStatus" integer,
-  "ErrorCode" text,
-  "LatencyMs" integer,
-  "InputTokens" integer,
-  "OutputTokens" integer,
-  "StartedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "FinishedAt" timestamp with time zone,
-  CONSTRAINT "MatchingAPICalls_AttemptNumber_check" CHECK (("AttemptNumber" > 0)),
-  CONSTRAINT "MatchingAPICalls_BatchNumber_check" CHECK (("BatchNumber" > 0)),
-  CONSTRAINT "MatchingAPICalls_CallID_RunID_Status_key" UNIQUE ("CallID", "RunID", "Status"),
-  CONSTRAINT "MatchingAPICalls_HTTPStatus_check" CHECK ((("HTTPStatus" >= 100) AND ("HTTPStatus" <= 599))),
-  CONSTRAINT "MatchingAPICalls_InputTokens_check" CHECK (("InputTokens" >= 0)),
-  CONSTRAINT "MatchingAPICalls_LatencyMs_check" CHECK (("LatencyMs" >= 0)),
-  CONSTRAINT "MatchingAPICalls_OutputTokens_check" CHECK (("OutputTokens" >= 0)),
-  CONSTRAINT "MatchingAPICalls_RunID_BatchNumber_AttemptNumber_key" UNIQUE ("RunID", "BatchNumber", "AttemptNumber"),
-  CONSTRAINT "MatchingAPICalls_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'SUCCEEDED'::text, 'FAILED'::text, 'TIMED_OUT'::text]))),
-  CONSTRAINT "MatchingAPICalls_check" CHECK ((("Status" = 'PENDING'::text) OR ("FinishedAt" IS NOT NULL))),
-  CONSTRAINT "MatchingAPICalls_pkey" PRIMARY KEY ("CallID")
-);
-COMMENT ON TABLE public."MatchingAPICalls" IS 'Backend call audit only. Never store API keys, Authorization headers, raw CVs or unredacted request/response bodies.';
-CREATE TABLE public."MatchingCandidates" (
-  "RunID" bigint NOT NULL,
-  "ProfileID" bigint NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "Eligibility" text NOT NULL,
-  "FilterReasons" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "ProfileSnapshot" jsonb NOT NULL,
-  "CheckedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "MatchingCandidates_Eligibility_check" CHECK (("Eligibility" = ANY (ARRAY['PASS'::text, 'FAIL'::text, 'REVIEW_REQUIRED'::text]))),
-  CONSTRAINT "MatchingCandidates_FilterReasons_check" CHECK ((jsonb_typeof("FilterReasons") = 'array'::text)),
-  CONSTRAINT "MatchingCandidates_ProfileSnapshot_check" CHECK ((jsonb_typeof("ProfileSnapshot") = 'object'::text)),
-  CONSTRAINT "MatchingCandidates_RunID_ProfileID_Eligibility_key" UNIQUE ("RunID", "ProfileID", "Eligibility"),
-  CONSTRAINT "MatchingCandidates_pkey" PRIMARY KEY ("RunID", "ProfileID")
-);
-CREATE TABLE public."MatchingEmbeddings" (
-  "EmbeddingID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."MatchingEmbeddings_EmbeddingID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "EmbeddingConfigID" integer NOT NULL,
-  "Dimensions" integer NOT NULL,
-  "StudentID" integer,
-  "ProfileID" bigint,
-  "ContentHash" text NOT NULL,
-  "Embedding" double precision[] NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "MatchingEmbeddings_EmbeddingID_ProfileID_EmbeddingConfigID_key" UNIQUE ("EmbeddingID", "ProfileID", "EmbeddingConfigID"),
-  CONSTRAINT "MatchingEmbeddings_EmbeddingID_StudentID_EmbeddingConfigID_key" UNIQUE ("EmbeddingID", "StudentID", "EmbeddingConfigID"),
-  CONSTRAINT "MatchingEmbeddings_Embedding_check" CHECK (((array_position("Embedding", NULL::double precision) IS NULL) AND (array_position("Embedding", 'NaN'::double precision) IS NULL) AND (array_position("Embedding", 'Infinity'::double precision) IS NULL) AND (array_position("Embedding", '-Infinity'::double precision) IS NULL))),
-  CONSTRAINT "MatchingEmbeddings_check" CHECK ((((("StudentID" IS NOT NULL))::integer + (("ProfileID" IS NOT NULL))::integer) = 1)),
-  CONSTRAINT "MatchingEmbeddings_check1" CHECK (((cardinality("Embedding") = "Dimensions") AND (array_ndims("Embedding") = 1) AND (array_lower("Embedding", 1) = 1))),
-  CONSTRAINT "MatchingEmbeddings_check2" CHECK (("Embedding" <> array_fill((0)::double precision, ARRAY["Dimensions"]))),
-  CONSTRAINT "MatchingEmbeddings_pkey" PRIMARY KEY ("EmbeddingID")
-);
-COMMENT ON TABLE public."MatchingEmbeddings" IS 'Sensitive derived profile data. Cache only for matching; delete per retention policy. Backend rejects zero-norm vectors and never compares different configurations.';
-CREATE TABLE public."MatchingProfileCourses" (
-  "ProfileID" bigint NOT NULL,
-  "CourseID" integer NOT NULL,
-  "IsRequired" boolean DEFAULT true NOT NULL,
-  CONSTRAINT "MatchingProfileCourses_pkey" PRIMARY KEY ("ProfileID", "CourseID")
-);
-CREATE TABLE public."MatchingProfileJobRoles" (
-  "ProfileID" bigint NOT NULL,
-  "JobRoleID" integer NOT NULL,
-  CONSTRAINT "MatchingProfileJobRoles_pkey" PRIMARY KEY ("ProfileID", "JobRoleID")
-);
-CREATE TABLE public."MatchingProfileMajors" (
-  "ProfileID" bigint NOT NULL,
-  "MajorID" integer NOT NULL,
-  CONSTRAINT "MatchingProfileMajors_pkey" PRIMARY KEY ("ProfileID", "MajorID")
-);
-CREATE TABLE public."MatchingProfileSkills" (
-  "ProfileID" bigint NOT NULL,
-  "SkillID" integer NOT NULL,
-  "IsRequired" boolean DEFAULT false NOT NULL,
-  "MinLevel" smallint,
-  "Weight" numeric(5,2) DEFAULT 1 NOT NULL,
-  CONSTRAINT "MatchingProfileSkills_MinLevel_check" CHECK ((("MinLevel" >= 1) AND ("MinLevel" <= 5))),
-  CONSTRAINT "MatchingProfileSkills_Weight_check" CHECK (("Weight" > (0)::numeric)),
-  CONSTRAINT "MatchingProfileSkills_pkey" PRIMARY KEY ("ProfileID", "SkillID")
-);
-CREATE TABLE public."MatchingProfileSpecializations" (
-  "ProfileID" bigint NOT NULL,
-  "SpecializationID" integer NOT NULL,
-  CONSTRAINT "MatchingProfileSpecializations_pkey" PRIMARY KEY ("ProfileID", "SpecializationID")
-);
-CREATE TABLE public."MatchingRecommendationFeedback" (
-  "RecommendationID" bigint NOT NULL,
-  "Action" text NOT NULL,
-  "Note" text,
-  "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "MatchingRecommendationFeedback_Action_check" CHECK (("Action" = ANY (ARRAY['SAVED'::text, 'DISMISSED'::text, 'INTERESTED'::text]))),
-  CONSTRAINT "MatchingRecommendationFeedback_pkey" PRIMARY KEY ("RecommendationID")
-);
-COMMENT ON TABLE public."MatchingRecommendationFeedback" IS 'Backend checks the authenticated student owns the recommendation run. Does not create an application or reserve capacity.';
-CREATE TABLE public."MatchingRecommendations" (
-  "RecommendationID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."MatchingRecommendations_RecommendationID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "RunID" bigint NOT NULL,
-  "ProfileID" bigint NOT NULL,
-  "StudentID" integer NOT NULL,
-  "EmbeddingConfigID" integer NOT NULL,
-  "Eligibility" text DEFAULT 'PASS'::text NOT NULL,
-  "CallID" bigint,
-  "CallStatus" text DEFAULT 'SUCCEEDED'::text NOT NULL,
-  "ScoringSource" text NOT NULL,
-  "StudentEmbeddingID" bigint NOT NULL,
-  "ProfileEmbeddingID" bigint NOT NULL,
-  "CosineSimilarity" double precision NOT NULL,
-  "MatchScore" numeric(5,2) NOT NULL,
-  "Rank" integer NOT NULL,
-  "Explanation" text NOT NULL,
-  "MatchedSkills" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "MissingSkills" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "ScoreBreakdown" jsonb DEFAULT '{}'::jsonb NOT NULL,
-  CONSTRAINT "MatchingRecommendations_CallStatus_check" CHECK (("CallStatus" = 'SUCCEEDED'::text)),
-  CONSTRAINT "MatchingRecommendations_CosineSimilarity_check" CHECK ((("CosineSimilarity" >= ('-1'::integer)::double precision) AND ("CosineSimilarity" <= (1)::double precision))),
-  CONSTRAINT "MatchingRecommendations_Eligibility_check" CHECK (("Eligibility" = 'PASS'::text)),
-  CONSTRAINT "MatchingRecommendations_MatchScore_check" CHECK ((("MatchScore" >= (0)::numeric) AND ("MatchScore" <= (100)::numeric))),
-  CONSTRAINT "MatchingRecommendations_MatchedSkills_check" CHECK ((jsonb_typeof("MatchedSkills") = 'array'::text)),
-  CONSTRAINT "MatchingRecommendations_MissingSkills_check" CHECK ((jsonb_typeof("MissingSkills") = 'array'::text)),
-  CONSTRAINT "MatchingRecommendations_Rank_check" CHECK (("Rank" > 0)),
-  CONSTRAINT "MatchingRecommendations_RunID_ProfileID_key" UNIQUE ("RunID", "ProfileID"),
-  CONSTRAINT "MatchingRecommendations_RunID_Rank_key" UNIQUE ("RunID", "Rank"),
-  CONSTRAINT "MatchingRecommendations_ScoreBreakdown_check" CHECK ((jsonb_typeof("ScoreBreakdown") = 'object'::text)),
-  CONSTRAINT "MatchingRecommendations_ScoringSource_check" CHECK (("ScoringSource" = ANY (ARRAY['API'::text, 'CACHE'::text]))),
-  CONSTRAINT "MatchingRecommendations_check" CHECK (((("ScoringSource" = 'API'::text) AND ("CallID" IS NOT NULL)) OR (("ScoringSource" = 'CACHE'::text) AND ("CallID" IS NULL)))),
-  CONSTRAINT "MatchingRecommendations_pkey" PRIMARY KEY ("RecommendationID")
-);
-COMMENT ON COLUMN public."MatchingRecommendations"."MatchScore" IS 'Advisory fit score, not probability of hiring or OJT eligibility. Backend computes cosine and versioned scoring; ranks descending with ProfileID tie-break.';
-CREATE TABLE public."MatchingRuns" (
-  "RunID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."MatchingRuns_RunID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "IdempotencyKey" text NOT NULL,
-  "StudentID" integer NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "RequestedBy" integer NOT NULL,
-  "TopK" smallint DEFAULT 10 NOT NULL,
-  "FilterVersion" text NOT NULL,
-  "ScoringVersion" text NOT NULL,
-  "EmbeddingConfigID" integer NOT NULL,
-  "Status" text DEFAULT 'PENDING'::text NOT NULL,
-  "StudentSnapshot" jsonb NOT NULL,
-  "InputHash" text NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "CompletedAt" timestamp with time zone,
-  "ExpiresAt" timestamp with time zone NOT NULL,
-  "ErrorCode" text,
-  CONSTRAINT "MatchingRuns_IdempotencyKey_key" UNIQUE ("IdempotencyKey"),
-  CONSTRAINT "MatchingRuns_RunID_OJTSemesterID_key" UNIQUE ("RunID", "OJTSemesterID"),
-  CONSTRAINT "MatchingRuns_RunID_StudentID_EmbeddingConfigID_key" UNIQUE ("RunID", "StudentID", "EmbeddingConfigID"),
-  CONSTRAINT "MatchingRuns_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'FILTERING'::text, 'SCORING'::text, 'SUCCEEDED'::text, 'FAILED'::text, 'CANCELLED'::text]))),
-  CONSTRAINT "MatchingRuns_StudentSnapshot_check" CHECK ((jsonb_typeof("StudentSnapshot") = 'object'::text)),
-  CONSTRAINT "MatchingRuns_TopK_check" CHECK ((("TopK" >= 1) AND ("TopK" <= 100))),
-  CONSTRAINT "MatchingRuns_check" CHECK (("ExpiresAt" > "CreatedAt")),
-  CONSTRAINT "MatchingRuns_check1" CHECK ((("Status" <> ALL (ARRAY['SUCCEEDED'::text, 'FAILED'::text, 'CANCELLED'::text])) OR ("CompletedAt" IS NOT NULL))),
-  CONSTRAINT "MatchingRuns_pkey" PRIMARY KEY ("RunID")
-);
 CREATE TABLE public."MatchingSkills" (
   "SkillID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."MatchingSkills_SkillID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "SkillCode" text NOT NULL,
@@ -931,30 +812,6 @@ CREATE TABLE public."OJTAlertCheckRuns" (
   CONSTRAINT "OJTAlertCheckRuns_check" CHECK ((("Status" <> ALL (ARRAY['SUCCEEDED'::text, 'FAILED'::text])) OR ("CompletedAt" IS NOT NULL))),
   CONSTRAINT "OJTAlertCheckRuns_pkey" PRIMARY KEY ("RunID")
 );
-CREATE TABLE public."OJTAlertDeliveries" (
-  "DeliveryID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTAlertDeliveries_DeliveryID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "AlertID" bigint NOT NULL,
-  "RecipientUserID" integer NOT NULL,
-  "Channel" text NOT NULL,
-  "IdempotencyKey" text NOT NULL,
-  "NotificationID" integer,
-  "Status" text DEFAULT 'PENDING'::text NOT NULL,
-  "AttemptCount" integer DEFAULT 0 NOT NULL,
-  "NextAttemptAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "LeaseUntil" timestamp with time zone,
-  "SentAt" timestamp with time zone,
-  "ProviderMessageID" text,
-  "ErrorCode" text,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "OJTAlertDeliveries_AttemptCount_check" CHECK (("AttemptCount" >= 0)),
-  CONSTRAINT "OJTAlertDeliveries_Channel_check" CHECK (("Channel" = ANY (ARRAY['IN_APP'::text, 'EMAIL'::text]))),
-  CONSTRAINT "OJTAlertDeliveries_IdempotencyKey_key" UNIQUE ("IdempotencyKey"),
-  CONSTRAINT "OJTAlertDeliveries_NotificationID_key" UNIQUE ("NotificationID"),
-  CONSTRAINT "OJTAlertDeliveries_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'SENDING'::text, 'SENT'::text, 'FAILED'::text, 'CANCELLED'::text]))),
-  CONSTRAINT "OJTAlertDeliveries_check" CHECK ((("Status" <> 'SENT'::text) OR ("SentAt" IS NOT NULL))),
-  CONSTRAINT "OJTAlertDeliveries_check1" CHECK ((("Status" <> 'SENDING'::text) OR ("LeaseUntil" IS NOT NULL))),
-  CONSTRAINT "OJTAlertDeliveries_pkey" PRIMARY KEY ("DeliveryID")
-);
 CREATE TABLE public."OJTAlertEvaluations" (
   "EvaluationID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTAlertEvaluations_EvaluationID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
   "RunID" bigint NOT NULL,
@@ -980,16 +837,6 @@ END) STORED,
   CONSTRAINT "OJTAlertEvaluations_RunID_TargetID_RuleID_ScopeKey_key" UNIQUE ("RunID", "TargetID", "RuleID", "ScopeKey"),
   CONSTRAINT "OJTAlertEvaluations_check" CHECK (((("Scope" = 'STUDENT'::text) AND ("TaskID" IS NULL)) OR (("Scope" = 'TASK'::text) AND ("TaskID" IS NOT NULL)))),
   CONSTRAINT "OJTAlertEvaluations_pkey" PRIMARY KEY ("EvaluationID")
-);
-CREATE TABLE public."OJTAlertEvents" (
-  "EventID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTAlertEvents_EventID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "AlertID" bigint NOT NULL,
-  "EventType" text NOT NULL,
-  "ActorUserID" integer,
-  "Note" text,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "OJTAlertEvents_EventType_check" CHECK (("EventType" = ANY (ARRAY['CREATED'::text, 'RECONFIRMED'::text, 'ACKNOWLEDGED'::text, 'RESOLVED'::text, 'DISMISSED'::text, 'NOTIFICATION_QUEUED'::text]))),
-  CONSTRAINT "OJTAlertEvents_pkey" PRIMARY KEY ("EventID")
 );
 CREATE TABLE public."OJTAlertRules" (
   "RuleID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTAlertRules_RuleID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
@@ -1037,30 +884,6 @@ CREATE TABLE public."OJTAlertTargets" (
   CONSTRAINT "OJTAlertTargets_TargetID_OJTSemesterID_key" UNIQUE ("TargetID", "OJTSemesterID"),
   CONSTRAINT "OJTAlertTargets_pkey" PRIMARY KEY ("TargetID")
 );
-CREATE TABLE public."OJTAlerts" (
-  "AlertID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTAlerts_AlertID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "TargetID" bigint NOT NULL,
-  "RuleID" bigint NOT NULL,
-  "ScopeKey" text NOT NULL,
-  "TriggerEvaluationID" bigint NOT NULL,
-  "TriggerOutcome" text DEFAULT 'TRIGGERED'::text NOT NULL,
-  "Severity" text NOT NULL,
-  "Status" text DEFAULT 'OPEN'::text NOT NULL,
-  "Title" text NOT NULL,
-  "Message" text NOT NULL,
-  "FirstDetectedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "LastDetectedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "ClosedAt" timestamp with time zone,
-  "ClosedBy" integer,
-  "CloseReason" text,
-  CONSTRAINT "OJTAlerts_Severity_check" CHECK (("Severity" = ANY (ARRAY['INFO'::text, 'WARNING'::text, 'CRITICAL'::text]))),
-  CONSTRAINT "OJTAlerts_Status_check" CHECK (("Status" = ANY (ARRAY['OPEN'::text, 'ACKNOWLEDGED'::text, 'RESOLVED'::text, 'DISMISSED'::text]))),
-  CONSTRAINT "OJTAlerts_TriggerOutcome_check" CHECK (("TriggerOutcome" = 'TRIGGERED'::text)),
-  CONSTRAINT "OJTAlerts_check" CHECK (("LastDetectedAt" >= "FirstDetectedAt")),
-  CONSTRAINT "OJTAlerts_check1" CHECK (((("Status" = ANY (ARRAY['OPEN'::text, 'ACKNOWLEDGED'::text])) AND ("ClosedAt" IS NULL)) OR (("Status" = ANY (ARRAY['RESOLVED'::text, 'DISMISSED'::text])) AND ("ClosedAt" IS NOT NULL) AND ("CloseReason" IS NOT NULL)))),
-  CONSTRAINT "OJTAlerts_pkey" PRIMARY KEY ("AlertID")
-);
-COMMENT ON TABLE public."OJTAlerts" IS 'Rule-based actionable warnings, not AI probabilities. Backend evaluates rules, maintains events and resolves alerts; SQL does not schedule jobs.';
 CREATE TABLE public."OJTAssessmentWindows" (
   "OJTSemesterID" integer NOT NULL,
   "BlockPeriodID" integer NOT NULL,
@@ -1084,100 +907,6 @@ CREATE TABLE public."OJTAssessmentWindows" (
   CONSTRAINT "OJTAssessmentWindows_check" CHECK (("ClosesAt" > "OpensAt")),
   CONSTRAINT "OJTAssessmentWindows_check1" CHECK (((("Status")::text <> 'OPEN'::text) OR (("ResultsFinalizedBy" IS NOT NULL) AND ("ResultsFinalizedAt" IS NOT NULL)))),
   CONSTRAINT "OJTAssessmentWindows_pkey" PRIMARY KEY ("OJTSemesterID")
-);
-CREATE TABLE public."OJTCompletionDeliveries" (
-  "EvaluationID" integer NOT NULL,
-  "EvaluatedAt" timestamp without time zone NOT NULL,
-  "UserID" integer NOT NULL,
-  "EmailID" bigint NOT NULL,
-  CONSTRAINT "OJTCompletionDeliveries_pkey" PRIMARY KEY ("EvaluationID", "EvaluatedAt", "UserID")
-);
-CREATE TABLE public."OJTEligibilityConditions" (
-  "ConditionID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTEligibilityConditions_ConditionID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "ProgramID" integer NOT NULL,
-  "OJTSemesterID" integer,
-  "MinGPA" numeric(4,2),
-  "MinCredits" numeric(6,2),
-  "RequiredCoursesNote" character varying(500),
-  "Description" character varying(500),
-  "GPAScale" integer,
-  "RequiredCoursesReviewed" boolean DEFAULT false NOT NULL,
-  "ApprovedBy" integer,
-  "ApprovedAt" timestamp with time zone,
-  CONSTRAINT "CK_OJTConditionApproval" CHECK ((("ApprovedBy" IS NULL) = ("ApprovedAt" IS NULL))),
-  CONSTRAINT "OJTEligibilityConditions_GPAScale_check" CHECK (("GPAScale" = ANY (ARRAY[4, 10]))),
-  CONSTRAINT "OJTEligibilityConditions_pkey" PRIMARY KEY ("ConditionID")
-);
-CREATE TABLE public."OJTEnterpriseImportBatches" (
-  "BatchID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTEnterpriseImportBatches_BatchID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "IdempotencyKey" text NOT NULL,
-  "SourceName" text NOT NULL,
-  "SourceObjectPath" text,
-  "ImportedBy" integer NOT NULL,
-  "Status" text DEFAULT 'PENDING'::text NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "CompletedAt" timestamp with time zone,
-  CONSTRAINT "OJTEnterpriseImportBatches_IdempotencyKey_key" UNIQUE ("IdempotencyKey"),
-  CONSTRAINT "OJTEnterpriseImportBatches_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'PROCESSING'::text, 'COMPLETED'::text, 'PARTIAL'::text, 'FAILED'::text]))),
-  CONSTRAINT "OJTEnterpriseImportBatches_pkey" PRIMARY KEY ("BatchID")
-);
-CREATE TABLE public."OJTEnterpriseImportRows" (
-  "ImportRowID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTEnterpriseImportRows_ImportRowID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "BatchID" bigint NOT NULL,
-  "RowNumber" integer NOT NULL,
-  "SourceRecordKey" text,
-  "RawData" jsonb NOT NULL,
-  "NormalizedData" jsonb,
-  "Status" text DEFAULT 'PENDING'::text NOT NULL,
-  "ValidationErrors" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "EnterpriseID" integer,
-  CONSTRAINT "OJTEnterpriseImportRows_BatchID_RowNumber_key" UNIQUE ("BatchID", "RowNumber"),
-  CONSTRAINT "OJTEnterpriseImportRows_NormalizedData_check" CHECK ((jsonb_typeof("NormalizedData") = 'object'::text)),
-  CONSTRAINT "OJTEnterpriseImportRows_RawData_check" CHECK ((jsonb_typeof("RawData") = 'object'::text)),
-  CONSTRAINT "OJTEnterpriseImportRows_RowNumber_check" CHECK (("RowNumber" > 0)),
-  CONSTRAINT "OJTEnterpriseImportRows_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'VALID'::text, 'IMPORTED'::text, 'REJECTED'::text]))),
-  CONSTRAINT "OJTEnterpriseImportRows_ValidationErrors_check" CHECK ((jsonb_typeof("ValidationErrors") = 'array'::text)),
-  CONSTRAINT "OJTEnterpriseImportRows_check" CHECK ((("Status" <> 'IMPORTED'::text) OR ("EnterpriseID" IS NOT NULL))),
-  CONSTRAINT "OJTEnterpriseImportRows_pkey" PRIMARY KEY ("ImportRowID")
-);
-CREATE TABLE public."OJTMatchingProfiles" (
-  "ProfileID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTMatchingProfiles_ProfileID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "ProfileType" text NOT NULL,
-  "EnterpriseID" integer NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "PositionID" integer,
-  "ImportRowID" bigint,
-  "CompanyOJTDescription" text,
-  "CompanyCapacity" integer,
-  "CompanyRemainingSlots" integer,
-  "CompanyLocation" text,
-  "CompanyWorkMode" text,
-  "MinGPA" numeric(4,2),
-  "GPAScale" numeric(4,2),
-  "LanguageRequirements" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "OtherHardRequirements" jsonb DEFAULT '{}'::jsonb NOT NULL,
-  "MajorPolicy" text DEFAULT 'REVIEW_REQUIRED'::text NOT NULL,
-  "DeadlineAt" timestamp with time zone,
-  "Status" text DEFAULT 'DRAFT'::text NOT NULL,
-  "ReviewedBy" integer,
-  "ReviewedAt" timestamp with time zone,
-  "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "OJTMatchingProfiles_CompanyCapacity_check" CHECK (("CompanyCapacity" >= 0)),
-  CONSTRAINT "OJTMatchingProfiles_CompanyWorkMode_check" CHECK (("CompanyWorkMode" = ANY (ARRAY['ONSITE'::text, 'REMOTE'::text, 'HYBRID'::text]))),
-  CONSTRAINT "OJTMatchingProfiles_GPAScale_check" CHECK (("GPAScale" = ANY (ARRAY[(4)::numeric, (10)::numeric]))),
-  CONSTRAINT "OJTMatchingProfiles_LanguageRequirements_check" CHECK ((jsonb_typeof("LanguageRequirements") = 'array'::text)),
-  CONSTRAINT "OJTMatchingProfiles_MajorPolicy_check" CHECK (("MajorPolicy" = ANY (ARRAY['ANY'::text, 'ALLOW_LIST'::text, 'REVIEW_REQUIRED'::text]))),
-  CONSTRAINT "OJTMatchingProfiles_OtherHardRequirements_check" CHECK ((jsonb_typeof("OtherHardRequirements") = 'object'::text)),
-  CONSTRAINT "OJTMatchingProfiles_PositionID_key" UNIQUE ("PositionID"),
-  CONSTRAINT "OJTMatchingProfiles_ProfileID_OJTSemesterID_key" UNIQUE ("ProfileID", "OJTSemesterID"),
-  CONSTRAINT "OJTMatchingProfiles_ProfileType_check" CHECK (("ProfileType" = ANY (ARRAY['POSITION'::text, 'ENTERPRISE_OJT'::text]))),
-  CONSTRAINT "OJTMatchingProfiles_Status_check" CHECK (("Status" = ANY (ARRAY['DRAFT'::text, 'PUBLISHED'::text, 'CLOSED'::text, 'ARCHIVED'::text]))),
-  CONSTRAINT "OJTMatchingProfiles_check" CHECK ((("CompanyRemainingSlots" >= 0) AND ("CompanyRemainingSlots" <= "CompanyCapacity"))),
-  CONSTRAINT "OJTMatchingProfiles_check1" CHECK ((("MinGPA" >= (0)::numeric) AND ("MinGPA" <= "GPAScale"))),
-  CONSTRAINT "OJTMatchingProfiles_check2" CHECK ((("MinGPA" IS NULL) = ("GPAScale" IS NULL))),
-  CONSTRAINT "OJTMatchingProfiles_check3" CHECK (((("ProfileType" = 'POSITION'::text) AND ("PositionID" IS NOT NULL) AND ("CompanyCapacity" IS NULL) AND ("CompanyRemainingSlots" IS NULL) AND ("CompanyOJTDescription" IS NULL) AND ("CompanyLocation" IS NULL) AND ("CompanyWorkMode" IS NULL)) OR (("ProfileType" = 'ENTERPRISE_OJT'::text) AND ("PositionID" IS NULL) AND (length(btrim("CompanyOJTDescription")) > 0) AND ("CompanyOJTDescription" IS NOT NULL) AND ("CompanyCapacity" IS NOT NULL) AND ("CompanyRemainingSlots" IS NOT NULL)))),
-  CONSTRAINT "OJTMatchingProfiles_check4" CHECK ((("Status" <> 'PUBLISHED'::text) OR (("ReviewedBy" IS NOT NULL) AND ("ReviewedAt" IS NOT NULL) AND ("MajorPolicy" <> 'REVIEW_REQUIRED'::text)))),
-  CONSTRAINT "OJTMatchingProfiles_pkey" PRIMARY KEY ("ProfileID")
 );
 CREATE TABLE public."OJTRegistrationEvents" (
   "EventID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTRegistrationEvents_EventID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
@@ -1261,24 +990,6 @@ CREATE TABLE public."OJTRegistrations" (
   CONSTRAINT "UQ_RegistrationIdentity" UNIQUE ("RegistrationID", "StudentID", "OJTSemesterID"),
   CONSTRAINT "UQ_Registration_Semester" UNIQUE ("RegistrationID", "OJTSemesterID")
 );
-CREATE TABLE public."OJTResultEvents" (
-  "EventID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTResultEvents_EventID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "ResultID" integer NOT NULL,
-  "Version" integer NOT NULL,
-  "Action" character varying(30) NOT NULL,
-  "Snapshot" jsonb NOT NULL,
-  "Reason" text NOT NULL,
-  "CreatedBy" integer NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "IdempotencyKey" character varying(100),
-  "RequestHash" text,
-  CONSTRAINT "OJTResultEvents_Action_check" CHECK ((("Action")::text = ANY ((ARRAY['TRANSFERRED'::character varying, 'RESUBMITTED'::character varying, 'REVISION_REQUESTED'::character varying, 'UPDATED'::character varying, 'CONFIRMED'::character varying])::text[]))),
-  CONSTRAINT "OJTResultEvents_IdempotencyKey_key" UNIQUE ("IdempotencyKey"),
-  CONSTRAINT "OJTResultEvents_Reason_check" CHECK ((length(btrim("Reason")) > 0)),
-  CONSTRAINT "OJTResultEvents_ResultID_Version_key" UNIQUE ("ResultID", "Version"),
-  CONSTRAINT "OJTResultEvents_check" CHECK ((("IdempotencyKey" IS NULL) = ("RequestHash" IS NULL))),
-  CONSTRAINT "OJTResultEvents_pkey" PRIMARY KEY ("EventID")
-);
 CREATE TABLE public."OJTResults" (
   "ResultID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."OJTResults_ResultID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "AssignmentID" integer NOT NULL,
@@ -1351,30 +1062,6 @@ CREATE TABLE public."OJTSemesters" (
   CONSTRAINT "OJTSemesters_SemesterCode_key" UNIQUE ("SemesterCode"),
   CONSTRAINT "OJTSemesters_pkey" PRIMARY KEY ("OJTSemesterID")
 );
-CREATE TABLE public."PathwayRecommendations" (
-  "RecommendationID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."PathwayRecommendations_RecommendationID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "StudentID" integer NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "MissingCourses" character varying(1000),
-  "RecommendedPlan" text,
-  "GeneratedAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-  "Status" character varying(20),
-  CONSTRAINT "PathwayRecommendations_pkey" PRIMARY KEY ("RecommendationID")
-);
-CREATE TABLE public."PositionSpecializations" (
-  "PositionID" integer NOT NULL,
-  "SpecializationID" integer NOT NULL,
-  CONSTRAINT "PositionSpecializations_pkey" PRIMARY KEY ("PositionID", "SpecializationID")
-);
-CREATE TABLE public."PredictionJobItems" (
-  "JobID" integer NOT NULL,
-  "StudentID" integer NOT NULL,
-  "Status" text DEFAULT 'PENDING'::text NOT NULL,
-  "ErrorCode" text,
-  "ErrorMessage" text,
-  CONSTRAINT "PredictionJobItems_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'COMPLETED'::text, 'FAILED'::text]))),
-  CONSTRAINT "PredictionJobItems_pkey" PRIMARY KEY ("JobID", "StudentID")
-);
 CREATE TABLE public."PredictionJobs" (
   "JobID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."PredictionJobs_JobID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "ModelID" integer NOT NULL,
@@ -1401,26 +1088,6 @@ CREATE TABLE public."PredictionModels" (
   CONSTRAINT "PredictionModels_Code_Version_key" UNIQUE ("Code", "Version"),
   CONSTRAINT "PredictionModels_Status_check" CHECK (("Status" = ANY (ARRAY['ACTIVE'::text, 'INACTIVE'::text]))),
   CONSTRAINT "PredictionModels_pkey" PRIMARY KEY ("ModelID")
-);
-CREATE TABLE public."Predictions" (
-  "PredictionID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."Predictions_PredictionID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "JobID" integer NOT NULL,
-  "StudentID" integer NOT NULL,
-  "ModelSnapshot" jsonb NOT NULL,
-  "InputSnapshot" jsonb NOT NULL,
-  "ReadinessScore" numeric(5,2) NOT NULL,
-  "ReadinessLevel" text NOT NULL,
-  "RiskScore" numeric(5,2) NOT NULL,
-  "RiskLevel" text NOT NULL,
-  "Factors" jsonb NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "Predictions_Factors_check" CHECK ((jsonb_typeof("Factors") = 'array'::text)),
-  CONSTRAINT "Predictions_JobID_StudentID_key" UNIQUE ("JobID", "StudentID"),
-  CONSTRAINT "Predictions_ReadinessLevel_check" CHECK (("ReadinessLevel" = ANY (ARRAY['LOW'::text, 'MEDIUM'::text, 'HIGH'::text]))),
-  CONSTRAINT "Predictions_ReadinessScore_check" CHECK ((("ReadinessScore" >= (0)::numeric) AND ("ReadinessScore" <= (100)::numeric))),
-  CONSTRAINT "Predictions_RiskLevel_check" CHECK (("RiskLevel" = ANY (ARRAY['LOW'::text, 'MEDIUM'::text, 'HIGH'::text]))),
-  CONSTRAINT "Predictions_RiskScore_check" CHECK ((("RiskScore" >= (0)::numeric) AND ("RiskScore" <= (100)::numeric))),
-  CONSTRAINT "Predictions_pkey" PRIMARY KEY ("PredictionID")
 );
 CREATE TABLE public."ProgramCombos" (
   "ProgramComboID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."ProgramCombos_ProgramComboID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
@@ -1504,12 +1171,6 @@ CREATE TABLE public."ProgramSlotOptions" (
   "ComboCourseID" integer NOT NULL,
   CONSTRAINT "ProgramSlotOptions_pkey" PRIMARY KEY ("ProgramCourseID", "ComboCourseID")
 );
-CREATE TABLE public."RecruitmentArchiveRuns" (
-  "RunID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."RecruitmentArchiveRuns_RunID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
-  "RunAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "ArchivedCount" integer NOT NULL,
-  CONSTRAINT "RecruitmentArchiveRuns_pkey" PRIMARY KEY ("RunID")
-);
 CREATE TABLE public."RecruitmentPostPositions" (
   "PostID" integer NOT NULL,
   "PositionID" integer NOT NULL,
@@ -1564,18 +1225,6 @@ CREATE TABLE public."RecruitmentWindows" (
   CONSTRAINT "RecruitmentWindows_check" CHECK (("EndsAt" > "StartsAt")),
   CONSTRAINT "RecruitmentWindows_pkey" PRIMARY KEY ("WindowID")
 );
-CREATE TABLE public."RiskAlerts" (
-  "AlertID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."RiskAlerts_AlertID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "PredictionID" integer NOT NULL,
-  "Status" text DEFAULT 'OPEN'::text NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "UpdatedBy" integer,
-  "ResolutionNote" text,
-  CONSTRAINT "RiskAlerts_PredictionID_key" UNIQUE ("PredictionID"),
-  CONSTRAINT "RiskAlerts_Status_check" CHECK (("Status" = ANY (ARRAY['OPEN'::text, 'ACKNOWLEDGED'::text, 'RESOLVED'::text, 'DISMISSED'::text]))),
-  CONSTRAINT "RiskAlerts_pkey" PRIMARY KEY ("AlertID")
-);
 CREATE TABLE public."Roles" (
   "RoleID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."Roles_RoleID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "RoleCode" character varying(30) NOT NULL,
@@ -1617,18 +1266,6 @@ CREATE TABLE public."StudentAcademicRecalculations" (
   CONSTRAINT "StudentAcademicRecalculations_EventID_key" UNIQUE ("EventID"),
   CONSTRAINT "StudentAcademicRecalculations_pkey" PRIMARY KEY ("RecalculationID")
 );
-CREATE TABLE public."StudentAcademicSnapshot" (
-  "SnapshotID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."StudentAcademicSnapshot_SnapshotID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "StudentID" integer NOT NULL,
-  "SnapshotDate" date NOT NULL,
-  "GPA" numeric(3,2),
-  "AccumulatedCredits" integer,
-  "RemainingCredits" integer,
-  "FailedCoursesCount" integer,
-  "CurrentSemester" integer,
-  "TargetOJTSemesterID" integer,
-  CONSTRAINT "StudentAcademicSnapshot_pkey" PRIMARY KEY ("SnapshotID")
-);
 CREATE TABLE public."StudentCVFiles" (
   "CVFileID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."StudentCVFiles_CVFileID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "StudentID" integer NOT NULL,
@@ -1657,14 +1294,6 @@ CREATE TABLE public."StudentCVVersions" (
   CONSTRAINT "StudentCVVersions_MimeType_check" CHECK (("MimeType" = 'application/pdf'::text)),
   CONSTRAINT "StudentCVVersions_SizeBytes_check" CHECK ((("SizeBytes" >= 1) AND ("SizeBytes" <= 5242880))),
   CONSTRAINT "StudentCVVersions_pkey" PRIMARY KEY ("CVID")
-);
-CREATE TABLE public."StudentCareerInterests" (
-  "StudentID" integer NOT NULL,
-  "JobRoleID" integer NOT NULL,
-  "Priority" smallint NOT NULL,
-  CONSTRAINT "StudentCareerInterests_Priority_check" CHECK (("Priority" > 0)),
-  CONSTRAINT "StudentCareerInterests_StudentID_Priority_key" UNIQUE ("StudentID", "Priority"),
-  CONSTRAINT "StudentCareerInterests_pkey" PRIMARY KEY ("StudentID", "JobRoleID")
 );
 CREATE TABLE public."StudentCareerProfiles" (
   "StudentID" integer NOT NULL,
@@ -1763,20 +1392,6 @@ CREATE TABLE public."StudentEnterpriseCoordination" (
   "OJTSemesterID" integer NOT NULL,
   CONSTRAINT "StudentEnterpriseCoordination_pkey" PRIMARY KEY ("CoordinationID")
 );
-CREATE TABLE public."StudentInterventions" (
-  "InterventionID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."StudentInterventions_InterventionID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "AlertID" integer NOT NULL,
-  "Description" text NOT NULL,
-  "AssignedTo" integer NOT NULL,
-  "DueDate" date,
-  "Status" text DEFAULT 'PLANNED'::text NOT NULL,
-  "Outcome" text,
-  "CreatedBy" integer NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "StudentInterventions_Status_check" CHECK (("Status" = ANY (ARRAY['PLANNED'::text, 'IN_PROGRESS'::text, 'COMPLETED'::text, 'CANCELLED'::text]))),
-  CONSTRAINT "StudentInterventions_pkey" PRIMARY KEY ("InterventionID")
-);
 CREATE TABLE public."StudentMatchingSkills" (
   "StudentID" integer NOT NULL,
   "SkillID" integer NOT NULL,
@@ -1816,39 +1431,6 @@ CREATE TABLE public."Students" (
   CONSTRAINT "UQ_Students_Program" UNIQUE ("StudentID", "ProgramID")
 );
 COMMENT ON COLUMN public."Students"."CohortCode" IS 'Source cohort, e.g. K19; do not infer enrollment calendar year from this label.';
-CREATE TABLE public."SupportClassRegistrations" (
-  "RegistrationID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."SupportClassRegistrations_RegistrationID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "SupportClassID" integer NOT NULL,
-  "StudentID" integer NOT NULL,
-  "RegisteredDate" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-  "Status" character varying(20),
-  CONSTRAINT "SupportClassRegistrations_pkey" PRIMARY KEY ("RegistrationID"),
-  CONSTRAINT "UQ_SupportClassStudent" UNIQUE ("SupportClassID", "StudentID")
-);
-CREATE TABLE public."SupportClasses" (
-  "SupportClassID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."SupportClasses_SupportClassID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "CourseID" integer NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "ClassName" character varying(100),
-  "StartDate" date,
-  "EndDate" date,
-  "Capacity" integer,
-  "CreatedBy" integer,
-  "Status" character varying(20),
-  CONSTRAINT "SupportClasses_pkey" PRIMARY KEY ("SupportClassID")
-);
-CREATE TABLE public."SupportRequests" (
-  "RequestID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."SupportRequests_RequestID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "StudentID" integer NOT NULL,
-  "Subject" character varying(200),
-  "Content" text,
-  "SubmittedAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-  "Status" character varying(20),
-  "HandledBy" integer,
-  "Response" text,
-  "RespondedAt" timestamp without time zone,
-  CONSTRAINT "SupportRequests_pkey" PRIMARY KEY ("RequestID")
-);
 CREATE TABLE public."TaskProgressUpdates" (
   "UpdateID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."TaskProgressUpdates_UpdateID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "TaskID" integer NOT NULL,
@@ -1910,7 +1492,6 @@ CREATE INDEX "IX_AcademicImportRequests_KindID" ON public."AcademicImportRequest
 CREATE INDEX "IX_AcademicImports_History" ON public."AcademicImportBatches" USING btree ("Kind", "CreatedAt" DESC);
 CREATE INDEX "IX_AcademicPeriods_Calendar" ON public."AcademicPeriods" USING btree ("Kind", "StartDate");
 CREATE INDEX "IX_AdvisoryPending" ON public."OJTAdvisoryRunItems" USING btree ("RunID", "StudentID") WHERE ("Status" = 'PENDING'::text);
-CREATE INDEX "IX_AlertDelivery_Queue" ON public."OJTAlertDeliveries" USING btree ("Status", "NextAttemptAt");
 CREATE INDEX "IX_AlertEvaluation_Target" ON public."OJTAlertEvaluations" USING btree ("TargetID", "EvaluatedAt" DESC);
 CREATE INDEX "IX_ApplicationEvents_Application" ON public."ApplicationEvents" USING btree ("ApplicationID", "EventID");
 CREATE INDEX "IX_Applications_PositionStatus" ON public."JobApplications" USING btree ("PositionID", "Status");
@@ -1924,32 +1505,24 @@ CREATE INDEX "IX_EligibilityPending" ON public."EligibilityRunStudents" USING bt
 CREATE INDEX "IX_EligibilityStudentHistory" ON public."EligibilityChecks" USING btree ("StudentID", "OJTSemesterID", "CheckID" DESC);
 CREATE INDEX "IX_EmailOutbox_Pending" ON public."EmailOutbox" USING btree ("Status", "NextAttemptAt");
 CREATE INDEX "IX_HandoffStudentSemester" ON public."EligibleStudentHandoffItems" USING btree ("StudentID", "OJTSemesterID");
-CREATE INDEX "IX_IncidentReports_Assignment" ON public."IncidentReports" USING btree ("AssignmentID");
 CREATE INDEX "IX_InternshipAssignments_Enterprise" ON public."InternshipAssignments" USING btree ("EnterpriseID");
 CREATE INDEX "IX_InternshipAssignments_Student" ON public."InternshipAssignments" USING btree ("StudentID");
 CREATE INDEX "IX_InternshipPositions_Enterprise" ON public."InternshipPositions" USING btree ("EnterpriseID");
 CREATE INDEX "IX_InternshipPositions_Semester" ON public."InternshipPositions" USING btree ("OJTSemesterID");
 CREATE INDEX "IX_InternshipTasks_Assignment" ON public."InternshipTasks" USING btree ("AssignmentID");
-CREATE INDEX "IX_MatchingProfile_SemesterStatus" ON public."OJTMatchingProfiles" USING btree ("OJTSemesterID", "Status");
-CREATE INDEX "IX_MatchingRuns_Student" ON public."MatchingRuns" USING btree ("StudentID", "OJTSemesterID", "CreatedAt" DESC);
 CREATE INDEX "IX_Notifications_UserRead" ON public."Notifications" USING btree ("UserID", "IsRead");
-CREATE INDEX "IX_OJTAlerts_TargetStatus" ON public."OJTAlerts" USING btree ("TargetID", "Status");
 CREATE INDEX "IX_OJTRegistrationExceptions_Context" ON public."OJTRegistrationExceptions" USING btree ("WindowID", "StudentID", "RelativeSemester");
 CREATE INDEX "IX_OJTRegistrationWindow" ON public."OJTRegistrations" USING btree ("WindowID", "Status");
 CREATE INDEX "IX_OJTRegistrations_Semester" ON public."OJTRegistrations" USING btree ("OJTSemesterID");
 CREATE INDEX "IX_OJTRegistrations_Student" ON public."OJTRegistrations" USING btree ("StudentID");
 CREATE INDEX "IX_OJTResults_SemesterStatus" ON public."OJTResults" USING btree ("OJTSemesterID", "Status");
-CREATE INDEX "IX_PathwayRecommendations_Student" ON public."PathwayRecommendations" USING btree ("StudentID");
 CREATE INDEX "IX_Positions_JobRole" ON public."InternshipPositions" USING btree ("JobRoleID");
 CREATE INDEX "IX_PostPositions_Position" ON public."RecruitmentPostPositions" USING btree ("PositionID");
 CREATE INDEX "IX_Post_EnterpriseStatus" ON public."RecruitmentPosts" USING btree ("EnterpriseID", "Status");
 CREATE INDEX "IX_Post_SemesterStatus" ON public."RecruitmentPosts" USING btree ("OJTSemesterID", "Status", "DeadlineAt");
-CREATE INDEX "IX_PredictionPending" ON public."PredictionJobItems" USING btree ("JobID") WHERE ("Status" = 'PENDING'::text);
-CREATE INDEX "IX_PredictionStudent" ON public."Predictions" USING btree ("StudentID", "CreatedAt" DESC);
 CREATE INDEX "IX_Programs_Specialization" ON public."TrainingPrograms" USING btree ("SpecializationID");
 CREATE INDEX "IX_RecruitmentPosts_Window" ON public."RecruitmentPosts" USING btree ("WindowID", "Status");
 CREATE INDEX "IX_Specializations_Major" ON public."Specializations" USING btree ("MajorID");
-CREATE INDEX "IX_StudentAcademicSnapshot_StudentDate" ON public."StudentAcademicSnapshot" USING btree ("StudentID", "SnapshotDate");
 CREATE INDEX "IX_StudentCVFiles_Latest" ON public."StudentCVFiles" USING btree ("StudentID", "CVFileID" DESC);
 CREATE INDEX "IX_StudentCombo_Program" ON public."StudentComboSelections" USING btree ("ProgramID", "ProgramComboID");
 CREATE INDEX "IX_StudentCourseResults_Course" ON public."StudentCourseResults" USING btree ("CourseID");
@@ -1961,19 +1534,14 @@ CREATE INDEX "IX_StudentOJTEligibility_Semester" ON public."StudentOJTEligibilit
 CREATE INDEX "IX_StudentOJTEligibility_Student" ON public."StudentOJTEligibility" USING btree ("StudentID");
 CREATE INDEX "IX_StudentResults_History" ON public."StudentCourseResults" USING btree ("StudentID", "AcademicPeriodID", "CourseID");
 CREATE INDEX "IX_Students_Program" ON public."Students" USING btree ("ProgramID");
-CREATE INDEX "IX_SupportClasses_Semester" ON public."SupportClasses" USING btree ("OJTSemesterID");
-CREATE INDEX "IX_SupportRequests_Student" ON public."SupportRequests" USING btree ("StudentID");
 CREATE INDEX "IX_Users_Role" ON public."Users" USING btree ("RoleID");
 CREATE UNIQUE INDEX "UQ_AcademicImports_CompletedKey" ON public."AcademicImportBatches" USING btree ("Kind", "IdempotencyKey") WHERE ("Status" = 'COMPLETED'::text);
 CREATE UNIQUE INDEX "UQ_AcademicPeriods_Block3Parent" ON public."AcademicPeriods" USING btree ("ParentPeriodID") WHERE (("Kind")::text = 'BLOCK3'::text);
 CREATE UNIQUE INDEX "UQ_AcademicPeriods_Code" ON public."AcademicPeriods" USING btree (upper(("PeriodCode")::text));
 CREATE UNIQUE INDEX "UQ_AcademicYears_Code" ON public."AcademicYears" USING btree (upper(("YearCode")::text));
-CREATE UNIQUE INDEX "UQ_ActiveOJTAlert" ON public."OJTAlerts" USING btree ("TargetID", "RuleID", "ScopeKey") WHERE ("Status" = ANY (ARRAY['OPEN'::text, 'ACKNOWLEDGED'::text]));
 CREATE UNIQUE INDEX "UQ_Cohorts_Code" ON public."Cohorts" USING btree (upper(("CohortCode")::text));
 CREATE UNIQUE INDEX "UQ_Combo_Code" ON public."ProgramCombos" USING btree ("ProgramID", upper("ComboCode"));
 CREATE UNIQUE INDEX "UQ_Combo_Course" ON public."ComboCourses" USING btree ("ProgramComboID", "CourseID");
-CREATE UNIQUE INDEX "UQ_CompanyImportCommit" ON public."CompanyImportBatches" USING btree ("IdempotencyKey") WHERE ("Status" = 'COMPLETED'::text);
-CREATE UNIQUE INDEX "UQ_CompanyOJT_Semester" ON public."OJTMatchingProfiles" USING btree ("EnterpriseID", "OJTSemesterID") WHERE ("ProfileType" = 'ENTERPRISE_OJT'::text);
 CREATE UNIQUE INDEX "UQ_Course_Code" ON public."Courses" USING btree (upper(("CourseCode")::text));
 CREATE UNIQUE INDEX "UQ_CurrentStudentCV" ON public."StudentCVVersions" USING btree ("StudentID") WHERE ("RetiredAt" IS NULL);
 CREATE UNIQUE INDEX "UQ_Curriculum_ProgramCode_CI" ON public."TrainingPrograms" USING btree (upper(("ProgramCode")::text));
@@ -1983,10 +1551,8 @@ CREATE UNIQUE INDEX "UQ_Enterprises_CodeNormalized" ON public."Enterprises" USIN
 CREATE UNIQUE INDEX "UQ_OJTSemesters_AcademicPeriod" ON public."OJTSemesters" USING btree ("AcademicPeriodID") WHERE ("AcademicPeriodID" IS NOT NULL);
 CREATE UNIQUE INDEX "UQ_OJTSemesters_Code" ON public."OJTSemesters" USING btree (upper(("SemesterCode")::text));
 CREATE UNIQUE INDEX "UQ_Position_ImportCode" ON public."InternshipPositions" USING btree ("EnterpriseID", "OJTSemesterID", "RecruitmentCode") WHERE ("RecruitmentCode" IS NOT NULL);
-CREATE UNIQUE INDEX "UQ_ProfileEmbedding" ON public."MatchingEmbeddings" USING btree ("ProfileID", "EmbeddingConfigID", "ContentHash") WHERE ("ProfileID" IS NOT NULL);
 CREATE UNIQUE INDEX "UQ_RecruitmentWindows_OpenPeriod" ON public."RecruitmentWindows" USING btree ("AcademicPeriodID") WHERE (("Status")::text = 'OPEN'::text);
 CREATE UNIQUE INDEX "UQ_Specialization_Code" ON public."Specializations" USING btree (upper(("SpecializationCode")::text));
-CREATE UNIQUE INDEX "UQ_StudentEmbedding" ON public."MatchingEmbeddings" USING btree ("StudentID", "EmbeddingConfigID", "ContentHash") WHERE ("StudentID" IS NOT NULL);
 CREATE UNIQUE INDEX "UQ_StudentResults_ActualAttempt" ON public."StudentCourseResults" USING btree ("StudentID", "CourseID", "AcademicPeriodID", "AttemptNumber") WHERE ("AcademicPeriodID" IS NOT NULL);
 CREATE UNIQUE INDEX "UQ_Student_SpecializationCombo" ON public."StudentComboSelections" USING btree ("StudentID", "ProgramID") WHERE ("SelectionPurpose" = 'SPECIALIZATION'::text);
 CREATE UNIQUE INDEX "UQ_Students_CodeNormalized" ON public."Students" USING btree (upper(("StudentCode")::text));
@@ -2218,7 +1784,7 @@ CREATE FUNCTION public."GuardAssessmentTemplate"()
  LANGUAGE plpgsql
 AS $function$
 BEGIN
- IF OLD."Status"='PUBLISHED' OR EXISTS (SELECT 1 FROM "InternshipEvaluations" WHERE "TemplateID"=OLD."TemplateID") THEN
+ IF TG_OP='DELETE' OR OLD."Status"='PUBLISHED' OR EXISTS (SELECT 1 FROM "InternshipEvaluations" WHERE "TemplateID"=OLD."TemplateID") THEN
   RAISE EXCEPTION 'Published or used assessment templates are immutable' USING ERRCODE='23514';
  END IF;
  IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
@@ -6135,12 +5701,6 @@ ALTER TABLE public."ComboWindowExtensions" ADD CONSTRAINT "ComboWindowExtensions
 ALTER TABLE public."ComboWindowStudents" ADD CONSTRAINT "ComboWindowStudents_ProgramID_fkey" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID");
 ALTER TABLE public."ComboWindowStudents" ADD CONSTRAINT "ComboWindowStudents_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
 ALTER TABLE public."ComboWindowStudents" ADD CONSTRAINT "ComboWindowStudents_WindowID_fkey" FOREIGN KEY ("WindowID") REFERENCES "ComboRegistrationWindows"("WindowID");
-ALTER TABLE public."CompanyImportBatches" ADD CONSTRAINT "CompanyImportBatches_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."CompanyImportBatches" ADD CONSTRAINT "CompanyImportBatches_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."CompanyImportRows" ADD CONSTRAINT "CompanyImportRows_BatchID_fkey" FOREIGN KEY ("BatchID") REFERENCES "CompanyImportBatches"("BatchID");
-ALTER TABLE public."CompanyImportRows" ADD CONSTRAINT "CompanyImportRows_EnterpriseID_fkey" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID");
-ALTER TABLE public."CoursePrerequisites" ADD CONSTRAINT "FK_CoursePrerequisites_Course" FOREIGN KEY ("CourseID") REFERENCES "Courses"("CourseID") ON DELETE CASCADE;
-ALTER TABLE public."CoursePrerequisites" ADD CONSTRAINT "FK_CoursePrerequisites_Prerequisite" FOREIGN KEY ("PrerequisiteCourseID") REFERENCES "Courses"("CourseID");
 ALTER TABLE public."EligibilityCheckRuns" ADD CONSTRAINT "EligibilityCheckRuns_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."EligibilityCheckRuns" ADD CONSTRAINT "EligibilityCheckRuns_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."EligibilityChecks" ADD CONSTRAINT "EligibilityChecks_CheckedBy_fkey" FOREIGN KEY ("CheckedBy") REFERENCES "Users"("UserID");
@@ -6151,8 +5711,6 @@ ALTER TABLE public."EligibilityChecks" ADD CONSTRAINT "EligibilityChecks_RunID_f
 ALTER TABLE public."EligibilityChecks" ADD CONSTRAINT "EligibilityChecks_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
 ALTER TABLE public."EligibilityConfirmations" ADD CONSTRAINT "EligibilityConfirmations_CheckID_fkey" FOREIGN KEY ("CheckID") REFERENCES "EligibilityChecks"("CheckID");
 ALTER TABLE public."EligibilityConfirmations" ADD CONSTRAINT "EligibilityConfirmations_ConfirmedBy_fkey" FOREIGN KEY ("ConfirmedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."EligibilityRequiredCourses" ADD CONSTRAINT "EligibilityRequiredCourses_ConditionID_fkey" FOREIGN KEY ("ConditionID") REFERENCES "OJTEligibilityConditions"("ConditionID");
-ALTER TABLE public."EligibilityRequiredCourses" ADD CONSTRAINT "EligibilityRequiredCourses_CourseID_fkey" FOREIGN KEY ("CourseID") REFERENCES "Courses"("CourseID");
 ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStudents_CheckID_fkey" FOREIGN KEY ("CheckID") REFERENCES "EligibilityChecks"("CheckID");
 ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStudents_ProgramID_fkey" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID");
 ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStudents_RuleSetID_fkey" FOREIGN KEY ("RuleSetID") REFERENCES "OJTRuleSets"("RuleSetID");
@@ -6166,8 +5724,6 @@ ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHand
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_UserID_fkey" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID");
 ALTER TABLE public."EnterpriseUsers" ADD CONSTRAINT "FK_EnterpriseUsers_Enterprise" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID") ON DELETE CASCADE;
 ALTER TABLE public."EnterpriseUsers" ADD CONSTRAINT "FK_EnterpriseUsers_User" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID") ON DELETE CASCADE;
-ALTER TABLE public."IncidentReports" ADD CONSTRAINT "FK_IncidentReports_Assignment" FOREIGN KEY ("AssignmentID") REFERENCES "InternshipAssignments"("AssignmentID") ON DELETE CASCADE;
-ALTER TABLE public."IncidentReports" ADD CONSTRAINT "FK_IncidentReports_Reporter" FOREIGN KEY ("ReportedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."InternshipAssignments" ADD CONSTRAINT "FK_InternshipAssignments_Coordination" FOREIGN KEY ("CoordinationID") REFERENCES "StudentEnterpriseCoordination"("CoordinationID");
 ALTER TABLE public."InternshipAssignments" ADD CONSTRAINT "FK_InternshipAssignments_Enterprise" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID");
 ALTER TABLE public."InternshipAssignments" ADD CONSTRAINT "FK_InternshipAssignments_Position" FOREIGN KEY ("PositionID") REFERENCES "InternshipPositions"("PositionID");
@@ -6186,32 +5742,6 @@ ALTER TABLE public."JobApplications" ADD CONSTRAINT "JobApplications_OfficialChe
 ALTER TABLE public."JobApplications" ADD CONSTRAINT "JobApplications_PostID_PositionID_OJTSemesterID_fkey" FOREIGN KEY ("PostID", "PositionID", "OJTSemesterID") REFERENCES "RecruitmentPostPositions"("PostID", "PositionID", "OJTSemesterID");
 ALTER TABLE public."JobApplications" ADD CONSTRAINT "JobApplications_RegistrationID_OJTSemesterID_fkey" FOREIGN KEY ("RegistrationID", "OJTSemesterID") REFERENCES "OJTRegistrations"("RegistrationID", "OJTSemesterID");
 ALTER TABLE public."JobApplications" ADD CONSTRAINT "JobApplications_ReviewedBy_fkey" FOREIGN KEY ("ReviewedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."MatchingAPICalls" ADD CONSTRAINT "MatchingAPICalls_RunID_fkey" FOREIGN KEY ("RunID") REFERENCES "MatchingRuns"("RunID");
-ALTER TABLE public."MatchingCandidates" ADD CONSTRAINT "MatchingCandidates_ProfileID_OJTSemesterID_fkey" FOREIGN KEY ("ProfileID", "OJTSemesterID") REFERENCES "OJTMatchingProfiles"("ProfileID", "OJTSemesterID");
-ALTER TABLE public."MatchingCandidates" ADD CONSTRAINT "MatchingCandidates_RunID_OJTSemesterID_fkey" FOREIGN KEY ("RunID", "OJTSemesterID") REFERENCES "MatchingRuns"("RunID", "OJTSemesterID");
-ALTER TABLE public."MatchingEmbeddings" ADD CONSTRAINT "MatchingEmbeddings_EmbeddingConfigID_Dimensions_fkey" FOREIGN KEY ("EmbeddingConfigID", "Dimensions") REFERENCES "EmbeddingConfigurations"("EmbeddingConfigID", "Dimensions");
-ALTER TABLE public."MatchingEmbeddings" ADD CONSTRAINT "MatchingEmbeddings_ProfileID_fkey" FOREIGN KEY ("ProfileID") REFERENCES "OJTMatchingProfiles"("ProfileID");
-ALTER TABLE public."MatchingEmbeddings" ADD CONSTRAINT "MatchingEmbeddings_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
-ALTER TABLE public."MatchingProfileCourses" ADD CONSTRAINT "MatchingProfileCourses_CourseID_fkey" FOREIGN KEY ("CourseID") REFERENCES "Courses"("CourseID");
-ALTER TABLE public."MatchingProfileCourses" ADD CONSTRAINT "MatchingProfileCourses_ProfileID_fkey" FOREIGN KEY ("ProfileID") REFERENCES "OJTMatchingProfiles"("ProfileID");
-ALTER TABLE public."MatchingProfileJobRoles" ADD CONSTRAINT "MatchingProfileJobRoles_JobRoleID_fkey" FOREIGN KEY ("JobRoleID") REFERENCES "JobRoles"("JobRoleID");
-ALTER TABLE public."MatchingProfileJobRoles" ADD CONSTRAINT "MatchingProfileJobRoles_ProfileID_fkey" FOREIGN KEY ("ProfileID") REFERENCES "OJTMatchingProfiles"("ProfileID");
-ALTER TABLE public."MatchingProfileMajors" ADD CONSTRAINT "MatchingProfileMajors_MajorID_fkey" FOREIGN KEY ("MajorID") REFERENCES "AcademicMajors"("MajorID");
-ALTER TABLE public."MatchingProfileMajors" ADD CONSTRAINT "MatchingProfileMajors_ProfileID_fkey" FOREIGN KEY ("ProfileID") REFERENCES "OJTMatchingProfiles"("ProfileID");
-ALTER TABLE public."MatchingProfileSkills" ADD CONSTRAINT "MatchingProfileSkills_ProfileID_fkey" FOREIGN KEY ("ProfileID") REFERENCES "OJTMatchingProfiles"("ProfileID");
-ALTER TABLE public."MatchingProfileSkills" ADD CONSTRAINT "MatchingProfileSkills_SkillID_fkey" FOREIGN KEY ("SkillID") REFERENCES "MatchingSkills"("SkillID");
-ALTER TABLE public."MatchingProfileSpecializations" ADD CONSTRAINT "MatchingProfileSpecializations_ProfileID_fkey" FOREIGN KEY ("ProfileID") REFERENCES "OJTMatchingProfiles"("ProfileID");
-ALTER TABLE public."MatchingProfileSpecializations" ADD CONSTRAINT "MatchingProfileSpecializations_SpecializationID_fkey" FOREIGN KEY ("SpecializationID") REFERENCES "Specializations"("SpecializationID");
-ALTER TABLE public."MatchingRecommendationFeedback" ADD CONSTRAINT "MatchingRecommendationFeedback_RecommendationID_fkey" FOREIGN KEY ("RecommendationID") REFERENCES "MatchingRecommendations"("RecommendationID");
-ALTER TABLE public."MatchingRecommendations" ADD CONSTRAINT "MatchingRecommendations_CallID_RunID_CallStatus_fkey" FOREIGN KEY ("CallID", "RunID", "CallStatus") REFERENCES "MatchingAPICalls"("CallID", "RunID", "Status");
-ALTER TABLE public."MatchingRecommendations" ADD CONSTRAINT "MatchingRecommendations_ProfileEmbeddingID_ProfileID_Embed_fkey" FOREIGN KEY ("ProfileEmbeddingID", "ProfileID", "EmbeddingConfigID") REFERENCES "MatchingEmbeddings"("EmbeddingID", "ProfileID", "EmbeddingConfigID");
-ALTER TABLE public."MatchingRecommendations" ADD CONSTRAINT "MatchingRecommendations_RunID_ProfileID_Eligibility_fkey" FOREIGN KEY ("RunID", "ProfileID", "Eligibility") REFERENCES "MatchingCandidates"("RunID", "ProfileID", "Eligibility");
-ALTER TABLE public."MatchingRecommendations" ADD CONSTRAINT "MatchingRecommendations_RunID_StudentID_EmbeddingConfigID_fkey" FOREIGN KEY ("RunID", "StudentID", "EmbeddingConfigID") REFERENCES "MatchingRuns"("RunID", "StudentID", "EmbeddingConfigID");
-ALTER TABLE public."MatchingRecommendations" ADD CONSTRAINT "MatchingRecommendations_StudentEmbeddingID_StudentID_Embed_fkey" FOREIGN KEY ("StudentEmbeddingID", "StudentID", "EmbeddingConfigID") REFERENCES "MatchingEmbeddings"("EmbeddingID", "StudentID", "EmbeddingConfigID");
-ALTER TABLE public."MatchingRuns" ADD CONSTRAINT "MatchingRuns_EmbeddingConfigID_fkey" FOREIGN KEY ("EmbeddingConfigID") REFERENCES "EmbeddingConfigurations"("EmbeddingConfigID");
-ALTER TABLE public."MatchingRuns" ADD CONSTRAINT "MatchingRuns_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."MatchingRuns" ADD CONSTRAINT "MatchingRuns_RequestedBy_fkey" FOREIGN KEY ("RequestedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."MatchingRuns" ADD CONSTRAINT "MatchingRuns_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
 ALTER TABLE public."Notifications" ADD CONSTRAINT "FK_Notifications_Template" FOREIGN KEY ("TemplateID") REFERENCES "NotificationTemplates"("TemplateID") ON DELETE SET NULL;
 ALTER TABLE public."Notifications" ADD CONSTRAINT "FK_Notifications_User" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID") ON DELETE CASCADE;
 ALTER TABLE public."OJTActiveRuleSets" ADD CONSTRAINT "OJTActiveRuleSets_ProgramID_fkey" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID");
@@ -6225,41 +5755,20 @@ ALTER TABLE public."OJTAdvisorySchedules" ADD CONSTRAINT "OJTAdvisorySchedules_O
 ALTER TABLE public."OJTAdvisorySchedules" ADD CONSTRAINT "OJTAdvisorySchedules_UpdatedBy_fkey" FOREIGN KEY ("UpdatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTAlertCheckRuns" ADD CONSTRAINT "OJTAlertCheckRuns_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."OJTAlertCheckRuns" ADD CONSTRAINT "OJTAlertCheckRuns_TriggeredBy_fkey" FOREIGN KEY ("TriggeredBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTAlertDeliveries" ADD CONSTRAINT "OJTAlertDeliveries_AlertID_fkey" FOREIGN KEY ("AlertID") REFERENCES "OJTAlerts"("AlertID");
-ALTER TABLE public."OJTAlertDeliveries" ADD CONSTRAINT "OJTAlertDeliveries_NotificationID_RecipientUserID_fkey" FOREIGN KEY ("NotificationID", "RecipientUserID") REFERENCES "Notifications"("NotificationID", "UserID");
-ALTER TABLE public."OJTAlertDeliveries" ADD CONSTRAINT "OJTAlertDeliveries_RecipientUserID_fkey" FOREIGN KEY ("RecipientUserID") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTAlertEvaluations" ADD CONSTRAINT "OJTAlertEvaluations_RuleID_Scope_fkey" FOREIGN KEY ("RuleID", "Scope") REFERENCES "OJTAlertRules"("RuleID", "Scope");
 ALTER TABLE public."OJTAlertEvaluations" ADD CONSTRAINT "OJTAlertEvaluations_RunID_OJTSemesterID_fkey" FOREIGN KEY ("RunID", "OJTSemesterID") REFERENCES "OJTAlertCheckRuns"("RunID", "OJTSemesterID");
 ALTER TABLE public."OJTAlertEvaluations" ADD CONSTRAINT "OJTAlertEvaluations_TargetID_OJTSemesterID_fkey" FOREIGN KEY ("TargetID", "OJTSemesterID") REFERENCES "OJTAlertTargets"("TargetID", "OJTSemesterID");
 ALTER TABLE public."OJTAlertEvaluations" ADD CONSTRAINT "OJTAlertEvaluations_TaskID_fkey" FOREIGN KEY ("TaskID") REFERENCES "InternshipTasks"("TaskID");
-ALTER TABLE public."OJTAlertEvents" ADD CONSTRAINT "OJTAlertEvents_ActorUserID_fkey" FOREIGN KEY ("ActorUserID") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTAlertEvents" ADD CONSTRAINT "OJTAlertEvents_AlertID_fkey" FOREIGN KEY ("AlertID") REFERENCES "OJTAlerts"("AlertID");
 ALTER TABLE public."OJTAlertRules" ADD CONSTRAINT "OJTAlertRules_ApprovedBy_fkey" FOREIGN KEY ("ApprovedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTAlertTargets" ADD CONSTRAINT "OJTAlertTargets_ConfirmedBy_fkey" FOREIGN KEY ("ConfirmedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTAlertTargets" ADD CONSTRAINT "OJTAlertTargets_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."OJTAlertTargets" ADD CONSTRAINT "OJTAlertTargets_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
-ALTER TABLE public."OJTAlerts" ADD CONSTRAINT "OJTAlerts_ClosedBy_fkey" FOREIGN KEY ("ClosedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTAlerts" ADD CONSTRAINT "OJTAlerts_TriggerEvaluationID_TargetID_RuleID_ScopeKey_Tri_fkey" FOREIGN KEY ("TriggerEvaluationID", "TargetID", "RuleID", "ScopeKey", "TriggerOutcome") REFERENCES "OJTAlertEvaluations"("EvaluationID", "TargetID", "RuleID", "ScopeKey", "Outcome");
 ALTER TABLE public."OJTAssessmentWindows" ADD CONSTRAINT "OJTAssessmentWindows_AssessmentAcademicPeriodID_fkey" FOREIGN KEY ("AssessmentAcademicPeriodID") REFERENCES "AcademicPeriods"("AcademicPeriodID");
 ALTER TABLE public."OJTAssessmentWindows" ADD CONSTRAINT "OJTAssessmentWindows_BlockPeriodID_fkey" FOREIGN KEY ("BlockPeriodID") REFERENCES "AcademicPeriods"("AcademicPeriodID");
 ALTER TABLE public."OJTAssessmentWindows" ADD CONSTRAINT "OJTAssessmentWindows_ClosedBy_fkey" FOREIGN KEY ("ClosedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTAssessmentWindows" ADD CONSTRAINT "OJTAssessmentWindows_ConfiguredBy_fkey" FOREIGN KEY ("ConfiguredBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTAssessmentWindows" ADD CONSTRAINT "OJTAssessmentWindows_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."OJTAssessmentWindows" ADD CONSTRAINT "OJTAssessmentWindows_ResultsFinalizedBy_fkey" FOREIGN KEY ("ResultsFinalizedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTCompletionDeliveries" ADD CONSTRAINT "OJTCompletionDeliveries_EmailID_fkey" FOREIGN KEY ("EmailID") REFERENCES "EmailOutbox"("EmailID");
-ALTER TABLE public."OJTCompletionDeliveries" ADD CONSTRAINT "OJTCompletionDeliveries_EvaluationID_fkey" FOREIGN KEY ("EvaluationID") REFERENCES "InternshipEvaluations"("EvaluationID");
-ALTER TABLE public."OJTCompletionDeliveries" ADD CONSTRAINT "OJTCompletionDeliveries_UserID_fkey" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTEligibilityConditions" ADD CONSTRAINT "FK_OJTEligibilityConditions_Program" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID") ON DELETE CASCADE;
-ALTER TABLE public."OJTEligibilityConditions" ADD CONSTRAINT "FK_OJTEligibilityConditions_Semester" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID") ON DELETE SET NULL;
-ALTER TABLE public."OJTEligibilityConditions" ADD CONSTRAINT "OJTEligibilityConditions_ApprovedBy_fkey" FOREIGN KEY ("ApprovedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTEnterpriseImportBatches" ADD CONSTRAINT "OJTEnterpriseImportBatches_ImportedBy_fkey" FOREIGN KEY ("ImportedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTEnterpriseImportRows" ADD CONSTRAINT "OJTEnterpriseImportRows_BatchID_fkey" FOREIGN KEY ("BatchID") REFERENCES "OJTEnterpriseImportBatches"("BatchID");
-ALTER TABLE public."OJTEnterpriseImportRows" ADD CONSTRAINT "OJTEnterpriseImportRows_EnterpriseID_fkey" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID");
-ALTER TABLE public."OJTMatchingProfiles" ADD CONSTRAINT "OJTMatchingProfiles_EnterpriseID_fkey" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID");
-ALTER TABLE public."OJTMatchingProfiles" ADD CONSTRAINT "OJTMatchingProfiles_ImportRowID_fkey" FOREIGN KEY ("ImportRowID") REFERENCES "OJTEnterpriseImportRows"("ImportRowID");
-ALTER TABLE public."OJTMatchingProfiles" ADD CONSTRAINT "OJTMatchingProfiles_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."OJTMatchingProfiles" ADD CONSTRAINT "OJTMatchingProfiles_PositionID_EnterpriseID_OJTSemesterID_fkey" FOREIGN KEY ("PositionID", "EnterpriseID", "OJTSemesterID") REFERENCES "InternshipPositions"("PositionID", "EnterpriseID", "OJTSemesterID");
-ALTER TABLE public."OJTMatchingProfiles" ADD CONSTRAINT "OJTMatchingProfiles_ReviewedBy_fkey" FOREIGN KEY ("ReviewedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTRegistrationEvents" ADD CONSTRAINT "OJTRegistrationEvents_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTRegistrationEvents" ADD CONSTRAINT "OJTRegistrationEvents_RegistrationID_fkey" FOREIGN KEY ("RegistrationID") REFERENCES "OJTRegistrations"("RegistrationID");
 ALTER TABLE public."OJTRegistrationExceptions" ADD CONSTRAINT "OJTRegistrationExceptions_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
@@ -6281,8 +5790,6 @@ ALTER TABLE public."OJTRegistrations" ADD CONSTRAINT "OJTRegistrations_ProgramID
 ALTER TABLE public."OJTRegistrations" ADD CONSTRAINT "OJTRegistrations_ReviewCheckID_fkey" FOREIGN KEY ("ReviewCheckID") REFERENCES "EligibilityChecks"("CheckID");
 ALTER TABLE public."OJTRegistrations" ADD CONSTRAINT "OJTRegistrations_ReviewedBy_fkey" FOREIGN KEY ("ReviewedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTRegistrations" ADD CONSTRAINT "OJTRegistrations_SubmittedBy_fkey" FOREIGN KEY ("SubmittedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTResultEvents" ADD CONSTRAINT "OJTResultEvents_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."OJTResultEvents" ADD CONSTRAINT "OJTResultEvents_ResultID_fkey" FOREIGN KEY ("ResultID") REFERENCES "OJTResults"("ResultID");
 ALTER TABLE public."OJTResults" ADD CONSTRAINT "OJTResults_AssignmentID_fkey" FOREIGN KEY ("AssignmentID") REFERENCES "InternshipAssignments"("AssignmentID");
 ALTER TABLE public."OJTResults" ADD CONSTRAINT "OJTResults_ConfirmedBy_fkey" FOREIGN KEY ("ConfirmedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTResults" ADD CONSTRAINT "OJTResults_CourseResultID_fkey" FOREIGN KEY ("CourseResultID") REFERENCES "StudentCourseResults"("ResultID");
@@ -6296,16 +5803,9 @@ ALTER TABLE public."OJTRuleSets" ADD CONSTRAINT "OJTRuleSets_ProgramID_fkey" FOR
 ALTER TABLE public."OJTRuleSets" ADD CONSTRAINT "OJTRuleSets_PublishedBy_fkey" FOREIGN KEY ("PublishedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."OJTSemesters" ADD CONSTRAINT "FK_OJTSemesters_AcademicYear" FOREIGN KEY ("AcademicYearID") REFERENCES "AcademicYears"("AcademicYearID");
 ALTER TABLE public."OJTSemesters" ADD CONSTRAINT "OJTSemesters_AcademicPeriodID_fkey" FOREIGN KEY ("AcademicPeriodID") REFERENCES "AcademicPeriods"("AcademicPeriodID");
-ALTER TABLE public."PathwayRecommendations" ADD CONSTRAINT "FK_PathwayRecommendations_Semester" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."PathwayRecommendations" ADD CONSTRAINT "FK_PathwayRecommendations_Student" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID") ON DELETE CASCADE;
-ALTER TABLE public."PositionSpecializations" ADD CONSTRAINT "PositionSpecializations_PositionID_fkey" FOREIGN KEY ("PositionID") REFERENCES "InternshipPositions"("PositionID");
-ALTER TABLE public."PositionSpecializations" ADD CONSTRAINT "PositionSpecializations_SpecializationID_fkey" FOREIGN KEY ("SpecializationID") REFERENCES "Specializations"("SpecializationID");
-ALTER TABLE public."PredictionJobItems" ADD CONSTRAINT "PredictionJobItems_JobID_fkey" FOREIGN KEY ("JobID") REFERENCES "PredictionJobs"("JobID");
-ALTER TABLE public."PredictionJobItems" ADD CONSTRAINT "PredictionJobItems_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
 ALTER TABLE public."PredictionJobs" ADD CONSTRAINT "PredictionJobs_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."PredictionJobs" ADD CONSTRAINT "PredictionJobs_ModelID_fkey" FOREIGN KEY ("ModelID") REFERENCES "PredictionModels"("ModelID");
 ALTER TABLE public."PredictionJobs" ADD CONSTRAINT "PredictionJobs_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."Predictions" ADD CONSTRAINT "Predictions_JobID_StudentID_fkey" FOREIGN KEY ("JobID", "StudentID") REFERENCES "PredictionJobItems"("JobID", "StudentID");
 ALTER TABLE public."ProgramCombos" ADD CONSTRAINT "ProgramCombos_ProgramID_fkey" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID");
 ALTER TABLE public."ProgramCourseEquivalences" ADD CONSTRAINT "ProgramCourseEquivalences_ConfirmedBy_fkey" FOREIGN KEY ("ConfirmedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."ProgramCourseEquivalences" ADD CONSTRAINT "ProgramCourseEquivalences_ProgramID_fkey" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID");
@@ -6336,8 +5836,6 @@ ALTER TABLE public."RecruitmentWindows" ADD CONSTRAINT "RecruitmentWindows_Acade
 ALTER TABLE public."RecruitmentWindows" ADD CONSTRAINT "RecruitmentWindows_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."RecruitmentWindows" ADD CONSTRAINT "RecruitmentWindows_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."RecruitmentWindows" ADD CONSTRAINT "RecruitmentWindows_UpdatedBy_fkey" FOREIGN KEY ("UpdatedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."RiskAlerts" ADD CONSTRAINT "RiskAlerts_PredictionID_fkey" FOREIGN KEY ("PredictionID") REFERENCES "Predictions"("PredictionID");
-ALTER TABLE public."RiskAlerts" ADD CONSTRAINT "RiskAlerts_UpdatedBy_fkey" FOREIGN KEY ("UpdatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."Specializations" ADD CONSTRAINT "Specializations_MajorID_fkey" FOREIGN KEY ("MajorID") REFERENCES "AcademicMajors"("MajorID");
 ALTER TABLE public."StudentAcademicPlacements" ADD CONSTRAINT "StudentAcademicPlacements_CohortID_GroupCode_fkey" FOREIGN KEY ("CohortID", "GroupCode") REFERENCES "CohortGroups"("CohortID", "GroupCode");
 ALTER TABLE public."StudentAcademicPlacements" ADD CONSTRAINT "StudentAcademicPlacements_CurrentAcademicPeriodID_fkey" FOREIGN KEY ("CurrentAcademicPeriodID") REFERENCES "AcademicPeriods"("AcademicPeriodID");
@@ -6346,14 +5844,10 @@ ALTER TABLE public."StudentAcademicPlacements" ADD CONSTRAINT "StudentAcademicPl
 ALTER TABLE public."StudentAcademicPlacements" ADD CONSTRAINT "StudentAcademicPlacements_UpdatedBy_fkey" FOREIGN KEY ("UpdatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."StudentAcademicRecalculations" ADD CONSTRAINT "StudentAcademicRecalculations_EventID_fkey" FOREIGN KEY ("EventID") REFERENCES "StudentComboSelectionEvents"("EventID");
 ALTER TABLE public."StudentAcademicRecalculations" ADD CONSTRAINT "StudentAcademicRecalculations_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
-ALTER TABLE public."StudentAcademicSnapshot" ADD CONSTRAINT "FK_StudentAcademicSnapshot_Semester" FOREIGN KEY ("TargetOJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID") ON DELETE SET NULL;
-ALTER TABLE public."StudentAcademicSnapshot" ADD CONSTRAINT "FK_StudentAcademicSnapshot_Student" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID") ON DELETE CASCADE;
 ALTER TABLE public."StudentCVFiles" ADD CONSTRAINT "StudentCVFiles_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID") ON DELETE CASCADE;
 ALTER TABLE public."StudentCVFiles" ADD CONSTRAINT "StudentCVFiles_UploadedBy_fkey" FOREIGN KEY ("UploadedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."StudentCVVersions" ADD CONSTRAINT "StudentCVVersions_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."StudentCVVersions" ADD CONSTRAINT "StudentCVVersions_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
-ALTER TABLE public."StudentCareerInterests" ADD CONSTRAINT "StudentCareerInterests_JobRoleID_fkey" FOREIGN KEY ("JobRoleID") REFERENCES "JobRoles"("JobRoleID");
-ALTER TABLE public."StudentCareerInterests" ADD CONSTRAINT "StudentCareerInterests_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "StudentCareerProfiles"("StudentID");
 ALTER TABLE public."StudentCareerProfiles" ADD CONSTRAINT "StudentCareerProfiles_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
 ALTER TABLE public."StudentComboCourseSelections" ADD CONSTRAINT "StudentComboCourseSelections_ProgramComboID_ComboCourseID_fkey" FOREIGN KEY ("ProgramComboID", "ComboCourseID") REFERENCES "ComboCourses"("ProgramComboID", "ComboCourseID");
 ALTER TABLE public."StudentComboCourseSelections" ADD CONSTRAINT "StudentComboCourseSelections_SelectionID_ProgramComboID_fkey" FOREIGN KEY ("SelectionID", "ProgramComboID") REFERENCES "StudentComboSelections"("SelectionID", "ProgramComboID");
@@ -6379,9 +5873,6 @@ ALTER TABLE public."StudentEnterpriseCoordination" ADD CONSTRAINT "FK_StudentEnt
 ALTER TABLE public."StudentEnterpriseCoordination" ADD CONSTRAINT "FK_StudentEnterpriseCoordination_Previous" FOREIGN KEY ("PreviousCoordinationID") REFERENCES "StudentEnterpriseCoordination"("CoordinationID");
 ALTER TABLE public."StudentEnterpriseCoordination" ADD CONSTRAINT "FK_StudentEnterpriseCoordination_Registration" FOREIGN KEY ("RegistrationID") REFERENCES "OJTRegistrations"("RegistrationID") ON DELETE CASCADE;
 ALTER TABLE public."StudentEnterpriseCoordination" ADD CONSTRAINT "FK_StudentEnterpriseCoordination_User" FOREIGN KEY ("CoordinatedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."StudentInterventions" ADD CONSTRAINT "StudentInterventions_AlertID_fkey" FOREIGN KEY ("AlertID") REFERENCES "RiskAlerts"("AlertID");
-ALTER TABLE public."StudentInterventions" ADD CONSTRAINT "StudentInterventions_AssignedTo_fkey" FOREIGN KEY ("AssignedTo") REFERENCES "Users"("UserID");
-ALTER TABLE public."StudentInterventions" ADD CONSTRAINT "StudentInterventions_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
 ALTER TABLE public."StudentMatchingSkills" ADD CONSTRAINT "StudentMatchingSkills_SkillID_fkey" FOREIGN KEY ("SkillID") REFERENCES "MatchingSkills"("SkillID");
 ALTER TABLE public."StudentMatchingSkills" ADD CONSTRAINT "StudentMatchingSkills_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "StudentCareerProfiles"("StudentID");
 ALTER TABLE public."StudentMatchingSkills" ADD CONSTRAINT "StudentMatchingSkills_VerifiedBy_fkey" FOREIGN KEY ("VerifiedBy") REFERENCES "Users"("UserID");
@@ -6390,13 +5881,6 @@ ALTER TABLE public."StudentOJTEligibility" ADD CONSTRAINT "FK_StudentOJTEligibil
 ALTER TABLE public."StudentOJTEligibility" ADD CONSTRAINT "FK_StudentOJTEligibility_Student" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID") ON DELETE CASCADE;
 ALTER TABLE public."Students" ADD CONSTRAINT "FK_Students_Program" FOREIGN KEY ("ProgramID") REFERENCES "TrainingPrograms"("ProgramID") ON DELETE SET NULL;
 ALTER TABLE public."Students" ADD CONSTRAINT "FK_Students_User" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID") ON DELETE CASCADE;
-ALTER TABLE public."SupportClassRegistrations" ADD CONSTRAINT "FK_SupportClassRegistrations_Class" FOREIGN KEY ("SupportClassID") REFERENCES "SupportClasses"("SupportClassID") ON DELETE CASCADE;
-ALTER TABLE public."SupportClassRegistrations" ADD CONSTRAINT "FK_SupportClassRegistrations_Student" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID") ON DELETE CASCADE;
-ALTER TABLE public."SupportClasses" ADD CONSTRAINT "FK_SupportClasses_Course" FOREIGN KEY ("CourseID") REFERENCES "Courses"("CourseID");
-ALTER TABLE public."SupportClasses" ADD CONSTRAINT "FK_SupportClasses_CreatedBy" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID") ON DELETE SET NULL;
-ALTER TABLE public."SupportClasses" ADD CONSTRAINT "FK_SupportClasses_Semester" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
-ALTER TABLE public."SupportRequests" ADD CONSTRAINT "FK_SupportRequests_Handler" FOREIGN KEY ("HandledBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."SupportRequests" ADD CONSTRAINT "FK_SupportRequests_Student" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID") ON DELETE CASCADE;
 ALTER TABLE public."TaskProgressUpdates" ADD CONSTRAINT "FK_TaskProgressUpdates_Student" FOREIGN KEY ("UpdatedByStudentID") REFERENCES "Students"("StudentID");
 ALTER TABLE public."TaskProgressUpdates" ADD CONSTRAINT "FK_TaskProgressUpdates_Task" FOREIGN KEY ("TaskID") REFERENCES "InternshipTasks"("TaskID") ON DELETE CASCADE;
 ALTER TABLE public."TrainingPrograms" ADD CONSTRAINT "TrainingPrograms_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID") ON DELETE SET NULL;
@@ -6423,7 +5907,6 @@ CREATE TRIGGER "TR_AppendOnly_OJTRegistrationEvents" BEFORE DELETE OR UPDATE ON 
 CREATE TRIGGER "TR_FixedOJT_Window" BEFORE INSERT OR UPDATE ON "OJTRegistrationWindows" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
 CREATE TRIGGER "TR_FixedOJT_Registration" BEFORE INSERT OR UPDATE OF "StudentID", "OJTSemesterID" ON "OJTRegistrations" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
 CREATE TRIGGER "TR_HandedOffApplication" BEFORE INSERT OR DELETE OR UPDATE ON "OJTRegistrations" FOR EACH ROW EXECUTE FUNCTION "GuardHandedOffRegistration"();
-CREATE TRIGGER "TR_AppendOnly_OJTResultEvents" BEFORE DELETE OR UPDATE ON "OJTResultEvents" FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
 CREATE TRIGGER "TR_GuardOJTResult" BEFORE INSERT OR DELETE OR UPDATE ON "OJTResults" FOR EACH ROW EXECUTE FUNCTION "GuardOJTResult"();
 CREATE TRIGGER "TR_OJTGradeLink" BEFORE UPDATE OF "Status", "CourseResultID", "GradeMappingID" ON "OJTResults" FOR EACH ROW EXECUTE FUNCTION "GuardOJTGradeLink"();
 CREATE TRIGGER "TR_ImmutableOJTRule" BEFORE DELETE OR UPDATE ON "OJTRuleSets" FOR EACH ROW EXECUTE FUNCTION "GuardOJTRuleSet"();
@@ -6473,39 +5956,22 @@ ALTER TABLE public."ComboReminderBatches" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ComboReminderDeliveries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ComboWindowExtensions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ComboWindowStudents" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."CompanyImportBatches" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."CompanyImportRows" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."CoursePrerequisites" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Courses" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityCheckRuns" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityChecks" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityConfirmations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."EligibilityRequiredCourses" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityRunStudents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibleStudentHandoffItems" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibleStudentHandoffs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EmailOutbox" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."EmbeddingConfigurations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EnterpriseUsers" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Enterprises" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."IncidentReports" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipAssignments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipEvaluations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipPositions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipTasks" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."JobApplications" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."JobRoles" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingAPICalls" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingCandidates" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingEmbeddings" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingProfileCourses" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingProfileJobRoles" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingProfileMajors" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingProfileSkills" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingProfileSpecializations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingRecommendationFeedback" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingRecommendations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."MatchingRuns" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."MatchingSkills" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."NotificationTemplates" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Notifications" ENABLE ROW LEVEL SECURITY;
@@ -6514,32 +5980,19 @@ ALTER TABLE public."OJTAdvisoryRunItems" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAdvisoryRuns" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAdvisorySchedules" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAlertCheckRuns" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTAlertDeliveries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAlertEvaluations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTAlertEvents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAlertRules" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAlertTargets" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTAlerts" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTAssessmentWindows" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTCompletionDeliveries" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTEligibilityConditions" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTEnterpriseImportBatches" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTEnterpriseImportRows" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTMatchingProfiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTRegistrationEvents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTRegistrationExceptions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTRegistrationWindows" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTRegistrations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTResultEvents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTResults" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTRuleSets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."OJTSemesters" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."PathwayRecommendations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."PositionSpecializations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."PredictionJobItems" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."PredictionJobs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."PredictionModels" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."Predictions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ProgramCombos" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ProgramCourseEquivalences" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ProgramCourses" ENABLE ROW LEVEL SECURITY;
@@ -6547,32 +6000,24 @@ ALTER TABLE public."ProgramOJTGradeMappings" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ProgramPrerequisiteGroups" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ProgramPrerequisiteMembers" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."ProgramSlotOptions" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."RecruitmentArchiveRuns" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."RecruitmentPostPositions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."RecruitmentPosts" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."RiskAlerts" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Roles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."SchemaMigrations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Specializations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentAcademicPlacements" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentAcademicRecalculations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."StudentAcademicSnapshot" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentCVFiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentCVVersions" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."StudentCareerInterests" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentCareerProfiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentComboCourseSelections" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentComboSelectionEvents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentComboSelections" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentCourseResults" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentEnterpriseCoordination" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."StudentInterventions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentMatchingSkills" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."StudentOJTEligibility" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Students" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."SupportClassRegistrations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."SupportClasses" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."SupportRequests" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."TaskProgressUpdates" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."TrainingPrograms" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Users" ENABLE ROW LEVEL SECURITY;
@@ -6608,39 +6053,22 @@ BEGIN
   ('ComboReminderDeliveries','TABLE'),
   ('ComboWindowExtensions','TABLE'),
   ('ComboWindowStudents','TABLE'),
-  ('CompanyImportBatches','TABLE'),
-  ('CompanyImportRows','TABLE'),
-  ('CoursePrerequisites','TABLE'),
   ('Courses','TABLE'),
   ('EligibilityCheckRuns','TABLE'),
   ('EligibilityChecks','TABLE'),
   ('EligibilityConfirmations','TABLE'),
-  ('EligibilityRequiredCourses','TABLE'),
   ('EligibilityRunStudents','TABLE'),
   ('EligibleStudentHandoffItems','TABLE'),
   ('EligibleStudentHandoffs','TABLE'),
   ('EmailOutbox','TABLE'),
-  ('EmbeddingConfigurations','TABLE'),
   ('EnterpriseUsers','TABLE'),
   ('Enterprises','TABLE'),
-  ('IncidentReports','TABLE'),
   ('InternshipAssignments','TABLE'),
   ('InternshipEvaluations','TABLE'),
   ('InternshipPositions','TABLE'),
   ('InternshipTasks','TABLE'),
   ('JobApplications','TABLE'),
   ('JobRoles','TABLE'),
-  ('MatchingAPICalls','TABLE'),
-  ('MatchingCandidates','TABLE'),
-  ('MatchingEmbeddings','TABLE'),
-  ('MatchingProfileCourses','TABLE'),
-  ('MatchingProfileJobRoles','TABLE'),
-  ('MatchingProfileMajors','TABLE'),
-  ('MatchingProfileSkills','TABLE'),
-  ('MatchingProfileSpecializations','TABLE'),
-  ('MatchingRecommendationFeedback','TABLE'),
-  ('MatchingRecommendations','TABLE'),
-  ('MatchingRuns','TABLE'),
   ('MatchingSkills','TABLE'),
   ('NotificationTemplates','TABLE'),
   ('Notifications','TABLE'),
@@ -6649,32 +6077,19 @@ BEGIN
   ('OJTAdvisoryRuns','TABLE'),
   ('OJTAdvisorySchedules','TABLE'),
   ('OJTAlertCheckRuns','TABLE'),
-  ('OJTAlertDeliveries','TABLE'),
   ('OJTAlertEvaluations','TABLE'),
-  ('OJTAlertEvents','TABLE'),
   ('OJTAlertRules','TABLE'),
   ('OJTAlertTargets','TABLE'),
-  ('OJTAlerts','TABLE'),
   ('OJTAssessmentWindows','TABLE'),
-  ('OJTCompletionDeliveries','TABLE'),
-  ('OJTEligibilityConditions','TABLE'),
-  ('OJTEnterpriseImportBatches','TABLE'),
-  ('OJTEnterpriseImportRows','TABLE'),
-  ('OJTMatchingProfiles','TABLE'),
   ('OJTRegistrationEvents','TABLE'),
   ('OJTRegistrationExceptions','TABLE'),
   ('OJTRegistrationWindows','TABLE'),
   ('OJTRegistrations','TABLE'),
-  ('OJTResultEvents','TABLE'),
   ('OJTResults','TABLE'),
   ('OJTRuleSets','TABLE'),
   ('OJTSemesters','TABLE'),
-  ('PathwayRecommendations','TABLE'),
-  ('PositionSpecializations','TABLE'),
-  ('PredictionJobItems','TABLE'),
   ('PredictionJobs','TABLE'),
   ('PredictionModels','TABLE'),
-  ('Predictions','TABLE'),
   ('ProgramCombos','TABLE'),
   ('ProgramCourseEquivalences','TABLE'),
   ('ProgramCourses','TABLE'),
@@ -6682,33 +6097,25 @@ BEGIN
   ('ProgramPrerequisiteGroups','TABLE'),
   ('ProgramPrerequisiteMembers','TABLE'),
   ('ProgramSlotOptions','TABLE'),
-  ('RecruitmentArchiveRuns','TABLE'),
   ('RecruitmentPostPositions','TABLE'),
   ('RecruitmentPosts','TABLE'),
   ('RecruitmentWindows','TABLE'),
-  ('RiskAlerts','TABLE'),
   ('Roles','TABLE'),
   ('SchemaMigrations','TABLE'),
   ('Specializations','TABLE'),
   ('StudentAcademicPlacements','TABLE'),
   ('StudentAcademicRecalculations','TABLE'),
-  ('StudentAcademicSnapshot','TABLE'),
   ('StudentCVFiles','TABLE'),
   ('StudentCVVersions','TABLE'),
-  ('StudentCareerInterests','TABLE'),
   ('StudentCareerProfiles','TABLE'),
   ('StudentComboCourseSelections','TABLE'),
   ('StudentComboSelectionEvents','TABLE'),
   ('StudentComboSelections','TABLE'),
   ('StudentCourseResults','TABLE'),
   ('StudentEnterpriseCoordination','TABLE'),
-  ('StudentInterventions','TABLE'),
   ('StudentMatchingSkills','TABLE'),
   ('StudentOJTEligibility','TABLE'),
   ('Students','TABLE'),
-  ('SupportClassRegistrations','TABLE'),
-  ('SupportClasses','TABLE'),
-  ('SupportRequests','TABLE'),
   ('TaskProgressUpdates','TABLE'),
   ('TrainingPrograms','TABLE'),
   ('Users','TABLE'),
@@ -6730,77 +6137,53 @@ BEGIN
   ('ComboRegistrationWindows_WindowID_seq','SEQUENCE'),
   ('ComboReminderBatches_BatchID_seq','SEQUENCE'),
   ('ComboWindowExtensions_ExtensionID_seq','SEQUENCE'),
-  ('CompanyImportBatches_BatchID_seq','SEQUENCE'),
   ('Courses_CourseID_seq','SEQUENCE'),
   ('EligibilityCheckRuns_RunID_seq','SEQUENCE'),
   ('EligibilityChecks_CheckID_seq','SEQUENCE'),
   ('EligibleStudentHandoffs_HandoffID_seq','SEQUENCE'),
   ('EmailOutbox_EmailID_seq','SEQUENCE'),
-  ('EmbeddingConfigurations_EmbeddingConfigID_seq','SEQUENCE'),
   ('EnterpriseUsers_EnterpriseUserID_seq','SEQUENCE'),
   ('Enterprises_EnterpriseID_seq','SEQUENCE'),
-  ('IncidentReports_IncidentID_seq','SEQUENCE'),
   ('InternshipAssignments_AssignmentID_seq','SEQUENCE'),
   ('InternshipEvaluations_EvaluationID_seq','SEQUENCE'),
   ('InternshipPositions_PositionID_seq','SEQUENCE'),
   ('InternshipTasks_TaskID_seq','SEQUENCE'),
   ('JobApplications_ApplicationID_seq','SEQUENCE'),
   ('JobRoles_JobRoleID_seq','SEQUENCE'),
-  ('MatchingAPICalls_CallID_seq','SEQUENCE'),
-  ('MatchingEmbeddings_EmbeddingID_seq','SEQUENCE'),
-  ('MatchingRecommendations_RecommendationID_seq','SEQUENCE'),
-  ('MatchingRuns_RunID_seq','SEQUENCE'),
   ('MatchingSkills_SkillID_seq','SEQUENCE'),
   ('NotificationTemplates_TemplateID_seq','SEQUENCE'),
   ('Notifications_NotificationID_seq','SEQUENCE'),
   ('OJTAdvisoryRuns_RunID_seq','SEQUENCE'),
   ('OJTAlertCheckRuns_RunID_seq','SEQUENCE'),
-  ('OJTAlertDeliveries_DeliveryID_seq','SEQUENCE'),
   ('OJTAlertEvaluations_EvaluationID_seq','SEQUENCE'),
-  ('OJTAlertEvents_EventID_seq','SEQUENCE'),
   ('OJTAlertRules_RuleID_seq','SEQUENCE'),
   ('OJTAlertTargets_TargetID_seq','SEQUENCE'),
-  ('OJTAlerts_AlertID_seq','SEQUENCE'),
-  ('OJTEligibilityConditions_ConditionID_seq','SEQUENCE'),
-  ('OJTEnterpriseImportBatches_BatchID_seq','SEQUENCE'),
-  ('OJTEnterpriseImportRows_ImportRowID_seq','SEQUENCE'),
-  ('OJTMatchingProfiles_ProfileID_seq','SEQUENCE'),
   ('OJTRegistrationEvents_EventID_seq','SEQUENCE'),
   ('OJTRegistrationExceptions_ExceptionID_seq','SEQUENCE'),
   ('OJTRegistrationWindows_WindowID_seq','SEQUENCE'),
   ('OJTRegistrations_RegistrationID_seq','SEQUENCE'),
-  ('OJTResultEvents_EventID_seq','SEQUENCE'),
   ('OJTResults_ResultID_seq','SEQUENCE'),
   ('OJTRuleSets_RuleSetID_seq','SEQUENCE'),
   ('OJTSemesters_OJTSemesterID_seq','SEQUENCE'),
-  ('PathwayRecommendations_RecommendationID_seq','SEQUENCE'),
   ('PredictionJobs_JobID_seq','SEQUENCE'),
   ('PredictionModels_ModelID_seq','SEQUENCE'),
-  ('Predictions_PredictionID_seq','SEQUENCE'),
   ('ProgramCombos_ProgramComboID_seq','SEQUENCE'),
   ('ProgramCourses_ProgramCourseID_seq','SEQUENCE'),
   ('ProgramOJTGradeMappings_MappingID_seq','SEQUENCE'),
   ('ProgramPrerequisiteGroups_GroupID_seq','SEQUENCE'),
-  ('RecruitmentArchiveRuns_RunID_seq','SEQUENCE'),
   ('RecruitmentPosts_PostID_seq','SEQUENCE'),
   ('RecruitmentWindows_WindowID_seq','SEQUENCE'),
-  ('RiskAlerts_AlertID_seq','SEQUENCE'),
   ('Roles_RoleID_seq','SEQUENCE'),
   ('Specializations_SpecializationID_seq','SEQUENCE'),
   ('StudentAcademicRecalculations_RecalculationID_seq','SEQUENCE'),
-  ('StudentAcademicSnapshot_SnapshotID_seq','SEQUENCE'),
   ('StudentCVFiles_CVFileID_seq','SEQUENCE'),
   ('StudentCVVersions_CVID_seq','SEQUENCE'),
   ('StudentComboSelectionEvents_EventID_seq','SEQUENCE'),
   ('StudentComboSelections_SelectionID_seq','SEQUENCE'),
   ('StudentCourseResults_ResultID_seq','SEQUENCE'),
   ('StudentEnterpriseCoordination_CoordinationID_seq','SEQUENCE'),
-  ('StudentInterventions_InterventionID_seq','SEQUENCE'),
   ('StudentOJTEligibility_EligibilityID_seq','SEQUENCE'),
   ('Students_StudentID_seq','SEQUENCE'),
-  ('SupportClassRegistrations_RegistrationID_seq','SEQUENCE'),
-  ('SupportClasses_SupportClassID_seq','SEQUENCE'),
-  ('SupportRequests_RequestID_seq','SEQUENCE'),
   ('TaskProgressUpdates_UpdateID_seq','SEQUENCE'),
   ('TrainingPrograms_ProgramID_seq','SEQUENCE'),
   ('Users_UserID_seq','SEQUENCE')
@@ -6851,10 +6234,6 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboWindowExtensions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ComboWindowExtensions_ExtensionID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboWindowStudents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CompanyImportBatches" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."CompanyImportBatches_BatchID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CompanyImportRows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."CoursePrerequisites" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Courses" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Courses_CourseID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityCheckRuns" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
@@ -6862,19 +6241,14 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityChecks" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibilityChecks_CheckID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityConfirmations" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."EligibilityRequiredCourses" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityRunStudents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffItems" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffs" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibleStudentHandoffs_HandoffID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."EmbeddingConfigurations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EmbeddingConfigurations_EmbeddingConfigID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."EnterpriseUsers" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EnterpriseUsers_EnterpriseUserID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Enterprises" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Enterprises_EnterpriseID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."IncidentReports" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."IncidentReports_IncidentID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."InternshipAssignments" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."InternshipAssignments_AssignmentID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."InternshipEvaluations" TO "service_role"'; END IF;
@@ -6887,21 +6261,6 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."JobApplications_ApplicationID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."JobRoles" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."JobRoles_JobRoleID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingAPICalls" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."MatchingAPICalls_CallID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingCandidates" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingEmbeddings" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."MatchingEmbeddings_EmbeddingID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingProfileCourses" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingProfileJobRoles" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingProfileMajors" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingProfileSkills" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingProfileSpecializations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingRecommendationFeedback" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingRecommendations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."MatchingRecommendations_RecommendationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingRuns" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."MatchingRuns_RunID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."MatchingSkills" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."MatchingSkills_SkillID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."NotificationTemplates" TO "service_role"'; END IF;
@@ -6915,27 +6274,13 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisorySchedules" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertCheckRuns" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertCheckRuns_RunID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertDeliveries" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertDeliveries_DeliveryID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertEvaluations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertEvaluations_EvaluationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertEvents" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertEvents_EventID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertRules" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertRules_RuleID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertTargets" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertTargets_TargetID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlerts" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlerts_AlertID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAssessmentWindows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTEligibilityConditions" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTEligibilityConditions_ConditionID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTEnterpriseImportBatches" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTEnterpriseImportBatches_BatchID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTEnterpriseImportRows" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTEnterpriseImportRows_ImportRowID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTMatchingProfiles" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTMatchingProfiles_ProfileID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrationEvents_EventID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationExceptions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
@@ -6944,24 +6289,16 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrationWindows_WindowID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTRegistrations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrations_RegistrationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTResultEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTResultEvents_EventID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTResults" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTResults_ResultID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRuleSets" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRuleSets_RuleSetID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTSemesters" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTSemesters_OJTSemesterID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."PathwayRecommendations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."PathwayRecommendations_RecommendationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."PositionSpecializations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionJobItems" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionJobs" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."PredictionJobs_JobID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionModels" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."PredictionModels_ModelID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."Predictions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Predictions_PredictionID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ProgramCombos" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ProgramCombos_ProgramComboID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ProgramCourseEquivalences" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
@@ -6977,8 +6314,6 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."RecruitmentPosts" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."RecruitmentPosts_PostID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."RecruitmentWindows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."RiskAlerts" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."RiskAlerts_AlertID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Roles" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Roles_RoleID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."SchemaMigrations" TO "service_role"'; END IF;
@@ -6987,13 +6322,10 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentAcademicPlacements" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentAcademicRecalculations" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentAcademicRecalculations_RecalculationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentAcademicSnapshot" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentAcademicSnapshot_SnapshotID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentCVFiles" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentCVFiles_CVFileID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentCVVersions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentCVVersions_CVID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentCareerInterests" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentCareerProfiles" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentComboCourseSelections" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentComboSelectionEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
@@ -7004,19 +6336,11 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentCourseResults_ResultID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentEnterpriseCoordination" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentEnterpriseCoordination_CoordinationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentInterventions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentInterventions_InterventionID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentMatchingSkills" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentOJTEligibility" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentOJTEligibility_EligibilityID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Students" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Students_StudentID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."SupportClassRegistrations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."SupportClassRegistrations_RegistrationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."SupportClasses" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."SupportClasses_SupportClassID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."SupportRequests" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."SupportRequests_RequestID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."TaskProgressUpdates" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."TaskProgressUpdates_UpdateID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."TrainingPrograms" TO "service_role"'; END IF;
@@ -8114,9 +7438,41 @@ ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_che
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
   CHECK ("Kind" IN ('ACCOUNT', 'COMBO_REMINDER', 'ACADEMIC_ALERT', 'OJT_RESULT', 'PASSWORD_RESET'));
 
+-- Final schema additions consolidated into this full install script.
+ALTER TABLE public."Notifications" ADD COLUMN IF NOT EXISTS "EventKey" text;
+CREATE UNIQUE INDEX IF NOT EXISTS "Notifications_EventKey_key" ON public."Notifications" ("EventKey");
+ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
+ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
+  CHECK ("Kind" IN ('ACCOUNT','COMBO_REMINDER','ACADEMIC_ALERT','OJT_RESULT','PASSWORD_RESET','SYSTEM_NOTIFICATION'));
+ALTER TABLE public."AssessmentTemplates"
+  ADD COLUMN IF NOT EXISTS "OJTSemesterID" integer,
+  ADD COLUMN IF NOT EXISTS "EffectiveFrom" date,
+  ADD COLUMN IF NOT EXISTS "Reason" text;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='AssessmentTemplates_OJTSemesterID_fkey') THEN
+    ALTER TABLE public."AssessmentTemplates" ADD CONSTRAINT "AssessmentTemplates_OJTSemesterID_fkey"
+      FOREIGN KEY ("OJTSemesterID") REFERENCES public."OJTSemesters"("OJTSemesterID");
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='AssessmentTemplates_Status_check') THEN
+    ALTER TABLE public."AssessmentTemplates" DROP CONSTRAINT "AssessmentTemplates_Status_check";
+  END IF;
+  ALTER TABLE public."AssessmentTemplates" ADD CONSTRAINT "AssessmentTemplates_Status_check"
+    CHECK ("Status" IN ('DRAFT','PUBLISHED','SUPERSEDED'));
+END $$;
+CREATE INDEX IF NOT EXISTS "IX_AssessmentTemplates_OJT_Effective"
+  ON public."AssessmentTemplates" ("OJTSemesterID","EffectiveFrom" DESC,"Version" DESC)
+  WHERE "Status"='PUBLISHED';
+CREATE OR REPLACE FUNCTION public."GuardAssessmentTemplate"() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD."Status"='PUBLISHED' AND NEW."Status"='SUPERSEDED'
+     AND (to_jsonb(NEW)-'Status')=(to_jsonb(OLD)-'Status') THEN RETURN NEW; END IF;
+  IF TG_OP='DELETE' OR OLD."Status" IN ('PUBLISHED','SUPERSEDED') OR EXISTS (SELECT 1 FROM public."InternshipEvaluations" WHERE "TemplateID"=OLD."TemplateID") THEN
+    RAISE EXCEPTION 'Published or used assessment templates are immutable' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+-- Required by the backend bulk-acceptance readiness check; this is migration metadata, not domain seed data.
+INSERT INTO public."SchemaMigrations"("Version")
+VALUES ('20261116_enterprise_bulk_acceptance') ON CONFLICT DO NOTHING;
 COMMIT;
-
-SELECT table_name, COUNT(*) AS column_count
-FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name NOT LIKE 'pg_%'
-GROUP BY table_name ORDER BY table_name;

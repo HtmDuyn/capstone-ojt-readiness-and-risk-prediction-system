@@ -290,6 +290,8 @@ export interface InternshipEvaluationData {
   comments?: string | null;
   status?: string;
   evaluatedAt?: string | null;
+  scoreDetails?: Record<string, number | null> | null;
+  criteria?: Array<{key:string;label:string;weight:number}> | null;
 }
 
 export interface EnterpriseInternshipEvaluationRequest {
@@ -307,6 +309,7 @@ export interface BulkEvaluationItem {
   skillScore: number | null;
   attitudeScore: number | null;
   comments: string | null;
+  scoreDetails?: Record<string, number | null>;
 }
 
 export interface BulkEvaluationResponse {
@@ -532,6 +535,10 @@ export const enterpriseService = {
       signal,
     });
     return response.data;
+  },
+  getOjtGradingCriteria: async (assignmentId:number, signal?:AbortSignal) => {
+    const response=await API.get<{success:boolean;data:{id:number|null;criteria:Array<{key:string;label:string;weight:number}>;name:string;version?:number}}>(`/enterprise/internships/grading-criteria`,{params:{assignmentId},signal});
+    return response.data.data;
   },
 
   // ── Internship Tasks ──────────────────────────────────────────────────────

@@ -209,6 +209,10 @@ const educationRoutes: RouteObject = {
           path: "/education/ojt-final-results",
           lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtFinalResults")).default }),
         },
+        {
+          path: "/education/grading-criteria",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationGradingCriteria")).default }),
+        },
 
         /* =========================
            ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI

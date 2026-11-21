@@ -232,7 +232,7 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       CASE WHEN supervisor."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',supervisor."UserID",'fullName',supervisor."FullName",'email',supervisor."Email",'phone',supervisor."Phone") END AS "academicSupervisor",
       CASE WHEN v."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object(
         'id',v."EvaluationID",'templateId',v."TemplateID",'scoreDetails',v."ScoreDetails",'evaluatedBy',v."EvaluatedBy",'completionScore',v."CompletionScore",'attitudeScore',v."AttitudeScore",
-        'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",
+        'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",'criteria',tmpl."Criteria",
         'status',v."Status",'evaluatedAt',v."EvaluatedAt") END AS evaluation,
       ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',result."OfficialScore",'outcome',result."Outcome",'publishedAt',result."PublishedAt") END AS result,
       result."Status" AS "resultStatus",(COALESCE(v."Status"='SUBMITTED',false) OR result."ResultID" IS NOT NULL) AS "evaluationLocked"

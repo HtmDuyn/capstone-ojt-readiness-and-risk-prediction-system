@@ -23,18 +23,22 @@ interface EvaluationRow extends EvaluationScores {
   submittedAverage: number | null;
   fromTask: boolean;
   tasks: EnterpriseInternshipTask[];
+  criteria: Array<{key:string;label:string;weight:number}>;
+  scoreDetails: Record<string,string>;
 }
 
 interface ScoreEditor extends EvaluationScores {
   id: number;
   comments: string;
+  scoreDetails: Record<string,string>;
 }
 
 function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask[], tasksAvailable: boolean): EvaluationRow {
   const ev = item.evaluation;
+  const criteria=ev?.criteria?.length?ev.criteria:[{key:'completionScore',label:'Kỹ năng chuyên ngành',weight:33.34},{key:'skillScore',label:'Kỹ năng mềm',weight:33.33},{key:'attitudeScore',label:'Thái độ',weight:33.33}];
   const completed = tasks.filter(task => task.enterpriseStatus === 'DONE').length;
   const suggestion = tasksAvailable ? taskScoreSuggestion(completed, tasks.length) : null;
-  const useSuggestion = !ev && suggestion !== null;
+  const useSuggestion = !ev && suggestion !== null && criteria.some(c=>c.key==='completionScore');
   return {
     id: item.id, fullName: item.student?.fullName || '', studentCode: item.student?.studentCode || '',
     position: item.position?.title || '', semesterId: item.ojtSemesterId,
@@ -45,7 +49,8 @@ function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask
     comments: ev?.comments || '', status: ev?.status === 'SUBMITTED' ? 'SUBMITTED' : ev ? 'DRAFT' : 'NEW',
     locked: item.evaluationLocked === true || ev?.status === 'SUBMITTED'
       || !['ASSIGNED','ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status?.toUpperCase()), dirty: false,
-    suggestion, submittedAverage: ev?.overallScore == null ? null : Number(ev.overallScore), fromTask: useSuggestion, tasks,
+    suggestion, submittedAverage: ev?.overallScore == null ? null : Number(ev.overallScore), fromTask: useSuggestion, tasks, criteria,
+    scoreDetails:Object.fromEntries(criteria.map(c=>[c.key,String(ev?.scoreDetails?.[c.key]??(c.key==='completionScore'?ev?.completionScore:c.key==='skillScore'?ev?.skillScore:c.key==='attitudeScore'?ev?.attitudeScore:c.key==='completionScore'&&useSuggestion?suggestion:'' )??'')])),
   };
 }
 
@@ -148,7 +153,7 @@ export function EnterpriseEvaluation() {
     const query = search.trim().toLocaleLowerCase('vi');
     return (!query || `${row.fullName} ${row.studentCode} ${row.position}`.toLocaleLowerCase('vi').includes(query))
       && (semester === 'all' || String(row.semesterId) === semester)
-      && (status === 'all' || (status === 'missing' ? evaluationAverage(row) === null && !row.locked : row.status === status));
+      && (status === 'all' || (status === 'missing' ? row.criteria.some(c=>parseEvaluationScore(row.scoreDetails[c.key]??'')===null) && !row.locked : row.status === status));
   }), [rows, search, semester, status]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
   const visible = filtered.slice((page - 1) * limit, page * limit);
@@ -173,18 +178,18 @@ export function EnterpriseEvaluation() {
   const openEditor = (row: EvaluationRow) => {
     if (busy || row.locked) return;
     setEditor({ id: row.id, completionScore: row.completionScore, skillScore: row.skillScore,
-      attitudeScore: row.attitudeScore, comments: row.comments });
+      attitudeScore: row.attitudeScore, comments: row.comments, scoreDetails:{...row.scoreDetails} });
     setEditorError('');
   };
   const updateScores = () => {
     if (!editor || !editingRow || editingRow.locked || savingRef.current) return;
-    if (evaluationScoreFields.some(({ key }) => editor[key].trim() !== '' && parseEvaluationScore(editor[key]) === null)) {
+    if (editingRow.criteria.some(c => (editor.scoreDetails[c.key]??'').trim() !== '' && parseEvaluationScore(editor.scoreDetails[c.key]) === null)) {
       setEditorError('Điểm phải từ 0 đến 10, tối đa 2 chữ số thập phân. Có thể để trống tiêu chí khi lưu nháp.');
       return;
     }
-    if (evaluationScoreFields.some(({ key }) => editor[key] !== editingRow[key]) || editor.comments !== editingRow.comments) {
+    if (editingRow.criteria.some(c=>editor.scoreDetails[c.key]!==editingRow.scoreDetails[c.key]) || editor.comments !== editingRow.comments) {
       const { id, ...scores } = editor;
-      edit(id, { ...scores, fromTask: scores.completionScore === editingRow.completionScore && editingRow.fromTask });
+      edit(id, { ...scores, scoreDetails:editor.scoreDetails, fromTask: scores.completionScore === editingRow.completionScore && editingRow.fromTask });
       setMessage(`Đã cập nhật điểm ${editingRow.fullName} trên bảng. Bấm Lưu nháp hoặc Lưu chính thức để lưu đánh giá.`);
     }
     setEditor(null);
@@ -201,9 +206,10 @@ export function EnterpriseEvaluation() {
   };
   const validate = (submitting: boolean) => {
     if (!selectedRows.length || selectedRows.length > 300) { setError('Vui lòng chọn từ 1 đến 300 sinh viên để lưu.'); return false; }
-    const invalid = selectedRows.find(row => evaluationScoreFields.some(({ key }) =>
-      (row[key].trim() !== '' || submitting) && parseEvaluationScore(row[key]) === null));
-    if (invalid) { setError(`${invalid.fullName} (${invalid.studentCode}): ${submitting ? 'cần đủ 3 tiêu chí, ' : ''}điểm từ 0 đến 10 và tối đa 2 chữ số thập phân.`); return false; }
+    const invalid = selectedRows.find(row => row.criteria.some(c=>{
+      const value=row.scoreDetails[c.key]??'';return (value.trim()!==''||submitting)&&parseEvaluationScore(value)===null;
+    }));
+    if (invalid) { setError(`${invalid.fullName} (${invalid.studentCode}): cần nhập đủ điểm cho các tiêu chí (0–10, tối đa 2 chữ số thập phân).`); return false; }
     setError(''); return true;
   };
   const save = async (target: 'DRAFT' | 'SUBMITTED') => {
@@ -214,7 +220,7 @@ export function EnterpriseEvaluation() {
       const response = await enterpriseService.saveBulkEvaluations(selectedRows.map(row => ({
         assignmentId: row.id, completionScore: parseEvaluationScore(row.completionScore),
         skillScore: parseEvaluationScore(row.skillScore), attitudeScore: parseEvaluationScore(row.attitudeScore),
-        comments: row.comments.trim() || null,
+        comments: row.comments.trim() || null, scoreDetails:Object.fromEntries(row.criteria.map(c=>[c.key,parseEvaluationScore(row.scoreDetails[c.key]??'')])),
       })), target, target === 'SUBMITTED');
       const saved = new Map(response.data.items.map(item => [item.assignmentId, item]));
       setRows(current => current.map(row => {
@@ -223,7 +229,7 @@ export function EnterpriseEvaluation() {
           submittedAverage: ev.overallScore ?? null,
           completionScore: ev.completionScore == null ? '' : String(ev.completionScore),
           skillScore: ev.skillScore == null ? '' : String(ev.skillScore),
-          attitudeScore: ev.attitudeScore == null ? '' : String(ev.attitudeScore) } : row;
+          attitudeScore: ev.attitudeScore == null ? '' : String(ev.attitudeScore),scoreDetails:Object.fromEntries(row.criteria.map(c=>[c.key,String(ev.scoreDetails?.[c.key]??'')])) } : row;
       }));
       if (target === 'SUBMITTED') setSelected(current => new Set([...current].filter(id => !saved.has(id))));
       setConfirming(false);
@@ -268,13 +274,14 @@ export function EnterpriseEvaluation() {
                 <th className="w-12 px-4 py-4"><input ref={selectAllRef} type="checkbox" aria-label="Chọn sinh viên có thể chấm trên trang này" className="h-4 w-4 accent-orange-500" checked={checked} disabled={busy || !editableVisible.length} onChange={() => setSelected(current => { const next = new Set(current); for (const row of editableVisible) { if (checked) next.delete(row.id); else next.add(row.id); } return next; })} /></th>
                 <th className="min-w-56 px-3 py-4">Sinh viên</th>
                 <th className="w-32 px-3 py-4">Task</th>
-                {evaluationScoreFields.map(field => <th key={field.key} className="w-36 px-3 py-4 text-center">{field.label}</th>)}
+                {(visible[0]?.criteria??evaluationScoreFields.map(f=>({key:f.key,label:f.label,weight:33.33}))).map(field => <th key={field.key} className="w-36 px-3 py-4 text-center">{field.label}<span className="block font-normal">{field.weight}%</span></th>)}
                 <th className="w-32 px-3 py-4 text-center">Điểm trung bình</th><th className="w-36 px-4 py-4">Trạng thái</th>
                 <th className="w-36 px-4 py-4 text-right">Thao tác</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">{!visible.length ? <tr><td colSpan={9} className="py-14 text-center text-slate-500">Không có sinh viên phù hợp với bộ lọc.</td></tr> : visible.map(row => {
                 const completed = row.tasks.filter(task => task.enterpriseStatus === 'DONE').length;
-                const average = row.status === 'SUBMITTED' ? row.submittedAverage : evaluationAverage(row);
+                const average = row.status === 'SUBMITTED' ? row.submittedAverage : row.criteria.every(c=>parseEvaluationScore(row.scoreDetails[c.key]??'')!==null)
+                  ? Math.round(row.criteria.reduce((sum,c)=>sum+parseEvaluationScore(row.scoreDetails[c.key])!*c.weight/100,0)*100)/100 : null;
                 return <tr key={row.id} className={selected.has(row.id) ? 'bg-orange-50/40' : 'hover:bg-slate-50/50'}>
                   <td className="px-4 py-5 align-top"><input type="checkbox" aria-label={`Chọn ${row.fullName} (${row.studentCode})`} className="mt-1 h-4 w-4 accent-orange-500" checked={selected.has(row.id)} disabled={busy || row.locked} onChange={() => toggle(row.id)} /></td>
                   <td className="px-3 py-4"><p className="font-semibold text-slate-900">{row.fullName}</p><p className="mt-0.5 text-xs text-slate-500">{row.studentCode}</p><p className="mt-1 text-xs text-slate-500">{row.position || 'Chưa có vị trí'}</p></td>
@@ -283,9 +290,9 @@ export function EnterpriseEvaluation() {
                     {!taskError && row.tasks.length > 0 && <div className="mt-1.5 h-1.5 w-20 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Tiến độ task của ${row.fullName}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completed / row.tasks.length * 100)}><div className={'h-full rounded-full ' + (completed / row.tasks.length >= 0.8 ? 'bg-emerald-500' : 'bg-amber-400')} style={{ width: `${completed / row.tasks.length * 100}%` }} /></div>}
                     <button type="button" disabled={busy} onClick={() => setDetailId(row.id)} aria-label={`Chi tiết task của ${row.fullName}`} className="mt-2 text-xs text-emerald-700 hover:underline">Chi tiết</button>
                   </td>
-                  {evaluationScoreFields.map(field => <td key={field.key} className="px-3 py-4 text-center align-middle">
+                  {row.criteria.map(field => <td key={field.key} className="px-3 py-4 text-center align-middle">
                     <div className="flex min-h-[2.875rem] flex-col items-center justify-center">
-                      <span aria-label={`${field.label} của ${row.fullName} (${row.studentCode})`} className="text-base font-semibold tabular-nums text-slate-800">{row[field.key] || '—'}</span>
+                      <span aria-label={`${field.label} của ${row.fullName} (${row.studentCode})`} className="text-base font-semibold tabular-nums text-slate-800">{row.scoreDetails[field.key] || (field.key in row ? row[field.key as EvaluationScoreKey] : '') || '—'}</span>
                       {field.key === 'completionScore' && row.suggestion !== null
                         ? <p className="mt-1 h-4 whitespace-nowrap text-[11px] leading-4 text-slate-500">{row.fromTask ? 'Gợi ý từ task' : 'Gợi ý task'}: {row.suggestion.toFixed(2)}</p>
                         : field.key === 'completionScore' && !taskError && !row.tasks.length
@@ -319,13 +326,13 @@ export function EnterpriseEvaluation() {
       <form onSubmit={event => { event.preventDefault(); updateScores(); }} className="space-y-5">
         <p className="text-sm text-slate-500">{editingRow.studentCode} · {editingRow.position || 'Chưa có vị trí'} · Thang điểm 0–10</p>
         <div className="grid gap-4 sm:grid-cols-3">
-          {evaluationScoreFields.map(field => <label key={field.key} className="text-sm font-semibold text-slate-700">
-            {field.label}
-            <input type="number" min={0} max={10} step="0.01" inputMode="decimal" placeholder="Chưa có điểm" className={inputClass + ' mt-2 w-full font-normal tabular-nums'} value={editor[field.key]} disabled={busy} onChange={event => { setEditor({ ...editor, [field.key]: event.target.value }); setEditorError(''); }} />
+          {editingRow.criteria.map(field => <label key={field.key} className="text-sm font-semibold text-slate-700">
+            {field.label} <span className="font-normal">({field.weight}%)</span>
+            <input type="number" min={0} max={10} step="0.01" inputMode="decimal" placeholder="Chưa có điểm" className={inputClass + ' mt-2 w-full font-normal tabular-nums'} value={editor.scoreDetails[field.key]??''} disabled={busy} onChange={event => setEditor({...editor,scoreDetails:{...editor.scoreDetails,[field.key]:event.target.value}})} />
             {field.key === 'completionScore' && editingRow.suggestion !== null && <span className="mt-2 block text-xs font-normal text-slate-500">Gợi ý từ task: {editingRow.suggestion.toFixed(2)}. Có thể điều chỉnh.</span>}
           </label>)}
         </div>
-        <div className="flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3"><span className="text-sm font-medium text-slate-700">Điểm trung bình</span><output aria-label="Điểm trung bình sau chỉnh sửa" className="text-xl font-bold tabular-nums text-orange-600">{evaluationAverage(editor)?.toFixed(2) ?? '—'}</output></div>
+        <div className="flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3"><span className="text-sm font-medium text-slate-700">Điểm tổng có trọng số</span><output aria-label="Điểm trung bình sau chỉnh sửa" className="text-xl font-bold tabular-nums text-orange-600">{editingRow.criteria.every(c=>parseEvaluationScore(editingRow.scoreDetails[c.key]??'')!==null)?editingRow.criteria.reduce((sum,c)=>sum+parseEvaluationScore(editingRow.scoreDetails[c.key])!*c.weight/100,0).toFixed(2):'—'}</output></div>
         <label className="block text-sm font-semibold text-slate-700">Nhận xét (không bắt buộc)<textarea className={inputClass + ' mt-2 w-full font-normal'} rows={3} maxLength={5000} disabled={busy} value={editor.comments} onChange={event => setEditor({ ...editor, comments: event.target.value })} placeholder="Ưu điểm và những điểm sinh viên cần cải thiện…" /></label>
         {editorError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{editorError}</p>}
         <p className="text-xs leading-relaxed text-slate-500">Thay đổi được cập nhật vào bảng. Bấm Lưu nháp hoặc Lưu chính thức ở cuối bảng để lưu đánh giá.</p>
@@ -334,7 +341,7 @@ export function EnterpriseEvaluation() {
     </StudentDialog>}
     {confirming && <StudentDialog title="Xác nhận gửi điểm chính thức" busy={busy} onClose={() => setConfirming(false)}>
       <p className="text-sm leading-6 text-slate-600">Bạn sắp gửi điểm của <strong className="text-slate-900">{selectedRows.length} sinh viên</strong> đến Phòng Quan hệ doanh nghiệp. Điểm sẽ được cập nhật ngay và không thể chỉnh sửa trực tiếp sau khi gửi.</p>
-      <div className="mt-4 max-h-64 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs text-slate-500"><tr><th className="p-3">Sinh viên</th>{evaluationScoreFields.map(field => <th className="p-3" key={field.key}>{field.label}</th>)}<th className="p-3">TB</th></tr></thead><tbody>{selectedRows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.fullName}<p className="text-xs text-slate-400">{row.studentCode}</p></td>{evaluationScoreFields.map(field => <td className="p-3 tabular-nums" key={field.key}>{row[field.key]}</td>)}<td className="p-3 font-bold text-orange-600">{evaluationAverage(row)?.toFixed(2)}</td></tr>)}</tbody></table></div>
+      <div className="mt-4 max-h-64 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs text-slate-500"><tr><th className="p-3">Sinh viên</th>{(selectedRows[0]?.criteria??[]).map(field => <th className="p-3" key={field.key}>{field.label}</th>)}<th className="p-3">Tổng</th></tr></thead><tbody>{selectedRows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.fullName}<p className="text-xs text-slate-400">{row.studentCode}</p></td>{row.criteria.map(field => <td className="p-3 tabular-nums" key={field.key}>{row.scoreDetails[field.key]}</td>)}<td className="p-3 font-bold text-orange-600">{row.criteria.reduce((sum,c)=>sum+(parseEvaluationScore(row.scoreDetails[c.key]??'')??0)*c.weight/100,0).toFixed(2)}</td></tr>)}</tbody></table></div>
       <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={busy} className={secondaryClass} onClick={() => setConfirming(false)}>Quay lại chỉnh sửa</button><button type="button" disabled={busy} className={primaryClass} onClick={() => void save('SUBMITTED')}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}{busy ? 'Đang gửi…' : 'Xác nhận'}</button></div>
     </StudentDialog>}
     {detail && <StudentDialog title={`Chi tiết task · ${detail.fullName}`} busy={busy} onClose={() => setDetailId(null)}>
