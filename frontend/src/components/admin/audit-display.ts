@@ -31,6 +31,7 @@ export function entityLabel(entityType: string): string {
 export const AUDIT_ACTIONS: Record<string, string> = {
   ASSIGN: 'Phân công thực tập', ASSIGNMENT_STATUS: 'Cập nhật trạng thái thực tập',
   COORDINATE: 'Điều phối sinh viên', ENTERPRISE_DECISION: 'Doanh nghiệp phản hồi tiếp nhận',
+  ENTERPRISE_DELETE: 'Xóa vĩnh viễn tin tuyển dụng',
   SUBMIT_EVALUATION: 'Nộp đánh giá thực tập', UPDATE_EVALUATION: 'Cập nhật đánh giá thực tập',
   RESET_DEMO_PASSWORD: 'Đặt lại mật khẩu tài khoản demo', SEED_DEMO: 'Khởi tạo dữ liệu demo',
   CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa', SOFT_DELETE: 'Ngừng hoạt động / Xóa mềm',

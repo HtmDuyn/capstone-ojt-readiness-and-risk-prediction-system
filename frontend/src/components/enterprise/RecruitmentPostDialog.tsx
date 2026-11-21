@@ -92,7 +92,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
     };
     submitting.current = true;
     try {
-      if (status === 'PUBLISHED' && !await feedback.confirm({ title: 'Công bố tin tuyển dụng?', message: 'Sinh viên sẽ thấy tin ngay sau khi công bố. Tin không được chỉnh sửa; bạn có thể xóa mềm khi còn Hạn 1.', confirmLabel: 'Công bố tin', tone: 'info' })) return;
+      if (status === 'PUBLISHED' && !await feedback.confirm({ title: 'Công bố tin tuyển dụng?', message: 'Sinh viên sẽ thấy tin ngay sau khi công bố.', confirmLabel: 'Công bố tin', tone: 'info' })) return;
       setSaving(true);
       const response = post ? await enterpriseService.updateRecruitmentPost(post.id, payload)
         : await enterpriseService.createRecruitmentPost({ ...payload, windowId, idempotencyKey });
@@ -172,7 +172,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
       </fieldset>
       </div>
       <footer className="shrink-0 space-y-3 border-t border-slate-100 bg-white px-5 py-4 sm:px-7">
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-1.5 text-xs text-slate-500"><Eye size={14} />Tin nháp chưa hiển thị. Tin Published chỉ được xóa mềm trong Hạn 1.</p>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-1.5 text-xs text-slate-500"><Eye size={14} />Sinh viên chỉ thấy tin đã công bố.</p>
           <div className="flex justify-end gap-3"><button type="button" disabled={saving} onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-40">Hủy</button>
             <button type="submit" name="status" value="DRAFT" disabled={saving || !canSave} className="flex items-center gap-2 rounded-xl border border-orange-200 px-4 py-2.5 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50">
               {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}Lưu nháp</button>

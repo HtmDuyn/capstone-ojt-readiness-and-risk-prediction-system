@@ -10,7 +10,7 @@ import { assertRoundPhase } from '../recruitment/round-policy';
 
 // The expiry worker keeps PublishedAt when it closes a published post. Legacy
 // manual closures must not appear in the enterprise list as expired vacancies.
-const visibleEnterprisePost = `(p."Status"<>'CLOSED' OR (
+const visibleEnterprisePost = `p."ArchivedAt" IS NULL AND p."Status"<>'ARCHIVED' AND (p."Status"<>'CLOSED' OR (
   p."PublishedAt" IS NOT NULL AND p."DeadlineAt"<=now() AND p."UpdatedAt">=p."DeadlineAt"
   AND NOT EXISTS (SELECT 1 FROM "AuditLogs" a WHERE a."EntityType"='RecruitmentPosts'
     AND a."EntityID"=p."PostID" AND a."Action" IN ('ENTERPRISE_CLOSE','CLOSED'))
@@ -21,7 +21,7 @@ async function company(c: PoolClient, actor: Actor) {
   return (await enterpriseScope(c, actor))!;
 }
 async function ownPost(c: PoolClient, id: number, companyId: number, lock = false) {
-  const p = (await c.query(`${postSelect} WHERE p."PostID"=$1 AND p."EnterpriseID"=$2 AND p."ArchivedAt" IS NULL AND ${visibleEnterprisePost}${lock ? ' FOR UPDATE OF p' : ''}`,[id,companyId])).rows[0];
+  const p = (await c.query(`${postSelect} WHERE p."PostID"=$1 AND p."EnterpriseID"=$2 AND ${visibleEnterprisePost}${lock ? ' FOR UPDATE OF p' : ''}`,[id,companyId])).rows[0];
   if (!p) throw invalid('Recruitment post not found.', 404, 'RECRUITMENT_POST_NOT_FOUND');
   return p;
 }
@@ -48,21 +48,20 @@ export async function enterpriseWindows(params: Row, actor: Actor) {
     return {items:rows.map(enterpriseWindowApi),total,page:p.page,limit:p.limit};
   });
 }
-export async function enterprisePosts(params: Row, actor: Actor, deleted = false) {
+export async function enterprisePosts(params: Row, actor: Actor) {
   const p = pagination(params, ['windowId','status','postId','positionId']);
   if (p.offset > 2147483647) throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async c => {
     const own = await company(c, actor);
-    const args: unknown[] = [own], where = ['p."EnterpriseID"=$1',deleted ? 'p."ArchivedAt" IS NOT NULL' : 'p."ArchivedAt" IS NULL'];
-    if (!deleted) where.push(visibleEnterprisePost);
+    const args: unknown[] = [own], where = ['p."EnterpriseID"=$1',visibleEnterprisePost];
     if (params.windowId !== undefined) { args.push(positiveId(params.windowId,'windowId')); where.push(`p."WindowID"=$${args.length}`); }
     if (params.postId !== undefined) { args.push(positiveId(params.postId,'postId')); where.push(`p."PostID"=$${args.length}`); }
     if (params.positionId !== undefined) { args.push(positiveId(params.positionId,'positionId')); where.push(`EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp WHERE pp."PostID"=p."PostID" AND pp."PositionID"=$${args.length})`); }
-    if (params.status !== undefined) { args.push(enumValue(params.status,['DRAFT','PENDING_REVIEW','REJECTED','PUBLISHED','CLOSED',...(deleted ? ['ARCHIVED'] : [])],'status')); where.push(`(CASE WHEN p."Status"='PUBLISHED' AND p."DeadlineAt"<=clock_timestamp() THEN 'CLOSED' ELSE p."Status" END)=$${args.length}`); }
+    if (params.status !== undefined) { args.push(enumValue(params.status,['DRAFT','PENDING_REVIEW','REJECTED','PUBLISHED','CLOSED'],'status')); where.push(`(CASE WHEN p."Status"='PUBLISHED' AND p."DeadlineAt"<=clock_timestamp() THEN 'CLOSED' ELSE p."Status" END)=$${args.length}`); }
     const selected = `SELECT p."PostID" FROM "RecruitmentPosts" p WHERE ${where.join(' AND ')}`;
     const sql = `${postSelect} WHERE ${where.join(' AND ')}`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${selected}) x`,args)).rows[0].n;
-    const rows = (await c.query(`${sql} ORDER BY ${deleted ? 'p."ArchivedAt" DESC,' : ''}p."PostID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
+    const rows = (await c.query(`${sql} ORDER BY p."PostID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,p.offset])).rows;
     const summary = (await c.query(`WITH selected AS (${selected}), positions AS (
       SELECT DISTINCT pos."PositionID" AS id,pos."Capacity" AS capacity,
         GREATEST(0,pos."Capacity"-public."RecruitmentOccupiedSlots"(pos."PositionID")) AS remaining
@@ -101,7 +100,17 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     const submissionKey = key ? `enterprise:${own}:${createHash('sha256').update(key).digest('hex')}` : null;
     // The academic transaction lock serializes retries, including concurrent requests.
     if (key) {
-      const prior = (await c.query('SELECT "PostID","RequestHash","CreatedBy" FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "SubmissionKey"=$2',[own,submissionKey])).rows[0];
+      // A late retry should not recreate a post that has since been deleted.
+      const prior = (await c.query(`WITH deleted_posts AS MATERIALIZED (
+          SELECT "EntityID","Detail"::jsonb AS detail FROM "AuditLogs"
+          WHERE "EntityType"='RecruitmentPosts' AND "Action"='ENTERPRISE_DELETE'
+        )
+        SELECT "PostID","RequestHash","CreatedBy" FROM "RecruitmentPosts"
+        WHERE "EnterpriseID"=$1 AND "SubmissionKey"=$2
+        UNION ALL
+        SELECT "EntityID",detail#>>'{after,requestHash}',(detail#>>'{after,createdBy}')::int
+        FROM deleted_posts WHERE detail#>>'{after,submissionKey}'=$2
+        LIMIT 1`, [own,submissionKey])).rows[0];
       if (prior) {
         if (prior.RequestHash !== hash || prior.CreatedBy !== actor.userId) throw invalid('Idempotency key belongs to a different request.',409,'IDEMPOTENCY_CONFLICT');
         return {...(await postResponses(c,[await ownPost(c,prior.PostID,own)]))[0],replayed:true};
@@ -180,16 +189,38 @@ export async function deleteEnterprisePost(id: number, actor: Actor) {
       assertRoundPhase(w,'POSTING');
       if (!w.CampaignID) await assertNoStudentRegistration(c,w.OJTSemesterID);
     } else if (before.Status !== 'DRAFT') {
-      throw invalid('Chỉ được xóa tin nháp hoặc tin Published còn trong Hạn 1.',409,'RECRUITMENT_POST_DELETE_DENIED');
+      throw invalid('Chỉ được xóa tin nháp hoặc tin đã công bố còn trong Hạn 1.',409,'RECRUITMENT_POST_DELETE_DENIED');
     }
-    if (before.Status === 'DRAFT' && (await c.query('SELECT 1 FROM "JobApplications" WHERE "PostID"=$1 LIMIT 1',[id])).rowCount) {
+    if ((await c.query('SELECT 1 FROM "JobApplications" WHERE "PostID"=$1 LIMIT 1',[id])).rowCount) {
       throw invalid('Tin đã có hồ sơ ứng tuyển không được xóa.',409,'RECRUITMENT_POST_HAS_APPLICATIONS');
     }
-    // Retain posts, positions, applications and submission keys. ARCHIVED hides
-    // the post from existing student reads and excludes it from carry-forward.
-    await c.query(`UPDATE "RecruitmentPosts" SET "Status"='ARCHIVED',"ArchivedAt"=clock_timestamp() WHERE "PostID"=$1`,[id]);
-    await closeUnusedPositions(c,id);
-    await audit(c,actor.userId,'RecruitmentPosts',id,'ENTERPRISE_SOFT_DELETE',postApi(before),{id,deleted:true});
+    const { rows: links } = await c.query<{ PositionID: number }>(
+      'DELETE FROM "RecruitmentPostPositions" WHERE "PostID"=$1 RETURNING "PositionID"', [id]);
+    try {
+      // The foreign key also removes any extraction of this post.
+      await c.query('DELETE FROM "RecruitmentPosts" WHERE "PostID"=$1', [id]);
+    } catch (error) {
+      if ((error as { code?: string }).code === '23503') {
+        throw invalid('Tin đang được tham chiếu bởi đợt tuyển dụng khác.', 409, 'RECRUITMENT_POST_IN_USE');
+      }
+      throw error;
+    }
+    const positionIds = links.map(link => link.PositionID);
+    if (positionIds.length) {
+      // A position can be shared across rounds or have its own placement history.
+      await c.query(`DELETE FROM "InternshipPositions" pos
+        WHERE pos."PositionID"=ANY($1::int[])
+          AND NOT EXISTS (SELECT 1 FROM "RecruitmentPostPositions" pp WHERE pp."PositionID"=pos."PositionID")
+          AND NOT EXISTS (SELECT 1 FROM "StudentEnterpriseCoordination" co WHERE co."PositionID"=pos."PositionID")
+          AND NOT EXISTS (SELECT 1 FROM "InternshipAssignments" a WHERE a."PositionID"=pos."PositionID")
+          AND NOT EXISTS (SELECT 1 FROM "OJTRegistrations" r WHERE r."PreferredPositionID"=pos."PositionID")
+          AND NOT EXISTS (SELECT 1 FROM "PositionSpecializations" s WHERE s."PositionID"=pos."PositionID")
+          AND NOT EXISTS (SELECT 1 FROM "OJTMatchingProfiles" m WHERE m."PositionID"=pos."PositionID")`, [positionIds]);
+      await closeUnusedPositions(c,positionIds);
+    }
+    await audit(c,actor.userId,'RecruitmentPosts',id,'ENTERPRISE_DELETE',null,{
+      id, deleted:true, submissionKey:before.SubmissionKey, requestHash:before.RequestHash, createdBy:before.CreatedBy,
+    });
     return {id,deleted:true};
   });
 }

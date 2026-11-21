@@ -194,7 +194,7 @@ export const EnterpriseProfile: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2.5 flex-shrink-0">
+              <div className="flex-shrink-0">
                 <button
                   onClick={() => {
                     setEditCompanyName(profile.name);
@@ -213,14 +213,6 @@ export const EnterpriseProfile: React.FC = () => {
                   <span>Cập nhật hồ sơ</span>
                 </button>
 
-                <button
-                  onClick={reload}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-xs"
-                  title="Cập nhật dữ liệu mới nhất"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Làm mới</span>
-                </button>
               </div>
             </div>
 

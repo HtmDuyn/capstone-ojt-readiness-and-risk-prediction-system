@@ -4,7 +4,7 @@ import { loadAllPages as loadPages } from '../shared/loadAllPages';
 
 export const recruitmentStatusLabels: Record<RecruitmentPost['status'], string> = {
   DRAFT: 'Bản nháp', PENDING_REVIEW: 'Tin cũ chưa công bố', PUBLISHED: 'Đang tuyển',
-  REJECTED: 'Cần chỉnh sửa', CLOSED: 'Hết hạn', ARCHIVED: 'Đã xóa',
+  REJECTED: 'Cần chỉnh sửa', CLOSED: 'Hết hạn',
 };
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
@@ -41,7 +41,6 @@ export function canDeleteRecruitmentPost(post: RecruitmentPost, windows: Recruit
 }
 
 export function postDeleteLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
-  if (post.deleted || post.status === 'ARCHIVED') return 'Tin đã xóa chỉ được xem lại.';
   if (post.status === 'DRAFT' && post.canDelete !== false) return '';
   const window = windows.find(item => item.id === post.windowId);
   if (post.status === 'PUBLISHED') {
@@ -54,8 +53,8 @@ export function postDeleteLockReason(post: RecruitmentPost, windows: Recruitment
 
 export function postEditLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], _now = Date.now()) {
   const window = windows.find(item => item.id === post.windowId);
-  if (post.status === 'PUBLISHED') return 'Tin đã công bố không được chỉnh sửa. Chỉ được xóa mềm trong Hạn 1.';
-  if (post.status !== 'DRAFT') return 'Chỉ tin nháp được chỉnh sửa. Tin đã xóa hoặc hết hạn chỉ được xem.';
+  if (post.status === 'PUBLISHED') return 'Chỉ được chỉnh sửa tin nháp. Tin đã công bố chỉ có thể xóa trong Hạn 1.';
+  if (post.status !== 'DRAFT') return 'Chỉ tin nháp được chỉnh sửa.';
   if (!window) return 'Không tìm thấy đợt của tin nháp. Vui lòng tải lại danh sách.';
   return '';
 }
@@ -96,9 +95,9 @@ export async function loadRecruitmentOverview(publishedCount: number, signal: Ab
     && (!post.deadlineAt || Date.parse(post.deadlineAt) > now)) };
 }
 
-export async function loadRecruitmentData(signal: AbortSignal, deleted = false) {
+export async function loadRecruitmentData(signal: AbortSignal) {
   const [posts, windows] = await Promise.all([
-    loadAllPages(page => deleted ? enterpriseService.listDeletedRecruitmentPosts({ page, limit: 100 }, signal) : enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
+    loadAllPages(page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
     loadAllPages(page => enterpriseService.listRecruitmentWindows({ page, limit: 100 }, signal), signal),
   ]);
   return { posts, windows };
@@ -110,8 +109,8 @@ export function recruitmentError(error: unknown) {
     const body = apiError.response?.data;
     const messages: Record<string, string> = {
       RECRUITMENT_WINDOW_CLOSED: 'Đã hết hạn đăng tin. Bạn vẫn có thể chỉnh sửa và lưu bản nháp, nhưng không thể công bố.',
-      RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa. Tin đã công bố không được sửa; tin đã xóa chỉ được xem lại.',
-      RECRUITMENT_POST_DELETE_DENIED: 'Chỉ được xóa tin nháp hoặc tin Published còn trong Hạn 1.',
+      RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa.',
+      RECRUITMENT_POST_DELETE_DENIED: 'Chỉ được xóa tin nháp hoặc tin đã công bố còn trong Hạn 1.',
       RECRUITMENT_PHASE_CLOSED: 'Hạn 1 chưa mở hoặc đã kết thúc; sinh viên có thể đang xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',
