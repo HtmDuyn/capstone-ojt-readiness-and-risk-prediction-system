@@ -20,7 +20,7 @@ router.put('/academic-years/:id/calendar', ...calendarStaff, async (req, res, ne
 // Scope authentication to these paths so sibling APIs retain their own role rules.
 for (const resource of Object.keys(resources) as Resource[]) {
   router.get(`/${resource}`, authenticate, (resource === 'academic-periods' ? authorizeRoles('ADMIN','ACADEMIC','OJT_COORD') : authorizeRoles('ADMIN','ACADEMIC')), async (req,res,next) => {
-    try { res.json({ success: true, ...await listRecords(resource, req.query as Record<string, unknown>,req.user!.roleCode!=='OJT_COORD') }); }
+    try { res.json({ success: true, ...await listRecords(resource, req.query as Record<string, unknown>, req.user!.roleCode === 'OJT_COORD') }); }
     catch (error) { next(error); }
   });
   router.post(`/${resource}`, authenticate, authorizeRoles('ADMIN','ACADEMIC'), async (req,res,next) => {

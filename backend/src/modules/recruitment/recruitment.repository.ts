@@ -3,6 +3,7 @@ import { invalid } from '../students/student.validation';
 import { enterpriseScope } from '../qhdn/catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { currentRoundPhase, roundActions, hasPhaseSchedule, phaseIsOpen } from './round-policy';
+import { academicPeriodStatusSql } from '../academic/period-status';
 
 export { type Actor, type Row };
 export const previousRoundSelect=`EXISTS(SELECT 1 FROM "RecruitmentWindows" previous
@@ -11,6 +12,7 @@ export const previousRoundSelect=`EXISTS(SELECT 1 FROM "RecruitmentWindows" prev
  AND (previous."EndsAt">clock_timestamp() OR previous."ResultsFinalizedAt" IS NULL)) AS "PreviousRoundPending"`;
 export async function windowRecord(c: PoolClient,id: number) {
  const w=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Kind",p."Status" AS "PeriodStatus",
+ ${academicPeriodStatusSql('p')} AS "CalendarStatus",
  p."EndDate" AS "PeriodEndDate",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow",${previousRoundSelect}
  FROM "RecruitmentWindows" w JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=w."AcademicPeriodID"
  JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID" WHERE w."WindowID"=$1 FOR UPDATE OF w`,[id])).rows[0];

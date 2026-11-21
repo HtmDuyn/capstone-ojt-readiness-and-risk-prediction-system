@@ -5,7 +5,7 @@ import { inputObject, invalid, positiveId, requiredText, optionalText, enumValue
 import { enterpriseScope, type Actor, type Row } from '../qhdn/qhdn.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { assertOpen, windowRecord, postApi, postSelect, closeUnusedPositions } from '../recruitment/recruitment.repository';
-import { assertNoStudentRegistration, enterpriseWindowApi, enterpriseWindowSelect, enterprisePostActions, recruitmentDeadline } from './enterprise-recruitment.policy';
+import { assertNoStudentRegistration, enterpriseWindowApi, enterpriseWindowSelect, enterprisePostActions, isUnpublishedEnterpriseDraft, recruitmentDeadline } from './enterprise-recruitment.policy';
 import { assertRoundPhase } from '../recruitment/round-policy';
 
 // The expiry worker keeps PublishedAt when it closes a published post. Legacy
@@ -118,7 +118,7 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     }
     const before = id ? await ownPost(c,id,own,true) : null;
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
-    if (before && before.Status !== 'DRAFT') throw invalid('Chỉ được chỉnh sửa hoặc công bố tin nháp. Tin đã công bố không được chỉnh sửa.',409,'RECRUITMENT_POST_LOCKED');
+    if (before && !isUnpublishedEnterpriseDraft(before)) throw invalid('Chỉ được chỉnh sửa hoặc công bố tin nháp chưa từng công bố.',409,'RECRUITMENT_POST_LOCKED');
     if (status === 'PUBLISHED') {
       assertOpen(w);
       assertRoundPhase(w,'POSTING');
@@ -183,13 +183,8 @@ export async function deleteEnterprisePost(id: number, actor: Actor) {
   return academicTransaction(async c => {
     const own = await company(c,actor);
     const before = await ownPost(c,id,own,true);
-    if (before.Status === 'PUBLISHED') {
-      const w = await windowRecord(c,positiveId(before.WindowID,'windowId'));
-      assertOpen(w);
-      assertRoundPhase(w,'POSTING');
-      if (!w.CampaignID) await assertNoStudentRegistration(c,w.OJTSemesterID);
-    } else if (before.Status !== 'DRAFT') {
-      throw invalid('Chỉ được xóa tin nháp hoặc tin đã công bố còn trong Hạn 1.',409,'RECRUITMENT_POST_DELETE_DENIED');
+    if (!isUnpublishedEnterpriseDraft(before)) {
+      throw invalid('Chỉ được xóa tin nháp chưa từng công bố.',409,'RECRUITMENT_POST_DELETE_DENIED');
     }
     if ((await c.query('SELECT 1 FROM "JobApplications" WHERE "PostID"=$1 LIMIT 1',[id])).rowCount) {
       throw invalid('Tin đã có hồ sơ ứng tuyển không được xóa.',409,'RECRUITMENT_POST_HAS_APPLICATIONS');

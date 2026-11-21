@@ -23,7 +23,7 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
    if(schema?.required)schema.required=schema.required.filter((name:string)=>name!=='academicPeriodId');
    if(schema?.properties?.academicPeriodId)schema.properties.academicPeriodId.description='Mặc định từ kỳ OJT; nếu truyền phải khớp kỳ đã chọn.';
    if(schema?.properties?.requiredRelativeSemester)schema.properties.requiredRelativeSemester.description='Metadata tương thích; quyền đăng ký dựa trên danh sách đã bàn giao.';
-   op.description='Chỉ ADMIN/OJT_COORD quản lý đợt đăng ký. Tạo ở DRAFT; PATCH status OPEN/CLOSED và reason để mở/đóng. Chỉ mở khi phạm vi có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là metadata tương thích, không thay thế điều kiện bàn giao.';
+   op.description='ADMIN/OJT_COORD tạo hoặc mở đợt đăng ký trong học kỳ chính đang diễn ra. Đợt được tạo ở trạng thái DRAFT. PATCH status OPEN/CLOSED và reason để mở hoặc đóng. Khi mở, phạm vi phải có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là kỳ tương đối 6.';
   }
  }
  spec.paths['/api/ojt-registrations'].post.description='Endpoint tương thích cho hồ sơ đăng ký OJT cũ; luồng mới STUDENT chọn vị trí và gửi trực tiếp bằng POST /api/job-applications. STUDENT chỉ nộp hồ sơ của mình; ADMIN có thể nhập thay. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN, trong thời hạn và đúng scope.';

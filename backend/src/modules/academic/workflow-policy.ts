@@ -2,11 +2,12 @@ import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from './academic.repository';
 import { invalid,inputObject,positiveId,requiredText,enumValue,score,optionalText } from '../students/student.validation';
 import { timestamp,ids } from '../combo-registration/combo.validation';
+import { academicPeriodStatusSql } from './period-status';
 type Row=Record<string,any>;
 export const dayString=(d:Date|string)=>d instanceof Date?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:d;
 export const periodBounds=(p:Row)=>({start:new Date(dayString(p.StartDate)+'T00:00:00+07:00'),end:new Date(new Date(dayString(p.EndDate)+'T00:00:00+07:00').getTime()+86400000)});
 export async function actualPeriod(c:PoolClient,id:number) {
- const p=(await c.query('SELECT * FROM "AcademicPeriods" WHERE "AcademicPeriodID"=$1',[id])).rows[0];
+ const p=(await c.query(`SELECT p.*, ${academicPeriodStatusSql('p')} AS "CalendarStatus" FROM "AcademicPeriods" p WHERE p."AcademicPeriodID"=$1`,[id])).rows[0];
  if(!p)throw invalid('Academic period not found.',404);return p;
 }
 export async function relativeSemester(c:PoolClient,studentId:number,targetId:number) {
@@ -31,6 +32,7 @@ export async function registrationPeriod(c:PoolClient,w:Row) {
  const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rows[0];
  if(!term)throw invalid('OJT semester not found.',404);
  if(target.Kind!=='SEMESTER'||term.AcademicPeriodID!==target.AcademicPeriodID||w.RequiredRelativeSemester!==6)throw invalid('The registration window must target OJT semester 6 and its linked academic period.',409,'REGISTRATION_PERIOD_MISMATCH');
+ return target;
 }
 export async function saveRegistrationExceptions(windowId:number,body:unknown,actor:number) {
  const b=inputObject(body,['studentIds','relativeSemester','expiresAt','reason']),students=ids(b.studentIds,'studentIds'),relative=positiveId(b.relativeSemester,'relativeSemester');

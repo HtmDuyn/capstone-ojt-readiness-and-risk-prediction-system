@@ -12,21 +12,26 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, seme
   const [periodId, setPeriodId] = useState(allowAll ? "ALL" : "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setError("");
     sharedRead('catalog:qhdn-periods', () => loadAllPages(page => getAcademicPeriods({ page, limit: 100 })), controller.signal)
       .then((items) => { if (!controller.signal.aborted) setCatalog(items); })
       .catch((e) => { if (!controller.signal.aborted) setError(errorMessage(e)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, []);
+  }, [revision]);
 
-  const periods = useMemo(() => semestersOnly ? catalog.filter(period => period.kind === 'SEMESTER') : catalog, [catalog, semestersOnly]);
+  const periods = useMemo(() => catalog.filter(period => (period.status === 'ACTIVE' || period.status === 'CLOSED')
+    && (!semestersOnly || period.kind === 'SEMESTER')), [catalog, semestersOnly]);
   const years = useMemo(() => academicYears(periods), [periods]);
+  const selectedYearId = years.some(year => String(year.id) === yearId) ? yearId : "";
   const filteredPeriods = useMemo(() => periods.filter((p) =>
-    !yearId || String(p.academicYearId) === yearId,
-  ), [periods, yearId]);
+    !selectedYearId || String(p.academicYearId) === selectedYearId,
+  ), [periods, selectedYearId]);
   const allPeriods = allowAll && periodId === "ALL";
   const selectedPeriod = allPeriods ? undefined :
     filteredPeriods.find((p) => String(p.id) === periodId)
@@ -38,11 +43,13 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, seme
   }, [allowAll]);
 
   const selectPeriod = useCallback((id: string) => setPeriodId(id), []);
+  const reload = useCallback(() => setRevision(value => value + 1), []);
   return {
-    periods, years, filteredPeriods, yearId, selectYear,
+    periods, years, filteredPeriods, yearId: selectedYearId, selectYear,
     periodId: allPeriods ? "ALL" : selectedPeriod ? String(selectedPeriod.id) : "",
     selectPeriod, selectedPeriod, allPeriods, allowAll,
     ojtSemesterId, semesterId: ojtSemesterId === null ? "" : String(ojtSemesterId),
-    loading, error, semestersOnly,
+    loading, error, semestersOnly, reload,
+    canOpenRecruitment: !loading && !error && selectedPeriod?.kind === 'SEMESTER' && selectedPeriod.status === 'ACTIVE',
   };
 }

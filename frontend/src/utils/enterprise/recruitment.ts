@@ -36,25 +36,19 @@ export function postPublishLockReason(post: RecruitmentPost, windows: Recruitmen
   return '';
 }
 
-export function canDeleteRecruitmentPost(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
-  return !postDeleteLockReason(post, windows, now);
+const unpublishedDraftRequired = 'Chỉ được xóa tin nháp chưa từng công bố.';
+
+export function canDeleteRecruitmentPost(post: RecruitmentPost) {
+  return post.status === 'DRAFT' && !post.publishedAt && post.canDelete !== false;
 }
 
-export function postDeleteLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
-  if (post.status === 'DRAFT' && post.canDelete !== false) return '';
-  const window = windows.find(item => item.id === post.windowId);
-  if (post.status === 'PUBLISHED') {
-    if (windowAcceptsPosts(window, now) && window?.canEdit !== false && !post.studentRegistrationWindow
-      && !window?.studentRegistrationWindow && post.canDelete !== false) return '';
-    return 'Hạn 1 đã kết thúc hoặc sinh viên đang xét tuyển. Không thể xóa tin đã công bố.';
-  }
-  return 'Không thể xóa tin ở trạng thái hiện tại.';
+export function postDeleteLockReason(post: RecruitmentPost) {
+  return canDeleteRecruitmentPost(post) ? '' : unpublishedDraftRequired;
 }
 
 export function postEditLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], _now = Date.now()) {
   const window = windows.find(item => item.id === post.windowId);
-  if (post.status === 'PUBLISHED') return 'Chỉ được chỉnh sửa tin nháp. Tin đã công bố chỉ có thể xóa trong Hạn 1.';
-  if (post.status !== 'DRAFT') return 'Chỉ tin nháp được chỉnh sửa.';
+  if (post.status !== 'DRAFT' || post.publishedAt) return 'Chỉ tin nháp chưa từng công bố được chỉnh sửa.';
   if (!window) return 'Không tìm thấy đợt của tin nháp. Vui lòng tải lại danh sách.';
   return '';
 }
@@ -110,7 +104,7 @@ export function recruitmentError(error: unknown) {
     const messages: Record<string, string> = {
       RECRUITMENT_WINDOW_CLOSED: 'Đã hết hạn đăng tin. Bạn vẫn có thể chỉnh sửa và lưu bản nháp, nhưng không thể công bố.',
       RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa.',
-      RECRUITMENT_POST_DELETE_DENIED: 'Chỉ được xóa tin nháp hoặc tin đã công bố còn trong Hạn 1.',
+      RECRUITMENT_POST_DELETE_DENIED: unpublishedDraftRequired,
       RECRUITMENT_PHASE_CLOSED: 'Hạn 1 chưa mở hoặc đã kết thúc; sinh viên có thể đang xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',

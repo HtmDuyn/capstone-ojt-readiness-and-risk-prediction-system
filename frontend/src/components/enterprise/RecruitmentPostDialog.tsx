@@ -92,7 +92,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
     };
     submitting.current = true;
     try {
-      if (status === 'PUBLISHED' && !await feedback.confirm({ title: 'Công bố tin tuyển dụng?', message: 'Sinh viên sẽ thấy tin ngay sau khi công bố.', confirmLabel: 'Công bố tin', tone: 'info' })) return;
+      if (status === 'PUBLISHED' && !await feedback.confirm({ title: 'Công bố tin tuyển dụng?', message: 'Sinh viên sẽ thấy tin sau khi công bố. Sau đó, bạn không thể xóa tin.', confirmLabel: 'Công bố tin', tone: 'info' })) return;
       setSaving(true);
       const response = post ? await enterpriseService.updateRecruitmentPost(post.id, payload)
         : await enterpriseService.createRecruitmentPost({ ...payload, windowId, idempotencyKey });

@@ -22,9 +22,9 @@ export function addEnterpriseRecruitmentOperations(spec: Spec) {
   add('post','/api/enterprise/recruitment/posts','Tạo tin nháp hoặc công bố tin ngay trong Hạn 1',{}, {windowId:id,idempotencyKey:{...text(100),description:'Gửi lại cùng khóa và nội dung trả về tin hiện có với replayed=true, hoặc 404 nếu tin đã bị xóa. Nội dung khác trả 409.'},...fields},['windowId','title','content','positions'],201);
   add('patch','/api/enterprise/recruitment/posts/{id}','Chỉnh sửa tin nháp hoặc lưu và công bố trong Hạn 1',{},fields);
   add('post','/api/enterprise/recruitment/posts/{id}/publish','Công bố tin nháp trong Hạn 1');
-  add('delete','/api/enterprise/recruitment/posts/{id}','Xóa vĩnh viễn tin tuyển dụng');
+  add('delete','/api/enterprise/recruitment/posts/{id}','Xóa vĩnh viễn tin nháp');
   const remove = spec.paths['/api/enterprise/recruitment/posts/{id}'].delete;
-  remove.description = 'Doanh nghiệp có thể xóa vĩnh viễn tin nháp của mình hoặc tin đã công bố trong Hạn 1. Tin có hồ sơ ứng tuyển hoặc được đợt khác tham chiếu sẽ trả 409. Vị trí dùng chung hoặc có dữ liệu liên quan được giữ lại.';
+  remove.description = 'Doanh nghiệp chỉ có thể xóa vĩnh viễn tin nháp của mình chưa từng công bố. Tin từng công bố, có hồ sơ ứng tuyển hoặc được đợt khác tham chiếu sẽ trả 409. Vị trí dùng chung hoặc có dữ liệu liên quan được giữ lại.';
   remove.responses[200].content = {'application/json':{schema:{type:'object',properties:{
     success:{type:'boolean'},data:{type:'object',properties:{id,deleted:{type:'boolean',enum:[true]}}}
   }}}};

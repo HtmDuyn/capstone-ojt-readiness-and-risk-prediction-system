@@ -6,7 +6,7 @@ import { RecruitmentPostDialog } from '@/components/enterprise/RecruitmentPostDi
 import { RecruitmentPostDetailsDialog } from '@/components/enterprise/RecruitmentPostDetailsDialog';
 import { useRecruitmentFeedback } from '@/components/enterprise/RecruitmentNoticeDialog';
 import { RecruitmentPostCard } from '@/components/enterprise/RecruitmentPostCard';
-import { canDeleteRecruitmentPost, canPublishRecruitmentPost, formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts } from '@/utils/enterprise/recruitment';
+import { formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts } from '@/utils/enterprise/recruitment';
 import { enterpriseService, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -79,10 +79,9 @@ export function EnterpriseJobs() {
 
   const changePost = async (post: RecruitmentPost, action: 'publish' | 'delete') => {
     if (actionBusy !== null) return;
-    const allowed = action === 'publish' ? canPublishRecruitmentPost(post, windows)
-      : canDeleteRecruitmentPost(post, windows);
-    if (!allowed) { feedback.notify(action === 'publish' ? postPublishLockReason(post, windows) : postDeleteLockReason(post, windows), 'Không thể thực hiện'); return; }
-    const confirmation = action === 'publish' ? 'Sinh viên sẽ thấy tin sau khi công bố.'
+    const lockReason = action === 'publish' ? postPublishLockReason(post, windows) : postDeleteLockReason(post);
+    if (lockReason) { feedback.notify(lockReason, 'Không thể thực hiện'); return; }
+    const confirmation = action === 'publish' ? 'Sinh viên sẽ thấy tin sau khi công bố. Sau đó, bạn không thể xóa tin.'
       : `Tin “${post.title}” sẽ bị xóa vĩnh viễn.`;
     if (!await feedback.confirm({ message: confirmation, title: action === 'publish' ? 'Công bố tin tuyển dụng?' : 'Xóa tin tuyển dụng?', confirmLabel: action === 'publish' ? 'Công bố tin' : 'Xóa vĩnh viễn', tone: action === 'delete' ? 'danger' : 'warning' })) return;
     setActionBusy(post.id);
@@ -131,7 +130,7 @@ export function EnterpriseJobs() {
             </p>
           </div>}
         </div>
-        <p className="mt-3 text-xs text-slate-500">Bạn có thể tạo, sửa và xóa bản nháp cho đợt đã thiết lập. Chỉ được công bố hoặc xóa tin đã công bố trong Hạn 1. Trong Hạn 2, sinh viên chỉ có thể ứng tuyển vào tin đang tuyển.</p>
+        <p className="mt-3 text-xs text-slate-500">Bạn có thể tạo, sửa và xóa tin nháp chưa từng công bố. Công bố tin trong Hạn 1 để sinh viên ứng tuyển ở Hạn 2.</p>
         {windows.length > 0 && !activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể tạo và lưu bản nháp.</p>}
         {selectedWindow?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
           <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký hoặc xét tuyển: không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.

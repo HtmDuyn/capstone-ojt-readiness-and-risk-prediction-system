@@ -11,6 +11,7 @@ import { requireRecruitmentSchema, requireThreePhaseSchema, expireRecruitmentRes
 import { schedulePermissions } from './schedule-policy';
 import { requireScheduleEditingSchema } from './schedule.service';
 import { notifyRecruitmentCreated } from './notification.service';
+import { academicPeriodStatusSql } from '../academic/period-status';
 
 export function validateCampaignSchedule(body:Row) {
  const start=new Date(timestamp(body.startsAt,'startsAt')),end=new Date(timestamp(body.endsAt,'endsAt'));
@@ -36,6 +37,7 @@ export async function listWindows(params: Row) {
  return readTransaction(async c=>{
   await requireRecruitmentSchema(c);
   const rows=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Status" AS "PeriodStatus",
+   ${academicPeriodStatusSql('p')} AS "CalendarStatus",
    p."Kind",o."AcademicPeriodID" AS "LinkedPeriodID",${previousRoundSelect},
    clock_timestamp() AS "DatabaseNow",campaign."Name" AS "CampaignName",
    (SELECT count(*)::int FROM "JobApplications" a JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID"
@@ -60,10 +62,13 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    const old=await windowRecord(c,id);
    if(old.ResultsFinalizedAt)throw invalid('Đợt đã chốt tổng hợp không thể thay đổi.',409);
    const status=b.status===undefined?old.Status:enumValue(b.status,['OPEN','CLOSED'],'status');
-   if(status==='OPEN'&&old.Status!=='OPEN'){
-    if(old.Kind!=='SEMESTER'||old.LinkedPeriodID!==old.AcademicPeriodID||['CLOSED','ARCHIVED'].includes(old.PeriodStatus))
+   if(status==='OPEN'){
+    if(old.Kind!=='SEMESTER'||old.LinkedPeriodID!==old.AcademicPeriodID)
      throw invalid('Học kỳ hoặc liên kết kỳ OJT không còn khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
-
+    if(old.CalendarStatus!=='ACTIVE')
+     throw invalid('Chỉ mở đợt tuyển dụng trong học kỳ đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
+   }
+   if(status==='OPEN'&&old.Status!=='OPEN'){
     if(old.Status==='CLOSED'||new Date(old.EndsAt)<=old.DatabaseNow)throw invalid('Đợt đã đóng hoặc đã hết thời hạn.',409);
     if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2
       AND "StartsAt"<$3 AND ("EndsAt">clock_timestamp() OR "ResultsFinalizedAt" IS NULL)`,[old.OJTSemesterID,id,old.StartsAt])).rowCount)
@@ -82,7 +87,7 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    return { ...windowApi(after), handedOffCount };
   }
   const periodId=positiveId(b.academicPeriodId,'academicPeriodId'),period=await actualPeriod(c,periodId);
-  if(period.Kind!=='SEMESTER'||['CLOSED','ARCHIVED'].includes(period.Status))throw invalid('Chọn học kỳ chính đang hoạt động hoặc đã lên kế hoạch.',409);
+  if(period.Kind!=='SEMESTER'||period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ tạo đợt tuyển dụng trong học kỳ chính đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
   await requireThreePhaseSchema(c);
   await requireLifecycleSchema(c);
   const schedule=validateCampaignSchedule(b);

@@ -1,6 +1,6 @@
 import { BriefcaseBusiness, Clock3, Eye, Pencil, Send, Trash2 } from 'lucide-react';
 import type { RecruitmentPost, RecruitmentWindow } from '@/services/enterpriseService';
-import { canDeleteRecruitmentPost, canEditRecruitmentPost, postDeleteLockReason, postEditLockReason, recruitmentStatusLabels, recruitmentTotals } from '@/utils/enterprise/recruitment';
+import { canDeleteRecruitmentPost, canEditRecruitmentPost, postEditLockReason, recruitmentStatusLabels, recruitmentTotals } from '@/utils/enterprise/recruitment';
 
 interface Props {
   post: RecruitmentPost;
@@ -51,11 +51,11 @@ export function RecruitmentPostCard({ post, windows, now, busy, onView, onEdit, 
     <footer className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-t border-black/5 px-3 py-2">
       <button type="button" data-view-post onClick={onView} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-orange-700"><Eye size={14} />Chi tiết</button>
       <div className="flex items-center gap-1">
-        {post.status === 'DRAFT' && <>
+        {post.status === 'DRAFT' && !post.publishedAt && <>
           <button type="button" data-edit-post aria-label="Chỉnh sửa tin nháp" title={postEditLockReason(post, windows, now) || 'Chỉnh sửa tin nháp'} disabled={busy || !editable} onClick={onEdit} className={`${iconButton} text-slate-500 hover:bg-orange-50 hover:text-orange-700`}><Pencil size={14} /></button>
           <button type="button" data-publish-post disabled={busy} onClick={() => onAction('publish')} className="ml-1 inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-700 disabled:opacity-40"><Send size={12} />Công bố</button>
         </>}
-        {['DRAFT', 'PUBLISHED'].includes(post.status) && <button type="button" data-delete-post aria-label={post.status === 'DRAFT' ? 'Xóa nháp' : 'Xóa tin tuyển dụng'} title={postDeleteLockReason(post, windows, now) || 'Xóa vĩnh viễn tin tuyển dụng'} disabled={busy || !canDeleteRecruitmentPost(post, windows, now)} onClick={() => onAction('delete')} className={`${iconButton} text-rose-500 hover:bg-rose-100`}><Trash2 size={14} /></button>}
+        {canDeleteRecruitmentPost(post) && <button type="button" data-delete-post aria-label="Xóa nháp" title="Xóa vĩnh viễn tin nháp" disabled={busy} onClick={() => onAction('delete')} className={`${iconButton} text-rose-500 hover:bg-rose-100`}><Trash2 size={14} /></button>}
       </div>
     </footer>
   </article>;

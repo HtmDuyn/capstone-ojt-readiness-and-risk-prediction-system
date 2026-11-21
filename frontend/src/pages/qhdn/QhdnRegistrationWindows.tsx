@@ -13,6 +13,7 @@ import type { RegistrationWindowItem } from '@/types/qhdn/qhdnTypes';
 const localDate = (value: string) => new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 const windowLabels: Record<string, string> = { OPEN: 'Đang mở', DRAFT: 'Bản nháp', CLOSED: 'Đã đóng' };
 const cell = 'px-4 py-4 align-middle';
+const openPeriodMessage = 'Chỉ mở đợt đăng ký OJT trong học kỳ đang diễn ra.';
 
 export default function QhdnRegistrationWindows() {
   const [url] = useSearchParams();
@@ -40,10 +41,14 @@ export default function QhdnRegistrationWindows() {
 
   useEffect(() => { setTask(null); setTaskError(''); setPage(1); setMessage(''); }, [semester.periodId]);
 
-  const openTask = (kind: 'extend' | 'toggle', window: RegistrationWindowItem) => { setTask({ kind, window }); setTaskError(''); };
+  const cannotOpen = (window: RegistrationWindowItem) => window.status !== 'OPEN' && !semester.canOpenRecruitment;
+  const openTask = (kind: 'extend' | 'toggle', window: RegistrationWindowItem) => {
+    if (kind === 'toggle' && cannotOpen(window)) return;
+    setTask({ kind, window }); setTaskError('');
+  };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!task || busy || !semester.semesterId) return;
+    if (!task || busy || !semester.semesterId || (task.kind === 'toggle' && cannotOpen(task.window))) return;
     const form = new FormData(event.currentTarget), reason = String(form.get('reason') || '').trim();
     if (!reason) return;
     setBusy(true); setTaskError('');
@@ -68,10 +73,10 @@ export default function QhdnRegistrationWindows() {
     <PageBanner variant="qhdn" title="Quản lý các đợt OJT" description="Thiết lập đợt OJT, quản lý lịch tuyển dụng, mở đợt con và chốt tổng hợp kết quả theo học kỳ." badge="Phòng QHDN" />
     <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
       <AcademicPeriodFilter selection={semester} disabled={busy} />
-      <button type="button" className={workflowSecondary} disabled={semester.loading || loading || busy} onClick={refresh}><RefreshCw size={16} />Tải lại các đợt</button>
+      <button type="button" className={workflowSecondary} disabled={semester.loading || loading || busy} onClick={() => { semester.reload(); refresh(); }}><RefreshCw size={16} />Tải lại các đợt</button>
     </section>
     {semester.error && <Notice>{semester.error}</Notice>}
-    {!semester.loading && semester.selectedPeriod && !semester.semesterId && <Notice>Học kỳ này chưa liên kết kỳ OJT. Bạn có thể tạo đợt OJT tổng để thiết lập lịch tuyển dụng.</Notice>}
+    {!semester.loading && semester.selectedPeriod && !semester.semesterId && <Notice>Học kỳ này chưa liên kết kỳ OJT.{semester.canOpenRecruitment && ' Tạo đợt tuyển dụng để thiết lập lịch OJT.'}</Notice>}
     {message && <Notice>{message}</Notice>}
     <RecruitmentRounds key={semester.periodId} selection={semester} refreshKey={revision} onChanged={refresh} />
     <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -91,7 +96,7 @@ export default function QhdnRegistrationWindows() {
                 <td className={cell}><span className={'whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ' + (window.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{windowLabels[window.status] || window.status}</span></td>
                 <td className={cell}><div className="flex justify-end gap-2">
                   <button type="button" className={workflowSecondary + ' !rounded-lg !px-3 !py-2 !text-xs'} disabled={busy} onClick={() => openTask('extend', window)}>Gia hạn</button>
-                  <button type="button" className={(window.status === 'OPEN' ? workflowSecondary : workflowPrimary) + ' whitespace-nowrap !rounded-lg !px-3 !py-2 !text-xs'} disabled={busy} onClick={() => openTask('toggle', window)}>{window.status === 'OPEN' ? 'Đóng đợt' : 'Mở đợt'}</button>
+                  <button type="button" className={(window.status === 'OPEN' ? workflowSecondary : workflowPrimary) + ' whitespace-nowrap !rounded-lg !px-3 !py-2 !text-xs'} disabled={busy || cannotOpen(window)} title={cannotOpen(window) ? openPeriodMessage : undefined} onClick={() => openTask('toggle', window)}>{window.status === 'OPEN' ? 'Đóng đợt' : 'Mở đợt'}</button>
                 </div></td>
               </tr>)}</tbody>
             </table></div>
@@ -107,7 +112,7 @@ export default function QhdnRegistrationWindows() {
         <Field label="Lý do"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
           <button type="button" className={workflowSecondary} disabled={busy} onClick={() => setTask(null)}>Hủy</button>
-          <button className={workflowPrimary} disabled={busy || !semester.semesterId}><CheckCircle2 size={16} />{busy ? 'Đang xử lý…' : 'Xác nhận'}</button>
+          <button className={workflowPrimary} disabled={busy || !semester.semesterId || (task.kind === 'toggle' && cannotOpen(task.window))}><CheckCircle2 size={16} />{busy ? 'Đang xử lý…' : 'Xác nhận'}</button>
         </div>
       </form>
     </WorkflowModal>}

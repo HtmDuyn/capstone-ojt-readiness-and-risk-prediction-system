@@ -20,7 +20,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
  const [editing,setEditing]=useState<Round|null>(null);
  const [draft,setDraft]=useState<ScheduleDraft>({...emptySchedule});
  const manuallyEdited=useRef(new Set<ScheduleField>());
- const startCreate=()=>{setEditing(null);setDraft({...emptySchedule});manuallyEdited.current.clear();setDateErrors({});setError('');setCreating(true);};
+ const startCreate=()=>{if(!catalog.canOpenRecruitment)return;setEditing(null);setDraft({...emptySchedule});manuallyEdited.current.clear();setDateErrors({});setError('');setCreating(true);};
  const startEdit=(round:Round)=>{setDraft(Object.fromEntries(Object.keys(emptySchedule).map(key=>[key,fmt(round[key as ScheduleField])])) as ScheduleDraft);manuallyEdited.current=new Set(Object.keys(emptySchedule) as ScheduleField[]);setEditing(round);setDateErrors({});setError('');setCreating(true);};
  const canSupplement=items.length>0&&items.every(item=>!!item.resultsFinalizedAt);
  const isSupplemental=campaigns.length>0;
@@ -48,10 +48,10 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    .then(r=>{if(active){setItems(r.data.data.items.map((item:Round)=>({...item,...recruitmentScheduleAccess(item,!['CLOSED','ARCHIVED'].includes(catalog.selectedPeriod?.status??''))})));setCampaigns(r.data.data.campaigns??[]);setMigrationRequired(false);}})
    .catch(e=>{if(active){setError(errorMessage(e));setMigrationRequired(e?.response?.status===503);}}).finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;};
- },[catalog.selectedPeriod?.id,revision,refreshKey]);
+ },[catalog.selectedPeriod?.id,catalog.selectedPeriod?.status,revision,refreshKey]);
  const create=async(e:FormEvent<HTMLFormElement>)=>{
   e.preventDefault();
-  if(!validateDates())return;
+  if((!editing&&!catalog.canOpenRecruitment)||!validateDates())return;
   const f=new FormData(e.currentTarget);setBusy(true);setError('');
   try{
    const schedule=Object.fromEntries(Object.entries(draft).map(([key,value])=>[key,editing&&value===fmt(editing[key as ScheduleField])?editing[key as ScheduleField]:parseDateTime(value)!.toISOString()])) as PhaseSchedule;
@@ -79,7 +79,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
   }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
  };
  const openRound=async(round:Round)=>{
-  if(busy||!round.canOpen)return;
+  if(busy||!catalog.canOpenRecruitment||!round.canOpen)return;
   setBusy(true);setError('');setMessage('');
   try{
    const { data } = await API.patch<{ data: { handedOffCount?: number } }>(
@@ -99,13 +99,14 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
   }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
  };
  return <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-  <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="flex items-center gap-2 text-lg font-bold text-slate-800"><CalendarDays size={22} className="text-orange-500"/>Đợt tuyển dụng OJT</h2><p className="mt-1 text-sm text-slate-500">Thiết lập một đợt tuyển dụng với ba hạn: đăng tin, ứng tuyển và xét tuyển, phản hồi.</p></div><button className={workflowPrimary} disabled={busy||loading||migrationRequired||!catalog.selectedPeriod||(isSupplemental&&!canSupplement)} onClick={startCreate}><Plus size={16}/>{isSupplemental?'Tạo đợt bổ sung':'Tạo đợt tuyển dụng'}</button></div>
-  {isSupplemental&&!canSupplement&&<p className="text-xs text-slate-500">Hoàn tất và chốt tổng hợp đợt hiện tại để tạo đợt bổ sung với ba hạn mới.</p>}
+  <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="flex items-center gap-2 text-lg font-bold text-slate-800"><CalendarDays size={22} className="text-orange-500"/>Đợt tuyển dụng OJT</h2><p className="mt-1 text-sm text-slate-500">Thiết lập hạn đăng tin, ứng tuyển và xét tuyển.</p></div><button className={workflowPrimary} disabled={busy||loading||migrationRequired||!catalog.canOpenRecruitment||(isSupplemental&&!canSupplement)} onClick={startCreate}><Plus size={16}/>{isSupplemental?'Tạo đợt bổ sung':'Tạo đợt tuyển dụng'}</button></div>
+  {catalog.selectedPeriod?.status==='CLOSED'&&<p className="text-sm text-slate-500">Chỉ tạo và mở đợt tuyển dụng trong học kỳ đang diễn ra.</p>}
+  {catalog.canOpenRecruitment&&isSupplemental&&!canSupplement&&<p className="text-xs text-slate-500">Hoàn tất và chốt tổng hợp đợt hiện tại để tạo đợt bổ sung với ba hạn mới.</p>}
   <p className="text-sm font-medium text-slate-700">{catalog.selectedPeriod?.name||'Chọn học kỳ chính ở bộ lọc phía trên.'}</p>
   {(error||catalog.error)&&<Notice>{error||catalog.error}</Notice>}{message&&<Notice>{message}</Notice>}
   <p className="text-xs text-slate-500">Giờ bắt đầu xét tuyển được gợi ý theo giờ bắt đầu ứng tuyển và có thể chỉnh tay; hạn phản hồi kết thúc bằng hoặc sau hạn ứng tuyển. Đợt chưa mở được sửa lịch và xóa; đợt đã mở không được xóa. Khi đang mở, chỉ sửa các mốc còn thời gian, không mở lại hạn đã hết.</p>
-  {migrationRequired?<button className={workflowSecondary} onClick={()=>setRevision(v=>v+1)}>Kiểm tra lại sau khi cập nhật database</button>:loading?<p className="text-sm text-slate-500">Đang tải…</p>:!items.length?<p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-500">Chưa có đợt tuyển dụng. Chọn “Tạo đợt tuyển dụng” để thiết lập ba hạn tuyển dụng.</p>:<div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200">{items.map((r,i)=>{
-   const canOpen=r.canOpen;
+  {migrationRequired?<button className={workflowSecondary} onClick={()=>setRevision(v=>v+1)}>Kiểm tra lại sau khi cập nhật database</button>:loading?<p className="text-sm text-slate-500">Đang tải…</p>:!items.length?<p className="rounded-xl bg-slate-50 p-5 text-sm text-slate-500">Chưa có đợt tuyển dụng trong học kỳ này.</p>:<div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200">{items.map((r,i)=>{
+   const canOpen=catalog.canOpenRecruitment&&r.canOpen;
    return <article key={r.id} className="space-y-4 p-4 sm:p-5"><div className="flex flex-wrap justify-between gap-3"><div><h3 className="flex items-center gap-2 font-bold text-slate-800"><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium tabular-nums text-slate-500">STT {i+1}</span><span>{r.roundNumber?`Đợt ${r.roundNumber} · `:''}{r.name}</span></h3><p className="mt-2 text-sm text-slate-500">{fmt(r.startsAt)} → {fmt(r.endsAt)}</p></div><span className="self-start rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">{labels[r.currentPhase]||r.currentPhase}</span></div>
     {r.postingStartsAt&&<dl className="divide-y divide-slate-100 border-y border-slate-100">{recruitmentPhases.map(phase=>{
      const active=phase.key==='posting'?r.canPost:phase.key==='application'?r.canApply:r.canRespond;
@@ -120,7 +121,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    <div className="divide-y divide-slate-100">{recruitmentPhases.map(phase=><fieldset key={phase.key} className="min-w-0 space-y-3 py-4 first:pt-0"><legend className="sr-only">{phase.label}</legend><div><h3 className="text-sm font-semibold text-slate-800">{phase.label}</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">{phase.description}</p></div><div className="grid gap-3 sm:grid-cols-2">{dateField((phase.key+'StartsAt') as ScheduleField,'Bắt đầu '+phase.label.toLowerCase())}{dateField((phase.key+'EndsAt') as ScheduleField,'Kết thúc '+phase.label.toLowerCase())}</div></fieldset>)}</div>
    <Notice>Hạn 2 mặc định bắt đầu khi hạn 1 kết thúc và kéo dài 7 ngày. Giờ bắt đầu hạn 3 được gợi ý theo hạn 2 và có thể chỉnh tay. Bạn tự chọn ngày và giờ kết thúc hạn 3; hệ thống không tự điền mốc này. Mốc bắt đầu đã diễn ra và các hạn đã hết sẽ được khóa khi sửa lịch.</Notice></>}
    {editing&&<Field label="Lý do sửa lịch"><textarea name="reason" className={workflowInput} required maxLength={2000}/></Field>}
-   <div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={()=>setCreating(false)}>Đóng</button>{(!!editing||!isSupplemental||canSupplement)&&<button className={workflowPrimary} disabled={busy||migrationRequired}>{busy?'Đang lưu…':editing?'Lưu lịch':isSupplemental?'Tạo đợt bổ sung':'Tạo đợt tuyển dụng'}</button>}</div>
+   <div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={()=>setCreating(false)}>Đóng</button>{(!!editing||!isSupplemental||canSupplement)&&<button className={workflowPrimary} disabled={busy||migrationRequired||(!editing&&!catalog.canOpenRecruitment)}>{busy?'Đang lưu…':editing?'Lưu lịch':isSupplemental?'Tạo đợt bổ sung':'Tạo đợt tuyển dụng'}</button>}</div>
   </form></WorkflowModal>}
   {extending&&<WorkflowModal title="Gia hạn đợt tuyển dụng" busy={busy} onClose={()=>setExtending(null)}><form className="space-y-4" onSubmit={extend}>{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">Chỉ kéo dài thời điểm kết thúc của giai đoạn đang mở. Không mở lại ứng tuyển đã đóng.</p>{recruitmentPhases.filter(phase=>phase.key==='posting'?extending.canPost:phase.key==='application'?extending.canApply:extending.canRespond).map(phase=><RecruitmentDateInput key={phase.key} name={phase.key} label={'Kết thúc mới: '+phase.label} defaultValue={fmt(extending[(phase.key+'EndsAt') as keyof PhaseSchedule])}/>)}<button className={workflowPrimary} disabled={busy}>{busy?'Đang cập nhật…':'Xác nhận gia hạn'}</button></form></WorkflowModal>}
   {action&&<WorkflowModal title={action.type==='delete'?'Xóa đợt chưa mở':'Chốt tổng hợp kết quả'} busy={busy} onClose={()=>setAction(null)}><form onSubmit={confirm} className="space-y-4">{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">{action.round.name} · {fmt(action.round.startsAt)} – {fmt(action.round.endsAt)}</p>{action.type==='delete'&&<Notice>Chỉ xóa đợt chưa từng mở và chưa có dữ liệu liên quan. Thao tác sẽ xóa cả lịch ứng tuyển đi kèm.</Notice>}<Field label="Lý do xác nhận"><textarea name="reason" className={workflowInput} required maxLength={2000}/></Field><button className={workflowPrimary} disabled={busy}>{busy?'Đang xử lý…':'Xác nhận'}</button></form></WorkflowModal>}

@@ -3,6 +3,7 @@ import { invalid } from '../students/student.validation';
 import { windowApi } from '../recruitment/recruitment.repository';
 import type { Row } from '../qhdn/qhdn.repository';
 import { currentRoundPhase, hasPhaseSchedule, phaseIsOpen } from '../recruitment/round-policy';
+import { academicPeriodStatusSql } from '../academic/period-status';
 
 // A scoped student registration window represents the existing bulk OJT intake.
 // Use the same semester and actual opening interval, not just Status='OPEN'.
@@ -10,7 +11,8 @@ export const activeStudentRegistration = (alias: string) => `${alias}."Status"='
   AND ${alias}."StartsAt"<=clock_timestamp() AND ${alias}."EndsAt">clock_timestamp()`;
 
 export const enterpriseWindowSelect = `SELECT w.*,ap."PeriodCode",ap."Name" AS "PeriodName",
-  ap."Kind",ap."Status" AS "PeriodStatus",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow",
+  ap."Kind",ap."Status" AS "PeriodStatus",${academicPeriodStatusSql('ap')} AS "CalendarStatus",
+  o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow",
   (SELECT jsonb_build_object('id',rw."WindowID",'name',rw."Name",'startsAt',rw."StartsAt",'endsAt',rw."EndsAt")
    FROM "OJTRegistrationWindows" rw WHERE rw."OJTSemesterID"=w."OJTSemesterID" AND ${activeStudentRegistration('rw')}
    ORDER BY rw."EndsAt" DESC,rw."WindowID" DESC LIMIT 1) AS "StudentRegistrationWindow"
@@ -32,14 +34,17 @@ export function enterpriseWindowApi(w: Row) {
     editLockCode:w.StudentRegistrationWindow ? 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' : null};
 }
 
+export function isUnpublishedEnterpriseDraft(post: Row) {
+  return post.Status === 'DRAFT' && !post.PublishedAt && !post.ArchivedAt;
+}
+
 export function enterprisePostActions(post: Row, window?: ReturnType<typeof enterpriseWindowApi>) {
-  const active = !!window?.accepting && !post.ArchivedAt;
-  const draft = post.Status === 'DRAFT';
-  const editable = !!window && !post.ArchivedAt && draft;
-  const posting = active && !!window?.canEdit;
+  const draft = isUnpublishedEnterpriseDraft(post);
+  const editable = !!window && draft;
+  const posting = !!window?.accepting && !!window.canEdit;
   return {
     canEdit: editable,
-    canDelete: !post.ArchivedAt && (draft || (post.Status === 'PUBLISHED' && posting)),
+    canDelete: draft,
     canPublish: editable && posting,
   };
 }
