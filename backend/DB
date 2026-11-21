@@ -1,10 +1,38 @@
--- OJT database bootstrap: final schema and final seed values.
--- FULL RESET: application data is deleted. Do not use to migrate a deployed database.
--- Full bootstrap: run the entire file only to initialize/reset application data.
--- Sections commit independently. A later error does not roll back earlier committed sections.
--- Self-contained: schema, routines, permissions and seed data are all in this file.
-
+-- OJT | Một file cho Supabase SQL Editor. Dán toàn bộ file, chọn Run.
+-- SYNC: cập nhật email student02, bổ sung phân công demo còn thiếu, tính lại slot và kiểm tra.
+-- RESET_DEMO: tạo lại toàn bộ dữ liệu OJT demo. Chỉ dùng trên DB demo đã đánh dấu
+-- hoặc DB mới có public trống. Những thay đổi sau lần seed trước sẽ bị xóa trong các bảng OJT.
+-- Chế độ được chọn ở dòng SET LOCAL dưới đây. Luôn chạy cả file trong một lượt.
 BEGIN;
+SET LOCAL ojt.run_mode = 'SYNC';
+SET LOCAL lock_timeout = '5s';
+SET LOCAL search_path = public, pg_catalog;
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+
+DO $ojt_dispatch$
+BEGIN
+  IF current_setting('ojt.run_mode') = 'RESET_DEMO' THEN
+    EXECUTE $ojt_schema_seed$
+DO $guard$
+BEGIN
+ IF to_regnamespace('ojt_demo_reset') IS NULL THEN
+   IF EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace
+     AND c.relkind IN ('r','p','v','m','S','f') AND NOT EXISTS (
+       SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e'))
+     OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND NOT EXISTS (
+       SELECT 1 FROM pg_depend d WHERE d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.deptype='e')) THEN
+     RAISE EXCEPTION 'DB đang có dữ liệu/cấu trúc. Hãy dùng project demo trống.';
+   END IF;
+   CREATE SCHEMA ojt_demo_reset;
+   REVOKE ALL ON SCHEMA ojt_demo_reset FROM PUBLIC;
+   CREATE TABLE ojt_demo_reset.instance(db_oid oid PRIMARY KEY, purpose text NOT NULL);
+   INSERT INTO ojt_demo_reset.instance SELECT oid,'OJT_DEMO_ONLY_V1' FROM pg_database WHERE datname=current_database();
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM ojt_demo_reset.instance i JOIN pg_database d ON d.oid=i.db_oid
+   WHERE d.datname=current_database() AND i.purpose='OJT_DEMO_ONLY_V1') THEN
+   RAISE EXCEPTION 'Thiếu định danh database demo.';
+ END IF;
+END $guard$;
 SET LOCAL TIME ZONE 'Asia/Bangkok';
 SET LOCAL search_path=public,pg_catalog;
 -- Serialize the destructive bootstrap with academic/OJT transactions before taking relation locks.
@@ -1632,7 +1660,7 @@ ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHand
 ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_RecipientRole_check" CHECK ((("RecipientRole")::text = 'OJT_COORD'::text));
 ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_RegistrationIDs_check" CHECK ((jsonb_typeof("RegistrationIDs") = 'array'::text));
 ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_pkey" PRIMARY KEY ("HandoffID");
-ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check" CHECK (("Kind" = ANY (ARRAY['ACCOUNT'::text, 'COMBO_REMINDER'::text, 'ACADEMIC_ALERT'::text, 'OJT_RESULT'::text, 'PASSWORD_RESET'::text, 'SYSTEM_NOTIFICATION'::text])));
+ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check" CHECK (("Kind" = ANY (ARRAY['ACCOUNT'::text, 'COMBO_REMINDER'::text, 'ACADEMIC_ALERT'::text, 'OJT_RESULT'::text])));
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Status_check" CHECK (("Status" = ANY (ARRAY['PENDING'::text, 'SENDING'::text, 'SENT'::text, 'FAILED'::text, 'CANCELLED'::text])));
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_check" CHECK ((("Status" <> ALL (ARRAY['PENDING'::text, 'SENDING'::text])) OR ("EncryptedPayload" IS NOT NULL)));
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_pkey" PRIMARY KEY ("EmailID");
@@ -6517,7 +6545,7 @@ BEGIN
 
  INSERT INTO "Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status")
  SELECT 'student'||lpad(d.n::text,2,'0'),'$2b$10$4qpatgMq9N2Fgc.qnWP4keLOFOTuazu8A9d67lUS9gn/AyhWHHCV.',
- 'student'||lpad(d.n::text,2,'0')||'@student.edu.vn','090100'||lpad(d.n::text,4,'0'),d.full_name,r."RoleID",'ACTIVE'
+ CASE WHEN d.n=2 THEN 'duyenhtmse180688@fpt.edu.vn' ELSE 'student'||lpad(d.n::text,2,'0')||'@student.edu.vn' END,'090100'||lpad(d.n::text,4,'0'),d.full_name,r."RoleID",'ACTIVE'
  FROM _demo_student_cases d CROSS JOIN "Roles" r WHERE r."RoleCode"='STUDENT';
  INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
  SELECT u."UserID",'SE'||right(entry_year::text,2)||lpad(d.n::text,4,'0'),program_id,entry_year,5,
@@ -7473,62 +7501,62 @@ BEGIN
    IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN EXECUTE format('REVOKE ALL ON %s public.%I FROM %I',item.kind,item.name,role_name); END IF;
   END LOOP;
  END LOOP;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicAlertNotificationBatches" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicAlertNotificationBatches" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AcademicAlertNotificationBatches_BatchID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicAlertNotificationDeliveries" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicGradingPolicies" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicImportBatches" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicAlertNotificationDeliveries" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicGradingPolicies" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicImportBatches" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AcademicImportBatches_BatchID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."AcademicImportRequests" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AcademicImportRequests_ImportID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicImportRows" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicImportRows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."AcademicMajors" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AcademicMajors_MajorID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicPeriods" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AcademicPeriods" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AcademicPeriods_AcademicPeriodID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."AcademicYears" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AcademicYears_AcademicYearID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ApplicationEvents" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ApplicationEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ApplicationEvents_EventID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AssessmentTemplates" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."AssessmentTemplates" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AssessmentTemplates_TemplateID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."AuditLogs" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."AuditLogs_LogID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CVAnalysisJobs" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CVAnalysisJobs" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."CVAnalysisJobs_AnalysisID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CohortGroups" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."Cohorts" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CohortGroups" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."Cohorts" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Cohorts_CohortID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ComboCourseChoiceGroups" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ComboCourseChoiceGroups_ChoiceGroupID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ComboCourseChoiceMembers" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ComboCourses" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ComboCourses_ComboCourseID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboExtensionStudents" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboPhaseSchedules" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboRegistrationWindows" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboExtensionStudents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboPhaseSchedules" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboRegistrationWindows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ComboRegistrationWindows_WindowID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboReminderBatches" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboReminderBatches" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ComboReminderBatches_BatchID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboReminderDeliveries" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboWindowExtensions" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboReminderDeliveries" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboWindowExtensions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ComboWindowExtensions_ExtensionID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboWindowStudents" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CompanyImportBatches" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ComboWindowStudents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CompanyImportBatches" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."CompanyImportBatches_BatchID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CompanyImportRows" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."CompanyImportRows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."CoursePrerequisites" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Courses" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Courses_CourseID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityCheckRuns" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityCheckRuns" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibilityCheckRuns_RunID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityChecks" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityChecks" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibilityChecks_CheckID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityConfirmations" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityConfirmations" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."EligibilityRequiredCourses" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityRunStudents" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffItems" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffs" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityRunStudents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffItems" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffs" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibleStudentHandoffs_HandoffID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."EmbeddingConfigurations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EmbeddingConfigurations_EmbeddingConfigID_seq" TO "service_role"'; END IF;
@@ -7571,11 +7599,11 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."NotificationTemplates_TemplateID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Notifications" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Notifications_NotificationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTActiveRuleSets" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisoryRunItems" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisoryRuns" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTActiveRuleSets" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisoryRunItems" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisoryRuns" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAdvisoryRuns_RunID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisorySchedules" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAdvisorySchedules" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertCheckRuns" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertCheckRuns_RunID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlertDeliveries" TO "service_role"'; END IF;
@@ -7590,7 +7618,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlertTargets_TargetID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTAlerts" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTAlerts_AlertID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAssessmentWindows" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTAssessmentWindows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTEligibilityConditions" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTEligibilityConditions_ConditionID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTEnterpriseImportBatches" TO "service_role"'; END IF;
@@ -7599,38 +7627,38 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTEnterpriseImportRows_ImportRowID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTMatchingProfiles" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTMatchingProfiles_ProfileID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationEvents" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrationEvents_EventID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationExceptions" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationExceptions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrationExceptions_ExceptionID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationWindows" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRegistrationWindows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrationWindows_WindowID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTRegistrations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRegistrations_RegistrationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTResultEvents" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTResultEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTResultEvents_EventID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTResults" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTResults" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTResults_ResultID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRuleSets" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."OJTRuleSets" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTRuleSets_RuleSetID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTSemesters" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."OJTSemesters_OJTSemesterID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."PathwayRecommendations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."PathwayRecommendations_RecommendationID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."PositionSpecializations" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionJobItems" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionJobs" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionJobItems" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionJobs" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."PredictionJobs_JobID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionModels" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."PredictionModels" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."PredictionModels_ModelID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."Predictions" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."Predictions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Predictions_PredictionID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ProgramCombos" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ProgramCombos_ProgramComboID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ProgramCourseEquivalences" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ProgramCourseEquivalences" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ProgramCourses" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ProgramCourses_ProgramCourseID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ProgramOJTGradeMappings" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."ProgramOJTGradeMappings" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ProgramOJTGradeMappings_MappingID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."ProgramPrerequisiteGroups" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."ProgramPrerequisiteGroups_GroupID_seq" TO "service_role"'; END IF;
@@ -7639,27 +7667,27 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."RecruitmentPostPositions" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."RecruitmentPosts" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."RecruitmentPosts_PostID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."RecruitmentWindows" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."RiskAlerts" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."RecruitmentWindows" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."RiskAlerts" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."RiskAlerts_AlertID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Roles" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Roles_RoleID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."SchemaMigrations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Specializations" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."Specializations_SpecializationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentAcademicPlacements" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentAcademicRecalculations" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentAcademicPlacements" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentAcademicRecalculations" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentAcademicRecalculations_RecalculationID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentAcademicSnapshot" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentAcademicSnapshot_SnapshotID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentCVFiles" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentCVFiles" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentCVFiles_CVFileID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentCVVersions" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentCVVersions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentCVVersions_CVID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentCareerInterests" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentCareerProfiles" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentComboCourseSelections" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentComboSelectionEvents" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentComboSelectionEvents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentComboSelectionEvents_EventID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentComboSelections" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentComboSelections_SelectionID_seq" TO "service_role"'; END IF;
@@ -7667,7 +7695,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentCourseResults_ResultID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentEnterpriseCoordination" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentEnterpriseCoordination_CoordinationID_seq" TO "service_role"'; END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentInterventions" TO "service_role"'; END IF;
+ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."StudentInterventions" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."StudentInterventions_InterventionID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentMatchingSkills" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."StudentOJTEligibility" TO "service_role"'; END IF;
@@ -7979,8 +8007,8 @@ BEGIN
   FROM public."OJTRegistrations"
   WHERE "StudentID"=v_active_student_id AND "OJTSemesterID"=v_semester_id;
   IF FOUND THEN
-    IF v_existing."Application"->>'demoFixture'<>'enterprise-flow'
-      OR v_existing."Application"->>'fixtureStage'<>'ACTIVE_INTERNSHIP' THEN
+    IF v_existing."Application"->>'demoFixture' IS DISTINCT FROM 'enterprise-flow'
+      OR v_existing."Application"->>'fixtureStage' IS DISTINCT FROM 'ACTIVE_INTERNSHIP' THEN
       RAISE EXCEPTION 'student02 already has a non-demo OJT registration for DEMO-OJT-S6.';
     END IF;
     v_active_registration_id:=v_existing."RegistrationID";
@@ -7999,7 +8027,7 @@ BEGIN
   v_result_checked_at:=date_trunc('milliseconds',clock_timestamp());
   SELECT jsonb_agg(jsonb_build_object(
       'studentId',eligible."StudentID",
-      'status',CASE WHEN eligible."EarnedCredits">=70 AND eligible."UnpassedCourseCount"<=2 THEN 'ELIGIBLE' ELSE 'NOT_ELIGIBLE' END,
+      'status',CASE WHEN eligible."EarnedCredits">=eligible."MinCredits" AND eligible."UnpassedCourseCount"<=eligible."MaxUnpassedCourses" THEN 'ELIGIBLE' ELSE 'NOT_ELIGIBLE' END,
       'earnedCredits',eligible."EarnedCredits",
       'unpassedCourseCount',eligible."UnpassedCourseCount",
       'reasons','[]'::jsonb,
@@ -8008,29 +8036,24 @@ BEGIN
     ) ORDER BY eligible."StudentID")
     INTO v_results
   FROM (
-    SELECT s."StudentID",
-      coalesce(sum(pc."Credits") FILTER (WHERE EXISTS (
-        SELECT 1 FROM public."StudentCourseResults" passed
-        WHERE passed."StudentID"=s."StudentID" AND passed."CourseID"=pc."CourseID"
-          AND passed."Status" IN ('PASSED','RECOGNIZED')
-      )),0)::numeric AS "EarnedCredits",
-      count(*) FILTER (WHERE EXISTS (
-        SELECT 1 FROM public."StudentCourseResults" failed
-        WHERE failed."StudentID"=s."StudentID" AND failed."CourseID"=pc."CourseID"
-          AND failed."Status"='FAILED'
-      ) AND NOT EXISTS (
-        SELECT 1 FROM public."StudentCourseResults" passed
-        WHERE passed."StudentID"=s."StudentID" AND passed."CourseID"=pc."CourseID"
-          AND passed."Status" IN ('PASSED','RECOGNIZED')
-      ))::int AS "UnpassedCourseCount"
-    FROM public."Students" s
-    JOIN public."Users" u ON u."UserID"=s."UserID"
-    JOIN public."ProgramCourses" pc ON pc."ProgramID"=s."ProgramID"
+    SELECT st."StudentID", rule."MinCredits",rule."MaxUnpassedCourses",
+      coalesce(sum(pc."Credits") FILTER (WHERE history.passed),0)::numeric AS "EarnedCredits",
+      count(*) FILTER (WHERE history.failed AND NOT history.passed)::int AS "UnpassedCourseCount"
+    FROM public."Students" st
+    JOIN public."Users" u USING ("UserID")
+    JOIN public."OJTActiveRuleSets" active ON active."ProgramID"=st."ProgramID" AND active."ScopeSemesterID"=v_semester_id
+    JOIN public."OJTRuleSets" rule USING ("RuleSetID")
+    JOIN public."ProgramCourses" pc ON pc."ProgramID"=st."ProgramID"
       AND pc."RecommendedSemester"<=5 AND pc."EntryKind"='COURSE'
+    LEFT JOIN (
+      SELECT "StudentID","CourseID",bool_or("Status" IN ('PASSED','RECOGNIZED')) AS passed,
+        bool_or("Status"='FAILED') AS failed
+      FROM public."StudentCourseResults" GROUP BY "StudentID","CourseID"
+    ) history ON history."StudentID"=st."StudentID" AND history."CourseID"=pc."CourseID"
     WHERE u."Username" IN ('student01','student02','student03','student04','student09',
       'student11','student12','student13','student14','student18','student20')
-      AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
-    GROUP BY s."StudentID"
+      AND u."Status"='ACTIVE' AND st."Status"='ACTIVE'
+    GROUP BY st."StudentID", rule."MinCredits", rule."MaxUnpassedCourses"
   ) eligible;
 
   IF v_results IS NULL OR jsonb_array_length(v_results)<>11 OR EXISTS (
@@ -8206,7 +8229,8 @@ BEGIN
       WHEN 'student09' THEN 'PENDING'
       WHEN 'student20' THEN 'PENDING'
       WHEN 'student11' THEN 'ACCEPTED'
-      WHEN 'student12' THEN 'ACCEPTED'
+      WHEN 'student12' THEN 'PENDING'
+      WHEN 'student18' THEN 'PENDING'
       ELSE 'REJECTED'
     END;
     v_reject_reason:=CASE WHEN v_decision='REJECTED'
@@ -8219,8 +8243,8 @@ BEGIN
     WHERE r."StudentID"=v_student."StudentID"
       AND r."OJTSemesterID"=v_semester_id;
     IF FOUND THEN
-      IF v_existing_registration."Application"->>'demoFixture'<>'enterprise-flow'
-        OR v_existing_registration."Application"->>'fixtureStage'<>'STATUS_CANDIDATE' THEN
+      IF v_existing_registration."Application"->>'demoFixture' IS DISTINCT FROM 'enterprise-flow'
+        OR v_existing_registration."Application"->>'fixtureStage' IS DISTINCT FROM 'STATUS_CANDIDATE' THEN
         RAISE EXCEPTION 'A demo candidate already has a non-demo OJT registration; refusing to overwrite it.';
       END IF;
       v_registration_id:=v_existing_registration."RegistrationID";
@@ -8361,7 +8385,7 @@ BEGIN
     RAISE EXCEPTION 'student01 must remain handed off but without an OJT registration or enterprise coordination.';
   END IF;
 
-  RAISE NOTICE 'Enterprise demo ready: 10 direct applications (4 pending, 3 accepted, 3 rejected); student01 is eligible and unregistered for direct-application testing.';
+  RAISE NOTICE 'Enterprise demo ready: 10 direct applications (6 pending, 2 accepted, 2 rejected); student01 is eligible and unregistered for direct-application testing.';
 END $enterprise_candidate_status_demo$;
 
 -- BEGIN STUDENT DATABASE AUDIT (READ ONLY)
@@ -8545,12 +8569,10 @@ DO $security$ BEGIN
 END $security$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261109_managed_ojt_policy') ON CONFLICT DO NOTHING;
 -- END INCREMENTAL UPDATE: 20261109_managed_ojt_policy
-COMMIT;
 
 -- BEGIN CV EXTRACTION AND CERTIFICATES V1
 -- Existing databases: run only this CV extraction and certificates block.
 -- Add CV extraction storage and application certificates.
-BEGIN;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "StudentCVFiles_FileStudent_unique" ON "StudentCVFiles" ("CVFileID","StudentID");
 CREATE TABLE IF NOT EXISTS "StudentCVExtractions" (
@@ -8592,23 +8614,22 @@ CHECK (
   AND jsonb_array_length("CertificateLinks") <= 5
 );
 
-COMMIT;
 
 -- END CV EXTRACTION AND CERTIFICATES V1
 
 -- BEGIN ENTERPRISE ACCOUNT IMPORT V2
 -- Existing databases: run only this block; historical recruitment imports remain valid.
-BEGIN;
+
 ALTER TABLE public."AccountImportBatches"
   DROP CONSTRAINT IF EXISTS "AccountImportBatches_check";
 ALTER TABLE public."AccountImportBatches"
   ADD CONSTRAINT "AccountImportBatches_check"
   CHECK ("Kind" = 'ENTERPRISE' OR "OJTSemesterID" IS NULL);
-COMMIT;
+
 -- END ENTERPRISE ACCOUNT IMPORT V2
 -- BEGIN OJT RECRUITMENT ROUNDS V1
 -- Additive migration. Existing recruitment records and applications are retained.
-BEGIN;
+
 SET LOCAL lock_timeout='5s';
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 CREATE TABLE IF NOT EXISTS public."RecruitmentCampaigns" (
@@ -8708,12 +8729,12 @@ DO $$ BEGIN
   GRANT USAGE,SELECT ON SEQUENCE public."RecruitmentCampaigns_CampaignID_seq" TO service_role;
  END IF;
 END $$;
-COMMIT;
+
 -- END OJT RECRUITMENT ROUNDS V1
 
 -- BEGIN OJT RECRUITMENT CAMPAIGN V2
 -- Run this block after OJT RECRUITMENT ROUNDS V1. No application data is deleted.
-BEGIN;
+
 SET LOCAL lock_timeout='5s';
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 ALTER TABLE public."RecruitmentCampaigns"
@@ -8785,11 +8806,11 @@ DROP TRIGGER IF EXISTS "TR_RecruitmentCampaign" ON public."RecruitmentCampaigns"
 CREATE TRIGGER "TR_RecruitmentCampaign" BEFORE INSERT OR UPDATE ON public."RecruitmentCampaigns"
  FOR EACH ROW EXECUTE FUNCTION public."GuardRecruitmentCampaign"();
 -- Existing V1 schedules and application history remain unchanged.
-COMMIT;
+
 -- END OJT RECRUITMENT CAMPAIGN V2
 -- BEGIN OJT PLACEMENT AND ACTUAL RECEIPT V1
 -- Additive update after OJT RECRUITMENT CAMPAIGN V2. Existing history is retained.
-BEGIN;
+
 SET LOCAL lock_timeout='5s';
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 ALTER TABLE public."StudentEnterpriseCoordination"
@@ -8883,12 +8904,12 @@ BEGIN
  RETURN NEW;
 END $$;
 
-COMMIT;
+
 -- END OJT PLACEMENT AND ACTUAL RECEIPT V1
 
 -- BEGIN OJT RECRUITMENT THREE PHASES V3
 -- Additive: existing round dates and applications are retained. Run this block alone on deployed databases.
-BEGIN;
+
 SET LOCAL lock_timeout='5s';
 SET LOCAL search_path=public,pg_catalog;
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
@@ -9017,12 +9038,12 @@ BEGIN
  RETURN continued;
 END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261111_recruitment_three_phases') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END OJT RECRUITMENT THREE PHASES V3
 
 -- BEGIN OJT RECRUITMENT LIFECYCLE V4
 -- Additive migration after THREE PHASES V3. Run only this block to retain deployed data.
-BEGIN;
+
 SET LOCAL search_path=public,pg_catalog;
 SET LOCAL lock_timeout='5s';
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
@@ -9148,12 +9169,12 @@ CREATE TRIGGER "TR_ApplicationSnapshot" BEFORE UPDATE ON public."JobApplications
 REVOKE ALL ON FUNCTION public."CarryForwardRecruitmentPosts"(integer),public."RecruitmentOccupiedSlots"(integer) FROM PUBLIC;
 DO $permissions$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN GRANT EXECUTE ON FUNCTION public."CarryForwardRecruitmentPosts"(integer),public."RecruitmentOccupiedSlots"(integer) TO service_role; END IF; END $permissions$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261111_recruitment_lifecycle') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END OJT RECRUITMENT LIFECYCLE V4
 
 -- BEGIN DATABASE ACCESS HARDENING V1
 -- Additive: closes missing RLS/grants on these application tables; no data is removed.
-BEGIN;
+
 ALTER TABLE public."CohortCurriculumPeriods" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."RecruitmentWindows" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public."CohortCurriculumPeriods",public."RecruitmentWindows" FROM PUBLIC;
@@ -9168,12 +9189,12 @@ DO $permissions$ BEGIN
   GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE public."CohortCurriculumPeriods",public."RecruitmentWindows" TO service_role;
  END IF;
 END $permissions$;
-COMMIT;
+
 -- END DATABASE ACCESS HARDENING V1
 
 -- BEGIN OJT QHDN SCHEDULE EDITING V5
 -- Additive update after LIFECYCLE V4. Run this block alone on an existing database.
-BEGIN;
+
 SET LOCAL search_path=public,pg_catalog;
 SET LOCAL lock_timeout='5s';
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
@@ -9287,13 +9308,13 @@ DO $$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
  GRANT DELETE ON public."RecruitmentCampaigns" TO service_role;
  END IF; END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_schedule_editing') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END OJT QHDN SCHEDULE EDITING V5
 
 -- BEGIN OJT QHDN COORDINATION CAPACITY V6
 -- Additive: QHDN referrals may exceed the advertised target; actual receipt
 -- remains a separate confirmation and never changes the original Capacity.
-BEGIN;
+
 SET LOCAL search_path=public,pg_catalog;
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 CREATE OR REPLACE FUNCTION public."GuardRecruitmentCapacity"() RETURNS trigger
@@ -9312,12 +9333,12 @@ BEGIN
  RETURN NEW;
 END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_coordination_capacity') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END OJT QHDN COORDINATION CAPACITY V6
 
 -- BEGIN OJT ENTERPRISE BULK ACCEPTANCE V7
 -- Additive. Only the validated company-scoped acceptance transaction may exceed capacity.
-BEGIN;
+
 SET LOCAL search_path=public,pg_catalog;
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 CREATE OR REPLACE FUNCTION public."GuardRecruitmentCapacity"() RETURNS trigger
@@ -9336,12 +9357,12 @@ BEGIN
  RETURN NEW;
 END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_enterprise_bulk_acceptance') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END OJT ENTERPRISE BULK ACCEPTANCE V7
 
 -- RECRUITMENT EXTRACTION V1
 -- Additive installation: run once on an existing database; does not reset data.
-BEGIN;
+
 SET LOCAL lock_timeout = '5s';
 CREATE TABLE IF NOT EXISTS public."RecruitmentPostExtractions" (
   "ExtractionID" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -9370,12 +9391,11 @@ DO $$ BEGIN
     GRANT USAGE,SELECT ON SEQUENCE public."RecruitmentPostExtractions_ExtractionID_seq" TO service_role;
   END IF;
 END $$;
-COMMIT;
 
 -- END RECRUITMENT EXTRACTION V1
 
 -- BEGIN INCREMENTAL UPDATE: ojt_credit_thresholds_v1
-BEGIN;
+
 CREATE TABLE IF NOT EXISTS public."OJTCreditThresholds" (
   "ThresholdID" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "MinCredits" numeric(6,2) NOT NULL UNIQUE CHECK ("MinCredits" >= 0),
@@ -9392,20 +9412,20 @@ DO $$ BEGIN
   END IF;
 END $$;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('ojt_credit_thresholds_v1') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END INCREMENTAL UPDATE: ojt_credit_thresholds_v1
 
 -- BEGIN INCREMENTAL UPDATE: internship_task_times_v1 (Vietnam local time)
-BEGIN;
+
 ALTER TABLE public."InternshipTasks"
   ADD COLUMN IF NOT EXISTS "AssignedAt" timestamp,
   ADD COLUMN IF NOT EXISTS "DueAt" timestamp;
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('internship_task_times_v1') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END INCREMENTAL UPDATE: internship_task_times_v1
 
 -- BEGIN INCREMENTAL UPDATE: accepted_intern_roster_v1
-BEGIN;
+
 SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 INSERT INTO public."InternshipAssignments"
   ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
@@ -9420,10 +9440,10 @@ WHERE co."Decision"='ACCEPTED'
     WHERE a."CoordinationID"=co."CoordinationID" OR (a."StudentID"=r."StudentID" AND old."OJTSemesterID"=co."OJTSemesterID"
       AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')));
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('accepted_intern_roster_v1') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END INCREMENTAL UPDATE: accepted_intern_roster_v1
 -- BEGIN INCREMENTAL UPDATE: 20261118_password_reset_codes
-BEGIN;
+
 CREATE TABLE IF NOT EXISTS public."PasswordResetCodes" (
   "UserID" integer PRIMARY KEY REFERENCES public."Users"("UserID") ON DELETE CASCADE,
   "CodeDigest" bytea NOT NULL,
@@ -9442,19 +9462,127 @@ DO $$ BEGIN
 END $$;
 ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
-  CHECK ("Kind" IN ('ACCOUNT', 'COMBO_REMINDER', 'ACADEMIC_ALERT', 'OJT_RESULT', 'PASSWORD_RESET', 'SYSTEM_NOTIFICATION'));
+  CHECK ("Kind" IN ('ACCOUNT', 'COMBO_REMINDER', 'ACADEMIC_ALERT', 'OJT_RESULT', 'PASSWORD_RESET'));
 INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261118_password_reset_codes') ON CONFLICT DO NOTHING;
-COMMIT;
+
 -- END INCREMENTAL UPDATE: 20261118_password_reset_codes
 
--- BEGIN INCREMENTAL UPDATE: 20261120_system_notifications
--- Existing deployments may run backend/migrations/20261120_system_notifications.sql instead.
-BEGIN;
-ALTER TABLE public."Notifications" ADD COLUMN IF NOT EXISTS "EventKey" text;
-CREATE UNIQUE INDEX IF NOT EXISTS "Notifications_EventKey_key" ON public."Notifications" ("EventKey");
-ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
-ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
-  CHECK ("Kind" IN ('ACCOUNT','COMBO_REMINDER','ACADEMIC_ALERT','OJT_RESULT','PASSWORD_RESET','SYSTEM_NOTIFICATION'));
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261120_system_notifications') ON CONFLICT DO NOTHING;
+
+$ojt_schema_seed$;
+  ELSIF current_setting('ojt.run_mode') <> 'SYNC' THEN
+    RAISE EXCEPTION 'Chế độ hợp lệ: SYNC hoặc RESET_DEMO.';
+  ELSIF to_regclass('public."Users"') IS NULL THEN
+    RAISE EXCEPTION 'Chưa có schema OJT. Với DB demo trống, chọn RESET_DEMO.';
+  END IF;
+END $ojt_dispatch$;
+
+UPDATE public."Users" AS u
+SET "Email" = 'duyenhtmse180688@fpt.edu.vn'
+FROM public."Roles" AS r
+WHERE u."Username" = 'student02'
+  AND r."RoleID" = u."RoleID"
+  AND r."RoleCode" = 'STUDENT' AND u."Email" IS DISTINCT FROM 'duyenhtmse180688@fpt.edu.vn';
+DO $email_check$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public."Users" u JOIN public."Roles" r USING ("RoleID")
+    WHERE u."Username"='student02' AND r."RoleCode"='STUDENT' AND u."Email"='duyenhtmse180688@fpt.edu.vn') THEN
+    RAISE EXCEPTION 'Thiếu tài khoản sinh viên student02. Đã hủy đồng bộ.';
+  END IF;
+END $email_check$;
+
+DO $sync$
+DECLARE
+  position_id integer;
+BEGIN
+  SELECT p."PositionID" INTO STRICT position_id
+  FROM public."InternshipPositions" p
+  JOIN public."OJTSemesters" s USING ("OJTSemesterID")
+  JOIN public."Enterprises" e USING ("EnterpriseID")
+  WHERE s."SemesterCode"='DEMO-OJT-S6' AND e."EnterpriseCode"='TECHVIET'
+    AND p."RecruitmentCode"='DEMO-TV-WEB-01' AND p."Capacity" IS NOT NULL
+    AND p."DeletedAt" IS NULL
+  FOR UPDATE OF p;
+
+  -- Bổ sung phân công còn thiếu cho hồ sơ demo có quyết định nhận cuối cùng.
+  INSERT INTO public."InternshipAssignments"
+    ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
+  SELECT c."CoordinationID",r."StudentID",c."EnterpriseID",p."PositionID",s."StartDate",s."EndDate",'ASSIGNED'
+  FROM public."StudentEnterpriseCoordination" c
+  JOIN public."OJTRegistrations" r USING ("RegistrationID","OJTSemesterID")
+  JOIN public."InternshipPositions" p USING ("PositionID","EnterpriseID","OJTSemesterID")
+  JOIN public."OJTSemesters" s USING ("OJTSemesterID")
+  JOIN public."JobApplications" j USING ("ApplicationID","RegistrationID","PositionID","EnterpriseID","OJTSemesterID","StudentID")
+  WHERE p."PositionID"=position_id AND r."Application"->>'demoFixture'='enterprise-flow'
+    AND r."Application"->>'fixtureStage' IN ('ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
+    AND c."Decision"='ACCEPTED' AND j."Status"='ACCEPTED'
+    AND NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" newer
+      WHERE newer."RegistrationID"=c."RegistrationID" AND newer."CoordinationID">c."CoordinationID")
+    AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" a
+      JOIN public."StudentEnterpriseCoordination" old USING ("CoordinationID")
+      WHERE a."StudentID"=r."StudentID" AND old."OJTSemesterID"=c."OJTSemesterID");
+
+  UPDATE public."InternshipPositions" p
+  SET "RemainingSlots"=greatest(0,p."Capacity"-public."RecruitmentOccupiedSlots"(position_id))
+  WHERE p."PositionID"=position_id AND p."RemainingSlots" IS DISTINCT FROM
+    greatest(0,p."Capacity"-public."RecruitmentOccupiedSlots"(position_id));
+END $sync$;
+
+DO $verify$
+DECLARE n int; accepted int; rejected int; pending int; assigned int; tasks int;
+BEGIN
+ IF current_setting('ojt.run_mode') <> 'RESET_DEMO' THEN RETURN; END IF;
+ SELECT count(*),count(*) FILTER (WHERE c."Decision"='ACCEPTED'),
+   count(*) FILTER (WHERE c."Decision"='REJECTED'),count(*) FILTER (WHERE c."Decision"='PENDING'),
+   count(a."AssignmentID"),sum((SELECT count(*) FROM public."InternshipTasks" t WHERE t."AssignmentID"=a."AssignmentID"))
+ INTO n,accepted,rejected,pending,assigned,tasks
+ FROM public."OJTRegistrations" r
+ JOIN public."OJTSemesters" s USING ("OJTSemesterID")
+ JOIN public."StudentEnterpriseCoordination" c USING ("RegistrationID")
+ LEFT JOIN public."InternshipAssignments" a USING ("CoordinationID")
+ WHERE s."SemesterCode"='DEMO-OJT-S6' AND r."Application"->>'demoFixture'='enterprise-flow';
+ IF ROW(n,accepted,rejected,pending,assigned,tasks) IS DISTINCT FROM ROW(10,2,2,6,2,3) THEN
+   RAISE EXCEPTION 'Sai baseline (hồ sơ/nhận/từ chối/chờ/phân công/task): %',ROW(n,accepted,rejected,pending,assigned,tasks);
+ END IF;
+END $verify$;
+
+
+WITH demo AS (
+  SELECT r."RegistrationID", u."Username", c."Decision", j."Status" AS app_status,
+    c."CoordinationID", j."ApplicationID"
+  FROM public."OJTRegistrations" r
+  JOIN public."Students" st USING ("StudentID")
+  JOIN public."Users" u USING ("UserID")
+  JOIN public."OJTSemesters" s USING ("OJTSemesterID")
+  LEFT JOIN LATERAL (
+    SELECT x.* FROM public."StudentEnterpriseCoordination" x
+    WHERE x."RegistrationID"=r."RegistrationID" ORDER BY x."CoordinationID" DESC LIMIT 1
+  ) c ON true
+  LEFT JOIN public."JobApplications" j ON j."ApplicationID"=c."ApplicationID"
+    AND j."RegistrationID"=r."RegistrationID" AND j."StudentID"=st."StudentID"
+    AND j."PositionID"=c."PositionID" AND j."EnterpriseID"=c."EnterpriseID"
+    AND j."OJTSemesterID"=s."OJTSemesterID"
+  WHERE r."Application"->>'demoFixture'='enterprise-flow' AND s."SemesterCode"='DEMO-OJT-S6'
+), measures(label,actual,baseline) AS (
+  SELECT 'Demo • Hồ sơ',count(*),10 FROM demo
+  UNION ALL SELECT 'Demo • Nhận',count(*),2 FROM demo WHERE "Decision"='ACCEPTED'
+  UNION ALL SELECT 'Demo • Từ chối',count(*),2 FROM demo WHERE "Decision"='REJECTED'
+  UNION ALL SELECT 'Demo • Chờ duyệt',count(*),6 FROM demo WHERE "Decision"='PENDING'
+  UNION ALL SELECT 'Demo • Lỗi liên kết hoặc lệch trạng thái hồ sơ',count(*),0 FROM demo
+    WHERE "ApplicationID" IS NULL OR app_status IS DISTINCT FROM CASE WHEN "Decision"='PENDING' THEN 'SUBMITTED' ELSE "Decision" END
+  UNION ALL SELECT 'Demo • Nhận nhưng thiếu phân công đúng sinh viên/vị trí',count(*),0 FROM demo d
+    WHERE d."Decision"='ACCEPTED' AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" a
+      JOIN public."JobApplications" j ON j."ApplicationID"=d."ApplicationID"
+      WHERE a."CoordinationID"=d."CoordinationID" AND a."StudentID"=j."StudentID"
+        AND a."PositionID"=j."PositionID" AND a."EnterpriseID"=j."EnterpriseID"
+        AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED'))
+  UNION ALL SELECT 'Demo • Vị trí có bộ đếm slot lệch',count(*),0 FROM public."InternshipPositions" p
+    JOIN public."OJTSemesters" s USING ("OJTSemesterID") JOIN public."Enterprises" e USING ("EnterpriseID")
+    WHERE s."SemesterCode"='DEMO-OJT-S6' AND e."EnterpriseCode"='TECHVIET' AND p."RecruitmentCode"='DEMO-TV-WEB-01'
+      AND p."RemainingSlots" IS DISTINCT FROM greatest(0,p."Capacity"-public."RecruitmentOccupiedSlots"(p."PositionID"))
+  UNION ALL SELECT 'Hệ thống • Tài khoản sinh viên active thiếu hồ sơ',count(*),0 FROM public."Users" u
+    JOIN public."Roles" r USING ("RoleID") WHERE u."Status"='ACTIVE' AND r."RoleCode"='STUDENT'
+      AND NOT EXISTS (SELECT 1 FROM public."Students" s WHERE s."UserID"=u."UserID" AND s."DeletedAt" IS NULL)
+) SELECT label AS "Chỉ số",actual AS "Hiện tại",baseline AS "Mốc đối chiếu",
+  CASE WHEN actual=baseline THEN 'Khớp' ELSE 'Cần đối chiếu' END AS "Kết quả" FROM measures ORDER BY label;
+
 COMMIT;
--- END INCREMENTAL UPDATE: 20261120_system_notifications
