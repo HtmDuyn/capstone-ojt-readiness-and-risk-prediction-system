@@ -143,8 +143,10 @@ export async function dashboardSummary(semesterId:number,actor:Actor) {
       GROUP BY p."EnterpriseID"
     )
     SELECT (SELECT row_to_json(progress) FROM (${progressSql}) progress) AS progress,
-      coalesce((SELECT json_agg(quotas ORDER BY "companyId") FROM quotas),'[]') AS quotas
-    FROM "OJTSemesters" WHERE "OJTSemesterID"=$1`,[semesterId,null]);
+      coalesce((SELECT json_agg(quotas ORDER BY "companyId") FROM quotas),'[]') AS quotas,
+      EXISTS (SELECT 1 FROM "RecruitmentWindows" w WHERE w."OJTSemesterID"=term."OJTSemesterID"
+        AND w."AcademicPeriodID"=term."AcademicPeriodID") AS "hasRecruitmentRounds"
+    FROM "OJTSemesters" term WHERE term."OJTSemesterID"=$1`,[semesterId,null]);
     if(!summary)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
     return summary;
   });

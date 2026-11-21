@@ -76,7 +76,6 @@ export default function QhdnRegistrationWindows() {
       <button type="button" className={workflowSecondary} disabled={semester.loading || loading || busy} onClick={() => { semester.reload(); refresh(); }}><RefreshCw size={16} />Tải lại các đợt</button>
     </section>
     {semester.error && <Notice>{semester.error}</Notice>}
-    {!semester.loading && semester.selectedPeriod && !semester.semesterId && <Notice>Học kỳ này chưa liên kết kỳ OJT.{semester.canOpenRecruitment && ' Tạo đợt tuyển dụng để thiết lập lịch OJT.'}</Notice>}
     {message && <Notice>{message}</Notice>}
     <RecruitmentRounds key={semester.periodId} selection={semester} refreshKey={revision} onChanged={refresh} />
     <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

@@ -40,6 +40,7 @@ import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
 import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
 import { useNearViewport } from "@/hooks/shared/useNearViewport";
 import { subscribeVisibleRefresh } from "@/utils/shared/visibleRefresh";
+import { missingRecruitmentRounds } from "@/utils/shared/recruitmentSchedule";
 import {
   listCompanies,
   listCoordinations,
@@ -85,6 +86,12 @@ export const QhdnDashboard: React.FC = () => {
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
   const quotas = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.quotas : undefined;
+  const hasRecruitmentRounds = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.hasRecruitmentRounds : undefined;
+  const periodNotice = !catalog.loading && !catalog.error && catalog.selectedPeriod && (
+    catalog.selectedPeriod.kind === 'SEMESTER' && (!selectedSemesterId || hasRecruitmentRounds === false)
+      ? missingRecruitmentRounds
+      : catalog.selectedPeriod.kind === 'BLOCK3' && !selectedSemesterId ? 'Block 3 này chưa liên kết kỳ OJT.' : ''
+  );
   const isLoading = !!selectedSemesterId && !quotas && !internshipError;
 
   // Coordinations data for rejected & accepted widgets
@@ -639,9 +646,7 @@ export const QhdnDashboard: React.FC = () => {
       {catalog.error && <Notice>{catalog.error}</Notice>}
       {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện đã bàn giao: {eligibleError}. Chọn Tải lại để thử lại.</Notice>}
       {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}. Chọn Tải lại để thử lại.</Notice>}
-      {!catalog.loading && catalog.selectedPeriod && !selectedSemesterId && (
-        <Notice>Học kỳ / Block 3 này chưa liên kết kỳ OJT. Chưa có dữ liệu OJT theo kỳ để hiển thị.</Notice>
-      )}
+      {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

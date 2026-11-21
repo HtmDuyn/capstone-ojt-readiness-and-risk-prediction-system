@@ -5,12 +5,4 @@ export const recruitmentPhases = [
 ] as const;
 
 export type PhaseSchedule = Record<'postingStartsAt'|'postingEndsAt'|'applicationStartsAt'|'applicationEndsAt'|'resultsStartsAt'|'resultsEndsAt', string>;
-export function validateRecruitmentPhases(schedule: PhaseSchedule) {
-  const times = Object.fromEntries(Object.entries(schedule).map(([key, value]) => [key, Date.parse(value)]));
-  if (Object.values(times).some(value => !Number.isFinite(value))) throw new Error('Vui lòng nhập đầy đủ ngày giờ hợp lệ cho cả ba hạn.');
-  if (times.postingStartsAt >= times.postingEndsAt || times.applicationStartsAt >= times.applicationEndsAt || times.resultsStartsAt >= times.resultsEndsAt)
-    throw new Error('Ngày giờ kết thúc của mỗi hạn phải sau ngày giờ bắt đầu.');
-  if (times.postingEndsAt > times.applicationStartsAt) throw new Error('Hạn đăng tin phải kết thúc trước hoặc đúng lúc bắt đầu ứng tuyển.');
-  if (times.resultsStartsAt < times.applicationStartsAt) throw new Error('Hạn xét tuyển không được bắt đầu trước hạn ứng tuyển.');
-  if (times.resultsEndsAt < times.applicationEndsAt) throw new Error('Hạn phản hồi của doanh nghiệp phải kết thúc bằng hoặc sau hạn ứng tuyển.');
-}
+export const missingRecruitmentRounds = 'Học kỳ này chưa tạo đợt tuyển dụng và chưa mở hạn xét tuyển cho doanh nghiệp và sinh viên.';
