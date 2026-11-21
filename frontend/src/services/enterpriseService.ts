@@ -90,7 +90,7 @@ export interface RecruitmentWindow {
   studentRegistrationWindow?: { id: number; name: string; startsAt: string; endsAt: string } | null;
   periodCode?: string;
   periodName?: string;
-  periodStatus?: string;
+  periodStatus: 'ACTIVE' | 'CLOSED';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -253,6 +253,7 @@ export interface EnterpriseCandidatePeriod {
   semesterName: string;
   academicPeriodId: number | null;
   academicPeriodName: string | null;
+  periodStatus: 'ACTIVE' | 'CLOSED';
   startDate: string | null;
   endDate: string | null;
 }

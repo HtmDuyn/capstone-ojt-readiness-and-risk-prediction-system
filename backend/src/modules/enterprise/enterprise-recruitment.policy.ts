@@ -19,16 +19,20 @@ export const enterpriseWindowSelect = `SELECT w.*,ap."PeriodCode",ap."Name" AS "
   FROM "RecruitmentWindows" w JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=w."AcademicPeriodID"
   JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID"`;
 
+export function canCreateEnterprisePost(w: Row) {
+  return w.CalendarStatus === 'ACTIVE' && w.Kind === 'SEMESTER' && w.LinkedPeriodID === w.AcademicPeriodID;
+}
+
 export function enterpriseWindowApi(w: Row) {
-  const window = windowApi(w);
+  const canCreate = canCreateEnterprisePost(w);
+  const window = {...windowApi(w), periodStatus:w.CalendarStatus, canCreate};
   if(w.CampaignID){
-    const posting=(hasPhaseSchedule(w)?phaseIsOpen(w,'POSTING'):currentRoundPhase(w)==='OPEN')
-      && w.Kind==='SEMESTER' && w.LinkedPeriodID===w.AcademicPeriodID && !['CLOSED','ARCHIVED'].includes(w.PeriodStatus);
-    return {...window,accepting:posting,canCreate:true,canEdit:posting,postingDeadlineAt:w.PostingEndsAt??w.EndsAt,
+    const posting=canCreate && (hasPhaseSchedule(w)?phaseIsOpen(w,'POSTING'):currentRoundPhase(w)==='OPEN');
+    return {...window,accepting:posting,canEdit:posting,postingDeadlineAt:w.PostingEndsAt??w.EndsAt,
       deadlineManagedBy:'QHDN',studentRegistrationWindow:null,editLockCode:posting?null:'RECRUITMENT_PHASE_CLOSED'};
   }
-  const accepting = window.accepting && w.Kind === 'SEMESTER' && w.LinkedPeriodID === w.AcademicPeriodID;
-  return {...window,accepting,canCreate:true,canEdit:accepting && !w.StudentRegistrationWindow,
+  const accepting = canCreate && window.accepting;
+  return {...window,accepting,canEdit:accepting && !w.StudentRegistrationWindow,
     postingDeadlineAt:w.EndsAt,deadlineManagedBy:'QHDN',
     studentRegistrationWindow:w.StudentRegistrationWindow ?? null,
     editLockCode:w.StudentRegistrationWindow ? 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' : null};

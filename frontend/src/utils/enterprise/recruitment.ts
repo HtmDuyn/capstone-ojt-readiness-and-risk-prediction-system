@@ -6,13 +6,18 @@ export const recruitmentStatusLabels: Record<RecruitmentPost['status'], string> 
   DRAFT: 'Bản nháp', PENDING_REVIEW: 'Tin cũ chưa công bố', PUBLISHED: 'Đang tuyển',
   REJECTED: 'Cần chỉnh sửa', CLOSED: 'Hết hạn',
 };
+export const enterprisePeriodLabels = { ACTIVE: 'Đang diễn ra', CLOSED: 'Đã đóng' } as const;
+
+export function windowAllowsPostCreation(window?: RecruitmentWindow) {
+  return window?.periodStatus === 'ACTIVE' && window.canCreate === true;
+}
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
 export const formatRecruitmentDate = (value?: string | null) => value && Number.isFinite(Date.parse(value))
   ? dateFormatter.format(new Date(value)) : 'Chưa có thời hạn';
 
 export function windowAcceptsPosts(window?: RecruitmentWindow, now = Date.now()) {
-  return !!window && window.accepting && window.canCreate !== false && window.status === 'OPEN'
+  return !!window && windowAllowsPostCreation(window) && window.accepting && window.canEdit !== false && window.status === 'OPEN'
     && new Date(window.postingStartsAt ?? window.startsAt).getTime() <= now
     && new Date(window.postingDeadlineAt ?? window.endsAt).getTime() > now;
 }
@@ -29,8 +34,9 @@ export function postPublishLockReason(post: RecruitmentPost, windows: Recruitmen
   const editReason = postEditLockReason(post, windows, now);
   if (editReason) return editReason;
   const window = windows.find(item => item.id === post.windowId);
+  if (!windowAllowsPostCreation(window)) return 'Chỉ công bố tin tuyển dụng trong học kỳ đang diễn ra.';
   if (!windowAcceptsPosts(window, now) || window?.studentRegistrationWindow
-    || post.studentRegistrationWindow || post.canPublish === false || window?.canEdit === false) {
+    || post.studentRegistrationWindow || post.canPublish === false) {
     return 'Đã hết hạn đăng tin hoặc sinh viên đang đăng ký, xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.';
   }
   return '';
@@ -108,6 +114,7 @@ export function recruitmentError(error: unknown) {
       RECRUITMENT_PHASE_CLOSED: 'Hạn 1 chưa mở hoặc đã kết thúc; sinh viên có thể đang xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',
+      RECRUITMENT_PERIOD_NOT_ACTIVE: 'Chỉ tạo hoặc công bố tin tuyển dụng trong học kỳ đang diễn ra.',
       RECRUITMENT_POST_NOT_FOUND: 'Không tìm thấy tin tuyển dụng thuộc doanh nghiệp của bạn.',
       RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION: 'Sinh viên đang đăng ký hoặc xét tuyển nên không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.',
       IDEMPOTENCY_CONFLICT: 'Yêu cầu tạo tin này đã được xử lý với nội dung khác. Hãy tải lại danh sách để kiểm tra trước khi tạo thêm.',

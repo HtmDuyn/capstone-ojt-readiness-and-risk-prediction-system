@@ -5,8 +5,10 @@ import { inputObject, invalid, positiveId, requiredText, optionalText, enumValue
 import { enterpriseScope, type Actor, type Row } from '../qhdn/qhdn.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { assertOpen, windowRecord, postApi, postSelect, closeUnusedPositions } from '../recruitment/recruitment.repository';
-import { assertNoStudentRegistration, enterpriseWindowApi, enterpriseWindowSelect, enterprisePostActions, isUnpublishedEnterpriseDraft, recruitmentDeadline } from './enterprise-recruitment.policy';
+import { assertNoStudentRegistration, canCreateEnterprisePost, enterpriseWindowApi, enterpriseWindowSelect, enterprisePostActions, isUnpublishedEnterpriseDraft, recruitmentDeadline } from './enterprise-recruitment.policy';
 import { assertRoundPhase } from '../recruitment/round-policy';
+import { academicPeriodStatusSql } from '../academic/period-status';
+import { visibleEnterpriseSemester } from './enterprise-periods';
 
 // The expiry worker keeps PublishedAt when it closes a published post. Legacy
 // manual closures must not appear in the enterprise list as expired vacancies.
@@ -42,7 +44,8 @@ export async function enterpriseWindows(params: Row, actor: Actor) {
   return readTransaction(async c => {
     await company(c, actor);
     const args = [params.academicPeriodId === undefined ? null : positiveId(params.academicPeriodId, 'academicPeriodId')];
-    const sql = `${enterpriseWindowSelect} WHERE ($1::int IS NULL OR w."AcademicPeriodID"=$1)`;
+    const sql = `${enterpriseWindowSelect} WHERE ($1::int IS NULL OR w."AcademicPeriodID"=$1)
+      AND (${academicPeriodStatusSql('ap')}) IN ('ACTIVE','CLOSED')`;
     const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) windows`, args)).rows[0].n;
     const rows = (await c.query(`${sql} ORDER BY w."WindowID" DESC LIMIT $2 OFFSET $3`, [...args,p.limit,p.offset])).rows;
     return {items:rows.map(enterpriseWindowApi),total,page:p.page,limit:p.limit};
@@ -53,7 +56,7 @@ export async function enterprisePosts(params: Row, actor: Actor) {
   if (p.offset > 2147483647) throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async c => {
     const own = await company(c, actor);
-    const args: unknown[] = [own], where = ['p."EnterpriseID"=$1',visibleEnterprisePost];
+    const args: unknown[] = [own], where = ['p."EnterpriseID"=$1',visibleEnterprisePost,visibleEnterpriseSemester('p."OJTSemesterID"')];
     if (params.windowId !== undefined) { args.push(positiveId(params.windowId,'windowId')); where.push(`p."WindowID"=$${args.length}`); }
     if (params.postId !== undefined) { args.push(positiveId(params.postId,'postId')); where.push(`p."PostID"=$${args.length}`); }
     if (params.positionId !== undefined) { args.push(positiveId(params.positionId,'positionId')); where.push(`EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp WHERE pp."PostID"=p."PostID" AND pp."PositionID"=$${args.length})`); }
@@ -119,6 +122,9 @@ export async function saveEnterprisePost(body: unknown, actor: Actor, id?: numbe
     const before = id ? await ownPost(c,id,own,true) : null;
     const w = await windowRecord(c,positiveId(before?.WindowID ?? b.windowId,'windowId'));
     if (before && !isUnpublishedEnterpriseDraft(before)) throw invalid('Chỉ được chỉnh sửa hoặc công bố tin nháp chưa từng công bố.',409,'RECRUITMENT_POST_LOCKED');
+    if ((!before || status === 'PUBLISHED') && !canCreateEnterprisePost(w)) {
+      throw invalid('Chỉ tạo hoặc công bố tin tuyển dụng trong học kỳ đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
+    }
     if (status === 'PUBLISHED') {
       assertOpen(w);
       assertRoundPhase(w,'POSTING');

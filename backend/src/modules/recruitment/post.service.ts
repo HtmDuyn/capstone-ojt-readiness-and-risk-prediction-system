@@ -7,6 +7,7 @@ import { inputObject,invalid,positiveId,requiredText,pagination,enumValue } from
 import { enterpriseScope } from '../qhdn/catalog.service';
 import { readTransaction } from '../qhdn/read.repository';
 import { windowRecord,postSelect,postApi,postRecord,closeUnusedPositions,type Row,type Actor } from './recruitment.repository';
+import { visibleEnterpriseSemester } from '../enterprise/enterprise-periods';
 
 export async function listPosts(params:Row,actor:Actor) {
  const companyId=positiveId(params.companyId,'companyId');
@@ -16,6 +17,7 @@ export async function listPosts(params:Row,actor:Actor) {
   const add=(sql:string,value:unknown)=>{args.push(value);where.push(sql.replace('?', '$'+args.length));};
   if(own!==null&&companyId!==null&&own!==companyId)throw invalid('This record belongs to another enterprise.',403,'FORBIDDEN');
   if(companyId!==null||own!==null)add('p."EnterpriseID"=?',companyId??own);
+  if(actor.roleCode==='ENTERPRISE')where.push(visibleEnterpriseSemester('p."OJTSemesterID"'));
   if(params.postId!==undefined)add('p."PostID"=?',positiveId(params.postId,'postId'));
   if(params.windowId!==undefined)add('p."WindowID"=?',positiveId(params.windowId,'windowId'));
   if(params.academicPeriodId!==undefined)add('w."AcademicPeriodID"=?',positiveId(params.academicPeriodId,'academicPeriodId'));

@@ -6,7 +6,7 @@ import { RecruitmentPostDialog } from '@/components/enterprise/RecruitmentPostDi
 import { RecruitmentPostDetailsDialog } from '@/components/enterprise/RecruitmentPostDetailsDialog';
 import { useRecruitmentFeedback } from '@/components/enterprise/RecruitmentNoticeDialog';
 import { RecruitmentPostCard } from '@/components/enterprise/RecruitmentPostCard';
-import { formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts } from '@/utils/enterprise/recruitment';
+import { enterprisePeriodLabels, formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts, windowAllowsPostCreation } from '@/utils/enterprise/recruitment';
 import { enterpriseService, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -42,7 +42,8 @@ export function EnterpriseJobs() {
     void loadRecruitmentData(controller.signal).then(({ posts: newPosts, windows: newWindows }) => {
       if (controller.signal.aborted) return;
       setPosts(newPosts); setWindows(newWindows);
-      setSelectedWindowId(current => current === 0 || newWindows.some(w => w.id === current) ? current : newWindows.find(w => windowAcceptsPosts(w))?.id ?? newWindows[0]?.id ?? 0);
+      setSelectedWindowId(current => current === 0 || newWindows.some(w => w.id === current) ? current :
+        newWindows.find(w => windowAcceptsPosts(w))?.id ?? newWindows.find(windowAllowsPostCreation)?.id ?? newWindows[0]?.id ?? 0);
     }).catch(err => { if (!controller.signal.aborted) setError(recruitmentError(err)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -57,7 +58,8 @@ export function EnterpriseJobs() {
   }, [windows, posts, now]);
   const selectedWindow = windows.find(w => w.id === selectedWindowId);
   const accepts = windowAcceptsPosts(selectedWindow, now);
-  const activeWindows = windows.filter(w => windowAcceptsPosts(w, now));
+  const creationWindows = windows.filter(windowAllowsPostCreation);
+  const canCreate = creationWindows.length > 0 && (!selectedWindow || windowAllowsPostCreation(selectedWindow));
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('vi');
     return posts.filter(post => (selectedWindowId <= 0 || post.windowId === selectedWindowId) && (!status || post.status === status) && (!query || [post.title, post.content, post.periodCode,
@@ -118,7 +120,7 @@ export function EnterpriseJobs() {
               onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
               <option value="0">Tất cả đợt đăng tin</option>
-              {windows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''}</option>)}
+              {windows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''} · {enterprisePeriodLabels[w.periodStatus]}</option>)}
             </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
           </div>
           {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -130,9 +132,10 @@ export function EnterpriseJobs() {
             </p>
           </div>}
         </div>
-        <p className="mt-3 text-xs text-slate-500">Bạn có thể tạo, sửa và xóa tin nháp chưa từng công bố. Công bố tin trong Hạn 1 để sinh viên ứng tuyển ở Hạn 2.</p>
-        {windows.length > 0 && !activeWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt nào đang nhận tin. Bạn vẫn có thể tạo và lưu bản nháp.</p>}
-        {selectedWindow?.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
+        <p className="mt-3 text-xs text-slate-500">Tạo tin trong học kỳ đang diễn ra. Công bố tin trong Hạn 1 để sinh viên ứng tuyển ở Hạn 2.</p>
+        {!creationWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt đăng tin khả dụng trong học kỳ đang diễn ra.</p>}
+        {creationWindows.length > 0 && !canCreate && <p className="mt-3 text-xs text-amber-800">Chọn đợt đăng tin trong học kỳ đang diễn ra để tạo tin.</p>}
+        {selectedWindow?.periodStatus === 'ACTIVE' && selectedWindow.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
           <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký hoặc xét tuyển: không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.
         </p>}
       </section>
@@ -149,7 +152,7 @@ export function EnterpriseJobs() {
             <option value="">Tất cả trạng thái</option>
             {currentStatuses.map(value => <option key={value} value={value}>{recruitmentStatusLabels[value]}</option>)}
           </select>
-          <button type="button" disabled={!windows.length} onClick={() => setEditor({ post: null })}
+          <button type="button" disabled={!canCreate} onClick={() => setEditor({ post: null })}
             className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
             <Plus size={17} />Tạo tin tuyển dụng
           </button>
@@ -163,7 +166,8 @@ export function EnterpriseJobs() {
       {!visible.length ? <div className="border-t border-slate-100 px-6 py-14 text-center">
         <BriefcaseBusiness size={30} className="mx-auto mb-3 text-slate-300" />
         <h2 className="font-medium text-slate-700">{search || status ? 'Không có tin phù hợp' : 'Chưa có tin tuyển dụng'}</h2>
-        <p className="mt-1 text-sm text-slate-400">{search || status ? 'Thử đổi từ khóa hoặc trạng thái.' : 'Tạo tin đầu tiên để bắt đầu tuyển thực tập sinh.'}</p>
+        {search || status ? <p className="mt-1 text-sm text-slate-400">Thử đổi từ khóa hoặc trạng thái.</p> :
+          canCreate && <p className="mt-1 text-sm text-slate-400">Tạo tin đầu tiên để bắt đầu tuyển thực tập sinh.</p>}
       </div> : <section aria-label="Danh sách tin tuyển dụng" className="grid grid-cols-1 gap-3 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {visible.map(post => <RecruitmentPostCard key={post.id} post={post} windows={windows} now={now} busy={actionBusy !== null}
           onView={() => setDetailPost(post)} onEdit={() => setEditor({ post })} onAction={action => void changePost(post, action)} />)}
@@ -199,7 +203,7 @@ export function EnterpriseJobs() {
     {feedback.dialog}
     {detailPost && <RecruitmentPostDetailsDialog post={detailPost} lockReason={postEditLockReason(detailPost, windows, now)} onClose={() => setDetailPost(null)}
       onEdit={() => { setDetailPost(null); setEditor({ post: detailPost }); }} />}
-    {editor && <RecruitmentPostDialog windows={windows} initialWindowId={selectedWindow?.id ?? activeWindows[0]?.id ?? windows[0]?.id} post={editor.post} now={now} onClose={() => setEditor(null)} onSaved={onSaved} />}
+    {editor && <RecruitmentPostDialog windows={editor.post ? windows : creationWindows} initialWindowId={selectedWindow?.id} post={editor.post} now={now} onClose={() => setEditor(null)} onSaved={onSaved} />}
   </div>;
 }
 
