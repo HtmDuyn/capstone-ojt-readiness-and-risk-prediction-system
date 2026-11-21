@@ -37,6 +37,7 @@ export const errorHandler: ErrorRequestHandler =
 
         errorCode,
         ...(typeof error?.importBatchId === 'string' ? { importBatchId: error.importBatchId } : {}),
+        ...(statusCode < 500 && typeof error?.field === 'string' ? { field: error.field } : {}),
 
         message:
           statusCode === 500

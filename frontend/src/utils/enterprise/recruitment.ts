@@ -1,17 +1,23 @@
 import axios, { type AxiosError } from 'axios';
 import { enterpriseService, type PaginatedResponse, type RecruitmentPost, type RecruitmentWindow } from '../../services/enterpriseService';
+import { loadAllPages as loadPages } from '../shared/loadAllPages';
 
 export const recruitmentStatusLabels: Record<RecruitmentPost['status'], string> = {
   DRAFT: 'Bản nháp', PENDING_REVIEW: 'Tin cũ chưa công bố', PUBLISHED: 'Đang tuyển',
-  REJECTED: 'Cần chỉnh sửa', CLOSED: 'Hết hạn', ARCHIVED: 'Đã xóa',
+  REJECTED: 'Cần chỉnh sửa', CLOSED: 'Hết hạn',
 };
+export const enterprisePeriodLabels = { ACTIVE: 'Đang diễn ra', CLOSED: 'Đã đóng' } as const;
+
+export function windowAllowsPostCreation(window?: RecruitmentWindow) {
+  return window?.periodStatus === 'ACTIVE' && window.canCreate === true;
+}
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
 export const formatRecruitmentDate = (value?: string | null) => value && Number.isFinite(Date.parse(value))
   ? dateFormatter.format(new Date(value)) : 'Chưa có thời hạn';
 
 export function windowAcceptsPosts(window?: RecruitmentWindow, now = Date.now()) {
-  return !!window && window.accepting && window.canCreate !== false && window.status === 'OPEN'
+  return !!window && windowAllowsPostCreation(window) && window.accepting && window.canEdit !== false && window.status === 'OPEN'
     && new Date(window.postingStartsAt ?? window.startsAt).getTime() <= now
     && new Date(window.postingDeadlineAt ?? window.endsAt).getTime() > now;
 }
@@ -28,33 +34,27 @@ export function postPublishLockReason(post: RecruitmentPost, windows: Recruitmen
   const editReason = postEditLockReason(post, windows, now);
   if (editReason) return editReason;
   const window = windows.find(item => item.id === post.windowId);
+  if (!windowAllowsPostCreation(window)) return 'Chỉ công bố tin tuyển dụng trong học kỳ đang diễn ra.';
   if (!windowAcceptsPosts(window, now) || window?.studentRegistrationWindow
-    || post.studentRegistrationWindow || post.canPublish === false || window?.canEdit === false) {
+    || post.studentRegistrationWindow || post.canPublish === false) {
     return 'Đã hết hạn đăng tin hoặc sinh viên đang đăng ký, xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.';
   }
   return '';
 }
 
-export function canDeleteRecruitmentPost(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
-  return !postDeleteLockReason(post, windows, now);
+const unpublishedDraftRequired = 'Chỉ được xóa tin nháp chưa từng công bố.';
+
+export function canDeleteRecruitmentPost(post: RecruitmentPost) {
+  return post.status === 'DRAFT' && !post.publishedAt && post.canDelete !== false;
 }
 
-export function postDeleteLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], now = Date.now()) {
-  if (post.deleted || post.status === 'ARCHIVED') return 'Tin đã xóa chỉ được xem lại.';
-  if (post.status === 'DRAFT' && post.canDelete !== false) return '';
-  const window = windows.find(item => item.id === post.windowId);
-  if (post.status === 'PUBLISHED') {
-    if (windowAcceptsPosts(window, now) && window?.canEdit !== false && !post.studentRegistrationWindow
-      && !window?.studentRegistrationWindow && post.canDelete !== false) return '';
-    return 'Hạn 1 đã kết thúc hoặc sinh viên đang xét tuyển. Không thể xóa tin đã công bố.';
-  }
-  return 'Không thể xóa tin ở trạng thái hiện tại.';
+export function postDeleteLockReason(post: RecruitmentPost) {
+  return canDeleteRecruitmentPost(post) ? '' : unpublishedDraftRequired;
 }
 
 export function postEditLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], _now = Date.now()) {
   const window = windows.find(item => item.id === post.windowId);
-  if (post.status === 'PUBLISHED') return 'Tin đã công bố không được chỉnh sửa. Chỉ được xóa mềm trong Hạn 1.';
-  if (post.status !== 'DRAFT') return 'Chỉ tin nháp được chỉnh sửa. Tin đã xóa hoặc hết hạn chỉ được xem.';
+  if (post.status !== 'DRAFT' || post.publishedAt) return 'Chỉ tin nháp chưa từng công bố được chỉnh sửa.';
   if (!window) return 'Không tìm thấy đợt của tin nháp. Vui lòng tải lại danh sách.';
   return '';
 }
@@ -72,28 +72,32 @@ export async function loadAllPages<T extends { id: number }>(
   signal: AbortSignal,
   dataLabel = 'dữ liệu tuyển dụng',
 ) {
-  if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
-  const first = await fetchPage(1);
-  if (!first.success || !first.data || first.data.limit <= 0) throw new Error(`Không thể tải ${dataLabel}.`);
-  const items = [...first.data.items];
-  const totalPages = Math.ceil(first.data.total / first.data.limit);
-
-  // Tải tối đa hai trang mỗi lượt để giảm thời gian chờ nhưng không gây quá tải API.
-  for (let page = 2; page <= totalPages; page += 2) {
-    if (signal.aborted) throw new DOMException('Đã hủy tải dữ liệu.', 'AbortError');
-    const pageNumbers = [page, ...(page + 1 <= totalPages ? [page + 1] : [])];
-    const responses = await Promise.all(pageNumbers.map(nextPage => fetchPage(nextPage)));
-    for (const response of responses) {
-      if (!response.success || !response.data) throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
-      items.push(...response.data.items);
-    }
-  }
-  return uniqueById(items);
+  return uniqueById(await loadPages(async page => {
+    const response = await fetchPage(page);
+    if (!response.success || !response.data || response.data.limit <= 0)
+      throw new Error(`Không thể tải đầy đủ ${dataLabel}.`);
+    return response.data;
+  }, signal));
 }
 
-export async function loadRecruitmentData(signal: AbortSignal, deleted = false) {
+export async function loadRecruitmentOverview(publishedCount: number, signal: AbortSignal) {
+  const label = 'danh sách tin tuyển dụng';
+  const first = await enterpriseService.listRecruitmentPosts({ page: 1, limit: 100 }, signal);
+  if (!first.success || !first.data || first.data.limit <= 0) throw new Error(`Không thể tải ${label}.`);
+  const { items, total, limit } = first.data;
+  const useStatusFilter = Math.max(1, Math.ceil(publishedCount / limit)) < Math.ceil(total / limit);
+  const posts = total <= limit ? items : await loadAllPages(page => {
+    if (page === 1 && !useStatusFilter) return Promise.resolve(first);
+    return enterpriseService.listRecruitmentPosts({ page, limit, ...(useStatusFilter ? { status: 'PUBLISHED' } : {}) }, signal);
+  }, signal, label);
+  const now = Date.now();
+  return { total, publishedPosts: posts.filter(post => post.status === 'PUBLISHED'
+    && (!post.deadlineAt || Date.parse(post.deadlineAt) > now)) };
+}
+
+export async function loadRecruitmentData(signal: AbortSignal) {
   const [posts, windows] = await Promise.all([
-    loadAllPages(page => deleted ? enterpriseService.listDeletedRecruitmentPosts({ page, limit: 100 }, signal) : enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
+    loadAllPages(page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, signal), signal),
     loadAllPages(page => enterpriseService.listRecruitmentWindows({ page, limit: 100 }, signal), signal),
   ]);
   return { posts, windows };
@@ -105,11 +109,12 @@ export function recruitmentError(error: unknown) {
     const body = apiError.response?.data;
     const messages: Record<string, string> = {
       RECRUITMENT_WINDOW_CLOSED: 'Đã hết hạn đăng tin. Bạn vẫn có thể chỉnh sửa và lưu bản nháp, nhưng không thể công bố.',
-      RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa. Tin đã công bố không được sửa; tin đã xóa chỉ được xem lại.',
-      RECRUITMENT_POST_DELETE_DENIED: 'Chỉ được xóa tin nháp hoặc tin Published còn trong Hạn 1.',
+      RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa.',
+      RECRUITMENT_POST_DELETE_DENIED: unpublishedDraftRequired,
       RECRUITMENT_PHASE_CLOSED: 'Hạn 1 chưa mở hoặc đã kết thúc; sinh viên có thể đang xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',
+      RECRUITMENT_PERIOD_NOT_ACTIVE: 'Chỉ tạo hoặc công bố tin tuyển dụng trong học kỳ đang diễn ra.',
       RECRUITMENT_POST_NOT_FOUND: 'Không tìm thấy tin tuyển dụng thuộc doanh nghiệp của bạn.',
       RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION: 'Sinh viên đang đăng ký hoặc xét tuyển nên không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.',
       IDEMPOTENCY_CONFLICT: 'Yêu cầu tạo tin này đã được xử lý với nội dung khác. Hãy tải lại danh sách để kiểm tra trước khi tạo thêm.',

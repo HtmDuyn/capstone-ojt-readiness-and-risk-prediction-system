@@ -6,6 +6,7 @@ import { timestamp,ids } from '../combo-registration/combo.validation';
 import { notifyRegistrationSchedule } from '../recruitment/notification.service';
 import { noticeFingerprint } from '../../shared/notification.service';
 import { wakeEmailAfterCommit } from '../../jobs/email-wakeup';
+import { actualPeriod, registrationPeriod } from '../academic/workflow-policy';
 export type Row=Record<string,any>;
 export type Actor={userId:number;roleCode:string;studentId?:number|null};
 export function registrationScope(value:unknown) {
@@ -32,18 +33,31 @@ async function saveWindowFields(body:unknown,actor:number,id:number|undefined,cl
  if(w.AcademicPeriodID!==term.AcademicPeriodID)throw invalid('academicPeriodId must match the selected OJT semester.',409,'REGISTRATION_PERIOD_MISMATCH');
  w.RequiredRelativeSemester=positiveId(b.requiredRelativeSemester??6,'requiredRelativeSemester');
  if(w.RequiredRelativeSemester!==6)throw invalid('OJT is fixed in relative semester 6.',409,'OJT_FIXED_SEMESTER_REQUIRED');
+ if(!before) {
+  const period=await actualPeriod(c,w.AcademicPeriodID);
+  if(period.Kind!=='SEMESTER'||period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ tạo đợt đăng ký OJT trong học kỳ đang diễn ra.',409,'REGISTRATION_PERIOD_NOT_ACTIVE');
+ }
  if(new Date(w.EndsAt)<=new Date(w.StartsAt))throw invalid('endsAt must be after startsAt.');await semester(c,w.OJTSemesterID);await validateScope(c,w.Scope);
  if(w.Status==='OPEN'&&new Date(w.EndsAt)<=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now)throw invalid('An open window deadline must be in the future.',409);
  const args=[w.OJTSemesterID,w.Name,JSON.stringify(w.Scope),w.StartsAt,w.EndsAt,w.AcademicPeriodID,w.RequiredRelativeSemester];const after=id?(await c.query(`UPDATE "OJTRegistrationWindows" SET "OJTSemesterID"=$1,"Name"=$2,"Scope"=$3,"StartsAt"=$4,"EndsAt"=$5,"AcademicPeriodID"=$6,"RequiredRelativeSemester"=$7,"UpdatedAt"=now() WHERE "WindowID"=$8 RETURNING *`,[...args,id])).rows[0]:(await c.query(`INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","Name","Scope","StartsAt","EndsAt","AcademicPeriodID","RequiredRelativeSemester","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,[...args,actor])).rows[0];await audit(c,actor,'OJTRegistrationWindows',after.WindowID,id?'UPDATE':'CREATE',before,after,optionalText(b.reason,'reason',2000)??undefined);return windowApi(await windowRecord(c,after.WindowID));
 
 }
-async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:number,client:PoolClient) {const b=inputObject(body,['reason']),reason=requiredText(b.reason,'reason',2000);const c=client;const before=await windowRecord(c,id),status=action==='open'?'OPEN':'CLOSED';if(before.Status===status)return {...windowApi(before),replayed:true};if(action==='close'&&before.Status!=='OPEN')throw invalid('Only an open window can be closed.',409,'REGISTRATION_WINDOW_NOT_OPEN');if(action==='open'){
+async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:number,client:PoolClient) {
+ const b=inputObject(body,['reason']),reason=requiredText(b.reason,'reason',2000),c=client;
+ const before=await windowRecord(c,id),status=action==='open'?'OPEN':'CLOSED';
+ if(action==='open'){
+ const period=await registrationPeriod(c,before);
+ if(period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ mở đợt đăng ký OJT trong học kỳ đang diễn ra.',409,'REGISTRATION_PERIOD_NOT_ACTIVE');
+ }
+ if(before.Status===status)return {...windowApi(before),replayed:true};
+ if(action==='close'&&before.Status!=='OPEN')throw invalid('Only an open window can be closed.',409,'REGISTRATION_WINDOW_NOT_OPEN');
+ if(action==='open'){
  const args:unknown[]=[before.OJTSemesterID];const filters=['h."OJTSemesterID"=$1'];
  for(const [key,column] of [['studentIds','s."StudentID"'],['programIds','s."ProgramID"'],['majorIds','s."SpecializationID"'],['cohortIds','p."CohortID"'],['groupCodes','p."GroupCode"']])if(before.Scope[key]){
   args.push(before.Scope[key]);filters.push((key==='majorIds'?'t."SpecializationID"':column)+'=ANY($'+args.length+'::'+(key==='groupCodes'?'text':'int')+'[])');
  }
  if(!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" h JOIN "Students" s ON s."StudentID"=h."StudentID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" WHERE '+filters.join(' AND ')+' LIMIT 1',args)).rowCount)throw invalid('No handed-off students in this window scope.',409,'HANDOFF_ROSTER_EMPTY');
- await semester(c,before.OJTSemesterID);await validateScope(c,before.Scope);if(new Date(before.EndsAt)<=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now)throw invalid('Extend the deadline before opening an expired window.',409,'REGISTRATION_WINDOW_EXPIRED');}
+ await validateScope(c,before.Scope);if(new Date(before.EndsAt)<=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now)throw invalid('Extend the deadline before opening an expired window.',409,'REGISTRATION_WINDOW_EXPIRED');}
  const after=(await c.query(`UPDATE "OJTRegistrationWindows" SET "Status"=$2,"${action==='open'?'OpenedBy':'ClosedBy'}"=$3,"${action==='open'?'OpenedAt':'ClosedAt'}"=now(),"UpdatedAt"=now() WHERE "WindowID"=$1 RETURNING *`,[id,status,actor])).rows[0];await audit(c,actor,'OJTRegistrationWindows',id,action==='open'?'OPEN':'CLOSE',before,after,reason);return {...windowApi(await windowRecord(c,after.WindowID)),replayed:false};}
 
 export async function saveWindow(body:unknown,actor:number,id?:number) {

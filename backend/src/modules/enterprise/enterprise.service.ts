@@ -9,6 +9,7 @@ import { api } from '../qhdn/catalog.service';
 import { enterpriseScope } from '../qhdn/qhdn.repository';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { enterpriseSemesterStatusSql, visibleEnterpriseSemester } from './enterprise-periods';
 
 const applicationCertificates='ja."CertificateLinks"';
 
@@ -68,7 +69,8 @@ export async function enterpriseCandidateCV(candidateId: number, actor: Actor) {
         AND ja."RegistrationID"=r."RegistrationID" AND ja."StudentID"=r."StudentID" AND ja."EnterpriseID"=co."EnterpriseID"
       LEFT JOIN "StudentCVFiles" cvfile ON cvfile."CVFileID"=ja."CVFileID" AND cvfile."StudentID"=r."StudentID"
       LEFT JOIN "StudentCVVersions" legacy ON legacy."CVID"=ja."CVID" AND legacy."StudentID"=r."StudentID"
-      WHERE co."CoordinationID"=$1 AND co."EnterpriseID"=$2`, [candidateId, companyId])).rows[0];
+      WHERE co."CoordinationID"=$1 AND co."EnterpriseID"=$2
+        AND ${visibleEnterpriseSemester('r."OJTSemesterID"')}`, [candidateId, companyId])).rows[0];
     if (!file || (!file.Content && !file.EncryptedContent))
       throw invalid('Không tìm thấy CV đã gửi cho doanh nghiệp trong hồ sơ này.', 404, 'CV_NOT_FOUND');
     return { FileName: file.FileName, Content: file.Content ?? decryptCv(file.EncryptedContent) };
@@ -79,26 +81,35 @@ export async function enterpriseProfile(actor: Actor) {
   return readTransaction(async c => {
     const companyId = await enterpriseScope(c, actor);
     const company = (await c.query('SELECT * FROM "Enterprises" WHERE "EnterpriseID"=$1', [companyId])).rows[0];
-    const summary=(await c.query(`WITH active_students AS (
-      SELECT r."StudentID" FROM "StudentEnterpriseCoordination" co
+    const summary=(await c.query(`WITH visible_coordinations AS (
+      SELECT co.* FROM "StudentEnterpriseCoordination" co
+      WHERE co."EnterpriseID"=$1 AND ${visibleEnterpriseSemester('co."OJTSemesterID"')}
+    ), visible_assignments AS (
+      SELECT a.* FROM "InternshipAssignments" a
+      JOIN visible_coordinations co USING ("CoordinationID")
+      WHERE a."EnterpriseID"=$1
+    ), active_students AS (
+      SELECT r."StudentID" FROM visible_coordinations co
       JOIN "OJTRegistrations" r USING ("RegistrationID")
-      WHERE co."EnterpriseID"=$1 AND co."Decision"='ACCEPTED'
+      WHERE co."Decision"='ACCEPTED'
         AND NOT EXISTS (SELECT 1 FROM "StudentEnterpriseCoordination" newer
           WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
         AND NOT EXISTS (SELECT 1 FROM "InternshipAssignments" a WHERE a."CoordinationID"=co."CoordinationID")
       UNION
-      SELECT a."StudentID" FROM "InternshipAssignments" a
-      WHERE a."EnterpriseID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') IN ('ASSIGNED','ACTIVE','IN_PROGRESS')
+      SELECT a."StudentID" FROM visible_assignments a
+      WHERE COALESCE(UPPER(a."Status"),'ASSIGNED') IN ('ASSIGNED','ACTIVE','IN_PROGRESS')
         AND NOT EXISTS (SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID"
           AND ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)
     ) SELECT
-      (SELECT count(*)::int FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "Status"='PUBLISHED' AND ("DeadlineAt" IS NULL OR "DeadlineAt">clock_timestamp())) AS "publishedPosts",
-      (SELECT count(*)::int FROM "RecruitmentPosts" WHERE "EnterpriseID"=$1 AND "Status"='PENDING_REVIEW') AS "pendingPosts",
-      (SELECT count(*)::int FROM "StudentEnterpriseCoordination" co WHERE co."EnterpriseID"=$1 AND COALESCE(co."Decision",'PENDING')='PENDING' AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")) AS "pendingCandidates",
+      (SELECT count(*)::int FROM "RecruitmentPosts" p WHERE "EnterpriseID"=$1 AND "Status"='PUBLISHED' AND ("DeadlineAt" IS NULL OR "DeadlineAt">clock_timestamp())
+        AND ${visibleEnterpriseSemester('p."OJTSemesterID"')}) AS "publishedPosts",
+      (SELECT count(*)::int FROM "RecruitmentPosts" p WHERE "EnterpriseID"=$1 AND "Status"='PENDING_REVIEW'
+        AND ${visibleEnterpriseSemester('p."OJTSemesterID"')}) AS "pendingPosts",
+      (SELECT count(*)::int FROM visible_coordinations co WHERE COALESCE(co."Decision",'PENDING')='PENDING' AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")) AS "pendingCandidates",
       (SELECT count(*)::int FROM active_students) AS "activeInterns",
       (SELECT count(*)::int FROM active_students) AS "acceptedInterns",
-      (SELECT count(DISTINCT a."StudentID")::int FROM "InternshipAssignments" a JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID" WHERE a."EnterpriseID"=$1 AND ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS "completedInterns",
-      (SELECT count(*)::int FROM "InternshipAssignments" a WHERE a."EnterpriseID"=$1 AND UPPER(a."Status") IN ('ACTIVE','IN_PROGRESS','COMPLETED') AND NOT EXISTS(SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID" AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS "pendingEvaluations"`,[companyId])).rows[0];
+      (SELECT count(DISTINCT a."StudentID")::int FROM visible_assignments a JOIN "InternshipEvaluations" ev ON ev."AssignmentID"=a."AssignmentID" WHERE ev."Status"='SUBMITTED' AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL) AS "completedInterns",
+      (SELECT count(*)::int FROM visible_assignments a WHERE UPPER(a."Status") IN ('ACTIVE','IN_PROGRESS','COMPLETED') AND NOT EXISTS(SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID" AND ev."EvaluatedAt" IS NOT NULL AND ev."OverallScore" IS NOT NULL)) AS "pendingEvaluations"`,[companyId])).rows[0];
     return {...api('companies', company),summary:{scope:'ALL_SEMESTERS',...summary}};
   });
 }
@@ -127,7 +138,7 @@ export async function dashboardCandidates(actor: Actor) {
       SELECT co."CoordinationID", co."PositionID", co."CoordinatedAt", co."Decision", r."StudentID"
       FROM "StudentEnterpriseCoordination" co
       JOIN "OJTRegistrations" r USING ("RegistrationID")
-      WHERE co."EnterpriseID"=$1 AND NOT EXISTS (
+      WHERE co."EnterpriseID"=$1 AND ${visibleEnterpriseSemester('r."OJTSemesterID"')} AND NOT EXISTS (
         SELECT 1 FROM "StudentEnterpriseCoordination" newer
         WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
     ), pending AS (
@@ -154,7 +165,7 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
     const companyId = await enterpriseScope(c,actor);
     if(companyId===null)throw invalid('Enterprise role required.',403,'FORBIDDEN');
     const args: unknown[] = [companyId];
-    const where = ['co."EnterpriseID"=$1'];
+    const where = ['co."EnterpriseID"=$1', visibleEnterpriseSemester('r."OJTSemesterID"')];
     const add = (sql: string, value: unknown) => { args.push(value); where.push(sql.replace('?', '$'+args.length)); };
     if (id) add('co."CoordinationID"=?', id);
     if(params.studentId!==undefined)add('r."StudentID"=?',positiveId(params.studentId,'studentId'));
@@ -192,17 +203,18 @@ export async function enterpriseCandidatePeriods(actor: Actor) {
   return readTransaction(async c => {
     const companyId = await enterpriseScope(c,actor);
     if(companyId===null)throw invalid('Enterprise role required.',403,'FORBIDDEN');
+    const periodStatus = enterpriseSemesterStatusSql('ap','o');
     const items=(await c.query(`SELECT DISTINCT
         ay."AcademicYearID" AS "academicYearId",ay."YearCode" AS "academicYearCode",
         o."OJTSemesterID" AS "ojtSemesterId",o."SemesterCode" AS "semesterCode",o."Name" AS "semesterName",
-        o."AcademicPeriodID" AS "academicPeriodId",ap."Name" AS "academicPeriodName",
+        o."AcademicPeriodID" AS "academicPeriodId",ap."Name" AS "academicPeriodName",(${periodStatus}) AS "periodStatus",
         o."StartDate" AS "startDate",o."EndDate" AS "endDate"
       FROM "StudentEnterpriseCoordination" co
       JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
       JOIN "OJTSemesters" o ON o."OJTSemesterID"=r."OJTSemesterID"
       JOIN "AcademicYears" ay ON ay."AcademicYearID"=o."AcademicYearID"
       LEFT JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=o."AcademicPeriodID"
-      WHERE co."EnterpriseID"=$1
+      WHERE co."EnterpriseID"=$1 AND (${periodStatus}) IN ('ACTIVE','CLOSED')
         AND NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer
           WHERE newer."RegistrationID"=co."RegistrationID"
             AND newer."EnterpriseID"=co."EnterpriseID"
@@ -218,7 +230,7 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
   return readTransaction(async c => {
     const companyId = await enterpriseScope(c,actor);
     if(companyId===null)throw invalid('Enterprise role required.',403,'FORBIDDEN');
-    const args: unknown[] = [companyId], where = ['a."EnterpriseID"=$1'];
+    const args: unknown[] = [companyId], where = ['a."EnterpriseID"=$1',visibleEnterpriseSemester('r."OJTSemesterID"')];
     const add = (sql: string,value: unknown) => { args.push(value); where.push(sql.replace('?', '$'+args.length)); };
     if(params.studentId!==undefined)add('a."StudentID"=?',positiveId(params.studentId,'studentId'));
     if(params.internshipId!==undefined)add('a."AssignmentID"=?',positiveId(params.internshipId,'internshipId'));

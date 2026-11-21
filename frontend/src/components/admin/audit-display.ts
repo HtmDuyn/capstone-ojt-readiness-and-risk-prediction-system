@@ -31,6 +31,7 @@ export function entityLabel(entityType: string): string {
 export const AUDIT_ACTIONS: Record<string, string> = {
   ASSIGN: 'Phân công thực tập', ASSIGNMENT_STATUS: 'Cập nhật trạng thái thực tập',
   COORDINATE: 'Điều phối sinh viên', ENTERPRISE_DECISION: 'Doanh nghiệp phản hồi tiếp nhận',
+  ENTERPRISE_DELETE: 'Xóa vĩnh viễn tin tuyển dụng',
   SUBMIT_EVALUATION: 'Nộp đánh giá thực tập', UPDATE_EVALUATION: 'Cập nhật đánh giá thực tập',
   RESET_DEMO_PASSWORD: 'Đặt lại mật khẩu tài khoản demo', SEED_DEMO: 'Khởi tạo dữ liệu demo',
   CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xóa', SOFT_DELETE: 'Ngừng hoạt động / Xóa mềm',
@@ -79,6 +80,11 @@ const FIELD_NAMES: Record<string, string> = {
 };
 
 export const actionLabel = (action: string) => AUDIT_ACTIONS[action] || action;
+export const accountActionLabel = (action: string) => ({
+  CREATE: 'Tạo tài khoản', UPDATE: 'Chỉnh sửa tài khoản',
+  UPDATE_ACCOUNT: 'Chỉnh sửa tài khoản', SOFT_DELETE: 'Ngừng hoạt động tài khoản',
+  REQUEST_PASSWORD_RESET: 'Gửi yêu cầu đặt lại mật khẩu',
+} as Record<string, string>)[action] || actionLabel(action);
 export const fieldLabel = (key: string) => FIELD_NAMES[key.replace(/_/g, '').toLowerCase()]
   || key.replace(/([a-z\d])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
 export const isRecord = (value: unknown): value is Record<string, unknown> =>

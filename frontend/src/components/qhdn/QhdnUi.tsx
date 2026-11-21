@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Page } from "@/types/qhdn/workflowTypes";
 import { pageNumbers } from '@/utils/qhdn/qhdnPagination';
 
@@ -152,11 +152,11 @@ export function useIdempotencyKey() {
 
 // Bỏ phản hồi cũ khi đổi bộ lọc hoặc rời trang.
 export function usePaged<T>(
-  loader: (page: number) => Promise<Page<T>>,
+  loader: (page: number, signal: AbortSignal) => Promise<Page<T>>,
   key: string,
   enabled = true,
 ) {
-  const [page, setPage] = useState(1),
+  const [selection, setSelection] = useState({ key, page: 1 }),
     [data, setData] = useState<Page<T>>({
       items: [],
       total: 0,
@@ -168,14 +168,12 @@ export function usePaged<T>(
     [revision, setRevision] = useState(0);
   const latest = useRef(loader);
   latest.current = loader;
-  const previousKey = useRef(key);
+  const page = selection.key === key ? selection.page : 1;
+  const setPage = useCallback((next: number) => setSelection({ key, page: next }), [key]);
+  const reload = useCallback(() => setRevision(v => v + 1), []);
   useEffect(() => {
-    if (previousKey.current !== key) {
-      previousKey.current = key;
-      setPage(1);
-      if (page !== 1) return;
-    }
-    let active = true;
+    const controller = new AbortController();
+    setSelection(current => current.key === key ? current : { key, page: 1 });
     setData({ items: [], total: 0, page, limit: 10 });
     setError("");
     if (!enabled) {
@@ -183,31 +181,31 @@ export function usePaged<T>(
       return;
     }
     setBusy(true);
-    latest
-      .current(page)
+    Promise.resolve().then(() => {
+      controller.signal.throwIfAborted();
+      return latest.current(page, controller.signal);
+    })
       .then((value) => {
-        if (active) {
+        if (!controller.signal.aborted) {
           setData(value);
           const last = Math.max(1, Math.ceil(value.total / value.limit));
           if (page > last) setPage(last);
         }
       })
       .catch((e) => {
-        if (active) setError(errorMessage(e));
+        if (!controller.signal.aborted) setError(errorMessage(e));
       })
       .finally(() => {
-        if (active) setBusy(false);
+        if (!controller.signal.aborted) setBusy(false);
       });
-    return () => {
-      active = false;
-    };
-  }, [key, page, revision, enabled]);
+    return () => controller.abort();
+  }, [key, page, revision, enabled, setPage]);
   return {
     page,
     setPage,
     data,
     busy,
     error,
-    reload: () => setRevision((v) => v + 1),
+    reload,
   };
 }

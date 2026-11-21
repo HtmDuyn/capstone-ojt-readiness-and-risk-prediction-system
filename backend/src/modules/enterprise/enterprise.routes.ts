@@ -22,7 +22,6 @@ router.get('/profile',handle(req=>enterpriseProfile(req.user)));
 router.patch('/profile',handle(req=>updateEnterpriseProfile(req.body,req.user)));
 router.get('/recruitment/windows',handle(req=>enterpriseWindows(req.query,req.user)));
 router.get('/recruitment/posts',handle(req=>enterprisePosts(req.query,req.user)));
-router.get('/recruitment/deleted-posts',handle(req=>enterprisePosts(req.query,req.user,true)));
 router.post('/recruitment/posts',handle(req=>saveEnterprisePost(req.body,req.user),201));
 router.patch('/recruitment/posts/:id',handle(req=>saveEnterprisePost(req.body,req.user,positiveId(req.params.id))));
 router.post('/recruitment/posts/:id/publish',handle(req=>saveEnterprisePost({status:'PUBLISHED'},req.user,positiveId(req.params.id))));

@@ -1,4 +1,5 @@
-import { useEducationOjtEligibility } from '@/hooks/education/useEducationOjtEligibility';
+import { OJT_ELIGIBILITY_PAGE_SIZE, useEducationOjtEligibility } from '@/hooks/education/useEducationOjtEligibility';
+import { useEducationStudentCredits } from '@/hooks/education/useEducationStudentCredits';
 import { PageBanner } from '@/components/common/PageBanner';
 import { educationOjtReason } from '@/utils/education/educationOjtReason';
 import { ojtDisplayStatusLabels, sortOjtTargets, type OjtSortDirection, type OjtSortKey } from '@/utils/education/educationOjtSorting';
@@ -9,7 +10,7 @@ import { ojtSourceLabels, type OjtSourceKey } from '@/utils/education/ojtEligibi
 import { summarizeOjtHandoff } from '@/utils/education/educationOjtCheckQueue';
 
 const EducationOjtConditions: React.FC = () => {
-  const { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, academicCredits, creditFailures, loadingCredits, retryCreditFailures, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule, selectionLocked, discardPending } = useEducationOjtEligibility();
+  const { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule, selectionLocked, discardPending } = useEducationOjtEligibility();
   const failedSources = Object.entries(sourceErrors) as [OjtSourceKey, NonNullable<(typeof sourceErrors)[OjtSourceKey]>][];
   const [detailStudentId, setDetailStudentId] = React.useState<number | null>(null);
   const detailTarget = targets.find(target => target.student.id === detailStudentId);
@@ -24,7 +25,22 @@ const EducationOjtConditions: React.FC = () => {
   const detailResult = detailStudentId === null ? undefined : results[detailStudentId];
   const [sortKey, setSortKey] = React.useState<OjtSortKey | null>(null);
   const [sortDirection, setSortDirection] = React.useState<OjtSortDirection>('asc');
-  const sortedVisible = sortOjtTargets(visible, sortKey, sortDirection, { results, failures, statuses: statusByStudent, academicCredits });
+  const sortingCredits = sortKey === 'credits';
+  const pageStart = (currentPage - 1) * OJT_ELIGIBILITY_PAGE_SIZE;
+  const pageEnd = pageStart + OJT_ELIGIBILITY_PAGE_SIZE;
+  const sortContext = React.useMemo(() => ({ results, failures, statuses: statusByStudent }), [results, failures, statusByStudent]);
+  const pageOrder = React.useMemo(() =>
+    sortOjtTargets(visible, sortingCredits ? null : sortKey, sortDirection, sortContext),
+    [visible, sortKey, sortDirection, sortContext, sortingCredits],
+  );
+  const creditIds = React.useMemo(() => {
+    const rows = sortingCredits ? visible : pageOrder.slice(pageStart, pageEnd);
+    return [...rows.map(row => row.student.id), ...(detailStudentId === null ? [] : [detailStudentId])];
+  }, [sortingCredits, visible, pageOrder, pageStart, pageEnd, detailStudentId]);
+  const { credits: academicCredits, failures: creditFailures, loading: loadingCredits, retry: retryCreditFailures } = useEducationStudentCredits(creditIds);
+  const sortedVisible = React.useMemo(() => sortingCredits && !loadingCredits
+    ? sortOjtTargets(visible, 'credits', sortDirection, { ...sortContext, academicCredits })
+    : pageOrder, [sortingCredits, loadingCredits, visible, sortDirection, sortContext, academicCredits, pageOrder]);
   const sortBy = (key: OjtSortKey) => {
     if (sortKey !== key) { setSortKey(key); setSortDirection('asc'); }
     else if (sortDirection === 'asc') setSortDirection('desc');
@@ -62,7 +78,8 @@ const EducationOjtConditions: React.FC = () => {
       {loading && <p role="status" className="text-sm text-slate-500">Đang tải danh sách sinh viên...</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {failedSources.length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p className="font-medium">Không thể tải đầy đủ dữ liệu. Dữ liệu đã tải thành công vẫn được giữ nguyên{dataLoaded ? '.' : '; thao tác xét và lưu tạm khóa.'}</p><ul className="mt-2 space-y-1">{failedSources.map(([key, issue]) => <li key={key}>Không thể tải {ojtSourceLabels[key]} ({issue.endpoint}){issue.status ? ` · HTTP ${issue.status}` : ''}{issue.errorCode ? ` · ${issue.errorCode}` : ''}{issue.message ? ` · ${issue.message}` : ''}</li>)}</ul><button type="button" disabled={retrying || busy || saving} onClick={() => void retryFailedSources()} className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 font-medium hover:bg-red-100 disabled:opacity-50">{retrying ? 'Đang thử tải lại…' : 'Thử tải lại nguồn lỗi'}</button></div>}
-      {creditFailures.length > 0 && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Chưa tải được tín chỉ học tập của {creditFailures.length} sinh viên từ hồ sơ. <button type="button" disabled={loadingCredits} onClick={() => void retryCreditFailures()} className="ml-2 underline disabled:opacity-50">Thử tải lại</button></div>}
+      {sortingCredits && loadingCredits && <p role="status" className="text-sm text-slate-600">Đang tải tín chỉ để sắp xếp toàn bộ kết quả lọc…</p>}
+      {creditFailures.length > 0 && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Chưa tải được tín chỉ học tập của {creditFailures.length} sinh viên từ hồ sơ. <button type="button" disabled={loadingCredits} onClick={retryCreditFailures} className="ml-2 underline disabled:opacity-50">Thử tải lại</button></div>}
       {showNotice && <p role="status" className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>}
     </section>
     <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border bg-white px-4 py-3 text-sm"><span>Đủ điều kiện đã lưu: <strong>{sourceLoaded.results && sourceLoaded.students ? handoffSummary.eligible : '—'}</strong></span><span>Đã bàn giao: <strong>{sourceLoaded.handoffs && sourceLoaded.students ? handoffSummary.handedOff : '—'}</strong></span><span>Đủ điều kiện chờ bàn giao: <strong>{sourceLoaded.results && sourceLoaded.handoffs && sourceLoaded.students ? handoffSummary.waiting : '—'}</strong></span></section>
@@ -76,13 +93,13 @@ const EducationOjtConditions: React.FC = () => {
       <div className="space-y-3 p-4"><h2 className="font-semibold">Danh sách sinh viên và kết quả xét</h2><div className="flex w-full max-w-4xl flex-col gap-2 sm:flex-row"><label className="relative min-w-0 flex-1"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input aria-label="Tìm sinh viên" value={search} onChange={e => setSearch(e.target.value)} placeholder="MSSV hoặc họ tên" className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm" /></label><select aria-label="Lọc kết quả OJT" disabled={!sourceLoaded.results} value={filter} onChange={e => setFilter(e.target.value)} className="w-full rounded-lg border p-2 text-sm sm:w-48"><option value="ALL">Tất cả sinh viên</option><option value="ELIGIBLE">Đủ điều kiện</option><option value="NOT_ELIGIBLE">Chưa đủ điều kiện</option><option value="REVIEW_REQUIRED">Cần đối soát</option><option value="PENDING">Chưa xét</option><option value="ERROR">Gặp lỗi</option><option value="STALE">Cần xét lại</option><option value="INACTIVE">Không hoạt động</option></select><select aria-label="Trạng thái bàn giao" disabled={!sourceLoaded.handoffs} value={handoffFilter} onChange={e => setHandoffFilter(e.target.value)} className="w-full rounded-lg border p-2 text-sm sm:w-44"><option value="ALL">Tất cả bàn giao</option><option value="NOT_HANDED_OFF">Chưa bàn giao</option><option value="HANDED_OFF">Đã bàn giao</option></select></div></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[1500px] text-left text-sm"><thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]"><tr><th scope="col" className="w-14 px-3 py-2.5 text-xs font-semibold">STT</th>{([
         ['Mã số sinh viên', 'studentCode'], ['Họ và tên', 'fullName'], ['Khóa', 'cohort'], ['Nhóm', 'group'], ['Chương trình', 'program'], ['Tín chỉ đạt', 'credits'], ['Kết quả', 'status'], ['Lý do', 'reason'],
-      ] as const).map(([label, key]) => <th key={key} scope="col" aria-sort={sortKey === key ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'} className={`px-3 py-2.5 text-xs font-semibold ${key === 'group' ? 'w-14' : key === 'cohort' || key === 'studentCode' ? 'w-36' : key === 'fullName' ? 'min-w-40' : ''}`}><button type="button" onClick={() => sortBy(key)} className="inline-flex items-center gap-1 text-left hover:text-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">{label}{sortKey === key ? sortDirection === 'asc' ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" /> : <ArrowUpDown size={13} className="text-slate-400" aria-hidden="true" />}</button></th>)}<th scope="col" className="min-w-36 px-3 py-2.5 text-xs font-semibold">Trạng thái bàn giao</th><th scope="col" className="min-w-36 px-3 py-2.5 text-xs font-semibold">Kỳ OJT</th><th scope="col" className="min-w-28 px-3 py-2.5 text-xs font-semibold">Đợt bàn giao</th><th scope="col" className="px-3 py-2.5">Chi tiết</th></tr></thead><tbody className="divide-y divide-[#E2E8F0]">{sortedVisible.slice((currentPage - 1) * 20, currentPage * 20).map((t, index) => {
+      ] as const).map(([label, key]) => <th key={key} scope="col" aria-sort={sortKey === key ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'} className={`px-3 py-2.5 text-xs font-semibold ${key === 'group' ? 'w-14' : key === 'cohort' || key === 'studentCode' ? 'w-36' : key === 'fullName' ? 'min-w-40' : ''}`}><button type="button" onClick={() => sortBy(key)} className="inline-flex items-center gap-1 text-left hover:text-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">{label}{sortKey === key ? sortDirection === 'asc' ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" /> : <ArrowUpDown size={13} className="text-slate-400" aria-hidden="true" />}</button></th>)}<th scope="col" className="min-w-36 px-3 py-2.5 text-xs font-semibold">Trạng thái bàn giao</th><th scope="col" className="min-w-36 px-3 py-2.5 text-xs font-semibold">Kỳ OJT</th><th scope="col" className="min-w-28 px-3 py-2.5 text-xs font-semibold">Đợt bàn giao</th><th scope="col" className="px-3 py-2.5">Chi tiết</th></tr></thead><tbody className="divide-y divide-[#E2E8F0]">{sortedVisible.slice(pageStart, pageEnd).map((t, index) => {
         const r = results[t.student.id];
         const displayStatus = statusByStudent[t.student.id];
         const statusLabel = ojtDisplayStatusLabels[displayStatus];
         const studentHandoffs = handoffByStudent.get(t.student.id) ?? [];
         return <tr key={t.student.id} className="bg-white align-top transition-colors duration-150 hover:bg-[#EAF2FF]">
-          <td className="px-3 py-2.5 tabular-nums">{(currentPage - 1) * 20 + index + 1}</td>
+          <td className="px-3 py-2.5 tabular-nums">{pageStart + index + 1}</td>
           <td className="whitespace-nowrap px-3 py-2.5 font-medium text-orange-700">{t.student.studentCode}</td>
           <td className="min-w-40 break-words px-3 py-2.5">{t.student.fullName}</td>
           <td className="w-36 break-words px-3 py-2.5">{t.student.cohort?.code ?? '—'}</td>

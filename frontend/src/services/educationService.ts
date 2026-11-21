@@ -9,11 +9,10 @@ import type { AcademicCatalogs, CatalogOption } from '@/types/education/import.t
 import { dashboardSummary } from '@/utils/education/educationDashboardSummary';
 import type { QueryParams } from '@/types/education/dashboard.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
-import { educationRead } from '../utils/education/educationReadCache';
+import { clearSharedReads, sharedRead } from '../utils/shared/sharedRead';
 import type { Handoff, OjtFinalResult } from '@/types/education/ojtWorkflow.types';
 import type { ImportCommitResponse, ImportPreviewResponse, StudentImportPayload } from '@/types/education/import.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult, StudentImportBatch } from '@/types/education/import.types';
-import { clearEducationReadCache } from '../utils/education/educationReadCache';
 import type { Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
 import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/education/localOjtEligibility';
 import { localOjtSavePayload } from '@/utils/education/localOjtSavePayload';
@@ -735,7 +734,7 @@ interface OverviewStudent {
 
 export const educationOverviewService = {
   async load(scope: QueryParams = {}, signal?: AbortSignal, onStudentsLoaded?: (total: number) => void) {
-    const students = (await educationRead(`overview:students:${scope.cohortId ?? ''}`, () => getAllItems<OverviewStudent>('/students', {
+    const students = (await sharedRead(`overview:students:${scope.cohortId ?? ''}`, () => getAllItems<OverviewStudent>('/students', {
       status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
     }), signal)).filter(student => student.accountStatus === 'ACTIVE');
     signal?.throwIfAborted();
@@ -844,7 +843,7 @@ const sendImportRequest = async <T>(
     throw new Error("Backend trả về cấu trúc kết quả không hợp lệ.");
   }
 
-  clearEducationReadCache();
+  clearSharedReads();
   return result as T;
 };
 
@@ -927,7 +926,7 @@ export async function saveLocalOjtResults(results: LocalOjtResult[], idempotency
     if (body.success !== true || body.data?.savedCount !== results.length) {
       throw new Error(body.message || 'Backend chưa xác nhận lưu đầy đủ kết quả. Hãy kiểm tra trạng thái lưu trước khi tiếp tục.');
     }
-    clearEducationReadCache();
+    clearSharedReads();
     return { savedCount: body.data.savedCount, handedOffCount: body.data.handedOffCount ?? 0 };
   } catch (error) {
     const response = (error as { response?: { status?: number; data?: { message?: string; errorCode?: string } } } | null)?.response;

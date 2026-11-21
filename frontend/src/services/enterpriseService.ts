@@ -90,7 +90,7 @@ export interface RecruitmentWindow {
   studentRegistrationWindow?: { id: number; name: string; startsAt: string; endsAt: string } | null;
   periodCode?: string;
   periodName?: string;
-  periodStatus?: string;
+  periodStatus: 'ACTIVE' | 'CLOSED';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -122,7 +122,7 @@ export interface RecruitmentPost {
   content: string;
   benefits?: string | null;
   applicationInstructions?: string | null;
-  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'CLOSED' | 'ARCHIVED';
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'CLOSED';
   deadlineAt?: string | null;
   publishedAt?: string | null;
   positions?: RecruitmentPostPosition[];
@@ -134,8 +134,6 @@ export interface RecruitmentPost {
   requiresReview?: boolean;
   canDelete?: boolean;
   canPublish?: boolean;
-  deleted?: boolean;
-  deletedAt?: string | null;
   replayed?: boolean;
   postingDeadlineAt?: string | null;
   deadlineManagedBy?: 'QHDN';
@@ -255,6 +253,7 @@ export interface EnterpriseCandidatePeriod {
   semesterName: string;
   academicPeriodId: number | null;
   academicPeriodName: string | null;
+  periodStatus: 'ACTIVE' | 'CLOSED';
   startDate: string | null;
   endDate: string | null;
 }
@@ -474,9 +473,6 @@ export const enterpriseService = {
     const response = await API.get<PaginatedResponse<RecruitmentPost>>('/enterprise/recruitment/posts', { params, signal });
     return response.data;
   },
-
-  listDeletedRecruitmentPosts: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<RecruitmentPost>> =>
-    (await API.get<PaginatedResponse<RecruitmentPost>>('/enterprise/recruitment/deleted-posts', { params, signal })).data,
 
   createRecruitmentPost: async (data: EnterpriseRecruitmentPostCreateInput): Promise<EnterpriseRecruitmentPostResponse> => {
     const { windowId, idempotencyKey, title, content, benefits, applicationInstructions, positions, status = 'DRAFT' } = data;

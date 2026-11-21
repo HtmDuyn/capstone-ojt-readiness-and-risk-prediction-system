@@ -5,6 +5,7 @@ import { StudentDialog } from '@/components/student/StudentDialog';
 import { enterpriseService, type EnterpriseInternshipItem, type EnterpriseInternshipTask } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
+import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { applyEvaluationScore, evaluationAverage, evaluationScoreFields, parseEvaluationScore, taskScoreSuggestion,
   type EvaluationScoreKey, type EvaluationScores } from '@/utils/enterprise/enterpriseEvaluation';
 
@@ -88,7 +89,7 @@ export function EnterpriseEvaluation() {
   const limit = 20;
 
   const fetchRows = useCallback(async (background = false) => {
-    if (profileLoading || savingRef.current) return;
+    if (profileLoading || savingRef.current || (background && requestRef.current)) return;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -126,7 +127,10 @@ export function EnterpriseEvaluation() {
       });
       if (!background) setSelected(new Set());
     } catch (e) { if (!controller.signal.aborted) setError(errorText(e)); }
-    finally { if (!controller.signal.aborted) setLoading(false); }
+    finally {
+      if (requestRef.current === controller) requestRef.current = null;
+      if (!controller.signal.aborted) setLoading(false);
+    }
   }, [companyId, profileLoading]);
 
   useEffect(() => {
@@ -136,10 +140,7 @@ export function EnterpriseEvaluation() {
   }, [fetchRows]);
   useEffect(() => {
     if (editor || confirming || busy || loading) return;
-    const refresh = () => { if (!document.hidden) void fetchRows(true); };
-    const timer = window.setInterval(refresh, 60000);
-    window.addEventListener('focus', refresh);
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+    return subscribeVisibleRefresh(() => void fetchRows(true), { interval: 60_000, canRefresh: () => !requestRef.current });
   }, [fetchRows, editor, confirming, busy, loading]);
   const hasUnsaved = rows.some(row => row.dirty);
   useEffect(() => {

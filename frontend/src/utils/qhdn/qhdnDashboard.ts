@@ -6,6 +6,7 @@ export interface DashboardPlacementStudent {
 }
 
 export interface QhdnDashboardSummary {
+  hasRecruitmentRounds?: boolean;
   quotas: {companyId:number; capacity:number; remainingSlots:number}[];
   progress: { inProgress: number; completed: number; evaluated: number };
 }

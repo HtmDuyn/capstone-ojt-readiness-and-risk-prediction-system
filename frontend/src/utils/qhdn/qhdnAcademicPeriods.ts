@@ -16,8 +16,9 @@ export function academicYears(periods: AcademicPeriodItem[]) {
 
 export function preferredAcademicPeriod(periods: AcademicPeriodItem[], initialOjtId = "") {
   return periods.find((p) => initialOjtId && String(linkedOjtSemesterId(p)) === initialOjtId)
-    ?? periods.find((p) => linkedOjtSemesterId(p) !== null)
     ?? periods.find((p) => p.kind === "SEMESTER" && p.status === "ACTIVE")
+    ?? periods.find((p) => p.status === "ACTIVE")
+    ?? periods.find((p) => linkedOjtSemesterId(p) !== null)
     ?? periods[0];
 }
 

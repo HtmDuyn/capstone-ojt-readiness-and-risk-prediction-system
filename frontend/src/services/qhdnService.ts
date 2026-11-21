@@ -8,29 +8,24 @@ import type {
 import { normalizeEnterpriseImportPreview } from "@/utils/qhdn/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
-import { loadAllPages } from "../utils/shared/loadAllPages";
 import API from "./apiService";
-import type { DashboardPlacementStudent, DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
+import type { DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
 
 /** Use the same roster as the OJT coordination screen, including unregistered students. */
-export const getDashboardPlacements = async (ojtSemesterId: number): Promise<DashboardPlacementStudent[]> => {
-  return (await getDashboardPlacementBoard(ojtSemesterId)).items;
-};
-export const getDashboardPlacementBoard = async (ojtSemesterId: number): Promise<DashboardPlacementBoard> => {
-  const response = await API.get<{ success: boolean; data: DashboardPlacementBoard }>('/qhdn/placements', { params: { ojtSemesterId } });
+export const getDashboardPlacementBoard = async (ojtSemesterId: number, signal?: AbortSignal): Promise<DashboardPlacementBoard> => {
+  const response = await API.get<{ success: boolean; data: DashboardPlacementBoard }>('/qhdn/placements', { params: { ojtSemesterId }, signal });
   if (!response.data.success) throw new Error('Không tải được danh sách điều phối OJT.');
   return response.data.data;
 };
 
-export const getQhdnDashboardSummary = async (ojtSemesterId: number): Promise<QhdnDashboardSummary> => {
-  const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard/summary', { params: { ojtSemesterId } });
+export const getQhdnDashboardSummary = async (ojtSemesterId: number, signal?: AbortSignal): Promise<QhdnDashboardSummary> => {
+  const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard/summary', { params: { ojtSemesterId }, signal });
   if (!response.data.success) throw new Error('Không tải được thống kê thực tập OJT.');
   const progress=response.data.data?.progress;
   if(!progress||![progress.completed,progress.inProgress,progress.evaluated].every(count=>Number.isSafeInteger(count)&&count>=0))throw new Error('Chưa tải được đầy đủ thống kê kết quả OJT. Vui lòng thử lại.');
   return response.data.data;
 };
 import type {
-  OjtSemesterItem,
   CompanyListResponse,
   PositionListResponse,
   CoordinationListResponse,
@@ -38,8 +33,6 @@ import type {
   OjtResultListResponse,
   PublishOjtResultsRequest,
   PublishOjtResultsResponse,
-  HandoffStudentListResponse,
-  AcademicPeriodItem,
   AcademicPeriodListResponse,
   RegistrationWindowItem,
   CreateRegistrationWindowRequest,
@@ -92,91 +85,11 @@ export const listPositions = async (
     status?: string;
     search?: string;
   } = { page: 1, limit: 100 },
+  signal?: AbortSignal,
 ): Promise<PositionListResponse> => {
   const response = await API.get<PositionListResponse>("/positions", {
-    params,
+    params, signal,
   });
-  return response.data;
-};
-
-/** Read QHDN semester options from the academic-period catalog. */
-export const listQhdnOjtSemesters = async (
-  academicPeriods?: AcademicPeriodItem[],
-): Promise<{ items: OjtSemesterItem[] }> => {
-  const periods =
-    academicPeriods ??
-    (await loadAllPages(async (page) =>
-      getAcademicPeriods({ page, limit: 100 }),
-    ));
-  const semesters = new Map<number, OjtSemesterItem>();
-  for (const period of periods) {
-    if (period.kind !== "SEMESTER") continue;
-    const ojt = period.ojt;
-    const id = period.ojtSemesterId || ojt?.id;
-    // Academic periods without an OJT link are not OJT semesters.
-    if (!id || semesters.has(id)) continue;
-    semesters.set(id, {
-      id,
-      name: ojt?.name || period.name,
-      code: ojt?.semesterCode || period.periodCode,
-      semesterCode: ojt?.semesterCode || period.periodCode,
-      academicPeriodId: ojt?.academicPeriodId ?? period.id,
-      academicYearId: ojt?.academicYearId ?? period.academicYearId,
-      status: ojt?.status || period.status,
-      startDate: ojt?.startDate || period.startDate,
-      endDate: ojt?.endDate || period.endDate,
-      regStartDate: ojt?.regStartDate ?? undefined,
-      regEndDate: ojt?.regEndDate ?? undefined,
-    });
-  }
-  return { items: Array.from(semesters.values()) };
-};
-
-// =========================================================================
-// 1. LUỒNG TIẾP NHẬN DANH SÁCH SINH VIÊN TỪ PHÒNG ĐÀO TẠO (ACADEMIC -> QHDN)
-// =========================================================================
-
-/** GET /api/qhdn/eligible-students: sinh viên đủ điều kiện đã được Đào tạo bàn giao. */
-export const listEligibleStudents = async (params: {
-  ojtSemesterId: number;
-  studentId?: number;
-  handoffId?: number;
-  programId?: number;
-  cohortId?: number;
-  groupCode?: "A" | "B" | "C" | "D";
-  search?: string;
-  registrationStatus?: "NOT_REGISTERED" | "SUBMITTED" | "APPROVED" | "REJECTED" | "LEGACY_REVIEW_REQUIRED";
-  page?: number;
-  limit?: number;
-}): Promise<HandoffStudentListResponse> => {
-  const { data } = await API.get<HandoffStudentListResponse>(
-    "/qhdn/eligible-students",
-    { params: { page: 1, limit: 100, ...params } },
-  );
-  if (data.success !== true) {
-    throw new Error(data.message || "Không tải được danh sách sinh viên đã bàn giao.");
-  }
-  return data;
-};
-
-/**
- * GET /api/ojt-semesters/:id/students
- * Tiếp nhận danh sách sinh viên trong kỳ OJT từ phòng đào tạo (kèm trạng thái bàn giao và đăng ký).
- */
-export const listStudentsInSemester = async (
-  ojtSemesterId: number,
-  params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    registrationStatus?: string;
-    coordinationStatus?: string;
-  } = { page: 1, limit: 100 },
-): Promise<HandoffStudentListResponse> => {
-  const response = await API.get<HandoffStudentListResponse>(
-    `/ojt-semesters/${ojtSemesterId}/students`,
-    { params },
-  );
   return response.data;
 };
 
@@ -213,10 +126,11 @@ export const listRegistrationWindows = async (
     page?: number;
     limit?: number;
   } = { page: 1, limit: 50 },
+  signal?: AbortSignal,
 ): Promise<ListRegistrationWindowsResponse> => {
   const response = await API.get<ListRegistrationWindowsResponse>(
     "/ojt-registration-windows",
-    { params },
+    { params, signal },
   );
   return response.data;
 };
@@ -330,9 +244,10 @@ export const listOjtResults = async (
     search?: string;
     includeUntransferred?: 'true' | 'false';
   } = { page: 1, limit: 100 },
+  signal?: AbortSignal,
 ): Promise<OjtResultListResponse> => {
   const response = await API.get<OjtResultListResponse>("/ojt-results", {
-    params,
+    params, signal,
   });
   return response.data;
 };

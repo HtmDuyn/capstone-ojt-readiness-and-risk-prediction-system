@@ -7,6 +7,7 @@ import { inputObject,invalid,positiveId,requiredText,pagination,enumValue } from
 import { enterpriseScope } from '../qhdn/catalog.service';
 import { readTransaction } from '../qhdn/read.repository';
 import { windowRecord,postSelect,postApi,postRecord,closeUnusedPositions,type Row,type Actor } from './recruitment.repository';
+import { visibleEnterpriseSemester } from '../enterprise/enterprise-periods';
 
 export async function listPosts(params:Row,actor:Actor) {
  const companyId=positiveId(params.companyId,'companyId');
@@ -16,6 +17,7 @@ export async function listPosts(params:Row,actor:Actor) {
   const add=(sql:string,value:unknown)=>{args.push(value);where.push(sql.replace('?', '$'+args.length));};
   if(own!==null&&companyId!==null&&own!==companyId)throw invalid('This record belongs to another enterprise.',403,'FORBIDDEN');
   if(companyId!==null||own!==null)add('p."EnterpriseID"=?',companyId??own);
+  if(actor.roleCode==='ENTERPRISE')where.push(visibleEnterpriseSemester('p."OJTSemesterID"'));
   if(params.postId!==undefined)add('p."PostID"=?',positiveId(params.postId,'postId'));
   if(params.windowId!==undefined)add('p."WindowID"=?',positiveId(params.windowId,'windowId'));
   if(params.academicPeriodId!==undefined)add('w."AcademicPeriodID"=?',positiveId(params.academicPeriodId,'academicPeriodId'));
@@ -48,7 +50,7 @@ export async function reviewPost(id:number,body:unknown,actor:Actor,close=false)
   await c.query(`UPDATE "RecruitmentPosts" SET "Status"=$2::varchar,"ReviewedBy"=$3,"ReviewedAt"=now(),"ReviewReason"=$4,"UpdatedAt"=now(),
    "PublishedAt"=CASE WHEN $2::varchar='PUBLISHED' THEN now() ELSE "PublishedAt" END,"DeadlineAt"=$5 WHERE "PostID"=$1`,[id,action,actor.userId,reason,deadline]);
   if(action==='PUBLISHED')await c.query(`UPDATE "InternshipPositions" pos SET "Status"='OPEN' FROM "RecruitmentPostPositions" pp WHERE pp."PositionID"=pos."PositionID" AND pp."PostID"=$1 AND pos."DeletedAt" IS NULL`,[id]);
-  else await closeUnusedPositions(c,id);
+  else await closeUnusedPositions(c,before.positions.map((position: Row) => position.id));
   const after=postApi(await postRecord(c,id,actor));await audit(c,actor.userId,'RecruitmentPosts',id,action,postApi(before),after,reason);return after;
  });
 }

@@ -21,12 +21,12 @@ export function addRecruitmentOperations(spec:Spec) {
  const phaseKeys=['postingStartsAt','postingEndsAt','applicationStartsAt','applicationEndsAt','resultsStartsAt','resultsEndsAt'];
  const child={type:'object',additionalProperties:false,required:['name',...phaseKeys],properties:{name:text(150),...Object.fromEntries(phaseKeys.map(key=>[key,time]))}};
  const window={academicPeriodId:id,name:text(150),startsAt:time,endsAt:time,reason,supplemental:{type:'boolean',default:false},rounds:{type:'array',minItems:1,maxItems:30,items:child}};
- add('post','/api/recruitment/windows','Create a recruitment intake with posting, application and response intervals',staff,{},window,['academicPeriodId','name','startsAt','endsAt','rounds']);
+ add('post','/api/recruitment/windows','Create a three-phase recruitment intake for the current academic semester',staff,{},window,['academicPeriodId','name','startsAt','endsAt','rounds']);
  add('get','/api/recruitment/windows','List campaign rounds, current phase and result summaries',staff,{academicPeriodId:id});
  add('patch','/api/recruitment/windows/{id}/schedule','QHDN edits a draft or the remaining future boundaries of an unexpired open round',['OJT_COORD'],{}, {name:text(150),reason,...Object.fromEntries(phaseKeys.map(key=>[key,time]))},['name','reason',...phaseKeys]);
  add('delete','/api/recruitment/windows/{id}','QHDN deletes a draft that has never been opened and has no linked data',['OJT_COORD'],{}, {reason},['reason']);
  add('post','/api/recruitment/windows/{id}/finalize','Reject overdue pending applications and finalize recruitment summary',staff,{},{reason},['reason']);
- add('patch','/api/recruitment/windows/{id}','Open/close a round, or extend ends of currently open phases without reopening intake',staff,{},{name:text(150),status:{type:'string',enum:['OPEN','CLOSED']},reason,postingEndsAt:time,applicationEndsAt:time,resultsEndsAt:time});
+ add('patch','/api/recruitment/windows/{id}','Open a round for the current semester, close a round, or extend currently open phases',staff,{},{name:text(150),status:{type:'string',enum:['OPEN','CLOSED']},reason,postingEndsAt:time,applicationEndsAt:time,resultsEndsAt:time});
  add('get','/api/recruitment/posts','Danh sách tin tuyển dụng kèm vị trí và chỉ tiêu',read,{...page,companyId:{...id,description:"Enterprise ID; enterprise accounts may only select their own company. Omit status to include all states."},postId:id,windowId:id,academicPeriodId:id,status:{type:'string',enum:['DRAFT','PENDING_REVIEW','PUBLISHED','REJECTED','CLOSED','ARCHIVED']}});
  add('post','/api/recruitment/posts/{id}/review','QHDN duyệt công bố hoặc từ chối tin',staff,{}, {decision:{type:'string',enum:['PUBLISH','REJECT']},reason,deadlineAt:time},['decision','reason']);
  add('post','/api/recruitment/posts/{id}/close','QHDN đóng tin và ngừng nhận vào các vị trí liên quan',staff,{}, {reason},['reason']);

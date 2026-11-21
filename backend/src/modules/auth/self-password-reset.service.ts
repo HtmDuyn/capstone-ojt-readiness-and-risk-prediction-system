@@ -93,8 +93,8 @@ export async function sendPasswordResetCode(value: unknown) {
 
 export async function resetPasswordWithCode(value: unknown, code: unknown, password: unknown) {
   const email = normalizeEmail(value);
-  if (typeof code !== 'string' || !/^\d{6}$/.test(code)) {
-    throw invalid('Vui lòng nhập mã gồm 6 chữ số.');
+  if (typeof code !== 'string' || !(/^[0-9]{6}$/.test(code) || /^[A-Za-z0-9_-]{43}$/.test(code))) {
+    throw invalid('Mã hoặc liên kết đặt lại mật khẩu không hợp lệ.');
   }
   if (typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password, 'utf8') > 72) {
     throw invalid('Mật khẩu mới phải có ít nhất 12 ký tự và tối đa 72 byte UTF-8.', 400, 'INVALID_PASSWORD');

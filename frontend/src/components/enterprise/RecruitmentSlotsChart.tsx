@@ -82,7 +82,7 @@ export function RecruitmentSlotsChart({ posts, loading, error }: {
             <Loader2 className="h-5 w-5 animate-spin text-indigo-500" /> Đang tải số liệu tuyển dụng…
           </div>
         ) : error ? (
-          <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được dữ liệu tuyển dụng. Vui lòng làm mới số liệu.</p>
+          <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được dữ liệu tuyển dụng.</p>
         ) : (
           <>
             <div className="relative mx-auto h-60 w-60">

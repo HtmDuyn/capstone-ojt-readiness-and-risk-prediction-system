@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -10,7 +10,6 @@ import {
   Loader2,
   AlertCircle,
   AlertTriangle,
-  RefreshCw,
   Clock3,
   CalendarClock,
 } from 'lucide-react';
@@ -23,7 +22,8 @@ import {
   type RecruitmentPost,
 } from '@/services/enterpriseService';
 import { describeApiError } from '@/services/apiService';
-import { loadAllPages, recruitmentTotals } from '@/utils/enterprise/recruitment';
+import { loadRecruitmentOverview, recruitmentTotals } from '@/utils/enterprise/recruitment';
+import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsChart';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -120,6 +120,7 @@ export const EnterpriseDashboard: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [chartAnimated, setChartAnimated] = useState(false);
+  const statsRequest = useRef<AbortController | null>(null);
 
   // Tải thống kê bằng hai request song song để dashboard xuất hiện nhanh hơn.
   useEffect(() => {
@@ -131,23 +132,19 @@ export const EnterpriseDashboard: React.FC = () => {
     }
 
     const controller = new AbortController();
+    statsRequest.current = controller;
     const loadDashboardStats = async () => {
       setStatsLoading(true);
       setStatsError(null);
       try {
         if (!summary) throw new Error('Không thể tải thống kê doanh nghiệp.');
-        const [posts, candidates] = await Promise.all([
-          loadAllPages<RecruitmentPost>(
-            page => enterpriseService.listRecruitmentPosts({ page, limit: 100 }, controller.signal),
-            controller.signal,
-            'danh sách tin tuyển dụng',
-          ),
+        const [recruitment, candidates] = await Promise.all([
+          loadRecruitmentOverview(summary.publishedPosts, controller.signal),
           enterpriseService.dashboardCandidates(controller.signal),
         ]);
         if (controller.signal.aborted) return;
 
-        const publishedPosts = posts.filter(post => post.status === 'PUBLISHED'
-          && (!post.deadlineAt || Date.parse(post.deadlineAt) > Date.now()));
+        const { publishedPosts } = recruitment;
         const currentSummary = summary;
         const counts = [
           currentSummary.pendingCandidates,
@@ -164,7 +161,7 @@ export const EnterpriseDashboard: React.FC = () => {
         setRecruitmentPosts(publishedPosts);
         setPendingCandidates(candidates.items);
         setDashboardStats({
-          totalRecruitmentPosts: posts.length,
+          totalRecruitmentPosts: recruitment.total,
           publishedRecruitmentPosts: publishedPosts.length,
           pendingRecruitmentPosts: currentSummary.pendingPosts,
           remainingPositions: recruitmentTotals(publishedPosts).remaining,
@@ -179,12 +176,16 @@ export const EnterpriseDashboard: React.FC = () => {
         const message = describeApiError(err, 'Không thể tải thống kê dashboard');
         setStatsError(message);
       } finally {
+        if (statsRequest.current === controller) statsRequest.current = null;
         if (!controller.signal.aborted) setStatsLoading(false);
       }
     };
 
-    void loadDashboardStats();
-    return () => controller.abort();
+    queueMicrotask(() => { if (!controller.signal.aborted) void loadDashboardStats(); });
+    return () => {
+      controller.abort();
+      if (statsRequest.current === controller) statsRequest.current = null;
+    };
   }, [companyId, loading, profileError, summary]);
 
   const refreshDashboard = useCallback(() => {
@@ -193,10 +194,9 @@ export const EnterpriseDashboard: React.FC = () => {
   }, [reload]);
 
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') refreshDashboard(); };
-    window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
-  }, [refreshDashboard]);
+    if (loading) return;
+    return subscribeVisibleRefresh(refreshDashboard, { canRefresh: () => !statsRequest.current });
+  }, [refreshDashboard, loading]);
 
   useEffect(() => {
     if (statsLoading || statsError || tasksLoading || tasksError) {
@@ -310,18 +310,6 @@ export const EnterpriseDashboard: React.FC = () => {
         description="Quản lý tiếp nhận sinh viên, vị trí tuyển dụng, tiến độ thực tập và các đầu việc cần xử lý tại một nơi."
         badge={profile?.status === 'ACTIVE' ? 'Đối tác chính thức' : 'Doanh nghiệp đối tác'}
       />
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={refreshDashboard}
-          disabled={statsLoading || tasksLoading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${statsLoading || tasksLoading ? 'animate-spin' : ''}`} />
-          Làm mới số liệu
-        </button>
-      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {statCards.map((stat, index) => {
@@ -561,7 +549,7 @@ export const EnterpriseDashboard: React.FC = () => {
             </div>
 
             <div className="p-5 sm:p-6">
-              {statsLoading ? <p role="status" className="py-6 text-center text-sm text-slate-500">Đang tải danh sách hồ sơ chờ duyệt…</p> : statsError ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được danh sách hồ sơ chờ duyệt. Vui lòng làm mới số liệu.</p> : pendingCandidates.length > 0 ? (
+              {statsLoading ? <p role="status" className="py-6 text-center text-sm text-slate-500">Đang tải danh sách hồ sơ chờ duyệt…</p> : statsError ? <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">Không tải được danh sách hồ sơ chờ duyệt.</p> : pendingCandidates.length > 0 ? (
                 <div className="space-y-2">
                   {pendingCandidates.map((candidate, index) => (
                     <Link

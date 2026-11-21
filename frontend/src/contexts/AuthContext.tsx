@@ -12,6 +12,7 @@ import type {
 } from "../types/auth.types";
 import { authService } from "../services/authService";
 import { expireSession, SESSION_EXPIRED_EVENT, tokenExpiry } from '../utils/shared/authSession';
+import { clearSharedReads } from '../utils/shared/sharedRead';
 
 export type { UserRole, AuthUser, AuthContextValue };
 
@@ -99,6 +100,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    clearSharedReads();
     setToken(null);
     setUser(null);
   }, []);

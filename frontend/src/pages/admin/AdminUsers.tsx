@@ -7,13 +7,13 @@ import {
   X,
   Eye,
   Pencil,
-  Trash2,
   KeyRound,
-  Mail,
+  UserRoundX,
+  UserRoundCheck,
 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/shared/useAuth';
-import { createAccount, getAccounts, updateAccount, resetAccountPassword, resendAccountEmail, formatDate, type Account } from '@/services/adminService';
+import { createAccount, getAccounts, getAccountRoles, updateAccount, resetAccountPassword, formatDate, type Account, type AccountRole } from '@/services/adminService';
 import { PageBanner } from '@/components/common/PageBanner';
 import { emailDeliveryMessage } from '@/utils/shared/emailDelivery';
 
@@ -44,11 +44,9 @@ interface UserAccount {
 
 interface UserForm {
   phone?: string;
-  password?: string;
-  code: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole | '';
   status: UserStatus;
 }
 
@@ -57,14 +55,14 @@ interface UserForm {
    ========================================================= */
 
 const ROLE_LABELS: Record<string, UserRole> = { STUDENT: 'Sinh viên', ACADEMIC: 'Phòng Đào tạo', OJT_COORD: 'Phòng Quan hệ Doanh nghiệp', ENTERPRISE: 'Doanh nghiệp', ADMIN: 'Quản trị viên' };
+const ROLE_ORDER: AccountRole['code'][] = ['STUDENT', 'ACADEMIC', 'OJT_COORD', 'ENTERPRISE', 'ADMIN'];
 const mapAccount = (a: Account): UserAccount => ({ raw: a, phone: a.phone ?? '', id: a.id, code: a.username, name: a.full_name, email: a.email, roleId: a.role_id, role: ROLE_LABELS[a.role_code], status: a.status === 'ACTIVE' ? 'Hoạt động' : a.status === 'LOCKED' ? 'Khóa' : 'Ngừng hoạt động' });
 const statusCode = (s: Exclude<UserStatus, 'Khóa'>) => s === 'Hoạt động' ? 'ACTIVE' : 'INACTIVE';
 
 const EMPTY_FORM: UserForm = {
-  code: '',
   name: '',
   email: '',
-  role: 'Phòng Đào tạo',
+  role: '',
   status: 'Hoạt động',
 };
 
@@ -80,19 +78,29 @@ const AdminUsers: React.FC = () => {
 
   const [users, setUsers] =
     useState<UserAccount[]>([]);
+  const [accountRoles, setAccountRoles] = useState<AccountRole[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [statusTarget, setStatusTarget] = useState<UserAccount | null>(null);
+  const [resetTarget, setResetTarget] = useState<UserAccount | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [statusToast, setStatusToast] = useState<{ message: string; error: boolean } | null>(null);
+  useEffect(() => {
+    if (!statusToast) return;
+    const timer = window.setTimeout(() => setStatusToast(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [statusToast]);
   const loadUsers = async () => {
     setLoading(true); setError('');
     try { const result = await getAccounts(); setUsers(result.data.map(mapAccount)); }
     catch (e) { setError(e instanceof Error ? e.message : 'Không tải được tài khoản.'); }
     finally { setLoading(false); }
   };
-  useEffect(() => { void loadUsers(); }, []);
-  const roleIdFor = (role: UserRole) => {
-    const id = users.find(user => user.role === role)?.roleId;
+  useEffect(() => { void loadUsers(); void getAccountRoles().then(result => setAccountRoles(result.data)).catch(() => setAccountRoles([])); }, []);
+  const roleIdFor = (role: UserRole | '') => {
+    const id = accountRoles.find(item => ROLE_LABELS[item.code] === role)?.id;
     if (!id) throw new Error('Chưa có ID cho vai trò này trong danh sách tài khoản.');
     return id;
   };
@@ -106,6 +114,8 @@ const AdminUsers: React.FC = () => {
 
   const [roleFilter, setRoleFilter] =
     useState<'Tất cả' | UserRole>('Tất cả');
+  const [statusFilter, setStatusFilter] =
+    useState<'Tất cả trạng thái' | 'Hoạt động' | 'Ngừng hoạt động'>('Tất cả trạng thái');
 
   /* =========================
      ADD
@@ -134,6 +144,8 @@ const AdminUsers: React.FC = () => {
 
   const [editForm, setEditForm] =
     useState<UserForm>(EMPTY_FORM);
+  const [editErrors, setEditErrors] = useState<Partial<Record<'name' | 'email' | 'role', string>>>({});
+  const [editError, setEditError] = useState('');
 
   /* =========================================================
      FILTERED USERS
@@ -159,18 +171,20 @@ const AdminUsers: React.FC = () => {
       const matchesRole =
         roleFilter === 'Tất cả' ||
         user.role === roleFilter;
+      const matchesStatus =
+        statusFilter === 'Tất cả trạng thái' ||
+        user.status === statusFilter;
 
-      return matchesSearch && matchesRole;
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [users, search, roleFilter]);
+  }, [users, search, roleFilter, statusFilter]);
 
   /* =========================================================
      ADD ACCOUNT
      ========================================================= */
 
   const handleOpenAddModal = () => {
-    const staff = users.find(user => !['Sinh viên', 'Doanh nghiệp'].includes(user.role));
-    setAddForm({ ...EMPTY_FORM, role: staff?.role ?? EMPTY_FORM.role });
+    setAddForm({ ...EMPTY_FORM });
     setNotice(''); setAddError(''); setIsAddModalOpen(true);
   };
 
@@ -181,9 +195,6 @@ const AdminUsers: React.FC = () => {
 
   const handleAddUser = async () => {
     if (saving) return;
-    if (!addForm.code.trim()) { setAddError('Vui lòng nhập mã tài khoản.'); return; }
-    if (!addForm.password?.trim()) { setAddError('Vui lòng nhập mật khẩu ban đầu.'); return; }
-    if (addForm.password.length < 8) { setAddError('Mật khẩu cần ít nhất 8 ký tự.'); return; }
     if (!addForm.name.trim()) { setAddError('Vui lòng nhập họ tên.'); return; }
     if (!addForm.email.trim()) { setAddError('Vui lòng nhập email.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.email.trim())) { setAddError('Vui lòng nhập email hợp lệ.'); return; }
@@ -191,8 +202,7 @@ const AdminUsers: React.FC = () => {
     setAddError(''); setSaving(true);
     try {
       if (['Sinh viên', 'Doanh nghiệp'].includes(addForm.role)) throw new Error('Tài khoản sinh viên và doanh nghiệp phải được tạo qua import.');
-      if (!addForm.password || addForm.password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.');
-      const result = await createAccount({ username: addForm.code.trim(), fullName: addForm.name.trim(), email: addForm.email.trim(), password: addForm.password, phone: addForm.phone?.trim() || null, roleId: roleIdFor(addForm.role) });
+      const result = await createAccount({ fullName: addForm.name.trim(), email: addForm.email.trim(), phone: addForm.phone?.trim() || null, roleId: roleIdFor(addForm.role) });
       handleCloseAddModal(); setNotice('Đã tạo tài khoản. ' + emailDeliveryMessage(result.emailDelivery)); await loadUsers();
     } catch (e) { setAddError(e instanceof Error ? e.message : 'Tạo tài khoản thất bại.'); }
     finally { setSaving(false); }
@@ -220,10 +230,10 @@ const AdminUsers: React.FC = () => {
     user: UserAccount,
   ) => {
     setEditUser(user);
+    setEditErrors({}); setEditError('');
 
     setEditForm({
       phone: user.phone,
-      code: user.code,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -234,56 +244,66 @@ const AdminUsers: React.FC = () => {
   const handleCloseEditUser = () => {
     setEditUser(null);
     setEditForm(EMPTY_FORM);
+    setEditErrors({}); setEditError('');
   };
 
   const handleSaveEditUser = async () => {
-    if (!editUser || saving) return; setSaving(true);
+    if (!editUser || saving) return;
+    const errors: typeof editErrors = {};
+    if (!editForm.name.trim()) errors.name = 'Vui lòng nhập họ tên.';
+    if (!editForm.email.trim()) errors.email = 'Vui lòng nhập email.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email.trim())) errors.email = 'Vui lòng nhập email hợp lệ.';
+    if (!editForm.role) errors.role = 'Vui lòng chọn vai trò.';
+    setEditErrors(errors); setEditError('');
+    if (Object.keys(errors).length) return;
+    setSaving(true);
     try {
       await updateAccount({ userId: editUser.id, fullName: editForm.name.trim(), phone: editForm.phone?.trim() || null, email: editForm.email.trim(), ...(editForm.status === 'Khóa' ? {} : { status: statusCode(editForm.status) }), roleId: editForm.role === editUser.role ? editUser.roleId : roleIdFor(editForm.role) });
       handleCloseEditUser(); setNotice('Đã cập nhật tài khoản.'); await loadUsers();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Cập nhật thất bại.'); }
+    } catch (e) { setEditError(e instanceof Error ? e.message : 'Cập nhật thất bại.'); }
     finally { setSaving(false); }
   };
 
   /* =========================================================
-     DELETE ACCOUNT
+     ACCOUNT STATUS
      ========================================================= */
 
-  const handleDeleteUser = async (user: UserAccount) => {
-    if (saving || !window.confirm('Ngừng hoạt động tài khoản ' + user.code + '?')) return; setSaving(true);
+  const confirmStatusChange = async () => {
+    if (!statusTarget || saving) return;
+    const activating = statusTarget.status === 'Ngừng hoạt động';
+    setSaving(true);
     try {
-      await updateAccount({ userId: user.id, status: 'INACTIVE' });
-      setNotice('Đã ngừng hoạt động tài khoản.'); await loadUsers();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Cập nhật trạng thái thất bại.'); }
+      await updateAccount({ userId: statusTarget.id, status: activating ? 'ACTIVE' : 'INACTIVE' });
+      setStatusTarget(null);
+      setStatusToast({ message: activating ? 'Đã kích hoạt lại tài khoản.' : 'Đã ngừng hoạt động tài khoản.', error: false });
+      await loadUsers();
+    } catch (e) { setStatusToast({ message: e instanceof Error ? e.message : 'Cập nhật trạng thái thất bại.', error: true }); }
     finally { setSaving(false); }
+  };
+
+  const confirmPasswordReset = async () => {
+    if (!resetTarget || resetBusy) return;
+    setResetBusy(true);
+    try {
+      const result = await resetAccountPassword(resetTarget.id);
+      setStatusToast({ message: result.data?.status === 'SENT'
+        ? `Đã gửi email hướng dẫn đặt lại mật khẩu đến ${resetTarget.email}.`
+        : 'Đã tiếp nhận yêu cầu đặt lại mật khẩu. Email sẽ được gửi khi hệ thống xử lý.', error: false });
+      setResetTarget(null);
+    } catch {
+      setStatusToast({ message: 'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại.', error: true });
+    } finally { setResetBusy(false); }
   };
 
   /* =========================================================
      RENDER
      ========================================================= */
 
-  const handleAccountAction = async (user: UserAccount, action: 'reset' | 'resend') => {
-    if (saving) return;
-    if (action === 'reset' && String(user.id) === currentUser?.id) { alert('Để đổi mật khẩu của bạn, mở Cài đặt hệ thống → Tài khoản cá nhân.'); return; }
-    if (!window.confirm(action === 'reset' ? 'Đặt lại mật khẩu và đưa email thông tin đăng nhập vào hàng đợi cho ' + user.email + '?' : 'Gửi lại email đăng nhập bị lỗi cho ' + user.email + '?')) return;
-    setSaving(true); setNotice('');
-    try {
-      if (action === 'reset') {
-        await resetAccountPassword(user.id);
-        setNotice('Đã đưa yêu cầu đặt lại mật khẩu vào hàng đợi email.');
-      } else {
-        await resendAccountEmail(user.email);
-        setNotice('Đã đưa email lỗi vào hàng đợi gửi lại.');
-      }
-      setViewUser(null); await loadUsers();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Thao tác thất bại.'); }
-    finally { setSaving(false); }
-  };
-
   return (
     <div className="space-y-6">
       {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error} <button onClick={() => void loadUsers()} className="underline">Thử lại</button></div>}
       {notice && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-emerald-700">{notice}</p>}
+      {statusToast && <div role={statusToast.error ? 'alert' : 'status'} className={`fixed right-5 top-5 z-[10000] max-w-sm rounded-xl border bg-white px-4 py-3 text-sm font-medium shadow-xl ${statusToast.error ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'}`}>{statusToast.message}</div>}
       {loading && <p role="status">Đang tải tài khoản...</p>}
       {saving && <p role="status">Đang lưu...</p>}
       <PageBanner
@@ -324,8 +344,8 @@ const AdminUsers: React.FC = () => {
 
         {/* FILTER */}
 
-        <div className="mt-6 flex flex-col gap-3 md:flex-row">
-          <div className="relative flex-1">
+        <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
             <Search
               size={18}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -342,7 +362,9 @@ const AdminUsers: React.FC = () => {
             />
           </div>
 
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row lg:justify-end">
           <select
+            aria-label="Lọc theo vai trò"
             value={roleFilter}
             onChange={(e) =>
               setRoleFilter(
@@ -351,7 +373,7 @@ const AdminUsers: React.FC = () => {
                   | UserRole,
               )
             }
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            className="h-11 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 sm:w-auto"
           >
             <option value="Tất cả">
               Tất cả vai trò
@@ -377,6 +399,17 @@ const AdminUsers: React.FC = () => {
               Quản trị viên
             </option>
           </select>
+          <select
+            aria-label="Lọc theo trạng thái"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+            className="h-11 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 sm:w-auto"
+          >
+            <option value="Tất cả trạng thái">Tất cả trạng thái</option>
+            <option value="Hoạt động">Hoạt động</option>
+            <option value="Ngừng hoạt động">Ngừng hoạt động</option>
+          </select>
+          </div>
         </div>
 
         {/* TABLE */}
@@ -473,18 +506,24 @@ const AdminUsers: React.FC = () => {
                         <Pencil size={17} />
                       </button>
 
-                      {/* XÓA */}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleDeleteUser(user)
-                        }
-                        title="Ngừng hoạt động tài khoản"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 transition hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 size={17} />
+                      <button type="button" onClick={() => { setStatusToast(null); setResetTarget(user); }}
+                        disabled={user.status !== 'Hoạt động'} title="Đặt lại mật khẩu" aria-label="Đặt lại mật khẩu"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-orange-600 transition hover:bg-orange-50 hover:text-orange-700 disabled:cursor-not-allowed disabled:opacity-40">
+                        <KeyRound size={17} />
                       </button>
+
+                      {/* TRẠNG THÁI */}
+
+                      {user.status !== 'Khóa' && <button
+                        type="button"
+                        onClick={() => { setStatusToast(null); setStatusTarget(user); }}
+                        disabled={saving || String(user.id) === currentUser?.id}
+                        title={user.status === 'Hoạt động' ? 'Ngừng hoạt động' : 'Kích hoạt lại'}
+                        aria-label={user.status === 'Hoạt động' ? 'Ngừng hoạt động' : 'Kích hoạt lại'}
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-40 ${user.status === 'Hoạt động' ? 'text-red-500 hover:bg-red-50 hover:text-red-600' : 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                      >
+                        {user.status === 'Hoạt động' ? <UserRoundX size={17} /> : <UserRoundCheck size={17} />}
+                      </button>}
                     </div>
                   </td>
                 </tr>
@@ -497,8 +536,7 @@ const AdminUsers: React.FC = () => {
                     colSpan={6}
                     className="px-4 py-10 text-center text-sm text-slate-500"
                   >
-                    Không tìm thấy tài khoản
-                    phù hợp.
+                    Không tìm thấy tài khoản phù hợp.
                   </td>
                 </tr>
               )}
@@ -514,6 +552,32 @@ const AdminUsers: React.FC = () => {
           tài khoản
         </div>
       </section>
+
+      {statusTarget && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 px-4" onClick={() => { if (!saving) setStatusTarget(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="status-dialog-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={event => event.stopPropagation()}>
+            <h2 id="status-dialog-title" className="text-lg font-bold text-slate-900">{statusTarget.status === 'Hoạt động' ? 'Ngừng hoạt động tài khoản' : 'Kích hoạt lại tài khoản'}</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{statusTarget.status === 'Hoạt động' ? `Bạn có chắc chắn muốn ngừng hoạt động tài khoản ${statusTarget.name} không? Tài khoản này sẽ không thể đăng nhập cho đến khi được kích hoạt lại.` : `Bạn có chắc chắn muốn kích hoạt lại tài khoản ${statusTarget.name} không?`}</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={saving} onClick={() => setStatusTarget(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+              <button type="button" disabled={saving} onClick={() => void confirmStatusChange()} className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 ${statusTarget.status === 'Hoạt động' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>{saving ? 'Đang xử lý...' : statusTarget.status === 'Hoạt động' ? 'Ngừng hoạt động' : 'Kích hoạt'}</button>
+            </div>
+          </div>
+        </div>, document.body,
+      )}
+
+      {resetTarget && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 px-4" onClick={() => { if (!resetBusy) setResetTarget(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="reset-dialog-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={event => event.stopPropagation()}>
+            <h2 id="reset-dialog-title" className="text-lg font-bold text-slate-900">Đặt lại mật khẩu</h2>
+            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{`Bạn có chắc chắn muốn gửi yêu cầu đặt lại mật khẩu cho tài khoản ${resetTarget.name} không?\n\nHệ thống sẽ gửi email hướng dẫn đặt lại mật khẩu đến ${resetTarget.email}.`}</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={resetBusy} onClick={() => setResetTarget(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+              <button type="button" disabled={resetBusy} onClick={() => void confirmPasswordReset()} className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">{resetBusy ? 'Đang gửi...' : 'Gửi email đặt lại mật khẩu'}</button>
+            </div>
+          </div>
+        </div>, document.body,
+      )}
 
       {/* =====================================================
           VIEW USER MODAL
@@ -561,16 +625,6 @@ const AdminUsers: React.FC = () => {
               {/* BODY */}
 
               <div className="space-y-4 px-6 py-6">
-                <div className="grid grid-cols-[140px_1fr] gap-4 border-b border-slate-100 pb-4">
-                  <p className="text-sm font-semibold text-slate-500">
-                    Mã tài khoản
-                  </p>
-
-                  <p className="text-sm font-semibold text-slate-900">
-                    {viewUser.code}
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-[140px_1fr] gap-4 border-b border-slate-100 pb-4">
                   <p className="text-sm font-semibold text-slate-500">
                     Họ tên
@@ -623,7 +677,12 @@ const AdminUsers: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-3 border-t border-slate-100 px-6 py-4 text-sm"><p><strong>ID tài khoản:</strong> {viewUser.id}</p><p><strong>Điện thoại:</strong> {viewUser.phone || '—'}</p><p><strong>Ngày tạo:</strong> {formatDate(viewUser.raw.created_at)}</p><p><strong>Đăng nhập gần nhất:</strong> {formatDate(viewUser.raw.last_login_at)}</p><div className="flex flex-wrap gap-2"><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'reset')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><KeyRound size={16} />Đặt lại mật khẩu</button><button disabled={saving} onClick={() => void handleAccountAction(viewUser, 'resend')} className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 disabled:opacity-50"><Mail size={16} />Gửi lại email lỗi</button></div></div>
+              <div className="grid gap-3 border-t border-slate-100 px-6 py-4 text-sm">
+                <p><strong>ID tài khoản:</strong> {viewUser.id}</p>
+                <p><strong>Điện thoại:</strong> {viewUser.phone || '—'}</p>
+                <p><strong>Ngày tạo:</strong> {formatDate(viewUser.raw.created_at)}</p>
+                <p><strong>Đăng nhập gần nhất:</strong> {formatDate(viewUser.raw.last_login_at)}</p>
+              </div>
               {/* FOOTER */}
 
               <div className="flex justify-end border-t border-slate-200 px-6 py-4">
@@ -688,30 +747,11 @@ const AdminUsers: React.FC = () => {
               {/* BODY */}
 
               <div className="space-y-4 px-6 py-6">
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Mã tài khoản
-                  </label>
-
-                  <input
-                    type="text"
-                    value={editForm.code} disabled title="Tên đăng nhập không thể sửa"
-                    onChange={(e) =>
-                      setEditForm(
-                        (current) => ({
-                          ...current,
-                          code:
-                            e.target.value,
-                        }),
-                      )
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
+                {editError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</p>}
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Họ tên
+                    Họ tên <span className="text-red-600">*</span>
                   </label>
 
                   <input
@@ -719,23 +759,21 @@ const AdminUsers: React.FC = () => {
                     value={
                       editForm.name
                     }
-                    onChange={(e) =>
-                      setEditForm(
-                        (current) => ({
-                          ...current,
-                          name:
-                            e.target.value,
-                        }),
-                      )
-                    }
+                    aria-invalid={!!editErrors.name}
+                    aria-describedby={editErrors.name ? 'edit-name-error' : undefined}
+                    onChange={(e) => {
+                      setEditErrors(current => ({ ...current, name: undefined }));
+                      setEditForm(current => ({ ...current, name: e.target.value }));
+                    }}
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
+                  {editErrors.name && <p id="edit-name-error" className="mt-1 text-sm text-red-600">{editErrors.name}</p>}
                 </div>
 
                 <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Số điện thoại</label><input type="tel" maxLength={20} value={editForm.phone || ''} onChange={e => setEditForm(current => ({...current,phone:e.target.value}))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
                   <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Email
+                    Email <span className="text-red-600">*</span>
                   </label>
 
                   <input
@@ -743,60 +781,45 @@ const AdminUsers: React.FC = () => {
                     value={
                       editForm.email
                     }
-                    onChange={(e) =>
-                      setEditForm(
-                        (current) => ({
-                          ...current,
-                          email:
-                            e.target.value,
-                        }),
-                      )
-                    }
+                    aria-invalid={!!editErrors.email}
+                    aria-describedby={editErrors.email ? 'edit-email-error' : undefined}
+                    onChange={(e) => {
+                      setEditErrors(current => ({ ...current, email: undefined }));
+                      setEditForm(current => ({ ...current, email: e.target.value }));
+                    }}
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
+                  {editErrors.email && <p id="edit-email-error" className="mt-1 text-sm text-red-600">{editErrors.email}</p>}
                 </div>
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Vai trò
+                    Vai trò <span className="text-red-600">*</span>
                   </label>
 
                   <select
                     value={
                       editForm.role
                     }
-                    onChange={(e) =>
-                      setEditForm(
-                        (current) => ({
-                          ...current,
-                          role:
-                            e.target
-                              .value as UserRole,
-                        }),
-                      )
-                    }
+                    aria-invalid={!!editErrors.role}
+                    aria-describedby={editErrors.role ? 'edit-role-error' : undefined}
+                    onChange={(e) => {
+                      setEditErrors(current => ({ ...current, role: undefined }));
+                      setEditForm(current => ({ ...current, role: e.target.value as UserRole }));
+                    }}
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
-                    <option value="Sinh viên" disabled={editUser?.role !== 'Sinh viên' || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Sinh viên'}>
-                      Sinh viên
-                    </option>
-
-                    <option value="Phòng Đào tạo" disabled={!users.some(user => user.role === 'Phòng Đào tạo') || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Phòng Đào tạo'}>
-                      Phòng Đào tạo
-                    </option>
-
-                    <option value="Phòng Quan hệ Doanh nghiệp" disabled={!users.some(user => user.role === 'Phòng Quan hệ Doanh nghiệp') || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Phòng Quan hệ Doanh nghiệp'}>
-                      Phòng Quan hệ Doanh nghiệp
-                    </option>
-
-                    <option value="Doanh nghiệp" disabled={editUser?.role !== 'Doanh nghiệp' || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Doanh nghiệp'}>
-                      Doanh nghiệp
-                    </option>
-
-                    <option value="Quản trị viên" disabled={!users.some(user => user.role === 'Quản trị viên') || !!(editUser?.raw.studentId || editUser?.raw.enterpriseId) && editUser?.role !== 'Quản trị viên'}>
-                      Quản trị viên
-                    </option>
+                    {ROLE_ORDER.map(code => {
+                      const label = ROLE_LABELS[code];
+                      const linkedProfile = !!(editUser.raw.studentId || editUser.raw.enterpriseId);
+                      const unavailable = !accountRoles.some(role => role.code === code);
+                      const importOnly = (code === 'STUDENT' || code === 'ENTERPRISE') && editUser.role !== label;
+                      const profileConflict = linkedProfile && editUser.role !== label;
+                      const selfRoleChange = String(editUser.id) === currentUser?.id && editUser.role !== label;
+                      return <option key={code} value={label} disabled={editUser.role !== label && (unavailable || importOnly || profileConflict || selfRoleChange)}>{label}</option>;
+                    })}
                   </select>
+                  {editErrors.role && <p id="edit-role-error" className="mt-1 text-sm text-red-600">{editErrors.role}</p>}
                 </div>
 
                 <div>
@@ -806,7 +829,7 @@ const AdminUsers: React.FC = () => {
 
                   {editUser.status === 'Khóa' && <p className="mb-2 text-xs text-amber-700">Trạng thái hiện tại: Khóa. Chọn trạng thái mới nếu muốn thay đổi.</p>}
                   <select
-                    value={editForm.status === 'Khóa' ? '' : editForm.status}
+                    value={editForm.status}
                     onChange={(e) =>
                       setEditForm(
                         (current) => ({
@@ -819,7 +842,7 @@ const AdminUsers: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
-                    <option value="" disabled hidden>Chọn trạng thái mới</option>
+                    <option value="Khóa" disabled>Khóa</option>
                     <option value="Hoạt động">
                       Hoạt động
                     </option>
@@ -902,31 +925,6 @@ const AdminUsers: React.FC = () => {
 
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
                 {addError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{addError}</p>}
-                  <div><label className="mb-1.5 block text-sm font-semibold text-slate-700">Mật khẩu ban đầu <span className="text-red-600">*</span></label><input required type="password" autoComplete="new-password" minLength={8} value={addForm.password || ''} onChange={e => setAddForm(current => ({ ...current, password: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-2.5" /></div>
-                  <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                    Mã tài khoản <span className="text-red-600">*</span>
-                  </label>
-
-                  <input
-                    type="text" required
-                    value={
-                      addForm.code
-                    }
-                    onChange={(e) =>
-                      setAddForm(
-                        (current) => ({
-                          ...current,
-                          code:
-                            e.target.value,
-                        }),
-                      )
-                    }
-                    placeholder="Nhập mã tài khoản"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
-                </div>
-
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                     Họ tên <span className="text-red-600">*</span>
@@ -997,18 +995,10 @@ const AdminUsers: React.FC = () => {
                     }
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   >
-                    <option value="Phòng Đào tạo" disabled={!users.some(user => user.role === 'Phòng Đào tạo')}>
-                      Phòng Đào tạo
-                    </option>
-
-                    <option value="Phòng Quan hệ Doanh nghiệp" disabled={!users.some(user => user.role === 'Phòng Quan hệ Doanh nghiệp')}>
-                      Phòng Quan hệ Doanh nghiệp
-                    </option>
-
-                    <option value="Quản trị viên" disabled={!users.some(user => user.role === 'Quản trị viên')}>
-                      Quản trị viên
-                    </option>
+                    <option value="" disabled>Chọn vai trò</option>
+                    {ROLE_ORDER.map(code => <option key={code} value={ROLE_LABELS[code]} disabled={!accountRoles.some(role => role.code === code)}>{ROLE_LABELS[code]}</option>)}
                   </select>
+                  {['Sinh viên', 'Doanh nghiệp'].includes(addForm.role) && <p className="mt-1 text-xs text-amber-700">Tài khoản vai trò này được tạo qua quy trình import.</p>}
                 </div>
 
                 <div>

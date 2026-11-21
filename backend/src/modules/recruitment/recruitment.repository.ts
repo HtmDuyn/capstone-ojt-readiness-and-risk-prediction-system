@@ -3,6 +3,7 @@ import { invalid } from '../students/student.validation';
 import { enterpriseScope } from '../qhdn/catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { currentRoundPhase, roundActions, hasPhaseSchedule, phaseIsOpen } from './round-policy';
+import { academicPeriodStatusSql } from '../academic/period-status';
 
 export { type Actor, type Row };
 export const previousRoundSelect=`EXISTS(SELECT 1 FROM "RecruitmentWindows" previous
@@ -11,6 +12,7 @@ export const previousRoundSelect=`EXISTS(SELECT 1 FROM "RecruitmentWindows" prev
  AND (previous."EndsAt">clock_timestamp() OR previous."ResultsFinalizedAt" IS NULL)) AS "PreviousRoundPending"`;
 export async function windowRecord(c: PoolClient,id: number) {
  const w=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Kind",p."Status" AS "PeriodStatus",
+ ${academicPeriodStatusSql('p')} AS "CalendarStatus",
  p."EndDate" AS "PeriodEndDate",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow",${previousRoundSelect}
  FROM "RecruitmentWindows" w JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=w."AcademicPeriodID"
  JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID" WHERE w."WindowID"=$1 FOR UPDATE OF w`,[id])).rows[0];
@@ -54,11 +56,12 @@ export async function postRecord(c:PoolClient,id:number,actor:Actor,lock=false) 
  if(!p)throw invalid('Recruitment post not found.',404,'RECRUITMENT_POST_NOT_FOUND');
  return p;
 }
-export async function closeUnusedPositions(c:PoolClient,postId?:number) {
+export async function closeUnusedPositions(c:PoolClient,positionIds?:number[]) {
  await c.query(`UPDATE "InternshipPositions" pos SET "Status"='CLOSED'
- WHERE pos."Status"='OPEN' AND EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp WHERE pp."PositionID"=pos."PositionID" AND ($1::int IS NULL OR pp."PostID"=$1))
+ WHERE pos."Status"='OPEN' AND (pos."PositionID"=ANY($1::int[]) OR ($1::int[] IS NULL
+ AND EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp WHERE pp."PositionID"=pos."PositionID")))
  AND NOT EXISTS(SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" p ON p."PostID"=pp."PostID"
- WHERE pp."PositionID"=pos."PositionID" AND p."Status"='PUBLISHED' AND (p."DeadlineAt" IS NULL OR p."DeadlineAt">clock_timestamp()))`,[postId??null]);
+ WHERE pp."PositionID"=pos."PositionID" AND p."Status"='PUBLISHED' AND (p."DeadlineAt" IS NULL OR p."DeadlineAt">clock_timestamp()))`,[positionIds??null]);
 }
 export async function assertPublishedPosition(c:PoolClient,positionId:number) {
  const blocked=await c.query(`SELECT 1 FROM "RecruitmentPostPositions" pp JOIN "RecruitmentPosts" p ON p."PostID"=pp."PostID"

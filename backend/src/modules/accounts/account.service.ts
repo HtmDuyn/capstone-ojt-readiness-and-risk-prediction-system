@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes } from 'node:crypto';
 import { queueNotices } from '../../shared/notification.service';
 import { deliverAccountEmailsNow, type EmailDeliveryResult } from '../imports/account-email-delivery.service';
 import { accountEmail } from '../../shared/account-email';
@@ -157,22 +158,22 @@ export const getAccounts = async (
 export const createNewAccount = async (
   input: CreateAccountInput,
 ): Promise<AccountRecord & { emailDelivery: EmailDeliveryResult }> => {
-  const username =
-    normalizeRequiredString(
-      input.username,
-      "username",
-    );
+  const suppliedUsername = input.username === undefined
+    ? null
+    : normalizeRequiredString(input.username, "username");
 
   const email =
     normalizeEmail(
       input.email,
     );
 
-  const password =
-    normalizeRequiredString(
-      input.password,
-      "password",
-    );
+  const generatedPassword = input.password === undefined;
+  const password = generatedPassword
+    ? randomBytes(18).toString('base64url')
+    : normalizeRequiredString(input.password, "password");
+  const temporaryExpiresAt = generatedPassword
+    ? new Date(Date.now() + 24 * 60 * 60 * 1000)
+    : null;
 
   const fullName =
     normalizeRequiredString(
@@ -200,11 +201,7 @@ export const createNewAccount = async (
     );
   }
 
-  if (
-    await existsByUsername(
-      username,
-    )
-  ) {
+  if (suppliedUsername && await existsByUsername(suppliedUsername)) {
     throw createError(
       "Username already exists.",
       409,
@@ -242,24 +239,35 @@ export const createNewAccount = async (
   const passwordHash =
     await bcrypt.hash(
       password,
-      10,
+      generatedPassword ? 12 : 10,
     );
 
   const { account, emailId } = await accountTransaction(async client => {
+    let username = suppliedUsername;
+    if (!username) {
+      await client.query('SELECT pg_advisory_xact_lock($1,$2)', [2026, 1121]);
+      const next = (await client.query<{ next: string }>(`SELECT (COALESCE(MAX(substring(lower("Username") from 7)::bigint),0)+1)::text AS next
+        FROM "Users" WHERE lower("Username") ~ '^staff_[0-9]+$'`)).rows[0].next;
+      username = `staff_${next.padStart(6, '0')}`;
+    }
     const created = await createAccount(
       username, passwordHash, email, fullName, phone, roleId, client,
     );
+    if (temporaryExpiresAt) {
+      await client.query(`UPDATE "Users" SET "MustChangePassword"=true,"TemporaryPasswordExpiresAt"=$2 WHERE "UserID"=$1`, [created.id, temporaryExpiresAt]);
+    }
     const [notice] = await queueNotices(client, [{ userId: created.id, email }], {
       title: 'Tài khoản hệ thống OJT đã được tạo',
       text: 'Tài khoản của bạn đã được tạo. Thông tin tài khoản và hướng dẫn đăng nhập đã được xếp hàng gửi đến email của bạn.',
-      emailContent: accountEmail({ fullName, email, username, roleCode: role.code }),
+      emailContent: accountEmail({ fullName, email, username, roleCode: role.code,
+        ...(temporaryExpiresAt ? { temporary: { password, expiresAt: temporaryExpiresAt } } : {}) }),
       entityType: 'ACCOUNT_CREATED', entityId: created.id, eventKey: `account-created:${created.id}`,
-      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+      expiresAt: temporaryExpiresAt ?? new Date(Date.now() + 72 * 60 * 60 * 1000),
     });
     return { account: created, emailId: notice?.emailId };
   });
   const emailDelivery = await deliverAccountEmailsNow({ emailId });
-  return { ...account, emailDelivery };
+  return { ...account, mustChangePassword: generatedPassword || account.mustChangePassword, emailDelivery };
 };
 
 export const updateAccount = async (

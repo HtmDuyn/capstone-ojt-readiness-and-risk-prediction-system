@@ -3,25 +3,25 @@ import { handoffPendingStudents } from '../ojt-registration/handoff.service';
 import { readTransaction } from '../qhdn/read.repository';
 import { ensureOjtSemesterForPeriod } from '../academic/ojt-semester-link';
 import { actualPeriod, periodBounds } from '../academic/workflow-policy';
-import { timestamp } from '../combo-registration/combo.validation';
 import { inputObject, invalid, positiveId, requiredText, enumValue } from '../students/student.validation';
 import { windowRecord, windowApi, previousRoundSelect, type Row } from './recruitment.repository';
 import { extendWindow, requireLifecycleSchema } from './lifecycle.service';
 import { requireRecruitmentSchema, requireThreePhaseSchema, expireRecruitmentResponses } from './round-policy';
-import { schedulePermissions } from './schedule-policy';
+import { futureScheduleMessage, scheduleColumns, scheduleDate, scheduleFieldError, schedulePermissions, validatePhaseOrder } from './schedule-policy';
 import { requireScheduleEditingSchema } from './schedule.service';
 import { notifyRecruitmentCreated } from './notification.service';
+import { academicPeriodStatusSql } from '../academic/period-status';
 
 export function validateCampaignSchedule(body:Row) {
- const start=new Date(timestamp(body.startsAt,'startsAt')),end=new Date(timestamp(body.endsAt,'endsAt'));
- if(end<=start)throw invalid('Ngày kết thúc đợt OJT phải sau ngày bắt đầu.');
+ const start=scheduleDate(body.startsAt,'postingStartsAt'),end=scheduleDate(body.endsAt,'resultsEndsAt');
+ if(end<=start)throw scheduleFieldError('resultsEndsAt','Ngày kết thúc đợt OJT phải sau ngày bắt đầu.');
  if(!Array.isArray(body.rounds)||body.rounds.length<1||body.rounds.length>30)throw invalid('Khai báo từ 1 đến 30 đợt con.');
  const rounds=body.rounds.map((value:unknown)=>{
-  const keys=['postingStartsAt','postingEndsAt','applicationStartsAt','applicationEndsAt','resultsStartsAt','resultsEndsAt'];
+  const keys=Object.keys(scheduleColumns) as (keyof typeof scheduleColumns)[];
   const r=inputObject(value,['name',...keys]);
-  const times=Object.fromEntries(keys.map(key=>[key,new Date(timestamp(r[key],'round.'+key))]));
+  const times=Object.fromEntries(keys.map(key=>[key,scheduleDate(r[key],key)])) as Record<keyof typeof scheduleColumns,Date>;
   const {postingStartsAt:ps,postingEndsAt:pe,applicationStartsAt:as,applicationEndsAt:ae,resultsStartsAt:rs,resultsEndsAt:re}=times;
-  if(!(ps<pe&&pe<=as&&as<ae&&rs>=as&&rs<re&&ae<=re))throw invalid('Hạn đăng tin kết thúc trước hoặc cùng lúc ứng tuyển. Hạn xét tuyển bắt đầu từ lúc mở ứng tuyển trở đi, kết thúc sau lúc bắt đầu và bằng hoặc sau hạn ứng tuyển.',400,'RECRUITMENT_PHASE_SCHEDULE_INVALID');
+  validatePhaseOrder(times);
   return {name:requiredText(r.name,'round.name',150),start:ps,end:re,
    postingStartsAt:ps,postingEndsAt:pe,applicationStartsAt:as,applicationEndsAt:ae,resultsStartsAt:rs,resultsEndsAt:re};
  });
@@ -36,6 +36,7 @@ export async function listWindows(params: Row) {
  return readTransaction(async c=>{
   await requireRecruitmentSchema(c);
   const rows=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Status" AS "PeriodStatus",
+   ${academicPeriodStatusSql('p')} AS "CalendarStatus",
    p."Kind",o."AcademicPeriodID" AS "LinkedPeriodID",${previousRoundSelect},
    clock_timestamp() AS "DatabaseNow",campaign."Name" AS "CampaignName",
    (SELECT count(*)::int FROM "JobApplications" a JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID"
@@ -60,10 +61,13 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    const old=await windowRecord(c,id);
    if(old.ResultsFinalizedAt)throw invalid('Đợt đã chốt tổng hợp không thể thay đổi.',409);
    const status=b.status===undefined?old.Status:enumValue(b.status,['OPEN','CLOSED'],'status');
-   if(status==='OPEN'&&old.Status!=='OPEN'){
-    if(old.Kind!=='SEMESTER'||old.LinkedPeriodID!==old.AcademicPeriodID||['CLOSED','ARCHIVED'].includes(old.PeriodStatus))
+   if(status==='OPEN'){
+    if(old.Kind!=='SEMESTER'||old.LinkedPeriodID!==old.AcademicPeriodID)
      throw invalid('Học kỳ hoặc liên kết kỳ OJT không còn khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
-
+    if(old.CalendarStatus!=='ACTIVE')
+     throw invalid('Chỉ mở đợt tuyển dụng trong học kỳ đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
+   }
+   if(status==='OPEN'&&old.Status!=='OPEN'){
     if(old.Status==='CLOSED'||new Date(old.EndsAt)<=old.DatabaseNow)throw invalid('Đợt đã đóng hoặc đã hết thời hạn.',409);
     if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2
       AND "StartsAt"<$3 AND ("EndsAt">clock_timestamp() OR "ResultsFinalizedAt" IS NULL)`,[old.OJTSemesterID,id,old.StartsAt])).rowCount)
@@ -82,14 +86,14 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    return { ...windowApi(after), handedOffCount };
   }
   const periodId=positiveId(b.academicPeriodId,'academicPeriodId'),period=await actualPeriod(c,periodId);
-  if(period.Kind!=='SEMESTER'||['CLOSED','ARCHIVED'].includes(period.Status))throw invalid('Chọn học kỳ chính đang hoạt động hoặc đã lên kế hoạch.',409);
+  if(period.Kind!=='SEMESTER'||period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ tạo đợt tuyển dụng trong học kỳ chính đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
   await requireThreePhaseSchema(c);
   await requireLifecycleSchema(c);
   const schedule=validateCampaignSchedule(b);
   if(schedule.rounds.some(r=>+r.applicationEndsAt===+r.resultsEndsAt||+r.resultsStartsAt!==+r.applicationStartsAt))await requireScheduleEditingSchema(c);
-  if(schedule.end>periodBounds(period).end)throw invalid('Thời hạn không được vượt quá ngày kết thúc học kỳ.');
+  if(schedule.end>periodBounds(period).end)throw scheduleFieldError('resultsEndsAt','Thời hạn không được vượt quá ngày kết thúc học kỳ.');
   const databaseNow=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
-  if(schedule.start<=databaseNow)throw invalid('Đợt OJT phải bắt đầu trong tương lai.');
+  if(schedule.start<=databaseNow)throw scheduleFieldError('postingStartsAt',futureScheduleMessage(databaseNow));
   const semesterId=await ensureOjtSemesterForPeriod(c,periodId);
   if(b.supplemental!==undefined&&typeof b.supplemental!=='boolean')throw invalid('supplemental must be boolean.');
   let campaign=(await c.query('SELECT * FROM "RecruitmentCampaigns" WHERE "OJTSemesterID"=$1 FOR UPDATE',[semesterId])).rows[0];

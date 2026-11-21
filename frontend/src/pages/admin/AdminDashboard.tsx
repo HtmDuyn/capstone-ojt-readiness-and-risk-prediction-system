@@ -1,117 +1,125 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Users, GraduationCap, Building2 } from 'lucide-react';
-import { Chart, CategoryScale, LinearScale, BarElement, BarController, ArcElement, DoughnutController, Tooltip, type Plugin } from 'chart.js';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Building2, GraduationCap, UserRoundPlus, Users } from 'lucide-react';
+import { ArcElement, Chart, DoughnutController, Tooltip } from 'chart.js';
 import { PageBanner } from '@/components/common/PageBanner';
-import { getAccounts, getSummary, ROLE_NAMES, type AccountCount, type Summary } from '@/services/adminService';
+import { getAccounts, getSummary, type AccountCount, type Summary } from '@/services/adminService';
 
-Chart.register(CategoryScale, LinearScale, BarElement, BarController, ArcElement, DoughnutController, Tooltip);
+Chart.register(ArcElement, DoughnutController, Tooltip);
 
-const roles = Object.entries(ROLE_NAMES);
+const roles = [
+  { code: 'STUDENT', label: 'Sinh viên', color: '#6366f1' },
+  { code: 'ENTERPRISE', label: 'Doanh nghiệp', color: '#f97316' },
+  { code: 'OJT_COORD', label: 'Phòng Quan hệ Doanh nghiệp', color: '#8b5cf6' },
+  { code: 'ACADEMIC', label: 'Phòng Đào tạo', color: '#06b6d4' },
+  { code: 'ADMIN', label: 'Quản trị viên', color: '#f59e0b' },
+] as const;
 const statuses = [
-  { code: 'ACTIVE', label: 'Đang hoạt động', color: '#2563eb' },
+  { code: 'ACTIVE', label: 'Đang hoạt động', color: '#22c55e' },
   { code: 'LOCKED', label: 'Đã khóa', color: '#f59e0b' },
   { code: 'INACTIVE', label: 'Ngừng hoạt động', color: '#94a3b8' },
-];
+] as const;
+const number = (value: number) => value.toLocaleString('vi-VN');
+const percent = (part: number, total: number) => total ? part / total * 100 : 0;
+const percentText = (part: number, total: number) => `${percent(part, total).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;
 const countBy = (rows: AccountCount[], key: 'roleCode' | 'status', value: string) =>
-  rows.reduce((total, row) => total + (row[key] === value ? row.count : 0), 0);
+  rows.reduce((sum, row) => sum + (row[key] === value ? row.count : 0), 0);
 
-const barValues: Plugin<'bar'> = {
-  id: 'adminBarValues',
-  afterDatasetsDraw(chart) {
-    const { ctx } = chart;
-    ctx.save(); ctx.fillStyle = '#334155'; ctx.font = '600 12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    chart.getDatasetMeta(0).data.forEach((bar, index) => {
-      const value = Number(chart.data.datasets[0].data[index] ?? 0);
-      ctx.fillText(value.toLocaleString('vi-VN'), bar.x + 8, bar.y);
-    });
-    ctx.restore();
-  },
-};
-
-function RoleChart({ counts }: { counts: AccountCount[] }) {
+function RoleDistribution({ counts, total }: { counts: AccountCount[]; total: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const values = useMemo(() => roles.map(([code]) => countBy(counts, 'roleCode', code)), [counts]);
-  const total = values.reduce((sum, value) => sum + value, 0);
+  const values = useMemo(() => roles.map(role => countBy(counts, 'roleCode', role.code)), [counts]);
   useEffect(() => {
-    if (!canvas.current || !total) return;
-    const chart = new Chart(canvas.current, {
-      type: 'bar',
-      data: { labels: roles.map(([, label]) => label), datasets: [{ data: values, backgroundColor: '#6366f1', hoverBackgroundColor: '#4f46e5', borderRadius: 6, maxBarThickness: 25 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        animation: { duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350 },
-        layout: { padding: { right: 48 } },
-        scales: { x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e2e8f0' } }, y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 11 } } } },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${(context.parsed.x ?? 0).toLocaleString('vi-VN')} tài khoản (${(values[context.dataIndex] / total * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%)` } } },
-      },
-      plugins: [barValues],
-    });
-    return () => chart.destroy();
-  }, [values, total]);
-  return <div className="h-60">{total ? <canvas ref={canvas} role="img" aria-label={roles.map(([, label], index) => `${label}: ${values[index]} tài khoản`).join(', ')} /> : <p className="flex h-full items-center justify-center text-sm text-slate-500">Chưa có tài khoản theo vai trò.</p>}</div>;
-}
-
-function StatusChart({ counts }: { counts: AccountCount[] }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const values = useMemo(() => statuses.map(({ code }) => countBy(counts, 'status', code)), [counts]);
-  const total = values.reduce((sum, value) => sum + value, 0);
-  useEffect(() => {
-    if (!canvas.current || !total) return;
+    if (!canvas.current || !values.some(Boolean)) return;
     const chart = new Chart(canvas.current, {
       type: 'doughnut',
-      data: { labels: statuses.map(status => status.label), datasets: [{ data: values, backgroundColor: statuses.map(status => status.color), hoverOffset: 6, borderColor: '#fff', borderWidth: 3 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '69%',
-        animation: { duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350 },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.label}: ${context.parsed.toLocaleString('vi-VN')} tài khoản (${(context.parsed / total * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%)` } } },
-      },
+      data: { labels: roles.map(role => role.label), datasets: [{ data: values, backgroundColor: roles.map(role => role.color), borderColor: '#fff', borderWidth: 3, hoverOffset: 5 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '76%',
+        animation: { duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300 },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.label}: ${number(context.parsed)} (${percentText(context.parsed, total)})` } } } },
     });
     return () => chart.destroy();
   }, [values, total]);
-  return <div className="flex min-h-60 flex-col items-center justify-center gap-3 sm:flex-row"><div className="h-52 w-52 shrink-0">{total ? <canvas ref={canvas} role="img" aria-label={statuses.map((status, index) => `${status.label}: ${values[index]} tài khoản`).join(', ')} /> : <p className="flex h-full items-center justify-center text-center text-sm text-slate-500">Chưa có tài khoản.</p>}</div><ul className="grid gap-2 text-sm">{statuses.map((status, index) => <li key={status.code} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: status.color }} /><span className="text-slate-600">{status.label}</span><strong className="ml-auto tabular-nums text-slate-900">{values[index].toLocaleString('vi-VN')}</strong></li>)}</ul></div>;
+  return <div className="mt-6 flex flex-col items-center gap-7 sm:flex-row sm:items-center">
+    <div className="relative size-52 shrink-0 sm:size-56">
+      {values.some(Boolean) && <canvas ref={canvas} role="img" aria-label={roles.map((role, index) => `${role.label}: ${values[index]}`).join(', ')} />}
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <strong className="text-3xl font-extrabold tabular-nums text-slate-900">{number(total)}</strong>
+        <span className="text-xs text-slate-500">Tài khoản</span>
+      </div>
+    </div>
+    <ul className="w-full min-w-0 space-y-3">{roles.map((role, index) =>
+      <li key={role.code} className="flex items-center gap-2 text-sm">
+        <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: role.color }} />
+        <span className="min-w-0 flex-1 text-slate-600">{role.label}</span>
+        <strong className="tabular-nums text-slate-900">{number(values[index])}</strong>
+        <span className="w-12 text-right tabular-nums text-slate-500">{percentText(values[index], total)}</span>
+      </li>)}</ul>
+  </div>;
+}
+
+function AccountStatus({ counts, total }: { counts: AccountCount[]; total: number }) {
+  const navigate = useNavigate();
+  const values = statuses.map(status => countBy(counts, 'status', status.code));
+  return <>
+    <div className="mt-7"><strong className="text-4xl font-extrabold tabular-nums text-slate-900">{percentText(values[0], total)}</strong><p className="mt-1 text-sm text-slate-500">Tài khoản đang hoạt động</p></div>
+    <div role="img" aria-label={statuses.map((status, index) => `${status.label}: ${values[index]}`).join(', ')} className="mt-5 flex h-3 overflow-hidden rounded-full bg-slate-100">
+      {statuses.map((status, index) => <span key={status.code} style={{ width: `${percent(values[index], total)}%`, backgroundColor: status.color }} />)}
+    </div>
+    <ul className="mt-7 space-y-4">{statuses.map((status, index) =>
+      <li key={status.code} className="flex items-center gap-3 text-sm"><span className="size-2.5 rounded-full" style={{ backgroundColor: status.color }} /><span className="flex-1 text-slate-600">{status.label}</span><strong className="tabular-nums text-slate-900">{number(values[index])}</strong></li>)}</ul>
+    <button type="button" onClick={() => navigate('/admin/users')} className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 hover:text-orange-700">Xem danh sách tài khoản <ArrowRight size={16} /></button>
+  </>;
 }
 
 export default function AdminDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [accountCounts, setAccountCounts] = useState<AccountCount[] | null>(null);
+  const [counts, setCounts] = useState<AccountCount[] | null>(null);
   const [newAccounts30, setNewAccounts30] = useState<number | null>(null);
-  const [summaryError, setSummaryError] = useState('');
-  const [chartError, setChartError] = useState('');
+  const [error, setError] = useState('');
+  const [accountsError, setAccountsError] = useState('');
   const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
-    setLoading(true); setSummaryError(''); setChartError(''); setNewAccounts30(null);
+    setLoading(true); setError(''); setAccountsError(''); setNewAccounts30(null);
     try {
       const { data: { summary: next } } = await getSummary();
       setSummary(next);
-      if (Array.isArray(next.accountBreakdown)) setAccountCounts(next.accountBreakdown);
+      setCounts(Array.isArray(next.accountBreakdown) ? next.accountBreakdown : null);
       try {
         const accounts = await getAccounts();
-        if (!Array.isArray(next.accountBreakdown)) setAccountCounts(accounts.data.map(account => ({ roleCode: account.role_code, status: account.status, count: 1 })));
+        if (!Array.isArray(next.accountBreakdown) && accounts.data.length === accounts.total)
+          setCounts(accounts.data.map(account => ({ roleCode: account.role_code, status: account.status, count: 1 })));
         if (accounts.total === next.accounts && accounts.data.length === accounts.total && accounts.data.every(account => account.created_at && Number.isFinite(Date.parse(account.created_at)))) {
           const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
           setNewAccounts30(accounts.data.filter(account => Date.parse(account.created_at!) >= cutoff).length);
-        }
-      } catch { if (!Array.isArray(next.accountBreakdown)) { setAccountCounts(null); setChartError('Không tải được thống kê tài khoản.'); } }
-    } catch { setSummary(null); setAccountCounts(null); setSummaryError('Không tải được tổng quan hệ thống.'); }
+        } else setAccountsError('Chưa đủ dữ liệu để tính tài khoản mới trong 30 ngày.');
+      } catch { setAccountsError('Không tải được số tài khoản mới trong 30 ngày.'); }
+    } catch { setSummary(null); setCounts(null); setError('Không tải được tổng quan tài khoản.'); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  const total = summary?.accounts ?? 0;
+  const studentCount = counts ? countBy(counts, 'roleCode', 'STUDENT') : null;
+  const enterpriseCount = counts ? countBy(counts, 'roleCode', 'ENTERPRISE') : null;
   const cards = [
-    { name: 'Tài khoản hệ thống', value: summary?.accounts, icon: Users },
-    { name: 'Sinh viên', value: summary?.students, icon: GraduationCap },
-    { name: 'Doanh nghiệp', value: summary?.companies, icon: Building2 },
+    { title: 'Tài khoản hệ thống', value: summary?.accounts ?? null, description: 'Tổng số tài khoản trong hệ thống', icon: Users },
+    { title: 'Sinh viên', value: studentCount, description: studentCount === null ? 'Chưa có dữ liệu' : `${percentText(studentCount, total)} tổng số tài khoản`, icon: GraduationCap },
+    { title: 'Doanh nghiệp', value: enterpriseCount, description: enterpriseCount === null ? 'Chưa có dữ liệu' : `${percentText(enterpriseCount, total)} tổng số tài khoản`, icon: Building2 },
+    { title: 'Tài khoản mới trong 30 ngày', value: newAccounts30, description: 'Được tạo trong 30 ngày gần nhất', icon: UserRoundPlus },
   ];
-  return <div className="space-y-4">
-    <PageBanner title="Trung tâm Quản trị Hệ thống" description="Tổng quan tài khoản, sinh viên và doanh nghiệp." badge="Quản trị viên" />
-    {summaryError && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{summaryError}</p>}
-    <main className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <section className="px-4 py-4 sm:px-6"><h2 className="mb-3 text-base font-bold text-slate-900">Tổng quan hệ thống</h2>
-        <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-3 sm:divide-x sm:divide-slate-200">{cards.map(({ name, value, icon: Icon }) => <div key={name} className="flex items-center gap-3 sm:px-5 sm:first:pl-0 sm:last:pr-0"><Icon className="shrink-0 text-indigo-500" size={19} aria-hidden="true" /><div><p className="text-xs text-slate-500">{name}</p><p className="mt-0.5 text-3xl font-bold tabular-nums text-slate-900">{loading || summaryError ? '—' : value?.toLocaleString('vi-VN') ?? '—'}</p></div></div>)}</div>
-        {!loading && newAccounts30 !== null && <p className="mt-3 text-xs text-slate-600">Tài khoản mới trong 30 ngày: <strong className="tabular-nums text-slate-900">{newAccounts30.toLocaleString('vi-VN')}</strong></p>}
-      </section>
-      <section className="border-t border-slate-200 px-4 py-4 sm:px-6"><h2 className="mb-3 text-base font-bold text-slate-900">Thống kê tài khoản</h2>
-        <div className="grid lg:grid-cols-2"><div className="min-w-0 pb-4 lg:pb-0 lg:pr-6"><h3 className="mb-2 text-sm font-semibold text-slate-700">Tài khoản theo vai trò</h3>{loading ? <p role="status" className="py-20 text-center text-sm text-slate-500">Đang tải biểu đồ…</p> : accountCounts ? <RoleChart counts={accountCounts} /> : <p role="alert" className="py-20 text-center text-sm text-slate-500">{chartError || summaryError}</p>}</div><div className="min-w-0 border-t border-slate-200 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"><h3 className="mb-2 text-sm font-semibold text-slate-700">Trạng thái tài khoản</h3>{loading ? <p role="status" className="py-20 text-center text-sm text-slate-500">Đang tải biểu đồ…</p> : accountCounts ? <StatusChart counts={accountCounts} /> : <p role="alert" className="py-20 text-center text-sm text-slate-500">{chartError || summaryError}</p>}</div></div>
-      </section>
-    </main>
+  return <div className="mx-auto max-w-[1440px] space-y-5">
+    <PageBanner title="Trung tâm Quản trị Hệ thống" badge={<span className="rounded-full border border-white/25 bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">Quản trị viên</span>}
+      description="Tổng quan tài khoản, sinh viên và doanh nghiệp" />
+    {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error} <button type="button" onClick={() => void load()} className="font-semibold underline">Thử lại</button></div>}
+    <section aria-label="Tổng quan tài khoản" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({ title, value, description, icon: Icon }) =>
+      <div key={title} className="min-h-40 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3"><h2 className="text-sm font-semibold text-slate-600">{title}</h2><span className="rounded-xl bg-slate-50 p-2.5 text-indigo-600"><Icon size={20} aria-hidden="true" /></span></div>
+        <p className="mt-3 text-3xl font-extrabold tabular-nums text-slate-900">{loading ? '…' : value === null ? '—' : number(value)}</p>
+        <p className="mt-1 text-xs text-slate-500">{description}</p>
+      </div>)}</section>
+    {accountsError && <p role="status" className="text-sm text-slate-600">{accountsError}</p>}
+    <section aria-label="Thống kê tài khoản" className="grid gap-4 lg:grid-cols-2">
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Tài khoản theo vai trò</h2><p className="mt-1 text-sm text-slate-500">Phân bố tài khoản theo 5 vai trò</p>{loading ? <p role="status" className="py-20 text-center text-sm text-slate-500">Đang tải thống kê…</p> : counts ? <RoleDistribution counts={counts} total={total} /> : <p className="py-20 text-center text-sm text-slate-500">Chưa có dữ liệu theo vai trò.</p>}</div>
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Trạng thái tài khoản</h2><p className="mt-1 text-sm text-slate-500">Tình trạng hoạt động của toàn bộ tài khoản</p>{loading ? <p role="status" className="py-20 text-center text-sm text-slate-500">Đang tải thống kê…</p> : counts ? <AccountStatus counts={counts} total={total} /> : <p className="py-20 text-center text-sm text-slate-500">Chưa có dữ liệu trạng thái.</p>}</div>
+    </section>
   </div>;
 }

@@ -36,7 +36,7 @@ export const ENTERPRISE_NAV_ITEMS: NavItem[] = [
     icon: <Briefcase size={20} />,
     banner: {
       title: 'Thông tin Vị trí Tuyển dụng',
-      description: 'Quản lý tin nháp, công bố và xóa mềm tin tuyển dụng trong thời hạn QHDN thiết lập.',
+      description: 'Tạo tin nháp, công bố và quản lý tin tuyển dụng theo lịch của QHDN.',
       badge: 'Tuyển dụng thực tập',
     },
   },

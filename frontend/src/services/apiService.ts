@@ -1,5 +1,5 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
-import { clearEducationReadCache } from '../utils/education/educationReadCache';
+import { clearSharedReads } from '../utils/shared/sharedRead';
 import { expireBearerSession, expireSession } from '../utils/shared/authSession';
 
 // Tất cả vai trò dùng chung backend; môi trường local đi qua proxy của Vite.
@@ -73,7 +73,7 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response: AxiosResponse) => {
     if (!['get', 'head'].includes(response.config.method?.toLowerCase() ?? 'get')) {
-      clearEducationReadCache();
+      clearSharedReads();
     }
     return response;
   },
@@ -115,6 +115,7 @@ export async function apiRequest<T>(
   if (!body) {
     throw new Error('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.');
   }
+  if (!['GET', 'HEAD'].includes((options.method ?? 'GET').toUpperCase())) clearSharedReads();
   return body as T;
 }
 
