@@ -1,13 +1,14 @@
--- OJT | FULL DATABASE TONG HOP | 2026-11-21
+-- OJT | FULL SCHEMA + CHI GIU INSERT KHUNG CHUONG TRINH | 2026-11-21
 -- Nguon: Pasted text.txt (full schema, seeds, triggers, RLS, migrations)
 -- Ket hop bo sung: OJT_DB_TONG_HOP_MIGRATION_SAFE.sql
 -- MUC DICH: Tao MOI database OJT tu dau tren Supabase project/DB trong.
 -- KHONG CHAY TREN DATABASE DANG CO BANG OJT HOAC DU LIEU CAN GIU.
 -- File nay KHONG chua khoi DROP/RESET_DEMO pha huy schema tu file goc.
 -- Giu cac bang nghiep vu doc lap; them cot vao BANG CU, khong tao bang thay the.
--- BAO GOM DATA DEMO TU SQL GOC: hay xem du lieu seed truoc khi chay.
+-- KHONG BAO GOM DATA DEMO: chi seed curriculum catalog/program/course/combo.
 -- KHONG PHAI database dump tu live Supabase; la script dung tu SQL do ban cung cap.
 -- Quan trong: chua test thuc thi voi Postgres/Supabase runtime. Test tren project moi.
+-- KHONG dung script nay de DELETE du lieu tren DB dang chay.
 
 BEGIN;
 SET LOCAL lock_timeout='5s';
@@ -2472,63 +2473,15 @@ SELECT p."ProgramID",
    FROM "TrainingPrograms" p
      JOIN "Cohorts" c ON upper(c."CohortCode"::text) = ANY ("CurriculumCohortCodes"(p."ProgramCode"::text));
 
--- 5. Static catalog and configuration: insert the final values, without follow-up UPDATEs.
+-- 5. CURRICULUM-ONLY SEED.
+-- This build contains NO demo users, enterprises, students, recruitment rounds or OJT rows.
+-- Curriculum metadata including program-level courses and combo courses are retained.
+-- Role catalog and operational configuration must be seeded separately by the backend/admin
+-- before login and other operational workflows are tested.
 
--- AcademicGradingPolicies: 40 rows.
-INSERT INTO public."AcademicGradingPolicies" ("ProgramID","GpaScale","RetakePolicy","ConfirmedBy") VALUES
-('1','10','LATEST','2'),
-('2','10','LATEST','2'),
-('3','10','LATEST','2'),
-('4','10','LATEST','2'),
-('5','10','LATEST','2'),
-('6','10','LATEST','2'),
-('7','10','LATEST','2'),
-('8','10','LATEST','2'),
-('9','10','LATEST','2'),
-('10','10','LATEST','2'),
-('11','10','LATEST','2'),
-('12','10','LATEST','2'),
-('13','10','LATEST','2'),
-('14','10','LATEST','2'),
-('15','10','LATEST','2'),
-('16','10','LATEST','2'),
-('17','10','LATEST','2'),
-('18','10','LATEST','2'),
-('19','10','LATEST','2'),
-('20','10','LATEST','2'),
-('21','10','LATEST','2'),
-('22','10','LATEST','2'),
-('23','10','LATEST','2'),
-('24','10','LATEST','2'),
-('25','10','LATEST','2'),
-('26','10','LATEST','2'),
-('27','10','LATEST','2'),
-('28','10','LATEST','2'),
-('29','10','LATEST','2'),
-('30','10','LATEST','2'),
-('31','10','LATEST','2'),
-('32','10','LATEST','2'),
-('33','10','LATEST','2'),
-('34','10','LATEST','2'),
-('35','10','LATEST','2'),
-('36','10','LATEST','2'),
-('37','10','LATEST','2'),
-('38','10','LATEST','2'),
-('39','10','LATEST','2'),
-('40','10','LATEST','2');
-
--- AcademicMajors: 1 rows.
 INSERT INTO public."AcademicMajors" ("MajorID","MajorCode","MajorName") OVERRIDING SYSTEM VALUE VALUES
 ('1','IT','Công nghệ thông tin');
 
--- Cohorts: 4 rows.
-INSERT INTO public."Cohorts" ("CohortID","CohortCode","Name","EnrollmentYear","Status") OVERRIDING SYSTEM VALUE VALUES
-('2','K18','Khóa K18','2023','ACTIVE'),
-('3','K19','Khóa K19','2024','ACTIVE'),
-('4','K20','Khóa K20','2025','ACTIVE'),
-('5','K21','Khóa K21','2026','ACTIVE');
-
--- ComboCourseChoiceGroups: 10 rows.
 INSERT INTO public."ComboCourseChoiceGroups" ("ChoiceGroupID","ProgramComboID","GroupCode","MinCourses","MaxCourses") OVERRIDING SYSTEM VALUE VALUES
 ('1','171','REQUIRED','3','3'),
 ('2','171','JIS_OR_JIT','1','1'),
@@ -2541,7 +2494,6 @@ INSERT INTO public."ComboCourseChoiceGroups" ("ChoiceGroupID","ProgramComboID","
 ('9','210','REQUIRED','3','3'),
 ('10','210','JIS_OR_JIT','1','1');
 
--- ComboCourseChoiceMembers: 25 rows.
 INSERT INTO public."ComboCourseChoiceMembers" ("ProgramComboID","ChoiceGroupID","ComboCourseID") VALUES
 ('171','1','628'),
 ('171','1','629'),
@@ -2569,7 +2521,6 @@ INSERT INTO public."ComboCourseChoiceMembers" ("ProgramComboID","ChoiceGroupID",
 ('223','4','825'),
 ('223','4','826');
 
--- ComboCourses: 1029 rows.
 INSERT INTO public."ComboCourses" ("ComboCourseID","ProgramComboID","SourceComboSubjectID","CourseID","CourseName","Semester","PrerequisiteText","Note") OVERRIDING SYSTEM VALUE VALUES
 ('1','1','5024','138','Vovinam 1','0','',''),
 ('2','1','5025','139','Vovinam 2','1','',''),
@@ -3071,6 +3022,7 @@ INSERT INTO public."ComboCourses" ("ComboCourseID","ProgramComboID","SourceCombo
 ('498','135','6989','200','DevSecOps for Information Systems_Tích hợp DevSecOps cho Hệ thống thông tin','8','',''),
 ('499','136','7017','106','Software Requirement_Yêu cầu phần mềm','5','',''),
 ('500','136','7018','195','Management Information System_Hệ thống thông tin quản lý','7','','');
+
 INSERT INTO public."ComboCourses" ("ComboCourseID","ProgramComboID","SourceComboSubjectID","CourseID","CourseName","Semester","PrerequisiteText","Note") OVERRIDING SYSTEM VALUE VALUES
 ('501','136','7019','107','Software Testing_Kiểm thử phần mềm','7','',''),
 ('502','136','7020','196','Agile and Automation Testing_Kiểm thử tự động và linh hoạt','8','',''),
@@ -3572,6 +3524,7 @@ INSERT INTO public."ComboCourses" ("ComboCourseID","ProgramComboID","SourceCombo
 ('998','271','7012','225','Microservices with Spring Cloud__Microservices với Spring Cloud','8','',''),
 ('999','272','6955','228','Fundamental Game Development_Phát triển game cơ bản','5','',''),
 ('1000','272','6956','229','Advanced Game Development_Phát triển game nâng cao','7','','');
+
 INSERT INTO public."ComboCourses" ("ComboCourseID","ProgramComboID","SourceComboSubjectID","CourseID","CourseName","Semester","PrerequisiteText","Note") OVERRIDING SYSTEM VALUE VALUES
 ('1001','272','6957','230','Game Design Fundamentals - From Concept to Creation_Thiết kế game cơ bản - Từ ý tưởng đến thực hiện','7','',''),
 ('1002','272','6958','231','Game Networking and Server Development_Mạng game và phát triển máy chủ game nâng cao','8','',''),
@@ -3603,7 +3556,6 @@ INSERT INTO public."ComboCourses" ("ComboCourseID","ProgramComboID","SourceCombo
 ('1028','279','1427','204','Intermediate Japanese 1-B1/B2_ Tiếng Nhật trung cấp 1-B1/B2','7','',''),
 ('1029','279','1428','205','Intermediate Japanese 2-B2.1_ Tiếng Nhật trung cấp 2-B2.1','8','','');
 
--- Courses: 255 rows.
 INSERT INTO public."Courses" ("CourseID","CourseCode","CourseName","IsOJTPrerequisite") OVERRIDING SYSTEM VALUE VALUES
 ('1','OTP101','Orientation and General Training Program_Định hướng và Rèn luyện tập trung','false'),
 ('2','PEN','Preparation English_Tiếng Anh chuẩn bị','false'),
@@ -3861,30 +3813,6 @@ INSERT INTO public."Courses" ("CourseID","CourseCode","CourseName","IsOJTPrerequ
 ('254','BSS301','AI-Augmented Backend Systems & Intelligent Services_Hệ thống Backend và Dịch vụ Thông minh được tăng cường bằng AI','false'),
 ('255','DDP301','Software Delivery, DevOps & Platform Engineering_Triển khai Phần mềm, DevOps và Kỹ thuật Nền tảng','false');
 
--- EnterpriseUsers: 1 rows.
-INSERT INTO public."EnterpriseUsers" ("EnterpriseUserID","UserID","EnterpriseID","PositionTitle") OVERRIDING SYSTEM VALUE VALUES
-('1','4','1','HR');
-
--- Enterprises: 1 rows.
-INSERT INTO public."Enterprises" ("EnterpriseID","EnterpriseCode","Name","Industry","ContactPersonName","ContactEmail","Status","CreatedAt") OVERRIDING SYSTEM VALUE VALUES
-('1','TECHVIET','TechViet','Information Technology','HR Department','hr@techviet.example','ACTIVE','2026-10-26 19:54:04.855');
-
--- JobRoles: 5 rows.
-INSERT INTO public."JobRoles" ("JobRoleID","RoleCode","RoleName","Description") OVERRIDING SYSTEM VALUE VALUES
-('1','WEB_DEV','Thực tập phát triển Web','Tham gia phát triển website nội bộ bằng React, Node.js và PostgreSQL.'),
-('2','BUSINESS_ANALYST','Thực tập Business Analyst','Hỗ trợ thu thập yêu cầu, viết user story và kiểm thử nghiệp vụ.'),
-('3','QA_TESTER','Thực tập kiểm thử phần mềm','Thiết kế test case, báo cáo lỗi và hỗ trợ kiểm thử API.'),
-('4','DATA_ANALYST','Thực tập phân tích dữ liệu','Làm sạch dữ liệu, tạo báo cáo và dashboard hỗ trợ vận hành.'),
-('5','SECURITY_INTERN','Thực tập An toàn thông tin','Hỗ trợ rà soát cấu hình và theo dõi cảnh báo bảo mật.');
-
--- OJTAlertRules: 4 rows.
-INSERT INTO public."OJTAlertRules" ("RuleID","RuleCode","Version","Name","RuleType","Scope","Anchor","LeadDays","GraceDays","Severity","CooldownHours","Parameters","IsEnabled") OVERRIDING SYSTEM VALUE VALUES
-('1','OJT_ELIGIBILITY','1','Chưa đủ điều kiện OJT','ELIGIBILITY_NOT_MET','STUDENT','REG_END','7','0','WARNING','24','{}','false'),
-('2','OJT_REGISTRATION','1','Chưa đăng ký OJT hợp lệ','REGISTRATION_MISSING','STUDENT','REG_END','7','0','WARNING','24','{}','false'),
-('3','OJT_PLACEMENT','1','Chưa có nơi thực tập','PLACEMENT_MISSING','STUDENT','OJT_START','7','0','WARNING','24','{}','false'),
-('4','OJT_TASK_OVERDUE','1','Nhiệm vụ thực tập quá hạn','TASK_OVERDUE','TASK','TASK_DUE','0','0','WARNING','24','{}','false');
-
--- ProgramCombos: 279 rows.
 INSERT INTO public."ProgramCombos" ("ProgramComboID","ProgramID","SourceComboID","ComboCode","ComboName","Note","CoursesReviewed") OVERRIDING SYSTEM VALUE VALUES
 ('1','1','1172','PHE_COM1','PHE_COM1: Vovinam BIT_AI_K17C(FNO)','','true'),
 ('2','1','1173','PHE_COM2','PHE_COM2: Chess_Cờ vua BIT_AI_K17C(FNO)','','true'),
@@ -4166,7 +4094,6 @@ INSERT INTO public."ProgramCombos" ("ProgramComboID","ProgramID","SourceComboID"
 ('278','40','2749','SE-2026_COM4','SE-2026_COM4: Topic on AI-Augmented Engineer (Fullstack Java)_Chủ đề Kỹ sư phát triển Fullstack Java tăng cường bằng AI','','true'),
 ('279','40','340','SE_COM5.2','SE_COM5.2: Topic on Japanese Bridge Engineer_Chủ đề Kỹ sư cầu nối Nhật Bản (Định hướng Tiếng Nhật nâng cao cho kỹ sư CNTT) BIT_SE_K15A','','true');
 
--- ProgramCourses: 1924 rows.
 INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","RecommendedSemester","IsRequired","CourseName","Credits","PrerequisiteText","EntryKind") OVERRIDING SYSTEM VALUE VALUES
 ('1','1','1','0','true','Orientation and General Training Program_Định hướng và Rèn luyện tập trung','0.00','None','COURSE'),
 ('2','1','2','0','true','Preparation English_Tiếng Anh chuẩn bị','0.00','','COURSE'),
@@ -4668,6 +4595,7 @@ INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","R
 ('498','11','24','4','true','AI-DS Project_Dự án TTNT-KHDL','3.00','PFP191, ADY201m','COURSE'),
 ('499','11','51','4','true','Kỹ năng giao tiếp và cộng tác','3.00','N/A','COURSE'),
 ('500','11','26','4','true','Introduction to Software Engineering_Nhập môn kĩ thuật phần mềm','3.00','PRO192 (not applied to the BIT_AI ; BIT_IC; BIT_AS; BIT_DX and BA programs)','COURSE');
+
 INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","RecommendedSemester","IsRequired","CourseName","Credits","PrerequisiteText","EntryKind") OVERRIDING SYSTEM VALUE VALUES
 ('501','11','27','5','true','Subject 1 of Combo*_Học phần 1 của combo*','3.00','','COMBO_SLOT'),
 ('502','11','28','5','true','Subject 2 of Combo*_Học phần 2 của combo*','3.00','','COMBO_SLOT'),
@@ -5169,6 +5097,7 @@ INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","R
 ('998','21','86','8','true','Subject 4 of Combo*_Học phần 4 của combo*','3.00','','COMBO_SLOT'),
 ('999','21','41','8','true','Philosophy of Marxism – Leninism_Triết học Mác - Lê-nin','3.00','None','COURSE'),
 ('1000','21','42','8','true','Political economics of Marxism – Leninism_Kinh tế chính trị Mác - Lê-nin','2.00','None','COURSE');
+
 INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","RecommendedSemester","IsRequired","CourseName","Credits","PrerequisiteText","EntryKind") OVERRIDING SYSTEM VALUE VALUES
 ('1001','21','37','8','true','Project Management','0.00','None','COURSE'),
 ('1002','21','45','9','true','Ho Chi Minh Ideology_Tư tưởng Hồ Chí Minh','2.00','MLN111, MLN122','COURSE'),
@@ -5670,6 +5599,7 @@ INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","R
 ('1498','32','58','1','true','Programming Fundamentals_Cơ sở lập trình','3.00','None','COURSE'),
 ('1499','32','10','1','true','Academic Skills for University Success_Kỹ năng học tập đại học','3.00','None','COURSE'),
 ('1500','32','6','2','true','Discrete mathematics_Toán rời rạc','3.00','None','COURSE');
+
 INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","RecommendedSemester","IsRequired","CourseName","Credits","PrerequisiteText","EntryKind") OVERRIDING SYSTEM VALUE VALUES
 ('1501','32','59','2','true','Computer Networking_Mạng máy tính','3.00','','COURSE'),
 ('1502','32','60','2','true','Operating Systems_Hệ điều hành','3.00','','COURSE'),
@@ -6096,49 +6026,12 @@ INSERT INTO public."ProgramCourses" ("ProgramCourseID","ProgramID","CourseID","R
 ('1923','40','114','9','true','Graduation Elective - Software Engineering_Học phần lựa chọn Đồ án tốt nghiệp chuyên ngành Kỹ thuật phần mềm','10.00','','ELECTIVE_SLOT'),
 ('1924','40','47','9','true','History of Communist Party of Vietnam_Lịch sử Đảng Cộng sản Việt Nam','2.00','MLN111, MLN122','COURSE');
 
--- Roles: 5 rows.
-INSERT INTO public."Roles" ("RoleID","RoleCode","RoleName") OVERRIDING SYSTEM VALUE VALUES
-('1','ADMIN','Quản trị viên'),
-('2','ACADEMIC','Phòng đào tạo'),
-('3','OJT_COORD','Phòng quan hệ doanh nghiệp'),
-('4','STUDENT','Sinh viên'),
-('5','ENTERPRISE','Doanh nghiệp');
-
--- SchemaMigrations: 24 rows.
-INSERT INTO public."SchemaMigrations" ("Version") VALUES
-('20261006_external_matching'),
-('20261006_it_combos_recruitment'),
-('20261006_ojt_deadline_alerts'),
-('20261006_student_specialization_combo'),
-('20261008_academic_calendar'),
-('20261008_academic_reporting'),
-('20261008_academic_workflow_gaps'),
-('20261008_admin_api'),
-('20261008_combo_registration'),
-('20261008_curriculum_management'),
-('20261008_ojt_eligibility'),
-('20261008_ojt_registration'),
-('20261008_ojt_results'),
-('20261008_student_academic_records'),
-('20261013_student_portal'),
-('20261022_handoff_before_registration'),
-('20261023_academic_rest_resources'),
-('20261024_publish_seeded_programs'),
-('20261024_training_program_metadata'),
-('20261025_academic_enrollment_integrity'),
-('20261025_fixed_ojt_semester_6'),
-('20261025_real_cohorts'),
-('20261025_student_course_semester_tag'),
-('20261026_prerequisite_based_advancement');
-
--- Specializations: 4 rows.
 INSERT INTO public."Specializations" ("SpecializationID","MajorID","SpecializationCode","SpecializationName") OVERRIDING SYSTEM VALUE VALUES
 ('1','1','SE','Kỹ thuật phần mềm'),
 ('2','1','IA','An toàn thông tin'),
 ('3','1','AI','Trí tuệ nhân tạo'),
 ('4','1','IS','Hệ thống thông tin');
 
--- TrainingPrograms: 40 rows.
 INSERT INTO public."TrainingPrograms" ("ProgramID","ProgramCode","ProgramName","TotalCredits","SpecializationID","Version","EffectiveYear","Status","PrerequisitesReviewed","EquivalencesReviewed","CreatedBy","PublishedBy","PublishedAt") OVERRIDING SYSTEM VALUE VALUES
 ('1','BIT_AI_K18D-19A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Trí tuệ nhân tạo','145.00','3','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('2','BIT_AI_K18D-19A_FNO','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Trí tuệ nhân tạo','145.00','3','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
@@ -6181,492 +6074,28 @@ INSERT INTO public."TrainingPrograms" ("ProgramID","ProgramCode","ProgramName","
 ('39','BIT_SE_K21C','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('40','BIT_SE-2026_K21D_K22A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','148.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP);
 
--- Users: 4 rows.
-INSERT INTO public."Users" ("UserID","Username","PasswordHash","Email","FullName","RoleID","Status","CreatedAt","UpdatedAt","MustChangePassword","AuthVersion") OVERRIDING SYSTEM VALUE VALUES
-('1','admin01','$2b$12$LQR3NnTiMLm3pELI8m/M1.XQ.YdWPSqIBH9JwQHVKvim5Ita.AorC','admin@ojtrpa.edu.vn','System Administrator','1','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
-('2','academic01','$2b$12$pFxlemy2lPqCnEuhONH4WOJrcuSqYR4BgQ6fGE0xyM2./B9MPMWF6','academic@ojtrpa.edu.vn','Academic Staff','2','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
-('3','ojt.coord01','$2b$12$7ju31R8JRLro8U1ZA3WzoOvJvJD1yXSY1nuzw/Gan9OI84tVNwa62','ojt.coord@ojtrpa.edu.vn','OJT Coordinator','3','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
-('4','enterprise01','$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii','hr@techviet.example','TechViet HR','5','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0');
-
--- Advance identity generators before the dependent seed inserts.
-SELECT setval('public."ProgramCourses_ProgramCourseID_seq"'::regclass,(SELECT max("ProgramCourseID") FROM public."ProgramCourses"),true);
-SELECT setval('public."TrainingPrograms_ProgramID_seq"'::regclass,(SELECT max("ProgramID") FROM public."TrainingPrograms"),true);
-SELECT setval('public."Users_UserID_seq"'::regclass,(SELECT max("UserID") FROM public."Users"),true);
-
--- 6. Existing calendar/demo seed. Dates remain relative to execution time.
-CREATE TEMP TABLE _demo_study_periods(stage int PRIMARY KEY, period_id int NOT NULL) ON COMMIT DROP;
-DO $calendar$
-DECLARE target date; start_day date; end_day date; y int; calendar_year int; month_no int; stage int; season text;
+-- Advance identity sequences for retained curriculum rows only.
+DO $curriculum_sequences$
+DECLARE entry record; maximum bigint;
 BEGIN
- target := (date_trunc('year',current_date)+(4*((extract(month FROM current_date)::int-1)/4+1))*interval '1 month')::date;
- -- Build complete years first, including the unused semesters at both boundaries.
- FOR calendar_year IN extract(year FROM target-interval '24 months')::int..extract(year FROM target+interval '12 months')::int LOOP
-  INSERT INTO "AcademicYears" ("YearCode","StartDate","EndDate","Status")
-  VALUES(calendar_year||'-'||(calendar_year+1),make_date(calendar_year,1,1),make_date(calendar_year,12,31),
-   CASE WHEN calendar_year<extract(year FROM current_date) THEN 'CLOSED' WHEN calendar_year=extract(year FROM current_date) THEN 'ACTIVE' ELSE 'PLANNED' END)
-  RETURNING "AcademicYearID" INTO y;
-  FOREACH month_no IN ARRAY ARRAY[1,5,9] LOOP
-   start_day := make_date(calendar_year,month_no,1);
-   end_day := (start_day+interval '4 months'-interval '1 day')::date;
-   season := CASE month_no WHEN 1 THEN 'SPRING' WHEN 5 THEN 'SUMMER' ELSE 'FALL' END;
-   INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","StartDate","EndDate","Status")
-   VALUES(y,season||calendar_year,initcap(season)||' '||calendar_year,'SEMESTER',start_day,end_day,
-    CASE WHEN end_day<current_date THEN 'CLOSED' WHEN start_day<=current_date THEN 'ACTIVE' ELSE 'PLANNED' END);
-  END LOOP;
- END LOOP;
- -- Curriculum stage is a separate mapping, never a count of calendar rows.
- FOR stage IN 0..9 LOOP
-  start_day := (target+(stage-6)*interval '4 months')::date;
-  INSERT INTO _demo_study_periods
-  SELECT stage,"AcademicPeriodID" FROM "AcademicPeriods" WHERE "Kind"='SEMESTER' AND "StartDate"=start_day;
- END LOOP;
- INSERT INTO "OJTSemesters" ("AcademicYearID","AcademicPeriodID","SemesterCode","Name","RegStartDate","RegEndDate","StartDate","EndDate","Status")
- SELECT p."AcademicYearID",p."AcademicPeriodID",'DEMO-OJT-S6','OJT kỳ chương trình 6 - '||p."Name",current_date,least(current_date+21,target-1),p."StartDate",p."EndDate",'PLANNED'
- FROM _demo_study_periods m JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=m.period_id WHERE m.stage=6;
-END $calendar$;
-
-
-DO $seed$
-DECLARE
-  v_enterprise_id integer;
-  v_user_id integer;
-  v_coordinator_id integer;
-  v_semester_id integer;
-  v_semester_code text;
-  v_period_id integer;
-  v_window_id integer;
-  v_job_role_id integer;
-  v_position_id integer;
-  v_post_id integer;
-  v_row record;
-BEGIN
-  SELECT e."EnterpriseID" INTO v_enterprise_id
-  FROM public."Enterprises" e WHERE e."EnterpriseCode" = 'TECHVIET';
-  IF v_enterprise_id IS NULL THEN
-    RAISE EXCEPTION 'TECHVIET enterprise missing. Seed enterprise first; nothing changed.';
-  END IF;
-
-  SELECT eu."UserID" INTO v_user_id
-  FROM public."EnterpriseUsers" eu
-  JOIN public."Users" u ON u."UserID" = eu."UserID"
-  WHERE eu."EnterpriseID" = v_enterprise_id
-  ORDER BY CASE WHEN u."Email" = 'hr@techviet.example' THEN 0 ELSE 1 END, eu."UserID"
-  LIMIT 1;
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'TECHVIET enterprise user missing; cannot create RecruitmentPosts.CreatedBy.';
-  END IF;
-
-  -- Coordinator must be a staff user (OJT_COORD), not the enterprise user.
-  SELECT u."UserID" INTO v_coordinator_id
-  FROM public."Users" u
-  JOIN public."Roles" r ON r."RoleID" = u."RoleID"
-  WHERE r."RoleCode" = 'OJT_COORD' AND u."Status" = 'ACTIVE'
-  ORDER BY CASE WHEN u."Username" = 'ojt.coord01' THEN 0 ELSE 1 END, u."UserID"
-  LIMIT 1;
-  IF v_coordinator_id IS NULL THEN
-    RAISE EXCEPTION 'No ACTIVE OJT_COORD account found for StudentEnterpriseCoordination.CoordinatedBy.';
-  END IF;
-
-  -- Use the dedicated DEMO OJT semester inserted above.
-  SELECT s."OJTSemesterID", s."SemesterCode", s."AcademicPeriodID" INTO v_semester_id, v_semester_code, v_period_id
-  FROM public."OJTSemesters" s
-  WHERE s."SemesterCode" = 'DEMO-OJT-S6';
-  IF v_semester_id IS NULL THEN
-    RAISE NOTICE 'Skipping optional demo recruitment: demo OJT semester is not configured.';
-    RETURN;
-  END IF;
-
-  -- Ensure an open RecruitmentWindows exists
-  SELECT "WindowID" INTO v_window_id
-  FROM public."RecruitmentWindows"
-  WHERE "OJTSemesterID" = v_semester_id AND "Status" = 'OPEN' AND "EndsAt" > clock_timestamp()
-  ORDER BY "WindowID" DESC LIMIT 1;
-
-  IF v_window_id IS NULL AND v_period_id IS NOT NULL THEN
-    INSERT INTO public."RecruitmentWindows"
-      ("AcademicPeriodID", "OJTSemesterID", "Name", "StartsAt", "EndsAt", "Status", "CreatedBy")
-    VALUES
-      (v_period_id, v_semester_id, 'Đợt tuyển dụng cho kỳ 6 OJT minh họa', now() - interval '10 days', now() + interval '21 days', 'OPEN', v_user_id)
-    RETURNING "WindowID" INTO v_window_id;
-  END IF;
-
-  FOR v_row IN
-    SELECT * FROM (VALUES
-      ('DEMO-TV-WEB-01', 'WEB_DEV', 'Thực tập phát triển Web', 'Tham gia phát triển website nội bộ bằng React, Node.js và PostgreSQL.', 'Biết HTML, CSS, JavaScript; hiểu Git và REST API.', 5, 'Biên Hòa, Đồng Nai', 'HYBRID', 'SE'),
-      ('DEMO-TV-BA-02', 'BUSINESS_ANALYST', 'Thực tập Business Analyst', 'Hỗ trợ thu thập yêu cầu, viết user story và kiểm thử nghiệp vụ.', 'Có khả năng phân tích yêu cầu, giao tiếp và vẽ quy trình.', 3, 'TP. Hồ Chí Minh', 'ONSITE', 'IS'),
-      ('DEMO-TV-QA-03', 'QA_TESTER', 'Thực tập kiểm thử phần mềm', 'Thiết kế test case, báo cáo lỗi và hỗ trợ kiểm thử API.', 'Biết kiểm thử chức năng, SQL cơ bản và Postman.', 4, 'Biên Hòa, Đồng Nai', 'HYBRID', 'SE'),
-      ('DEMO-TV-DATA-04', 'DATA_ANALYST', 'Thực tập phân tích dữ liệu', 'Làm sạch dữ liệu, tạo báo cáo và dashboard hỗ trợ vận hành.', 'Biết Excel, SQL; có kiến thức Python hoặc Power BI là lợi thế.', 2, 'TP. Hồ Chí Minh', 'REMOTE', 'IS'),
-      ('DEMO-TV-SEC-05', 'SECURITY_INTERN', 'Thực tập An toàn thông tin', 'Hỗ trợ rà soát cấu hình và theo dõi cảnh báo bảo mật.', 'Hiểu mạng máy tính, Linux cơ bản và nguyên tắc an toàn thông tin.', 2, 'TP. Hồ Chí Minh', 'ONSITE', 'IA')
-    ) AS x(code, role_code, title, description, requirements, capacity, location, workmode, specialization_code)
-  LOOP
-SELECT j."JobRoleID" INTO v_job_role_id
-    FROM public."JobRoles" j WHERE j."RoleCode" = v_row.role_code;
-
-    SELECT p."PositionID" INTO v_position_id
-    FROM public."InternshipPositions" p
-    WHERE p."EnterpriseID" = v_enterprise_id
-      AND p."OJTSemesterID" = v_semester_id
-      AND p."RecruitmentCode" = v_row.code;
-
-    IF v_position_id IS NULL THEN
-      INSERT INTO public."InternshipPositions"
-        ("EnterpriseID", "OJTSemesterID", "RecruitmentCode", "Title",
-         "Description", "Requirements", "Capacity", "RemainingSlots", "Status",
-         "JobRoleID", "Location", "WorkMode")
-      VALUES
-        (v_enterprise_id, v_semester_id, v_row.code, v_row.title,
-         v_row.description, v_row.requirements, v_row.capacity, v_row.capacity,
-         'OPEN', v_job_role_id, v_row.location, v_row.workmode)
-      RETURNING "PositionID" INTO v_position_id;
+  FOR entry IN SELECT * FROM (VALUES
+      ('AcademicMajors','MajorID'),('Specializations','SpecializationID'),
+      ('TrainingPrograms','ProgramID'),('Courses','CourseID'),
+      ('ProgramCourses','ProgramCourseID'),('ProgramCombos','ProgramComboID'),
+      ('ComboCourses','ComboCourseID'),('ComboCourseChoiceGroups','ChoiceGroupID')
+  ) AS t(tab,col) LOOP
+    EXECUTE format('SELECT max(%I) FROM public.%I',entry.col,entry.tab) INTO maximum;
+    IF maximum IS NOT NULL THEN
+      PERFORM setval(pg_get_serial_sequence(format('public.%I',entry.tab),entry.col),maximum,true);
     END IF;
-
-    -- Do not create duplicate demo posts on rerun. Do not change existing posts.
-    SELECT rp."PostID" INTO v_post_id
-    FROM public."RecruitmentPosts" rp
-    JOIN public."RecruitmentPostPositions" rpp ON rpp."PostID" = rp."PostID"
-    WHERE rp."EnterpriseID" = v_enterprise_id
-      AND rp."OJTSemesterID" = v_semester_id
-      AND rpp."PositionID" = v_position_id
-    ORDER BY rp."PostID" LIMIT 1;
-
-    IF v_post_id IS NULL THEN
-      INSERT INTO public."RecruitmentPosts"
-        ("EnterpriseID", "OJTSemesterID", "WindowID", "Title", "Content", "Benefits",
-         "ApplicationInstructions", "Status", "PublishedAt", "DeadlineAt", "CreatedBy")
-      VALUES
-        (v_enterprise_id, v_semester_id, v_window_id, '[DEMO OJT] ' || v_row.title,
-         v_row.description || E'\nYêu cầu: ' || v_row.requirements,
-         'Được hướng dẫn công việc và tham gia dự án thực tế (dữ liệu DEMO).',
-         'Đăng ký qua hệ thống OJT của trường (chỉ dùng để kiểm thử).',
-         'PUBLISHED', now(), now() + interval '21 days', v_user_id)
-      RETURNING "PostID" INTO v_post_id;
-
-END IF;
-
-    INSERT INTO public."RecruitmentPostPositions"
-      ("PostID", "PositionID", "EnterpriseID", "OJTSemesterID")
-    VALUES (v_post_id, v_position_id, v_enterprise_id, v_semester_id);
-
-    INSERT INTO public."PositionSpecializations" ("PositionID", "SpecializationID")
-    SELECT v_position_id, sp."SpecializationID"
-    FROM public."Specializations" sp
-    WHERE sp."SpecializationCode" = v_row.specialization_code;
   END LOOP;
+END $curriculum_sequences$;
 
-  -- Student registrations/decisions are created through the validated backend workflow.
-  RAISE NOTICE 'Seed completed for enterprise TECHVIET, OJT semester % (ID %).', v_semester_code, v_semester_id;
-END $seed$;
+-- TrainingPrograms seed in original dump references user id=2 (academic01).
+-- In curriculum-only build no account is seeded; detach audit authors before FKs are added.
+UPDATE public."TrainingPrograms" SET "CreatedBy" = NULL, "PublishedBy" = NULL;
 
-
-
-
-CREATE TEMP TABLE _demo_prerequisites(target text NOT NULL,prerequisite text NOT NULL,PRIMARY KEY(target,prerequisite)) ON COMMIT DROP;
-INSERT INTO _demo_prerequisites VALUES
-  ('PRO192','PRF192'),('CSD201','PRO192'),('LAB211','PRO192'),
-  ('PRJ301','PRO192'),('PRJ301','DBI202'),('SWE201c','PRO192'),
-  ('SWP391','PRJ301'),('SWP391','SWE201c'),('SWP391','LAB211'),
-  ('SWR302','SWE201c'),('SWT301','SWE201c'),('JPD123','JPD113'),
-  ('MAS291','MAE101'),('SWD392','SWE201c'),('SWD392','PRO192'),
-  ('EXE201','EXE101'),('PRM393','PRO192'),('HCM202','MLN111'),('HCM202','MLN122'),
-  ('MLN131','MLN111'),('MLN131','MLN122'),('VNR202','MLN111'),('VNR202','MLN122')
- ;
-
-CREATE TEMP TABLE _demo_student_cases (
- n int PRIMARY KEY, full_name text NOT NULL, base_score numeric NOT NULL,
- failed_codes text[] NOT NULL DEFAULT '{}', passed_retake boolean NOT NULL DEFAULT false,
- withdraw_fifth boolean NOT NULL DEFAULT false
-) ON COMMIT DROP;
-INSERT INTO _demo_student_cases VALUES
- (1,'Nguyễn Minh Anh',8.1,'{}',false,false),
- (2,'Trần Quốc Bảo',7.4,'{}',false,false),
- (3,'Lê Ngọc Châu',8.7,'{}',false,false),
- (4,'Phạm Thành Đạt',6.8,'{}',false,false),
- (5,'Hoàng Thùy Dương',7.1,'{SWR302}',false,false),
- (6,'Vũ Gia Hân',6.9,'{SWR302,SWT301}',false,false),
- (7,'Đặng Minh Hiếu',6.3,'{SWE201c}',false,false),
- (8,'Bùi Khánh Hòa',7.0,'{WDU203c}',false,false),
- (9,'Đỗ Tuấn Hùng',7.8,'{CSI106}',true,false),
- (10,'Hồ Thanh Hương',6.1,'{SWP391,SWR302,WDU203c}',false,false),
- (11,'Ngô Đức Khang',8.4,'{}',false,false),
- (12,'Dương Bảo Linh',8.8,'{}',false,false),
- (13,'Lý Hoàng Long',7.6,'{}',false,false),
- (14,'Mai Phương Mai',8.0,'{}',false,false),
- (15,'Tạ Quang Minh',6.7,'{SWT301}',false,false),
- (16,'Phan Hải Nam',7.2,'{}',false,true),
- (17,'Cao Bích Ngọc',6.6,'{SWR302,SWT301}',false,false),
- (18,'Trịnh Hoài Phong',7.9,'{CSI106,CEA201}',true,false),
- (19,'Võ Minh Quân',5.6,'{}',false,false),
- (20,'Đinh Hà Trang',9.2,'{}',false,false);
-
-DO $students$
-DECLARE actor_id int; source_program int; program_id int; cohort_id int; entry_id int;
- target_period int; prep_id int; block_id int; term_id int; year_id int; entry_year int; study_stage int;
-BEGIN
- SELECT "UserID" INTO STRICT actor_id FROM "Users" WHERE "Email"='academic@ojtrpa.edu.vn';
- SELECT "OJTSemesterID","AcademicPeriodID" INTO STRICT term_id,target_period FROM "OJTSemesters" WHERE "SemesterCode"='DEMO-OJT-S6';
- SELECT period_id INTO STRICT entry_id FROM _demo_study_periods WHERE stage=0;
- SELECT period_id INTO STRICT prep_id FROM _demo_study_periods WHERE stage=5;
- SELECT "AcademicYearID" INTO STRICT year_id FROM "AcademicPeriods" WHERE "AcademicPeriodID"=prep_id;
- SELECT extract(year FROM "StartDate")::int INTO entry_year FROM "AcademicPeriods" WHERE "AcademicPeriodID"=entry_id;
- INSERT INTO "AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","ParentPeriodID","StartDate","EndDate","Status")
- SELECT year_id,'DEMO-PREP-B3','Block 3 - '||"Name",'BLOCK3',prep_id,greatest("StartDate",current_date-30),greatest("StartDate",current_date-1),
- CASE WHEN "StartDate"<current_date THEN 'CLOSED' ELSE 'ACTIVE' END FROM "AcademicPeriods" WHERE "AcademicPeriodID"=prep_id
- RETURNING "AcademicPeriodID" INTO block_id;
-
- -- Keep the student demo self-contained using actual concrete catalog subjects.
- -- Final publication metadata and prerequisite text are inserted directly.
- SELECT p."ProgramID" INTO STRICT source_program FROM "TrainingPrograms" p
- JOIN "Specializations" sp ON sp."SpecializationID"=p."SpecializationID"
- WHERE sp."SpecializationCode"='SE' AND p."ProgramCode"='BIT_SE_K18D_19A';
- INSERT INTO "TrainingPrograms" ("ProgramCode","ProgramName","TotalCredits","SpecializationID","Version","EffectiveYear","CreatedBy","Status","PrerequisitesReviewed","EquivalencesReviewed","PublishedBy","PublishedAt")
- SELECT 'DEMO-SE-FULL','Khung minh họa SE - 39 môn cụ thể / 114 tín chỉ (không phải CTĐT chính thức)',
-  (SELECT sum(pc."Credits") FROM "ProgramCourses" pc WHERE pc."ProgramID"=p."ProgramID" AND pc."EntryKind"='COURSE'),
-  p."SpecializationID",'1.0',entry_year,actor_id,'PUBLISHED',true,true,actor_id,now() FROM "TrainingPrograms" p WHERE p."ProgramID"=source_program
- RETURNING "ProgramID" INTO program_id;
- INSERT INTO "ProgramCourses" ("ProgramID","CourseID","CourseName","Credits","RecommendedSemester","IsRequired","EntryKind","PrerequisiteText")
- SELECT program_id,pc."CourseID",pc."CourseName",pc."Credits",pc."RecommendedSemester",true,'COURSE',
-  (SELECT string_agg(v.prerequisite,' AND ' ORDER BY v.prerequisite) FROM _demo_prerequisites v WHERE v.target=c."CourseCode")
- FROM "ProgramCourses" pc JOIN "Courses" c USING("CourseID") WHERE pc."ProgramID"=source_program AND pc."EntryKind"='COURSE'
- ORDER BY pc."RecommendedSemester",pc."ProgramCourseID";
- INSERT INTO "AcademicGradingPolicies" ("ProgramID","GpaScale","ConfirmedBy") VALUES(program_id,10,actor_id);
-
- -- Explicit prerequisite examples apply only to this fictional demo curriculum.
- INSERT INTO "ProgramPrerequisiteGroups" ("ProgramID","ProgramCourseID","GroupCode","MinimumPassed")
- SELECT program_id,pc."ProgramCourseID",'DEMO-ALL',count(*) FROM _demo_prerequisites v JOIN "Courses" c ON c."CourseCode"=v.target
- JOIN "ProgramCourses" pc ON pc."CourseID"=c."CourseID" AND pc."ProgramID"=program_id GROUP BY pc."ProgramCourseID";
- INSERT INTO "ProgramPrerequisiteMembers" ("ProgramID","GroupID","CourseID")
- SELECT program_id,g."GroupID",pr."CourseID" FROM _demo_prerequisites v JOIN "Courses" c ON c."CourseCode"=v.target JOIN "Courses" pr ON pr."CourseCode"=v.prerequisite
- JOIN "ProgramCourses" pc ON pc."CourseID"=c."CourseID" AND pc."ProgramID"=program_id
- JOIN "ProgramPrerequisiteGroups" g ON g."ProgramCourseID"=pc."ProgramCourseID" AND g."ProgramID"=program_id;
-
- INSERT INTO "Cohorts" ("CohortCode","Name","EnrollmentYear","Status")
- VALUES('DEMO-SE-COHORT','Khóa SE minh họa '||entry_year,entry_year,'ACTIVE') RETURNING "CohortID" INTO cohort_id;
- INSERT INTO "CohortGroups" ("CohortID","GroupCode","EntryAcademicPeriodID")
- SELECT cohort_id,v,entry_id FROM unnest(ARRAY['A','B','C','D']) AS v;
-
- INSERT INTO "CohortCurriculumPeriods" ("CohortID","GroupCode","CurriculumSemester","AcademicPeriodID")
- SELECT cohort_id,g,stage,period_id FROM unnest(ARRAY['A','B','C','D']) g CROSS JOIN _demo_study_periods;
-
- INSERT INTO "Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status")
- SELECT 'student'||lpad(d.n::text,2,'0'),'$2b$10$4qpatgMq9N2Fgc.qnWP4keLOFOTuazu8A9d67lUS9gn/AyhWHHCV.',
- CASE WHEN d.n=2 THEN 'duyenhtmse180688@fpt.edu.vn' ELSE 'student'||lpad(d.n::text,2,'0')||'@student.edu.vn' END,'090100'||lpad(d.n::text,4,'0'),d.full_name,r."RoleID",'ACTIVE'
- FROM _demo_student_cases d CROSS JOIN "Roles" r WHERE r."RoleCode"='STUDENT';
- INSERT INTO "Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status")
- SELECT u."UserID",'SE'||right(entry_year::text,2)||lpad(d.n::text,4,'0'),program_id,entry_year,5,
- 'SE'||right(entry_year::text,2)||chr(65+(d.n-1)%4),'ACTIVE'
- FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0');
- INSERT INTO "StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
- SELECT s."StudentID",cohort_id,chr(65+(d.n-1)%4),entry_id,prep_id,actor_id
- FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0') JOIN "Students" s ON s."UserID"=u."UserID";
-
- -- Insert in curriculum order, so eligibility uses only earlier passed attempts.
- FOR study_stage IN 0..5 LOOP
- -- Completed coursework preserves curriculum stages 0..5, including stage 0.
- -- Vary scores by stable course codes, not global identity sequence values.
- INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","AcademicPeriodID","AttemptNumber","Score","Grade","Status","SourceReference","RecordedBy")
- SELECT student."StudentID",pc."CourseID",pc."RecommendedSemester",period."AcademicYearID",period."AcademicPeriodID",1,
- mark.score,CASE WHEN mark.score IS NULL THEN NULL WHEN mark.score<5 THEN 'F' WHEN mark.score>=8 THEN 'A' WHEN mark.score>=7 THEN 'B' WHEN mark.score>=6 THEN 'C' ELSE 'D' END,
- CASE WHEN mark.score IS NULL THEN 'WITHDRAWN' WHEN mark.score<5 THEN 'FAILED' ELSE 'PASSED' END,
- 'DEMO-20-STUDENTS:FINALIZED-CURRICULUM-0-5',actor_id
- FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0') JOIN "Students" student ON student."UserID"=u."UserID"
- CROSS JOIN "ProgramCourses" pc JOIN "Courses" course ON course."CourseID"=pc."CourseID"
- JOIN _demo_study_periods plan ON plan.stage=pc."RecommendedSemester"
- JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=plan.period_id
- CROSS JOIN LATERAL (SELECT CASE
-  WHEN d.withdraw_fifth AND pc."RecommendedSemester"=5 THEN NULL
-  WHEN course."CourseCode"=ANY(d.failed_codes) THEN round(2.5+((d.n+ascii(course."CourseCode"))%11)*0.2,2)
-  ELSE round(least(9.8,greatest(5.0,d.base_score+(((ascii(course."CourseCode")+length(course."CourseCode")+d.n)%5)-2)*0.15)),2)
- END AS score) mark
- WHERE pc."ProgramID"=program_id AND pc."RecommendedSemester"=study_stage
- AND NOT EXISTS (
-  SELECT 1 FROM "ProgramPrerequisiteGroups" g WHERE g."ProgramCourseID"=pc."ProgramCourseID"
-  AND (SELECT count(*) FROM "ProgramPrerequisiteMembers" m WHERE m."GroupID"=g."GroupID"
-   AND EXISTS(SELECT 1 FROM "StudentCourseResults" passed WHERE passed."StudentID"=student."StudentID"
-    AND passed."CourseID"=m."CourseID" AND passed."Status" IN ('PASSED','RECOGNIZED')
-    AND passed."SemesterTaken"<study_stage))<g."MinimumPassed"
- );
- END LOOP;
-
- -- Resits in stage 5 use earlier subjects (stage 1), never a second result in the same semester.
- INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","AcademicPeriodID","AttemptNumber","Score","Grade","Status","SourceReference","RecordedBy")
- SELECT student."StudentID",course."CourseID",5,year_id,prep_id,2,mark.score,
- CASE WHEN mark.score>=8 THEN 'A' WHEN mark.score>=7 THEN 'B' WHEN mark.score>=6 THEN 'C' ELSE 'D' END,
- 'PASSED','DEMO-20-STUDENTS:SEMESTER-5-RESIT',actor_id
- FROM _demo_student_cases d JOIN "Users" u ON u."Username"='student'||lpad(d.n::text,2,'0') JOIN "Students" student ON student."UserID"=u."UserID"
- JOIN "Courses" course ON course."CourseCode"=ANY(d.failed_codes)
- CROSS JOIN LATERAL (SELECT round(least(9.8,d.base_score+0.35),2) AS score) mark
- WHERE d.passed_retake;
-
- -- OJT202, ENW493c and unfinished retakes in semester 6 have not started yet.
- -- Keep them in the curriculum; do not invent IN_PROGRESS rows or grades in the future.
-
- INSERT INTO "OJTRuleSets" ("ProgramID","OJTSemesterID","Version","Name","CreatedBy","Status","PublishedBy","PublishedAt")
- VALUES(program_id,term_id,1,'DEMO: tối thiểu 70 tín chỉ, tối đa 2 môn nợ',actor_id,'PUBLISHED',actor_id,now());
- INSERT INTO "OJTActiveRuleSets" ("ProgramID","ScopeSemesterID","RuleSetID")
- SELECT program_id,term_id,"RuleSetID" FROM "OJTRuleSets" WHERE "ProgramID"=program_id AND "OJTSemesterID"=term_id;
- INSERT INTO "OJTAssessmentWindows" ("OJTSemesterID","BlockPeriodID","AssessmentAcademicPeriodID","RequiredRelativeSemester","OpensAt","ClosesAt","Status","ConfiguredBy","Reason","ResultsFinalizedBy","ResultsFinalizedAt")
- VALUES(term_id,block_id,prep_id,5,current_date,least(current_date+7,(SELECT "StartDate" FROM "OJTSemesters" WHERE "OJTSemesterID"=term_id)),'OPEN',actor_id,'Mốc xét dữ liệu minh họa sau Block 3 kỳ 5',actor_id,clock_timestamp()-interval '1 second');
- INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","Name","Scope","AcademicPeriodID","RequiredRelativeSemester","StartsAt","EndsAt","Status","CreatedBy","OpenedBy","OpenedAt")
- VALUES(term_id,'Đợt đăng ký OJT cho 20 sinh viên demo',jsonb_build_object('programIds',jsonb_build_array(program_id)),target_period,6,current_date::timestamptz,(SELECT "RegEndDate"::timestamptz FROM "OJTSemesters" WHERE "OJTSemesterID"=term_id),'OPEN',actor_id,actor_id,now());
- INSERT INTO "ProgramOJTGradeMappings" ("ProgramID","OJTSemesterID","CourseID","AcademicPeriodID","GradeBands","Reason","ConfirmedBy")
- SELECT program_id,term_id,"CourseID",target_period,'[{"minimumScore":0,"outcome":"FAILED","grade":"F"},{"minimumScore":5,"outcome":"PASSED","grade":"D"},{"minimumScore":6,"outcome":"PASSED","grade":"C"},{"minimumScore":7,"outcome":"PASSED","grade":"B"},{"minimumScore":8,"outcome":"PASSED","grade":"A"}]'::jsonb,
- 'Ánh xạ OJT của chương trình minh họa, thang 10',actor_id FROM "Courses" WHERE "CourseCode"='OJT202';
-END $students$;
-
--- Cache only values derived from the actual attempts. The backend still recalculates
--- GPA/credits itself and official eligibility is confirmed through the normal workflow.
-INSERT INTO "StudentAcademicSnapshot" ("StudentID","SnapshotDate","GPA","AccumulatedCredits","RemainingCredits","FailedCoursesCount","CurrentSemester","TargetOJTSemesterID")
-SELECT s."StudentID",current_date,
- (SELECT round(sum(r."Score"*pc."Credits")/NULLIF(sum(pc."Credits"),0),2) FROM (
-  SELECT DISTINCT ON (r."CourseID") r.* FROM "StudentCourseResults" r JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=r."AcademicPeriodID"
-  WHERE r."StudentID"=s."StudentID" AND r."Status" IN ('PASSED','FAILED') ORDER BY r."CourseID",ap."StartDate" DESC,r."AttemptNumber" DESC,r."ResultID" DESC
- ) r JOIN "ProgramCourses" pc ON pc."CourseID"=r."CourseID" AND pc."ProgramID"=s."ProgramID"),
- totals.earned,p."TotalCredits"-totals.earned,totals.failed,s."CurrentSemester",o."OJTSemesterID"
-FROM "Students" s JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID"
-CROSS JOIN "OJTSemesters" o CROSS JOIN LATERAL (
- SELECT coalesce(sum(pc."Credits") FILTER (WHERE EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID" AND r."CourseID"=pc."CourseID" AND r."Status" IN ('PASSED','RECOGNIZED'))),0)::int AS earned,
- count(*) FILTER (WHERE EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID" AND r."CourseID"=pc."CourseID" AND r."Status"='FAILED') AND NOT EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID" AND r."CourseID"=pc."CourseID" AND r."Status" IN ('PASSED','RECOGNIZED')))::int AS failed
- FROM "ProgramCourses" pc WHERE pc."ProgramID"=s."ProgramID"
-) totals WHERE p."ProgramCode"='DEMO-SE-FULL' AND o."SemesterCode"='DEMO-OJT-S6';
-INSERT INTO "Notifications" ("UserID","Title","Content","SentAt","IsRead")
-SELECT "UserID",'Hồ sơ học tập demo đã sẵn sàng',
- 'Bạn đã có kết quả học phần đến kỳ chương trình 5. Kỳ 6 OJT chưa bắt đầu. Hãy kiểm tra bảng điểm và điều kiện OJT; kết quả chính thức cần được Phòng Đào tạo xét, xác nhận và bàn giao trước khi đăng ký.',now(),false FROM "Students";
-
-DO $verify$
-BEGIN
- IF (SELECT count(*) FROM "Students")<>20 OR (SELECT count(*) FROM "StudentAcademicPlacements")<>20
- OR (SELECT count(*) FROM "StudentAcademicSnapshot")<>20 THEN
-  RAISE EXCEPTION 'The reset must create exactly 20 complete student profiles.';
- END IF;
- IF EXISTS(SELECT 1 FROM "Students" s WHERE s."ProgramID" IS NULL OR NOT EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=s."StudentID")) THEN
-  RAISE EXCEPTION 'A demo student is missing a curriculum or course results.';
- END IF;
- IF EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."Status"='IN_PROGRESS' AND r."Score" IS NOT NULL) THEN
-  RAISE EXCEPTION 'In-progress courses must not have fabricated grades.';
- END IF;
- IF EXISTS(SELECT 1 FROM "StudentCourseResults" result WHERE result."SemesterTaken" IS DISTINCT FROM "StudentCurriculumSemester"(result."StudentID",result."AcademicPeriodID")) THEN
-  RAISE EXCEPTION 'Transcript curriculum stage must match the explicit cohort/calendar mapping.';
- END IF;
- -- The cohort is at curriculum stage 5; stage 6 OJT is in the next calendar semester.
- IF EXISTS(SELECT 1 FROM "Students" student JOIN "StudentAcademicPlacements" placement USING("StudentID") JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=placement."CurrentAcademicPeriodID" WHERE student."CurrentSemester"<>5 OR period."AcademicPeriodID"<>(SELECT period_id FROM _demo_study_periods WHERE stage=5)) THEN
-  RAISE EXCEPTION 'Student progress must remain at mapped curriculum stage 5 before the upcoming OJT6 target.';
- END IF;
- IF EXISTS(SELECT 1 FROM "StudentCourseResults" result JOIN "Students" student USING("StudentID") JOIN "AcademicPeriods" period USING("AcademicPeriodID") WHERE result."SemesterTaken">student."CurrentSemester" OR period."StartDate">current_date OR result."AcademicYearID"<>period."AcademicYearID") THEN
-  RAISE EXCEPTION 'Transcript contains future courses or an inconsistent semester/year.';
- END IF;
- IF EXISTS(SELECT 1 FROM "StudentCourseResults" result WHERE result."Grade" IS DISTINCT FROM CASE WHEN result."Score" IS NULL THEN NULL WHEN result."Score"<5 THEN 'F' WHEN result."Score">=8 THEN 'A' WHEN result."Score">=7 THEN 'B' WHEN result."Score">=6 THEN 'C' ELSE 'D' END) THEN
-  RAISE EXCEPTION 'Letter grades must be calculated from the actual numeric attempt score.';
- END IF;
- IF EXISTS(SELECT 1 FROM _demo_student_cases sample CROSS JOIN LATERAL unnest(sample.failed_codes) failed(code) JOIN "Users" account ON account."Username"='student'||lpad(sample.n::text,2,'0') JOIN "Students" student ON student."UserID"=account."UserID" WHERE NOT EXISTS(SELECT 1 FROM "ProgramCourses" pc JOIN "Courses" course USING("CourseID") WHERE pc."ProgramID"=student."ProgramID" AND course."CourseCode"=failed.code)) THEN
-  RAISE EXCEPTION 'A failed/retaken course is missing from the student curriculum.';
- END IF;
- IF EXISTS(SELECT 1 FROM "OJTSemesters" term JOIN "OJTRegistrationWindows" registration_window ON registration_window."OJTSemesterID"=term."OJTSemesterID" WHERE term."SemesterCode"='DEMO-OJT-S6' AND (term."StartDate"<=current_date OR term."Status"<>'PLANNED' OR registration_window."EndsAt">term."StartDate"::timestamptz)) THEN
-  RAISE EXCEPTION 'OJT6 must begin after the assessment and registration period.';
- END IF;
-END $verify$;
-INSERT INTO "SchemaMigrations" ("Version") VALUES('20261025_complete_20_student_seed');
-
-DO $sequences$
-DECLARE item record; maximum bigint;
-BEGIN
- FOR item IN SELECT * FROM (VALUES
-  ('AcademicAlertNotificationBatches_BatchID_seq','AcademicAlertNotificationBatches','BatchID'),
-  ('AcademicImportBatches_BatchID_seq','AcademicImportBatches','BatchID'),
-  ('AcademicImportRequests_ImportID_seq','AcademicImportRequests','ImportID'),
-  ('AcademicMajors_MajorID_seq','AcademicMajors','MajorID'),
-  ('AcademicPeriods_AcademicPeriodID_seq','AcademicPeriods','AcademicPeriodID'),
-  ('AcademicYears_AcademicYearID_seq','AcademicYears','AcademicYearID'),
-  ('AccountImportBatches_BatchID_seq','AccountImportBatches','BatchID'),
-  ('ApplicationEvents_EventID_seq','ApplicationEvents','EventID'),
-  ('AssessmentTemplates_TemplateID_seq','AssessmentTemplates','TemplateID'),
-  ('AuditLogs_LogID_seq','AuditLogs','LogID'),
-  ('CVAnalysisJobs_AnalysisID_seq','CVAnalysisJobs','AnalysisID'),
-  ('Cohorts_CohortID_seq','Cohorts','CohortID'),
-  ('ComboCourseChoiceGroups_ChoiceGroupID_seq','ComboCourseChoiceGroups','ChoiceGroupID'),
-  ('ComboCourses_ComboCourseID_seq','ComboCourses','ComboCourseID'),
-  ('ComboRegistrationWindows_WindowID_seq','ComboRegistrationWindows','WindowID'),
-  ('ComboReminderBatches_BatchID_seq','ComboReminderBatches','BatchID'),
-  ('ComboWindowExtensions_ExtensionID_seq','ComboWindowExtensions','ExtensionID'),
-  ('CompanyImportBatches_BatchID_seq','CompanyImportBatches','BatchID'),
-  ('Courses_CourseID_seq','Courses','CourseID'),
-  ('EligibilityCheckRuns_RunID_seq','EligibilityCheckRuns','RunID'),
-  ('EligibilityChecks_CheckID_seq','EligibilityChecks','CheckID'),
-  ('EligibleStudentHandoffs_HandoffID_seq','EligibleStudentHandoffs','HandoffID'),
-  ('EmailOutbox_EmailID_seq','EmailOutbox','EmailID'),
-  ('EmbeddingConfigurations_EmbeddingConfigID_seq','EmbeddingConfigurations','EmbeddingConfigID'),
-  ('EnterpriseUsers_EnterpriseUserID_seq','EnterpriseUsers','EnterpriseUserID'),
-  ('Enterprises_EnterpriseID_seq','Enterprises','EnterpriseID'),
-  ('IncidentReports_IncidentID_seq','IncidentReports','IncidentID'),
-  ('InternshipAssignments_AssignmentID_seq','InternshipAssignments','AssignmentID'),
-  ('InternshipEvaluations_EvaluationID_seq','InternshipEvaluations','EvaluationID'),
-  ('InternshipPositions_PositionID_seq','InternshipPositions','PositionID'),
-  ('InternshipTasks_TaskID_seq','InternshipTasks','TaskID'),
-  ('JobApplications_ApplicationID_seq','JobApplications','ApplicationID'),
-  ('JobRoles_JobRoleID_seq','JobRoles','JobRoleID'),
-  ('MatchingAPICalls_CallID_seq','MatchingAPICalls','CallID'),
-  ('MatchingEmbeddings_EmbeddingID_seq','MatchingEmbeddings','EmbeddingID'),
-  ('MatchingRecommendations_RecommendationID_seq','MatchingRecommendations','RecommendationID'),
-  ('MatchingRuns_RunID_seq','MatchingRuns','RunID'),
-  ('MatchingSkills_SkillID_seq','MatchingSkills','SkillID'),
-  ('NotificationTemplates_TemplateID_seq','NotificationTemplates','TemplateID'),
-  ('Notifications_NotificationID_seq','Notifications','NotificationID'),
-  ('OJTAdvisoryRuns_RunID_seq','OJTAdvisoryRuns','RunID'),
-  ('OJTAlertCheckRuns_RunID_seq','OJTAlertCheckRuns','RunID'),
-  ('OJTAlertDeliveries_DeliveryID_seq','OJTAlertDeliveries','DeliveryID'),
-  ('OJTAlertEvaluations_EvaluationID_seq','OJTAlertEvaluations','EvaluationID'),
-  ('OJTAlertEvents_EventID_seq','OJTAlertEvents','EventID'),
-  ('OJTAlertRules_RuleID_seq','OJTAlertRules','RuleID'),
-  ('OJTAlertTargets_TargetID_seq','OJTAlertTargets','TargetID'),
-  ('OJTAlerts_AlertID_seq','OJTAlerts','AlertID'),
-  ('OJTEligibilityConditions_ConditionID_seq','OJTEligibilityConditions','ConditionID'),
-  ('OJTEnterpriseImportBatches_BatchID_seq','OJTEnterpriseImportBatches','BatchID'),
-  ('OJTEnterpriseImportRows_ImportRowID_seq','OJTEnterpriseImportRows','ImportRowID'),
-  ('OJTMatchingProfiles_ProfileID_seq','OJTMatchingProfiles','ProfileID'),
-  ('OJTRegistrationEvents_EventID_seq','OJTRegistrationEvents','EventID'),
-  ('OJTRegistrationExceptions_ExceptionID_seq','OJTRegistrationExceptions','ExceptionID'),
-  ('OJTRegistrationWindows_WindowID_seq','OJTRegistrationWindows','WindowID'),
-  ('OJTRegistrations_RegistrationID_seq','OJTRegistrations','RegistrationID'),
-  ('OJTResultEvents_EventID_seq','OJTResultEvents','EventID'),
-  ('OJTResults_ResultID_seq','OJTResults','ResultID'),
-  ('OJTRuleSets_RuleSetID_seq','OJTRuleSets','RuleSetID'),
-  ('OJTSemesters_OJTSemesterID_seq','OJTSemesters','OJTSemesterID'),
-  ('PathwayRecommendations_RecommendationID_seq','PathwayRecommendations','RecommendationID'),
-  ('PredictionJobs_JobID_seq','PredictionJobs','JobID'),
-  ('PredictionModels_ModelID_seq','PredictionModels','ModelID'),
-  ('Predictions_PredictionID_seq','Predictions','PredictionID'),
-  ('ProgramCombos_ProgramComboID_seq','ProgramCombos','ProgramComboID'),
-  ('ProgramCourses_ProgramCourseID_seq','ProgramCourses','ProgramCourseID'),
-  ('ProgramOJTGradeMappings_MappingID_seq','ProgramOJTGradeMappings','MappingID'),
-  ('ProgramPrerequisiteGroups_GroupID_seq','ProgramPrerequisiteGroups','GroupID'),
-  ('RecruitmentArchiveRuns_RunID_seq','RecruitmentArchiveRuns','RunID'),
-  ('RecruitmentPosts_PostID_seq','RecruitmentPosts','PostID'),
-  ('RecruitmentWindows_WindowID_seq','RecruitmentWindows','WindowID'),
-  ('RiskAlerts_AlertID_seq','RiskAlerts','AlertID'),
-  ('Roles_RoleID_seq','Roles','RoleID'),
-  ('Specializations_SpecializationID_seq','Specializations','SpecializationID'),
-  ('StudentAcademicRecalculations_RecalculationID_seq','StudentAcademicRecalculations','RecalculationID'),
-  ('StudentAcademicSnapshot_SnapshotID_seq','StudentAcademicSnapshot','SnapshotID'),
-  ('StudentCVFiles_CVFileID_seq','StudentCVFiles','CVFileID'),
-  ('StudentCVVersions_CVID_seq','StudentCVVersions','CVID'),
-  ('StudentComboSelectionEvents_EventID_seq','StudentComboSelectionEvents','EventID'),
-  ('StudentComboSelections_SelectionID_seq','StudentComboSelections','SelectionID'),
-  ('StudentCourseResults_ResultID_seq','StudentCourseResults','ResultID'),
-  ('StudentEnterpriseCoordination_CoordinationID_seq','StudentEnterpriseCoordination','CoordinationID'),
-  ('StudentInterventions_InterventionID_seq','StudentInterventions','InterventionID'),
-  ('StudentOJTEligibility_EligibilityID_seq','StudentOJTEligibility','EligibilityID'),
-  ('Students_StudentID_seq','Students','StudentID'),
-  ('SupportClassRegistrations_RegistrationID_seq','SupportClassRegistrations','RegistrationID'),
-  ('SupportClasses_SupportClassID_seq','SupportClasses','SupportClassID'),
-  ('SupportRequests_RequestID_seq','SupportRequests','RequestID'),
-  ('TaskProgressUpdates_UpdateID_seq','TaskProgressUpdates','UpdateID'),
-  ('TrainingPrograms_ProgramID_seq','TrainingPrograms','ProgramID'),
-  ('Users_UserID_seq','Users','UserID')
- ) AS seed(sequence_name,table_name,column_name) LOOP
-  EXECUTE format('SELECT max(%I) FROM public.%I',item.column_name,item.table_name) INTO maximum;
-  PERFORM setval(format('public.%I',item.sequence_name)::regclass,COALESCE(maximum,1),maximum IS NOT NULL);
- END LOOP;
-END $sequences$;
-
+-- 6. No operational/demo seeding. Academic calendars and students start empty.
 
 -- 7. Foreign keys and runtime triggers validate the finished dataset.
 ALTER TABLE public."AcademicAlertNotificationBatches" ADD CONSTRAINT "AcademicAlertNotificationBatches_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
@@ -7666,42 +7095,7 @@ BEGIN
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."ValidateStudentStudyHistory"(student_id integer) TO PUBLIC';
 END $security$;
 
--- 9. Final acceptance. Any failure rolls back the entire reset.
-DO $accept_seed$
-DECLARE student_id int;
-BEGIN
- IF EXISTS(SELECT 1 FROM "AcademicYears" y LEFT JOIN "AcademicPeriods" p
-  ON p."AcademicYearID"=y."AcademicYearID" AND p."Kind"='SEMESTER'
-  GROUP BY y."AcademicYearID",y."YearCode" HAVING count(p.*)<>3
-   OR array_agg(p."PeriodCode" ORDER BY p."StartDate") IS DISTINCT FROM
-    ARRAY['SPRING'||left(y."YearCode",4),'SUMMER'||left(y."YearCode",4),'FALL'||left(y."YearCode",4)]::varchar[]) THEN
-  RAISE EXCEPTION 'Every academic year requires Spring, Summer and Fall in order.';
- END IF;
- IF EXISTS(SELECT 1 FROM "CohortGroups" g LEFT JOIN "CohortCurriculumPeriods" p USING("CohortID","GroupCode")
-  GROUP BY g."CohortID",g."GroupCode" HAVING count(p.*)<>10 OR min(p."CurriculumSemester")<>0 OR max(p."CurriculumSemester")<>9) THEN
-  RAISE EXCEPTION 'Every cohort group requires all ten curriculum stages 0..9.';
- END IF;
- IF EXISTS(SELECT 1 FROM "TrainingPrograms" WHERE "Status"<>'PUBLISHED')
-  OR EXISTS(SELECT 1 FROM "OJTRuleSets" WHERE "Status"<>'PUBLISHED')
-  OR EXISTS(SELECT 1 FROM "RecruitmentPosts" WHERE "Status"='DRAFT')
-  OR EXISTS(SELECT 1 FROM "OJTAssessmentWindows" WHERE "Status"='DRAFT') THEN
-  RAISE EXCEPTION 'Seeded input must be published/open, never draft.';
- END IF;
- FOR student_id IN SELECT "StudentID" FROM "Students" LOOP
-  PERFORM "ValidateStudentStudyHistory"(student_id);
- END LOOP;
- -- Regression fixture: SWE201c failed at stage 4 blocks its stage-5 dependents.
- IF EXISTS(SELECT 1 FROM "StudentCourseResults" r JOIN "Students" s USING("StudentID")
-  JOIN "Users" u USING("UserID") JOIN "Courses" c USING("CourseID")
-  WHERE u."Username"='student07' AND c."CourseCode" IN ('SWP391','SWR302','SWT301')) THEN
-  RAISE EXCEPTION 'A failed prerequisite must block dependent enrollment.';
- END IF;
- IF EXISTS(SELECT 1 FROM "StudentCourseResults" resit JOIN "StudentCourseResults" original
-  ON original."StudentID"=resit."StudentID" AND original."CourseID"=resit."CourseID" AND original."AttemptNumber"<resit."AttemptNumber"
-  WHERE resit."AttemptNumber">1 AND original."SemesterTaken">=resit."SemesterTaken") THEN
-  RAISE EXCEPTION 'Demo resits must belong to a later curriculum stage than the failed attempt.';
- END IF;
-END $accept_seed$;
+-- 9. Demo acceptance assertions removed (no sample students/calendar exist).
 SET CONSTRAINTS ALL IMMEDIATE;
 
 -- BEGIN INCREMENTAL UPDATE: 20261027_pro192_prerequisite
@@ -7777,7 +7171,7 @@ BEGIN
   GRANT USAGE,SELECT ON SEQUENCE public."OJTEligibilityResultBatches_BatchID_seq" TO service_role;
  END IF;
 END $security$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261027_frontend_ojt_results') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 -- END INCREMENTAL UPDATE: 20261027_frontend_ojt_results
 
 -- BEGIN INCREMENTAL UPDATE: 20261027_frontend_ojt_handoff
@@ -7838,516 +7232,10 @@ BEGIN
  END IF;
  RETURN NEW;
 END $function$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261027_frontend_ojt_handoff') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 -- END INCREMENTAL UPDATE: 20261027_frontend_ojt_handoff
 
--- 8. Enterprise workflow fixtures. Eligibility snapshots are derived from the
--- seeded transcripts and handed off through the current frontend-result workflow.
--- The bootstrap's FULL RESET runs before this block.
-DO $enterprise_flow_demo$
-DECLARE
-  v_enterprise_id integer;
-  v_enterprise_user_id integer;
-  v_academic_user_id integer;
-  v_semester_id integer;
-  v_window_id integer;
-  v_position_id integer;
-  v_post_id integer;
-  v_active_student_id integer;
-  v_active_user_id integer;
-  v_active_registration_id integer;
-  v_active_application_id integer;
-  v_result_batch_id integer;
-  v_result_saved_at timestamptz;
-  v_result_checked_at timestamptz;
-  v_results jsonb;
-  v_handoff_id integer;
-  v_active_coordination_id integer;
-  v_assignment_id integer;
-  v_start_date date;
-  v_end_date date;
-  v_existing record;
-BEGIN
-  SELECT e."EnterpriseID",eu."UserID"
-    INTO STRICT v_enterprise_id,v_enterprise_user_id
-  FROM public."Enterprises" e
-  JOIN public."EnterpriseUsers" eu ON eu."EnterpriseID"=e."EnterpriseID"
-  JOIN public."Users" u ON u."UserID"=eu."UserID"
-  WHERE e."EnterpriseCode"='TECHVIET' AND u."Username"='enterprise01'
-    AND u."Status"='ACTIVE' AND e."Status"='ACTIVE';
-
-  SELECT u."UserID" INTO STRICT v_academic_user_id
-  FROM public."Users" u
-  JOIN public."Roles" r ON r."RoleID"=u."RoleID"
-  WHERE r."RoleCode" IN ('ACADEMIC','ADMIN') AND u."Status"='ACTIVE'
-  ORDER BY CASE WHEN r."RoleCode"='ACADEMIC' THEN 0 ELSE 1 END,u."UserID"
-  LIMIT 1;
-
-  SELECT s."OJTSemesterID",p."PositionID",s."StartDate",s."EndDate"
-    INTO STRICT v_semester_id,v_position_id,v_start_date,v_end_date
-  FROM public."OJTSemesters" s
-  JOIN public."InternshipPositions" p ON p."OJTSemesterID"=s."OJTSemesterID"
-  WHERE s."SemesterCode"='DEMO-OJT-S6'
-    AND p."EnterpriseID"=v_enterprise_id
-    AND p."RecruitmentCode"='DEMO-TV-WEB-01'
-    AND p."Status"='OPEN';
-
-  SELECT "WindowID" INTO STRICT v_window_id
-  FROM public."OJTRegistrationWindows"
-  WHERE "OJTSemesterID"=v_semester_id AND "Status"='OPEN'
-    AND "StartsAt"<=clock_timestamp() AND "EndsAt">clock_timestamp()
-  ORDER BY "WindowID" DESC LIMIT 1;
-  SELECT "PostID" INTO STRICT v_post_id
-  FROM public."RecruitmentPostPositions"
-  WHERE "PositionID"=v_position_id AND "OJTSemesterID"=v_semester_id
-  ORDER BY "PostID" DESC LIMIT 1;
-
-  SELECT s."StudentID",s."UserID" INTO STRICT v_active_student_id,v_active_user_id
-  FROM public."Students" s
-  JOIN public."Users" u ON u."UserID"=s."UserID"
-  WHERE u."Username"='student02' AND u."Status"='ACTIVE' AND s."Status"='ACTIVE';
-
-  SELECT "RegistrationID","Application" INTO v_existing
-  FROM public."OJTRegistrations"
-  WHERE "StudentID"=v_active_student_id AND "OJTSemesterID"=v_semester_id;
-  IF FOUND THEN
-    IF v_existing."Application"->>'demoFixture' IS DISTINCT FROM 'enterprise-flow'
-      OR v_existing."Application"->>'fixtureStage' IS DISTINCT FROM 'ACTIVE_INTERNSHIP' THEN
-      RAISE EXCEPTION 'student02 already has a non-demo OJT registration for DEMO-OJT-S6.';
-    END IF;
-    v_active_registration_id:=v_existing."RegistrationID";
-  ELSE
-    INSERT INTO public."OJTRegistrations"
-      ("StudentID","OJTSemesterID","WindowID","Status","ProgramID","Application","SubmittedBy")
-    SELECT s."StudentID",v_semester_id,v_window_id,'SUBMITTED',s."ProgramID",
-      jsonb_build_object('demoFixture','enterprise-flow','fixtureStage','ACTIVE_INTERNSHIP',
-        'contactPhone',u."Phone",'contactEmail',u."Email",'note','Hồ sơ demo gửi trực tiếp đến doanh nghiệp.'),
-      s."UserID"
-    FROM public."Students" s JOIN public."Users" u ON u."UserID"=s."UserID"
-    WHERE s."StudentID"=v_active_student_id
-    RETURNING "RegistrationID" INTO v_active_registration_id;
-  END IF;
-
-  v_result_checked_at:=date_trunc('milliseconds',clock_timestamp());
-  SELECT jsonb_agg(jsonb_build_object(
-      'studentId',eligible."StudentID",
-      'status',CASE WHEN eligible."EarnedCredits">=eligible."MinCredits" AND eligible."UnpassedCourseCount"<=eligible."MaxUnpassedCourses" THEN 'ELIGIBLE' ELSE 'NOT_ELIGIBLE' END,
-      'earnedCredits',eligible."EarnedCredits",
-      'unpassedCourseCount',eligible."UnpassedCourseCount",
-      'reasons','[]'::jsonb,
-      'academicIssues','[]'::jsonb,
-      'checkedAt',v_result_checked_at
-    ) ORDER BY eligible."StudentID")
-    INTO v_results
-  FROM (
-    SELECT st."StudentID", rule."MinCredits",rule."MaxUnpassedCourses",
-      coalesce(sum(pc."Credits") FILTER (WHERE history.passed),0)::numeric AS "EarnedCredits",
-      count(*) FILTER (WHERE history.failed AND NOT history.passed)::int AS "UnpassedCourseCount"
-    FROM public."Students" st
-    JOIN public."Users" u USING ("UserID")
-    JOIN public."OJTActiveRuleSets" active ON active."ProgramID"=st."ProgramID" AND active."ScopeSemesterID"=v_semester_id
-    JOIN public."OJTRuleSets" rule USING ("RuleSetID")
-    JOIN public."ProgramCourses" pc ON pc."ProgramID"=st."ProgramID"
-      AND pc."RecommendedSemester"<=5 AND pc."EntryKind"='COURSE'
-    LEFT JOIN (
-      SELECT "StudentID","CourseID",bool_or("Status" IN ('PASSED','RECOGNIZED')) AS passed,
-        bool_or("Status"='FAILED') AS failed
-      FROM public."StudentCourseResults" GROUP BY "StudentID","CourseID"
-    ) history ON history."StudentID"=st."StudentID" AND history."CourseID"=pc."CourseID"
-    WHERE u."Username" IN ('student01','student02','student03','student04','student09',
-      'student11','student12','student13','student14','student18','student20')
-      AND u."Status"='ACTIVE' AND st."Status"='ACTIVE'
-    GROUP BY st."StudentID", rule."MinCredits", rule."MaxUnpassedCourses"
-  ) eligible;
-
-  IF v_results IS NULL OR jsonb_array_length(v_results)<>11 OR EXISTS (
-    SELECT 1 FROM jsonb_array_elements(v_results) result
-    WHERE result->>'status'<>'ELIGIBLE'
-  ) THEN
-    RAISE EXCEPTION 'Enterprise candidates must have current transcript-derived eligibility (at least 70 credits and no more than 2 unpassed courses).';
-  END IF;
-
-  INSERT INTO public."OJTEligibilityResultBatches"
-    ("IdempotencyKey","RequestHash","SavedBy","SavedCount","Results")
-  VALUES ('DEMO-ENTERPRISE-FLOW-20261028',md5(v_results::text)||md5('frontend:'||v_results::text),
-    v_academic_user_id,jsonb_array_length(v_results),v_results)
-  RETURNING "BatchID","SavedAt" INTO v_result_batch_id,v_result_saved_at;
-
-  INSERT INTO public."StudentOJTCalculatedResults"
-    ("StudentID","BatchID","ProgramID","Status","Result","CheckedAt","SavedAt","SavedBy")
-  SELECT (result->>'studentId')::int,v_result_batch_id,s."ProgramID",result->>'status',
-    result,(result->>'checkedAt')::timestamptz,v_result_saved_at,v_academic_user_id
-  FROM jsonb_array_elements(v_results) result
-  JOIN public."Students" s ON s."StudentID"=(result->>'studentId')::int;
-
-  INSERT INTO public."EligibleStudentHandoffs"
-    ("OJTSemesterID","IdempotencyKey","RequestHash","RegistrationIDs","Reason","CreatedBy")
-  VALUES (v_semester_id,'DEMO-ENTERPRISE-FLOW-20261028',
-    md5(v_result_batch_id::text||':'||v_semester_id::text),'[]'::jsonb,
-    'Bàn giao dữ liệu mẫu đã đủ điều kiện để kiểm thử luồng doanh nghiệp.',v_academic_user_id)
-  RETURNING "HandoffID" INTO v_handoff_id;
-
-  INSERT INTO public."EligibleStudentHandoffItems"
-    ("HandoffID","OJTSemesterID","StudentID","CalculatedBatchID","Snapshot")
-  SELECT v_handoff_id,v_semester_id,calculated."StudentID",v_result_batch_id,
-    jsonb_build_object('studentId',calculated."StudentID",'currentSemester',5,'targetSemester',6,
-      'calculatedEligibility',calculated."Result"||jsonb_build_object('source','FRONTEND',
-        'batchId',calculated."BatchID",'savedAt',calculated."SavedAt",
-        'savedBy',calculated."SavedBy",'isStale',false))
-  FROM public."StudentOJTCalculatedResults" calculated
-  WHERE calculated."BatchID"=v_result_batch_id
-  ORDER BY calculated."StudentID";
-
-  SELECT "ApplicationID" INTO v_active_application_id
-  FROM public."JobApplications"
-  WHERE "RegistrationID"=v_active_registration_id AND "PostID"=v_post_id
-    AND "PositionID"=v_position_id;
-  IF v_active_application_id IS NULL THEN
-    INSERT INTO public."JobApplications"
-      ("RegistrationID","OJTSemesterID","PostID","PositionID","StudentID","EnterpriseID",
-       "CoverLetter","Status","ReviewedBy","ReviewNote")
-    VALUES (v_active_registration_id,v_semester_id,v_post_id,v_position_id,
-      v_active_student_id,v_enterprise_id,'Hồ sơ demo gửi trực tiếp đến doanh nghiệp.',
-      'ACCEPTED',v_enterprise_user_id,'Hồ sơ demo được doanh nghiệp tiếp nhận.')
-    RETURNING "ApplicationID" INTO v_active_application_id;
-  END IF;
-
-  SELECT "CoordinationID" INTO v_active_coordination_id
-  FROM public."StudentEnterpriseCoordination"
-  WHERE "RegistrationID"=v_active_registration_id
-  ORDER BY "CoordinationID" DESC LIMIT 1;
-  IF v_active_coordination_id IS NULL THEN
-    INSERT INTO public."StudentEnterpriseCoordination"
-      ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","CoordinatedAt","Decision","DecisionAt","OJTSemesterID","ApplicationID")
-    VALUES (v_active_registration_id,v_enterprise_id,v_position_id,v_active_user_id,now(),
-      'ACCEPTED',now(),v_semester_id,v_active_application_id)
-    RETURNING "CoordinationID" INTO v_active_coordination_id;
-  ELSIF NOT EXISTS (
-    SELECT 1 FROM public."StudentEnterpriseCoordination"
-    WHERE "CoordinationID"=v_active_coordination_id
-      AND "EnterpriseID"=v_enterprise_id AND "PositionID"=v_position_id
-      AND "ApplicationID"=v_active_application_id
-  ) THEN
-    RAISE EXCEPTION 'student02 demo registration has a coordination for another enterprise or position.';
-  END IF;
-
-  SELECT * INTO v_existing
-  FROM public."InternshipAssignments"
-  WHERE "CoordinationID"=v_active_coordination_id;
-  IF FOUND THEN
-    IF v_existing."StudentID"<>v_active_student_id
-      OR v_existing."EnterpriseID"<>v_enterprise_id
-      OR v_existing."PositionID"<>v_position_id THEN
-      RAISE EXCEPTION 'Existing student02 assignment does not match the enterprise demo fixture.';
-    END IF;
-    v_assignment_id:=v_existing."AssignmentID";
-  ELSE
-    INSERT INTO public."InternshipAssignments"
-      ("CoordinationID","StudentID","EnterpriseID","PositionID","EnterpriseSupervisorName","StartDate","EndDate","Status")
-    VALUES (v_active_coordination_id,v_active_student_id,v_enterprise_id,v_position_id,
-      'TechViet HR Demo',v_start_date,v_end_date,'ACTIVE')
-    RETURNING "AssignmentID" INTO v_assignment_id;
-  END IF;
-
-  INSERT INTO public."InternshipTasks"
-    ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status")
-  SELECT v_assignment_id,t.name,t.description,v_start_date,
-    LEAST(v_start_date+t.due_days,v_end_date),t.status
-  FROM (VALUES
-    ('DEMO OJT: Hoàn tất tìm hiểu hệ thống','Dữ liệu mẫu để kiểm tra tiến độ task.','COMPLETED',7),
-    ('DEMO OJT: Phân tích yêu cầu tính năng','Dữ liệu mẫu để kiểm tra tiến độ task.','IN_PROGRESS',14),
-    ('DEMO OJT: Viết test case cơ bản','Dữ liệu mẫu để kiểm tra tiến độ task.','TODO',21)
-  ) AS t(name,description,status,due_days)
-  WHERE NOT EXISTS (
-    SELECT 1 FROM public."InternshipTasks" existing
-    WHERE existing."AssignmentID"=v_assignment_id AND existing."TaskName"=t.name
-  );
-
-  RAISE NOTICE 'Enterprise demo fixture ready: student01 is eligible and unregistered for direct-application testing; an accepted sample has assignment % for task/evaluation testing (OJT semester %).',
-    v_assignment_id,v_semester_id;
-END $enterprise_flow_demo$;
-
--- Seed direct-application examples for all enterprise decision states.
-DO $enterprise_candidate_status_demo$
-DECLARE
-  v_enterprise_id integer;
-  v_enterprise_user_id integer;
-  v_semester_id integer;
-  v_window_id integer;
-  v_post_id integer;
-  v_position_id integer;
-  v_student record;
-  v_existing_registration record;
-  v_registration_id integer;
-  v_application_id integer;
-  v_coordination_id integer;
-  v_existing_assignment record;
-  v_start_date date;
-  v_end_date date;
-  v_decision text;
-  v_reject_reason text;
-BEGIN
-  SELECT e."EnterpriseID" INTO STRICT v_enterprise_id
-  FROM public."Enterprises" e
-  WHERE e."EnterpriseCode"='TECHVIET' AND e."Status"='ACTIVE';
-
-  SELECT eu."UserID" INTO STRICT v_enterprise_user_id
-  FROM public."EnterpriseUsers" eu
-  JOIN public."Users" u ON u."UserID"=eu."UserID"
-  WHERE eu."EnterpriseID"=v_enterprise_id AND u."Username"='enterprise01'
-    AND u."Status"='ACTIVE';
-
-  SELECT s."OJTSemesterID",p."PositionID",s."StartDate",s."EndDate"
-    INTO STRICT v_semester_id,v_position_id,v_start_date,v_end_date
-  FROM public."OJTSemesters" s
-  JOIN public."InternshipPositions" p ON p."OJTSemesterID"=s."OJTSemesterID"
-  WHERE s."SemesterCode"='DEMO-OJT-S6'
-    AND p."EnterpriseID"=v_enterprise_id
-    AND p."RecruitmentCode"='DEMO-TV-WEB-01'
-    AND p."Status"='OPEN';
-
-  SELECT "WindowID" INTO STRICT v_window_id
-  FROM public."OJTRegistrationWindows"
-  WHERE "OJTSemesterID"=v_semester_id AND "Status"='OPEN'
-    AND "StartsAt"<=clock_timestamp() AND "EndsAt">clock_timestamp()
-  ORDER BY "WindowID" DESC LIMIT 1;
-
-  SELECT "PostID" INTO STRICT v_post_id
-  FROM public."RecruitmentPostPositions"
-  WHERE "PositionID"=v_position_id AND "OJTSemesterID"=v_semester_id
-  ORDER BY "PostID" DESC LIMIT 1;
-
-  FOR v_student IN
-    SELECT s."StudentID",s."ProgramID",s."UserID",u."Username",u."Email",u."Phone"
-    FROM public."Students" s
-    JOIN public."Users" u ON u."UserID"=s."UserID"
-    WHERE u."Username" IN ('student03','student04','student09','student11',
-                           'student12','student13','student14','student18','student20')
-      AND u."Status"='ACTIVE'
-      AND s."Status"='ACTIVE'
-    ORDER BY u."Username"
-  LOOP
-    v_decision:=CASE v_student."Username"
-      WHEN 'student03' THEN 'PENDING'
-      WHEN 'student04' THEN 'PENDING'
-      WHEN 'student09' THEN 'PENDING'
-      WHEN 'student20' THEN 'PENDING'
-      WHEN 'student11' THEN 'ACCEPTED'
-      WHEN 'student12' THEN 'PENDING'
-      WHEN 'student18' THEN 'PENDING'
-      ELSE 'REJECTED'
-    END;
-    v_reject_reason:=CASE WHEN v_decision='REJECTED'
-      THEN 'Hồ sơ demo: chưa phù hợp vị trí thực tập.'
-      ELSE NULL
-    END;
-
-    SELECT r."RegistrationID",r."Application" INTO v_existing_registration
-    FROM public."OJTRegistrations" r
-    WHERE r."StudentID"=v_student."StudentID"
-      AND r."OJTSemesterID"=v_semester_id;
-    IF FOUND THEN
-      IF v_existing_registration."Application"->>'demoFixture' IS DISTINCT FROM 'enterprise-flow'
-        OR v_existing_registration."Application"->>'fixtureStage' IS DISTINCT FROM 'STATUS_CANDIDATE' THEN
-        RAISE EXCEPTION 'A demo candidate already has a non-demo OJT registration; refusing to overwrite it.';
-      END IF;
-      v_registration_id:=v_existing_registration."RegistrationID";
-    ELSE
-      INSERT INTO public."OJTRegistrations"
-        ("StudentID","OJTSemesterID","WindowID","Status","ProgramID","Application","SubmittedBy")
-      VALUES (
-        v_student."StudentID",v_semester_id,v_window_id,'SUBMITTED',v_student."ProgramID",
-        jsonb_build_object('demoFixture','enterprise-flow','fixtureStage','STATUS_CANDIDATE',
-          'contactPhone',v_student."Phone",'contactEmail',v_student."Email",
-          'note','Hồ sơ demo gửi trực tiếp đến doanh nghiệp.'),
-        v_student."UserID"
-      )
-      RETURNING "RegistrationID" INTO v_registration_id;
-    END IF;
-
-    SELECT app."ApplicationID" INTO v_application_id
-    FROM public."JobApplications" app
-    WHERE app."RegistrationID"=v_registration_id
-      AND app."PostID"=v_post_id AND app."PositionID"=v_position_id;
-    IF v_application_id IS NULL THEN
-      INSERT INTO public."JobApplications"
-        ("RegistrationID","OJTSemesterID","PostID","PositionID","StudentID","EnterpriseID",
-         "CoverLetter","Status","ReviewedBy","ReviewNote")
-      VALUES (
-        v_registration_id,v_semester_id,v_post_id,v_position_id,
-        v_student."StudentID",v_enterprise_id,
-        'Hồ sơ demo gửi trực tiếp đến doanh nghiệp.',
-        CASE WHEN v_decision='PENDING' THEN 'SUBMITTED' ELSE v_decision END,
-        CASE WHEN v_decision='PENDING' THEN NULL ELSE v_enterprise_user_id END,
-        CASE WHEN v_decision='REJECTED' THEN v_reject_reason
-          WHEN v_decision='ACCEPTED' THEN 'Hồ sơ demo được doanh nghiệp tiếp nhận.'
-          ELSE NULL END
-      )
-      RETURNING "ApplicationID" INTO v_application_id;
-    END IF;
-
-    SELECT co."CoordinationID" INTO v_coordination_id
-    FROM public."StudentEnterpriseCoordination" co
-    WHERE co."RegistrationID"=v_registration_id
-    ORDER BY co."CoordinationID" DESC
-    LIMIT 1;
-    IF v_coordination_id IS NULL THEN
-      INSERT INTO public."StudentEnterpriseCoordination"
-        ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy",
-         "CoordinatedAt","Decision","DecisionAt","RejectReason","OJTSemesterID","ApplicationID")
-      VALUES (
-        v_registration_id,v_enterprise_id,v_position_id,v_student."UserID",now(),
-        v_decision,CASE WHEN v_decision='PENDING' THEN NULL ELSE now() END,
-        v_reject_reason,v_semester_id,v_application_id
-      )
-      RETURNING "CoordinationID" INTO v_coordination_id;
-    ELSIF NOT EXISTS (
-      SELECT 1 FROM public."StudentEnterpriseCoordination" co
-      WHERE co."CoordinationID"=v_coordination_id
-        AND co."EnterpriseID"=v_enterprise_id
-        AND co."PositionID"=v_position_id
-        AND co."ApplicationID"=v_application_id
-    ) THEN
-      RAISE EXCEPTION 'Existing demo coordination does not match TECHVIET demo position.';
-    END IF;
-
-    IF v_decision='ACCEPTED' THEN
-      SELECT * INTO v_existing_assignment
-      FROM public."InternshipAssignments"
-      WHERE "CoordinationID"=v_coordination_id;
-      IF FOUND THEN
-        IF v_existing_assignment."StudentID"<>v_student."StudentID"
-          OR v_existing_assignment."EnterpriseID"<>v_enterprise_id
-          OR v_existing_assignment."PositionID"<>v_position_id THEN
-          RAISE EXCEPTION 'Existing accepted demo assignment does not match its coordination.';
-        END IF;
-      ELSE
-        INSERT INTO public."InternshipAssignments"
-          ("CoordinationID","StudentID","EnterpriseID","PositionID",
-           "EnterpriseSupervisorName","StartDate","EndDate","Status")
-        VALUES (
-          v_coordination_id,v_student."StudentID",v_enterprise_id,v_position_id,
-          'TechViet HR Demo',v_start_date,v_end_date,'ASSIGNED'
-        );
-      END IF;
-    END IF;
-  END LOOP;
-
-  UPDATE public."InternshipPositions" p
-  SET "RemainingSlots"=GREATEST(0,p."Capacity"-(
-    SELECT count(*)::int FROM public."InternshipAssignments" a
-    WHERE a."PositionID"=p."PositionID"
-      AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
-  ))
-  WHERE p."PositionID"=v_position_id;
-
-  IF (SELECT count(*) FROM public."StudentEnterpriseCoordination" co
-      JOIN public."OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
-      WHERE co."EnterpriseID"=v_enterprise_id
-        AND co."OJTSemesterID"=v_semester_id
-        AND r."Application"->>'demoFixture'='enterprise-flow'
-        AND r."Application"->>'fixtureStage' IN ('ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
-        AND NOT EXISTS (
-          SELECT 1 FROM public."StudentEnterpriseCoordination" newer
-          WHERE newer."RegistrationID"=co."RegistrationID"
-            AND newer."EnterpriseID"=co."EnterpriseID"
-            AND newer."CoordinationID">co."CoordinationID"
-        ))<>10 THEN
-    RAISE EXCEPTION 'Expected ten latest enterprise demo candidates for DEMO-OJT-S6.';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM public."StudentEnterpriseCoordination" co
-    JOIN public."OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
-    WHERE co."EnterpriseID"=v_enterprise_id
-      AND co."OJTSemesterID"=v_semester_id
-      AND r."Application"->>'demoFixture'='enterprise-flow'
-      AND r."Application"->>'fixtureStage' IN ('ACTIVE_INTERNSHIP','STATUS_CANDIDATE')
-      AND (co."ApplicationID" IS NULL OR NOT EXISTS (
-        SELECT 1 FROM public."JobApplications" app
-        WHERE app."ApplicationID"=co."ApplicationID"
-          AND app."RegistrationID"=co."RegistrationID"
-          AND app."PositionID"=co."PositionID"
-          AND app."EnterpriseID"=co."EnterpriseID"
-          AND app."Status"=CASE WHEN co."Decision"='PENDING' THEN 'SUBMITTED' ELSE co."Decision" END
-      ))
-  ) THEN
-    RAISE EXCEPTION 'Every enterprise demo coordination must reference its matching direct job application.';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM public."Students" student
-    JOIN public."Users" account ON account."UserID"=student."UserID"
-    WHERE account."Username"='student01'
-      AND (EXISTS (SELECT 1 FROM public."OJTRegistrations" r
-        WHERE r."StudentID"=student."StudentID" AND r."OJTSemesterID"=v_semester_id)
-        OR EXISTS (SELECT 1 FROM public."EligibleStudentHandoffItems" h
-          JOIN public."StudentEnterpriseCoordination" co ON co."RegistrationID"=h."RegistrationID"
-          WHERE h."StudentID"=student."StudentID" AND h."OJTSemesterID"=v_semester_id))
-  ) THEN
-    RAISE EXCEPTION 'student01 must remain handed off but without an OJT registration or enterprise coordination.';
-  END IF;
-
-  RAISE NOTICE 'Enterprise demo ready: 10 direct applications (6 pending, 2 accepted, 2 rejected); student01 is eligible and unregistered for direct-application testing.';
-END $enterprise_candidate_status_demo$;
-
--- BEGIN STUDENT DATABASE AUDIT (READ ONLY)
--- This block checks the CURRENT database; it does not create a second database.
--- To audit an existing database, run ONLY this block, not the FULL RESET above.
-DO $student_database_audit$
-DECLARE
-  required_columns jsonb := '{"Users":["UserID","RoleID","Username","Email","Phone","Status","PasswordHash","MustChangePassword","TemporaryPasswordExpiresAt","AuthVersion"],"Roles":["RoleID","RoleCode"],"Students":["StudentID","UserID","ProgramID","Status","DeletedAt","CurrentSemester"],"TrainingPrograms":["ProgramID","Status"],"StudentAcademicPlacements":["StudentID","CohortID","GroupCode","UpdatedAt"],"StudentCourseResults":["StudentID","CourseID","Status","UpdatedAt","CreatedAt"],"StudentCVFiles":["CVFileID","StudentID","FileName","Content","MimeType","Sha256","UploadedBy","UploadedAt"],"StudentOJTCalculatedResults":["StudentID","BatchID","ProgramID","Status","Result","CheckedAt"],"OJTEligibilityResultBatches":["BatchID"],"EligibleStudentHandoffItems":["HandoffID","StudentID","OJTSemesterID","CheckID","CalculatedBatchID","Snapshot"],"EligibleStudentHandoffs":["HandoffID","CreatedAt"],"EligibilityChecks":["CheckID","StudentID","OJTSemesterID"],"EligibilityConfirmations":["CheckID"],"OJTSemesters":["OJTSemesterID","AcademicPeriodID"],"OJTRegistrationWindows":["WindowID","OJTSemesterID","StartsAt","EndsAt","Status","Scope"],"OJTRegistrations":["RegistrationID","StudentID","OJTSemesterID","WindowID","ProgramID","Application","Status"],"JobApplications":["ApplicationID","RegistrationID","StudentID","PostID","PositionID","EnterpriseID","CVFileID","OfficialCheckID","Status"],"RecruitmentPosts":["PostID","Status","DeadlineAt"],"RecruitmentPostPositions":["PostID","PositionID"],"InternshipPositions":["PositionID","OJTSemesterID","Capacity","Status"],"StudentEnterpriseCoordination":["CoordinationID","RegistrationID","ApplicationID","Decision","OJTSemesterID"],"InternshipAssignments":["AssignmentID","StudentID","CoordinationID","StartDate","EndDate","Status"],"InternshipTasks":["TaskID","AssignmentID","TaskName","Description","AssignedDate","DueDate","Status"],"TaskProgressUpdates":["UpdateID","TaskID","UpdatedByStudentID","UpdateDate","ProgressDescription","PercentComplete"],"Notifications":["NotificationID","UserID","Title","Content","IsRead","SentAt"],"OJTResults":["ResultID","AssignmentID","Status","OfficialScore","ConfirmedAt"],"AuditLogs":["LogID","UserID","EntityType","EntityID","Action","Detail"]}'::jsonb;
-  missing_columns text;
-  linked_accounts record;
-  handoffs record;
-  task_data record;
-  privileges record;
-BEGIN
-  SELECT string_agg(format('%I.%I', expected.table_name, expected.column_name), ', '
-    ORDER BY expected.table_name, expected.column_name)
-  INTO missing_columns
-  FROM (
-    SELECT tables.key AS table_name, columns.value AS column_name
-    FROM jsonb_each(required_columns) tables
-    CROSS JOIN LATERAL jsonb_array_elements_text(tables.value) columns
-  ) expected
-  WHERE NOT EXISTS (
-    SELECT 1 FROM information_schema.columns actual
-    WHERE actual.table_schema='public'
-      AND actual.table_name=expected.table_name AND actual.column_name=expected.column_name
-  );
-  IF missing_columns IS NOT NULL THEN
-    RAISE EXCEPTION 'Student database audit failed: missing tables/columns: %',missing_columns;
-  END IF;
-  IF to_regprocedure('public."AssertStudentOJTTerm6"(integer,integer)') IS NULL THEN
-    RAISE EXCEPTION 'Student database audit failed: AssertStudentOJTTerm6(integer,integer) is missing.';
-  END IF;
-  SELECT count(*)::int AS accounts,
-    count(*) FILTER (WHERE student."StudentID" IS NULL)::int AS unlinked
-  INTO linked_accounts
-  FROM public."Users" account JOIN public."Roles" role USING("RoleID")
-  LEFT JOIN public."Students" student ON student."UserID"=account."UserID" AND student."DeletedAt" IS NULL
-  WHERE role."RoleCode"='STUDENT' AND account."Status"='ACTIVE';
-  SELECT count(*) FILTER (WHERE "CalculatedBatchID" IS NOT NULL)::int AS saved,
-    count(*) FILTER (WHERE "CheckID" IS NOT NULL)::int AS official
-  INTO handoffs FROM public."EligibleStudentHandoffItems";
-  SELECT (SELECT count(*) FROM public."InternshipTasks") AS tasks,
-    (SELECT count(*) FROM public."TaskProgressUpdates") AS submissions INTO task_data;
-  RAISE NOTICE 'Student schema audit passed: 27 required tables, all required columns and OJT pathway function are present.';
-  RAISE NOTICE 'Student accounts: %, missing student links: %. Saved-result handoffs: %, official-check handoffs: %. Tasks: %, submissions: %.',
-    linked_accounts.accounts,linked_accounts.unlinked,handoffs.saved,handoffs.official,task_data.tasks,task_data.submissions;
-  FOR privileges IN
-    SELECT name AS table_name,
-      has_table_privilege(format('public.%I',name),'SELECT') AS readable,
-      has_table_privilege(format('public.%I',name),'INSERT') AS insertable
-    FROM unnest(ARRAY['TaskProgressUpdates','AuditLogs']) name
-  LOOP
-    RAISE NOTICE 'Current DB user permissions on %: SELECT=%, INSERT=%.',privileges.table_name,privileges.readable,privileges.insertable;
-  END LOOP;
-  RAISE NOTICE 'These are the permissions of the CURRENT SQL connection. Backend JWT_SECRET/AI provider settings must be checked in the server environment.';
-END $student_database_audit$;
--- END STUDENT DATABASE AUDIT (READ ONLY)
+-- Enterprise demo workflow fixtures and sample audit removed.
 
 -- Enterprise recruitment: the canonical deadline and continuation rules live here.
 -- No separate migration script or second TypeScript continuation implementation.
@@ -8471,7 +7359,7 @@ DO $security$ BEGIN
   GRANT USAGE,SELECT ON SEQUENCE public."OJTConditionPolicies_PolicyID_seq" TO service_role;
  END IF;
 END $security$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261109_managed_ojt_policy') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 -- END INCREMENTAL UPDATE: 20261109_managed_ojt_policy
 
 -- BEGIN CV EXTRACTION AND CERTIFICATES V1
@@ -8941,7 +7829,7 @@ BEGIN
  END LOOP;
  RETURN continued;
 END $$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261111_recruitment_three_phases') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END OJT RECRUITMENT THREE PHASES V3
 
@@ -9072,7 +7960,7 @@ DROP TRIGGER IF EXISTS "TR_ApplicationSnapshot" ON public."JobApplications";
 CREATE TRIGGER "TR_ApplicationSnapshot" BEFORE UPDATE ON public."JobApplications" FOR EACH ROW EXECUTE FUNCTION public."GuardApplicationSnapshot"();
 REVOKE ALL ON FUNCTION public."CarryForwardRecruitmentPosts"(integer),public."RecruitmentOccupiedSlots"(integer) FROM PUBLIC;
 DO $permissions$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN GRANT EXECUTE ON FUNCTION public."CarryForwardRecruitmentPosts"(integer),public."RecruitmentOccupiedSlots"(integer) TO service_role; END IF; END $permissions$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261111_recruitment_lifecycle') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END OJT RECRUITMENT LIFECYCLE V4
 
@@ -9211,7 +8099,7 @@ CREATE TRIGGER "TR_RecruitmentRoundDeletion" BEFORE DELETE ON public."Recruitmen
 DO $$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
  GRANT DELETE ON public."RecruitmentCampaigns" TO service_role;
  END IF; END $$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_schedule_editing') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END OJT QHDN SCHEDULE EDITING V5
 
@@ -9236,7 +8124,7 @@ BEGIN
   RAISE EXCEPTION 'Shared semester capacity is exhausted' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END $$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_qhdn_coordination_capacity') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END OJT QHDN COORDINATION CAPACITY V6
 
@@ -9260,7 +8148,7 @@ BEGIN
   RAISE EXCEPTION 'Shared semester capacity is exhausted' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END $$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261116_enterprise_bulk_acceptance') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END OJT ENTERPRISE BULK ACCEPTANCE V7
 
@@ -9315,7 +8203,7 @@ DO $$ BEGIN
     GRANT USAGE, SELECT ON SEQUENCE public."OJTCreditThresholds_ThresholdID_seq" TO service_role;
   END IF;
 END $$;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('ojt_credit_thresholds_v1') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END INCREMENTAL UPDATE: ojt_credit_thresholds_v1
 
@@ -9324,28 +8212,11 @@ INSERT INTO public."SchemaMigrations"("Version") VALUES ('ojt_credit_thresholds_
 ALTER TABLE public."InternshipTasks"
   ADD COLUMN IF NOT EXISTS "AssignedAt" timestamp,
   ADD COLUMN IF NOT EXISTS "DueAt" timestamp;
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('internship_task_times_v1') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END INCREMENTAL UPDATE: internship_task_times_v1
 
--- BEGIN INCREMENTAL UPDATE: accepted_intern_roster_v1
-
-SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
-INSERT INTO public."InternshipAssignments"
-  ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
-SELECT co."CoordinationID",r."StudentID",co."EnterpriseID",co."PositionID",s."StartDate",s."EndDate",'ASSIGNED'
-FROM public."StudentEnterpriseCoordination" co
-JOIN public."OJTRegistrations" r USING ("RegistrationID")
-JOIN public."OJTSemesters" s ON s."OJTSemesterID"=co."OJTSemesterID"
-WHERE co."Decision"='ACCEPTED'
-  AND NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" newer
-    WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID")
-  AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" a JOIN public."StudentEnterpriseCoordination" old USING ("CoordinationID")
-    WHERE a."CoordinationID"=co."CoordinationID" OR (a."StudentID"=r."StudentID" AND old."OJTSemesterID"=co."OJTSemesterID"
-      AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')));
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('accepted_intern_roster_v1') ON CONFLICT DO NOTHING;
-
--- END INCREMENTAL UPDATE: accepted_intern_roster_v1
+-- accepted_intern_roster_v1 backfill omitted: fresh DB has no accepted interns.
 -- BEGIN INCREMENTAL UPDATE: 20261118_password_reset_codes
 
 CREATE TABLE IF NOT EXISTS public."PasswordResetCodes" (
@@ -9367,7 +8238,7 @@ END $$;
 ALTER TABLE public."EmailOutbox" DROP CONSTRAINT IF EXISTS "EmailOutbox_Kind_check";
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_Kind_check"
   CHECK ("Kind" IN ('ACCOUNT', 'COMBO_REMINDER', 'ACADEMIC_ALERT', 'OJT_RESULT', 'PASSWORD_RESET'));
-INSERT INTO public."SchemaMigrations"("Version") VALUES ('20261118_password_reset_codes') ON CONFLICT DO NOTHING;
+-- Migration version row deliberately omitted in curriculum-only seed build.
 
 -- END INCREMENTAL UPDATE: 20261118_password_reset_codes
 
