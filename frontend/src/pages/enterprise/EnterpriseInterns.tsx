@@ -28,6 +28,7 @@ import {
 } from '@/services/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
+import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 // Adapter: map API data to existing UI's expected format
@@ -156,15 +157,12 @@ export const EnterpriseInterns: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     queueMicrotask(() => { if (mounted) void fetchInternships(); });
-    const refresh = () => { if (!document.hidden) void fetchInternships(true); };
-    const timer = window.setInterval(refresh, 60000);
-    window.addEventListener('focus',refresh);
+    const unsubscribe = subscribeVisibleRefresh(() => void fetchInternships(true), { interval: 60_000, canRefresh: () => !activeRequest.current });
     return () => {
       mounted = false;
       activeRequest.current?.abort();
       activeRequest.current = null;
-      window.clearInterval(timer);
-      window.removeEventListener('focus', refresh);
+      unsubscribe();
     };
   }, [fetchInternships]);
 

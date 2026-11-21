@@ -1,10 +1,10 @@
 import type { LocalOjtResult } from '@/types/education/localEligibility.types';
 import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
-import { getAllItems } from '@/services/educationService';
-import { educationOjtWorkflowService } from '@/services/educationService';
-import { loadAndCalculateLocalEligibility, loadCurrentOjtRule, loadSavedLocalOjtResults, loadStudentAcademicCredits, saveLocalOjtResults } from '@/services/educationService';
-import type { CurrentOjtRule } from '@/services/educationService';
+import {
+  educationOjtWorkflowService, getAllItems, loadAndCalculateLocalEligibility,
+  loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults, type CurrentOjtRule,
+} from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/education/educationOjtReason';
 import { handoffsByStudent, matchesHandoffFilter, selectFullCheckTargets, selectPendingSaveResults } from '@/utils/education/educationOjtCheckQueue';
@@ -13,6 +13,7 @@ import React from 'react';
 import { ojtSourceEndpoints, partitionOjtLoad, type OjtLoadIssue, type OjtSourceKey } from '@/utils/education/ojtEligibilityLoad';
 
 type Target = { student: ImportedStudent; reason: string };
+export const OJT_ELIGIBILITY_PAGE_SIZE = 20;
 const normalize = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().trim();
 const normalizeResults = (rows: (SavedOjtEligibility & { studentId: number })[] | LocalOjtResult[]): Record<number, LocalOjtResult> =>
   Object.fromEntries(rows.map(row => [row.studentId, { ...row, reasons: row.reasons ?? [], academicIssues: row.academicIssues ?? [] }]));
@@ -30,9 +31,6 @@ export function useEducationOjtEligibility() {
   const [savedResults, setSavedResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [pendingResults, setPendingResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [handoffs, setHandoffs] = React.useState<Handoff[]>([]);
-  const [academicCredits, setAcademicCredits] = React.useState<Record<number, number | null>>({});
-  const [creditFailures, setCreditFailures] = React.useState<number[]>([]);
-  const [loadingCredits, setLoadingCredits] = React.useState(false);
   const [failures, setFailures] = React.useState<Record<number, string>>({});
   const [notice, setNotice] = React.useState('');
   const [search, setSearch] = React.useState('');
@@ -80,53 +78,19 @@ export function useEducationOjtEligibility() {
     const c = new AbortController();
     loadController.current = c;
     setLoading(true); setError('');
-    Promise.allSettled(sourceKeys.map(key => loadSource(key, c.signal))).then(settled => {
+    Promise.resolve().then(() => {
+      c.signal.throwIfAborted();
+      return Promise.allSettled(sourceKeys.map(key => loadSource(key, c.signal)));
+    }).then(settled => {
       if (c.signal.aborted) return;
       const { values, issues } = partitionOjtLoad(sourceKeys, settled);
       sourceKeys.forEach(key => { if (key in values) applySource(key, values[key]); });
       setSourceErrors(issues);
+    }, error => {
+      if (!c.signal.aborted) setError(error instanceof Error ? error.message : 'Không tải được dữ liệu xét OJT.');
     }).finally(() => { if (!c.signal.aborted) setLoading(false); });
     return () => { c.abort(); activeRequest.current?.abort(); };
   }, [applySource, loadSource, sourceKeys]);
-
-  React.useEffect(() => {
-    if (!sourceLoaded.students) return;
-    const c = new AbortController();
-    const ids = targets.map(target => target.student.id);
-    let next = 0;
-    const failed: number[] = [];
-    setLoadingCredits(true);
-    void Promise.all(Array.from({ length: Math.min(4, ids.length) }, async () => {
-      while (next < ids.length && !c.signal.aborted) {
-        const id = ids[next++];
-        try {
-          const credits = await loadStudentAcademicCredits(id, c.signal);
-          if (!c.signal.aborted) setAcademicCredits(previous => ({ ...previous, [id]: credits }));
-        } catch { if (!c.signal.aborted) failed.push(id); }
-      }
-    })).then(() => {
-      if (!c.signal.aborted) { setCreditFailures(failed); setLoadingCredits(false); }
-    });
-    return () => c.abort();
-  }, [sourceLoaded.students, targets]);
-
-  async function retryCreditFailures() {
-    if (loadingCredits || !creditFailures.length) return;
-    setLoadingCredits(true);
-    const failed: number[] = [];
-    let next = 0;
-    await Promise.all(Array.from({ length: Math.min(4, creditFailures.length) }, async () => {
-      while (next < creditFailures.length) {
-        const id = creditFailures[next++];
-        try {
-          const credits = await loadStudentAcademicCredits(id);
-          setAcademicCredits(previous => ({ ...previous, [id]: credits }));
-        } catch { failed.push(id); }
-      }
-    }));
-    setCreditFailures(failed);
-    setLoadingCredits(false);
-  }
 
   async function retryFailedSources() {
     const keys = sourceKeys.filter(key => sourceErrors[key]);
@@ -152,7 +116,7 @@ export function useEducationOjtEligibility() {
   const handedOffIds = React.useMemo(() => new Set(handoffByStudent.keys()), [handoffByStudent]);
   const dataLoaded = sourceKeys.every(key => sourceLoaded[key]);
   const canCheck = !loading && !retrying && dataLoaded && Boolean(rule);
-  const fullCheck = canCheck ? selectFullCheckTargets(targets, handedOffIds) : [];
+  const fullCheck = React.useMemo(() => canCheck ? selectFullCheckTargets(targets, handedOffIds) : [], [canCheck, targets, handedOffIds]);
   const selectionLocked = loading || retrying || busy || saving || Object.keys(pendingResults).length > 0;
 
   async function runTargets(selected: Target[]) {
@@ -233,17 +197,24 @@ export function useEducationOjtEligibility() {
     } finally { savingRequest.current = false; setSaving(false); }
   }
 
-  const results = { ...savedResults, ...pendingResults };
-  const statusByStudent = Object.fromEntries(targets.map(t => [t.student.id, educationOjtDisplayStatus(results[t.student.id], failures[t.student.id], t.reason)])) as Record<number, OjtDisplayStatus>;
-  const statusCounts = targets.reduce((counts, t) => { counts[statusByStudent[t.student.id]]++; return counts; },
-    { ELIGIBLE: 0, NOT_ELIGIBLE: 0, REVIEW_REQUIRED: 0, PENDING: 0, ERROR: 0, STALE: 0, INACTIVE: 0 } as Record<OjtDisplayStatus, number>);
-  const visible = targets.filter(t => (!search.trim() || normalize(`${t.student.studentCode} ${t.student.fullName}`).includes(normalize(search)))
-    && (filter === 'ALL' || statusByStudent[t.student.id] === filter)
-    && (sourceLoaded.handoffs ? matchesHandoffFilter(t.student.id, handoffFilter, handedOffIds) : handoffFilter === 'ALL'));
+  const results = React.useMemo(() => ({ ...savedResults, ...pendingResults }), [savedResults, pendingResults]);
+  const statusByStudent = React.useMemo(() => Object.fromEntries(targets.map(t =>
+    [t.student.id, educationOjtDisplayStatus(results[t.student.id], failures[t.student.id], t.reason)],
+  )) as Record<number, OjtDisplayStatus>, [targets, results, failures]);
+  const statusCounts = React.useMemo(() => targets.reduce((counts, t) => {
+    counts[statusByStudent[t.student.id]]++;
+    return counts;
+  }, { ELIGIBLE: 0, NOT_ELIGIBLE: 0, REVIEW_REQUIRED: 0, PENDING: 0, ERROR: 0, STALE: 0, INACTIVE: 0 }), [targets, statusByStudent]);
+  const visible = React.useMemo(() => {
+    const term = normalize(search);
+    return targets.filter(t => (!term || normalize(`${t.student.studentCode} ${t.student.fullName}`).includes(term))
+      && (filter === 'ALL' || statusByStudent[t.student.id] === filter)
+      && (sourceLoaded.handoffs ? matchesHandoffFilter(t.student.id, handoffFilter, handedOffIds) : handoffFilter === 'ALL'));
+  }, [targets, search, filter, statusByStudent, sourceLoaded.handoffs, handoffFilter, handedOffIds]);
   React.useEffect(() => setPage(1), [search, filter, handoffFilter]);
-  const pages = Math.max(1, Math.ceil(visible.length / 20)), currentPage = Math.min(page, pages);
+  const pages = Math.max(1, Math.ceil(visible.length / OJT_ELIGIBILITY_PAGE_SIZE)), currentPage = Math.min(page, pages);
   const checked = selectPendingSaveResults(pendingResults);
-  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, academicCredits, creditFailures, loadingCredits, retryCreditFailures, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule,
+  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule,
     selectionLocked,
     discardPending: () => { setPendingResults({}); saveKey.current = null; },
   };

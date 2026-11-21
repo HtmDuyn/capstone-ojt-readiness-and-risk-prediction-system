@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, UserPlus, Eye } from 'lucide-react';
 import API from '@/services/apiService';
@@ -51,12 +52,14 @@ export default function QhdnOjtCoordination() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchErrors, setBatchErrors] = useState<string[]>([]);
   const [completed, setCompleted] = useState(0);
+  const request = useRef<AbortController | null>(null);
   const companies=useMemo(()=>data?summarizePlacementCompanies(data):[],[data]);
 
   useEffect(() => { setSelectedIds(new Set()); }, [semester.semesterId, search, filter, followUpOnly]);
   useEffect(() => { setPage(1); }, [semester.semesterId, semester.periodId, semester.yearId, search, filter, followUpOnly, limit]);
   useEffect(() => {
-    setSelectedIds(previous => new Set([...previous].filter(id => data?.items.some(student => student.id === id && canSelectForCoordination(student)))));
+    const selectable = new Set(data?.items.filter(canSelectForCoordination).map(student => student.id));
+    setSelectedIds(previous => new Set([...previous].filter(id => selectable.has(id))));
   }, [data]);
 
   useEffect(() => {
@@ -68,20 +71,24 @@ export default function QhdnOjtCoordination() {
   useEffect(() => {
     setError('');
     if (!semester.semesterId) { setLoading(false); return; }
-    let active = true;
+    const controller = new AbortController();
+    request.current = controller;
     if (!data) setLoading(true);
-    API.get('/qhdn/placements', { params: { ojtSemesterId: semester.semesterId } })
-      .then(r => { if (active) setData(r.data.data); })
-      .catch(e => { if (active) setError(errorMessage(e)); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    Promise.resolve().then(() => {
+      controller.signal.throwIfAborted();
+      return API.get('/qhdn/placements', { params: { ojtSemesterId: semester.semesterId }, signal: controller.signal });
+    }).then(r => { if (!controller.signal.aborted) setData(r.data.data); })
+      .catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)); })
+      .finally(() => {
+        if (request.current === controller) request.current = null;
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [semester.semesterId, revision]);
 
   useEffect(() => {
-    const refreshIfIdle = () => { if (semester.semesterId && !busy && !task && !detail && document.visibilityState === 'visible') setRevision(v => v + 1); };
-    const timer = window.setInterval(refreshIfIdle, 15000);
-    window.addEventListener('focus', refreshIfIdle);
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshIfIdle); };
+    if (!semester.semesterId || busy || task || detail) return;
+    return subscribeVisibleRefresh(() => setRevision(v => v + 1), { interval: 30_000, canRefresh: () => !request.current });
   }, [semester.semesterId, busy, task, detail]);
 
   const refresh = () => setRevision(v => v + 1);

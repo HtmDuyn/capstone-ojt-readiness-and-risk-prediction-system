@@ -2,6 +2,7 @@ import { academicTransaction, audit } from '../academic/academic.repository';
 import { inputObject, invalid } from '../students/student.validation';
 import { windowRecord, windowApi } from './recruitment.repository';
 import { extendedSchedule } from './extension-policy';
+import { scheduleFieldError } from './schedule-policy';
 import { periodBounds } from '../academic/workflow-policy';
 import type { PoolClient } from 'pg';
 
@@ -15,7 +16,7 @@ export async function extendWindow(id:number,body:unknown,actor:number){
   await requireLifecycleSchema(c);
   const before=await windowRecord(c,id),after=extendedSchedule(before,b);
   const period=(await c.query('SELECT * FROM "AcademicPeriods" WHERE "AcademicPeriodID"=$1',[before.AcademicPeriodID])).rows[0];
-  if(new Date(after.EndsAt)>periodBounds(period).end)throw invalid('Gia hạn không được vượt ngày kết thúc học kỳ.');
+  if(new Date(after.EndsAt)>periodBounds(period).end)throw scheduleFieldError('resultsEndsAt','Gia hạn không được vượt ngày kết thúc học kỳ.');
   if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2 AND "StartsAt"<$4 AND "EndsAt">$3`,[before.OJTSemesterID,id,before.StartsAt,after.EndsAt])).rowCount)
    throw invalid('Gia hạn trùng lịch đợt tuyển dụng khác.',409,'RECRUITMENT_WINDOW_CONFLICT');
   await c.query(`UPDATE "RecruitmentCampaigns" SET "EndsAt"=GREATEST("EndsAt",$2::timestamptz) WHERE "CampaignID"=$1`,[before.CampaignID,after.EndsAt]);

@@ -6,6 +6,7 @@ import { enterpriseService, type EnterpriseCandidateItem, type EnterpriseCandida
 import { describeApiError } from '@/services/apiService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { WorkflowModal,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
+import { enterprisePeriodLabels } from '@/utils/enterprise/recruitment';
 
 export const EnterpriseCandidates: React.FC = () => {
   const { error: profileError } = useEnterprise();
@@ -274,7 +275,7 @@ export const EnterpriseCandidates: React.FC = () => {
             <option value="">Tất cả kỳ OJT</option>
             {availablePeriods.map((period) => (
               <option key={period.ojtSemesterId} value={period.ojtSemesterId}>
-                {period.semesterCode || period.semesterName}
+                {period.semesterCode || period.semesterName} · {enterprisePeriodLabels[period.periodStatus]}
               </option>
             ))}
           </select>

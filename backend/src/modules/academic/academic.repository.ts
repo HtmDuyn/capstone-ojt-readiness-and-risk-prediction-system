@@ -2,6 +2,7 @@ import { enrichListRows } from '../../shared/list-context';
 import { pool, query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicError, pageInput, positiveId, statusInput } from './academic.schema';
+import { academicPeriodStatusSql } from './period-status';
 
 export const resources = {
   'academic-years': { table: 'AcademicYears', id: 'AcademicYearID', code: 'YearCode', fields: { yearCode: 'YearCode', startDate: 'StartDate', endDate: 'EndDate', status: 'Status' } },
@@ -39,15 +40,18 @@ export async function findRecord(client: PoolClient, resource: Resource, id: num
   return row;
 }
 
-export async function listRecords(resource: Resource, params: Record<string, unknown>,includeWorkflow=true) {
+export async function listRecords(resource: Resource, params: Record<string, unknown>, forCoordinator = false) {
   const c = resources[resource], p = pageInput(params);
   const allCalendarRecords = Object.keys(params).length === 0;
   const allowed = ['page','limit','search','status', ...(resource === 'academic-periods' ? ['academicYearId','kind','academicPeriodId'] : [])];
   for (const key of Object.keys(params)) if (!allowed.includes(key)) throw academicError(`Unknown query parameter: ${key}.`);
   const args: unknown[] = [];
   const conditions: string[] = [];
+  const coordinatorPeriods = resource === 'academic-periods' && forCoordinator;
+  const status = coordinatorPeriods ? academicPeriodStatusSql('t') : 't."Status"';
+  if (coordinatorPeriods) conditions.push(`(${status}) IN ('ACTIVE','CLOSED')`);
   if (p.search) { args.push(`%${p.search}%`); conditions.push(`(t."${c.code}" ILIKE $${args.length}${resource === 'academic-years' ? '' : ` OR t."Name" ILIKE $${args.length}`})`); }
-  if (p.status) { args.push(statusInput(p.status)); conditions.push(`t."Status"=$${args.length}`); }
+  if (p.status) { args.push(statusInput(p.status)); conditions.push(`(${status})=$${args.length}`); }
   if (params.academicYearId !== undefined) { args.push(positiveId(params.academicYearId, 'academicYearId')); conditions.push(`t."AcademicYearID"=$${args.length}`); }
   if (params.kind !== undefined) {
     if (!['SEMESTER','BLOCK3'].includes(params.kind as string)) throw academicError('kind must be SEMESTER or BLOCK3.');
@@ -60,15 +64,18 @@ export async function listRecords(resource: Resource, params: Record<string, unk
     COALESCE((SELECT jsonb_agg(jsonb_build_object('id',p."AcademicPeriodID",'periodCode',p."PeriodCode",'name',p."Name",'kind',p."Kind",
       'parentPeriodId',p."ParentPeriodID",'startDate',p."StartDate",'endDate',p."EndDate",'status',p."Status",'ojtSemesterId',o."OJTSemesterID") ORDER BY p."StartDate",p."AcademicPeriodID")
       FROM "AcademicPeriods" p LEFT JOIN "OJTSemesters" o ON o."AcademicPeriodID"=p."AcademicPeriodID" WHERE p."AcademicYearID"=t."AcademicYearID"),'[]'::jsonb) AS periods`;
-  const workflow=resource==='academic-periods'&&includeWorkflow?`,
+  const workflow=resource==='academic-periods'&&!forCoordinator?`,
     COALESCE((SELECT jsonb_agg(jsonb_build_object('phase',s."Phase",'startsAt',s."StartsAt",'endsAt',s."EndsAt",'reason',s."Reason",'confirmedBy',s."ConfirmedBy",'confirmedAt',s."ConfirmedAt") ORDER BY s."Phase")
       FROM "ComboPhaseSchedules" s WHERE s."AcademicPeriodID"=t."AcademicPeriodID"),'[]'::jsonb) AS "comboPhaseSchedules",
     (SELECT jsonb_build_object('ojtSemesterId',a."OJTSemesterID",'sendAt',a."SendAt",'assessmentDeadline',a."AssessmentDeadline",'scope',a."Scope",'enabled',a."Enabled",'version',a."Version",'updatedBy',a."UpdatedBy",'updatedAt',a."UpdatedAt")
       FROM "OJTAdvisorySchedules" a WHERE a."AcademicPeriodID"=t."AcademicPeriodID") AS "advisorySchedule"`:'';
-  const result = await query(`WITH filtered AS (SELECT t.* ${grouped} ${workflow} FROM "${c.table}" t ${where}), page AS (
+  const currentStatus = coordinatorPeriods ? `, ${status} AS "CalendarStatus"` : '';
+  const result = await query(`WITH filtered AS (SELECT t.* ${grouped} ${workflow} ${currentStatus} FROM "${c.table}" t ${where}), page AS (
     SELECT * FROM filtered ORDER BY "${c.id}" DESC ${allCalendarRecords ? '' : `LIMIT $${args.length+1} OFFSET $${args.length+2}`}
   ) SELECT (SELECT count(*)::int FROM filtered) AS total, COALESCE(jsonb_agg(to_jsonb(page) ORDER BY page."${c.id}" DESC) FILTER (WHERE page."${c.id}" IS NOT NULL),'[]'::jsonb) AS items FROM page`, allCalendarRecords ? args : [...args, p.limit, p.offset]);
-  return { items: await enrichListRows({query},result.rows[0].items.map((r: AcademicRecord) => asApi(resource, r))), page: p.page, limit: allCalendarRecords ? Math.max(1,result.rows[0].total) : p.limit, total: result.rows[0].total };
+  const items = result.rows[0].items.map((r: AcademicRecord) => asApi(resource,
+    coordinatorPeriods ? { ...r, Status: r.CalendarStatus } : r));
+  return { items: await enrichListRows({query},items), page: p.page, limit: allCalendarRecords ? Math.max(1,result.rows[0].total) : p.limit, total: result.rows[0].total };
 }
 
 export async function academicTransaction<T>(work: (client: PoolClient) => Promise<T>, existingClient?:PoolClient, calendarLock: 'wait' | 'try' = 'wait'): Promise<T> {

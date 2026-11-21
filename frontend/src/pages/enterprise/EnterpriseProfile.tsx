@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
   Building2,
@@ -18,17 +18,12 @@ import {
   Check,
 } from 'lucide-react';
 import { enterpriseService } from '@/services/enterpriseService';
-import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 export const EnterpriseProfile: React.FC = () => {
   const { user: authUser } = useAuth();
-  // Dùng EnterpriseContext để lấy profile ban đầu — tránh gọi API lại khi vào trang
-  const { profile: contextProfile, loading: contextLoading, reload: reloadContext } = useEnterprise();
-  const [profile, setProfile] = useState<EnterpriseProfileData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { profile, loading, error, reload, updateProfile } = useEnterprise();
 
   // Edit Profile Modal State
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -45,55 +40,6 @@ export const EnterpriseProfile: React.FC = () => {
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Lấy profile từ context (khi context load xong) — tránh double-fetch
-  useEffect(() => {
-    if (!contextLoading) {
-      setProfile(contextProfile);
-      setLoading(false);
-      if (contextProfile) {
-        setEditCompanyName(contextProfile.name);
-        setEditAddress(contextProfile.address || '');
-        setEditIndustry(contextProfile.industry || '');
-        setEditFullName(authUser?.name || contextProfile.contactPersonName || 'Nguyen Van A');
-        setEditPhone(contextProfile.contactPhone || '');
-        setEditEmail(contextProfile.contactEmail || '');
-        setEditPositionTitle(contextProfile.representative?.positionTitle || '');
-      }
-    }
-  }, [contextProfile, contextLoading, authUser]);
-
-  // Refresh lại profile sau khi cập nhật — gọi cả context reload và cập nhật state cục bộ
-  const fetchProfile = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await enterpriseService.getProfile();
-      if (response && response.success && response.data) {
-        setProfile(response.data);
-        setEditCompanyName(response.data.name);
-        setEditAddress(response.data.address || '');
-        setEditIndustry(response.data.industry || '');
-        setEditFullName(authUser?.name || response.data.contactPersonName || 'Nguyen Van A');
-        setEditPhone(response.data.contactPhone || '');
-        setEditEmail(response.data.contactEmail || '');
-        setEditPositionTitle(response.data.representative?.positionTitle || '');
-        // Cập nhật context để các component khác cũng dùng profile mới
-        void reloadContext();
-      } else {
-        setError(response.message || 'Không thể tải thông tin hồ sơ doanh nghiệp.');
-      }
-    } catch (err: any) {
-      console.error('Error fetching enterprise profile:', err);
-      setError(
-        err?.response?.data?.message ||
-          'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cập nhật thông tin liên hệ qua PATCH /api/enterprise/profile
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) {
@@ -121,9 +67,7 @@ export const EnterpriseProfile: React.FC = () => {
       });
 
       if (res?.success && res.data) {
-        setProfile({ ...profile, ...res.data });
-        setEditPositionTitle(res.data.representative.positionTitle || '');
-        void reloadContext();
+        updateProfile(res.data);
 
         setShowEditModal(false);
         setToastMessage(res.message || 'Cập nhật hồ sơ thành công!');
@@ -204,7 +148,7 @@ export const EnterpriseProfile: React.FC = () => {
           </div>
           <p className="text-xs text-rose-600 leading-relaxed">{error}</p>
           <button
-            onClick={fetchProfile}
+            onClick={reload}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold inline-flex items-center space-x-1.5 transition-colors shadow-xs"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -250,11 +194,16 @@ export const EnterpriseProfile: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2.5 flex-shrink-0">
+              <div className="flex-shrink-0">
                 <button
                   onClick={() => {
-                    setEditFullName(profile.contactPersonName || authUser?.name || 'Nguyen Van A');
-                    setEditPhone(profile.contactPhone || '0909123456');
+                    setEditCompanyName(profile.name);
+                    setEditAddress(profile.address ?? '');
+                    setEditIndustry(profile.industry ?? '');
+                    setEditFullName(profile.contactPersonName || authUser?.name || '');
+                    setEditPhone(profile.contactPhone ?? '');
+                    setEditEmail(profile.contactEmail ?? '');
+                    setEditPositionTitle(profile.representative?.positionTitle ?? '');
                     setUpdateError(null);
                     setShowEditModal(true);
                   }}
@@ -264,14 +213,6 @@ export const EnterpriseProfile: React.FC = () => {
                   <span>Cập nhật hồ sơ</span>
                 </button>
 
-                <button
-                  onClick={fetchProfile}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-xs"
-                  title="Cập nhật dữ liệu mới nhất"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Làm mới</span>
-                </button>
               </div>
             </div>
 

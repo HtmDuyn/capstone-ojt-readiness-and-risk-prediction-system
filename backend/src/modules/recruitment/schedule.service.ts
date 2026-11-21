@@ -3,7 +3,7 @@ import { academicTransaction,audit } from '../academic/academic.repository';
 import { actualPeriod,periodBounds } from '../academic/workflow-policy';
 import { inputObject,invalid,requiredText } from '../students/student.validation';
 import { windowRecord,windowApi } from './recruitment.repository';
-import { editedSchedule,scheduleColumns,schedulePermissions } from './schedule-policy';
+import { editedSchedule,scheduleColumns,scheduleFieldError,schedulePermissions } from './schedule-policy';
 
 export async function requireScheduleEditingSchema(c:PoolClient) {
  if(!(await c.query(`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='RecruitmentWindows' AND column_name='OpenedAt') AS ready`)).rows[0].ready)
@@ -17,7 +17,7 @@ export async function editWindowSchedule(id:number,body:unknown,actor:number) {
   await requireScheduleEditingSchema(c);
   const before=await windowRecord(c,id),after=editedSchedule(before,b);
   const period=await actualPeriod(c,before.AcademicPeriodID);
-  if(new Date(after.EndsAt)>periodBounds(period).end)throw invalid('Lịch không được vượt ngày kết thúc học kỳ.');
+  if(new Date(after.EndsAt)>periodBounds(period).end)throw scheduleFieldError('resultsEndsAt','Lịch không được vượt ngày kết thúc học kỳ.');
   if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2
    AND (("StartsAt"<$4 AND "EndsAt">$3) OR ("CampaignID"=$5 AND
    (("RoundNumber"<$6 AND "EndsAt">$3) OR ("RoundNumber">$6 AND "StartsAt"<$4))))`,

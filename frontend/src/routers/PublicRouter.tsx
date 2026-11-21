@@ -344,7 +344,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "/enterprise/jobs/deleted",
-            element: <Navigate to="/enterprise/jobs?tab=deleted" replace />,
+            element: <Navigate to="/enterprise/jobs" replace />,
           },
           {
             path: "/enterprise/candidates",

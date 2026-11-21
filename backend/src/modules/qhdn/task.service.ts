@@ -7,6 +7,7 @@ import { inputObject, requiredText, optionalText, positiveId, invalid, paginatio
 import { dateInput } from '../academic/academic.schema';
 import { fingerprint } from '../eligibility/eligibility.service';
 import type { Actor } from '../ojt-registration/window.service';
+import { visibleEnterpriseSemester } from '../enterprise/enterprise-periods';
 
 export async function assignTasks(body: unknown, actor: Actor) {
   if (actor.roleCode !== 'ENTERPRISE') throw invalid('Enterprise role required.',403);
@@ -93,7 +94,8 @@ export async function dashboardTasks(actor: Actor) {
         ${enterpriseTaskStatus} AS "enterpriseStatus",
         t."DueDate" <= (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 7 AS upcoming
       FROM "InternshipTasks" t JOIN "InternshipAssignments" a USING ("AssignmentID")
-      WHERE a."EnterpriseID"=$1
+      JOIN "StudentEnterpriseCoordination" co USING ("CoordinationID")
+      WHERE a."EnterpriseID"=$1 AND ${visibleEnterpriseSemester('co."OJTSemesterID"')}
     ), attention AS (
       SELECT id,name,"dueAt","dueDate","enterpriseStatus",u."FullName" AS "fullName"
       FROM tasks JOIN "Students" s USING ("StudentID") JOIN "Users" u USING ("UserID")
@@ -135,6 +137,7 @@ export async function listTasks(params:Record<string,unknown>, actor:Actor,exist
       FROM "InternshipTasks" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "Students" s ON s."StudentID"=a."StudentID"
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
       WHERE ($1::int IS NULL OR a."AssignmentID"=$1) AND ($2::int IS NULL OR a."EnterpriseID"=$2) AND ($3::int IS NULL OR a."StudentID"=$3) AND ($4::int IS NULL OR a."PositionID"=$4) AND ($7::int IS NULL OR co."OJTSemesterID"=$7)
+      ${actor.roleCode==='ENTERPRISE' ? `AND ${visibleEnterpriseSemester('co."OJTSemesterID"')}` : ''}
       ), paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $5 OFFSET $6)
       SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id DESC) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[id,company,studentId,positionId,p.limit,p.offset,semesterId]);
     return {...rows.rows[0],items:await enrichListRows(c,rows.rows[0].items),page:p.page,limit:p.limit};

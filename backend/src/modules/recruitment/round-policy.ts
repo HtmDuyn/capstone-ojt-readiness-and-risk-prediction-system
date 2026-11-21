@@ -56,8 +56,9 @@ export function roundActions(w: Row) {
  else if(w.Status==='CLOSED')openBlockedReason='Đợt đã đóng không thể mở lại.';
  else if(w.Status==='OPEN')openBlockedReason='Đợt đã được mở.';
  else if(now>=new Date(w.EndsAt).getTime())openBlockedReason='Đợt đã hết thời hạn tuyển dụng.';
- else if(w.Kind!=='SEMESTER'||w.LinkedPeriodID!==w.AcademicPeriodID||['CLOSED','ARCHIVED'].includes(w.PeriodStatus))
+ else if(w.Kind!=='SEMESTER'||w.LinkedPeriodID!==w.AcademicPeriodID)
   openBlockedReason='Học kỳ hoặc liên kết kỳ OJT không còn khả dụng.';
+ else if(w.CalendarStatus!=='ACTIVE')openBlockedReason='Chỉ mở đợt tuyển dụng trong học kỳ đang diễn ra.';
  else if(w.PreviousRoundPending)openBlockedReason='Đợi đợt trước kết thúc và được chốt tổng hợp.';
  return {canOpen:openBlockedReason===null,openBlockedReason,
   canFinalize:!w.ResultsFinalizedAt&&now>=new Date(w.EndsAt).getTime()};
