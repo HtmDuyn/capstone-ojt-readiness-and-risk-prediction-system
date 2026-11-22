@@ -1915,6 +1915,16 @@ BEGIN
  SELECT s.*,p."Status" AS program_status INTO student FROM "Students" s
  LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID" WHERE s."StudentID"=student_id;
  IF NOT FOUND THEN RETURN; END IF;
+ -- New student accounts may be provisioned before academic placement/import.
+ -- Only bypass history validation for a completely unassigned profile.
+ -- Once a program, term, placement, or result exists, full rules apply.
+ IF student."ProgramID" IS NULL
+    AND student."CurrentSemester" IS NULL
+    AND NOT EXISTS (SELECT 1 FROM "StudentAcademicPlacements" ap WHERE ap."StudentID"=student_id)
+    AND NOT EXISTS (SELECT 1 FROM "StudentCourseResults" cr WHERE cr."StudentID"=student_id)
+ THEN
+   RETURN;
+ END IF;
  IF student."ProgramID" IS NULL OR student.program_status IS DISTINCT FROM 'PUBLISHED' THEN
   RAISE EXCEPTION 'Student % requires a published curriculum.',student_id USING ERRCODE='23514';
  END IF;
@@ -7467,4 +7477,91 @@ END $$;
 -- Required by the backend bulk-acceptance readiness check; this is migration metadata, not domain seed data.
 INSERT INTO public."SchemaMigrations"("Version")
 VALUES ('20261116_enterprise_bulk_acceptance') ON CONFLICT DO NOTHING;
+
+-- =============================================================
+-- HISTORICAL AUTH SEED: restore known account snapshot from 2026-10-26
+-- Only four users can be recovered from this snapshot.
+-- Subsequent imports and password changes cannot be recovered here.
+-- =============================================================
+-- Original rows, IDs and password hashes preserved exactly as supplied in historic SQL.
+
+-- Restore Roles
+INSERT INTO public."Roles" ("RoleID","RoleCode","RoleName") OVERRIDING SYSTEM VALUE VALUES
+('1','ADMIN','Quản trị viên'),
+('2','ACADEMIC','Phòng đào tạo'),
+('3','OJT_COORD','Phòng quan hệ doanh nghiệp'),
+('4','STUDENT','Sinh viên'),
+('5','ENTERPRISE','Doanh nghiệp');
+
+-- Restore Users
+INSERT INTO public."Users" ("UserID","Username","PasswordHash","Email","FullName","RoleID","Status","CreatedAt","UpdatedAt","MustChangePassword","AuthVersion") OVERRIDING SYSTEM VALUE VALUES
+('1','admin01','$2b$12$LQR3NnTiMLm3pELI8m/M1.XQ.YdWPSqIBH9JwQHVKvim5Ita.AorC','admin@ojtrpa.edu.vn','System Administrator','1','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
+('2','academic01','$2b$12$pFxlemy2lPqCnEuhONH4WOJrcuSqYR4BgQ6fGE0xyM2./B9MPMWF6','academic@ojtrpa.edu.vn','Academic Staff','2','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
+('3','ojt.coord01','$2b$12$7ju31R8JRLro8U1ZA3WzoOvJvJD1yXSY1nuzw/Gan9OI84tVNwa62','ojt.coord@ojtrpa.edu.vn','OJT Coordinator','3','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
+('4','enterprise01','$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii','hr@techviet.example','TechViet HR','5','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0');
+
+-- Restore Enterprises
+INSERT INTO public."Enterprises" ("EnterpriseID","EnterpriseCode","Name","Industry","ContactPersonName","ContactEmail","Status","CreatedAt") OVERRIDING SYSTEM VALUE VALUES
+('1','TECHVIET','TechViet','Information Technology','HR Department','hr@techviet.example','ACTIVE','2026-10-26 19:54:04.855');
+
+-- Restore EnterpriseUsers
+INSERT INTO public."EnterpriseUsers" ("EnterpriseUserID","UserID","EnterpriseID","PositionTitle") OVERRIDING SYSTEM VALUE VALUES
+('1','4','1','HR');
+
+-- Advance identity sequences so subsequent imports do not collide with restored IDs.
+SELECT setval(pg_get_serial_sequence('public."Roles"','RoleID'), (SELECT MAX("RoleID") FROM public."Roles"), true);
+SELECT setval(pg_get_serial_sequence('public."Users"','UserID'), (SELECT MAX("UserID") FROM public."Users"), true);
+SELECT setval(pg_get_serial_sequence('public."Enterprises"','EnterpriseID'), (SELECT MAX("EnterpriseID") FROM public."Enterprises"), true);
+SELECT setval(pg_get_serial_sequence('public."EnterpriseUsers"','EnterpriseUserID'), (SELECT MAX("EnterpriseUserID") FROM public."EnterpriseUsers"), true);
+
+-- =============================================================
+-- FIFTH ACCOUNT: STUDENT DEMO LOGIN (not the previous SE180595)
+-- Credentials supplied by owner: student01@student.edu.vn
+-- Password stored as bcrypt hash. No historical grades fabricated.
+-- =============================================================
+INSERT INTO public."Users"
+  ("Username", "PasswordHash", "Email", "FullName", "RoleID", "Status",
+   "MustChangePassword", "TemporaryPasswordExpiresAt")
+SELECT
+  'student01',
+  '$2y$12$.rJ1b/Mt.0QWXDNvES98MeLmDI3RKtqup6OXQzuPLTV2GpYXmwlpa',
+  'student01@student.edu.vn',
+  'Student 01',
+  r."RoleID",
+  'ACTIVE',
+  FALSE,
+  NULL
+FROM public."Roles" r
+WHERE r."RoleCode" = 'STUDENT';
+
+INSERT INTO public."Students" ("UserID", "StudentCode", "Status")
+SELECT u."UserID", 'student01', 'ACTIVE'
+FROM public."Users" u
+WHERE u."Username" = 'student01';
+
+-- Assert exactly five demo accounts (four restored staff/enterprise + student01).
+DO $verify_five_demo_accounts$
+BEGIN
+  IF (SELECT COUNT(*) FROM public."Users") <> 5
+     OR (SELECT COUNT(*) FROM public."Students") <> 1
+     OR NOT EXISTS (
+       SELECT 1 FROM public."Users" u
+       JOIN public."Roles" r ON r."RoleID"=u."RoleID"
+       WHERE u."Username"='student01'
+         AND u."Email"='student01@student.edu.vn'
+         AND r."RoleCode"='STUDENT'
+     ) THEN
+    RAISE EXCEPTION 'Demo account seed verification failed; transaction rolled back.';
+  END IF;
+END
+$verify_five_demo_accounts$;
+
 COMMIT;
+
+-- READ ONLY: verify created identities without exposing password hashes.
+SELECT u."Username", u."Email", r."RoleCode", u."Status",
+       s."StudentCode"
+FROM public."Users" u
+JOIN public."Roles" r ON r."RoleID"=u."RoleID"
+LEFT JOIN public."Students" s ON s."UserID"=u."UserID"
+ORDER BY u."UserID";
