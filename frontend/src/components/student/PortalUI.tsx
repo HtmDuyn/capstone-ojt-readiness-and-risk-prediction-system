@@ -276,7 +276,7 @@ export function EligibilityCard({
 }: {
   official: Eligibility | null;
   current?: Eligibility | null;
-  admission?: Eligibility | null;
+  admission?: import('@/types/student/portal').AdmissionEligibility | null;
 }) {
   return (
     <Card title="Điều kiện tham gia OJT">
@@ -304,6 +304,7 @@ export function EligibilityCard({
           {current.rule.maxUnpassedCourses} môn nợ.
         </p>
       )}
+      {admission?.appliedCondition && <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm"><p className="font-semibold text-slate-800">Điều kiện Phòng Đào tạo đã dùng</p><p className="mt-1 text-slate-700">Phiên bản {admission.appliedCondition.version} · tối thiểu {admission.appliedCondition.minCredits} tín chỉ</p><p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">{admission.appliedCondition.issuingDocument}</p></div>}
     </Card>
   );
 }

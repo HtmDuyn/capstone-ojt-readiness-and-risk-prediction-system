@@ -80,6 +80,7 @@ export const StudentDashboard = () => {
               </dl>
               <Blockers values={data?.academic.officialEligibility?.reasons ?? data?.academic.currentEligibility?.reasons} />
               {data?.academic.currentEligibility?.rule && <p className="mt-3 text-xs leading-relaxed text-slate-500">Ngưỡng theo quy định: {data.academic.currentEligibility.rule.minCredits} tín chỉ, tối đa {data.academic.currentEligibility.rule.maxUnpassedCourses} môn nợ.</p>}
+              {admission?.appliedCondition && <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm"><p className="font-semibold text-slate-800">Điều kiện Phòng Đào tạo đã dùng</p><p className="mt-1 text-slate-700">Phiên bản {admission.appliedCondition.version} · tối thiểu {admission.appliedCondition.minCredits} tín chỉ</p><p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">{admission.appliedCondition.issuingDocument}</p></div>}
             </div>
           </div>
           {eligible && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">

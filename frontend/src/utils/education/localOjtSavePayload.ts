@@ -5,8 +5,7 @@ export function localOjtSavePayload(results: LocalOjtResult[], idempotencyKey: s
   return {
     idempotencyKey,
     source: 'FRONTEND' as const,
-    rule: { version: rule.version, minCredits: rule.minCredits,
-      ...(rule.thresholdId === undefined ? { maxUnpassedCourses: rule.maxUnpassedCourses } : { thresholdId: rule.thresholdId }) },
+    rule: { conditionId: rule.id, version: rule.version, minCredits: rule.minCredits, issuingDocument: rule.issuingDocument },
     results: [...results].sort((a, b) => a.studentId - b.studentId)
       .map(({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt }) =>
         ({ studentId, status, earnedCredits, unpassedCourseCount, reasons, academicIssues, checkedAt })),

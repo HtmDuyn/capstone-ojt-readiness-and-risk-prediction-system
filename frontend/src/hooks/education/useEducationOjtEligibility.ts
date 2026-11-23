@@ -3,7 +3,7 @@ import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
 import {
   educationOjtWorkflowService, getAllItems, loadAndCalculateLocalEligibility,
-  loadCurrentOjtRule, loadSavedLocalOjtResults, saveLocalOjtResults, type CurrentOjtRule,
+  loadOjtConditions, loadSavedLocalOjtResults, saveLocalOjtResults, type CurrentOjtRule,
 } from '@/services/educationService';
 import type { ImportedStudent } from '@/types/education/import.types';
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/education/educationOjtReason';
@@ -27,6 +27,7 @@ export function useEducationOjtEligibility() {
   const [busy, setBusy] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [rule, setRule] = React.useState<CurrentOjtRule | null>(null);
+  const [conditions, setConditions] = React.useState<CurrentOjtRule[]>([]);
   const [error, setError] = React.useState('');
   const [savedResults, setSavedResults] = React.useState<Record<number, LocalOjtResult>>({});
   const [pendingResults, setPendingResults] = React.useState<Record<number, LocalOjtResult>>({});
@@ -48,7 +49,7 @@ export function useEducationOjtEligibility() {
     switch (key) {
       case 'students': return getAllItems<ImportedStudent>('/students', {}, signal);
       case 'results': return loadSavedLocalOjtResults(signal);
-      case 'policy': return loadCurrentOjtRule(signal);
+      case 'policy': return loadOjtConditions(signal);
       case 'handoffs': return educationOjtWorkflowService.getHandoffs(undefined, signal);
       case 'thresholds': throw new Error('Nguồn mức tín chỉ tùy chọn không còn được sử dụng.');
     }
@@ -67,7 +68,7 @@ export function useEducationOjtEligibility() {
         if (stored.some(result => result.isStale)) setNotice('Có kết quả đã cũ; hãy xét lại sinh viên chưa bàn giao trước khi sử dụng.');
         break;
       }
-      case 'policy': setRule(value as CurrentOjtRule); break;
+      case 'policy': { const list = value as CurrentOjtRule[]; setConditions(list); setRule(previous => list.find(item => item.id === previous?.id) ?? list[0] ?? null); break; }
       case 'handoffs': setHandoffs(value as Handoff[]); break;
       case 'thresholds': break;
     }
@@ -116,7 +117,7 @@ export function useEducationOjtEligibility() {
   const handedOffIds = React.useMemo(() => new Set(handoffByStudent.keys()), [handoffByStudent]);
   const dataLoaded = sourceKeys.every(key => sourceLoaded[key]);
   const canCheck = !loading && !retrying && dataLoaded && Boolean(rule);
-  const fullCheck = React.useMemo(() => canCheck ? selectFullCheckTargets(targets, handedOffIds) : [], [canCheck, targets, handedOffIds]);
+  const fullCheck = React.useMemo(() => canCheck ? selectFullCheckTargets(targets, handedOffIds, savedResults) : [], [canCheck, targets, handedOffIds, savedResults]);
   const selectionLocked = loading || retrying || busy || saving || Object.keys(pendingResults).length > 0;
 
   async function runTargets(selected: Target[]) {
@@ -130,11 +131,11 @@ export function useEducationOjtEligibility() {
     const calculated: LocalOjtResult[] = [];
     let next = 0, failed = 0;
     try {
-      const policy = await loadCurrentOjtRule(controller.signal);
-      const currentRule = policy;
-      if (rule && (rule.version !== currentRule.version || rule.minCredits !== currentRule.minCredits || rule.thresholdId !== currentRule.thresholdId)) {
+      if (!rule) throw new Error('Vui lòng thêm và chọn điều kiện xét OJT trước khi xét sinh viên.');
+      const currentRule = rule;
+      if (rule.id !== currentRule.id || rule.version !== currentRule.version || rule.minCredits !== currentRule.minCredits) {
         setPendingResults({});
-        setNotice('Quy tắc xét đã thay đổi. Kết quả chưa lưu trước đó không còn được sử dụng.');
+        setNotice('Điều kiện xét đã thay đổi. Kết quả chưa lưu trước đó không còn được sử dụng.');
       }
       setRule(currentRule);
       await Promise.all(Array.from({ length: Math.min(4, selected.length) }, async () => {
@@ -143,7 +144,7 @@ export function useEducationOjtEligibility() {
           try {
             const result = await loadAndCalculateLocalEligibility(target.student.id, currentRule, controller.signal);
             if (controller.signal.aborted) return;
-            const checked = { ...result, rule: currentRule };
+            const checked = { ...result, rule: { id: currentRule.id, version: currentRule.version, minCredits: currentRule.minCredits, issuingDocument: currentRule.issuingDocument } };
             calculated.push(checked);
             setPendingResults(previous => ({ ...previous, [target.student.id]: checked }));
           } catch (e) {
@@ -214,7 +215,8 @@ export function useEducationOjtEligibility() {
   React.useEffect(() => setPage(1), [search, filter, handoffFilter]);
   const pages = Math.max(1, Math.ceil(visible.length / OJT_ELIGIBILITY_PAGE_SIZE)), currentPage = Math.min(page, pages);
   const checked = selectPendingSaveResults(pendingResults);
-  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule,
+  return { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule, conditions,
+    setRule: (id: number) => { const selected = conditions.find(item => item.id === id); if (selected) { setPendingResults({}); saveKey.current = null; setRule(selected); setNotice('Đã chọn điều kiện xét OJT.'); } },
     selectionLocked,
     discardPending: () => { setPendingResults({}); saveKey.current = null; },
   };

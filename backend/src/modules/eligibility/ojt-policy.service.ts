@@ -3,6 +3,28 @@ import { academicTransaction, audit } from '../academic/academic.repository';
 import { inputObject, invalid } from '../students/student.validation';
 import { assessPublishedPrograms, type ProgramFeasibility } from './ojt-policy-feasibility';
 
+export async function listOjtConditions() {
+  return academicTransaction(async client => {
+    const rows = (await client.query(`SELECT c.*,u."FullName" AS "CreatedByName" FROM "OJTConditions" c LEFT JOIN "Users" u ON u."UserID"=c."CreatedBy" ORDER BY c."Version" DESC`)).rows;
+    return rows.map(conditionApi);
+  });
+}
+const conditionApi = (row: Record<string, any>) => ({ id: row.ConditionID, version: row.Version, minCredits: Number(row.MinCredits), issuingDocument: row.IssuingDocument, createdAt: row.CreatedAt, createdBy: row.CreatedBy, createdByName: row.CreatedByName ?? null });
+export async function createOjtCondition(body: unknown, actorId: number) {
+  const value = inputObject(body, ['minCredits', 'issuingDocument']);
+  if (typeof value.minCredits !== 'number' || !Number.isFinite(value.minCredits) || value.minCredits < 0 || value.minCredits > 9999.99 || Math.abs(Math.round(value.minCredits * 100) - value.minCredits * 100) > 1e-8) throw invalid('Tín chỉ phải là số không âm, tối đa hai chữ số thập phân.');
+  const issuingDocument = value.issuingDocument;
+  if (typeof issuingDocument !== 'string' || !issuingDocument.trim() || issuingDocument.length > 10000) throw invalid('Văn bản ban hành không được để trống và tối đa 10.000 ký tự.');
+  return academicTransaction(async client => {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['ojt-condition-version']);
+    const current = (await client.query('SELECT COALESCE(max("Version"),0)::int AS version FROM "OJTConditions"')).rows[0].version;
+    const row = (await client.query(`INSERT INTO "OJTConditions" ("Version","MinCredits","IssuingDocument","CreatedBy") VALUES ($1,$2,$3,$4) RETURNING *`, [current + 1, value.minCredits, issuingDocument.trim(), actorId])).rows[0];
+    await audit(client, actorId, 'OJTConditions', row.ConditionID, 'CREATE', null, conditionApi(row));
+    const actor = (await client.query('SELECT "FullName" FROM "Users" WHERE "UserID"=$1',[actorId])).rows[0];
+    return conditionApi({...row,CreatedByName:actor?.FullName});
+  });
+}
+
 type PolicyInput = { minCredits: number; maxUnpassedCourses: number };
 function parseValues(body: unknown): PolicyInput {
   const value = inputObject(body, ['minCredits', 'maxUnpassedCourses']);

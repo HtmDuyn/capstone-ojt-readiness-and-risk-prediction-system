@@ -3,6 +3,8 @@ import { invalid } from './student.validation';
 import { resultSelect } from './student.service';
 
 type Row=Record<string,any>;
+const excludedOjtCredit = /(?:\bGDTC\b|\bGDQP\b|\bQPAN\b|\bPE\b|\bphysical\s+education\b|\bmilitary\b|quoc\s+phong|giao\s+duc\s+the\s+chat|the\s+duc|nhac\s+cu|musical\s+instrument)/i;
+const normalizedCourseText=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d');
 // Pure calculation: no guessed passing threshold, conversion scale, or legacy global course credits.
 export function calculateProgress(program:Row|undefined,courses:Row[],attempts:Row[],aliases:Row[],options:Row[],policy:Row|undefined,configurationIssues:string[]=[],curriculumGradeWeights:Row[]=[]) {
   const issues=[...configurationIssues];
@@ -63,11 +65,14 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   };
   [...requirements].sort((a,b)=>Number(b.required===true)-Number(a.required===true)||(b.credits??0)-(a.credits??0)).forEach(r=>assign(r,new Set()));
   const byRequirement=new Map([...matched].map(([course,r])=>[r.id,course]));
-  let earned=0;const weights=new Map<number,number>();
+  let earned=0,ojtEarned=0;const weights=new Map<number,number>();
   for (const r of requirements) {
     const key=byRequirement.get(r.id);
     r.completed=key!==undefined;r.matchedCourseId=key??null;
-    if (key!==undefined && r.credits!==null) {earned+=r.credits;weights.set(key,r.credits);}
+    const selected=key===undefined?null:[...courses,...options].find(course=>Number(course.CourseID)===key);
+    const courseDescription=`${selected?.CourseCatalogName??''} ${selected?.ChosenCourseName??''} ${selected?.CourseName??r.name??''} ${selected?.CourseCode??r.courseCode??''}`;
+    r.excludedFromOjtCredits=excludedOjtCredit.test(normalizedCourseText(courseDescription))||/(?:^|[\s._-])PE\s*\d+\b/i.test(courseDescription);
+    if (key!==undefined && r.credits!==null) {earned+=r.credits;if(!r.excludedFromOjtCredits)ojtEarned+=r.credits;weights.set(key,r.credits);}
     if (r.kind==='COURSE' && r.credits!==null) weights.set(r.courseId,r.credits);
   }
   // Failed slot subjects still contribute to GPA when the approved slot supplies a unique credit weight.
@@ -104,7 +109,7 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   if (total===null || total<=0) issues.push('PROGRAM_TOTAL_CREDITS_MISSING');
   if (total!==null && earned>total) issues.push('EARNED_CREDITS_EXCEED_PROGRAM_TOTAL');
   const allIssues=[...new Set([...issues,...gpaIssues])];
-  return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
+  return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),ojtEarned:Math.round(ojtEarned*100)/100,completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
 export async function loadAcademicProgress(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
     const {rows:[curriculum]}=await client.query<{
@@ -113,22 +118,24 @@ export async function loadAcademicProgress(client:PoolClient, studentId:number,p
     }>(`WITH curriculum AS (
       SELECT "ProgramID" FROM "Students" WHERE "StudentID"=$1
     ), courses AS (
-      SELECT pc.*, c."CourseCode" FROM "ProgramCourses" pc JOIN curriculum USING ("ProgramID")
+      SELECT pc.*, c."CourseCode",c."CourseName" AS "CourseCatalogName" FROM "ProgramCourses" pc JOIN curriculum USING ("ProgramID")
       JOIN "Courses" c USING ("CourseID")
     ), selections AS (
       SELECT "SelectionID","SelectionPurpose","ProgramID","ProgramComboID"
       FROM "StudentComboSelections" WHERE "StudentID"=$1 AND "ConfirmedAt" IS NOT NULL
         AND ($2::int IS NULL OR "SelectionPurpose"<>'SPECIALIZATION')
     ), options AS (
-      SELECT sc."SelectionPurpose", opt."ProgramCourseID", cc."CourseID", cc."Credits"::text AS "Credits"
+      SELECT sc."SelectionPurpose", opt."ProgramCourseID", cc."CourseID", cc."Credits"::text AS "Credits",course."CourseCode",course."CourseName" AS "CourseCatalogName",cc."CourseName" AS "ChosenCourseName"
       FROM selections sc JOIN "StudentComboCourseSelections" choice USING ("SelectionID")
       JOIN "ComboCourses" cc USING ("ComboCourseID")
+      JOIN "Courses" course USING ("CourseID")
       JOIN "ProgramSlotOptions" opt ON opt."ProgramID"=sc."ProgramID"
         AND opt."ProgramComboID"=sc."ProgramComboID" AND opt."ComboCourseID"=cc."ComboCourseID"
       WHERE sc."ProgramID"=(SELECT "ProgramID" FROM curriculum)
       UNION ALL
-      SELECT 'SPECIALIZATION', opt."ProgramCourseID",cc."CourseID",cc."Credits"::text
+      SELECT 'SPECIALIZATION', opt."ProgramCourseID",cc."CourseID",cc."Credits"::text,course."CourseCode",course."CourseName",cc."CourseName"
       FROM "ProgramSlotOptions" opt JOIN "ComboCourses" cc USING ("ComboCourseID")
+      JOIN "Courses" course USING ("CourseID")
       WHERE opt."ProgramID"=(SELECT "ProgramID" FROM curriculum) AND opt."ProgramComboID"=$2 AND cc."CourseID"=ANY($3::int[])
     ), invalid_groups AS (
       SELECT g."ChoiceGroupID" FROM selections sc

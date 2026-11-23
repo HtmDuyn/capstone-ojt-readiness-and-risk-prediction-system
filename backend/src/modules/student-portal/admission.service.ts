@@ -34,6 +34,7 @@ export async function studentAdmission(client: PoolClient, studentId: number, se
     source: saved ? 'FRONTEND_HANDOFF' : 'OFFICIAL_CHECK', handoffId: handoff.HandoffID,
     batchId: saved ? handoff.CalculatedBatchID : undefined, handedOffAt: handoff.CreatedAt,
     checkId: saved ? null : result?.checkId ?? null,
+    appliedCondition: saved && result?.rule?.conditionId ? { id: result.rule.conditionId, version: result.rule.version, minCredits: result.rule.minCredits, issuingDocument: result.rule.issuingDocument ?? '' } : null,
   };
 }
 

@@ -6,7 +6,7 @@ import { listRules,saveRule } from './eligibility.service';
 import { checkBatch } from './eligibility-run.service';
 import { saveFrontendResults, listFrontendResults } from './frontend-results.service';
 import { requireJsonBody } from '../../middleware/json-body';
-import { currentOjtPolicy, previewOjtPolicy, publishOjtPolicy } from './ojt-policy.service';
+import { currentOjtPolicy, previewOjtPolicy, publishOjtPolicy, listOjtConditions, createOjtCondition } from './ojt-policy.service';
 import { createCreditThreshold, listCreditThresholds } from './credit-threshold.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
 const handle=(work:(req:any)=>Promise<unknown>,code=200):RequestHandler=>async(req,res,next)=>{try{res.status(code).json({success:true,data:await work(req)});}catch(error){next(error);}};
@@ -15,6 +15,8 @@ router.post('/ojt-eligibility-results',...staff,requireJsonBody,handle(req=>save
 router.get('/ojt-rule-sets',...staff,handle(req=>listRules(req.query)));
 router.post('/ojt-rule-sets',...staff,handle(req=>saveRule(req.body,req.user.userId),201));
 router.get('/ojt-condition-policy',...staff,handle(async()=>currentOjtPolicy()));
+router.get('/ojt-conditions',...staff,handle(listOjtConditions));
+router.post('/ojt-conditions',...staff,requireJsonBody,handle(req=>createOjtCondition(req.body,req.user.userId),201));
 router.get('/ojt-credit-thresholds',...staff,handle(listCreditThresholds));
 router.post('/ojt-credit-thresholds',...staff,requireJsonBody,handle(req=>createCreditThreshold(req.body,req.user.userId),201));
 router.post('/ojt-condition-policy/preview',...staff,requireJsonBody,handle(req=>previewOjtPolicy(req.body)));

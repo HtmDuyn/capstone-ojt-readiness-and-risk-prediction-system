@@ -62,6 +62,7 @@ export interface AdmissionEligibility extends Eligibility {
   handoffId: number;
   batchId?: number;
   handedOffAt?: string;
+  appliedCondition?: import('../education/eligibility.types').OjtAppliedCondition | null;
 }
 export interface CourseResult {
   id: number;
