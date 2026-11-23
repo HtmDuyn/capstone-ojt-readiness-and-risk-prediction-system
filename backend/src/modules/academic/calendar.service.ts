@@ -60,9 +60,9 @@ export async function getYearCalendar(yearId: number) {
 }
 
 export async function createYearCalendar(body: unknown, actorId: number) {
-  const b = inputObject(body, ['yearCode']);
+  const b = inputObject(body, ['yearCode', 'semesters']);
   const yearCode = requiredText(b.yearCode, 'yearCode', 20);
-  const startYear = calendarYear(yearCode), dates = defaultCalendar(yearCode);
+  const startYear = calendarYear(yearCode), dates = b.semesters === undefined ? defaultCalendar(yearCode) : validateSemesterDates(yearCode, b.semesters);
   return academicTransaction(async client => {
     const year = await saveResourceWithClient(client, 'academic-years', {
       yearCode, startDate: `${startYear}-01-01`, endDate: `${startYear}-12-31`, status: 'PLANNED',

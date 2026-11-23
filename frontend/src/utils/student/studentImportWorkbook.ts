@@ -15,7 +15,7 @@ const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> =
 
 export const STUDENT_IMPORT_COLUMNS = [
   'Họ và tên', 'Mã sinh viên', 'Email', 'Số điện thoại',
-  'Mã chương trình đào tạo', 'Chuyên ngành', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
+  'Mã chương trình đào tạo', 'Chuyên ngành', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Kỳ bắt đầu chuyên ngành', 'Học kỳ hiện tại',
 ];
 export const COURSE_RESULT_COLUMNS = [
   'Mã sinh viên', 'Mã môn', 'Tên môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
@@ -138,7 +138,7 @@ const readRows = (
 export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   const book = XLSX.utils.book_new();
   const sheets: [string, string[], number[], number[]][] = [
-    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 23, 20, 12, 24], [1, 3, 4, 5, 7, 8, 9]],
+    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 23, 20, 12, 27, 24], [1, 3, 4, 5, 7, 8, 9, 10]],
     ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 38, 20, 14, 19, 15], [0, 1, 3, 5]],
   ];
   for (const [name, headers, widths, textColumns] of sheets) {
@@ -152,6 +152,18 @@ export const createStudentImportWorkbook = (): XLSX.WorkBook => {
     sheet['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRows, c: headers.length - 1 } });
     XLSX.utils.book_append_sheet(book, sheet, name);
   }
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['HƯỚNG DẪN NHẬP DỮ LIỆU SINH VIÊN'],
+    ['Sheet Danh sách sinh viên: bắt buộc có Họ và tên, Mã sinh viên, Email, Mã chương trình đào tạo, Khóa, Nhóm và Học kỳ hiện tại.'],
+    ['Mã chương trình đào tạo, Khóa và Học kỳ phải có trong danh mục Backend. Nhóm nhận A, B, C hoặc D.'],
+    ['Kỳ bắt đầu chuyên ngành có thể để trống: hệ thống lấy kỳ bắt đầu từ nhóm khi tạo mới/đổi nhóm, giữ nguyên khi cập nhật.'],
+    ['Trạng thái học vụ có thể để trống; nếu nhập, chọn Đang học, Bảo lưu hoặc Thôi học.'],
+    ['Sheet Kết quả học tập là tùy chọn. Nếu nhập dòng kết quả, cần Mã sinh viên, Mã môn, Kỳ học và Trạng thái.'],
+    ['Mã sinh viên trong bảng điểm phải thuộc sheet Danh sách sinh viên. Lần học để trống sẽ mặc định là 1.'],
+    ['Chỉ dùng các mã/chọn giá trị có thật; không cần nhập dữ liệu mẫu vào sheet này.'],
+  ]);
+  guide['!cols'] = [{ wch: 115 }];
+  XLSX.utils.book_append_sheet(book, guide, 'Hướng dẫn');
   return book;
 };
 

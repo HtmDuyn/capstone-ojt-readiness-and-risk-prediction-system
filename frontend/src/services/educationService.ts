@@ -711,9 +711,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
 
   if (!programs.length || !cohortOptions.length || !periodOptions.length) {
     throw new Error(
-      "Thiếu danh mục chương trình, khóa hoặc kỳ học từ Backend. " +
-        "Đặc biệt, danh sách CTĐT phải trả về programId hoặc program.id; " +
-        "id trong danh sách curricula là ProgramID.",
+      "Chưa có đủ chương trình đào tạo đã công bố, khóa hoặc học kỳ để kiểm tra tệp nhập. Vui lòng khởi tạo dữ liệu tham chiếu trước.",
     );
   }
 
@@ -775,6 +773,24 @@ type StudentImportErrorResponse = {
   message?: string;
 };
 
+const studentImportErrorMessage = (body: StudentImportErrorResponse | null, fallback: string): string => {
+  const message = body?.message?.trim() || fallback;
+  const row = /^(?:Row|Dòng)\s+(\d+)\s*:\s*(.*)$/i.exec(message);
+  const detail = row?.[2] ?? message;
+  const known: Record<string, string> = {
+    'Invalid email.': 'Email không đúng định dạng.',
+    'Duplicate code or email within the file.': 'Mã sinh viên hoặc email bị trùng trong tệp.',
+    'academic profile, placement and courseResults are required.': 'Thiếu hồ sơ học vụ, vị trí học tập hoặc danh sách kết quả môn học.',
+    'Only the staff member who validated this import can commit it.': 'Chỉ người đã kiểm tra đợt nhập này mới được xác nhận lưu.',
+    'Import request not found.': 'Không tìm thấy đợt nhập đã kiểm tra. Vui lòng kiểm tra lại tệp.',
+    'Import key belongs to different data.': 'Dữ liệu đợt nhập đã thay đổi. Vui lòng kiểm tra lại.',
+    'Map the cohort curriculum stage to this calendar semester before importing results.': 'Chưa ánh xạ học kỳ của nhóm trong lộ trình đào tạo; chưa thể nhập kết quả học tập.',
+  };
+  const translated = known[detail] ?? (/^Unknown courseCode:\s*(.+)\.$/.exec(detail)?.[1]
+    ? `Không tìm thấy mã môn ${/^Unknown courseCode:\s*(.+)\.$/.exec(detail)?.[1]} trong danh mục.` : detail);
+  return row ? `Dòng ${row[1]}: ${translated}` : translated;
+};
+
 const sendImportRequest = async <T>(
   endpoint: string,
   payload: unknown,
@@ -826,17 +842,11 @@ const sendImportRequest = async <T>(
     if (body?.errorCode === 'ROUTE_NOT_FOUND') {
       throw new Error(`Không tìm thấy đường dẫn API ${endpoint} (HTTP 404).`);
     }
-    throw new Error(
-      typeof body?.message === 'string' && body.message.trim()
-        ? body.message
-        : "Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).",
-    );
+    throw new Error(studentImportErrorMessage(body, "Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404)."));
   }
 
   if (!response.ok || body?.success === false) {
-    throw new Error(
-      body?.message || `${fallbackError} (HTTP ${response.status}).`,
-    );
+    throw new Error(studentImportErrorMessage(body, `${fallbackError} (HTTP ${response.status}).`));
   }
 
   if (!body) {
@@ -850,12 +860,15 @@ const sendImportRequest = async <T>(
 interface StudentImportResource {
   id: number;
   status: string;
+  createdAt?: string;
+  committedAt?: string | null;
   preview: Omit<ImportPreviewResponse, 'success'>;
   result?: Omit<ImportCommitResponse, 'success'>;
   students?: ImportCommitResponse['students'];
 }
 
 export const importService = {
+  listStudentImports: (signal?: AbortSignal) => getAllItems<StudentImportResource>('/student-imports', {}, signal),
   getStudentImport: async (id: number, signal?: AbortSignal): Promise<ImportCommitResponse> => {
     const resource = apiData<StudentImportResource>(await getJson(`/student-imports/${id}`, {}, signal));
     if (resource.status !== 'COMMITTED' || !resource.result) throw new Error('Đợt nhập chưa hoàn tất.');
@@ -891,6 +904,9 @@ export const importService = {
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'COMMITTED' || !resource.result)
       throw new Error('Backend chưa xác nhận hoàn tất import.');
+    if (!Number.isInteger(resource.result.total) || !Number.isInteger(resource.result.created) ||
+        !Number.isInteger(resource.result.updated) || resource.result.created + resource.result.updated !== resource.result.total)
+      throw new Error('Backend trả kết quả nhập không đầy đủ. Vui lòng kiểm tra lịch sử nhập trước khi thực hiện lại.');
     return { ...resource.result, importId: resource.id, students: resource.students, success: true };
   },
 };

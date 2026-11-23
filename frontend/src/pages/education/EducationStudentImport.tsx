@@ -12,6 +12,10 @@ const EducationStudentImport: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<'import' | 'students'>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'students' ? 'students' : 'import');
   const [savedRevision, setSavedRevision] = React.useState(0);
+  const [historyRevision, setHistoryRevision] = React.useState(0);
+  const [history, setHistory] = React.useState<Awaited<ReturnType<typeof importService.listStudentImports>>>([]);
+  const [historyLoading, setHistoryLoading] = React.useState(true);
+  const [historyError, setHistoryError] = React.useState('');
   const [catalogs, setCatalogs] = React.useState<AcademicCatalogs | null>(null),
     [rows, setRows] = React.useState<StudentImportRow[]>([]);
   const [preview, setPreview] = React.useState<ImportPreviewResponse | null>(
@@ -27,6 +31,7 @@ const EducationStudentImport: React.FC = () => {
   const [reviewFilter, setReviewFilter] = React.useState<'all' | 'valid' | 'error' | 'skipped'>('all');
   const [reviewErrors, setReviewErrors] = React.useState<Record<string, string[]>>({});
   const [previewSignature, setPreviewSignature] = React.useState('');
+  const operationLock = React.useRef(false);
   React.useEffect(() => {
     let active = true;
     setCatalogs(null);
@@ -42,6 +47,15 @@ const EducationStudentImport: React.FC = () => {
       active = false;
     };
   }, []);
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setHistoryLoading(true); setHistoryError('');
+    importService.listStudentImports(controller.signal)
+      .then(items => { if (!controller.signal.aborted) setHistory(items); })
+      .catch(e => { if (!controller.signal.aborted) setHistoryError(e instanceof Error ? e.message : 'Không tải được lịch sử nhập.'); })
+      .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false); });
+    return () => controller.abort();
+  }, [historyRevision]);
   const keptRows = rows.filter(row => !skipped.has(row.code));
   const rowErrors = (row: StudentImportRow) => reviewErrors[row.code] ?? [];
   const gradeCount = keptRows.reduce(
@@ -54,6 +68,7 @@ const EducationStudentImport: React.FC = () => {
     keptRows.length > 0 &&
     preview.total === keptRows.length &&
     preview.created + preview.updated === keptRows.length &&
+    preview.rows?.length === keptRows.length &&
     !preview.rows?.some((row) => row.errors?.length) &&
     !keptRows.some(row => rowErrors(row).length) &&
     !result;
@@ -87,8 +102,9 @@ const EducationStudentImport: React.FC = () => {
     }
   }
   async function check() {
-    if (!keptRows.length) return;
-    setBusy("commit");
+    if (!keptRows.length || busy || operationLock.current) return;
+    operationLock.current = true;
+    setBusy("check");
     setError("");
     setPreview(null);
     setPreviewSignature('');
@@ -105,12 +121,14 @@ const EducationStudentImport: React.FC = () => {
         !response.importId ||
         response.total !== keptRows.length ||
         response.created + response.updated !== keptRows.length ||
+        response.rows?.length !== keptRows.length ||
         response.rows?.some((row) => row.errors?.length)
       )
         throw new Error(
           "Kết quả kiểm tra chưa hợp lệ; chưa thể xác nhận import.",
         );
       setPreviewSignature(keptRows.map(row => row.code).join('|'));
+      setHistoryRevision(value => value + 1);
       return response.importId;
     } catch (e) {
       const message = e instanceof Error ? e.message : "Không kiểm tra được dữ liệu.";
@@ -118,30 +136,35 @@ const EducationStudentImport: React.FC = () => {
       const row = match ? keptRows[Number(match[1]) - 1] : undefined;
       if (row) setReviewErrors(previous => ({ ...previous, [row.code]: [message] }));
       setError(message);
+    } finally {
+      operationLock.current = false;
+      setBusy("");
     }
   }
   async function commit() {
-    if (!keptRows.length || result || busy) return;
+    if (!canCommit || result || busy || operationLock.current) return;
+    operationLock.current = true;
     if (
       !window.confirm(
         `Nhập ${keptRows.length} sinh viên và ${gradeCount} kết quả học tập vào hệ thống?`,
       )
-    )
+    ) {
+      operationLock.current = false;
       return;
+    }
     setBusy("commit");
     setError("");
     try {
-      const importId = canCommit ? preview!.importId! : await check();
-      if (!importId) return;
-      setBusy("commit");
-      const imported=await importService.commitStudentImport(importId);
+      const imported=await importService.commitStudentImport(preview!.importId!);
       setResult(imported);
       setPreview(null);
       setRows([]); setSelected(null); setSearch(''); setSkipped(new Set()); setReviewErrors({}); setPreviewSignature('');
       setSavedRevision(value => value + 1);
+      setHistoryRevision(value => value + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không lưu được dữ liệu.");
     } finally {
+      operationLock.current = false;
       setBusy("");
     }
   }
@@ -181,7 +204,7 @@ const EducationStudentImport: React.FC = () => {
           </div>
           <div className="flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
           <label className={`inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 focus-within:ring-4 focus-within:ring-orange-200 sm:w-auto ${!!busy || !catalogs ? 'cursor-not-allowed opacity-50' : ''}`}>
-            Chọn tệp Excel
+            Chọn tệp Excel <span className="ml-1 text-red-100" aria-label="bắt buộc">*</span>
             <input
               aria-label="Tệp sinh viên và bảng điểm"
               className="sr-only"
@@ -226,9 +249,10 @@ const EducationStudentImport: React.FC = () => {
         {rows.length > 0 && (
           <section aria-label="Dữ liệu sinh viên trong tệp" className="space-y-5 rounded-2xl border border-slate-200 p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className="rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-semibold text-orange-700 disabled:opacity-50" disabled={!!busy || !keptRows.length} onClick={() => void check()}>{busy === 'check' ? 'Đang kiểm tra...' : 'Kiểm tra dữ liệu'}</button>
               <button
                 className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                disabled={!!busy || !!result || !keptRows.length}
+                disabled={!!busy || !!result || !canCommit}
                 onClick={() => void commit()}
               >
                 Xác nhận Import {keptRows.length} sinh viên
@@ -253,6 +277,7 @@ const EducationStudentImport: React.FC = () => {
             <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="accent-orange-600" checked={errorCount > 0 && errorRows.every(row => skipped.has(row.code))} disabled={!errorCount || !!busy} onChange={e => { const next = new Set(skipped); errorRows.forEach(row => e.target.checked ? next.add(row.code) : next.delete(row.code)); setSkipped(next); setPreview(null); setPreviewSignature(''); setError(''); }} />Bỏ qua tất cả dòng lỗi</label>
             </div>
             <p className="text-sm text-slate-500">Hiển thị {visible.length}/{rows.length} sinh viên trong tệp. Cuộn ngang để xem đầy đủ thông tin; mở bảng điểm ngay tại từng sinh viên.</p>
+            <p className="text-sm text-slate-600">Đang chọn {keptRows.length} dòng: {keptRows.length - selectedErrorCount} chưa ghi nhận lỗi, {selectedErrorCount} có lỗi; {skipped.size} đã bỏ qua. {previewSignature ? 'Đã kiểm tra với Backend, có thể xác nhận nhập.' : 'Cần bấm Kiểm tra dữ liệu trước khi xác nhận nhập.'}</p>
             <div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200" tabIndex={0} aria-label="Bảng xem trước sinh viên và bảng điểm">
               <table className="w-full min-w-[2200px] text-left text-sm">
                 <thead className="sticky top-0 z-10 border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]">
@@ -355,6 +380,13 @@ const EducationStudentImport: React.FC = () => {
             </Link>
           </div>
         )}
+        <section className="space-y-3 border-t border-slate-200 pt-4" aria-label="Lịch sử nhập sinh viên">
+          <h2 className="text-lg font-semibold text-slate-900">Lịch sử Import</h2>
+          {historyLoading && <p role="status" className="text-sm text-slate-500">Đang tải lịch sử nhập...</p>}
+          {historyError && <p role="alert" className="text-sm text-red-700">{historyError}</p>}
+          {!historyLoading && !historyError && !history.length && <p className="text-sm text-slate-500">Chưa có đợt nhập sinh viên.</p>}
+          {!!history.length && <div className="overflow-auto rounded-xl border border-slate-200"><table className="w-full min-w-[640px] text-left text-sm"><thead className="border-b bg-slate-50"><tr><th className="p-3">Mã đợt</th><th className="p-3">Ngày kiểm tra</th><th className="p-3">Trạng thái</th><th className="p-3">Số sinh viên</th><th className="p-3">Tạo mới</th><th className="p-3">Cập nhật</th></tr></thead><tbody>{history.map(item => { const summary = item.status === 'COMMITTED' ? item.result : item.preview; return <tr key={item.id} className="border-t bg-white hover:bg-blue-50"><td className="p-3">{item.id}</td><td className="p-3">{item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '—'}</td><td className="p-3">{item.status === 'COMMITTED' ? 'Đã nhập' : item.status === 'VALIDATED' ? 'Đã kiểm tra, chưa nhập' : item.status}</td><td className="p-3">{summary?.total ?? '—'}</td><td className="p-3">{summary?.created ?? '—'}</td><td className="p-3">{summary?.updated ?? '—'}</td></tr>; })}</tbody></table></div>}
+        </section>
       </section>
       </div>
       <div role="tabpanel" id="student-list-panel" aria-labelledby="student-list-tab" hidden={activeTab !== 'students'} className={activeTab !== 'students' ? 'hidden' : ''}>

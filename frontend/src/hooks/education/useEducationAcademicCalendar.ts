@@ -3,7 +3,20 @@ import { academicService } from '@/services/educationService';
 import { getAllItems } from '@/services/educationService';
 import type { AcademicCalendar, AcademicPeriod, AcademicYear, SemesterDates } from '@/types/education/academic.types';
 
-const errorText = (error: unknown) => (error as { response?: { data?: { message?: string } } })?.response?.data?.message || (error instanceof Error ? error.message : 'Không thực hiện được yêu cầu.');
+const errorText = (error: unknown) => {
+  const response = (error as { response?: { data?: { message?: string; errorCode?: string } } })?.response?.data;
+  if (response?.errorCode === 'ACADEMIC_DUPLICATE') return 'Mã năm học hoặc mã học kỳ đã tồn tại.';
+  const message = response?.message || (error instanceof Error ? error.message : 'Không thực hiện được yêu cầu.');
+  const known: Record<string, string> = {
+    'Only a semester and its own Block 3 may overlap.': 'Lịch mới chồng lấn với học kỳ hoặc Block 3 đã có.',
+    'Periods must be within their academic year, and Block 3 must be within its parent semester.': 'Lịch mới khiến Block 3 nằm ngoài học kỳ hoặc năm học.',
+    'OJT dates must be within their academic year and any linked semester.': 'Lịch mới khiến kỳ OJT nằm ngoài học kỳ hoặc năm học.',
+    'Each group must start in a semester on or after its enrollment year.': 'Lịch mới không phù hợp với năm nhập học của nhóm sinh viên.',
+    'A placement must start in a semester on or after enrollment, and cannot be later than the current specialized semester.': 'Lịch mới không phù hợp với tiến độ học tập của sinh viên.',
+    'Configure the cohort curriculum mapping before assigning a student to this calendar period.': 'Cần cấu hình lộ trình học kỳ của khóa trước khi gán sinh viên vào kỳ này.',
+  };
+  return known[message] ?? message;
+};
 export function useEducationAcademicCalendar() {
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
@@ -55,7 +68,7 @@ export function useEducationAcademicCalendar() {
     years, periods, selectedId, setSelectedId, calendar, loading, calendarLoading, busy,
     error, catalogError, calendarError, notice,
     reload: () => { setError(''); setNotice(''); setRefresh(v => v + 1); },
-    create: (yearCode: string) => mutate(() => academicService.createAcademicYear({ yearCode }), `Đã tạo năm học ${yearCode} và đầy đủ 3 kỳ Spring → Summer → Fall.`),
+    create: (yearCode: string, semesters: SemesterDates[]) => mutate(() => academicService.createAcademicYear({ yearCode, semesters }), `Đã tạo năm học ${yearCode} và đầy đủ 3 kỳ Spring → Summer → Fall.`),
     save: (rows: SemesterDates[]) => calendar
       ? mutate(() => academicService.updateCalendar(calendar.year.id, rows, calendar.revision), 'Đã cập nhật đồng thời cả 3 học kỳ.')
       : Promise.resolve(false),

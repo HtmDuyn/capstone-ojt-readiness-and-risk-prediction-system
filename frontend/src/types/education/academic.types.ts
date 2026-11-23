@@ -2,6 +2,7 @@ export type AcademicYearStatus = "PLANNED" | "ACTIVE" | "COMPLETED" | "CLOSED";
 
 export interface CreateAcademicYearPayload {
   yearCode: string;
+  semesters?: SemesterDates[];
 }
 
 export interface AcademicYear {

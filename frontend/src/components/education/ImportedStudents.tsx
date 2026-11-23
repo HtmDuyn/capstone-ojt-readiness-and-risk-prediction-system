@@ -7,9 +7,9 @@ import { STUDENT_STATUS_LABELS } from '@/utils/student/studentAcademicStatus';
 
 const text = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value);
 const status = (value: string) => STUDENT_STATUS_LABELS[value as StudentAcademicStatus] ?? value;
-type SortKey = 'student' | 'studentCode' | 'email' | 'phone' | 'cohort' | 'program' | 'current' | 'status';
+type SortKey = 'student' | 'studentCode' | 'email' | 'phone' | 'cohort' | 'program' | 'entry' | 'current' | 'status';
 type Sort = { key: SortKey; direction: 'asc' | 'desc' } | null;
-const columns: { key: SortKey | 'entry'; label: string }[] = [
+const columns: { key: SortKey; label: string }[] = [
   { key: 'student', label: 'Tên sinh viên' }, { key: 'studentCode', label: 'Mã số sinh viên' },
   { key: 'email', label: 'Email' }, { key: 'phone', label: 'SĐT' },
   { key: 'cohort', label: 'Khóa' }, { key: 'program', label: 'Mã khung chương trình' },
@@ -29,6 +29,7 @@ const sortValue = (row: ImportedStudent, key: SortKey): string | number | null =
     case 'phone': return row.phone || null;
     case 'program': return row.program?.code || null;
     case 'cohort': return row.cohort?.code || null;
+    case 'entry': return periodTime(row.entryAcademicPeriod?.startDate);
     case 'current': return periodTime(row.currentAcademicPeriod?.startDate);
     case 'status': return academicStatusOrder[row.status] ?? null;
   }
@@ -44,7 +45,7 @@ export function ImportedStudents({ revision, catalogs }: { revision: number; cat
     const params = new URLSearchParams(window.location.search);
     const key = params.get('sort');
     const direction = params.get('direction');
-    return columns.some(column => column.key === key && column.key !== 'entry') && (direction === 'asc' || direction === 'desc')
+    return columns.some(column => column.key === key) && (direction === 'asc' || direction === 'desc')
       ? { key: key as SortKey, direction } : null;
   });
   const model = useEducationImportedStudents(revision, sort !== null);
@@ -96,7 +97,7 @@ export function ImportedStudents({ revision, catalogs }: { revision: number; cat
         <table className="w-full min-w-[1380px] text-left text-sm">
           <thead className="bg-[#EFF6FF] text-[#334155]"><tr className="border-b border-[#D6E4F0]">
             <th scope="col" className="w-14 px-3 py-3 text-center font-semibold">STT</th>
-            {columns.map(({ key, label }) => <th key={key} scope="col" aria-sort={key === 'entry' ? undefined : sort?.key === key ? sort.direction === 'asc' ? 'ascending' : 'descending' : 'none'} className="whitespace-nowrap px-4 py-3 font-semibold">{key === 'entry' ? <span title="Chưa có số kỳ bắt đầu trong dữ liệu sinh viên">{label}</span> : <button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1.5 rounded-sm text-left hover:text-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">{label}{sort?.key === key ? sort.direction === 'asc' ? <ArrowUp size={14} aria-hidden="true" className="text-orange-600" /> : <ArrowDown size={14} aria-hidden="true" className="text-orange-600" /> : <ArrowUpDown size={14} aria-hidden="true" className="text-slate-400" />}</button>}</th>)}
+            {columns.map(({ key, label }) => <th key={key} scope="col" aria-sort={sort?.key === key ? sort.direction === 'asc' ? 'ascending' : 'descending' : 'none'} className="whitespace-nowrap px-4 py-3 font-semibold"><button type="button" onClick={() => toggleSort(key)} className="inline-flex items-center gap-1.5 rounded-sm text-left hover:text-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">{label}{sort?.key === key ? sort.direction === 'asc' ? <ArrowUp size={14} aria-hidden="true" className="text-orange-600" /> : <ArrowDown size={14} aria-hidden="true" className="text-orange-600" /> : <ArrowUpDown size={14} aria-hidden="true" className="text-slate-400" />}</button></th>)}
             <th scope="col" className="w-16 px-3 py-3 text-center font-semibold">Thao tác</th>
           </tr></thead>
           <tbody>{visibleRows.map((row, index) => <tr key={row.id} className="border-t border-[#E2E8F0] bg-white align-middle transition-colors duration-150 hover:bg-[#EAF2FF]">
@@ -107,7 +108,7 @@ export function ImportedStudents({ revision, catalogs }: { revision: number; cat
             <td className="whitespace-nowrap px-4 py-4 text-slate-700">{text(row.phone)}</td>
             <td className="whitespace-nowrap px-4 py-4 text-slate-700">{text(row.cohort?.code)}</td>
             <td className="whitespace-nowrap px-4 py-4 text-slate-700">{text(row.program?.code)}</td>
-            <td className="whitespace-nowrap px-4 py-4 text-slate-700">—</td>
+            <td className="whitespace-nowrap px-4 py-4 text-slate-700">{text(row.entryAcademicPeriod?.name ?? row.entryAcademicPeriod?.code)}</td>
             <td className="whitespace-nowrap px-4 py-4 text-slate-700">{text(row.currentAcademicPeriod?.name ?? row.currentAcademicPeriod?.code)}</td>
             <td className="whitespace-nowrap px-4 py-4">{status(row.status)}</td>
             <td className="px-3 py-4 text-center"><button type="button" title="Xem hồ sơ và bảng điểm" aria-label="Xem hồ sơ và bảng điểm" className="inline-flex size-9 items-center justify-center rounded-lg text-orange-600 hover:bg-orange-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500" onClick={() => { const params = new URLSearchParams(location.search); params.set('tab', 'students'); const search = `?${params.toString()}`; navigate(`${location.pathname}/students/${row.id}${search}`, { state: { returnTo: `${location.pathname}${search}`, scrollY: window.scrollY } }); }}><Eye size={18} aria-hidden="true" /></button></td>
