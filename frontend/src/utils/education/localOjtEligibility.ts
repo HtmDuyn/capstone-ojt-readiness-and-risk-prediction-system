@@ -1,11 +1,17 @@
 import type { Attempt, Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
 
-export type LocalOjtRule = { version: number; minCredits: number };
+export type LocalOjtRule = { id: number; version: number; minCredits: number; issuingDocument: string };
+
+const excludedCreditName = /(?:\bGDTC\b|\bGDQP\b|\bQPAN\b|\bPE\b|\bphysical\s+education\b|\bmilitary\b|quoc\s+phong|giao\s+duc\s+the\s+chat|the\s+duc|nhac\s+cu|musical\s+instrument)/i;
+const normalizeCourseText = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd');
 
 export function calculateLocalOjtEligibility(studentId: number, profile: Profile, attempts: Attempt[], rule: LocalOjtRule): LocalOjtResult {
   const credits = profile.academicProgress?.credits;
-  const earned = credits?.earned;
-  const earnedCredits = typeof earned === 'number' && Number.isFinite(earned) && earned >= 0 ? earned : null;
+  const earned = credits?.ojtEarned ?? credits?.earned;
+  const requirements = profile.academicProgress?.requirements ?? [];
+  const curriculumEarned = requirements.filter(requirement => requirement.completed && !excludedCreditName.test(normalizeCourseText(`${requirement.name ?? ''} ${requirement.courseCode ?? ''}`)) && !/(?:^|[\s._-])PE\s*\d+\b/i.test(`${requirement.name ?? ''} ${requirement.courseCode ?? ''}`))
+    .reduce((sum, requirement) => sum + (typeof requirement.credits === 'number' && Number.isFinite(requirement.credits) ? requirement.credits : 0), 0);
+  const earnedCredits = requirements.length && typeof earned === 'number' && Number.isFinite(earned) && earned >= 0 ? Math.round(curriculumEarned * 100) / 100 : null;
   const completed = new Set(attempts.filter(a => a.status === 'PASSED' || a.status === 'RECOGNIZED').map(a => a.courseId));
   // A completed equivalent curriculum requirement also clears its previous failed subject.
   for (const requirement of profile.academicProgress?.requirements ?? []) {

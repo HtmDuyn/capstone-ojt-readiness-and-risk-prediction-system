@@ -110,6 +110,13 @@ export interface PublishOjtRuleSetResponse {
 
 export type EligibilityStatus = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'REVIEW_REQUIRED';
 
+export interface OjtAppliedCondition {
+  id: number;
+  version: number;
+  minCredits: number;
+  issuingDocument: string;
+}
+
 export interface EligibilityEvaluation {
   studentId: number;
   ojtSemesterId: number;

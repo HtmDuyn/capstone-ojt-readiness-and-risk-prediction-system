@@ -1,4 +1,4 @@
-import type { EligibilityStatus } from '@/types/education/eligibility.types';
+import type { EligibilityStatus, OjtAppliedCondition } from '@/types/education/eligibility.types';
 
 export interface SavedOjtEligibility {
   studentId?: number;
@@ -13,6 +13,7 @@ export interface SavedOjtEligibility {
   batchId?: number;
   isStale: boolean;
   source?: 'FRONTEND';
+  rule?: OjtAppliedCondition;
 }
 
 export function savedOjtLabel(result: SavedOjtEligibility): 'Đủ điều kiện' | 'Chưa đủ điều kiện' | 'Cần đối soát' | 'Cần xét lại' {

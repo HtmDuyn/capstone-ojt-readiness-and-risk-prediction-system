@@ -22,7 +22,7 @@ export function describeFrontendEligibilityResults(spec: Record<string, any>) {
       requestBody: { required: true, content: { 'application/json': {
         schema: { type: 'object', additionalProperties: false, required: ['idempotencyKey','source','rule','results'], properties: {
           idempotencyKey: { type: 'string', maxLength: 100 }, source: { type: 'string', enum: ['FRONTEND'] },
-          rule: { type: 'object', additionalProperties: false, required: ['version','minCredits'], properties: { thresholdId: { type: 'integer', minimum: 1 }, version: { type: 'integer', minimum: 0 }, minCredits: { type: 'number', minimum: 0 }, maxUnpassedCourses: { type: 'integer', minimum: 0, deprecated: true } } },
+          rule: { type: 'object', additionalProperties: false, required: ['conditionId','version','minCredits','issuingDocument'], properties: { conditionId: { type: 'integer', minimum: 1 }, issuingDocument: { type: 'string' }, thresholdId: { type: 'integer', minimum: 1, deprecated: true }, version: { type: 'integer', minimum: 0 }, minCredits: { type: 'number', minimum: 0 }, maxUnpassedCourses: { type: 'integer', minimum: 0, deprecated: true } } },
           results: { type: 'array', minItems: 1, maxItems: 10000, items: result },
         } },
         example: { idempotencyKey: 'fe-ojt-save-unique-key', source: 'FRONTEND', rule: { version: 0, thresholdId: 1, minCredits: 70 }, results: [{ studentId: 1, status: 'ELIGIBLE', earnedCredits: 70, unpassedCourseCount: 2, reasons: [], academicIssues: [], checkedAt: '2026-10-27T09:00:00.000Z' }] },
@@ -50,6 +50,10 @@ export function describeFrontendEligibilityResults(spec: Record<string, any>) {
     post: { summary: 'Tạo mức tín chỉ xét OJT', security: [{ bearerAuth: [] }],
       requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['minCredits'], properties: { minCredits: threshold } } } } },
       responses: { 201: response('Đã tạo mức tín chỉ.'), 409: response('Mức tín chỉ đã tồn tại.') } },
+  };
+  spec.paths['/api/ojt-conditions'] = {
+    get: { tags: ['OJT eligibility'], summary: 'Danh sách điều kiện và văn bản ban hành', security: [{ bearerAuth: [] }], responses: { 200: response('Danh sách điều kiện bất biến theo phiên bản; mỗi lần tạo được ghi audit log.') } },
+    post: { tags: ['OJT eligibility'], summary: 'Thêm điều kiện xét OJT', security: [{ bearerAuth: [] }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['minCredits','issuingDocument'], properties: { minCredits: { type: 'number', minimum: 0, maximum: 9999.99 }, issuingDocument: { type: 'string', minLength: 1, maxLength: 10000 } } } } } }, responses: { 201: response('Tạo điều kiện mới và audit log.') } },
   };
   const responsePolicy = (description: string) => ({ description });
   spec.paths['/api/ojt-condition-policy'] = {
