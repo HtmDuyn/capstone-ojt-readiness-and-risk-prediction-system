@@ -2,6 +2,7 @@ import { cvMetadataSql } from '../students/cv.service';
 import { decryptCv } from '../student-portal/cv.service';
 import { postSelect,postApi } from '../recruitment/recruitment.repository';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
+import { gradingCriteriaSelection } from '../academic/grading-criteria.service';
 import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from '../qhdn/read.repository';
 import { templateField } from '../qhdn/context-fields';
@@ -257,7 +258,8 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       LEFT JOIN "Users" supervisor ON supervisor."UserID"=a."AcademicSupervisorID"
       LEFT JOIN "InternshipEvaluations" v ON v."AssignmentID"=a."AssignmentID"
       LEFT JOIN ${officialEvaluationRelation} result ON result."AssignmentID"=a."AssignmentID"
-      LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=v."TemplateID"
+      LEFT JOIN LATERAL (${gradingCriteriaSelection('r."OJTSemesterID"')}) applicable_template ON true
+      LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=CASE WHEN v."Status"='SUBMITTED' THEN v."TemplateID" ELSE applicable_template."TemplateID" END
       WHERE ${where.join(' AND ')}`;
     const items = (await c.query(
       hasPagination

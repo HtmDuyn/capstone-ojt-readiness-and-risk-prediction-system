@@ -7464,6 +7464,9 @@ END $$;
 CREATE INDEX IF NOT EXISTS "IX_AssessmentTemplates_OJT_Effective"
   ON public."AssessmentTemplates" ("OJTSemesterID","EffectiveFrom" DESC,"Version" DESC)
   WHERE "Status"='PUBLISHED';
+CREATE INDEX IF NOT EXISTS "IX_AssessmentTemplates_PublishedEffective"
+  ON public."AssessmentTemplates" ("EffectiveFrom" DESC,"Version" DESC,"TemplateID" DESC)
+  WHERE "Status"='PUBLISHED' AND "OJTSemesterID" IS NOT NULL;
 CREATE OR REPLACE FUNCTION public."GuardAssessmentTemplate"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -7477,6 +7480,8 @@ END $$;
 -- Required by the backend bulk-acceptance readiness check; this is migration metadata, not domain seed data.
 INSERT INTO public."SchemaMigrations"("Version")
 VALUES ('20261116_enterprise_bulk_acceptance') ON CONFLICT DO NOTHING;
+INSERT INTO public."SchemaMigrations"("Version")
+VALUES ('20261124_enterprise_grading_criteria') ON CONFLICT DO NOTHING;
 
 -- =============================================================
 -- HISTORICAL AUTH SEED: restore known account snapshot from 2026-10-26
