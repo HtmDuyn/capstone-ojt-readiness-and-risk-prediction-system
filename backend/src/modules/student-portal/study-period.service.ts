@@ -1,3 +1,4 @@
+import { latestEffectiveOjtCondition } from '../eligibility/ojt-policy.service';
 import type { PoolClient } from 'pg';
 import { readTransaction } from '../qhdn/read.repository';
 import { invalid, positiveId } from '../students/student.validation';
@@ -86,11 +87,7 @@ export async function studyOverview(params: Row, actor: Actor) {
       JOIN "CohortCurriculumPeriods" plan ON plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode" AND plan."CurriculumSemester"=6
       JOIN "OJTSemesters" o ON o."AcademicPeriodID"=plan."AcademicPeriodID"
       WHERE placement."StudentID"=$1 ORDER BY o."StartDate" LIMIT 1)) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
-    const latestCondition = historical ? null : (await c.query(
-      `SELECT "Version","MinCredits" FROM "OJTConditions"
-        WHERE "EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
-        ORDER BY "Version" DESC LIMIT 1`
-    )).rows[0] ?? null;
+    const latestCondition = historical ? null : await latestEffectiveOjtCondition(c);
     const configuredRule = historical ? await activeRule(c, student.ProgramID, target ?? 0) : null;
     const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
       && (configuredRule.OJTSemesterID === null || configuredRule.OJTSemesterID === target) ? configuredRule : null;

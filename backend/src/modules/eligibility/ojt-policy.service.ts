@@ -1,7 +1,14 @@
+import type { PoolClient } from 'pg';
 import { createHash } from 'node:crypto';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { inputObject, invalid } from '../students/student.validation';
 import { assessPublishedPrograms, type ProgramFeasibility } from './ojt-policy-feasibility';
+
+export async function latestEffectiveOjtCondition(client: PoolClient) {
+  return (await client.query(`SELECT * FROM "OJTConditions"
+    WHERE "EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+    ORDER BY "EffectiveFrom" DESC, "Version" DESC LIMIT 1`)).rows[0] ?? null;
+}
 
 export async function listOjtConditions() {
   return academicTransaction(async client => {

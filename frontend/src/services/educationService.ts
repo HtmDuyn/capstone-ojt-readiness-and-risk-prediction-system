@@ -377,8 +377,8 @@ export const academicService = {
   getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number;effectiveFrom:string;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
   saveOjtGradingCriteria: async (payload:{ojtSemesterId:number;name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
   getCalendar: async (id: number, signal?: AbortSignal) => apiData<AcademicCalendar>(await getJson(`/academic-years/${id}/calendar`, {}, signal)),
-  updateCalendar: async (id: number, semesters: SemesterDates[], revision: string, blocks?: SemesterDates[]) =>
-    apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision, blocks })).data),
+  updateCalendar: async (id: number, semesters: SemesterDates[], revision: string, blocks?: SemesterDates[], block10?: SemesterDates[]) =>
+    apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision, blocks, block10 })).data),
   createAcademicYear,
   searchAcademicYears,
 
@@ -399,7 +399,7 @@ export const academicReportingService = {
     }catch(error){
       const body=(error as {response?:{data?:{errorCode?:string}}}).response?.data;
       if(body?.errorCode==='BLOCK_OUTSIDE_PARENT_SEMESTER')throw new Error('Block 3 phải nằm trong thời gian của kỳ học đã chọn. Vui lòng kiểm tra lịch đã cấu hình.');
-      if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Học kỳ đã chọn không đủ thời gian cho Block 10, một tuần nghỉ và Block 3. Vui lòng kiểm tra ngày của học kỳ.');
+      if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Học kỳ đã chọn không đủ thời gian cho Block 10 và Block 3. Vui lòng kiểm tra ngày của học kỳ.');
       if(body?.errorCode==='SEMESTER_REQUIRED')throw new Error('Vui lòng chọn kỳ học chính để tự tính lịch Block 3.');
       const messages:Record<string,string>={UPCOMING_SEMESTER_REQUIRED:'Vui lòng chọn học kỳ sắp tới.',BLOCK3_REQUIRED:'Vui lòng chọn kỳ học loại Block 3.',BLOCK_PERIOD_NOT_FOUND:'Không tìm thấy kỳ Block 3 đã chọn.',BLOCK_PARENT_INVALID:'Kỳ Block 3 chưa được gắn đúng với học kỳ chính. Vui lòng đối soát cấu hình.',BLOCK_NOT_OPEN_FOR_PLANNING:'Kỳ Block 3 này không còn ở trạng thái có thể lập kế hoạch.',BLOCK_ALREADY_ENDED:'Kỳ Block 3 đã kết thúc. Vui lòng chọn kỳ sắp tới hoặc đang diễn ra.',BLOCK_DATES_INVALID:'Ngày bắt đầu và kết thúc Block 3 chưa hợp lệ.'};
       throw new Error(messages[body?.errorCode??'']??'Không tải được đề xuất mở lớp. Vui lòng kiểm tra kết nối và thử lại.');
@@ -913,9 +913,12 @@ export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
   apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
 export const createOjtCreditThreshold = async (minCredits: number) =>
   apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
+export const latestEffectiveOjtRule = (conditions: CurrentOjtRule[]) => conditions
+  .filter(condition => condition.isEffective)
+  .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom) || b.version - a.version)[0] ?? null;
 export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
   const conditions = await loadOjtConditions(signal);
-  const active = conditions.find(condition => condition.isEffective);
+  const active = latestEffectiveOjtRule(conditions);
   if (!active) throw new Error('Chưa có điều kiện xét OJT đến ngày áp dụng.');
   return active;
 };

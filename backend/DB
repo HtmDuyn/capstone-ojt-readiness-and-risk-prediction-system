@@ -57,6 +57,7 @@ DECLARE table_name text;
     'NotificationTemplates',
     'OJTActiveRuleSets',
     'OJTActualReceipts',
+    'OJTAutomaticAssessments',
     'OJTAdvisoryRunItems',
     'OJTAdvisoryRuns',
     'OJTAdvisorySchedules',
@@ -8016,3 +8017,32 @@ CREATE TRIGGER "TR_OJTConditionEffectiveFrom"
   FOR EACH ROW EXECUTE FUNCTION public."GuardOJTConditionEffectiveFrom"();
 
 COMMIT;
+CREATE TABLE IF NOT EXISTS public."OJTAutomaticAssessments" (
+  "AcademicPeriodID" integer NOT NULL REFERENCES public."AcademicPeriods"("AcademicPeriodID") ON DELETE CASCADE,
+  "Milestone" text NOT NULL CHECK ("Milestone" IN ('BLOCK10','BLOCK3','SEMESTER')),
+  "DueAt" timestamptz NOT NULL,
+  "ConditionID" integer NOT NULL REFERENCES public."OJTConditions"("ConditionID"),
+  "CompletedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),
+  PRIMARY KEY ("AcademicPeriodID","Milestone")
+);
+ALTER TABLE public."OJTAutomaticAssessments" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public."OJTAutomaticAssessments" FROM PUBLIC;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+    GRANT SELECT,INSERT ON public."OJTAutomaticAssessments" TO service_role;
+  END IF;
+END $$;
+ALTER TABLE public."AcademicPeriods"
+  ADD COLUMN IF NOT EXISTS "Block10StartDate" date,
+  ADD COLUMN IF NOT EXISTS "Block10EndDate" date;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+    WHERE conrelid='public."AcademicPeriods"'::regclass AND conname='CK_AcademicPeriods_Block10Dates') THEN
+    ALTER TABLE public."AcademicPeriods" ADD CONSTRAINT "CK_AcademicPeriods_Block10Dates" CHECK (
+      ("Block10StartDate" IS NULL AND "Block10EndDate" IS NULL)
+      OR ("Kind"='SEMESTER' AND "Block10StartDate" IS NOT NULL AND "Block10EndDate" IS NOT NULL
+        AND "StartDate"<="Block10StartDate" AND "Block10StartDate"<="Block10EndDate" AND "Block10EndDate"<="EndDate")
+    );
+  END IF;
+END $$;

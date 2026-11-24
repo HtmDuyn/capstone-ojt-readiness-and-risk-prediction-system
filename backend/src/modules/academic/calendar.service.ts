@@ -59,11 +59,29 @@ export async function getYearCalendar(yearId: number) {
   return academicTransaction(client => snapshot(client, yearId));
 }
 
-function checkBlock3Dates(block: SemesterDates, semester: SemesterDates) {
+function checkBlockDates(block: SemesterDates, semester: SemesterDates, label = 'Block 3') {
   if (block.startDate > block.endDate)
-    throw academicError(`Ngày kết thúc Block 3 của ${block.term} không được trước ngày bắt đầu.`);
+    throw academicError(`Ngày kết thúc ${label} của ${block.term} không được trước ngày bắt đầu.`);
   if (block.startDate < semester.startDate || block.endDate > semester.endDate)
-    throw academicError(`Ngày Block 3 của ${block.term} phải nằm trong học kỳ tương ứng.`);
+    throw academicError(`Ngày ${label} của ${block.term} phải nằm trong học kỳ tương ứng.`);
+}
+
+function parseBlocks(input: unknown, dates: SemesterDates[], label: string) {
+  const blocks = new Map<Term, SemesterDates>();
+  if (input !== undefined) {
+    if (!Array.isArray(input) || input.length > dates.length) throw academicError(`Gửi tối đa một ${label} cho mỗi học kỳ.`);
+    for (const value of input) {
+      const raw = inputObject(value, ['term', 'startDate', 'endDate']);
+      const semester = dates.find(row => row.term === raw.term);
+      if (!semester || blocks.has(semester.term)) throw academicError(`Mỗi ${label} phải có học kỳ hợp lệ và duy nhất.`);
+      const startDate = dateInput(raw.startDate, 'startDate');
+      const endDate = dateInput(raw.endDate, 'endDate');
+      const block = { term: semester.term, startDate, endDate };
+      checkBlockDates(block, semester, label);
+      blocks.set(semester.term, block);
+    }
+  }
+  return blocks;
 }
 
 async function saveBlock3(client: PoolClient, semester: AcademicRecord, block: SemesterDates, actorId: number, existing?: AcademicRecord) {
@@ -80,20 +98,23 @@ async function saveBlock3(client: PoolClient, semester: AcademicRecord, block: S
 }
 
 export async function createYearCalendar(body: unknown, actorId: number) {
-  const b = inputObject(body, ['yearCode', 'blocks']);
+  const b = inputObject(body, ['yearCode', 'blocks', 'block10']);
   const yearCode = requiredText(b.yearCode, 'yearCode', 20);
   const startYear = calendarYear(yearCode), dates = defaultCalendar(yearCode);
   const blocks = b.blocks === undefined ? [] : validateSemesterDates(yearCode, b.blocks);
-  blocks.forEach((block, index) => checkBlock3Dates(block, dates[index]));
+  blocks.forEach((block, index) => checkBlockDates(block, dates[index]));
+  const block10 = parseBlocks(b.block10, dates, 'Block 10');
   return academicTransaction(async client => {
     const year = await saveResourceWithClient(client, 'academic-years', {
       yearCode, startDate: `${startYear}-01-01`, endDate: `${startYear}-12-31`, status: 'PLANNED',
     }, actorId, undefined, false);
     for (const [index, row] of dates.entries()) {
+      const main = block10.get(row.term);
       const semester = await saveResourceWithClient(client, 'academic-periods', {
         academicYearId: year.id, periodCode: `${row.term}${startYear}`,
         name: `${row.term[0]}${row.term.slice(1).toLowerCase()} ${startYear}`,
         kind: 'SEMESTER', startDate: row.startDate, endDate: row.endDate, status: 'PLANNED',
+        block10StartDate: main?.startDate, block10EndDate: main?.endDate,
       }, actorId, undefined, false);
       const block = blocks[index];
       if (block) await saveBlock3(client, semester, block, actorId);
@@ -104,36 +125,27 @@ export async function createYearCalendar(body: unknown, actorId: number) {
 }
 
 export async function updateYearCalendar(yearId: number, body: unknown, actorId: number) {
-  const b = inputObject(body, ['semesters', 'revision', 'blocks']);
+  const b = inputObject(body, ['semesters', 'revision', 'blocks', 'block10']);
   const revision = requiredText(b.revision, 'revision', 64);
   return academicTransaction(async client => {
     const before = await snapshot(client, yearId);
     if (before.revision !== revision) throw academicError('Lịch đã được người khác thay đổi. Tải lại lịch trước khi chỉnh sửa.', 409, 'ACADEMIC_CALENDAR_STALE');
     const dates = validateSemesterDates(before.year.yearCode, b.semesters);
     const year = calendarYear(before.year.yearCode);
-    const blocks = new Map<Term, SemesterDates>();
-    if (b.blocks !== undefined) {
-      if (!Array.isArray(b.blocks) || b.blocks.length > dates.length) throw academicError('Gửi tối đa một Block 3 cho mỗi học kỳ.');
-      for (const value of b.blocks) {
-        const raw = inputObject(value, ['term', 'startDate', 'endDate']);
-        const semester = dates.find(row => row.term === raw.term);
-        if (!semester || blocks.has(semester.term)) throw academicError('Mỗi Block 3 phải có học kỳ hợp lệ và duy nhất.');
-        const startDate = dateInput(raw.startDate, 'startDate');
-        const endDate = dateInput(raw.endDate, 'endDate');
-        const block = { term: semester.term, startDate, endDate };
-        checkBlock3Dates(block, semester);
-        blocks.set(semester.term, block);
-      }
-    }
+    const blocks = parseBlocks(b.blocks, dates, 'Block 3');
+    const block10 = parseBlocks(b.block10, dates, 'Block 10');
     // Preserve IDs and all references. Legacy calendars require explicit reconciliation.
     if (before.semesters.length !== 3 || dates.some(row => !before.semesters.some(p => p.periodCode === `${row.term}${year}`))) {
       throw academicError('Lịch năm học cũ chưa đúng mẫu 3 kỳ Spring–Summer–Fall. Cần đối soát dữ liệu trước khi sửa đồng thời.', 409, 'ACADEMIC_CALENDAR_LEGACY');
     }
     for (const row of dates) {
       const period = before.semesters.find(p => p.periodCode === `${row.term}${year}`)!;
-      if (period.startDate !== row.startDate || period.endDate !== row.endDate)
+      const main = block10.get(row.term);
+      if (period.startDate !== row.startDate || period.endDate !== row.endDate
+        || (main && (period.block10StartDate !== main.startDate || period.block10EndDate !== main.endDate)))
         await saveResourceWithClient(client, 'academic-periods', {
           startDate: row.startDate, endDate: row.endDate,
+          ...(main ? { block10StartDate: main.startDate, block10EndDate: main.endDate } : {}),
         }, actorId, positiveId(period.id), false);
       const block = blocks.get(row.term);
       if (block) {

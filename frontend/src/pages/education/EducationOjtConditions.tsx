@@ -10,7 +10,7 @@ import { ojtSourceLabels, type OjtSourceKey } from '@/utils/education/ojtEligibi
 import { summarizeOjtHandoff } from '@/utils/education/educationOjtCheckQueue';
 
 const EducationOjtConditions: React.FC = () => {
-  const { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule, conditions, setRule, selectionLocked, discardPending } = useEducationOjtEligibility();
+  const { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, handoffByStudent, handoffDisplay, failures, notice, search, setSearch, filter, setFilter, handoffFilter, setHandoffFilter, setPage, currentPage, rule, selectionLocked, discardPending } = useEducationOjtEligibility();
   const failedSources = Object.entries(sourceErrors) as [OjtSourceKey, NonNullable<(typeof sourceErrors)[OjtSourceKey]>][];
   const [detailStudentId, setDetailStudentId] = React.useState<number | null>(null);
   const detailTarget = targets.find(target => target.student.id === detailStudentId);
@@ -56,13 +56,13 @@ const EducationOjtConditions: React.FC = () => {
   return <div className="space-y-4">
     <PageBanner title="Xét điều kiện đi OJT" description="Xét sinh viên cần xét từ tín chỉ tích lũy và bảng điểm, không cần chọn năm học hoặc kỳ OJT." badge="Phòng Đào tạo" />
     <section className="space-y-3 rounded-2xl border border-orange-100 bg-white px-5 py-4 shadow-sm">
-      <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck size={20} className="text-orange-600" />{rule ? `Điều kiện đang chọn: ${rule.minCredits} tín chỉ · phiên bản ${rule.version}` : 'Chưa có điều kiện OJT'}</h2>
+      <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck size={20} className="text-orange-600" />{rule ? `Điều kiện đang áp dụng: ${rule.minCredits} tín chỉ · phiên bản ${rule.version}` : 'Chưa có điều kiện OJT đến ngày áp dụng'}</h2>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="grid gap-1 text-sm font-medium text-slate-700">Chọn điều kiện xét<select aria-label="Chọn điều kiện xét OJT" disabled={!conditions.length || selectionLocked} value={rule?.id ?? ''} onChange={event => setRule(Number(event.target.value))} className="min-w-64 rounded-lg border p-2"><option value="">Chọn điều kiện</option>{conditions.map(item => <option key={item.id} value={item.id}>Phiên bản {item.version} · {item.minCredits} tín chỉ</option>)}</select></label>
+        {rule && <p className="text-sm text-slate-600">Ngày bắt đầu áp dụng {rule.effectiveFrom.split('-').reverse().join('/')}</p>}
         <Link to="/education/ojt-policy" className="px-2 py-2 text-sm font-medium text-orange-700 underline">Quản lý điều kiện</Link>
       </div>
       {rule?.issuingDocument && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Văn bản ban hành: {rule.issuingDocument}</p>}
-      <p className="text-sm text-slate-600">Tín chỉ xét lấy theo khung chương trình, loại trừ Giáo dục thể chất, Quốc phòng – An ninh và học phần nhạc cụ. Sinh viên đủ điều kiện hoặc đã bàn giao sẽ không được xét lại.</p>
+      <p className="text-sm text-slate-600">Tín chỉ xét lấy theo khung chương trình, loại trừ Giáo dục thể chất, Quốc phòng – An ninh và học phần nhạc cụ. Hệ thống tự xét theo ngày kết thúc đã lưu của Block 10, Block 3 và học kỳ. Có thể dùng nút xét để chạy thủ công khi cần.</p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void runAll()} disabled={loading || busy || saving || !fullCheck.length || selectionLocked}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">

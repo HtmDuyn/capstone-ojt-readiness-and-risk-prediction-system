@@ -16,12 +16,12 @@ export function defaultSemesters(year: number): SemesterDates[] {
 }
 const validCalendarDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 type DateRange = Pick<SemesterDates, 'startDate' | 'endDate'>;
-export function blockDateError(block: DateRange | undefined, semester: DateRange): string {
+export function blockDateError(block: DateRange | undefined, semester: DateRange, label = 'Block 3'): string {
   if (!block || !validCalendarDate(block.startDate) || !validCalendarDate(block.endDate))
-    return 'Chọn đủ ngày bắt đầu và kết thúc Block 3 hợp lệ.';
-  if (block.startDate > block.endDate) return 'Ngày kết thúc Block 3 không được trước ngày bắt đầu.';
+    return `Chọn đủ ngày bắt đầu và kết thúc ${label} hợp lệ.`;
+  if (block.startDate > block.endDate) return `Ngày kết thúc ${label} không được trước ngày bắt đầu.`;
   if (block.startDate < semester.startDate || block.endDate > semester.endDate)
-    return 'Block 3 phải nằm trong học kỳ tương ứng.';
+    return `${label} phải nằm trong học kỳ tương ứng.`;
   return '';
 }
 

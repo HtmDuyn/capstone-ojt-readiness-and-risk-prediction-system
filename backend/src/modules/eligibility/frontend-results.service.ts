@@ -1,3 +1,5 @@
+import type { PoolClient } from 'pg';
+import { latestEffectiveOjtCondition } from './ojt-policy.service';
 import { createHash } from 'node:crypto';
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { inputObject, invalid, positiveId, requiredText, enumValue, pagination, score } from '../students/student.validation';
@@ -52,7 +54,7 @@ export function parseFrontendResults(body: unknown) {
   return { idempotencyKey, results, requestHash, rule, thresholdId, conditionId };
 }
 
-export async function saveFrontendResults(body: unknown, actorId: number) {
+export async function saveFrontendResults(body: unknown, actorId: number, automatedClient?: PoolClient) {
   const input = parseFrontendResults(body);
   return academicTransaction(async client => {
     const policy = (await client.query('SELECT "Version","MinCredits","MaxUnpassedCourses" FROM "OJTConditionPolicies" ORDER BY "Version" DESC LIMIT 1')).rows[0];
@@ -79,6 +81,9 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
         'SELECT count(*)::int AS count FROM "EligibleStudentHandoffItems" WHERE "CalculatedBatchID"=$1', [existing.BatchID]);
       return { batchId: existing.BatchID, savedCount: existing.SavedCount, handedOffCount: handoff.count, replayed: true };
     }
+    const latest = await latestEffectiveOjtCondition(client);
+    if (latest && condition?.ConditionID !== latest.ConditionID)
+      throw invalid('Điều kiện OJT đang áp dụng đã thay đổi. Vui lòng xét lại.', 409, 'OJT_POLICY_CHANGED');
     const ids = input.results.map(result => result.studentId);
     const students = (await client.query(`SELECT s."StudentID",s."ProgramID",s."Status",u."Status" AS "AccountStatus",
       (SELECT max(COALESCE(h."UpdatedAt",h."CreatedAt")) FROM "StudentCourseResults" h WHERE h."StudentID"=s."StudentID") AS "HistoryUpdatedAt"
@@ -107,12 +112,12 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
       ON CONFLICT ("StudentID") DO UPDATE SET "BatchID"=EXCLUDED."BatchID","ProgramID"=EXCLUDED."ProgramID","Status"=EXCLUDED."Status",
         "Result"=EXCLUDED."Result","CheckedAt"=EXCLUDED."CheckedAt","SavedAt"=EXCLUDED."SavedAt","SavedBy"=EXCLUDED."SavedBy","ConditionID"=EXCLUDED."ConditionID"`,
       [JSON.stringify(records), batch.BatchID, batch.SavedAt, actorId, condition?.ConditionID ?? null]);
-    await audit(client, actorId, 'OJTEligibilityResultBatches', batch.BatchID, 'SAVE_FRONTEND_ELIGIBILITY', null, { savedCount: ids.length, studentIds: ids });
+    await audit(client, actorId, 'OJTEligibilityResultBatches', batch.BatchID, automatedClient ? 'SAVE_AUTOMATIC_ELIGIBILITY' : 'SAVE_FRONTEND_ELIGIBILITY', null, { savedCount: ids.length, studentIds: ids });
     const { handoffSavedEligibleStudents } = await import('../ojt-registration/handoff.service.js');
     const eligibleIds = records.filter(result => result.status === 'ELIGIBLE').map(result => result.studentId);
     const handedOffCount = await handoffSavedEligibleStudents(client, batch.BatchID, eligibleIds, actorId);
     return { batchId: batch.BatchID, savedCount: ids.length, handedOffCount, replayed: false };
-  });
+  }, automatedClient);
 }
 
 export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result."Result" || jsonb_build_object('source','FRONTEND','batchId',result."BatchID",'savedAt',result."SavedAt",'savedBy',result."SavedBy",
@@ -120,7 +125,9 @@ export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result.
   'isStale',result."ProgramID" IS DISTINCT FROM ${studentAlias}."ProgramID"
     OR CASE WHEN result."ConditionID" IS NOT NULL THEN
       result."ConditionID" IS DISTINCT FROM (result."Result"->'rule'->>'conditionId')::int
-      OR NOT EXISTS(SELECT 1 FROM "OJTConditions" condition WHERE condition."ConditionID"=result."ConditionID")
+      OR result."ConditionID" IS DISTINCT FROM (SELECT condition."ConditionID" FROM "OJTConditions" condition
+        WHERE condition."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+        ORDER BY condition."EffectiveFrom" DESC, condition."Version" DESC LIMIT 1)
       ELSE COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0) END
     OR ${studentAlias}."Status"<>'ACTIVE'
     OR EXISTS(SELECT 1 FROM "StudentAcademicPlacements" placement WHERE placement."StudentID"=${studentAlias}."StudentID" AND placement."UpdatedAt">result."CheckedAt")

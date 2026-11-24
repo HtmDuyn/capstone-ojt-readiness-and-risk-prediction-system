@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, History, Pencil, Plus, RefreshCw } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
+import { AcademicBlockDates } from '@/components/education/AcademicBlockDates';
 import { AcademicCalendarEditor } from '@/components/education/AcademicCalendarEditor';
 import { useEducationAcademicCalendar } from '@/hooks/education/useEducationAcademicCalendar';
-import { CALENDAR_TERMS, blockDateBounds, blockDateError, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
+import { CALENDAR_TERMS, blockDateError, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
 import type { AcademicPeriod, SemesterDates } from '@/types/education/academic.types';
 
 const stateLabel = { UPCOMING: 'Sắp diễn ra', NOT_STARTED: 'Chưa diễn ra', CURRENT: 'Đang diễn ra', PAST: 'Đã kết thúc' };
@@ -31,20 +32,21 @@ const compareValues = (a: number | string | null, b: number | string | null) => 
 };
 function SemesterBlocks({ semester, configured }: { semester: AcademicPeriod; configured?: AcademicPeriod }) {
   const calendar = semester.blockCalendar;
+  const savedBlock10 = semester.block10StartDate && semester.block10EndDate
+    ? { startDate: semester.block10StartDate, endDate: semester.block10EndDate } : null;
+  const main = savedBlock10 ?? calendar?.mainSemester;
   const blocks = [
-    { label: 'Block 10', range: calendar?.mainSemester },
-    { label: 'Tuần nghỉ', range: calendar?.break },
-    { label: 'Block 3', range: configured ?? calendar?.block },
+    { label: 'Block 10', range: main, saved: !!savedBlock10 },
+    { label: 'Block 3', range: configured ?? calendar?.block, saved: !!configured },
   ];
   return <div className="mt-3 border-l-2 border-orange-200 pl-3">
-    <p className="mb-2 text-xs font-medium text-slate-600">{configured ? 'Block 3 đã cấu hình · Block 10 và tuần nghỉ theo mẫu' : 'Lịch block xem trước'}</p>
     <dl className="grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2">
-      {blocks.map(({ label, range }) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-        <dt className="font-semibold text-slate-800">{label}</dt>
+      {blocks.map(({ label, range, saved }) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+        <dt className="font-semibold text-slate-800">{label}{range && <span className="ml-1 font-normal text-slate-500">{saved ? '· Đã lưu' : '· Xem trước'}</span>}</dt>
         <dd className="mt-1 text-slate-600">{range ? `${formatCalendarDate(range.startDate)} – ${formatCalendarDate(range.endDate)}` : 'Chưa có lịch'}</dd>
       </div>)}
     </dl>
-    {!calendar && <p className="mt-2 text-xs text-slate-600">Kỳ này không đủ ngày để tính lịch 10 tuần học, 1 tuần nghỉ và 3 tuần học lại.</p>}
+    {!calendar && (!savedBlock10 || !configured) && <p className="mt-2 text-xs text-slate-600">Kỳ này chưa có đủ ngày để hiển thị lịch xem trước của các block.</p>}
   </div>;
 }
 
@@ -52,6 +54,7 @@ const EducationAcademicYear: React.FC = () => {
   const model = useEducationAcademicCalendar();
   const [startYear, setStartYear] = useState(() => currentCalendarDate().slice(0, 4));
   const [creating, setCreating] = useState(false);
+  const [createBlock10, setCreateBlock10] = useState<SemesterDates[]>([]);
   const [createBlocks, setCreateBlocks] = useState<SemesterDates[]>([]);
   const [editing, setEditing] = useState(false);
   const initializedYear = useRef(false);
@@ -64,7 +67,11 @@ const EducationAcademicYear: React.FC = () => {
   const yearCode = validYear ? `${year}-${year + 1}` : '';
   const exists = model.years.some(item => item.yearCode === yearCode);
   const defaults = validYear ? defaultSemesters(year) : [];
-  const blockErrors = defaults.map((semester, index) => blockDateError(createBlocks[index], semester));
+  const blockErrors = defaults.map((semester, index) => {
+    const main = createBlock10[index], block = createBlocks[index];
+    return blockDateError(main, semester, 'Block 10') || blockDateError(block, semester)
+      || (main.endDate >= block.startDate ? 'Block 3 phải bắt đầu sau ngày kết thúc Block 10.' : '');
+  });
   const createConflict = defaults.some(semester => model.periods.some(period =>
     period.kind === 'SEMESTER' && period.startDate <= semester.endDate && period.endDate >= semester.startDate));
   const createHasErrors = createConflict || blockErrors.some(Boolean);
@@ -160,7 +167,7 @@ const EducationAcademicYear: React.FC = () => {
           <datalist id="academic-year-starts">{model.years.map(item => <option key={item.id} value={item.yearCode.slice(0, 4)} />)}</datalist>
         </label>
         <p className="pb-2 text-sm text-slate-600">Năm học: <strong className="text-slate-900">{yearCode || '—'}</strong></p>
-        {validYear && !exists && <button type="button" disabled={model.busy || model.loading || Boolean(model.catalogError)} onClick={() => { setCreateBlocks(defaults.map(({ term }) => ({ term, startDate: '', endDate: '' }))); setCreating(true); }} className="ml-auto inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Plus size={17} />Tạo năm học</button>}
+        {validYear && !exists && <button type="button" disabled={model.busy || model.loading || Boolean(model.catalogError)} onClick={() => { const empty = defaults.map(({ term }) => ({ term, startDate: '', endDate: '' })); setCreateBlocks(empty); setCreateBlock10(empty); setCreating(true); }} className="ml-auto inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Plus size={17} />Tạo năm học</button>}
         {validYear && exists && <button type="button" disabled={model.busy || model.calendarLoading || !draft} onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-2 rounded-lg border border-orange-200 px-4 py-2.5 text-sm font-semibold text-orange-700 disabled:opacity-50"><Pencil size={16} />Chỉnh sửa lịch học kỳ</button>}
       </div>
       {!validYear && <p role="alert" className="text-sm text-red-700">Nhập năm bắt đầu từ 1900 đến 2199.</p>}
@@ -217,22 +224,17 @@ const EducationAcademicYear: React.FC = () => {
     </div>
     {creating && validYear && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="create-year-title" className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl md:p-6">
-        <form className="space-y-5" onSubmit={async event => { event.preventDefault(); if (!model.busy && !exists && !createHasErrors && await model.create(yearCode, createBlocks)) setCreating(false); }}>
-          <div><h2 id="create-year-title" className="text-lg font-semibold text-slate-900">Tạo năm học {yearCode}</h2><p className="mt-1 text-sm text-slate-600">Chọn ngày bắt đầu và kết thúc Block 3 trong từng học kỳ.</p></div>
+        <form className="space-y-5" onSubmit={async event => { event.preventDefault(); if (!model.busy && !exists && !createHasErrors && await model.create(yearCode, createBlocks, createBlock10)) setCreating(false); }}>
+          <div><h2 id="create-year-title" className="text-lg font-semibold text-slate-900">Tạo năm học {yearCode}</h2><p className="mt-1 text-sm text-slate-600">Chọn ngày bắt đầu và kết thúc Block 10 và Block 3 trong từng học kỳ.</p></div>
           <label className="block max-w-56 text-sm font-medium text-slate-700">Năm bắt đầu<input type="number" value={startYear} readOnly className="mt-2 block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800" /></label>
           <div className="grid gap-4 md:grid-cols-3">{defaults.map((semester, index) => <fieldset key={semester.term} className={`min-w-0 space-y-3 rounded-xl border p-4 ${TERM_COLOR[semester.term]}`}>
             <legend className="px-1 font-semibold">{TERM_LABEL[semester.term]} {year}</legend>
             <p className="text-sm">Học kỳ {formatCalendarDate(semester.startDate)} – {formatCalendarDate(semester.endDate)}</p>
-            {(['startDate', 'endDate'] as const).map(field => <label key={field} className="block text-sm">
-              {field === 'startDate' ? 'Ngày bắt đầu Block 3' : 'Ngày kết thúc Block 3'}
-              <input required type="date" {...blockDateBounds(createBlocks[index], semester, field)} value={createBlocks[index]?.[field] ?? ''}
-                onChange={event => {
-                  const value = event.target.value;
-                  setCreateBlocks(blocks => blocks.map(block => block.term === semester.term ? { ...block, [field]: value } : block));
-                }}
-                className="mt-1 block w-full min-w-0 rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" />
-            </label>)}
-            {blockErrors[index] && createBlocks[index]?.startDate && createBlocks[index]?.endDate && <p role="alert" className="text-xs text-red-700">{blockErrors[index]}</p>}
+            <AcademicBlockDates label="Block 10" semester={semester} block={createBlock10[index]} required onChange={(field, value) =>
+              setCreateBlock10(rows => rows.map(row => row.term === semester.term ? { ...row, [field]: value } : row))} />
+            <AcademicBlockDates label="Block 3" semester={semester} block={createBlocks[index]} required onChange={(field, value) =>
+              setCreateBlocks(rows => rows.map(row => row.term === semester.term ? { ...row, [field]: value } : row))} />
+            {blockErrors[index] && createBlocks[index]?.endDate && createBlock10[index]?.endDate && <p role="alert" className="text-xs text-red-700">{blockErrors[index]}</p>}
           </fieldset>)}</div>
           {createConflict && <p role="alert" className="text-sm text-red-700">Lịch của năm học trùng với học kỳ đã tồn tại.</p>}
           {model.error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{model.error}</p>}

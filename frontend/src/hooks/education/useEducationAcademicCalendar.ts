@@ -56,9 +56,9 @@ export function useEducationAcademicCalendar() {
     years, periods, selectedId, setSelectedId, calendar, loading, calendarLoading, busy,
     error, catalogError, calendarError, notice,
     reload: () => { setError(''); setNotice(''); setRefresh(v => v + 1); },
-    create: (yearCode: string, blocks: SemesterDates[]) => mutate(() => academicService.createAcademicYear({ yearCode, blocks }), `Đã tạo năm học ${yearCode} và lịch Block 3 cho cả ba học kỳ.`),
-    save: (rows: SemesterDates[], blocks: SemesterDates[]) => calendar
-      ? mutate(() => academicService.updateCalendar(calendar.year.id, rows, calendar.revision, blocks), 'Đã cập nhật lịch học kỳ và Block 3.')
+    create: (yearCode: string, blocks: SemesterDates[], block10: SemesterDates[]) => mutate(() => academicService.createAcademicYear({ yearCode, blocks, block10 }), `Đã tạo năm học ${yearCode} và lịch Block 10 và Block 3 cho cả ba học kỳ.`),
+    save: (rows: SemesterDates[], blocks: SemesterDates[], block10: SemesterDates[]) => calendar
+      ? mutate(() => academicService.updateCalendar(calendar.year.id, rows, calendar.revision, blocks, block10), 'Đã cập nhật lịch học kỳ, Block 10 và Block 3.')
       : Promise.resolve(false),
   };
 }
