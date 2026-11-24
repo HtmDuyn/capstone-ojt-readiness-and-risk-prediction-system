@@ -7779,54 +7779,62 @@ ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCod
   "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
   "UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
 
--- Seeded passed history across curriculum semesters 1-5, tied to each student's actual cohort calendar.
--- Courses with unstructured prerequisite prose are skipped to preserve the database's history guard.
--- AI/IA have no directly importable required semester-5 course, so one safe required course is
--- modeled as delayed into semester 5 for those seeded students.
-CREATE TEMP TABLE qhdn_delayed_courses ON COMMIT DROP AS
-SELECT programs."ProgramID",chosen."CourseID"
-FROM (VALUES (11),(22)) AS programs("ProgramID")
-CROSS JOIN LATERAL (
-  SELECT pc."CourseID" FROM public."ProgramCourses" pc
-  WHERE pc."ProgramID"=programs."ProgramID" AND pc."EntryKind"='COURSE'
-    AND pc."IsRequired"=true AND pc."Credits">0 AND pc."RecommendedSemester"=3
-    AND lower(btrim(COALESCE(pc."PrerequisiteText",''))) IN ('','none','n/a','na','không','no','-')
-  ORDER BY pc."ProgramCourseID" LIMIT 1
-) chosen;
+-- Configure unambiguous single-course prerequisites already present in the source curriculum.
+WITH single_prerequisites AS (
+  SELECT target."ProgramID",target."ProgramCourseID",prerequisite."CourseID"
+  FROM public."ProgramCourses" target
+  JOIN public."ProgramCourses" prerequisite ON prerequisite."ProgramID"=target."ProgramID"
+    AND prerequisite."EntryKind"='COURSE' AND prerequisite."RecommendedSemester"<target."RecommendedSemester"
+  JOIN public."Courses" c ON c."CourseID"=prerequisite."CourseID"
+  WHERE target."EntryKind"='COURSE' AND target."IsRequired" AND target."RecommendedSemester" BETWEEN 1 AND 5
+    AND EXISTS (SELECT 1 FROM qhdn_student_roster r WHERE r."ProgramID"=target."ProgramID")
+    AND upper(c."CourseCode")=regexp_replace(upper(btrim(target."PrerequisiteText")), '^PASS[[:space:]]+', '')
+    AND NOT EXISTS (SELECT 1 FROM public."ProgramPrerequisiteGroups" g
+      WHERE g."ProgramID"=target."ProgramID" AND g."ProgramCourseID"=target."ProgramCourseID")
+), added AS (
+  INSERT INTO public."ProgramPrerequisiteGroups" ("ProgramID","ProgramCourseID","GroupCode","MinimumPassed")
+  SELECT "ProgramID","ProgramCourseID",'REQUIRED_PREVIOUS_COURSE',1 FROM single_prerequisites
+  RETURNING "ProgramID","ProgramCourseID","GroupID"
+)
+INSERT INTO public."ProgramPrerequisiteMembers" ("ProgramID","GroupID","CourseID")
+SELECT a."ProgramID",a."GroupID",p."CourseID" FROM added a JOIN single_prerequisites p USING ("ProgramID","ProgramCourseID");
 
-INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
-SELECT s."StudentID",pc."CourseID",pc."RecommendedSemester",period."AcademicYearID",8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,'QHDN_HANDOFF_2026',academic."UserID"
-FROM qhdn_student_roster r
-JOIN public."Users" u ON u."Email"=r."Email"
-JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
-JOIN public."ProgramCourses" pc ON pc."ProgramID"=s."ProgramID" AND pc."EntryKind"='COURSE'
-  AND pc."IsRequired"=true AND pc."Credits">0 AND pc."RecommendedSemester" BETWEEN 1 AND 5
-  AND lower(btrim(COALESCE(pc."PrerequisiteText",''))) IN ('','none','n/a','na','không','no','-')
-LEFT JOIN qhdn_delayed_courses delayed ON delayed."ProgramID"=s."ProgramID" AND delayed."CourseID"=pc."CourseID"
-JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
-JOIN public."CohortCurriculumPeriods" curriculum_period
-  ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
-  AND curriculum_period."CurriculumSemester"=pc."RecommendedSemester"
-JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
-JOIN public."Users" academic ON academic."Username"='academic01'
-WHERE delayed."CourseID" IS NULL AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
-  WHERE old."StudentID"=s."StudentID" AND old."CourseID"=pc."CourseID"
-    AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
-
-INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
-SELECT s."StudentID",delayed."CourseID",5,period."AcademicYearID",8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,'QHDN_HANDOFF_2026_DELAYED',academic."UserID"
-FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
-JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
-JOIN qhdn_delayed_courses delayed ON delayed."ProgramID"=s."ProgramID"
-JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
-JOIN public."CohortCurriculumPeriods" curriculum_period
-  ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
-  AND curriculum_period."CurriculumSemester"=5
-JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
-JOIN public."Users" academic ON academic."Username"='academic01'
-WHERE NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
-  WHERE old."StudentID"=s."StudentID" AND old."CourseID"=delayed."CourseID"
-    AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
+-- Seed real courses at their recommended stages, reading passed prerequisites from earlier stages.
+DO $seed_study_history$
+DECLARE stage integer;
+BEGIN
+  FOR stage IN 1..5 LOOP
+    INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
+    SELECT s."StudentID",pc."CourseID",pc."RecommendedSemester",period."AcademicYearID",8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,'QHDN_HANDOFF_2026',academic."UserID"
+    FROM qhdn_student_roster r
+    JOIN public."Users" u ON u."Email"=r."Email"
+    JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
+    JOIN public."ProgramCourses" pc ON pc."ProgramID"=s."ProgramID" AND pc."EntryKind"='COURSE'
+      AND pc."IsRequired"=true AND pc."Credits">0 AND pc."RecommendedSemester"=stage
+    JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
+    JOIN public."CohortCurriculumPeriods" curriculum_period
+      ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
+      AND curriculum_period."CurriculumSemester"=pc."RecommendedSemester"
+    JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
+    JOIN public."Users" academic ON academic."Username"='academic01'
+    WHERE (lower(btrim(COALESCE(pc."PrerequisiteText",''))) IN ('','none','n/a','na','không','no','-')
+      OR EXISTS (SELECT 1 FROM public."ProgramPrerequisiteGroups" g
+        WHERE g."ProgramID"=pc."ProgramID" AND g."ProgramCourseID"=pc."ProgramCourseID"))
+      AND NOT EXISTS (
+        SELECT 1 FROM public."ProgramPrerequisiteGroups" g
+        WHERE g."ProgramID"=pc."ProgramID" AND g."ProgramCourseID"=pc."ProgramCourseID"
+          AND g."MinimumPassed">(
+            SELECT count(*) FROM public."ProgramPrerequisiteMembers" m WHERE m."GroupID"=g."GroupID"
+              AND EXISTS (SELECT 1 FROM public."StudentCourseResults" passed
+                WHERE passed."StudentID"=s."StudentID" AND passed."CourseID"=m."CourseID"
+                  AND passed."Status" IN ('PASSED','RECOGNIZED') AND passed."SemesterTaken"<stage)
+          )
+      )
+      AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
+      WHERE old."StudentID"=s."StudentID" AND old."CourseID"=pc."CourseID"
+        AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
+  END LOOP;
+END $seed_study_history$;
 
 -- Twenty students submitted OJT registration; 5 approved, 2 rejected, 13 awaiting review.
 -- Ten remaining seeded students have no OJTRegistrations row.
