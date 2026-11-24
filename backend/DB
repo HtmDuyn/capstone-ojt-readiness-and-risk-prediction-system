@@ -3395,7 +3395,24 @@ INSERT INTO public."Courses" ("CourseID","CourseCode","CourseName","IsOJTPrerequ
 ('252','EFD301','Enterprise Fullstack Application Development (with Java)_Phát triển ứng dụng Fullstack doanh nghiệp (với Java)','false'),
 ('253','EMD301','Enterprise Microservices Architecture & Development (with Java)_Kiến trúc và Phát triển Microservices doanh nghiệp (với Java)','false'),
 ('254','BSS301','AI-Augmented Backend Systems & Intelligent Services_Hệ thống Backend và Dịch vụ Thông minh được tăng cường bằng AI','false'),
-('255','DDP301','Software Delivery, DevOps & Platform Engineering_Triển khai Phần mềm, DevOps và Kỹ thuật Nền tảng','false');
+('255','DDP301','Software Delivery, DevOps & Platform Engineering_Triển khai Phần mềm, DevOps và Kỹ thuật Nền tảng','false'),
+('256','AIP491','AI Capstone Project_Đồ án tốt nghiệp TTNT','false'),
+('257','CSR301','Cloud Computing Security_Bảo mật điện toán đám mây','false'),
+('258','DBA103','Traditional musical instrument_Nhạc cụ truyền thống - Đàn Bầu','false'),
+('259','DNG103','Traditional musical instrument_Nhạc cụ truyền thống-Đàn nguyệt','false'),
+('260','DNH103','Traditional music instrument_Nhạc cụ truyền thống- Đàn Nhị','false'),
+('261','DSA103','Traditional musical instrument_Nhạc cụ truyền thống- Sáo trúc','false'),
+('262','DTB103','Traditional music instrument_Nhạc cụ truyền thống- Đàn Tỳ bà','false'),
+('263','DTR103','Traditional musical instrument_Nhạc cụ truyền thống-Đàn Tranh','false'),
+('264','EXE401','Graduation Thesis Startup Project_Dự án khởi nghiệp tốt nghiệp','false'),
+('265','EXE402','Graduation Thesis on a Startup Project_Dự án khởi nghiệp tốt nghiệp','false'),
+('266','IAO202','Information Assurance Overview_Nhập môn An toàn thông tin','false'),
+('267','IAP491','IA Capstone Project_Đồ án tốt nghiệp an toàn thông tin','false'),
+('268','IAP491t','IA Graduation Project_Đồ án tốt nghiệp An Toàn Thông Tin','false'),
+('269','ISP490','IS Capstone Project_Đồ án tốt nghiệp HTTT','false'),
+('270','SAP490','SAP Interdisciplinary Capstone Project_Đồ án liên ngành SAP','false'),
+('271','SEP490','SE Capstone Project_Đồ án tốt nghiệp KTPM','false'),
+('272','TRG103','Traditional Musical Instrument_Nhạc cụ truyền thống -Trống dân tộc','false');
 
 INSERT INTO public."ProgramCombos" ("ProgramComboID","ProgramID","SourceComboID","ComboCode","ComboName","Note","CoursesReviewed") OVERRIDING SYSTEM VALUE VALUES
 ('1','1','1172','PHE_COM1','PHE_COM1: Vovinam BIT_AI_K17C(FNO)','','true'),
@@ -5674,6 +5691,121 @@ BEGIN
   END LOOP;
 END $curriculum_sequences$;
 
+-- Restore shared physical-education combos omitted from the four latest source folders.
+-- The same two combos and course sequences occur identically in the other 36 curriculum sources.
+-- Reuse the source names from the nearest SE and IA curriculum rows; the four omitted folders have no local source IDs.
+-- Candidate IDs are inferred from BIT_SE_K21C (26/334) and BIT_IA_K20D-21A (1172/1173); confirm before running this seed.
+INSERT INTO public."ProgramCombos" ("ProgramID","SourceComboID","ComboCode","ComboName","SelectionGroup","Note","CoursesReviewed")
+SELECT p."ProgramID",v."SourceComboID",v."ComboCode",v."ComboName",NULL,NULL,true
+FROM (VALUES
+  ('BIT_SE-2026_K21D_K22A',26,'PHE_COM1','PHE_COM1: Vovinam BIT_GD_K16D,K17A'),
+  ('BIT_SE-2026_K21D_K22A',334,'PHE_COM2','PHE_COM2: Cờ vua BIT_SE_K15A'),
+  ('BIT_IA_K21B',1172,'PHE_COM1','PHE_COM1: Vovinam BIT_AI_K17C(FNO)'),
+  ('BIT_IA_K21B',1173,'PHE_COM2','PHE_COM2: Chess_Cờ vua BIT_AI_K17C(FNO)'),
+  ('BIT_IA_K21C',1172,'PHE_COM1','PHE_COM1: Vovinam BIT_AI_K17C(FNO)'),
+  ('BIT_IA_K21C',1173,'PHE_COM2','PHE_COM2: Chess_Cờ vua BIT_AI_K17C(FNO)'),
+  ('BIT_IA_K21D-22A',1172,'PHE_COM1','PHE_COM1: Vovinam BIT_AI_K17C(FNO)'),
+  ('BIT_IA_K21D-22A',1173,'PHE_COM2','PHE_COM2: Chess_Cờ vua BIT_AI_K17C(FNO)')
+) AS v("ProgramCode","SourceComboID","ComboCode","ComboName")
+JOIN public."TrainingPrograms" p ON p."ProgramCode"=v."ProgramCode";
+
+-- Reuse the common PHE course sequences and take credits from each program's matching slot.
+INSERT INTO public."ComboCourses" ("ProgramComboID","SourceComboSubjectID","CourseID","CourseName","Semester","Credits","PrerequisiteText","Note")
+SELECT b."ProgramComboID",v."SourceComboSubjectID",c."CourseID",v."CourseName",v."Semester",slot."Credits",'',''
+FROM (VALUES
+  ('BIT_SE-2026_K21D_K22A','PHE_COM1',82,'VOV114','Vovinam 1',0,'PHE_COM*1'),
+  ('BIT_SE-2026_K21D_K22A','PHE_COM1',83,'VOV124','Vovinam 2',1,'PHE_COM*2'),
+  ('BIT_SE-2026_K21D_K22A','PHE_COM1',84,'VOV134','Vovinam 3',2,'PHE_COM*3'),
+  ('BIT_SE-2026_K21D_K22A','PHE_COM2',1398,'COV111','Cờ Vua 1',0,'PHE_COM*1'),
+  ('BIT_SE-2026_K21D_K22A','PHE_COM2',1399,'COV121','Cờ Vua 2',1,'PHE_COM*2'),
+  ('BIT_SE-2026_K21D_K22A','PHE_COM2',1400,'COV131','Cờ Vua 3',2,'PHE_COM*3'),
+  ('BIT_IA_K21B','PHE_COM1',5024,'VOV114','Vovinam 1',0,'PHE_COM*1'),
+  ('BIT_IA_K21B','PHE_COM1',5025,'VOV124','Vovinam 2',1,'PHE_COM*2'),
+  ('BIT_IA_K21B','PHE_COM1',5026,'VOV134','Vovinam 3',2,'PHE_COM*3'),
+  ('BIT_IA_K21B','PHE_COM2',5027,'COV111','Cờ Vua 1',0,'PHE_COM*1'),
+  ('BIT_IA_K21B','PHE_COM2',5028,'COV121','Cờ Vua 2',1,'PHE_COM*2'),
+  ('BIT_IA_K21B','PHE_COM2',5029,'COV131','Cờ Vua 3',2,'PHE_COM*3'),
+  ('BIT_IA_K21C','PHE_COM1',5024,'VOV114','Vovinam 1',0,'PHE_COM*1'),
+  ('BIT_IA_K21C','PHE_COM1',5025,'VOV124','Vovinam 2',1,'PHE_COM*2'),
+  ('BIT_IA_K21C','PHE_COM1',5026,'VOV134','Vovinam 3',2,'PHE_COM*3'),
+  ('BIT_IA_K21C','PHE_COM2',5027,'COV111','Cờ Vua 1',0,'PHE_COM*1'),
+  ('BIT_IA_K21C','PHE_COM2',5028,'COV121','Cờ Vua 2',1,'PHE_COM*2'),
+  ('BIT_IA_K21C','PHE_COM2',5029,'COV131','Cờ Vua 3',2,'PHE_COM*3'),
+  ('BIT_IA_K21D-22A','PHE_COM1',5024,'VOV114','Vovinam 1',0,'PHE_COM*1'),
+  ('BIT_IA_K21D-22A','PHE_COM1',5025,'VOV124','Vovinam 2',1,'PHE_COM*2'),
+  ('BIT_IA_K21D-22A','PHE_COM1',5026,'VOV134','Vovinam 3',2,'PHE_COM*3'),
+  ('BIT_IA_K21D-22A','PHE_COM2',5027,'COV111','Cờ Vua 1',0,'PHE_COM*1'),
+  ('BIT_IA_K21D-22A','PHE_COM2',5028,'COV121','Cờ Vua 2',1,'PHE_COM*2'),
+  ('BIT_IA_K21D-22A','PHE_COM2',5029,'COV131','Cờ Vua 3',2,'PHE_COM*3')
+) AS v("ProgramCode","ComboCode","SourceComboSubjectID","CourseCode","CourseName","Semester","SlotCode")
+JOIN public."TrainingPrograms" p ON p."ProgramCode"=v."ProgramCode"
+JOIN public."ProgramCombos" b ON b."ProgramID"=p."ProgramID" AND b."ComboCode"=v."ComboCode"
+JOIN public."Courses" c ON upper(c."CourseCode")=v."CourseCode"
+JOIN public."ProgramCourses" slot ON slot."ProgramID"=p."ProgramID"
+  AND slot."EntryKind"='COMBO_SLOT' AND slot."RecommendedSemester"=v."Semester"
+JOIN public."Courses" slot_course ON slot_course."CourseID"=slot."CourseID"
+  AND slot_course."CourseCode"=v."SlotCode";
+
+-- Map each combo subject to all interchangeable combo slots in its curriculum:
+-- the combo-family prefix and curriculum semester must both match.
+-- SE-2026 source combo codes have both SE-2026_COM and legacy SE_COM spellings.
+WITH slots AS (
+  SELECT pc."ProgramID",pc."ProgramCourseID",pc."RecommendedSemester",pc."Credits",
+    CASE WHEN left(upper(c."CourseCode"),11)='SE-2026_COM' THEN 'SE_COM'
+         ELSE regexp_replace(upper(c."CourseCode"),'\*.*$','') END AS "Family"
+  FROM public."ProgramCourses" pc JOIN public."Courses" c USING ("CourseID")
+  WHERE pc."EntryKind"='COMBO_SLOT'
+), combos AS (
+  SELECT b."ProgramID",b."ProgramComboID",
+    CASE WHEN left(upper(b."ComboCode"),11)='SE-2026_COM' THEN 'SE_COM'
+         ELSE split_part(upper(b."ComboCode"),'_COM',1)||'_COM' END AS "Family"
+  FROM public."ProgramCombos" b
+)
+INSERT INTO public."ProgramSlotOptions" ("ProgramID","ProgramCourseID","ProgramComboID","ComboCourseID")
+SELECT DISTINCT s."ProgramID",s."ProgramCourseID",b."ProgramComboID",cc."ComboCourseID"
+FROM slots s JOIN combos f ON f."ProgramID"=s."ProgramID" AND f."Family"=s."Family"
+JOIN public."ProgramCombos" b ON b."ProgramID"=f."ProgramID" AND b."ProgramComboID"=f."ProgramComboID"
+JOIN public."ComboCourses" cc ON cc."ProgramComboID"=b."ProgramComboID"
+  AND cc."Semester"=s."RecommendedSemester"
+WHERE cc."Credits" IS NULL OR cc."Credits"=s."Credits";
+
+-- Every mapped combo subject inherits the matching slot credit weight.
+WITH weights AS (
+  SELECT option."ProgramComboID",option."ComboCourseID",min(slot."Credits") AS "Credits",
+    count(DISTINCT slot."Credits") AS "CreditVariants"
+  FROM public."ProgramSlotOptions" option
+  JOIN public."ProgramCourses" slot ON slot."ProgramCourseID"=option."ProgramCourseID"
+  GROUP BY option."ProgramComboID",option."ComboCourseID"
+)
+UPDATE public."ComboCourses" cc SET "Credits"=weights."Credits"
+FROM weights
+WHERE cc."ProgramComboID"=weights."ProgramComboID"
+  AND cc."ComboCourseID"=weights."ComboCourseID"
+  AND cc."Credits" IS NULL AND weights."CreditVariants"=1;
+
+DO $verify_curriculum_slot_mapping$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public."ProgramCourses" pc
+    WHERE pc."EntryKind"='COMBO_SLOT'
+      AND NOT EXISTS (SELECT 1 FROM public."ProgramSlotOptions" option
+        WHERE option."ProgramCourseID"=pc."ProgramCourseID")
+  ) THEN
+    RAISE EXCEPTION 'A combo placeholder has no mapped combo options.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public."ComboCourses" cc
+    WHERE NOT EXISTS (SELECT 1 FROM public."ProgramSlotOptions" option
+      WHERE option."ComboCourseID"=cc."ComboCourseID")
+  ) THEN
+    RAISE EXCEPTION 'A combo subject has no mapped placeholder slot.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public."ComboCourses" WHERE "Credits" IS NULL) THEN
+    RAISE EXCEPTION 'A combo subject has no credit weight from its mapped curriculum slot.';
+  END IF;
+END $verify_curriculum_slot_mapping$;
+
+
 UPDATE public."TrainingPrograms" SET "CreatedBy" = NULL, "PublishedBy" = NULL;
 
 ALTER TABLE public."AcademicAlertNotificationBatches" ADD CONSTRAINT "AcademicAlertNotificationBatches_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
@@ -7518,6 +7650,300 @@ SELECT setval(pg_get_serial_sequence('public."Roles"','RoleID'), (SELECT MAX("Ro
 SELECT setval(pg_get_serial_sequence('public."Users"','UserID'), (SELECT MAX("UserID") FROM public."Users"), true);
 SELECT setval(pg_get_serial_sequence('public."Enterprises"','EnterpriseID'), (SELECT MAX("EnterpriseID") FROM public."Enterprises"), true);
 SELECT setval(pg_get_serial_sequence('public."EnterpriseUsers"','EnterpriseUserID'), (SELECT MAX("EnterpriseUserID") FROM public."EnterpriseUsers"), true);
+
+-- Seed QHDN handoff: 30 student accounts distributed across existing AI/IA/IS/SE curricula.
+-- Transcript rows use only required, mapped COURSE entries from semesters 1-5; combo/elective
+-- choices are not fabricated because no student-specific selection data was provided.
+CREATE TEMP TABLE qhdn_student_roster ON COMMIT DROP AS
+SELECT g.n AS "Number",
+  'student'||lpad(g.n::text,2,'0') AS "Username",
+  'student'||lpad(g.n::text,2,'0')||'@student.edu.vn' AS "Email",
+  'Sinh viên QHDN '||lpad(g.n::text,2,'0') AS "FullName",
+  'STU25-'||lpad(g.n::text,3,'0') AS "StudentCode",
+  CASE
+    WHEN g.n IN (1,2,3,14,15,16,17,25,26,27) THEN 30
+    WHEN g.n IN (4,5,18,19,20,28,29,30) THEN 40
+    WHEN g.n IN (6,8,9,10,21,22) THEN 11
+    ELSE 22
+  END AS "ProgramID",
+  CASE
+    WHEN g.n IN (1,2,3,14,15,16,17,25,26,27) THEN 'IS-K25'
+    WHEN g.n IN (4,5,18,19,20,28,29,30) THEN 'SE-K25'
+    WHEN g.n IN (6,8,9,10,21,22) THEN 'AI-K25'
+    ELSE 'IA-K25'
+  END AS "CohortCode",
+  CASE WHEN g.n<=5 THEN 'APPROVED'
+       WHEN g.n<=7 THEN 'REJECTED'
+       WHEN g.n<=20 THEN 'SUBMITTED'
+       ELSE NULL END AS "RegistrationStatus"
+FROM generate_series(1,30) AS g(n);
+
+INSERT INTO public."AcademicYears" ("YearCode","StartDate","EndDate","Status") VALUES
+  ('2025-2026','2025-01-01','2025-12-31','CLOSED'),
+  ('2026-2027','2026-01-01','2026-12-31','ACTIVE'),
+  ('2027-2028','2027-01-01','2027-12-31','PLANNED'),
+  ('2028-2029','2028-01-01','2028-12-31','PLANNED')
+ON CONFLICT ("YearCode") DO UPDATE SET
+  "StartDate"=EXCLUDED."StartDate","EndDate"=EXCLUDED."EndDate","Status"=EXCLUDED."Status";
+
+INSERT INTO public."AcademicPeriods" ("AcademicYearID","PeriodCode","Name","Kind","ParentPeriodID","StartDate","EndDate","Status")
+SELECT y."AcademicYearID",v."PeriodCode",v."Name",'SEMESTER',NULL,v."StartDate"::date,v."EndDate"::date,v."Status"
+FROM (VALUES
+  ('SPRING2025','2025-2026','Spring 2025','2025-01-01','2025-04-30','CLOSED'),
+  ('SUMMER2025','2025-2026','Summer 2025','2025-05-01','2025-08-31','CLOSED'),
+  ('FALL2025','2025-2026','Fall 2025','2025-09-01','2025-12-31','CLOSED'),
+  ('SPRING2026','2026-2027','Spring 2026','2026-01-01','2026-04-30','CLOSED'),
+  ('SUMMER2026','2026-2027','Summer 2026','2026-05-01','2026-08-31','CLOSED'),
+  ('FALL2026','2026-2027','Fall 2026','2026-09-01','2026-12-31','ACTIVE'),
+  ('SPRING2027','2027-2028','Spring 2027','2027-01-01','2027-04-30','PLANNED'),
+  ('SUMMER2027','2027-2028','Summer 2027','2027-05-01','2027-08-31','PLANNED'),
+  ('FALL2027','2027-2028','Fall 2027','2027-09-01','2027-12-31','PLANNED'),
+  ('SPRING2028','2028-2029','Spring 2028','2028-01-01','2028-04-30','PLANNED'),
+  ('SUMMER2028','2028-2029','Summer 2028','2028-05-01','2028-08-31','PLANNED'),
+  ('FALL2028','2028-2029','Fall 2028','2028-09-01','2028-12-31','PLANNED')
+) AS v("PeriodCode","YearCode","Name","StartDate","EndDate","Status")
+JOIN public."AcademicYears" y ON y."YearCode"=v."YearCode"
+ON CONFLICT ("PeriodCode") DO UPDATE SET
+  "AcademicYearID"=EXCLUDED."AcademicYearID","Name"=EXCLUDED."Name","Kind"=EXCLUDED."Kind",
+  "ParentPeriodID"=NULL,"StartDate"=EXCLUDED."StartDate","EndDate"=EXCLUDED."EndDate","Status"=EXCLUDED."Status";
+
+INSERT INTO public."OJTSemesters" ("AcademicYearID","SemesterCode","Name","RegStartDate","RegEndDate","StartDate","EndDate","Status","AcademicPeriodID")
+SELECT y."AcademicYearID",'OJT-AP-'||p."AcademicPeriodID",p."Name",'2026-10-15','2026-12-31',p."StartDate",p."EndDate",'OPEN',p."AcademicPeriodID"
+FROM public."AcademicPeriods" p
+JOIN public."AcademicYears" y ON y."AcademicYearID"=p."AcademicYearID"
+WHERE p."PeriodCode"='SPRING2027'
+ON CONFLICT ("SemesterCode") DO UPDATE SET
+  "AcademicYearID"=EXCLUDED."AcademicYearID","Name"=EXCLUDED."Name",
+  "RegStartDate"=EXCLUDED."RegStartDate","RegEndDate"=EXCLUDED."RegEndDate",
+  "StartDate"=EXCLUDED."StartDate","EndDate"=EXCLUDED."EndDate",
+  "Status"=EXCLUDED."Status","AcademicPeriodID"=EXCLUDED."AcademicPeriodID";
+
+INSERT INTO public."Cohorts" ("CohortCode","Name","EnrollmentYear","Status") VALUES
+  ('AI-K25','Cohort 2025 - AI',2025,'ACTIVE'),
+  ('IA-K25','Cohort 2025 - IA',2025,'ACTIVE'),
+  ('IS-K25','Cohort 2025 - IS',2025,'ACTIVE'),
+  ('SE-K25','Cohort 2025 - SE',2025,'ACTIVE')
+ON CONFLICT ("CohortCode") DO UPDATE SET "Name"=EXCLUDED."Name","EnrollmentYear"=EXCLUDED."EnrollmentYear","Status"=EXCLUDED."Status";
+
+INSERT INTO public."CohortGroups" ("CohortID","GroupCode","EntryAcademicPeriodID")
+SELECT c."CohortID",group_row."GroupCode",entry."AcademicPeriodID"
+FROM public."Cohorts" c
+CROSS JOIN (VALUES ('A'),('B'),('C'),('D')) AS group_row("GroupCode")
+JOIN public."AcademicPeriods" entry ON entry."PeriodCode"='SPRING2025'
+WHERE c."CohortCode" IN ('AI-K25','IA-K25','IS-K25','SE-K25')
+ON CONFLICT ("CohortID","GroupCode") DO UPDATE SET "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID";
+
+INSERT INTO public."CohortCurriculumPeriods" ("CohortID","GroupCode","CurriculumSemester","AcademicPeriodID")
+SELECT c."CohortID",group_row."GroupCode",stage."CurriculumSemester",p."AcademicPeriodID"
+FROM public."Cohorts" c
+CROSS JOIN (VALUES ('A'),('B'),('C'),('D')) AS group_row("GroupCode")
+CROSS JOIN (VALUES
+  (0,'SPRING2025'),(1,'SUMMER2025'),(2,'FALL2025'),(3,'SPRING2026'),
+  (4,'SUMMER2026'),(5,'FALL2026'),(6,'SPRING2027'),(7,'SUMMER2027'),
+  (8,'FALL2027'),(9,'SPRING2028')
+) AS stage("CurriculumSemester","PeriodCode")
+JOIN public."AcademicPeriods" p ON p."PeriodCode"=stage."PeriodCode"
+WHERE c."CohortCode" IN ('AI-K25','IA-K25','IS-K25','SE-K25')
+ON CONFLICT ("CohortID","GroupCode","CurriculumSemester") DO UPDATE SET "AcademicPeriodID"=EXCLUDED."AcademicPeriodID";
+
+INSERT INTO public."Users" ("Username","PasswordHash","Email","FullName","RoleID","Status","MustChangePassword","AuthVersion")
+SELECT r."Username",'$2b$12$i.9n5k5f7IoSkoBsjrNiFuYsz4myUZ42zMmwYSYPRklJc5jyTjl/G',r."Email",r."FullName",student_role."RoleID",'ACTIVE',false,0
+FROM qhdn_student_roster r CROSS JOIN public."Roles" student_role
+WHERE student_role."RoleCode"='STUDENT'
+  AND NOT EXISTS (SELECT 1 FROM public."Users" u WHERE u."Username"=r."Username" OR u."Email"=r."Email")
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status","CohortCode")
+SELECT u."UserID",r."StudentCode",r."ProgramID",
+  2025,5,
+  CASE r."ProgramID" WHEN 11 THEN 'AI-K25' WHEN 22 THEN 'IA-K25' WHEN 30 THEN 'IS-K25' ELSE 'SE-K25' END,
+  'ACTIVE',r."CohortCode"
+FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email" AND u."RoleID"=(SELECT "RoleID" FROM public."Roles" WHERE "RoleCode"='STUDENT')
+WHERE NOT EXISTS (SELECT 1 FROM public."Students" s WHERE s."UserID"=u."UserID" OR s."StudentCode"=r."StudentCode")
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
+SELECT s."StudentID",c."CohortID",'A',entry."AcademicPeriodID",current_period."AcademicPeriodID",academic."UserID"
+FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
+JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
+JOIN public."Cohorts" c ON c."CohortCode"=r."CohortCode"
+JOIN public."AcademicPeriods" entry ON entry."PeriodCode"='SPRING2025'
+JOIN public."AcademicPeriods" current_period ON current_period."PeriodCode"='FALL2026'
+JOIN public."Users" academic ON academic."Username"='academic01'
+ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCode"=EXCLUDED."GroupCode",
+  "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
+  "UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
+
+-- Seeded passed history across curriculum semesters 1-5, tied to each student's actual cohort calendar.
+-- Courses with unstructured prerequisite prose are skipped to preserve the database's history guard.
+-- AI/IA have no directly importable required semester-5 course, so one safe required course is
+-- modeled as delayed into semester 5 for those seeded students.
+CREATE TEMP TABLE qhdn_delayed_courses ON COMMIT DROP AS
+SELECT programs."ProgramID",chosen."CourseID"
+FROM (VALUES (11),(22)) AS programs("ProgramID")
+CROSS JOIN LATERAL (
+  SELECT pc."CourseID" FROM public."ProgramCourses" pc
+  WHERE pc."ProgramID"=programs."ProgramID" AND pc."EntryKind"='COURSE'
+    AND pc."IsRequired"=true AND pc."Credits">0 AND pc."RecommendedSemester"=3
+    AND lower(btrim(COALESCE(pc."PrerequisiteText",''))) IN ('','none','n/a','na','không','no','-')
+  ORDER BY pc."ProgramCourseID" LIMIT 1
+) chosen;
+
+INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
+SELECT s."StudentID",pc."CourseID",pc."RecommendedSemester",period."AcademicYearID",8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,'QHDN_HANDOFF_2026',academic."UserID"
+FROM qhdn_student_roster r
+JOIN public."Users" u ON u."Email"=r."Email"
+JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
+JOIN public."ProgramCourses" pc ON pc."ProgramID"=s."ProgramID" AND pc."EntryKind"='COURSE'
+  AND pc."IsRequired"=true AND pc."Credits">0 AND pc."RecommendedSemester" BETWEEN 1 AND 5
+  AND lower(btrim(COALESCE(pc."PrerequisiteText",''))) IN ('','none','n/a','na','không','no','-')
+LEFT JOIN qhdn_delayed_courses delayed ON delayed."ProgramID"=s."ProgramID" AND delayed."CourseID"=pc."CourseID"
+JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
+JOIN public."CohortCurriculumPeriods" curriculum_period
+  ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
+  AND curriculum_period."CurriculumSemester"=pc."RecommendedSemester"
+JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
+JOIN public."Users" academic ON academic."Username"='academic01'
+WHERE delayed."CourseID" IS NULL AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
+  WHERE old."StudentID"=s."StudentID" AND old."CourseID"=pc."CourseID"
+    AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
+
+INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
+SELECT s."StudentID",delayed."CourseID",5,period."AcademicYearID",8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,'QHDN_HANDOFF_2026_DELAYED',academic."UserID"
+FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
+JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
+JOIN qhdn_delayed_courses delayed ON delayed."ProgramID"=s."ProgramID"
+JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
+JOIN public."CohortCurriculumPeriods" curriculum_period
+  ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
+  AND curriculum_period."CurriculumSemester"=5
+JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
+JOIN public."Users" academic ON academic."Username"='academic01'
+WHERE NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
+  WHERE old."StudentID"=s."StudentID" AND old."CourseID"=delayed."CourseID"
+    AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
+
+-- Twenty students submitted OJT registration; 5 approved, 2 rejected, 13 awaiting review.
+-- Ten remaining seeded students have no OJTRegistrations row.
+-- WindowID is NULL to use the legacy-compatible seed path; no formal review window/check is fabricated.
+INSERT INTO public."OJTRegistrations" ("StudentID","OJTSemesterID","RegisteredAt","Status","WindowID","ProgramID","Application","SubmittedBy","ReviewedBy","ReviewedAt","ReviewReason")
+SELECT s."StudentID",term."OJTSemesterID",TIMESTAMP '2026-10-15 09:00:00'+(r."Number"-1)*INTERVAL '1 day',r."RegistrationStatus",
+  NULL,s."ProgramID",jsonb_build_object('source','QHDN_HANDOFF','studentCode',s."StudentCode"),u."UserID",
+  CASE WHEN r."RegistrationStatus" IN ('APPROVED','REJECTED') THEN coordinator."UserID" END,
+  CASE WHEN r."RegistrationStatus" IN ('APPROVED','REJECTED') THEN TIMESTAMP '2026-11-10 09:00:00' END,
+  CASE r."RegistrationStatus" WHEN 'APPROVED' THEN 'Hồ sơ được tiếp nhận trong đợt bàn giao QHDN.'
+       WHEN 'REJECTED' THEN 'Hồ sơ chưa đạt điều kiện xét OJT trong đợt bàn giao QHDN.' ELSE NULL END
+FROM qhdn_student_roster r
+JOIN public."Users" u ON u."Email"=r."Email"
+JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
+JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=(SELECT "AcademicPeriodID" FROM public."AcademicPeriods" WHERE "PeriodCode"='SPRING2027')
+CROSS JOIN public."Users" coordinator
+WHERE r."RegistrationStatus" IS NOT NULL AND coordinator."Username"='ojt.coord01'
+ON CONFLICT ("StudentID","OJTSemesterID") DO UPDATE SET
+  "RegisteredAt"=EXCLUDED."RegisteredAt","Status"=EXCLUDED."Status","WindowID"=NULL,
+  "ProgramID"=EXCLUDED."ProgramID","Application"=EXCLUDED."Application","SubmittedBy"=EXCLUDED."SubmittedBy",
+  "ReviewCheckID"=NULL,"ReviewedBy"=EXCLUDED."ReviewedBy","ReviewedAt"=EXCLUDED."ReviewedAt","ReviewReason"=EXCLUDED."ReviewReason";
+
+INSERT INTO public."OJTRegistrationEvents" ("RegistrationID","Action","IdempotencyKey","Snapshot","CreatedBy","CreatedAt","Reason")
+SELECT reg."RegistrationID",'SUBMITTED','QHDN-'||s."StudentCode"||'-SUBMITTED',
+  jsonb_build_object('source','QHDN_HANDOFF','studentCode',s."StudentCode",'status','SUBMITTED'),u."UserID",reg."RegisteredAt" AT TIME ZONE 'Asia/Ho_Chi_Minh',NULL
+FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
+JOIN public."Students" s ON s."UserID"=u."UserID"
+JOIN public."OJTRegistrations" reg ON reg."StudentID"=s."StudentID"
+JOIN public."OJTSemesters" term ON term."OJTSemesterID"=reg."OJTSemesterID"
+  AND term."AcademicPeriodID"=(SELECT "AcademicPeriodID" FROM public."AcademicPeriods" WHERE "PeriodCode"='SPRING2027')
+WHERE r."RegistrationStatus" IS NOT NULL
+ON CONFLICT ("RegistrationID","IdempotencyKey") DO NOTHING;
+
+INSERT INTO public."OJTRegistrationEvents" ("RegistrationID","Action","IdempotencyKey","Snapshot","CreatedBy","CreatedAt","Reason")
+SELECT reg."RegistrationID",r."RegistrationStatus",'QHDN-'||s."StudentCode"||'-REVIEWED',
+  jsonb_build_object('source','QHDN_HANDOFF','studentCode',s."StudentCode",'status',r."RegistrationStatus"),coordinator."UserID",TIMESTAMPTZ '2026-11-10 09:00:00+07',
+  CASE r."RegistrationStatus" WHEN 'APPROVED' THEN 'Hồ sơ được tiếp nhận trong đợt bàn giao QHDN.' ELSE 'Hồ sơ chưa đạt điều kiện xét OJT trong đợt bàn giao QHDN.' END
+FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
+JOIN public."Students" s ON s."UserID"=u."UserID"
+JOIN public."OJTRegistrations" reg ON reg."StudentID"=s."StudentID"
+JOIN public."OJTSemesters" term ON term."OJTSemesterID"=reg."OJTSemesterID"
+  AND term."AcademicPeriodID"=(SELECT "AcademicPeriodID" FROM public."AcademicPeriods" WHERE "PeriodCode"='SPRING2027')
+CROSS JOIN public."Users" coordinator
+WHERE r."RegistrationStatus" IN ('APPROVED','REJECTED') AND coordinator."Username"='ojt.coord01'
+ON CONFLICT ("RegistrationID","IdempotencyKey") DO NOTHING;
+
+DO $verify_qhdn_seed_students$
+BEGIN
+  IF (SELECT count(*) FROM public."Students" s JOIN public."Users" u USING ("UserID") WHERE u."Email" LIKE 'student__@student.edu.vn')<>30 THEN
+    RAISE EXCEPTION 'Expected 30 QHDN seed students.';
+  END IF;
+  IF (SELECT count(*) FROM public."AcademicPeriods" WHERE "PeriodCode" IN (
+      'SPRING2025','SUMMER2025','FALL2025','SPRING2026','SUMMER2026','FALL2026',
+      'SPRING2027','SUMMER2027','FALL2027','SPRING2028','SUMMER2028','FALL2028'))<>12 THEN
+    RAISE EXCEPTION 'Expected the standard Spring/Summer/Fall periods for academic years 2025-2026 through 2028-2029.';
+  END IF;
+  IF (SELECT count(*) FROM public."CohortGroups" group_row JOIN public."Cohorts" cohort USING ("CohortID")
+      WHERE cohort."CohortCode" IN ('AI-K25','IA-K25','IS-K25','SE-K25'))<>16
+     OR (SELECT count(*) FROM public."CohortCurriculumPeriods" mapping
+         JOIN public."Cohorts" cohort USING ("CohortID")
+         WHERE cohort."CohortCode" IN ('AI-K25','IA-K25','IS-K25','SE-K25'))<>160 THEN
+    RAISE EXCEPTION 'Each cohort group must have the source-defined A-D groups and curriculum stages 0-9.';
+  END IF;
+  IF (SELECT count(*) FROM public."OJTRegistrations" r JOIN public."OJTSemesters" term USING ("OJTSemesterID")
+      JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID" WHERE period."PeriodCode"='SPRING2027')<>20 THEN
+    RAISE EXCEPTION 'Expected 20 OJT registrations for the QHDN seed cohort.';
+  END IF;
+  IF (SELECT count(*) FROM public."OJTRegistrations" r JOIN public."OJTSemesters" term USING ("OJTSemesterID")
+      JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID" WHERE period."PeriodCode"='SPRING2027' AND r."Status"='APPROVED')<>5
+     OR (SELECT count(*) FROM public."OJTRegistrations" r JOIN public."OJTSemesters" term USING ("OJTSemesterID")
+         JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID" WHERE period."PeriodCode"='SPRING2027' AND r."Status"='REJECTED')<>2
+     OR (SELECT count(*) FROM public."OJTRegistrations" r JOIN public."OJTSemesters" term USING ("OJTSemesterID")
+         JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID" WHERE period."PeriodCode"='SPRING2027' AND r."Status"='SUBMITTED')<>13 THEN
+    RAISE EXCEPTION 'OJT registration status counts do not match 5/2/13.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public."StudentCourseResults" result
+    JOIN public."Students" student ON student."StudentID"=result."StudentID"
+    JOIN public."Users" account ON account."UserID"=student."UserID"
+    WHERE account."Email" LIKE 'student__@student.edu.vn'
+      AND NOT EXISTS (SELECT 1 FROM public."ProgramCourses" pc
+        WHERE pc."ProgramID"=student."ProgramID" AND pc."CourseID"=result."CourseID"
+          AND pc."EntryKind"='COURSE' AND pc."IsRequired"=true AND pc."RecommendedSemester" BETWEEN 1 AND 5)
+  ) THEN RAISE EXCEPTION 'A seeded course result is not mapped to its assigned curriculum in semesters 1-5.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public."StudentCourseResults" result
+    JOIN public."Students" student ON student."StudentID"=result."StudentID"
+    JOIN public."Users" account ON account."UserID"=student."UserID"
+    WHERE account."Email" LIKE 'student__@student.edu.vn'
+      AND (result."SemesterTaken" NOT BETWEEN 1 AND 5 OR NOT EXISTS (
+        SELECT 1 FROM public."StudentAcademicPlacements" placement
+        JOIN public."CohortCurriculumPeriods" curriculum_period
+          ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
+          AND curriculum_period."CurriculumSemester"=result."SemesterTaken"
+        JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
+        WHERE placement."StudentID"=student."StudentID"
+          AND period."AcademicPeriodID"=result."AcademicPeriodID"
+          AND period."AcademicYearID"=result."AcademicYearID"))
+  ) THEN RAISE EXCEPTION 'A seeded course result does not match the student's mapped academic semester and year.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM qhdn_student_roster roster
+    JOIN public."Users" account ON account."Email"=roster."Email"
+    JOIN public."Students" student ON student."UserID"=account."UserID"
+    CROSS JOIN generate_series(1,5) AS stage(n)
+    WHERE NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" result
+      WHERE result."StudentID"=student."StudentID" AND result."SemesterTaken"=stage.n
+        AND result."Status" IN ('PASSED','RECOGNIZED'))
+  ) THEN RAISE EXCEPTION 'Every seeded student must have course history in each curriculum semester from 1 through 5.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM qhdn_student_roster roster
+    JOIN public."Users" account ON account."Email"=roster."Email"
+    JOIN public."Students" student ON student."UserID"=account."UserID"
+    LEFT JOIN public."OJTRegistrations" registration ON registration."StudentID"=student."StudentID"
+    LEFT JOIN public."OJTSemesters" term ON term."OJTSemesterID"=registration."OJTSemesterID"
+      AND term."AcademicPeriodID"=(SELECT "AcademicPeriodID" FROM public."AcademicPeriods" WHERE "PeriodCode"='SPRING2027')
+    WHERE roster."RegistrationStatus" IS NULL AND term."OJTSemesterID" IS NOT NULL
+  ) THEN RAISE EXCEPTION 'The ten seeded students without an OJT application must have no registration row.';
+  END IF;
+END $verify_qhdn_seed_students$;
 
 COMMIT;
 
