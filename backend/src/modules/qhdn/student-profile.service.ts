@@ -42,9 +42,9 @@ export async function studentDossier(studentId: number, params: Row, actor: Acto
       LEFT JOIN "JobApplications" application ON application."ApplicationID"=coordination."ApplicationID" AND application."StudentID"=s."StudentID" AND application."OJTSemesterID"=$2
       LEFT JOIN "StudentCVFiles" submitted_cv ON submitted_cv."CVFileID"=application."CVFileID" AND submitted_cv."StudentID"=s."StudentID"
       WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL
-        AND EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" handoff
+        AND EXISTS (SELECT 1 FROM "OJTRecruitmentAccess" handoff
           WHERE handoff."StudentID"=s."StudentID" AND handoff."OJTSemesterID"=$2)`, [id, semesterId])).rows[0];
-    if (!student) throw invalid('Không tìm thấy sinh viên trong danh sách bàn giao của học kỳ này.', 404, 'STUDENT_NOT_FOUND');
+    if (!student) throw invalid('Không tìm thấy sinh viên trong danh sách OJT của học kỳ này.', 404, 'STUDENT_NOT_FOUND');
     return student;
   });
 }

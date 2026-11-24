@@ -1,3 +1,4 @@
+import { studentAdmission } from '../student-portal/admission.service';
 import { registrationRecord, eligibleOfficial } from '../ojt-registration/registration.service';
 import type { PoolClient } from 'pg';
 import { assertPublishedPosition } from '../recruitment/recruitment.repository';
@@ -14,6 +15,13 @@ const rejected=(value:unknown)=>['REJECTED','REJECT'].includes(String(value).toU
 async function registration(c:PoolClient,id:number){
   const r=await registrationRecord(c,id);
   if(!r)throw invalid('Registration not found.',404);
+  if (['SUBMITTED','APPROVED','HANDED_OFF','REJECTED'].includes(r.Status)) {
+    const admission = await studentAdmission(c,r.StudentID,r.OJTSemesterID);
+    if (admission?.source === 'SAVED_ELIGIBILITY') {
+      if (r.ProgramID!==r.CurrentProgramID) throw invalid('Chương trình của sinh viên đã thay đổi.',409,'REGISTRATION_PROGRAM_CHANGED');
+      return r;
+    }
+  }
   const handoff=(await c.query(`SELECT "RegistrationID","CheckID","CalculatedBatchID" FROM "EligibleStudentHandoffItems"
     WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 AND ("RegistrationID" IS NULL OR "RegistrationID"=$3)
     ORDER BY ("RegistrationID"=$3) DESC LIMIT 1`,[r.StudentID,r.OJTSemesterID,r.RegistrationID])).rows[0];

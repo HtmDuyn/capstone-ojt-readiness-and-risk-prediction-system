@@ -764,11 +764,6 @@ export const educationOverviewService = {
 export const educationOjtWorkflowService = {
   getHandoffs: (ojtSemesterId?: number, signal?: AbortSignal) =>
     getAllItems<Handoff>('/eligible-student-handoffs', ojtSemesterId ? { ojtSemesterId } : {}, signal),
-  async handoff(payload: { ojtSemesterId: number; studentIds: number[]; reason: string; idempotencyKey: string }) {
-    return apiData<{ handoffId: number; total: number; recipientRole: string }>(
-      (await API.post('/eligible-student-handoffs', payload)).data,
-    );
-  },
   getFinalResults: (query: Query, signal?: AbortSignal) =>
     getPage<OjtFinalResult>('/ojt-results', query, signal),
 };

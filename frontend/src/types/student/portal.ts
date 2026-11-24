@@ -66,8 +66,9 @@ export interface Eligibility {
   rule?: { minCredits: number; maxUnpassedCourses: number | null } | null;
 }
 export interface AdmissionEligibility extends Eligibility {
-  source: 'FRONTEND_HANDOFF' | 'OFFICIAL_CHECK';
-  handoffId: number;
+  source: 'SAVED_ELIGIBILITY' | 'FRONTEND_HANDOFF' | 'OFFICIAL_CHECK';
+  handoffId: number | null;
+  roundId?: number | null;
   batchId?: number;
   handedOffAt?: string;
   appliedCondition?: import('../education/eligibility.types').OjtAppliedCondition | null;

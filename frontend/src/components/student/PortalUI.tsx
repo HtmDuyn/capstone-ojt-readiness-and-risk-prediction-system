@@ -55,7 +55,7 @@ export const statusText = (status?: string | null): string =>
   'Chưa có dữ liệu';
 const blockerLabels: Record<string, string> = {
   ELIGIBLE_HANDOFF_REQUIRED:
-    'Chờ Phòng Đào tạo bàn giao danh sách đủ điều kiện.',
+    'Chưa có kết quả đủ điều kiện tham gia OJT.',
   CONFIRMED_ELIGIBILITY_REQUIRED:
     'Chưa có xác nhận đủ điều kiện OJT hiện hành.',
   OFFICIAL_ELIGIBILITY_REQUIRED: 'Chưa có xác nhận đủ điều kiện OJT hiện hành.',
@@ -287,7 +287,7 @@ export function EligibilityCard({
     <Card title="Điều kiện tham gia OJT">
       {admission && (
         <p className="font-semibold">
-          Kết quả bàn giao từ Phòng Đào tạo:{' '}
+          Kết quả xét để tham gia OJT:{' '}
           {admission.isStale ? 'Dữ liệu đã thay đổi, cần rà soát' : statusText(admission.status)}
         </p>
       )}

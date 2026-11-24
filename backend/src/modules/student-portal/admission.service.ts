@@ -4,10 +4,24 @@ import { officialEligibilityWithClient } from '../eligibility/eligibility.servic
 import { invalid } from '../students/student.validation';
 import type { Row } from './shared';
 
-// Student admission follows the same handoff sources already accepted by QHDN.
-// Never manufacture an official check for a saved-calculation handoff.
+// Use the live recruitment roster first, then check historical eligibility records.
 export async function studentAdmission(client: PoolClient, studentId: number, semesterId: number,
   options: { lockSource?: boolean; official?: Row | null } = {}) {
+  const direct = (await client.query(`SELECT saved."Result" AS result, roster."BatchID", roster."RoundID"
+    FROM "OJTRecruitmentRoster" roster JOIN "StudentOJTCalculatedResults" saved USING ("StudentID")
+    WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=$2`, [studentId, semesterId])).rows[0];
+  if (direct) {
+    const { result } = direct;
+    return {
+      studentId, status: 'ELIGIBLE', isStale: false,
+      earnedCredits: result.earnedCredits ?? null, missingCredits: 0,
+      unpassedCourseCount: result.unpassedCourseCount ?? null,
+      reasons: result.reasons ?? [], academicIssues: result.academicIssues ?? [],
+      source: 'SAVED_ELIGIBILITY', handoffId: null, batchId: direct.BatchID,
+      roundId: direct.RoundID as number | null, checkId: null,
+      appliedCondition: result.rule?.conditionId ? { id: result.rule.conditionId, version: result.rule.version, minCredits: result.rule.minCredits, issuingDocument: result.rule.issuingDocument ?? '' } : null,
+    };
+  }
   const handoff = (await client.query(`SELECT i."HandoffID",i."CheckID",i."CalculatedBatchID",i."Snapshot",h."CreatedAt"
     FROM "EligibleStudentHandoffItems" i JOIN "EligibleStudentHandoffs" h ON h."HandoffID"=i."HandoffID"
     WHERE i."StudentID"=$1 AND i."OJTSemesterID"=$2 ORDER BY i."HandoffID" DESC LIMIT 1`, [studentId, semesterId])).rows[0];
@@ -40,8 +54,8 @@ export async function studentAdmission(client: PoolClient, studentId: number, se
 
 export async function requireStudentAdmission(client: PoolClient, studentId: number, semesterId: number) {
   const result = await studentAdmission(client, studentId, semesterId, { lockSource: true });
-  if (!result) throw invalid('Academic handoff required.', 403, 'ELIGIBLE_HANDOFF_REQUIRED');
-  if (result.isStale || result.status !== 'ELIGIBLE') throw invalid('A current eligible academic handoff is required.', 409,
+  if (!result) throw invalid('Saved OJT eligibility is required.', 403, 'ELIGIBLE_HANDOFF_REQUIRED');
+  if (result.isStale || result.status !== 'ELIGIBLE') throw invalid('A valid OJT eligibility result is required.', 409,
     result.isStale ? 'ELIGIBILITY_HANDOFF_STALE' : 'CONFIRMED_ELIGIBILITY_REQUIRED');
   return result;
 }

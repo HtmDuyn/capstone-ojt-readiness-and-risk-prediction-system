@@ -286,7 +286,7 @@ export const QhdnDashboard: React.FC = () => {
     if (!ctx) return;
 
     const labels = [
-      "Bàn giao từ PĐT",
+      "Đủ điều kiện OJT",
       "Đã chốt DN",
       "Chờ DN duyệt",
       "Đang thực tập",
@@ -498,7 +498,7 @@ export const QhdnDashboard: React.FC = () => {
           <div className="mt-2 flex items-center justify-between text-xs">
             <span className="text-slate-500 flex items-center gap-1">
               <TrendingUp size={13} className="text-blue-600" />
-              <span>Bàn giao từ PĐT</span>
+              <span>Đủ điều kiện OJT</span>
             </span>
             <span className="font-semibold text-slate-400">
               {kpiStats.handedOff ?? "—"} SV
@@ -619,7 +619,7 @@ export const QhdnDashboard: React.FC = () => {
               Chọn học kỳ theo dõi
             </h3>
             <p className="text-xs text-slate-500">
-              Dữ liệu bàn giao từ Đào tạo, điều phối DN và kết quả OJT theo kỳ
+              Danh sách sinh viên đủ điều kiện, điều phối DN và kết quả OJT theo kỳ
             </p>
           </div>
         </div>
@@ -644,7 +644,7 @@ export const QhdnDashboard: React.FC = () => {
       </div>
 
       {catalog.error && <Notice>{catalog.error}</Notice>}
-      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện đã bàn giao: {eligibleError}. Chọn Tải lại để thử lại.</Notice>}
+      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện: {eligibleError}. Chọn Tải lại để thử lại.</Notice>}
       {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}. Chọn Tải lại để thử lại.</Notice>}
       {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
 
@@ -658,13 +658,13 @@ export const QhdnDashboard: React.FC = () => {
                 Tiến độ Toàn trình OJT ({selectedSemesterName})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Bàn giao PĐT ⟶ Doanh nghiệp tiếp nhận ⟶ Thực tập ⟶ Có kết quả OJT
+                Đủ điều kiện ⟶ Doanh nghiệp tiếp nhận ⟶ Thực tập ⟶ Có kết quả OJT
               </p>
             </div>
             <TrendingUp className="text-slate-400" size={18} />
           </div>
           <div className="relative w-full h-72">
-            <canvas ref={pipelineChartRef} role="img" aria-label={`Tiến độ OJT: Bàn giao ${kpiStats.handedOff??'chưa có dữ liệu'}, Đã chốt DN ${kpiStats.assigned??'chưa có dữ liệu'}, Chờ duyệt ${kpiStats.waiting??'chưa có dữ liệu'}, Đang thực tập ${kpiStats.inProgress??'chưa có dữ liệu'}, Hoàn thành OJT ${kpiStats.completed??'chưa có dữ liệu'}`} />
+            <canvas ref={pipelineChartRef} role="img" aria-label={`Tiến độ OJT: Đủ điều kiện ${kpiStats.handedOff??'chưa có dữ liệu'}, Đã chốt DN ${kpiStats.assigned??'chưa có dữ liệu'}, Chờ duyệt ${kpiStats.waiting??'chưa có dữ liệu'}, Đang thực tập ${kpiStats.inProgress??'chưa có dữ liệu'}, Hoàn thành OJT ${kpiStats.completed??'chưa có dữ liệu'}`} />
             {kpiStats.handedOff === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="rounded-xl bg-white/95 px-4 py-2 text-sm text-slate-500">Chưa có dữ liệu thống kê tổng hợp.</p>
             </div>}

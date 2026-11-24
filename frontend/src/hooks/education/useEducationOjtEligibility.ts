@@ -199,10 +199,10 @@ export function useEducationOjtEligibility() {
     savingRequest.current = true; setSaving(true); setError('');
     saveKey.current ??= crypto.randomUUID();
     try {
-      const { handedOffCount } = await saveLocalOjtResults(calculated, saveKey.current, rule);
+      const { savedCount } = await saveLocalOjtResults(calculated, saveKey.current, rule);
       setPendingResults({});
       saveKey.current = null;
-      setNotice('Đã lưu kết quả xét và bàn giao ' + handedOffCount + ' sinh viên.' +
+      setNotice('Đã lưu kết quả xét OJT cho ' + savedCount + ' sinh viên.' +
         (failed ? ' Có ' + failed + ' hồ sơ chưa xét được. Xem lý do ở từng sinh viên.' : ''));
       const refreshed = await Promise.allSettled([loadSavedLocalOjtResults(), educationOjtWorkflowService.getHandoffs()]);
       const { values, issues } = partitionOjtLoad(['results', 'handoffs'], refreshed);

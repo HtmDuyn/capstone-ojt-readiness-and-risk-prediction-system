@@ -5,7 +5,7 @@ import { inputObject,positiveId } from '../students/student.validation';
 import { assessmentWindows,createAssessment,updateAssessment,updateRule,semesters,semesterDossier,createNotification,notifications } from './rest-resource.service';
 import { createImportRequest,commitImportRequest,importRequests,retryStudentImportEmail } from '../imports/import-request.service';
 import { saveGradeMapping } from './workflow-policy';
-import { handoff,handoffHistory } from '../ojt-registration/handoff.service';
+import { handoffHistory } from '../ojt-registration/handoff.service';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';
 import { enumValue } from '../students/student.validation';
 import { retakeClassProposals } from '../academic-reporting/retake-class.service';
@@ -25,10 +25,6 @@ router.put('/ojt-grade-mappings',...staff,handle(r=>{
   return saveGradeMapping(positiveId(programId,'programId'),positiveId(ojtSemesterId,'ojtSemesterId'),mapping,r.user.userId);
 }));
 router.get('/eligible-student-handoffs',...staff,handle(r=>{const {ojtSemesterId,...params}=r.query;return handoffHistory(ojtSemesterId===undefined?null:positiveId(ojtSemesterId,'ojtSemesterId'),params);}));
-router.post('/eligible-student-handoffs',...staff,handle(r=>{
-  const b=inputObject(r.body,['ojtSemesterId','studentIds','idempotencyKey','reason']),{ojtSemesterId,...input}=b;
-  return handoff(positiveId(ojtSemesterId,'ojtSemesterId'),input,r.user.userId);
-},201));
 router.get('/academic-notifications',...staff,handle(r=>notifications(r.query,r.user)));
 router.get('/academic-notifications/:id',...staff,handle(r=>notifications(r.query,r.user,String(r.params.id))));
 router.post('/academic-notifications',...staff,handle(r=>createNotification(r.body,r.user),202));

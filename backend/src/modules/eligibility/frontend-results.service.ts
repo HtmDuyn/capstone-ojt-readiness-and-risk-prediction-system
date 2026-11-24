@@ -115,10 +115,7 @@ export async function saveFrontendResults(body: unknown, actorId: number, automa
         "Result"=EXCLUDED."Result","CheckedAt"=EXCLUDED."CheckedAt","SavedAt"=EXCLUDED."SavedAt","SavedBy"=EXCLUDED."SavedBy","ConditionID"=EXCLUDED."ConditionID"`,
       [JSON.stringify(records), batch.BatchID, batch.SavedAt, actorId, condition?.ConditionID ?? null]);
     await audit(client, actorId, 'OJTEligibilityResultBatches', batch.BatchID, automatedClient ? 'SAVE_AUTOMATIC_ELIGIBILITY' : 'SAVE_FRONTEND_ELIGIBILITY', null, { savedCount: ids.length, studentIds: ids });
-    const { handoffSavedEligibleStudents } = await import('../ojt-registration/handoff.service.js');
-    const eligibleIds = records.filter(result => result.status === 'ELIGIBLE').map(result => result.studentId);
-    const handedOffCount = await handoffSavedEligibleStudents(client, batch.BatchID, eligibleIds, actorId);
-    return { batchId: batch.BatchID, savedCount: ids.length, handedOffCount, replayed: false };
+    return { batchId: batch.BatchID, savedCount: ids.length, handedOffCount: 0, replayed: false };
   }, automatedClient);
 }
 

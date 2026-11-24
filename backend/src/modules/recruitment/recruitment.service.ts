@@ -19,5 +19,5 @@ export async function applicationScope(c:PoolClient,actor:Actor) {
   if(actor.roleCode==='ADMIN')return {sql:'$1::int IS NULL',value:null};
   if(actor.roleCode==='STUDENT')return {sql:'r."StudentID"=$1',value:(await ownStudent(c,actor)).StudentID};
   const scope=await enterpriseScope(c,actor);
-  return scope===null?{sql:'EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AND $1::int IS NULL',value:null}:{sql:'p."EnterpriseID"=$1 AND EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" hr ON hr."RegistrationID"=co."RegistrationID" JOIN "EligibleStudentHandoffItems" h ON h."StudentID"=hr."StudentID" AND h."OJTSemesterID"=hr."OJTSemesterID" WHERE co."ApplicationID"=a."ApplicationID" AND co."EnterpriseID"=$1)',value:scope};
+  return scope===null?{sql:'EXISTS(SELECT 1 FROM "OJTRecruitmentAccess" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AND $1::int IS NULL',value:null}:{sql:'p."EnterpriseID"=$1 AND EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" hr ON hr."RegistrationID"=co."RegistrationID" JOIN "OJTRecruitmentAccess" h ON h."StudentID"=hr."StudentID" AND h."OJTSemesterID"=hr."OJTSemesterID" WHERE co."ApplicationID"=a."ApplicationID" AND co."EnterpriseID"=$1)',value:scope};
 }

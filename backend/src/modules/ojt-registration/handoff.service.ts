@@ -1,123 +1,13 @@
-import { assertOjtSemesterSix } from '../academic/workflow-policy';
 import { enrichListRows } from '../../shared/list-context';
 import { currentCVSql } from '../students/cv.service';
-import { academicTransaction,audit } from '../academic/academic.repository';
-import { invalid,inputObject,positiveId,requiredText,pagination,enumValue } from '../students/student.validation';
-import { ids } from '../combo-registration/combo.validation';
-import { fingerprint } from '../eligibility/eligibility.service';
+import { academicTransaction } from '../academic/academic.repository';
+import { positiveId,requiredText,pagination,enumValue } from '../students/student.validation';
 import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 import { semester,type Actor,type Row } from './window.service';
-import type { PoolClient } from 'pg';
-type HandoffRound = { id: number; name: string };
-
-export async function handoff(semesterId:number,body:unknown,actor:number,client?:PoolClient,round?:HandoffRound) {
- const b=inputObject(body,['studentIds','idempotencyKey','reason']);
- const selected=ids(b.studentIds,'studentIds',1000).sort((a,b)=>a-b);
- if(!selected.length)throw invalid('studentIds must be nonempty.');
- const key=requiredText(b.idempotencyKey,'idempotencyKey',100),reason=requiredText(b.reason,'reason',2000),hash=fingerprint({ojtSemesterId:semesterId,studentIds:selected,reason});
- return academicTransaction(async c=>{
-  const term=await semester(c,semesterId);
-  const prior=(await c.query('SELECT * FROM "EligibleStudentHandoffs" WHERE "IdempotencyKey"=$1',[key])).rows[0];
-  if(prior){
-   if(prior.CreatedBy!==actor||prior.RequestHash!==hash)throw invalid('Idempotency key belongs to another handoff.',409,'IDEMPOTENCY_CONFLICT');
-   return {handoffId:prior.HandoffID,ojtSemesterId:semesterId,studentIds:selected,total:selected.length,recipientRole:'OJT_COORD',replayed:true};
-  }
-  if(['CLOSED','ARCHIVED'].includes(term.Status))throw invalid('The target OJT semester is closed.',409,'HANDOFF_SEMESTER_CLOSED');
-  const checks:Row[]=[];
-  for(const studentId of selected){
-   const student=(await c.query(`SELECT s."StudentID",s."CurrentSemester",s."Status",u."Status" AS "AccountStatus",
-     "StudentCurriculumSemester"(s."StudentID",p."CurrentAcademicPeriodID") AS stage
-     FROM "Students" s JOIN "Users" u USING("UserID") LEFT JOIN "StudentAcademicPlacements" p USING("StudentID")
-     WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL FOR UPDATE OF s FOR SHARE OF u`,[studentId])).rows[0];
-   if(!student)throw invalid('Student not found: '+studentId,404,'STUDENT_NOT_FOUND');
-   if(student.Status!=='ACTIVE'||student.AccountStatus!=='ACTIVE')throw invalid('Student and account must be active: '+studentId,409,'HANDOFF_STUDENT_INACTIVE');
-   if(student.CurrentSemester!==5||student.stage!==5)throw invalid('Only current semester 5 students can be handed off: '+studentId,409,'HANDOFF_SEMESTER_5_REQUIRED');
-   if((await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2',[studentId,semesterId])).rowCount)throw invalid('Student already handed off for this semester.',409,'STUDENT_ALREADY_HANDED_OFF');
-   await assertOjtSemesterSix(c,studentId,semesterId);
-   await c.query('SELECT "StudentID" FROM "StudentOJTCalculatedResults" WHERE "StudentID"=$1 FOR SHARE',[studentId]);
-   const check=(await c.query(`SELECT ${calculatedEligibilitySql()} AS result FROM "Students" s WHERE s."StudentID"=$1`,[studentId])).rows[0]?.result;
-   if(!check||check.status!=='ELIGIBLE')throw invalid('A saved eligible frontend result is required for student '+studentId,409,'SAVED_ELIGIBILITY_REQUIRED');
-   if(check.isStale)throw invalid('Saved eligibility is stale; recalculate and save before handoff: '+studentId,409,'ELIGIBILITY_RESULT_STALE');
-   checks.push(check);
-  }
-  const batch=(await c.query(`INSERT INTO "EligibleStudentHandoffs" ("OJTSemesterID","IdempotencyKey","RequestHash","RegistrationIDs","Reason","CreatedBy") VALUES ($1,$2,$3,'[]',$4,$5) RETURNING *`,[semesterId,key,hash,reason,actor])).rows[0];
-  for(let n=0;n<selected.length;n++)await c.query(`INSERT INTO "EligibleStudentHandoffItems" ("HandoffID","OJTSemesterID","StudentID","CalculatedBatchID","Snapshot") VALUES ($1,$2,$3,$4,$5)`,[batch.HandoffID,semesterId,selected[n],checks[n].batchId,JSON.stringify({studentId:selected[n],currentSemester:5,targetSemester:6,calculatedEligibility:checks[n],...(round ? { recruitmentRound: round } : {})})]);
-  const result={handoffId:batch.HandoffID,ojtSemesterId:semesterId,studentIds:selected,total:selected.length,recipientRole:'OJT_COORD',createdAt:batch.CreatedAt,replayed:false};
-  await audit(c,actor,'EligibleStudentHandoffs',batch.HandoffID,'HANDOFF',null,result,reason);return result;
- },client);
-}
-
-type HandoffScope = { batchId: number; studentIds: number[] } | { roundId: number; semesterId: number };
-
-export async function handoffSavedEligibleStudents(client: PoolClient, batchId: number, studentIds: number[], actorId: number) {
- if (!studentIds.length) return 0;
- return handoffPendingStudents(client, { batchId, studentIds }, actorId);
-}
-
-export async function handoffPendingStudents(client: PoolClient, scope: HandoffScope, actorId: number) {
- const fromBatch = 'batchId' in scope;
- const { rows } = await client.query<{ studentId: number; batchId: number; semesterId: number; roundId: number; roundName: string }>(`
-   SELECT s."StudentID" AS "studentId", saved."BatchID" AS "batchId", target."semesterId", next_round."roundId", next_round."roundName"
-   FROM "Students" s
-   JOIN "Users" holder ON holder."UserID"=s."UserID" AND holder."Status"='ACTIVE'
-   JOIN "StudentAcademicPlacements" placement USING ("StudentID")
-   JOIN "StudentOJTCalculatedResults" saved USING ("StudentID")
-   JOIN LATERAL (
-     SELECT min(term."OJTSemesterID") AS "semesterId"
-     FROM "CohortCurriculumPeriods" plan
-     JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=plan."AcademicPeriodID" AND period."Kind"='SEMESTER'
-     JOIN "OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
-     WHERE plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode"
-       AND plan."CurriculumSemester"=6
-     HAVING count(*)=1 AND bool_and(term."Status" NOT IN ('CLOSED','ARCHIVED'))
-   ) target ON true
-   JOIN LATERAL (
-     SELECT w."WindowID" AS "roundId", w."Name" AS "roundName"
-     FROM "RecruitmentWindows" w
-     WHERE w."OJTSemesterID"=target."semesterId"
-       AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
-       AND w."ApplicationEndsAt">GREATEST(saved."CheckedAt",statement_timestamp())
-       AND w."ApplicationStartsAt" IS NOT NULL
-     ORDER BY w."ApplicationStartsAt", w."WindowID"
-     LIMIT 1
-   ) next_round ON true
-   WHERE ${fromBatch
-     ? 's."StudentID"=ANY($1::int[]) AND saved."BatchID"=$2'
-     : 'next_round."roundId"=$1 AND target."semesterId"=$2'}
-     AND saved."Status"='ELIGIBLE' AND s."CurrentSemester"=5
-     AND s."Status"='ACTIVE' AND s."DeletedAt" IS NULL
-     AND "StudentCurriculumSemester"(s."StudentID",placement."CurrentAcademicPeriodID")=5
-     AND (${calculatedEligibilitySql()}->>'isStale')::boolean IS FALSE
-     AND NOT EXISTS (
-       SELECT 1 FROM "EligibleStudentHandoffItems" i
-       WHERE i."StudentID"=s."StudentID" AND i."OJTSemesterID"=target."semesterId"
-     )
-   ORDER BY target."semesterId", next_round."roundId", s."StudentID"
-   FOR UPDATE OF s FOR SHARE OF holder`, fromBatch ? [scope.studentIds, scope.batchId] : [scope.roundId, scope.semesterId]);
- const groups = new Map<string, { batchId: number; semesterId: number; round: HandoffRound; ids: number[] }>();
- for (const row of rows) {
-   const key = `${row.roundId}:${row.batchId}`;
-   const group = groups.get(key) ?? {
-     batchId: row.batchId, semesterId: row.semesterId, round: { id: row.roundId, name: row.roundName }, ids: [],
-   };
-   group.ids.push(row.studentId);
-   groups.set(key, group);
- }
- for (const { batchId, semesterId, round, ids } of groups.values()) {
-   for (let offset = 0; offset < ids.length; offset += 1000) {
-     await handoff(semesterId, {
-       studentIds: ids.slice(offset, offset + 1000),
-       idempotencyKey: `auto-eligibility-${batchId}-${round.id}-${ids[offset]}`,
-       reason: `Bàn giao tự động vào đợt ${round.name}.`,
-     }, actorId, client, round);
-   }
- }
- return rows.length;
-}
 export async function handoffHistory(semesterId:number|null,params:Row) {const p=pagination(params,[]);return academicTransaction(async c=>{if(semesterId!==null)await semester(c,semesterId);const total=(await c.query('SELECT count(*)::int AS n FROM "EligibleStudentHandoffs" WHERE ($1::int IS NULL OR "OJTSemesterID"=$1)',[semesterId])).rows[0].n;const rows=(await c.query(`SELECT "HandoffID" AS id,"OJTSemesterID" AS "ojtSemesterId","RegistrationIDs" AS "registrationIds","RecipientRole" AS "recipientRole","Reason" AS reason,"CreatedBy" AS "createdBy","CreatedAt" AS "createdAt",(SELECT count(*)::int FROM "EligibleStudentHandoffItems" i WHERE i."HandoffID"="EligibleStudentHandoffs"."HandoffID") AS "studentCount",(SELECT COALESCE(jsonb_agg(i."StudentID" ORDER BY i."StudentID"),'[]'::jsonb) FROM "EligibleStudentHandoffItems" i WHERE i."HandoffID"="EligibleStudentHandoffs"."HandoffID") AS "studentIds",(SELECT COALESCE(jsonb_agg(jsonb_build_object('studentId',i."StudentID",'condition',i."Snapshot"->'calculatedEligibility'->'rule') ORDER BY i."StudentID"),'[]'::jsonb) FROM "EligibleStudentHandoffItems" i WHERE i."HandoffID"="EligibleStudentHandoffs"."HandoffID") AS "studentConditions" FROM "EligibleStudentHandoffs" WHERE ($1::int IS NULL OR "OJTSemesterID"=$1) ORDER BY "HandoffID" DESC LIMIT $2 OFFSET $3`,[semesterId,p.limit,p.offset])).rows;return {items:await enrichListRows(c,rows),total,page:p.page,limit:p.limit};});}
 export async function semesterStudents(semesterId:number,params:Row,actor:Actor) {
- const p=pagination(params,['programId','cohortId','groupCode','registrationStatus','search','enterpriseId','coordinationStatus','assignmentStatus']);const args:any[]=[semesterId],filters:string[]=['(r."RegistrationID" IS NOT NULL OR f."CheckID" IS NOT NULL OR i."HandoffID" IS NOT NULL)'];const add=(sql:string,value:any)=>{args.push(value);filters.push(sql.replace('?',`$${args.length}`));};
- if(params.programId!==undefined)add('s."ProgramID"=?',positiveId(params.programId,'programId'));if(params.cohortId!==undefined)add('p."CohortID"=?',positiveId(params.cohortId,'cohortId'));if(params.groupCode!==undefined)add('p."GroupCode"=?',enumValue(params.groupCode,['A','B','C','D'],'groupCode'));if(params.registrationStatus!==undefined)add(`COALESCE(r."Status",'NOT_REGISTERED')=?`,enumValue(params.registrationStatus,['NOT_REGISTERED','SUBMITTED','APPROVED','REJECTED','HANDED_OFF'],'registrationStatus'));if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length} OR u."Email" ILIKE $${args.length})`);}if(actor.roleCode==='OJT_COORD')filters.push('i."HandoffID" IS NOT NULL');else if(actor.roleCode==='STUDENT')add('s."UserID"=?',actor.userId);
+ const p=pagination(params,['programId','cohortId','groupCode','registrationStatus','search','enterpriseId','coordinationStatus','assignmentStatus']);const args:any[]=[semesterId],filters:string[]=['(r."RegistrationID" IS NOT NULL OR f."CheckID" IS NOT NULL OR i."HandoffID" IS NOT NULL OR EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=s."StudentID" AND roster."OJTSemesterID"=$1))'];const add=(sql:string,value:any)=>{args.push(value);filters.push(sql.replace('?',`$${args.length}`));};
+ if(params.programId!==undefined)add('s."ProgramID"=?',positiveId(params.programId,'programId'));if(params.cohortId!==undefined)add('p."CohortID"=?',positiveId(params.cohortId,'cohortId'));if(params.groupCode!==undefined)add('p."GroupCode"=?',enumValue(params.groupCode,['A','B','C','D'],'groupCode'));if(params.registrationStatus!==undefined)add(`COALESCE(r."Status",'NOT_REGISTERED')=?`,enumValue(params.registrationStatus,['NOT_REGISTERED','SUBMITTED','APPROVED','REJECTED','HANDED_OFF'],'registrationStatus'));if(params.search!==undefined){args.push('%'+requiredText(params.search,'search',100)+'%');filters.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length} OR u."Email" ILIKE $${args.length})`);}if(actor.roleCode==='OJT_COORD')filters.push('EXISTS (SELECT 1 FROM "OJTRecruitmentAccess" access WHERE access."StudentID"=s."StudentID" AND access."OJTSemesterID"=$1)');else if(actor.roleCode==='STUDENT')add('s."UserID"=?',actor.userId);
  if(params.enterpriseId!==undefined)add('co."EnterpriseID"=?',positiveId(params.enterpriseId,'enterpriseId'));
  if(params.coordinationStatus!==undefined)add(`CASE WHEN co."CoordinationID" IS NULL THEN 'NOT_COORDINATED' WHEN UPPER(co."Decision") IN ('ACCEPTED','ACCEPT','APPROVED') THEN 'ACCEPTED' WHEN UPPER(co."Decision") IN ('REJECTED','REJECT') THEN 'REJECTED' ELSE 'PENDING' END=?`,enumValue(params.coordinationStatus,['NOT_COORDINATED','PENDING','ACCEPTED','REJECTED'],'coordinationStatus'));
  if(params.assignmentStatus!==undefined)add(`CASE WHEN a."AssignmentID" IS NULL THEN 'UNASSIGNED' ELSE COALESCE(UPPER(a."Status"),'ASSIGNED') END=?`,enumValue(params.assignmentStatus,['UNASSIGNED','ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED','CANCELLED','CANCELED','FAILED'],'assignmentStatus'));

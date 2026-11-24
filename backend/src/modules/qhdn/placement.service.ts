@@ -41,7 +41,7 @@ export async function placementBoard(params:Row,actor:Actor){
    LEFT JOIN LATERAL(SELECT * FROM "StudentEnterpriseCoordination" co WHERE co."RegistrationID"=r."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1) latest ON true
    LEFT JOIN "InternshipPositions" p ON p."PositionID"=latest."PositionID" LEFT JOIN "Enterprises" e ON e."EnterpriseID"=latest."EnterpriseID"
    LEFT JOIN "OJTActualReceipts" receipt ON receipt."StudentID"=s."StudentID" AND receipt."OJTSemesterID"=$1
-   WHERE s."DeletedAt" IS NULL AND EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" hi WHERE hi."StudentID"=s."StudentID" AND hi."OJTSemesterID"=$1)
+   WHERE s."DeletedAt" IS NULL AND EXISTS(SELECT 1 FROM "OJTRecruitmentAccess" hi WHERE hi."StudentID"=s."StudentID" AND hi."OJTSemesterID"=$1)
    ORDER BY s."StudentCode"`,[semesterId])).rows;
   const positions=(await c.query(`SELECT p."PositionID" AS id,p."Title" AS title,p."EnterpriseID" AS "companyId",e."Name" AS "companyName",p."Capacity" AS capacity,
    CASE WHEN p."Status"='ARCHIVED' THEN 0 ELSE ${coordinationSlotsSql} END AS "coordinationSlots",
