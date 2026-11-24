@@ -71,6 +71,7 @@ export interface ImportCommitResponse {
   total: number;
   batchId?: string;
   academicImportId?: string;
+  ojtAssessment?: { status: 'COMPLETED' | 'NO_EFFECTIVE_CONDITION' | 'FAILED'; checkedCount: number };
   replayed?: boolean;
   students?: { studentCode: string; email?: string; action: string; emailStatus: string; emailLastError?: string | null }[];
 }

@@ -65,7 +65,7 @@ export function useEducationOjtEligibility() {
       case 'results': {
         const stored = value as (SavedOjtEligibility & { studentId: number })[];
         setSavedResults(normalizeResults(stored));
-        if (stored.some(result => result.isStale)) setNotice('Có kết quả đã cũ; hãy xét lại sinh viên chưa bàn giao trước khi sử dụng.');
+        if (stored.some(result => result.isStale && result.status !== 'ELIGIBLE')) setNotice('Có kết quả đã cũ; hãy xét lại các hồ sơ chưa đủ điều kiện và chưa bàn giao.');
         break;
       }
       case 'policy': setRule(latestEffectiveOjtRule(value as CurrentOjtRule[])); break;
@@ -109,8 +109,14 @@ export function useEducationOjtEligibility() {
         });
       } finally { refreshing = false; }
     };
-    const timer = window.setInterval(() => void refresh(), 5000);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    const onReturn = () => { void refresh(); };
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    return () => {
+      controller.abort();
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
   }, [applySource, loadSource, loading, retrying, busy, saving]);
 
   async function retryFailedSources() {

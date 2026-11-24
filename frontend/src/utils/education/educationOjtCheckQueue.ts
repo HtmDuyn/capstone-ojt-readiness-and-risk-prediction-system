@@ -1,7 +1,7 @@
 import type { Handoff } from '@/types/education/ojtWorkflow.types';
 
 type Target = { student: { id: number }; reason: string };
-type Saved = { isStale?: boolean };
+type Saved = { status?: string; isStale?: boolean };
 
 export function handoffsByStudent(handoffs: Handoff[]): Map<number, Handoff[]> {
   const byStudent = new Map<number, Handoff[]>();
@@ -17,11 +17,11 @@ export function progressHandoffStatus(studentId: number, handoffs: Handoff[] | n
 }
 
 export function selectAutoCheckTargets<T extends Target>(targets: T[], saved: Record<number, Saved>, pending: Record<number, unknown>, handedOff: Set<number>): T[] {
-  return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && !pending[student.id] && (!saved[student.id] || saved[student.id].isStale));
+  return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && !pending[student.id] && saved[student.id]?.status !== 'ELIGIBLE' && (!saved[student.id] || saved[student.id].isStale));
 }
 
-export function selectFullCheckTargets<T extends Target>(targets: T[], handedOff: Set<number>, saved: Record<number, { status?: string; isStale?: boolean }> = {}): T[] {
-  return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && !(saved[student.id]?.status === 'ELIGIBLE' && !saved[student.id]?.isStale));
+export function selectFullCheckTargets<T extends Target>(targets: T[], handedOff: Set<number>, saved: Record<number, Saved> = {}): T[] {
+  return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && saved[student.id]?.status !== 'ELIGIBLE');
 }
 
 export function selectPendingSaveResults<T extends { studentId: number }>(pending: Record<number, T>): T[] {

@@ -96,7 +96,9 @@ export async function saveFrontendResults(body: unknown, actorId: number, automa
     if (handedOff.rowCount) throw invalid('Có sinh viên đã được bàn giao. Tải lại danh sách trước khi xét lại.', 409, 'STUDENT_ALREADY_HANDED_OFF');
     const inputTimes = new Map(input.results.map(row => [row.studentId, new Date(row.checkedAt).getTime()]));
     if (students.some(row => row.HistoryUpdatedAt && new Date(row.HistoryUpdatedAt).getTime() > inputTimes.get(row.StudentID)!)) throw invalid('Course history changed after calculation. Recalculate before saving.', 409, 'ELIGIBILITY_RESULT_STALE');
-    const current = (await client.query('SELECT "StudentID","CheckedAt" FROM "StudentOJTCalculatedResults" WHERE "StudentID"=ANY($1::int[])', [ids])).rows;
+    const current = (await client.query('SELECT "StudentID","CheckedAt","Status" FROM "StudentOJTCalculatedResults" WHERE "StudentID"=ANY($1::int[])', [ids])).rows;
+    if (current.some(row => row.Status === 'ELIGIBLE'))
+      throw invalid('Có sinh viên đã có kết quả đủ điều kiện. Tải lại danh sách trước khi xét.', 409, 'STUDENT_ALREADY_ELIGIBLE');
     const previous = new Map(current.map(row => [row.StudentID, new Date(row.CheckedAt).getTime()]));
     if (input.results.some(row => (previous.get(row.studentId) ?? 0) > new Date(row.checkedAt).getTime())) throw invalid('Newer results already exist. Recalculate before saving.', 409, 'ELIGIBILITY_RESULT_STALE');
     const batch = (await client.query(`INSERT INTO "OJTEligibilityResultBatches" ("IdempotencyKey","RequestHash","SavedBy","SavedCount","Results") VALUES ($1,$2,$3,$4,$5) RETURNING "BatchID","SavedAt"`,

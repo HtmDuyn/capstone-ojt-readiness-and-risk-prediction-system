@@ -5,7 +5,7 @@ export type OjtDisplayStatus = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'REVIEW_REQUIRED' |
 
 export function educationOjtDisplayStatus(result?: ReasonResult, failure?: string, inactiveReason?: string): OjtDisplayStatus {
   if (failure) return 'ERROR';
-  if (result?.isStale) return 'STALE';
+  if (result?.isStale && result.status !== 'ELIGIBLE') return 'STALE';
   if (inactiveReason) return 'INACTIVE';
   return result?.status ?? 'PENDING';
 }

@@ -1,3 +1,6 @@
+import { assessOjtStudents } from '../eligibility/automatic-assessment.service';
+import { latestEffectiveOjtCondition } from '../eligibility/ojt-policy.service';
+import { logger } from '../../config/logger';
 import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { pool } from '../../config/database';
@@ -147,7 +150,12 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       return {...summary,preview:true,rows:plans.map((p,i)=>({rowNumber:i+1,code:p.row.code,action:p.action}))};
     }
     if (input.kind==='STUDENT') academicImportId=await saveHistory(client,{kind:'STUDENT',key:input.idempotencyKey,hash:payloadHash,status:'COMPLETED',summary,sourceAccountBatchId:batchId},actorId,plans.map(p=>({raw:safeRow(p.row,'STUDENT'),normalized:{userId:p.userId,action:p.action},status:'IMPORTED'})));
-    const result={ ...summary, batchId, academicImportId, replayed: false };
+    const ojtAssessment = input.kind === 'STUDENT'
+      ? await assessImportedStudents(client, plans.map(plan => plan.entityId!), actorId, batchId) : undefined;
+    const completedSummary = ojtAssessment ? { ...summary, ojtAssessment } : summary;
+    if (ojtAssessment) await client.query('UPDATE "AccountImportBatches" SET "Summary"=$2 WHERE "BatchID"=$1',
+      [batchId, JSON.stringify(completedSummary)]);
+    const result={ ...completedSummary, batchId, academicImportId, replayed: false };
     if(onCommit)await onCommit(client,result);
     await client.query('COMMIT');
     return result;
@@ -164,4 +172,24 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     }
     throw error;
   } finally { client.release(); }
+}
+
+async function assessImportedStudents(client: PoolClient, studentIds: number[], actorId: number, batchId: string | number) {
+  // The import has passed deferred validation. An assessment error must not
+  // invalidate the imported transcript or roll back account provisioning.
+  await client.query('SAVEPOINT import_ojt_assessment');
+  try {
+    const condition = await latestEffectiveOjtCondition(client);
+    const checkedCount = condition
+      ? await assessOjtStudents(client, { studentIds }, condition, actorId, `import-ojt:${batchId}`) : 0;
+    const status = condition ? 'COMPLETED' : 'NO_EFFECTIVE_CONDITION';
+    await client.query('RELEASE SAVEPOINT import_ojt_assessment');
+    return { status, checkedCount };
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT import_ojt_assessment');
+    await client.query('RELEASE SAVEPOINT import_ojt_assessment');
+    const failure = error as { code?: string; errorCode?: string };
+    logger.error('OJT assessment could not finish for the student import.', { batchId, code: failure?.code ?? failure?.errorCode });
+    return { status: 'FAILED', checkedCount: 0 };
+  }
 }
