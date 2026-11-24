@@ -57,9 +57,9 @@ function RegistrationContent() {
   const [activeTab, setActiveTab] = useState<'apply' | 'records'>('apply');
   const [recordsRequested, setRecordsRequested] = useState(false);
   const scope = `${profile?.id}:${semesterId}:${revision}`;
-  const windows = useStudentResource('ojt-windows:' + scope,
+  const windows = useStudentResource(profile && semesterId ? 'ojt-windows:' + scope : null,
     (signal) => allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }), signal), { snapshot: true });
-  const applications = useStudentResource(recordsRequested ? 'ojt-applications:' + scope + ':' + applicationPage : null,
+  const applications = useStudentResource(recordsRequested && profile && semesterId ? 'ojt-applications:' + scope + ':' + applicationPage : null,
     (signal) => studentGet<Page<Application>>('/job-applications' + studentQuery({ ojtSemesterId: semesterId, page: applicationPage, limit: 20 }), signal), { snapshot: true });
   const chosenWindow = windows.data?.find((item) => String(item.id) === windowChoice)
     ?? windows.data?.find((item) => item.status === 'OPEN') ?? windows.data?.[0];
@@ -81,7 +81,7 @@ function RegistrationContent() {
   const applicationItems = applications.data?.items ?? [];
   const cv = savedCv ?? profile?.cv ?? null;
   const blockers = opportunities.data?.blockers ?? [];
-  const canApply = !!chosenWindow && !profileRefreshing && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
+  const canApply = !!semesterId && !!chosenWindow && !profileRefreshing && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
   const refreshRecruitment = () => { windows.reload(); opportunities.reload(); applications.reload(); };
   const openApplication = (position?: Opportunity) => {
     if (!canApply) return;
@@ -108,7 +108,7 @@ function RegistrationContent() {
         <ResourceState loading={windows.loading} refreshing={windows.refreshing} error={windows.error} retry={windows.reload} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {chosenWindow && <p className="text-sm text-slate-600">Nhận hồ sơ: {dateText(chosenWindow.startsAt)} – {dateText(chosenWindow.endsAt)}</p>}
-          <button type="button" onClick={() => openApplication()} disabled={!canApply} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
+          <button type="button" onClick={() => openApplication()} disabled={!canApply} title={!semesterId ? 'Cần có đợt OJT để nộp đơn đăng ký' : undefined} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
         </div>
         {!!blockers.length && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{explainOjtBlockers(blockers)} Bạn vẫn có thể xem thông tin doanh nghiệp bên dưới.</p>}
         {chosenWindow && <StudentJobMatches key={`${scope}:${chosenWindow.id}:${cv?.id??'no-cv'}`} windowId={chosenWindow.id} cvFileId={cv?.id??null} opportunities={opportunities.data?.items??[]} onApply={openApplication}/>}

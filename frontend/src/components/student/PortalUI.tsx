@@ -207,25 +207,12 @@ export function StudentPage({
           </button>
         </div>
       ))}
-      {!portal.loading &&
-        !portal.error &&
-        portal.profile &&
-        (needsSemester && !portal.semesterId ? (
-          <Card title="Chưa có đợt OJT">
-            <Empty>
-              Hồ sơ chưa có đợt OJT được liên kết. Bạn vẫn có thể xem hồ sơ học
-              tập; liên hệ nhà trường để kiểm tra đợt đăng ký.
-            </Empty>
-            <Link
-              className="text-orange-600 underline"
-              to="/student/academic-profile"
-            >
-              Xem hồ sơ học tập
-            </Link>
-          </Card>
-        ) : (
-          children
-        ))}
+      {!portal.loading && !portal.error && portal.profile && <>
+        {needsSemester && !portal.semesterId && <p role="status" className="rounded-xl border border-slate-200 bg-white/90 px-4 py-3 text-sm leading-relaxed text-slate-600">
+          Chưa có đợt OJT được liên kết. Bạn vẫn có thể xem các mục bên dưới; dữ liệu và thao tác theo đợt sẽ mở khi nhà trường cập nhật.
+        </p>}
+        {children}
+      </>}
     </div>
   );
 }

@@ -30,24 +30,31 @@ function ResultsContent() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<number | null>(null);
   const key = profile!.id + ':' + semesterId + ':' + revision;
-  const list = useStudentResource('ojt-results:' + key + ':' + page, (signal) =>
+  const list = useStudentResource(semesterId ? 'ojt-results:' + key + ':' + page : null, (signal) =>
     getOjtResults(semesterId!, page, signal),
   );
   const detail = useStudentResource(
-    selected ? 'ojt-result:' + key + ':' + selected : null,
+    selected && semesterId ? 'ojt-result:' + key + ':' + selected : null,
     (signal) => getOjtResult(selected!, semesterId!, signal),
   );
+  const items = list.data?.items ?? [];
+  const latest = items[0];
   return (
     <>
+      <Metrics values={[
+        { label: 'Điểm tổng OJT', value: latest?.overallScore == null ? '—' : latest.overallScore.toFixed(2) },
+        { label: 'Doanh nghiệp đánh giá', value: latest?.enterpriseName || '—' },
+        { label: 'Kỳ OJT', value: latest?.semesterCode || '—' },
+        { label: 'Ngày công bố', value: latest?.publishedAt ? dateText(latest.publishedAt) : '—' },
+      ]} />
       <Card title="Kết quả đã công bố">
         <ResourceState
           loading={list.loading}
           error={list.error}
           retry={list.reload}
         />
-        {list.data && (
-          <>
-            {list.data.items.map((result) => (
+        <>
+            {items.map((result) => (
               <article
                 key={result.id}
                 className="rounded-2xl border border-slate-200 p-5 space-y-3"
@@ -71,19 +78,19 @@ function ResultsContent() {
                 </button>
               </article>
             ))}
-            {!list.data.items.length && (
-              <Empty>Chưa có kết quả OJT được công bố trong đợt này.</Empty>
+            {!list.loading && !list.error && !items.length && (
+              <Empty>{semesterId ? 'Chưa có kết quả OJT được công bố trong đợt này.' : 'Chưa có điểm và nhận xét. Kết quả sẽ được cập nhật sau khi bạn tham gia OJT và được công bố đánh giá.'}</Empty>
             )}
             <Pagination
               page={page}
-              total={list.data.total}
+              total={list.data?.total ?? 0}
               onChange={(value) => {
                 setPage(value);
                 setSelected(null);
               }}
+              disabled={list.loading || !semesterId}
             />
           </>
-        )}
       </Card>
       {selected && (
         <Card title="Chi tiết đánh giá OJT">
@@ -139,7 +146,7 @@ export const StudentEvaluationResults = () => {
       title="Kết quả đánh giá thực tập OJT"
       description="Điểm và nhận xét từ doanh nghiệp được Phòng Quan hệ doanh nghiệp công bố cho sinh viên."
     >
-      {!loading && profile && semesterId && (
+      {!loading && profile && (
         <ResultsContent key={profile.id + ':' + semesterId} />
       )}
     </StudentPage>

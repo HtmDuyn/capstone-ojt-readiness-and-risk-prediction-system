@@ -9,7 +9,7 @@ import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentSemesterS
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { useStudentRisk } from '@/hooks/student/useStudentRisk';
-import { getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
+import { getStudentAcademicProgress, getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
 
 const card = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';
 const heading = 'text-sm font-semibold text-slate-800 sm:text-base';
@@ -28,13 +28,19 @@ export const StudentDashboard = () => {
     signal => getStudentNotifications(1, signal, undefined, 1),
     { snapshot: true },
   );
+  // Academic records remain available before a student is linked to an OJT semester.
+  const academic = useStudentResource(
+    !loading && profile && !semesterId ? 'academic-progress:' + profile.id + ':' + revision : null,
+    signal => getStudentAcademicProgress(profile!.id, signal),
+    { snapshot: true },
+  );
   const windows = registrationWindows.filter(window => window.ojtSemesterId === semesterId).slice(0, 5);
   const data = resource.data;
-  const progress = data?.academic.academicProgress;
+  const progress = data?.academic.academicProgress ?? academic.data;
   const credits = progress?.credits;
   const assignment = data?.internship.assignment ?? null;
   const complete = !!assignment;
-  const admission = data?.academic.admissionEligibility;
+  const admission = data?.academic.admissionEligibility ?? profile?.admissionEligibility;
   const eligible = admission?.status === 'ELIGIBLE' && !admission.isStale;
   const percent = credits?.total != null && credits.total > 0
     ? Math.max(0, Math.min(100, Math.round(credits.earned / credits.total * 100))) : null;
@@ -48,6 +54,7 @@ export const StudentDashboard = () => {
     description="Tổng quan học tập, điều kiện OJT, nhiệm vụ thực tập và thông báo của bạn."
     showRefreshAction={false} showSemesterInBanner={false} compactTopSpacing>
     <ResourceState loading={resource.loading} refreshing={resource.refreshing} error={resource.error} retry={resource.reload} />
+    <ResourceState loading={academic.loading} refreshing={academic.refreshing} error={academic.error} retry={academic.reload} />
     <OjtRiskPanel key={'ojt-risk:' + (profile?.id ?? 'pending') + ':' + revision}
       assessment={assessment} showRefreshAction={false} renderDashboard={risk => <div className="space-y-4">
         <section className={card} aria-labelledby="student-ojt-overview">
@@ -62,13 +69,13 @@ export const StudentDashboard = () => {
                 <p className={`mx-auto mt-3 w-fit rounded-full border px-3 py-1 text-sm font-bold ${riskTheme[risk.risk.level].badge}`}>{riskTheme[risk.risk.level].label}</p>
                 <p className="mt-3 text-sm leading-relaxed text-slate-500">{riskTheme[risk.risk.level].description}</p>
                 <p className="mt-2 text-xs text-slate-500">Cập nhật: {dateText(risk.risk.computedAt)}</p></>
-                : <p className="mt-3 text-sm text-slate-500">Đang tải đánh giá rủi ro…</p>}</div>
+                : <><RiskLevelChart level="INSUFFICIENT_DATA" /><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải đánh giá rủi ro…' : 'Chưa có đánh giá rủi ro. Dữ liệu sẽ được cập nhật khi đủ thông tin học vụ.'}</p></>}</div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:px-5 lg:pt-0">
               <h3 className={heading}>Tiến độ chương trình đào tạo</h3>
               <CreditProgressChart percent={percent} />
               <p className="mt-3 text-center text-xl font-bold text-slate-900">{credits?.earned ?? '—'} / {credits?.total ?? '—'} <span className="text-sm font-medium text-slate-500">tín chỉ</span></p>
               <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" />Đã tích lũy</span><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-200" />Còn lại</span></div>
-              <p className="mt-2 text-sm text-slate-500">{progress ? statusText(progress.status) : resource.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ'}</p>
+              <p className="mt-2 text-sm text-slate-500">{progress ? statusText(progress.status) : resource.pending || academic.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ'}</p>
               <Link to="/student/academic-profile" className={`${link} mt-3 inline-block`}>Xem bảng điểm và chương trình</Link>
             </div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
@@ -106,8 +113,8 @@ export const StudentDashboard = () => {
             </div>
           </div>
           <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 lg:grid-cols-2 lg:gap-0">
-            <div className="min-w-0 lg:pr-6">{risk ? <RiskInsights data={risk} embedded /> : <p className="text-sm text-slate-500">Đang tải phân tích rủi ro…</p>}</div>
-            <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">{risk ? <LearningRoadmap key={profile?.id + ':' + risk.risk.computedAt} roadmap={risk.roadmap} embedded /> : <p className="text-sm text-slate-500">Đang tải lộ trình học tập…</p>}</div>
+            <div className="min-w-0 lg:pr-6">{risk ? <RiskInsights data={risk} embedded /> : <><h3 className={heading}>Phân tích nguyên nhân rủi ro</h3><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải phân tích rủi ro…' : 'Chưa có dữ liệu phân tích. Các yếu tố rủi ro sẽ hiển thị khi có đánh giá.'}</p></>}</div>
+            <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">{risk ? <LearningRoadmap key={profile?.id + ':' + risk.risk.computedAt} roadmap={risk.roadmap} embedded /> : <><h3 className={heading}>Lộ trình học tập đề xuất</h3><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải lộ trình học tập…' : 'Chưa có lộ trình đề xuất. Bạn vẫn có thể xem bảng điểm và chương trình đào tạo.'}</p></>}</div>
           </div>
           {risk && <RoadmapNotes roadmap={risk.roadmap} />}
         </section>

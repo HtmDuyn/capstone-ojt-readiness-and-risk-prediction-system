@@ -14,8 +14,9 @@ function ProgressContent() {
   const [search, setSearch] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [message, setMessage] = useState('');
-  const tasks = useStudentResource(`assigned-tasks:${profile!.id}:${semesterId}:${revision}:${page}`,
+  const tasks = useStudentResource(semesterId ? `assigned-tasks:${profile!.id}:${semesterId}:${revision}:${page}` : null,
     signal => getAssignedTasks(semesterId!, page, signal));
+  const taskPage = tasks.data ?? { items: [], total: 0 };
   const reload = useRef(tasks.reload);
   reload.current = tasks.reload;
   // Pick up newly assigned tasks when returning to the tab and while it is visible.
@@ -43,15 +44,16 @@ function ProgressContent() {
     <Card title="Nhiệm vụ được doanh nghiệp giao">
       <div className="flex flex-col gap-3 sm:flex-row">
         <input className={inputClass} aria-label="Tìm nhiệm vụ trong trang" placeholder="Tìm nhiệm vụ trong trang hiện tại..." value={search} onChange={event => setSearch(event.target.value)} />
-        <button type="button" disabled={tasks.loading} onClick={tasks.reload} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><RefreshCw size={16} />Cập nhật nhiệm vụ</button>
+        <button type="button" disabled={tasks.loading || !semesterId} title={!semesterId ? 'Cần có đợt OJT để cập nhật nhiệm vụ' : undefined} onClick={tasks.reload} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw size={16} />Cập nhật nhiệm vụ</button>
       </div>
       <ResourceState loading={tasks.loading} error={tasks.error} retry={tasks.reload} />
-      {tasks.data && <>
-        {columns.every(([, items]) => items.length === 0) && <Empty>{search ? 'Không có nhiệm vụ phù hợp trong trang này.' : 'Bạn chưa được doanh nghiệp giao nhiệm vụ trong đợt này.'}</Empty>}
+      <>
+        {!tasks.loading && !tasks.error && columns.every(([, items]) => items.length === 0) && <Empty>{!semesterId ? 'Chưa có nhiệm vụ vì bạn chưa được liên kết với đợt OJT. Các nhiệm vụ sẽ hiển thị theo trạng thái bên dưới khi được giao.' : search ? 'Không có nhiệm vụ phù hợp trong trang này.' : 'Bạn chưa được doanh nghiệp giao nhiệm vụ trong đợt này.'}</Empty>}
         <div className="grid gap-4 lg:grid-cols-3">
           {columns.map(([status, items]) => {
             return <section key={status} className="space-y-3 rounded-2xl bg-slate-50 p-4">
               <h3 className="font-bold text-slate-700">{statusText(status)} ({items.length})</h3>
+              {!items.length && <p className="py-4 text-sm text-slate-400">{tasks.loading ? 'Đang tải nhiệm vụ…' : 'Chưa có nhiệm vụ'}</p>}
               {items.map(task => <article key={task.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-sm">
                 <h4 className="font-bold text-slate-900">{task.name}</h4>
                 {task.company?.name && <p className="text-xs text-slate-500">{task.company.name}</p>}
@@ -63,8 +65,8 @@ function ProgressContent() {
             </section>;
           })}
         </div>
-        <Pagination page={page} total={tasks.data.total} onChange={setPage} disabled={tasks.loading} />
-      </>}
+        <Pagination page={page} total={taskPage.total} onChange={setPage} disabled={tasks.loading || !semesterId} />
+      </>
       <p className="text-xs text-slate-500">Danh sách tự cập nhật mỗi 30 giây khi bạn đang xem trang. Nộp bài không tự xác nhận hoàn thành; trạng thái do doanh nghiệp cập nhật.</p>
     </Card>
     {selectedTask && <TaskSubmissionsDialog taskId={selectedTask.id} name={selectedTask.name} initialContent={selectedTask.latestSubmission?.content}
@@ -76,6 +78,6 @@ function ProgressContent() {
 export default function StudentOJTProgress() {
   const { profile, semesterId, loading } = useStudentPortal();
   return <StudentPage title="Nhiệm vụ thực tập" description="Nhận nhiệm vụ từ doanh nghiệp, nộp bài làm và theo dõi phản hồi.">
-    {!loading && profile && semesterId && <ProgressContent key={`${profile.id}:${semesterId}`} />}
+    {!loading && profile && <ProgressContent key={`${profile.id}:${semesterId}`} />}
   </StudentPage>;
 }

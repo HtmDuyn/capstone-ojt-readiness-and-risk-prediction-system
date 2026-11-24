@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { CircleAlert,GraduationCap,RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { useStudentRisk, type StudentRiskResource } from '@/hooks/student/useStudentRisk';
@@ -14,6 +15,23 @@ import { StudentSemesterSelect } from '../PortalUI';
 
 function AssessmentSkeleton({showSemesterSelector=false}:{showSemesterSelector?:boolean}){
   return <div role="status" aria-label="Đang tải đánh giá OJT" className="space-y-4"><span className="sr-only">Đang tải dữ liệu học vụ và lộ trình…</span><div className={`${cardClass} space-y-4 p-6`}><div className="flex flex-wrap items-start justify-between gap-4"><div aria-hidden="true" className="h-5 w-2/3 animate-pulse rounded bg-slate-100 motion-reduce:animate-none"/>{showSemesterSelector && <div className="w-full sm:w-60"><StudentSemesterSelect /></div>}</div><div aria-hidden="true" className="space-y-4 animate-pulse motion-reduce:animate-none"><div className="h-8 w-28 rounded-full bg-slate-100"/><div className="h-4 w-full rounded bg-slate-100"/><div className="h-4 w-3/4 rounded bg-slate-100"/></div></div><div aria-hidden="true" className="space-y-4 animate-pulse motion-reduce:animate-none"><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[0,1,2,3].map(i=><div key={i} className={`${cardClass} space-y-4 p-5`}><div className="size-10 rounded-xl bg-slate-100"/><div className="h-3 w-3/4 rounded bg-slate-100"/><div className="h-8 w-1/2 rounded bg-slate-100"/></div>)}</div><div className={`${cardClass} h-52 bg-white p-6`}><div className="h-5 w-1/2 rounded bg-slate-100"/><div className="mt-6 h-24 rounded-xl bg-slate-50"/></div></div></div>;
+}
+
+function EmptyAssessment({showSemesterSelector=false}:{showSemesterSelector?:boolean}) {
+  return <div className="space-y-4">
+    <section className={`${cardClass} border-l-4 border-l-slate-300 p-5 sm:p-6`} aria-label="Tổng quan đánh giá OJT">
+      <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-400"><GraduationCap size={24} aria-hidden="true" /></span><div><h2 className="text-lg font-bold text-slate-900">Đánh giá mức độ rủi ro OJT</h2><p className="mt-2 text-sm leading-relaxed text-slate-500">Chưa có kết quả đánh giá. Các chỉ số sẽ hiển thị khi có đủ dữ liệu học vụ.</p></div></div>{showSemesterSelector && <div className="w-full sm:w-64"><StudentSemesterSelect /></div>}</div>
+      <p className="mt-4 inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">Chưa có dữ liệu đánh giá</p>
+    </section>
+    <section className={`${cardClass} space-y-5 p-5 sm:p-6`} aria-label="Tiến độ và phân tích OJT">
+      <div><h3 className="text-base font-semibold text-slate-900">Tín chỉ tích lũy</h3><p className="mt-3 text-3xl font-bold text-slate-900">—</p><p className="mt-2 text-sm text-slate-500">Chưa có dữ liệu tín chỉ trong đánh giá.</p></div>
+      <div className="grid gap-5 border-t border-slate-200 pt-5 lg:grid-cols-2">
+        <section aria-label="Phân tích nguyên nhân rủi ro"><h3 className="text-base font-semibold text-slate-900">Phân tích nguyên nhân rủi ro</h3><p className="mt-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-500">Chưa có thông tin phân tích. Các yếu tố ảnh hưởng sẽ được cập nhật sau khi hệ thống đánh giá dữ liệu học tập.</p></section>
+        <section aria-label="Lộ trình học tập đề xuất"><h3 className="text-base font-semibold text-slate-900">Lộ trình học tập đề xuất</h3><p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-500">Chưa có môn học đề xuất. Bạn vẫn có thể xem bảng điểm và chương trình đào tạo của mình.</p></section>
+      </div>
+    </section>
+    <section className={`${cardClass} p-5 sm:p-6`} aria-label="Hướng hành động tiếp theo"><h3 className="text-base font-semibold text-slate-900">Bạn nên làm gì tiếp theo?</h3><p className="mt-3 text-sm leading-6 text-slate-500">Theo dõi tiến độ học tập và kiểm tra dữ liệu các môn đã hoàn thành để chuẩn bị cho kỳ OJT.</p><Link to="/student/academic-profile" className={`mt-3 inline-block rounded text-sm font-medium text-orange-600 hover:underline ${focusClass}`}>Xem hồ sơ học tập</Link></section>
+  </div>;
 }
 
 export function OjtRiskPanel({showRefreshAction=true,showSemesterSelector=false,compactTop=false,compactLayout=false,renderDashboard,assessment}:{showRefreshAction?:boolean;showSemesterSelector?:boolean;compactTop?:boolean;compactLayout?:boolean;renderDashboard?:(data:RiskAssessment|null)=>ReactNode;assessment?:StudentRiskResource}){
@@ -42,6 +60,6 @@ export function OjtRiskPanel({showRefreshAction=true,showSemesterSelector=false,
       <RiskInsights data={data}/>
       <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap}/>
       <RecommendationSummary data={data}/>
-    </>:!error&&<div className={`${cardClass} flex flex-col items-center p-8 text-center sm:p-12`}><span className="mb-4 grid size-14 place-items-center rounded-2xl bg-slate-50 text-slate-400"><GraduationCap size={28} aria-hidden="true"/></span><h2 className="font-bold text-slate-800">Chưa có đánh giá học tập</h2><p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">Đăng nhập tài khoản sinh viên để xem mức rủi ro và lộ trình OJT của bạn.</p></div>}
+    </>:<EmptyAssessment showSemesterSelector={showSemesterSelector} />}
   </section>;
 }
