@@ -49,6 +49,8 @@ export interface AcademicProgress {
     earned: number;
     total: number | null;
     remaining: number | null;
+    ojtEarned?: number;
+    historyOjtEarned?: number;
     completeConfiguration?: boolean;
   };
   requirements: Requirement[];

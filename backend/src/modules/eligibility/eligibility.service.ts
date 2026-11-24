@@ -52,16 +52,16 @@ export function evaluateEligibility(input:Row) {
  const {student,rule,progress,attempts,aliases}=input;const reasons:string[]=[];
  const mapping=new Map<number,number>(aliases.map((a:Row)=>[a.SourceCourseID,a.TargetCourseID]));
  const canonical=(id:number)=>{const seen=new Set<number>();while(mapping.has(id)){if(seen.has(id))return -1;seen.add(id);id=mapping.get(id)!;}return id;};
- const scoped=new Set<number>(progress.requirements.flatMap((r:Row)=>r.choices));const groups=new Map<number,Row[]>();
- for(const r of attempts){const key=canonical(r.courseId);if(scoped.has(key))groups.set(key,[...(groups.get(key)??[]),r]);}
+ const groups=new Map<number,Row[]>();
+ for(const r of attempts){const key=canonical(r.courseId);if(key>0)groups.set(key,[...(groups.get(key)??[]),r]);}
  const unpassedCourses=[...groups].filter(([,rows])=>rows.some(r=>r.status==='FAILED')&&!rows.some(r=>['PASSED','RECOGNIZED'].includes(r.status))).map(([id,rows])=>({courseId:id,courseCode:rows.find(r=>r.courseId===id)?.courseCode??rows[0].courseCode,resultIds:rows.map(r=>r.id)})).sort((a,b)=>a.courseId-b.courseId);
  if(!rule)reasons.push('OJT_RULE_NOT_PUBLISHED');
- if(!progress.credits.completeConfiguration)reasons.push('ACADEMIC_CREDIT_DATA_INCOMPLETE');
  if(student.Status!=='ACTIVE'||student.AccountStatus!=='ACTIVE')reasons.push('STUDENT_NOT_ACTIVE');
- const eligibleCredits=Number(progress.credits.ojtEarned??progress.credits.earned);
+ const rawEligibleCredits=progress.credits.historyOjtEarned??progress.credits.ojtEarned??progress.credits.earned;
+ const eligibleCredits=Number.isFinite(Number(rawEligibleCredits))?Math.max(0,Number(rawEligibleCredits)):0;
  const missingCredits=rule?Math.max(0,Math.round((Number(rule.MinCredits)-eligibleCredits)*100)/100):null;
  let status='REVIEW_REQUIRED';if(!reasons.length){if(missingCredits!>0)reasons.push('MIN_CREDITS_NOT_MET');if(unpassedCourses.length>rule.MaxUnpassedCourses)reasons.push('MAX_UNPASSED_COURSES_EXCEEDED');status=reasons.length?'NOT_ELIGIBLE':'ELIGIBLE';}
- return {studentId:student.StudentID,ojtSemesterId:input.semester.OJTSemesterID,status,ruleSetId:rule?.RuleSetID??null,rule:rule?ruleApi(rule):null,earnedCredits:eligibleCredits,missingCredits,unpassedCourseCount:unpassedCourses.length,unpassedCourses,excessUnpassedCourses:rule?Math.max(0,unpassedCourses.length-rule.MaxUnpassedCourses):null,reasons,academicIssues:progress.credits.completeConfiguration?[]:progress.issues};
+ return {studentId:student.StudentID,ojtSemesterId:input.semester.OJTSemesterID,status,ruleSetId:rule?.RuleSetID??null,rule:rule?ruleApi(rule):null,earnedCredits:eligibleCredits,missingCredits,unpassedCourseCount:unpassedCourses.length,unpassedCourses,excessUnpassedCourses:rule?Math.max(0,unpassedCourses.length-rule.MaxUnpassedCourses):null,reasons,academicIssues:[]};
 }
 export async function prospectiveEligibility(c:PoolClient,studentId:number,semesterId:number,progress:Row) {return evaluateEligibility(await inputSnapshot(c,studentId,semesterId,undefined,progress));}
 export async function performEligibilityCheck(c:PoolClient,studentId:number,semesterId:number,actorId:number,source='MANUAL',runId:number|null=null,eventId:number|null=null,pinnedRule?:Row|null) {

@@ -3,7 +3,7 @@ import { invalid } from './student.validation';
 import { resultSelect } from './student.service';
 
 type Row=Record<string,any>;
-const excludedOjtCredit = /(?:\bGDTC\b|\bGDQP\b|\bQPAN\b|\bPE\b|\bphysical\s+education\b|\bmilitary\b|quoc\s+phong|giao\s+duc\s+the\s+chat|the\s+duc|nhac\s+cu|musical\s+instrument)/i;
+const excludedOjtCredit = /(?:\bGDTC\b|\bGDQP\b|\bQPAN\b|\bPE\b|PHE[_ -]?COM|\bphysical\s+education\b|\bmilitary\b|quoc\s+phong|giao\s+duc\s+the\s+chat|the\s+duc|nhac\s+cu|musical\s+instrument)/i;
 const normalizedCourseText=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d');
 // Pure calculation: no guessed passing threshold, conversion scale, or legacy global course credits.
 export function calculateProgress(program:Row|undefined,courses:Row[],attempts:Row[],aliases:Row[],options:Row[],policy:Row|undefined,configurationIssues:string[]=[],curriculumGradeWeights:Row[]=[]) {
@@ -86,6 +86,19 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
     const known=curriculumGradeWeights.filter(r=>canonical(r.CourseID)===key && r.Credits!==null).map(r=>Number(r.Credits));
     if(new Set(known).size===1) weights.set(key,known[0]);
   }
+  // OJT credits come from passed course history, including combo courses whose
+  // curriculum slot option was never mapped. Unknown course weights are omitted.
+  const physicalEducationCourses=new Set<number>(curriculumGradeWeights
+    .filter(r=>/^PHE_COM/i.test(String(r.ComboCode??'')))
+    .map(r=>canonical(Number(r.CourseID))).filter(id=>id>0));
+  let historyOjtEarned=0;
+  for (const key of achieved) {
+    const credit=weights.get(key);
+    if (credit===undefined) continue;
+    const description=(groups.get(key)??[]).map(r=>`${r.courseName??''} ${r.courseCode??''}`).join(' ');
+    if (physicalEducationCourses.has(key) || excludedOjtCredit.test(normalizedCourseText(description)) || /(?:^|[\s._-])PE\s*\d+\b/i.test(description)) continue;
+    historyOjtEarned+=credit;
+  }
   const gpaIssues:string[]=[];
   if (!policy) gpaIssues.push('GPA_SCALE_NOT_CONFIGURED');
   const scale=policy?.GpaScale;
@@ -109,7 +122,7 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   if (total===null || total<=0) issues.push('PROGRAM_TOTAL_CREDITS_MISSING');
   if (total!==null && earned>total) issues.push('EARNED_CREDITS_EXCEED_PROGRAM_TOTAL');
   const allIssues=[...new Set([...issues,...gpaIssues])];
-  return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),ojtEarned:Math.round(ojtEarned*100)/100,completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
+  return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),ojtEarned:Math.round(ojtEarned*100)/100,historyOjtEarned:Math.round(historyOjtEarned*100)/100,completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
 export async function loadAcademicProgress(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]},studyCutoff?:string) {
     const {rows:[curriculum]}=await client.query<{
@@ -145,9 +158,23 @@ export async function loadAcademicProgress(client:PoolClient, studentId:number,p
       LEFT JOIN "StudentComboCourseSelections" choice ON choice."SelectionID"=sc."SelectionID" AND choice."ComboCourseID"=m."ComboCourseID"
       GROUP BY g."ChoiceGroupID",g."MinCourses",g."MaxCourses"
       HAVING count(choice."ComboCourseID") NOT BETWEEN g."MinCourses" AND g."MaxCourses"
+    ), slot_families AS (
+      SELECT pc."ProgramID",pc."RecommendedSemester",pc."Credits",
+        CASE WHEN left(upper(c."CourseCode"),11)='SE-2026_COM' THEN 'SE_COM'
+             ELSE regexp_replace(upper(c."CourseCode"),'\\*.*$','') END AS "Family"
+      FROM "ProgramCourses" pc JOIN "Courses" c USING ("CourseID")
+      WHERE pc."EntryKind"='COMBO_SLOT'
+    ), slot_weights AS (
+      SELECT "ProgramID","RecommendedSemester","Family",min("Credits") AS "Credits",
+        count(DISTINCT "Credits") AS "CreditVariants"
+      FROM slot_families GROUP BY "ProgramID","RecommendedSemester","Family"
     ), weights AS (
-      SELECT cc."CourseID",cc."Credits"::text AS "Credits" FROM "ComboCourses" cc JOIN "ProgramCombos" c USING ("ProgramComboID")
-      WHERE c."ProgramID"=(SELECT "ProgramID" FROM curriculum) AND c."CoursesReviewed"=true
+      SELECT cc."CourseID",coalesce(cc."Credits",CASE WHEN sw."CreditVariants"=1 THEN sw."Credits" END)::text AS "Credits",pcmb."ComboCode"
+      FROM "ComboCourses" cc JOIN "ProgramCombos" pcmb USING ("ProgramComboID")
+      LEFT JOIN slot_weights sw ON sw."ProgramID"=pcmb."ProgramID" AND sw."RecommendedSemester"=cc."Semester"
+        AND sw."Family"=CASE WHEN left(upper(pcmb."ComboCode"),11)='SE-2026_COM' THEN 'SE_COM'
+          ELSE split_part(upper(pcmb."ComboCode"),'_COM',1)||'_COM' END
+      WHERE pcmb."ProgramID"=(SELECT "ProgramID" FROM curriculum) AND pcmb."CoursesReviewed"=true
     )
     SELECT (SELECT row_to_json(p) FROM "TrainingPrograms" p WHERE p."ProgramID"=curriculum."ProgramID") AS program,
       (SELECT row_to_json(p) FROM "AcademicGradingPolicies" p WHERE p."ProgramID"=curriculum."ProgramID") AS policy,
