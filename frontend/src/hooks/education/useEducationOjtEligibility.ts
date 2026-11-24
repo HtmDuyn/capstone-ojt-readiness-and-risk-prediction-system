@@ -69,7 +69,7 @@ export function useEducationOjtEligibility() {
         if (stored.some(result => result.isStale)) setNotice('Có kết quả đã cũ; hãy xét lại sinh viên chưa bàn giao trước khi sử dụng.');
         break;
       }
-      case 'policy': { const list = value as CurrentOjtRule[]; setConditions(list); setRule(previous => list.find(item => item.id === previous?.id) ?? list[0] ?? null); break; }
+      case 'policy': { const list = (value as CurrentOjtRule[]).filter(item => item.isEffective); setConditions(list); setRule(previous => list.find(item => item.id === previous?.id) ?? list[0] ?? null); break; }
       case 'handoffs': setHandoffs(value as Handoff[]); break;
       case 'thresholds': break;
     }

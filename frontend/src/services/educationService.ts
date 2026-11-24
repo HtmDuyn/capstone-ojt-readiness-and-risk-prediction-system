@@ -903,11 +903,11 @@ export const loadStudentAcademicCredits = async (studentId: number, signal?: Abo
   const earned = profile.academicProgress?.credits?.earned;
   return typeof earned === 'number' && Number.isFinite(earned) ? earned : null;
 };
-export type CurrentOjtRule = LocalOjtRule & { createdAt?: string | null; createdByName?: string | null };
+export type CurrentOjtRule = LocalOjtRule & { effectiveFrom: string; isEffective: boolean; createdAt?: string | null; createdByName?: string | null };
 export const loadOjtConditions = async (signal?: AbortSignal): Promise<CurrentOjtRule[]> =>
   apiData<CurrentOjtRule[]>(await getJson('/ojt-conditions', {}, signal));
-export const createOjtCondition = async (minCredits: number, issuingDocument: string): Promise<CurrentOjtRule> =>
-  apiData<CurrentOjtRule>((await API.post('/ojt-conditions', { minCredits, issuingDocument })).data);
+export const createOjtCondition = async (minCredits: number, issuingDocument: string, effectiveFrom: string): Promise<CurrentOjtRule> =>
+  apiData<CurrentOjtRule>((await API.post('/ojt-conditions', { minCredits, issuingDocument, effectiveFrom })).data);
 export type OjtCreditThreshold = { id: number; minCredits: number };
 export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
   apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
@@ -915,8 +915,9 @@ export const createOjtCreditThreshold = async (minCredits: number) =>
   apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
 export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
   const conditions = await loadOjtConditions(signal);
-  if (!conditions.length) throw new Error('Chưa có điều kiện xét OJT. Vui lòng thêm điều kiện trước khi xét.');
-  return conditions[0];
+  const active = conditions.find(condition => condition.isEffective);
+  if (!active) throw new Error('Chưa có điều kiện xét OJT đến ngày áp dụng.');
+  return active;
 };
 export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; code: string; name: string; status: string; reasons: string[] }[] };
 export const previewOjtPolicy = async (minCredits: number, maxUnpassedCourses: number) =>

@@ -5,20 +5,31 @@ import { assessPublishedPrograms, type ProgramFeasibility } from './ojt-policy-f
 
 export async function listOjtConditions() {
   return academicTransaction(async client => {
-    const rows = (await client.query(`SELECT c.*,u."FullName" AS "CreatedByName" FROM "OJTConditions" c LEFT JOIN "Users" u ON u."UserID"=c."CreatedBy" ORDER BY c."Version" DESC`)).rows;
+    const rows = (await client.query(`SELECT c.*,to_char(c."EffectiveFrom",'YYYY-MM-DD') AS "EffectiveDate",
+      c."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS "IsEffective",u."FullName" AS "CreatedByName" FROM "OJTConditions" c LEFT JOIN "Users" u ON u."UserID"=c."CreatedBy" ORDER BY c."Version" DESC`)).rows;
     return rows.map(conditionApi);
   });
 }
-const conditionApi = (row: Record<string, any>) => ({ id: row.ConditionID, version: row.Version, minCredits: Number(row.MinCredits), issuingDocument: row.IssuingDocument, createdAt: row.CreatedAt, createdBy: row.CreatedBy, createdByName: row.CreatedByName ?? null });
+const conditionApi = (row: Record<string, any>) => ({ id: row.ConditionID, version: row.Version, minCredits: Number(row.MinCredits), issuingDocument: row.IssuingDocument, effectiveFrom: row.EffectiveDate, isEffective: row.IsEffective, createdAt: row.CreatedAt, createdBy: row.CreatedBy, createdByName: row.CreatedByName ?? null });
 export async function createOjtCondition(body: unknown, actorId: number) {
-  const value = inputObject(body, ['minCredits', 'issuingDocument']);
+  const value = inputObject(body, ['minCredits', 'issuingDocument', 'effectiveFrom']);
   if (typeof value.minCredits !== 'number' || !Number.isFinite(value.minCredits) || value.minCredits < 0 || value.minCredits > 9999.99 || Math.abs(Math.round(value.minCredits * 100) - value.minCredits * 100) > 1e-8) throw invalid('Tín chỉ phải là số không âm, tối đa hai chữ số thập phân.');
   const issuingDocument = value.issuingDocument;
   if (typeof issuingDocument !== 'string' || !issuingDocument.trim() || issuingDocument.length > 10000) throw invalid('Văn bản ban hành không được để trống và tối đa 10.000 ký tự.');
+  const effectiveFrom = value.effectiveFrom;
+  if (typeof effectiveFrom !== 'string' || !/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(effectiveFrom))
+    throw invalid('Ngày bắt đầu áp dụng phải có định dạng YYYY-MM-DD.');
+  const date = new Date(effectiveFrom);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== effectiveFrom)
+    throw invalid('Ngày bắt đầu áp dụng không hợp lệ.');
   return academicTransaction(async client => {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['ojt-condition-version']);
     const current = (await client.query('SELECT COALESCE(max("Version"),0)::int AS version FROM "OJTConditions"')).rows[0].version;
-    const row = (await client.query(`INSERT INTO "OJTConditions" ("Version","MinCredits","IssuingDocument","CreatedBy") VALUES ($1,$2,$3,$4) RETURNING *`, [current + 1, value.minCredits, issuingDocument.trim(), actorId])).rows[0];
+    const row = (await client.query(`INSERT INTO "OJTConditions" ("Version","MinCredits","IssuingDocument","CreatedBy","EffectiveFrom")
+      SELECT $1,$2,$3,$4,$5::date WHERE $5::date > (clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+      RETURNING *,to_char("EffectiveFrom",'YYYY-MM-DD') AS "EffectiveDate",false AS "IsEffective"`,
+      [current + 1, value.minCredits, issuingDocument.trim(), actorId, effectiveFrom])).rows[0];
+    if (!row) throw invalid('Ngày bắt đầu áp dụng phải sau ngày hiện tại.');
     await audit(client, actorId, 'OJTConditions', row.ConditionID, 'CREATE', null, conditionApi(row));
     const actor = (await client.query('SELECT "FullName" FROM "Users" WHERE "UserID"=$1',[actorId])).rows[0];
     return conditionApi({...row,CreatedByName:actor?.FullName});

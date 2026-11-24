@@ -53,7 +53,7 @@ export function describeFrontendEligibilityResults(spec: Record<string, any>) {
   };
   spec.paths['/api/ojt-conditions'] = {
     get: { tags: ['OJT eligibility'], summary: 'Danh sách điều kiện và văn bản ban hành', security: [{ bearerAuth: [] }], responses: { 200: response('Danh sách điều kiện bất biến theo phiên bản; mỗi lần tạo được ghi audit log.') } },
-    post: { tags: ['OJT eligibility'], summary: 'Thêm điều kiện xét OJT', security: [{ bearerAuth: [] }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['minCredits','issuingDocument'], properties: { minCredits: { type: 'number', minimum: 0, maximum: 9999.99 }, issuingDocument: { type: 'string', minLength: 1, maxLength: 10000 } } } } } }, responses: { 201: response('Tạo điều kiện mới và audit log.') } },
+    post: { tags: ['OJT eligibility'], summary: 'Thêm điều kiện xét OJT', security: [{ bearerAuth: [] }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['minCredits','issuingDocument','effectiveFrom'], properties: { minCredits: { type: 'number', minimum: 0, maximum: 9999.99 }, issuingDocument: { type: 'string', minLength: 1, maxLength: 10000 }, effectiveFrom: { type: 'string', format: 'date', description: 'Ngày sau ngày hiện tại theo giờ Việt Nam.' } } } } } }, responses: { 201: response('Tạo điều kiện mới và audit log.') } },
   };
   const responsePolicy = (description: string) => ({ description });
   spec.paths['/api/ojt-condition-policy'] = {

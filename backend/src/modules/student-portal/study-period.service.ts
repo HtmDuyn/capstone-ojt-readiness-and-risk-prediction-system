@@ -87,7 +87,9 @@ export async function studyOverview(params: Row, actor: Actor) {
       JOIN "OJTSemesters" o ON o."AcademicPeriodID"=plan."AcademicPeriodID"
       WHERE placement."StudentID"=$1 ORDER BY o."StartDate" LIMIT 1)) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
     const latestCondition = historical ? null : (await c.query(
-      'SELECT "Version","MinCredits" FROM "OJTConditions" ORDER BY "Version" DESC LIMIT 1'
+      `SELECT "Version","MinCredits" FROM "OJTConditions"
+        WHERE "EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+        ORDER BY "Version" DESC LIMIT 1`
     )).rows[0] ?? null;
     const configuredRule = historical ? await activeRule(c, student.ProgramID, target ?? 0) : null;
     const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID

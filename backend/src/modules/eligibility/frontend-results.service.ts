@@ -57,8 +57,11 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
   return academicTransaction(async client => {
     const policy = (await client.query('SELECT "Version","MinCredits","MaxUnpassedCourses" FROM "OJTConditionPolicies" ORDER BY "Version" DESC LIMIT 1')).rows[0];
     const defaults = policy ? { version: policy.Version, minCredits: Number(policy.MinCredits), maxUnpassedCourses: policy.MaxUnpassedCourses } : { version: 0, minCredits: 70, maxUnpassedCourses: 2 };
-    const condition = input.conditionId === undefined ? undefined : (await client.query('SELECT "ConditionID","Version","MinCredits","IssuingDocument" FROM "OJTConditions" WHERE "ConditionID"=$1',[input.conditionId])).rows[0];
+    const condition = input.conditionId === undefined ? undefined : (await client.query(`SELECT "ConditionID","Version","MinCredits","IssuingDocument",
+      "EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS "IsEffective"
+      FROM "OJTConditions" WHERE "ConditionID"=$1`,[input.conditionId])).rows[0];
     if (input.conditionId !== undefined && !condition) throw invalid('Điều kiện xét đã chọn không tồn tại. Hãy tải lại danh sách điều kiện.',409,'OJT_CONDITION_NOT_FOUND');
+    if (condition && !condition.IsEffective) throw invalid('Điều kiện xét đã chọn chưa đến ngày áp dụng.',409,'OJT_CONDITION_NOT_EFFECTIVE');
     const threshold = input.thresholdId === undefined ? undefined : (await client.query(
       'SELECT "MinCredits" FROM "OJTCreditThresholds" WHERE "ThresholdID"=$1', [input.thresholdId])).rows[0];
     if (input.thresholdId !== undefined && !threshold)
