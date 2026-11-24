@@ -7,6 +7,7 @@ import { describeApiError } from '@/services/apiService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { WorkflowModal,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { enterprisePeriodLabels } from '@/utils/enterprise/recruitment';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 export const EnterpriseCandidates: React.FC = () => {
   const { error: profileError } = useEnterprise();
@@ -36,7 +37,7 @@ export const EnterpriseCandidates: React.FC = () => {
     if(bulkLoading||actionLoading!==null||!ids.length)return;
     setBulkLoading(true);setAcceptanceError('');setAllowOverCapacity(false);
     try{setAcceptance(await enterpriseService.previewAcceptance(ids));setSelectedCandidate(null);}
-    catch(err:any){setToastMessage('Lỗi: '+(err?.response?.data?.message||err.message||'Không kiểm tra được chỉ tiêu.'));}
+    catch(err:any){setToastMessage(friendlyErrorMessage(err, 'Không kiểm tra được chỉ tiêu lúc này. Vui lòng thử lại.'));}
     finally{setBulkLoading(false);}
   };
   const confirmAcceptance=async()=>{
@@ -47,10 +48,10 @@ export const EnterpriseCandidates: React.FC = () => {
       setToastMessage(`Đã tiếp nhận ${acceptance.totalSelected} sinh viên. Số thực nhận và chênh lệch chỉ tiêu đã được cập nhật.`);
       setSelectedIds(new Set());setAcceptance(null);await fetchCandidates();
     }catch(err:any){
-      setAcceptanceError(err?.response?.data?.message||err.message||'Không nhận được sinh viên.');
+      setAcceptanceError(friendlyErrorMessage(err, 'Chưa thể xác nhận tiếp nhận sinh viên. Vui lòng thử lại.'));
       if(err?.response?.data?.errorCode==='BULK_ACCEPTANCE_CHANGED'){
         try{setAcceptance(await enterpriseService.previewAcceptance(acceptance.candidateIds));setAllowOverCapacity(false);}
-        catch(refreshError:any){setAcceptanceError(refreshError?.response?.data?.message||'Hãy đóng hộp thoại và tải lại danh sách.');}
+        catch(refreshError:any){setAcceptanceError(friendlyErrorMessage(refreshError, 'Hãy đóng hộp thoại và tải lại danh sách.'));}
       }
     }finally{setBulkLoading(false);}
   };
@@ -164,9 +165,8 @@ export const EnterpriseCandidates: React.FC = () => {
         setSelectedCandidate(null);
       }
     } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
       const errorCode = err?.response?.data?.errorCode;
-      let displayMessage = serverMessage || err?.message || 'Không thể cập nhật quyết định';
+      let displayMessage = friendlyErrorMessage(err, 'Không thể cập nhật quyết định. Vui lòng thử lại.');
       if (errorCode === 'INVALID_TOKEN' || errorCode === 'TOKEN_EXPIRED') {
         displayMessage = 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại!';
       }

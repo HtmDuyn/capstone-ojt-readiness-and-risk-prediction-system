@@ -6,6 +6,7 @@ import { enterpriseService, type EnterpriseInternshipItem, type EnterpriseIntern
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { applyEvaluationScore, evaluationAverage, parseEvaluationScore, taskScoreSuggestion,
   type EvaluationScores } from '@/utils/enterprise/enterpriseEvaluation';
 
@@ -59,8 +60,7 @@ function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask
 }
 
 function errorText(error: unknown): string {
-  const e = error as { response?: { data?: { message?: string } }; message?: string };
-  return e.response?.data?.message || e.message || 'Không thể lưu đánh giá. Vui lòng thử lại.';
+  return friendlyErrorMessage(error, 'Không thể hoàn thành đánh giá lúc này. Vui lòng thử lại.');
 }
 
 const inputClass = 'rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-400';

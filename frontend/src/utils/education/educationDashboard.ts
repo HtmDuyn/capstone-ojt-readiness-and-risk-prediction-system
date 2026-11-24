@@ -1,4 +1,5 @@
 import type { AcademicAlert, AcademicPeriod, AcademicYear, CohortProgress, CourseDemand, JsonObject, PeriodStatistic } from '@/types/education/dashboard.types';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 export const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -125,45 +126,7 @@ export const toApiId = (value: string): string | number =>
   /^\d+$/.test(value) ? Number(value) : value;
 
 export const getErrorMessage = (error: unknown): string => {
-  const apiError = error as {
-    response?: {
-      status?: number;
-      data?: unknown;
-    };
-    message?: string;
-  };
-
-  const status = apiError?.response?.status;
-
-  const message = readString(apiError?.response?.data, [
-    "message",
-    "error.message",
-    "error",
-    "detail",
-  ]);
-
-  if (status === 404) {
-    return "API không tồn tại trên Backend hiện tại (HTTP 404).";
-  }
-
-  if (status === 401) {
-    return "Phiên đăng nhập đã hết hạn hoặc không hợp lệ.";
-  }
-
-  if (status === 403) {
-    return "Tài khoản không có quyền truy cập API này.";
-  }
-
-  if (status === 400) {
-    return message || "Tham số API không hợp lệ.";
-  }
-
-  if (status) {
-    return message || `Máy chủ dữ liệu trả về lỗi HTTP ${status}.`;
-  }
-
-  if (apiError?.message === 'Network Error') return 'Không kết nối được máy chủ dữ liệu.';
-  return apiError?.message || "Không thể kết nối máy chủ dữ liệu.";
+  return friendlyErrorMessage(error, 'Không thể tải dữ liệu lúc này. Vui lòng thử lại.');
 };
 
 export const isCanceledRequest = (error: unknown): boolean => {

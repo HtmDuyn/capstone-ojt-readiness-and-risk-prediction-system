@@ -99,7 +99,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
       setSaving(true);
       const response = post ? await enterpriseService.updateRecruitmentPost(post.id, payload)
         : await enterpriseService.createRecruitmentPost({ ...payload, windowId, idempotencyKey });
-      if (!response.success || !response.data) throw new Error('Máy chủ chưa xác nhận lưu tin thành công. Vui lòng thử lại.');
+      if (!response.success || !response.data) throw new Error('Chưa lưu được tin tuyển dụng. Vui lòng thử lại.');
       onSaved(response.data);
     } catch (err) {
       feedback.notify(recruitmentError(err), status === 'PUBLISHED' ? 'Không thể công bố tin' : 'Chưa lưu được bản nháp');

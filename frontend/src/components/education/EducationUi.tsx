@@ -78,7 +78,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     </p>
 
     <p className="mt-2 text-[11px] leading-5 text-slate-400">
-      {!loading && value === null ? "Chưa có số liệu từ API" : description}
+      {!loading && value === null ? "Chưa có số liệu để hiển thị" : description}
     </p>
   </div>
 );

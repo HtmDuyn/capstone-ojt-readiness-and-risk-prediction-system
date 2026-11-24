@@ -3,6 +3,7 @@ import { expireBearerSession } from '../utils/shared/authSession';
 import { API_BASE_URL } from '@/services/apiService';
 import { studentReads } from '../utils/student/studentReads';
 import { initializeStudentSnapshots, studentSnapshots } from '../utils/student/studentSnapshots';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 import { downloadFile } from '@/utils/shared/downloadFile';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
@@ -79,9 +80,9 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
   try {
     const response = await API.request({ ...options, url: path, headers, responseType: 'json' }) as { data: T; status: number };
     const body = response.data;
-    if (!body || typeof body !== 'object') throw new ApiError('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.', response.status, 'INVALID_API_RESPONSE');
+    if (!body || typeof body !== 'object') throw new ApiError('Chưa thể tải dữ liệu lúc này. Vui lòng thử lại.', response.status, 'INVALID_API_RESPONSE');
     const result = body as ErrorBody;
-    if (result.success === false) throw new ApiError(result.message || 'Yêu cầu API thất bại.', response.status, result.errorCode ?? result.code);
+    if (result.success === false) throw new ApiError(friendlyErrorMessage({ response: { status: response.status, data: result } }, 'Yêu cầu chưa thể hoàn thành. Vui lòng thử lại.'), response.status, result.errorCode ?? result.code);
     if (!['get', 'head'].includes(options.method?.toLowerCase() ?? 'get')) {
       studentReads.invalidate();
       studentSnapshots.invalidate();
@@ -91,20 +92,14 @@ export async function apiRequest<T>(path: string, options: StudentRequestConfig 
     if (isRequestCanceled(error) || error instanceof ApiError) throw error;
     if (!axios.isAxiosError<ErrorBody>(error)) throw error;
     const failure = error;
-    if (!failure.response) throw new ApiError(
-      ['ECONNABORTED', 'ETIMEDOUT'].includes(failure.code ?? '') ? 'Yêu cầu API hết thời gian chờ. Vui lòng thử lại.' : 'Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.',
-      0, failure.code,
-    );
+    if (!failure.response) throw new ApiError(friendlyErrorMessage(failure, 'Không thể kết nối lúc này. Vui lòng kiểm tra mạng và thử lại.'), 0, failure.code);
     const { status, data } = failure.response;
     if (status === 401) {
       studentSnapshots.invalidate();
       expireBearerSession(failure.config?.headers?.Authorization);
     }
-    const method = failure.config?.method?.toUpperCase() ?? 'GET';
-    const path = failure.config?.url ?? 'API';
     const errorCode = data?.errorCode ?? data?.code;
-    const details = [method + ' ' + path, `HTTP ${status}`, errorCode].filter(Boolean).join(' · ');
-    throw new ApiError(`${data?.message || 'Yêu cầu API thất bại.'} (${details})`, status, errorCode);
+    throw new ApiError(friendlyErrorMessage({ response: { status, data } }, 'Chưa thể hoàn thành yêu cầu. Vui lòng thử lại.'), status, errorCode);
   }
 }
 
@@ -124,7 +119,7 @@ export async function studentGet<T>(
   return studentReads.read(localStorage.getItem('ojt_auth_token'), path, async sharedSignal => {
     const response = await apiRequest<{ data: T }>(path, { signal: sharedSignal });
     if (!Object.prototype.hasOwnProperty.call(response, 'data'))
-      throw new ApiError('API chưa trả dữ liệu theo hợp đồng. Vui lòng kiểm tra backend.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+      throw new ApiError('Chưa thể tải đầy đủ dữ liệu. Vui lòng thử lại sau.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
     return response.data;
   }, signal);
 }
@@ -149,7 +144,7 @@ export async function allStudentPages<T>(
     items.push(...result.items);
     if (items.length >= result.total) return items;
     if (!result.items.length)
-      throw new ApiError('API chưa trả đủ danh sách. Vui lòng tải lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+      throw new ApiError('Chưa thể tải đầy đủ danh sách. Vui lòng tải lại trang.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
   }
 }
 export async function getOwnStudent(
@@ -207,7 +202,7 @@ async function resolveOwnStudent<T extends Pick<Profile, 'id' | 'userId'>>(
     studentId = own.studentId;
   }
   if (!Number.isSafeInteger(studentId) || studentId <= 0)
-    throw new ApiError('Máy chủ chưa xác định được hồ sơ sinh viên của tài khoản. Liên hệ Phòng Đào tạo để kiểm tra liên kết.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+    throw new ApiError('Chưa tìm thấy hồ sơ sinh viên liên kết với tài khoản. Vui lòng liên hệ Phòng Đào tạo để được hỗ trợ.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
   const profile = await loadProfile(studentId, signal, user);
   if (profile.id !== studentId || profile.userId !== user.id)
     throw new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.', 401, 'SESSION_IDENTITY_CHANGED');
@@ -298,7 +293,7 @@ export async function getAllCourseResults(id: number, signal?: AbortSignal, onPa
     items.push(...courseResults.items);
     if (items.length >= courseResults.total) return items;
     if (!courseResults.items.length)
-      throw new ApiError('API chưa trả đủ bảng điểm. Vui lòng tải lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+      throw new ApiError('Chưa thể tải đầy đủ bảng điểm. Vui lòng tải lại trang.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
     onPage?.([...items]);
   }
 }

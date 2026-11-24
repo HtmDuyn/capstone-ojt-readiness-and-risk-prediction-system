@@ -12,7 +12,7 @@ function statusText(student: NonNullable<ImportCommitResponse['students']>[numbe
     if (/^BREVO_RATE_LIMIT(?:_|$)/.test(code)) return deliveryIssue('RATE_LIMIT');
   }
   switch (student.emailStatus) {
-    case 'SENT': return 'Đã được máy chủ email tiếp nhận. Sinh viên kiểm tra Hộp thư đến và Thư rác.';
+    case 'SENT': return 'Email đã được gửi đi. Sinh viên vui lòng kiểm tra Hộp thư đến và Thư rác.';
     case 'PENDING': return 'Đang chờ gửi email cấp tài khoản.';
     case 'SENDING': return 'Đang gửi email cấp tài khoản.';
     case 'FAILED': return 'Gửi email thất bại. Liên hệ quản trị viên để kiểm tra và gửi lại.';

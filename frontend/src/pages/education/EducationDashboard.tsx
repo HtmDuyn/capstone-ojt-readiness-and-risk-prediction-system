@@ -345,7 +345,7 @@ export const EducationDashboard: React.FC = () => {
                 <EmptyState
                   loading={courseDemandLoading}
                   title="Chưa có thống kê nhu cầu học phần"
-                  description="Chưa có dữ liệu học phần phù hợp từ Backend."
+                  description="Chưa có dữ liệu học phần phù hợp để hiển thị."
                 />
               ) : (
                 <div className="mt-3 max-w-full overflow-x-auto rounded-lg border border-slate-200">

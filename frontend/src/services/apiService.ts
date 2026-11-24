@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { clearSharedReads } from '../utils/shared/sharedRead';
 import { expireBearerSession, expireSession } from '../utils/shared/authSession';
+import { friendlyErrorMessage } from '../utils/shared/friendlyError';
 
 // Tất cả vai trò dùng chung backend; môi trường local đi qua proxy của Vite.
 export const API_BASE_URL = (
@@ -13,31 +14,9 @@ export const API_BASE_URL = (
 export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, "");
 export const API_URL = API_BASE_URL;
 
-type ApiErrorPayload = { message?: unknown; errorCode?: unknown; code?: unknown };
-
-/** Format an HTTP failure with the backend's message and the request that failed. */
+/** Format a request failure for display without exposing transport details. */
 export function describeApiError(error: unknown, fallback: string): string {
-  if (!axios.isAxiosError<ApiErrorPayload>(error))
-    return error instanceof Error ? error.message : fallback;
-
-  const status = error.response?.status;
-  const payload = error.response?.data;
-  const backendMessage = typeof payload?.message === 'string' ? payload.message : '';
-  const errorCode = typeof payload?.errorCode === 'string'
-    ? payload.errorCode
-    : typeof payload?.code === 'string' ? payload.code : '';
-  const method = error.config?.method?.toUpperCase() ?? 'GET';
-  const path = error.config?.url ?? '';
-  const params = error.config?.params;
-  const query = params && typeof params === 'object'
-    ? new URLSearchParams(Object.entries(params)
-      .filter(([, value]) => value !== undefined && value !== null && value !== '')
-      .map(([key, value]) => [key, String(value)] as [string, string])).toString()
-    : '';
-  const endpoint = path ? `${method} ${path}${query ? `?${query}` : ''}` : method;
-  const details = [status ? `HTTP ${status}` : '', errorCode, endpoint].filter(Boolean).join(' · ');
-  const message = backendMessage || error.message || fallback;
-  return details ? `${message} (${details})` : message;
+  return friendlyErrorMessage(error, fallback);
 }
 
 // Axios instance dùng chung cho toàn bộ service để đồng nhất baseURL và token.
@@ -83,6 +62,7 @@ API.interceptors.response.use(
         ?? error.config?.headers?.Authorization;
       expireBearerSession(authorization);
     }
+    error.message = friendlyErrorMessage(error, 'Yêu cầu chưa thể hoàn thành. Vui lòng thử lại.');
     return Promise.reject(error);
   }
 );
@@ -101,19 +81,19 @@ export async function apiRequest<T>(
     response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, cache: 'no-store' });
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    throw new Error('Không kết nối được backend. Kiểm tra máy chủ API và VITE_API_URL.');
+    throw new Error('Không thể kết nối lúc này. Vui lòng kiểm tra mạng và thử lại.');
   }
 
   const body = await response.json().catch(() => null);
   if (response.status === 401) expireSession(token);
   if ([502, 503, 504].includes(response.status)) {
-    throw new Error(`Máy chủ hoặc proxy API không khả dụng (HTTP ${response.status}). Kiểm tra backend tại ${API_BASE_URL}.`);
+    throw new Error('Hệ thống đang gặp sự cố tạm thời. Vui lòng thử lại sau.');
   }
   if (!response.ok || body?.success === false) {
-    throw new Error(body?.message || 'Yêu cầu API thất bại (HTTP ' + response.status + ').');
+    throw new Error(friendlyErrorMessage({ response: { status: response.status, data: body } }, 'Chưa thể hoàn thành yêu cầu. Vui lòng thử lại.'));
   }
   if (!body) {
-    throw new Error('API không trả JSON. Kiểm tra cấu hình địa chỉ backend.');
+    throw new Error('Chưa thể xử lý phản hồi lúc này. Vui lòng thử lại sau.');
   }
   if (!['GET', 'HEAD'].includes((options.method ?? 'GET').toUpperCase())) clearSharedReads();
   return body as T;

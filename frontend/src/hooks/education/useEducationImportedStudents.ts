@@ -97,7 +97,7 @@ export function useImportedStudentDetail(id: number, revision: number) {
       const first = await importService.getStoredCourseResults(id, 1, c.signal);
       const items = [...first.items];
       if (!Number.isSafeInteger(first.total) || first.total < 0 || !Number.isSafeInteger(first.limit) || first.limit < 1)
-        throw new Error('Backend trả thông tin phân trang bảng điểm không hợp lệ.');
+        throw new Error('Chưa thể tải đầy đủ bảng điểm. Vui lòng thử lại.');
       for (let next = 2; items.length < first.total; next++) {
         const page = await importService.getStoredCourseResults(id, next, c.signal);
         if (page.total !== first.total || !page.items.length)

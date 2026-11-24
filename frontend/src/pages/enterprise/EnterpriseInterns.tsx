@@ -29,6 +29,7 @@ import {
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
 // Adapter: map API data to existing UI's expected format
@@ -77,12 +78,7 @@ const localDateString = (date: Date) => {
 };
 
 const getApiErrorMessage = (error: unknown): string | null => {
-  if (typeof error !== 'object' || error === null || !('response' in error)) return null;
-  const response = error.response;
-  if (typeof response !== 'object' || response === null || !('data' in response)) return null;
-  const data = response.data;
-  if (typeof data !== 'object' || data === null || !('message' in data)) return null;
-  return typeof data.message === 'string' ? data.message : null;
+  return friendlyErrorMessage(error, 'Không thể hoàn thành yêu cầu lúc này. Vui lòng thử lại.');
 };
 
 type InternStatusFilter = 'ALL' | 'ONGOING' | 'RISK';
@@ -428,12 +424,12 @@ export const EnterpriseInterns: React.FC = () => {
         taskRequestRef.current.idempotencyKey
       );
       if (!response.success || !response.data || response.data.created !== assignmentIds.length || response.data.tasks.length !== assignmentIds.length) {
-        throw new Error('Backend trả về số task không khớp với số sinh viên đã chọn.');
+        throw new Error('Chưa thể xác nhận đã giao đủ nhiệm vụ cho sinh viên được chọn. Vui lòng tải lại danh sách để kiểm tra.');
       }
       createdTasks = response.data.tasks.map((task) => {
         const student = assignedStudents.find((item) => Number(item.id) === task.assignmentId);
         if (!student) {
-          throw new Error('Backend trả về task không khớp với danh sách thực tập sinh đã chọn.');
+          throw new Error('Kết quả giao nhiệm vụ chưa khớp với danh sách đã chọn. Vui lòng tải lại danh sách để kiểm tra.');
         }
         return {
           id: String(task.id),

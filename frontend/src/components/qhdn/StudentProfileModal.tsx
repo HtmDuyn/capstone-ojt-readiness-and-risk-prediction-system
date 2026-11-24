@@ -3,6 +3,7 @@ import { Download, Eye, FileText, GraduationCap, LoaderCircle, RefreshCw, UserRo
 import { getCvFile, getQhdnStudentDossier } from '@/services/qhdnService';
 import type { QhdnStudentCv, QhdnStudentDossier } from '@/types/qhdn/qhdnTypes';
 import { downloadFile } from '@/utils/shared/downloadFile';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { Notice, errorMessage } from './QhdnUi';
 import { WorkflowModal, workflowSecondary } from './StudentWorkflowUi';
 
@@ -39,7 +40,7 @@ function CvDocument({ studentId, cv, label }: { studentId: number; cv: QhdnStude
       if (controller.signal.aborted) return;
       const data = error.response?.data;
       const message = data instanceof Blob ? await data.text().then(text => { try { return JSON.parse(text).message; } catch { return null; } }) : null;
-      if (!controller.signal.aborted) setError(message || errorMessage(error));
+      if (!controller.signal.aborted) setError(friendlyErrorMessage(message || errorMessage(error), 'Không thể tải CV của sinh viên. Vui lòng thử lại.'));
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [studentId, cv.id, preview]);

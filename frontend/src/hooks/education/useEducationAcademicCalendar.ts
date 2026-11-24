@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { academicService } from '@/services/educationService';
 import { getAllItems } from '@/services/educationService';
 import type { AcademicCalendar, AcademicPeriod, AcademicYear, SemesterDates } from '@/types/education/academic.types';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
-const errorText = (error: unknown) => (error as { response?: { data?: { message?: string } } })?.response?.data?.message || (error instanceof Error ? error.message : 'Không thực hiện được yêu cầu.');
+const errorText = (error: unknown) => friendlyErrorMessage(error, 'Không thực hiện được yêu cầu. Vui lòng thử lại.');
 export function useEducationAcademicCalendar() {
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
