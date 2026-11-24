@@ -2,6 +2,7 @@ import { enrichListRows } from '../../shared/list-context';
 import { pool, query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicError, pageInput, positiveId, statusInput } from './academic.schema';
+import { previewBlockCalendar } from '../academic-reporting/block-calendar';
 import { academicPeriodStatusSql } from './period-status';
 
 export const resources = {
@@ -25,6 +26,10 @@ export function asApi(resource: Resource, row: AcademicRecord): AcademicRecord {
   if (resource === 'cohorts') value.groups = row.groups ?? [];
   if (resource === 'academic-years') value.periods = row.periods ?? [];
   if (resource === 'academic-periods') { value.ojt = row.ojt ?? null; value.ojtSemesterId = row.ojt?.id ?? null; }
+  if (resource === 'academic-periods' && value.kind === 'SEMESTER' && value.startDate && value.endDate) {
+    const preview = previewBlockCalendar(value.startDate);
+    value.blockCalendar = preview.block.endDate <= value.endDate ? preview : null;
+  }
   if(resource==='academic-periods'&&row.comboPhaseSchedules!==undefined){value.comboPhaseSchedules=row.comboPhaseSchedules;value.advisorySchedule=row.advisorySchedule;}
   return value;
 }
