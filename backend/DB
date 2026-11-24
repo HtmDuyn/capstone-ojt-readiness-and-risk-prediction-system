@@ -7753,6 +7753,11 @@ WHERE student_role."RoleCode"='STUDENT'
   AND NOT EXISTS (SELECT 1 FROM public."Users" u WHERE u."Username"=r."Username" OR u."Email"=r."Email")
 ON CONFLICT DO NOTHING;
 
+-- The schema section above switched all constraints to IMMEDIATE for migration checks.
+-- Student history validation needs the complete student + placement + transcript set first.
+SET CONSTRAINTS "TR_Placement_ProgramCohort", "TR_Placement_StudyHistory", "TR_Result_StudyHistory",
+  "TR_Student_ProgramCohort", "TR_Student_StudyHistory" DEFERRED;
+
 INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status","CohortCode")
 SELECT u."UserID",r."StudentCode",r."ProgramID",
   2025,5,
@@ -7921,7 +7926,7 @@ BEGIN
         WHERE placement."StudentID"=student."StudentID"
           AND period."AcademicPeriodID"=result."AcademicPeriodID"
           AND period."AcademicYearID"=result."AcademicYearID"))
-  ) THEN RAISE EXCEPTION 'A seeded course result does not match the student's mapped academic semester and year.';
+  ) THEN RAISE EXCEPTION 'A seeded course result does not match the mapped curriculum stage and academic year.';
   END IF;
   IF EXISTS (
     SELECT 1 FROM qhdn_student_roster roster
