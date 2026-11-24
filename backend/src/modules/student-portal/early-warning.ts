@@ -17,7 +17,6 @@ export function earlyWarning(input: WarningInput) {
   else if (input.currentSemester! < 2) reasons.push('BEFORE_SEMESTER_2');
   const creditsValid = typeof input.earnedCredits === 'number' && Number.isFinite(input.earnedCredits) && input.earnedCredits >= 0;
   if (!creditsValid) reasons.push('EARNED_CREDITS_UNAVAILABLE');
-  else if (input.earnedCredits === 0) reasons.push('NO_EARNED_CREDITS');
   if (!input.completeConfiguration || input.issues.length || !['ELIGIBLE', 'NOT_ELIGIBLE'].includes(input.eligibilityStatus)) {
     reasons.push('ACADEMIC_DATA_INVALID');
   }
@@ -25,10 +24,9 @@ export function earlyWarning(input: WarningInput) {
   let message: string;
   if (!available) {
     const descriptions: Record<string,string> = {
-      CURRENT_SEMESTER_UNAVAILABLE:'Chưa xác định được kỳ học hiện tại theo lộ trình.',
+      CURRENT_SEMESTER_UNAVAILABLE:'Chưa có học kỳ nào có ít nhất hai môn học khác nhau trong lịch sử học vụ.',
       BEFORE_SEMESTER_2:'Theo dõi sớm chỉ bắt đầu từ kỳ 2.',
       EARNED_CREDITS_UNAVAILABLE:'Dữ liệu tín chỉ tích lũy chưa hợp lệ.',
-      NO_EARNED_CREDITS:'Bạn chưa có tín chỉ tích lũy để theo dõi sớm.',
       ACADEMIC_DATA_INVALID:'Dữ liệu học vụ hoặc quy tắc xét OJT cần được kiểm tra, đối soát trước khi tư vấn.',
     };
     message=reasons.map(reason=>descriptions[reason]).join(' ');

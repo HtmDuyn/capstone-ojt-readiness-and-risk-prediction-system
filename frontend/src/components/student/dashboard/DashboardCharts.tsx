@@ -16,14 +16,14 @@ export function RiskLevelChart({ level }: { level: RiskLevel }) {
   const marker = active ? gaugePoint(active.marker) : null;
 
   return <div className="mt-4">
-    <svg viewBox="0 0 240 136" role="img" aria-label={`Mức cảnh báo AI: ${riskTheme[level].label}`} className="mx-auto w-full max-w-[240px]">
+    <svg viewBox="0 0 240 136" role="img" aria-label={`Mức cảnh báo OJT: ${riskTheme[level].label}`} className="mx-auto w-full max-w-[240px]">
       {riskBands.map(band => {
         const start = gaugePoint(band.start), end = gaugePoint(band.end);
         return <path key={band.level} d={`M ${start.x} ${start.y} A 96 96 0 0 1 ${end.x} ${end.y}`}
           fill="none" stroke={active ? band.color : '#cbd5e1'} strokeWidth="18" strokeLinecap="round" opacity={!active || active.level === band.level ? 1 : 0.25} />;
       })}
       {marker && <circle cx={marker.x} cy={marker.y} r="10" fill={active?.color} stroke="white" strokeWidth="4" />}
-      <text x="120" y="94" textAnchor="middle" className="fill-slate-500 text-[12px]">Mức cảnh báo AI</text>
+      <text x="120" y="94" textAnchor="middle" className="fill-slate-500 text-[12px]">Mức cảnh báo OJT</text>
       <text x="120" y="118" textAnchor="middle" className="fill-slate-900 text-[17px] font-bold">{active?.label ?? 'Chưa đủ dữ liệu'}</text>
     </svg>
     <div aria-hidden="true" className="mt-1 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-600">

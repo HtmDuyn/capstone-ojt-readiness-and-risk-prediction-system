@@ -167,7 +167,15 @@ export function StudentAcademicPeriodSelect({ label = 'Học kỳ theo dõi' }: 
 export function StudentCurrentAcademicPeriod({ currentSemester }: { currentSemester?: number | null } = {}) {
   const portal = useStudentPortal();
   const period = portal.academicPeriods.find(item => item.isCurrent);
-  const stage = currentSemester ?? period?.curriculumSemester ?? portal.profile?.currentSemester;
+  if (currentSemester !== undefined) {
+    return <div className="text-sm sm:text-right">
+      <p className="text-xs text-slate-500">Học kỳ theo lịch sử học vụ</p>
+      <p className="mt-1 font-semibold text-slate-800">
+        {currentSemester === null ? 'Chưa xác định học kỳ' : `Kỳ ${currentSemester}`}
+      </p>
+    </div>;
+  }
+  const stage = period?.curriculumSemester ?? portal.profile?.currentSemester;
   return <div className="text-sm sm:text-right"><p className="text-xs text-slate-500">Học kỳ đang học</p><p className="mt-1 font-semibold text-slate-800">{period
     ? `${period.name}${stage == null ? '' : ` · Kỳ ${stage}`}`
     : stage != null ? `Kỳ ${stage} · Theo hồ sơ sinh viên`

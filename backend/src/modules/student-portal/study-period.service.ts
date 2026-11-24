@@ -44,6 +44,21 @@ export async function studyPeriods(params: Row, actor: Actor) {
   return readTransaction(async c => studyPeriodsWithClient(c, await ownStudent(c, actor)));
 }
 
+// A retake does not count as a second subject in the same recorded semester.
+export function inferStudySemester(attempts: Awaited<ReturnType<typeof loadAcademicProgress>>['attempts']): number | null {
+  const subjectsBySemester = new Map<number, Set<number>>();
+  let latest: number | null = null;
+  for (const { courseId, semesterTaken, status } of attempts) {
+    if (!Number.isInteger(semesterTaken) || semesterTaken < 0 || semesterTaken > 9
+      || !['IN_PROGRESS', 'PASSED', 'FAILED', 'RECOGNIZED'].includes(status)) continue;
+    const subjects = subjectsBySemester.get(semesterTaken) ?? new Set<number>();
+    subjects.add(courseId);
+    subjectsBySemester.set(semesterTaken, subjects);
+    if (subjects.size >= 2 && (latest === null || semesterTaken > latest)) latest = semesterTaken;
+  }
+  return latest;
+}
+
 export async function studyOverview(params: Row, actor: Actor) {
   for (const key of Object.keys(params)) if (!['academicPeriodId', 'view'].includes(key)) throw invalid(`Unknown study parameter: ${key}.`);
   if (params.view !== undefined && params.view !== 'current') throw invalid('Unknown study view.');
@@ -52,23 +67,9 @@ export async function studyOverview(params: Row, actor: Actor) {
   const requested = live ? null : positiveId(params.academicPeriodId, 'academicPeriodId');
   return readTransaction(async c => {
     const student = await ownStudent(c, actor);
-    let period: Row | null;
-    let currentSemester: number | null;
-    if (live) {
-      // The placement/study stage is authoritative even when the calendar dates
-      // have not been advanced. Never treat the last historical term as "now".
-      const placement = (await c.query(`SELECT COALESCE("StudentCurriculumSemester"(s."StudentID",placement."CurrentAcademicPeriodID"),s."CurrentSemester") AS semester
-        FROM "Students" s LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
-        WHERE s."StudentID"=$1`, [student.StudentID])).rows[0];
-      currentSemester = placement?.semester ?? student.CurrentSemester ?? null;
-      const catalog = await studyPeriodsWithClient(c, student);
-      period = catalog.items.find(item => item.isCurrent) ?? null;
-    } else {
-      const catalog = await studyPeriodsWithClient(c, student);
-      period = catalog.items.find(item => item.id === requested) ?? null;
-      if (!period) throw invalid('Chỉ được xem học kỳ đang học hoặc đã học của chính mình.', 404, 'STUDY_PERIOD_NOT_FOUND');
-      currentSemester = period.curriculumSemester;
-    }
+    const catalog = await studyPeriodsWithClient(c, student);
+    const period: Row | null = catalog.items.find(item => live ? item.isCurrent : item.id === requested) ?? null;
+    if (!live && !period) throw invalid('Chỉ được xem học kỳ đang học hoặc đã học của chính mình.', 404, 'STUDY_PERIOD_NOT_FOUND');
     const historical = !live && !period!.isCurrent;
     const cutoff = historical
       ? (await c.query(`SELECT to_char(LEAST(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',($1::date+1)::timestamp-interval '1 microsecond'),'YYYY-MM-DD"T"HH24:MI:SS.US') AS cutoff`, [period!.endDate])).rows[0].cutoff as string
@@ -76,6 +77,7 @@ export async function studyOverview(params: Row, actor: Actor) {
     // Live reads include the latest grades, retakes and confirmed choices, with
     // no cutoff inherited from an expired academic period.
     const source = await loadAcademicProgress(c, student.StudentID, undefined, cutoff ?? undefined);
+    const currentSemester = historical ? period!.curriculumSemester : inferStudySemester(source.attempts);
     const progress = progressFromData(source);
     // Resolve the single OJT target internally; it is not the student's study filter.
     const target = (await c.query(`SELECT COALESCE(
@@ -87,7 +89,7 @@ export async function studyOverview(params: Row, actor: Actor) {
     const latestCondition = historical ? null : (await c.query(
       'SELECT "Version","MinCredits" FROM "OJTConditions" ORDER BY "Version" DESC LIMIT 1'
     )).rows[0] ?? null;
-    const configuredRule = latestCondition ?? await activeRule(c, student.ProgramID, target ?? 0);
+    const configuredRule = historical ? await activeRule(c, student.ProgramID, target ?? 0) : null;
     const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
       && (configuredRule.OJTSemesterID === null || configuredRule.OJTSemesterID === target) ? configuredRule : null;
     const current = evaluateEligibility({ student, semester: { OJTSemesterID: target }, rule, progress, attempts: source.attempts, aliases: source.aliases });
@@ -117,6 +119,6 @@ export async function studyOverview(params: Row, actor: Actor) {
       basis: historical ? 'STORED_GRADES_THROUGH_PERIOD_CURRENT_CURRICULUM' : 'CURRENT_STORED_ACADEMIC_DATA',
       note: historical
         ? 'Tiến độ và bảng điểm kỳ cũ được tính lại từ dữ liệu đang lưu theo khung hiện hành. Đánh giá rủi ro và lộ trình đề xuất luôn sử dụng học kỳ đang học.'
-        : 'Tín chỉ, điều kiện, rủi ro và lộ trình được tính từ dữ liệu học vụ mới nhất và kỳ hiện tại theo hồ sơ sinh viên.' };
+        : 'Tín chỉ, điều kiện, rủi ro và lộ trình được tính từ dữ liệu học vụ mới nhất và kỳ cao nhất có ít nhất hai môn khác nhau trong lịch sử học vụ.' };
   });
 }
