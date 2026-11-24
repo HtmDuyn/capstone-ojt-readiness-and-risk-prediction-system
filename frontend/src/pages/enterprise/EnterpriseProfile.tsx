@@ -18,6 +18,7 @@ import {
   Check,
 } from 'lucide-react';
 import { enterpriseService } from '@/services/enterpriseService';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -73,15 +74,11 @@ export const EnterpriseProfile: React.FC = () => {
         setToastMessage(res.message || 'Cập nhật hồ sơ thành công!');
         setTimeout(() => setToastMessage(null), 4000);
       } else {
-        setUpdateError(res.message || 'Không thể cập nhật hồ sơ. Vui lòng thử lại.');
+        setUpdateError(friendlyErrorMessage(res.message, 'Không thể cập nhật hồ sơ. Vui lòng thử lại.'));
       }
     } catch (err: any) {
       console.error('Error updating enterprise profile:', err);
-      setUpdateError(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Đã có lỗi xảy ra khi cập nhật hồ sơ. Vui lòng thử lại.'
-      );
+      setUpdateError(friendlyErrorMessage(err, 'Đã xảy ra lỗi khi cập nhật hồ sơ. Vui lòng thử lại.'));
     } finally {
       setIsUpdating(false);
     }
@@ -134,7 +131,7 @@ export const EnterpriseProfile: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-12 text-center space-y-4">
           <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm font-semibold text-slate-600">
-            Đang tải dữ liệu hồ sơ doanh nghiệp từ máy chủ...
+            Đang tải hồ sơ doanh nghiệp...
           </p>
         </div>
       )}

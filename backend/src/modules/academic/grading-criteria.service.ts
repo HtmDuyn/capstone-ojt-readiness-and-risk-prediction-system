@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { academicTransaction } from './academic.repository';
 import { inputObject, invalid, positiveId, requiredText, score } from '../students/student.validation';
+import { assertScope } from '../qhdn/catalog.service';
 
 type Criterion = { key: string; label: string; weight: number };
 type Row = Record<string, any>;
@@ -12,6 +13,7 @@ function validateCriteria(value: unknown): Criterion[] {
     const weight = score(item.weight, 100, `criteria[${index}].weight`);
     if (weight === null || weight <= 0) throw invalid('Tỷ lệ mỗi tiêu chí phải lớn hơn 0 và không quá 100.');
     const key = item.key === undefined ? `criterion_${index + 1}` : requiredText(item.key, `criteria[${index}].key`, 40);
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(key)) throw invalid('Mã tiêu chí chỉ được chứa chữ, số, dấu gạch ngang và gạch dưới.');
     return { key, label, weight };
   });
   if (new Set(items.map(item => item.key)).size !== items.length) throw invalid('Mã tiêu chí không được trùng nhau.');
@@ -20,11 +22,12 @@ function validateCriteria(value: unknown): Criterion[] {
 }
 export function validateCriteriaPayload(value: unknown): Record<string,number|null> {
   if(!value||typeof value!=='object'||Array.isArray(value))throw invalid('scoreDetails must be an object.');
-  const details:Record<string,number|null>={};
-  for(const [key,raw] of Object.entries(value as Row)){if(!/^[A-Za-z0-9_-]{1,40}$/.test(key))throw invalid('Invalid scoreDetails key.');details[key]=score(raw,10,`scoreDetails.${key}`);}
-  return details;
+  return Object.fromEntries(Object.entries(value as Row).map(([key,raw])=>{
+    if(!/^[A-Za-z0-9_-]{1,40}$/.test(key))throw invalid('Invalid scoreDetails key.');
+    return [key,score(raw,10,`scoreDetails.${key}`)];
+  }));
 }
-const api = (r: Row) => ({ id:r.TemplateID, ojtSemesterId:r.OJTSemesterID, effectiveFrom:r.EffectiveFrom, name:r.Name, criteria:r.Criteria, version:r.Version, status:r.Status, createdBy:r.CreatedBy, createdAt:r.CreatedAt });
+const api = (r: Row) => ({ id:r.TemplateID as number, ojtSemesterId:r.OJTSemesterID as number, effectiveFrom:r.EffectiveFrom, name:r.Name as string, criteria:r.Criteria as Criterion[], version:r.Version as number, status:r.Status, createdBy:r.CreatedBy, createdAt:r.CreatedAt });
 export async function getGradingCriteria(params: Row) {
   for(const key of Object.keys(params))if(!['ojtSemesterId','page','limit'].includes(key))throw invalid(`Unknown query parameter: ${key}.`);
   const semesterId = params.ojtSemesterId === undefined ? null : positiveId(params.ojtSemesterId, 'ojtSemesterId');
@@ -36,20 +39,28 @@ export async function getGradingCriteria(params: Row) {
     return { items: rows.map(api), semesters, currentOjtSemesterId: current };
   });
 }
-export async function getEnterpriseGradingCriteria(params: Row, _actor: { userId:number }) {
+export async function getEnterpriseGradingCriteria(params: Row, actor: { userId:number; roleCode:string }) {
   for(const key of Object.keys(params))if(key!=='assignmentId')throw invalid(`Unknown query parameter: ${key}.`);
   const assignmentId = positiveId(params.assignmentId, 'assignmentId');
   return academicTransaction(async c => {
-    const assignment = (await c.query(`SELECT co."OJTSemesterID" FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."AssignmentID"=$1`, [assignmentId])).rows[0];
+    const assignment = (await c.query(`SELECT co."OJTSemesterID",a."EnterpriseID" FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."AssignmentID"=$1`, [assignmentId])).rows[0];
     if (!assignment) throw invalid('Internship assignment not found.',404);
+    await assertScope(c, actor, assignment.EnterpriseID);
     return activeCriteria(c, assignment.OJTSemesterID);
   });
 }
+// The same effective-date selection is used by the roster and every score write.
+// semesterSql is a trusted SQL expression supplied only by server code.
+export function gradingCriteriaSelection(semesterSql: string) {
+  return `SELECT t.* FROM "AssessmentTemplates" t
+    JOIN "OJTSemesters" source ON source."OJTSemesterID"=t."OJTSemesterID"
+    JOIN "OJTSemesters" target ON target."OJTSemesterID"=${semesterSql}
+    WHERE t."Status"='PUBLISHED' AND COALESCE(t."EffectiveFrom",source."StartDate")<=target."StartDate"
+    ORDER BY COALESCE(t."EffectiveFrom",source."StartDate") DESC,t."Version" DESC,t."TemplateID" DESC LIMIT 1`;
+}
 export async function activeCriteria(c: PoolClient, semesterId: number) {
-  const row = (await c.query(`SELECT * FROM "AssessmentTemplates" WHERE "OJTSemesterID"=$1 AND "Status"='PUBLISHED' ORDER BY "EffectiveFrom" DESC,"Version" DESC LIMIT 1`, [semesterId])).rows[0];
-  return row ? api(row) : { id:null, ojtSemesterId:semesterId, name:'Bộ tiêu chí mặc định', criteria:[
-    {key:'completionScore',label:'Kỹ năng chuyên ngành',weight:33.34}, {key:'skillScore',label:'Kỹ năng mềm',weight:33.33}, {key:'attitudeScore',label:'Thái độ',weight:33.33},
-  ] };
+  const row = (await c.query(gradingCriteriaSelection('$1'), [semesterId])).rows[0];
+  return row ? api(row) : { id:null, ojtSemesterId:semesterId, name:'Chưa có quy ước chấm điểm do Phòng Đào tạo ban hành', criteria:[] as Criterion[] };
 }
 export async function saveGradingCriteria(body: unknown, actor: {userId:number;roleCode:string}) {
   if(!['ACADEMIC','ADMIN'].includes(actor.roleCode))throw invalid('Only Academic Affairs may manage grading criteria.',403,'FORBIDDEN');

@@ -273,6 +273,7 @@ export interface EnterpriseInternshipItem {
   endDate?: string | null;
   status: string;
   evaluation?: InternshipEvaluationData | null;
+  template?: { id: number; name: string; version: number; criteria: Array<{ key: string; label: string; weight: number }> } | null;
   academicSupervisor?: { id: number; fullName: string; email?: string | null; phone?: string | null } | null;
   result?: Record<string, unknown> | null;
   evaluationLocked?: boolean;
@@ -282,6 +283,7 @@ export interface EnterpriseInternshipItem {
 
 export interface InternshipEvaluationData {
   id?: number;
+  templateId?: number | null;
   completionScore?: number | null;
   attitudeScore?: number | null;
   skillScore?: number | null;
@@ -294,21 +296,17 @@ export interface InternshipEvaluationData {
 }
 
 export interface EnterpriseInternshipEvaluationRequest {
-  completionScore: number;
-  attitudeScore: number;
-  skillScore: number;
-  overallScore: number;
+  templateId: number;
+  scoreDetails: Record<string, number | null>;
   comments: string | null;
   reason: string;
 }
 
 export interface BulkEvaluationItem {
   assignmentId: number;
-  completionScore: number | null;
-  skillScore: number | null;
-  attitudeScore: number | null;
+  templateId: number;
   comments: string | null;
-  scoreDetails?: Record<string, number | null>;
+  scoreDetails: Record<string, number | null>;
 }
 
 export interface BulkEvaluationResponse {

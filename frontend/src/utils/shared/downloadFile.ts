@@ -1,3 +1,5 @@
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+
 export function downloadCourseDemand(blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -34,8 +36,8 @@ export async function downloadFile(
       } catch {
         // Giữ lỗi gốc nếu máy chủ không trả JSON.
       }
-      if (typeof message === "string" && message) throw new Error(message);
+      if (typeof message === "string" && message) throw new Error(friendlyErrorMessage(message, 'Không thể tải tệp lúc này. Vui lòng thử lại.'));
     }
-    throw error;
+    throw new Error(friendlyErrorMessage(error, 'Không thể tải tệp lúc này. Vui lòng thử lại.'));
   }
 }

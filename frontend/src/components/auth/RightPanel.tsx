@@ -91,7 +91,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   });
 
   return (
-    <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
+    <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full lg:min-h-[33rem] bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
       {/* Top Header Row with Language switcher */}
       <div className="relative z-10 flex items-center justify-between pb-4">
         {/* Language selector */}

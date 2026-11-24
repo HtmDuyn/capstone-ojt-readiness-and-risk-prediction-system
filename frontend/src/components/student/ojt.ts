@@ -1,3 +1,5 @@
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+
 export type PartnerCompany = {
   id: number; name: string; code?: string; address?: string | null;
   industry?: string | null; contactPersonName?: string | null;
@@ -24,5 +26,5 @@ const blockers: Record<string, string> = {
   REGISTRATION_PROGRAM_CHANGED: 'Chương trình đào tạo đã thay đổi; cần được rà soát.',
 };
 export const explainOjtBlockers = (values: string[]) => [...new Set(values)].map((value) => blockers[value] || 'Hồ sơ chưa đáp ứng điều kiện của đợt đăng ký.').join(' ');
-export const ojtError = (error: unknown) => error instanceof Error ? error.message : 'Không thể hoàn tất yêu cầu. Vui lòng thử lại.';
+export const ojtError = (error: unknown) => friendlyErrorMessage(error, 'Không thể hoàn tất yêu cầu. Vui lòng thử lại.');
 export const workModeText = (value?: string | null) => ({ ONSITE: 'Tại văn phòng', REMOTE: 'Từ xa', HYBRID: 'Kết hợp' })[value ?? ''] || value || 'Chưa cập nhật';

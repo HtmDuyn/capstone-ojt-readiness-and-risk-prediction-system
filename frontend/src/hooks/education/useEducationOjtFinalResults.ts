@@ -2,6 +2,7 @@ import { educationOjtWorkflowService } from '@/services/educationService';
 import type { OjtFinalResult as Result } from '@/types/education/ojtWorkflow.types';
 import { useEducationSemesters } from '@/hooks/education/useEducationSemesters';
 import type { Page } from '@/types/education/api.types';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import React from "react";
 
 export function useEducationOjtFinalResults() {
@@ -38,7 +39,7 @@ export function useEducationOjtFinalResults() {
     )
       .then(result => { if (!controller.signal.aborted) setData(result); })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
+        if (!controller.signal.aborted) setError(friendlyErrorMessage(e, 'Không tải được kết quả OJT. Vui lòng thử lại.'));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

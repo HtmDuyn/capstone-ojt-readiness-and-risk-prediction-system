@@ -270,7 +270,7 @@ const EducationStudentProgress: React.FC = () => {
                             chỉ và có không quá {OJT_MAX_NOT_PASSED_SUBJECTS}{" "}
                             môn chưa đạt.
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả FE đã tính và lưu; không thay thế quyết định OJT chính thức.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức từ backend.' : 'Chưa có kết quả đã lưu.'}</p>
+                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả tham khảo đã tính và lưu; không thay thế quyết định OJT chính thức.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức.' : 'Chưa có kết quả đã lưu.'}</p>
                         </div>
                       </div>
                     </div>
@@ -487,7 +487,7 @@ const EducationStudentProgress: React.FC = () => {
 
                 {selectedStudent.subjects.length === 0 ? (
                   <div className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                    API chưa trả về dữ liệu kết quả môn học cho sinh viên này.
+                    Chưa có dữ liệu kết quả môn học cho sinh viên này.
                   </div>
                 ) : unfinishedSubjects.length === 0 ? (
                   <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">

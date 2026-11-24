@@ -1,6 +1,6 @@
-import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
 import { authService } from "@/services/authService";
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 interface Props {
   initialEmail: string;
@@ -38,9 +38,7 @@ export default function PasswordResetForm({ initialEmail, initialToken = "", onB
       setNotice(message);
       setCanResend(false);
     } catch (failure) {
-      setError(isAxiosError<{ message?: string }>(failure)
-        ? failure.response?.data?.message || "Không thể gửi mã. Vui lòng thử lại."
-        : "Không thể gửi mã. Vui lòng thử lại.");
+      setError(friendlyErrorMessage(failure, "Không thể gửi mã. Vui lòng thử lại."));
     } finally {
       setBusy(false);
     }
@@ -67,9 +65,7 @@ export default function PasswordResetForm({ initialEmail, initialToken = "", onB
       const { message } = await authService.resetPassword(email.trim(), code, password);
       onComplete(email.trim(), message);
     } catch (failure) {
-      setError(isAxiosError<{ message?: string }>(failure)
-        ? failure.response?.data?.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại."
-        : "Không thể đặt lại mật khẩu. Vui lòng thử lại.");
+      setError(friendlyErrorMessage(failure, "Không thể đặt lại mật khẩu. Vui lòng thử lại."));
     } finally {
       setBusy(false);
     }

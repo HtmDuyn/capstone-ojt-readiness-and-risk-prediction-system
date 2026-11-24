@@ -11,6 +11,7 @@ import { handoffsByStudent, matchesHandoffFilter, selectFullCheckTargets, select
 import { handoffDisplayById } from '@/utils/education/educationOjtHandoffDisplay';
 import React from 'react';
 import { ojtSourceEndpoints, partitionOjtLoad, type OjtLoadIssue, type OjtSourceKey } from '@/utils/education/ojtEligibilityLoad';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 type Target = { student: ImportedStudent; reason: string };
 export const OJT_ELIGIBILITY_PAGE_SIZE = 20;
@@ -88,7 +89,7 @@ export function useEducationOjtEligibility() {
       sourceKeys.forEach(key => { if (key in values) applySource(key, values[key]); });
       setSourceErrors(issues);
     }, error => {
-      if (!c.signal.aborted) setError(error instanceof Error ? error.message : 'Không tải được dữ liệu xét OJT.');
+      if (!c.signal.aborted) setError(friendlyErrorMessage(error, 'Không tải được dữ liệu xét OJT. Vui lòng thử lại.'));
     }).finally(() => { if (!c.signal.aborted) setLoading(false); });
     return () => { c.abort(); activeRequest.current?.abort(); };
   }, [applySource, loadSource, sourceKeys]);
@@ -177,7 +178,7 @@ export function useEducationOjtEligibility() {
       const { handedOffCount } = await saveLocalOjtResults(calculated, saveKey.current, rule);
       setPendingResults({});
       saveKey.current = null;
-      setNotice('Đã lưu kết quả xét. Backend báo đã bàn giao ' + handedOffCount + ' sinh viên.' +
+      setNotice('Đã lưu kết quả xét và bàn giao ' + handedOffCount + ' sinh viên.' +
         (failed ? ' Có ' + failed + ' hồ sơ chưa xét được. Xem lý do ở từng sinh viên.' : ''));
       const refreshed = await Promise.allSettled([loadSavedLocalOjtResults(), educationOjtWorkflowService.getHandoffs()]);
       const { values, issues } = partitionOjtLoad(['results', 'handoffs'], refreshed);

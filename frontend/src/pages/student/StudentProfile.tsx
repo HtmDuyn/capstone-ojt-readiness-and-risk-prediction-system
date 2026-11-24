@@ -2,48 +2,36 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
-import { getAllCourseResults, getCurriculum, getStudentAcademicProgress } from '@/services/studentService';
-import type { CourseResult } from '@/types/student/portal';
+import { getCurriculum } from '@/services/studentService';
+import { useStudentAcademicView } from '@/hooks/student/useStudentAcademicView';
 import {
   Empty,
   ResourceState,
   statusText,
   StudentPage,
-  StudentSemesterSelect,
+  StudentAcademicPeriodSelect,
   valueText,
 } from '@/components/student/PortalUI';
 
 export const StudentAcademicProfile = () => {
   const { profile, revision, loading } = useStudentPortal();
   const [courseSearch, setCourseSearch] = useState('');
-  const [studySemester, setStudySemester] = useState('');
   const [activeTab, setActiveTab] = useState<'results' | 'curriculum'>('results');
   const [curriculumRequested, setCurriculumRequested] = useState(false);
-  const results = useStudentResource<CourseResult[]>(
-    !loading && profile
-      ? 'courses:' + profile.id + ':' + revision
-      : null,
-    (signal, publish) => getAllCourseResults(profile!.id, signal, publish),
-    { snapshot: true },
-  );
+  const study = useStudentAcademicView();
+  const results = { ...study, data: study.data?.courseResults.filter(item =>
+    item.periodStartDate && item.periodStartDate.slice(0, 10) >= study.data!.period.startDate) ?? null };
   const curriculum = useStudentResource(
     !loading && profile && curriculumRequested ? 'curriculum:' + profile.id + ':' + revision : null,
     (signal) => getCurriculum(profile!.id, signal),
     { snapshot: true },
   );
-  const academic = useStudentResource(
-    !loading && profile ? 'academic-progress:' + profile.id + ':' + revision : null,
-    signal => getStudentAcademicProgress(profile!.id, signal),
-    { snapshot: true },
-  );
+  const academic = { ...study, data: study.data?.academic.academicProgress ?? null };
   const progress = academic.data;
-  const semesters = useMemo(() => [...new Set((results.data ?? []).flatMap(item =>
-    item.semesterTaken == null ? [] : [item.semesterTaken]))].sort((a, b) => a - b), [results.data]);
   const query = courseSearch.trim().toLocaleLowerCase();
   const filtered = useMemo(() => (results.data ?? []).filter(item =>
-    (studySemester === '' || String(item.semesterTaken) === studySemester) &&
     (item.courseCode + ' ' + item.courseName).toLocaleLowerCase().includes(query)
-  ), [results.data, studySemester, query]);
+  ), [results.data, query]);
   const requirementsById = useMemo(() => new Map(progress?.requirements.map(item => [item.id, item])), [progress?.requirements]);
   const courses = curriculum.data?.courses ?? [];
   return (
@@ -59,7 +47,7 @@ export const StudentAcademicProfile = () => {
           <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <h2 className="min-w-0 text-xl font-bold text-slate-900">{profile.fullName}</h2>
-              <div className="w-full min-w-0 sm:ml-auto sm:w-64 sm:max-w-full"><StudentSemesterSelect /></div>
+              <div className="w-full min-w-0 sm:ml-auto sm:w-80 sm:max-w-full"><StudentAcademicPeriodSelect /></div>
             </div>
             <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
               <div className="min-w-0 space-y-3">
@@ -75,6 +63,8 @@ export const StudentAcademicProfile = () => {
                 <div><dt className="text-slate-500">Học kỳ hiện tại</dt><dd className="break-words text-slate-800">{profile.currentAcademicPeriod?.name || profile.currentSemester || 'Chưa cập nhật'}</dd></div>
               </div>
             </dl>
+            <p className="mt-4 text-xs leading-6 text-slate-500">Chỉ số tích lũy tính đến học kỳ được chọn. Bảng điểm bên dưới hiển thị các môn thuộc học kỳ đó; chương trình đào tạo là phiên bản hiện hành.</p>
+            {study.data?.historical && <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-6 text-blue-900">{study.data.note}</p>}
             <ResourceState loading={academic.loading} refreshing={academic.refreshing} error={academic.error} retry={academic.reload} />
             {progress && <dl className="mt-5 grid grid-cols-2 gap-y-4 border-t border-slate-200 pt-5 lg:grid-cols-4">
               {[
@@ -98,14 +88,7 @@ export const StudentAcademicProfile = () => {
               error={results.error}
               retry={results.reload}
             />
-            <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
-              <label className="block min-w-0 text-left text-sm font-medium text-slate-700">
-                <span className="mb-1.5 block">Kỳ học</span>
-                <select className="h-[42px] w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-800 transition-colors hover:border-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" aria-label="Lọc bảng điểm theo kỳ" value={studySemester} onChange={(event) => setStudySemester(event.target.value)}>
-                  <option value="">Tất cả các kỳ</option>
-                  {semesters.map((semester) => <option key={semester} value={semester}>{semester === 0 ? 'Kỳ 0 (dự bị)' : `Kỳ ${semester}`}</option>)}
-                </select>
-              </label>
+            <div className="grid gap-3">
               <label className="block min-w-0 text-left text-sm font-medium text-slate-700">
                 <span className="mb-1.5 block">Tìm môn học</span>
                 <span className="relative block">

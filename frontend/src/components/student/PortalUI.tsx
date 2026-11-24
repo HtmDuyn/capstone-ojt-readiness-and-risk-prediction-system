@@ -143,25 +143,43 @@ export function ResourceState({
     </>
   );
 }
-export function StudentSemesterSelect() {
+export function StudentAcademicPeriodSelect({ label = 'Học kỳ theo dõi' }: { label?: string } = {}) {
   const portal = useStudentPortal();
   return (
     <label className="block space-y-2 text-sm font-medium text-slate-600 sm:min-w-60">
-      Đợt OJT
+      {label}
       <select
-        aria-label="Chọn đợt OJT"
+        aria-label={label === 'Học kỳ theo dõi' ? 'Chọn học kỳ theo dõi' : `Chọn ${label.toLocaleLowerCase('vi')}`}
         className={inputClass + ' text-slate-800'}
-        disabled={portal.loading || !portal.semesters.length}
-        value={portal.semesterId ?? ''}
-        onChange={(e) => portal.selectSemester(Number(e.target.value))}
+        disabled={portal.loading || portal.academicPeriodsLoading || !portal.academicPeriods.length}
+        value={portal.academicPeriodId ?? ''}
+        onChange={(e) => portal.selectAcademicPeriod(Number(e.target.value))}
       >
-        <option value="" disabled>Chưa có đợt OJT</option>
-        {portal.semesters.map((semester) => (
-          <option key={semester.id} value={semester.id}>{semester.name}</option>
+        <option value="" disabled>{portal.academicPeriodsLoading ? 'Đang tải học kỳ…' : 'Chưa có dữ liệu học kỳ'}</option>
+        {portal.academicPeriods.map((semester) => (
+          <option key={semester.id} value={semester.id}>{semester.name}{semester.curriculumSemester == null ? '' : ` · Kỳ ${semester.curriculumSemester}`}{semester.isCurrent ? ' · Đang học' : ' · Đã học'}</option>
         ))}
       </select>
     </label>
   );
+}
+
+export function StudentCurrentAcademicPeriod({ currentSemester }: { currentSemester?: number | null } = {}) {
+  const portal = useStudentPortal();
+  const period = portal.academicPeriods.find(item => item.isCurrent);
+  if (currentSemester !== undefined) {
+    return <div className="text-sm sm:text-right">
+      <p className="text-xs text-slate-500">Học kỳ theo lịch sử học vụ</p>
+      <p className="mt-1 font-semibold text-slate-800">
+        {currentSemester === null ? 'Chưa xác định học kỳ' : `Kỳ ${currentSemester}`}
+      </p>
+    </div>;
+  }
+  const stage = period?.curriculumSemester ?? portal.profile?.currentSemester;
+  return <div className="text-sm sm:text-right"><p className="text-xs text-slate-500">Học kỳ đang học</p><p className="mt-1 font-semibold text-slate-800">{period
+    ? `${period.name}${stage == null ? '' : ` · Kỳ ${stage}`}`
+    : stage != null ? `Kỳ ${stage} · Theo hồ sơ sinh viên`
+    : portal.academicPeriodsLoading ? 'Đang xác định học kỳ…' : 'Chưa xác định học kỳ đang học'}</p></div>;
 }
 
 export function StudentPage({
@@ -169,7 +187,7 @@ export function StudentPage({
   description,
   children,
   needsSemester = true,
-  showSemesterInBanner = true,
+  showSemesterInBanner = false,
   compactTopSpacing = false,
 }: {
   title: string;
@@ -187,7 +205,7 @@ export function StudentPage({
         title={title}
         description={description}
         badge={null}
-        extra={showSemesterInBanner ? <StudentSemesterSelect /> : undefined}
+        extra={showSemesterInBanner ? <StudentAcademicPeriodSelect /> : undefined}
       />
       <ResourceState
         loading={portal.loading}
@@ -207,25 +225,12 @@ export function StudentPage({
           </button>
         </div>
       ))}
-      {!portal.loading &&
-        !portal.error &&
-        portal.profile &&
-        (needsSemester && !portal.semesterId ? (
-          <Card title="Chưa có đợt OJT">
-            <Empty>
-              Hồ sơ chưa có đợt OJT được liên kết. Bạn vẫn có thể xem hồ sơ học
-              tập; liên hệ nhà trường để kiểm tra đợt đăng ký.
-            </Empty>
-            <Link
-              className="text-orange-600 underline"
-              to="/student/academic-profile"
-            >
-              Xem hồ sơ học tập
-            </Link>
-          </Card>
-        ) : (
-          children
-        ))}
+      {!portal.loading && !portal.error && portal.profile && <>
+        {needsSemester && !portal.semesterId && <p role="status" className="rounded-xl border border-slate-200 bg-white/90 px-4 py-3 text-sm leading-relaxed text-slate-600">
+          Chưa có đợt OJT được liên kết. Bạn vẫn có thể xem các mục bên dưới; dữ liệu và thao tác theo đợt sẽ mở khi nhà trường cập nhật.
+        </p>}
+        {children}
+      </>}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { useStudentRisk } from '@/hooks/student/useStudentRisk';
 export default function StudentOjtRisk(){
   const {profile,revision}=useStudentPortal();
   const assessment=useStudentRisk();
-  return <StudentPage title="Rủi ro và lộ trình OJT" description="Xem mức rủi ro từ tiến độ học tập, sau đó xác định các môn cần ưu tiên và điều kiện tiên quyết." showSemesterInBanner={false} compactTopSpacing>
-    <OjtRiskPanel key={`${profile?.id??'pending'}:${revision}`} assessment={assessment} showSemesterSelector compactLayout />
+  return <StudentPage title="Rủi ro và lộ trình OJT" description="Đánh giá mức độ sẵn sàng OJT dựa trên học kỳ đang học và tiến độ tích lũy hiện tại." needsSemester={false} showSemesterInBanner={false} compactTopSpacing>
+    <OjtRiskPanel key={`${profile?.id??'pending'}:${revision}`} assessment={assessment} compactLayout />
   </StudentPage>;
 }

@@ -1,23 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Page } from "@/types/qhdn/workflowTypes";
 import { pageNumbers } from '@/utils/qhdn/qhdnPagination';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 export const control =
   "rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";
 export const action =
   "rounded-xl bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50";
 export function errorMessage(error: unknown): string {
-  const e = error as {
-    response?: { status?: number; data?: { message?: string } };
-    message?: string;
-  };
-  if (e.response?.status === 401)
-    return "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
-  return (
-    e.response?.data?.message ||
-    e.message ||
-    "Không thực hiện được yêu cầu. Vui lòng thử lại."
-  );
+  return friendlyErrorMessage(error, 'Không thực hiện được yêu cầu. Vui lòng thử lại.');
 }
 export function Notice({ children }: { children: ReactNode }) {
   return (

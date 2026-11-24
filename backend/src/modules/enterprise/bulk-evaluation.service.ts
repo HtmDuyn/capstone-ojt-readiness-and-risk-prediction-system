@@ -8,21 +8,17 @@ import { activeCriteria, validateCriteriaPayload } from '../academic/grading-cri
 type EvaluationStatus = 'DRAFT' | 'SUBMITTED';
 const scoreKeys = ['completionScore', 'skillScore', 'attitudeScore'] as const;
 
-function valuesFor(body: unknown, _status: EvaluationStatus) {
-  // Keep the existing field names: completionScore = chuyên ngành, skillScore = kỹ năng mềm.
-  const b = inputObject(body, ['completionScore', 'skillScore', 'attitudeScore', 'overallScore', 'comments','scoreDetails']);
-  const values: Row = {};
-  if(b.scoreDetails!==undefined) {
-    if(!b.scoreDetails||typeof b.scoreDetails!=='object'||Array.isArray(b.scoreDetails))throw invalid('scoreDetails must be an object.');
-    const details:Row={};
-    for(const [key,value] of Object.entries(b.scoreDetails as Row))details[key]=score(value,10,`scoreDetails.${key}`);
-    values.ScoreDetails=details;
-  }
-  const scores = scoreKeys.map(key => score(b[key], 10, key));
-  scores.forEach((value,index)=>{values[scoreKeys[index][0].toUpperCase()+scoreKeys[index].slice(1)]=value;});
-  values.OverallScore = scores.some(value => value === null) ? null : Math.round((scores.reduce<number>((sum,value)=>sum+value!,0)/3)*100)/100;
-  values.Comments = optionalText(b.comments, 'comments', 5000);
-  return values;
+function valuesFor(body: unknown) {
+  const b = inputObject(body, [...scoreKeys, 'overallScore', 'comments', 'scoreDetails', 'templateId']);
+  if (b.templateId == null) throw invalid('Vui lòng tải bộ tiêu chí do Phòng Đào tạo ban hành trước khi chấm điểm.', 400, 'GRADING_TEMPLATE_REQUIRED');
+  if (b.scoreDetails === undefined) throw invalid('Vui lòng nhập điểm theo các tiêu chí do Phòng Đào tạo ban hành.', 400, 'CRITERIA_SCORES_REQUIRED');
+  // Legacy fields remain accepted for compatibility, but cannot set scores or the total.
+  for (const key of [...scoreKeys, 'overallScore']) if (b[key] !== undefined) score(b[key], 10, key);
+  return {
+    TemplateID: positiveId(b.templateId, 'templateId'),
+    ScoreDetails: validateCriteriaPayload(b.scoreDetails),
+    Comments: optionalText(b.comments, 'comments', 5000),
+  };
 }
 
 async function save(c: PoolClient, id: number, values: Row, status: EvaluationStatus, reason: string, actor: Actor) {
@@ -33,28 +29,34 @@ async function save(c: PoolClient, id: number, values: Row, status: EvaluationSt
   if ((await c.query('SELECT 1 FROM "OJTResults" WHERE "AssignmentID"=$1', [id])).rowCount)
     throw invalid('Điểm đã chuyển giao không thể chỉnh sửa.', 409, 'OJT_RESULT_CONFIRMED');
   const before = (await c.query('SELECT * FROM "InternshipEvaluations" WHERE "AssignmentID"=$1 FOR UPDATE', [id])).rows[0] ?? null;
-  const grading = await activeCriteria(c, (await c.query(`SELECT "OJTSemesterID" FROM "StudentEnterpriseCoordination" WHERE "CoordinationID"=$1`, [assignment.CoordinationID])).rows[0].OJTSemesterID);
-  if (!values.ScoreDetails && !grading.id) values.ScoreDetails={completionScore:values.CompletionScore,skillScore:values.SkillScore,attitudeScore:values.AttitudeScore};
-  if (values.ScoreDetails && grading.id) {
-    const details = values.ScoreDetails as Record<string, number|null>;
-    if(before?.TemplateID===grading.id&&before.ScoreDetails) {
-      const oldDetails=before.ScoreDetails as Record<string,number|null>;
-      if(status==='SUBMITTED'&&Object.entries(details).every(([key,value])=>value==null&&oldDetails[key]!=null))values.ScoreDetails=oldDetails;
-    }
-    const finalDetails=values.ScoreDetails as Record<string,number|null>;
-    if (Object.keys(finalDetails).length !== grading.criteria.length || (status==='SUBMITTED'&&grading.criteria.some((item: {key:string}) => finalDetails[item.key] == null))) throw invalid('Vui lòng nhập điểm cho tất cả tiêu chí chấm.',400,'CRITERIA_SCORES_REQUIRED');
-    if(status==='DRAFT'&&grading.criteria.some((item: {key:string})=>finalDetails[item.key]===undefined))throw invalid('Điểm nháp không khớp bộ tiêu chí của kỳ OJT.',400,'CRITERIA_SCORES_REQUIRED');
-    const weighted = grading.criteria.reduce((sum: number, item: {key:string;weight:number}) => sum + (finalDetails[item.key]==null?0:Number(finalDetails[item.key])) * item.weight / 100, 0);
-    values.OverallScore = grading.id ? Math.round(weighted * 100) / 100 : (values.OverallScore);
-    values.TemplateID = grading.id;
-  }
   if (before?.Status === 'SUBMITTED') {
     // An identical retry after a lost response is safe; changed official scores are rejected.
-    const same = status === 'SUBMITTED' && Object.entries(values).every(([key, value]) =>
-      key.endsWith('Score') ? before[key] != null && Number(before[key]) === value : JSON.stringify(before[key] ?? null) === JSON.stringify(value ?? null));
+    const oldDetails = before.ScoreDetails as Record<string, number | null> | null;
+    const details = values.ScoreDetails as Record<string, number | null>;
+    const same = status === 'SUBMITTED' && before.TemplateID === values.TemplateID
+      && (before.Comments ?? null) === values.Comments && oldDetails != null
+      && Object.keys(details).length === Object.keys(oldDetails).length
+      && Object.entries(details).every(([key, value]) => Object.hasOwn(oldDetails, key) && oldDetails[key] === value);
     if (same) return { ...api('evaluations', before), replayed: true };
     throw invalid('Điểm đã gửi QHDN không thể chỉnh sửa trực tiếp.', 409, 'OJT_SCORE_FINALIZED');
   }
+  const grading = await activeCriteria(c, (await c.query(`SELECT "OJTSemesterID" FROM "StudentEnterpriseCoordination" WHERE "CoordinationID"=$1`, [assignment.CoordinationID])).rows[0].OJTSemesterID);
+  if (!grading.id || !grading.criteria.length)
+    throw invalid('Phòng Đào tạo chưa ban hành quy ước chấm điểm áp dụng cho kỳ OJT này.', 409, 'GRADING_CRITERIA_NOT_PUBLISHED');
+  if (values.TemplateID !== grading.id)
+    throw invalid('Bộ tiêu chí chấm điểm đã thay đổi. Vui lòng tải lại danh sách và nhập điểm theo quy ước mới.', 409, 'GRADING_TEMPLATE_CHANGED');
+  const details = values.ScoreDetails as Record<string, number | null>;
+  if (Object.keys(details).length !== grading.criteria.length || grading.criteria.some(item => !Object.hasOwn(details, item.key)))
+    throw invalid('Các cột điểm phải khớp chính xác bộ tiêu chí do Phòng Đào tạo ban hành.', 400, 'CRITERIA_SCORES_REQUIRED');
+  const complete = grading.criteria.every(item => details[item.key] !== null);
+  if (status === 'SUBMITTED' && !complete)
+    throw invalid('Vui lòng nhập đủ điểm cho tất cả tiêu chí trước khi gửi chính thức.', 400, 'CRITERIA_SCORES_REQUIRED');
+  // Integer hundredths keep rounding identical to the UI, including half-cent totals.
+  values.OverallScore = complete ? Math.round(grading.criteria.reduce((sum, item) =>
+    sum + Math.round(details[item.key]! * 100) * Math.round(item.weight * 100), 0) / 10000) / 100 : null;
+  values.ScoreDetails = Object.fromEntries(grading.criteria.map(item => [item.key, details[item.key]]));
+  // Populate historical report columns only when the issued template explicitly uses those keys.
+  for (const key of scoreKeys) values[key[0].toUpperCase() + key.slice(1)] = Object.hasOwn(details, key) ? details[key] : null;
   const after = await persist(c, 'evaluations', {
     ...values, AssignmentID: id, EvaluatedBy: actor.userId,
     EvaluatedAt: status === 'SUBMITTED' ? new Date() : null, Status: status,
@@ -74,9 +76,8 @@ export async function bulkEvaluate(body: unknown, actor: Actor) {
   if (!Array.isArray(b.items) || b.items.length < 1 || b.items.length > 300)
     throw invalid('Mỗi lần lưu cần chọn từ 1 đến 300 sinh viên.');
   const items = b.items.map(item => {
-    const { assignmentId, ...scores } = inputObject(item, ['assignmentId', ...scoreKeys, 'comments','scoreDetails']);
-    const normalized=valuesFor(scores, status);
-    if(scores.scoreDetails!==undefined) normalized.ScoreDetails=validateCriteriaPayload(scores.scoreDetails);
+    const { assignmentId, ...scores } = inputObject(item, ['assignmentId', ...scoreKeys, 'comments', 'scoreDetails', 'templateId']);
+    const normalized=valuesFor(scores);
     return { id: positiveId(assignmentId, 'assignmentId'), values: normalized };
   });
   if (new Set(items.map(item => item.id)).size !== items.length) throw invalid('Danh sách sinh viên bị trùng.');
@@ -91,8 +92,8 @@ export async function bulkEvaluate(body: unknown, actor: Actor) {
 
 export async function submitEvaluation(id: number, body: unknown, actor: Actor) {
   if (actor.roleCode !== 'ENTERPRISE') throw invalid('Only the enterprise may submit official OJT scores.', 403, 'FORBIDDEN');
-  const { reason, ...scores } = inputObject(body, [...scoreKeys, 'overallScore', 'comments', 'reason','scoreDetails']);
+  const { reason, ...scores } = inputObject(body, [...scoreKeys, 'overallScore', 'comments', 'reason', 'scoreDetails', 'templateId']);
   const explanation = requiredText(reason, 'reason', 2000);
-  const values = valuesFor(scores, 'SUBMITTED');
+  const values = valuesFor(scores);
   return academicTransaction(c => save(c, id, values, 'SUBMITTED', explanation, actor));
 }

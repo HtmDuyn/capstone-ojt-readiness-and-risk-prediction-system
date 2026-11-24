@@ -1,10 +1,8 @@
-export const evaluationScoreFields = [
-  { key: 'completionScore', label: 'Kỹ năng chuyên ngành' },
-  { key: 'skillScore', label: 'Kỹ năng mềm' },
-  { key: 'attitudeScore', label: 'Thái độ' },
-] as const;
-export type EvaluationScoreKey = typeof evaluationScoreFields[number]['key'];
-export type EvaluationScores = Record<EvaluationScoreKey, string>;
+export interface EvaluationCriterion { key: string; label: string; weight: number }
+export interface EvaluationScores {
+  criteria: EvaluationCriterion[];
+  scoreDetails: Record<string, string>;
+}
 
 export function parseEvaluationScore(value: string): number | null {
   if (!value.trim()) return null;
@@ -14,9 +12,10 @@ export function parseEvaluationScore(value: string): number | null {
 }
 
 export function evaluationAverage(scores: EvaluationScores): number | null {
-  const values = evaluationScoreFields.map(field => parseEvaluationScore(scores[field.key]));
-  return values.some(value => value === null) ? null
-    : Math.round(values.reduce<number>((sum, value) => sum + value!, 0) / 3 * 100) / 100;
+  if (!scores.criteria.length) return null;
+  const values = scores.criteria.map(field => parseEvaluationScore(scores.scoreDetails[field.key] ?? ''));
+  return values.some(value => value === null) ? null : Math.round(scores.criteria.reduce((sum, field, index) =>
+    sum + Math.round(values[index]! * 100) * Math.round(field.weight * 100), 0) / 10000) / 100;
 }
 
 export function taskScoreSuggestion(completed: number, total: number): number | null {
@@ -24,8 +23,8 @@ export function taskScoreSuggestion(completed: number, total: number): number | 
   return Math.round(Math.min(1, Math.max(0, completed / total)) * 1000) / 100;
 }
 
-export function applyEvaluationScore<T extends EvaluationScores>(row: T, column: EvaluationScoreKey | 'all', value: string): T {
-  const next = { ...row };
-  for (const field of evaluationScoreFields) if (column === 'all' || field.key === column) next[field.key] = value;
+export function applyEvaluationScore<T extends EvaluationScores>(row: T, column: string | null, value: string): T {
+  const next = { ...row, scoreDetails: { ...row.scoreDetails } };
+  for (const field of row.criteria) if (column === null || field.key === column) next.scoreDetails[field.key] = value;
   return next;
 }

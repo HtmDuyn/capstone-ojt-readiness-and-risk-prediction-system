@@ -146,6 +146,7 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
     "POST /api/enterprise/candidates/acceptance-preview",
     "POST /api/enterprise/candidates/accept-bulk",
     "GET /api/enterprise/internships",
+    "GET /api/enterprise/internships/grading-criteria",
     "POST /api/enterprise/internships/evaluations/bulk",
     "GET /api/enterprise/profile",
     "PATCH /api/enterprise/profile",

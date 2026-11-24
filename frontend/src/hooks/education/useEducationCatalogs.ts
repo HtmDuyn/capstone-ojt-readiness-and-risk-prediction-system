@@ -1,4 +1,5 @@
 import { getAllItems } from '@/services/educationService';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import type { AcademicYear } from '@/types/education/academic.types';
 import type { CurriculumSummary } from '@/types/education/curriculum.types';
 import type { ReportPeriod } from '@/types/education/reporting.types';
@@ -22,7 +23,7 @@ export function useEducationCatalogs(revision = 0) {
       if (controller.signal.aborted) return;
       setYears(years); setPeriods(periods); setPrograms(programs);
     }).catch(error => {
-      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'Không tải được danh mục học vụ.');
+      if (!controller.signal.aborted) setError(friendlyErrorMessage(error, 'Không tải được danh mục học vụ. Vui lòng thử lại.'));
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });

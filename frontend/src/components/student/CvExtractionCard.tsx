@@ -3,6 +3,7 @@ import { useEffect,useRef,useState } from 'react';
 import { cvAnalysisApi,type CvAnalysis,type CvEntry,type CvProfile,type MatchingProfile } from '@/services/studentService';
 import { buttonClass,inputClass } from './PortalUI';
 import { useAuth } from '@/hooks/shared/useAuth';
+import { friendlyErrorMessage as getFriendlyErrorMessage } from '@/utils/shared/friendlyError';
 const skillCategories:Record<string,string>={TOOL:'Công cụ',TECHNOLOGY:'Ngôn ngữ lập trình và công nghệ',PROFESSIONAL:'Kỹ năng chuyên môn',SOFT:'Kỹ năng mềm',OTHER:'Chưa phân loại'};
 type Section=Exclude<keyof CvProfile,'summary'>;
 const sections:{key:Section;label:string;fields:{key:string;label:string;kind?:'list'|'number'|'paragraph'|'category'}[]}[]=[
@@ -39,7 +40,7 @@ export function CvExtractionCard({cvFileId}:{cvFileId:number}) {
  const icons={skills:Code2,projects:FolderKanban,experience:BriefcaseBusiness,languages:Languages,education:GraduationCap};
  const card='min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6';
  const secondary='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50';
- const friendlyError=/internal server error|timeout|network error|failed to fetch/i.test(error)?'Không thể xử lý hồ sơ lúc này. Vui lòng thử lại.':error;
+ const friendlyError=getFriendlyErrorMessage(error,'Không thể xử lý hồ sơ lúc này. Vui lòng thử lại.');
  return <div className="min-w-0 space-y-5">
   <section className={card} aria-label="Hoàn thiện hồ sơ từ CV">
    <header className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-6">
@@ -51,13 +52,13 @@ export function CvExtractionCard({cvFileId}:{cvFileId:number}) {
     {analysis?.status==='CONFIRMED'&&<div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-800"><CheckCircle2 size={20} className="mt-0.5 shrink-0"/><p>Hồ sơ của bạn đã được xác nhận và sẵn sàng sử dụng cho việc gợi ý vị trí thực tập.</p></div>}
     {(!analysis||analysis.status==='FAILED'||analysis.canRetry)&&<>
      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600"><input className="mt-1 h-4 w-4 shrink-0 accent-orange-500" type="checkbox" checked={consent} disabled={busy} onChange={e=>setConsent(e.target.checked)}/><span>Tôi đồng ý gửi nội dung CV hiện tại đến Claude AI để trích xuất thông tin phục vụ tư vấn và gợi ý vị trí thực tập. Tôi sẽ kiểm tra lại kết quả trước khi xác nhận hồ sơ.</span></label>
-     <button type="button" className={buttonClass+' inline-flex w-full items-center justify-center gap-2 py-3 sm:w-auto'} disabled={!consent||busy} onClick={()=>run(async signal=>{const r=await cvAnalysisApi.analyze(cvFileId,signal);if(signal.aborted)return;setAnalysis(r.analysis);setDraft(r.analysis.profile);setConfirm(false);if(r.reviewMessage)setNotice(r.reviewMessage);if(r.analysis.status==='FAILED')setError(r.analysis.error?.message??'Không đọc được CV.');})}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<Sparkles size={17}/ >}{busy?'Đang phân tích CV…':'Phân tích CV'}</button>
+     <button type="button" className={buttonClass+' inline-flex w-full items-center justify-center gap-2 py-3 sm:w-auto'} disabled={!consent||busy} onClick={()=>run(async signal=>{const r=await cvAnalysisApi.analyze(cvFileId,signal);if(signal.aborted)return;setAnalysis(r.analysis);setDraft(r.analysis.profile);setConfirm(false);if(r.reviewMessage)setNotice(r.reviewMessage);if(r.analysis.status==='FAILED')setError(getFriendlyErrorMessage(r.analysis.error?.message,'Không đọc được CV lúc này. Vui lòng thử lại sau.'));})}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<Sparkles size={17}/ >}{busy?'Đang phân tích CV…':'Phân tích CV'}</button>
     </>}
-    {analysis?.status==='PROCESSING'&&!analysis.canRetry&&<p className="rounded-xl bg-orange-50 p-4 text-sm leading-relaxed text-orange-800">Yêu cầu đang xử lý. Hãy cập nhật trạng thái sau; nếu tác vụ bị ngắt, bạn có thể thử lại sau khoảng 2 phút.</p>}
-    {analysis?.error&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><p>{analysis.error.message}</p><details className="mt-2 text-xs"><summary className="cursor-pointer">Chi tiết kỹ thuật</summary>{analysis.error.code}</details></div>}
+    {analysis?.status==='PROCESSING'&&!analysis.canRetry&&<p className="rounded-xl bg-orange-50 p-4 text-sm leading-relaxed text-orange-800">CV đang được phân tích. Hãy cập nhật trạng thái sau; nếu quá trình bị gián đoạn, bạn có thể thử lại sau khoảng 2 phút.</p>}
+    {analysis?.error&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><p>{getFriendlyErrorMessage(analysis.error.message,'Không đọc được CV lúc này. Vui lòng thử lại sau.')}</p></div>}
    </div>}
    {notice&&<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-800">{notice}</p>}
-   {error&&<div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle size={18} className="mt-0.5 shrink-0"/><div><p>{friendlyError}</p>{friendlyError!==error&&<details className="mt-2 text-xs"><summary className="cursor-pointer">Chi tiết kỹ thuật</summary><p className="break-words">{error}</p></details>}</div></div>}
+   {error&&<div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><AlertCircle size={18} className="mt-0.5 shrink-0"/><p>{friendlyError}</p></div>}
   </section>
   {draft&&<section className={card} aria-label="Kiểm tra và hoàn thiện hồ sơ">
    <header className="flex flex-wrap items-start justify-between gap-4"><div className="flex min-w-0 flex-1 items-start gap-3"><span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600"><CheckCircle2 size={22}/></span><div><h2 className="text-lg font-semibold text-slate-800">Kiểm tra và hoàn thiện hồ sơ</h2><span className="mt-2 inline-block rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Phân tích thành công</span></div></div></header>
