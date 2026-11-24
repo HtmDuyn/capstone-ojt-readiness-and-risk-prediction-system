@@ -21,6 +21,7 @@ import type {
   Page,
   Profile,
   StudentIdentityProfile,
+  StudyPeriod,
   Registration,
   Supplementary,
   Task,
@@ -222,6 +223,27 @@ export const getStudentAcademicProgress = (id: number, signal?: AbortSignal) =>
   studentGet<Pick<Profile, 'academicProgress'>>(
     `/students/${id}` + studentQuery({ include: 'academicProgress' }), signal,
   ).then(profile => profile.academicProgress);
+export interface StudyOverview {
+  period: StudyPeriod;
+  historical: boolean;
+  cutoff: string | null;
+  academic: DashboardSummary['academic'];
+  assessment: RiskAssessment | null;
+  courseResults: CourseResult[];
+  basis: string;
+  note: string;
+}
+export const getStudyPeriods = (signal?: AbortSignal) =>
+  studentGet<{ items: StudyPeriod[]; currentAcademicPeriodId: number | null }>('/students/me/study-periods', signal);
+export const getStudyOverview = (academicPeriodId: number, signal?: AbortSignal) =>
+  studentGet<StudyOverview>('/students/me/study-overview' + studentQuery({ academicPeriodId }), signal);
+export interface CurrentStudyOverview extends Omit<StudyOverview, 'period' | 'cutoff'> {
+  period: StudyPeriod | null;
+  currentSemester: number | null;
+  cutoff: null;
+}
+export const getCurrentStudyOverview = (signal?: AbortSignal) =>
+  studentGet<CurrentStudyOverview>('/students/me/study-overview?view=current', signal);
 export const getStudentDashboard = (semester: number, signal?: AbortSignal) =>
   studentGet<Dashboard>(
     '/students/me/dashboard' + studentQuery({ ojtSemesterId: semester }),

@@ -16,6 +16,12 @@ export interface Named {
   name: string;
   code?: string;
 }
+export interface StudyPeriod extends Named {
+  startDate: string;
+  endDate: string;
+  curriculumSemester: number | null;
+  isCurrent: boolean;
+}
 export interface CV {
   id: number;
   fileName: string;
@@ -65,6 +71,8 @@ export interface AdmissionEligibility extends Eligibility {
   appliedCondition?: import('../education/eligibility.types').OjtAppliedCondition | null;
 }
 export interface CourseResult {
+  academicPeriodId?: number;
+  periodStartDate?: string;
   id: number;
   courseId: number;
   courseCode: string;

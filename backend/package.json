@@ -11,6 +11,8 @@
     "dev": "tsx watch src/server.ts",
     "check:db": "node scripts/check-db.cjs",
     "test:enterprise-grading": "node --test tests/enterprise-grading.test.cjs",
+    "pretest:study-periods": "npm run build",
+    "test:study-periods": "node --test tests/study-periods.test.cjs",
     "migrate:enterprise-grading": "node scripts/migrate-enterprise-grading.cjs",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
     "check:mail": "node scripts/check-mail.cjs",

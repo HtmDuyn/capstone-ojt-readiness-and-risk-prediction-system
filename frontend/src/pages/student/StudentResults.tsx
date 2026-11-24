@@ -145,6 +145,7 @@ export const StudentEvaluationResults = () => {
     <StudentPage
       title="Kết quả đánh giá thực tập OJT"
       description="Điểm và nhận xét từ doanh nghiệp được Phòng Quan hệ doanh nghiệp công bố cho sinh viên."
+      needsSemester={false}
     >
       {!loading && profile && (
         <ResultsContent key={profile.id + ':' + semesterId} />

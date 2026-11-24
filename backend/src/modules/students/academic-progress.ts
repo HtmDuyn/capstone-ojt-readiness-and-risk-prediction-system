@@ -111,7 +111,7 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   const allIssues=[...new Set([...issues,...gpaIssues])];
   return {program:{id:program.ProgramID,code:program.ProgramCode,version:program.Version},status:allIssues.length?'INSUFFICIENT_CONFIGURATION':'CALCULATED',retakePolicy:'LATEST',gpa:gpaIssues.length || issues.length || !denominator?null:Math.round(numerator/denominator)/100,gpaScale:scale??null,gpaCredits:denominator/100,gpaCourses,credits:{earned,total,remaining:total===null || issues.length?null:Math.max(0,total-earned),ojtEarned:Math.round(ojtEarned*100)/100,completeConfiguration:issues.length===0},issues:allIssues,requirements,unmappedAchievements:[...achieved].filter(id=>!matched.has(id)),computedAt:new Date().toISOString()};
 }
-export async function loadAcademicProgress(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]}) {
+export async function loadAcademicProgress(client:PoolClient, studentId:number,prospective?:{comboId:number;courseIds:number[]},studyCutoff?:string) {
     const {rows:[curriculum]}=await client.query<{
       program: Row | null; policy: Row | null; courses: Row[]; aliases: Row[];
       options: Row[]; invalidGroups: number[]; gradeWeights: Row[];
@@ -124,6 +124,7 @@ export async function loadAcademicProgress(client:PoolClient, studentId:number,p
       SELECT "SelectionID","SelectionPurpose","ProgramID","ProgramComboID"
       FROM "StudentComboSelections" WHERE "StudentID"=$1 AND "ConfirmedAt" IS NOT NULL
         AND ($2::int IS NULL OR "SelectionPurpose"<>'SPECIALIZATION')
+        AND ($4::timestamp IS NULL OR "ConfirmedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh'<=$4::timestamp)
     ), options AS (
       SELECT sc."SelectionPurpose", opt."ProgramCourseID", cc."CourseID", cc."Credits"::text AS "Credits",course."CourseCode",course."CourseName" AS "CourseCatalogName",cc."CourseName" AS "ChosenCourseName"
       FROM selections sc JOIN "StudentComboCourseSelections" choice USING ("SelectionID")
@@ -156,12 +157,16 @@ export async function loadAcademicProgress(client:PoolClient, studentId:number,p
       coalesce((SELECT json_agg(options) FROM options),'[]') AS options,
       ARRAY(SELECT "ChoiceGroupID" FROM invalid_groups ORDER BY "ChoiceGroupID") AS "invalidGroups",
       coalesce((SELECT json_agg(weights) FROM weights),'[]') AS "gradeWeights" FROM curriculum`,
-      [studentId,prospective?.comboId??null,prospective?.courseIds??[]]);
+      [studentId,prospective?.comboId??null,prospective?.courseIds??[],studyCutoff??null]);
     if (!curriculum) throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
     const {courses,aliases,options,invalidGroups,gradeWeights}=curriculum;
     const program=curriculum.program??undefined, policy=curriculum.policy??undefined;
-    const attempts=(await client.query(`${resultSelect} WHERE r."StudentID"=$1`,[studentId])).rows;
+    const attempts=(await client.query(`${resultSelect} WHERE r."StudentID"=$1${studyCutoff ? ' AND p."StartDate"<=$2::timestamp' : ''}`,studyCutoff ? [studentId,studyCutoff] : [studentId])).rows;
     const issues=invalidGroups.map(id=>`COMBO_CHOICE_GROUP_INVALID:${id}`);
+    if (studyCutoff && (await client.query(`SELECT EXISTS(SELECT 1 FROM "StudentCourseResults" r
+      LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=r."AcademicPeriodID"
+      WHERE r."StudentID"=$1 AND p."AcademicPeriodID" IS NULL) AS missing`, [studentId])).rows[0].missing)
+      issues.push('STUDY_RESULT_PERIOD_MISSING');
     return {studentId,program,courses,attempts,aliases,options:invalidGroups.length?[]:options,policy,issues,gradeWeights};
 }
 

@@ -10,6 +10,7 @@ import { assessOjtRisk } from './ojt-risk.service';
 import { analyzeCurrentCv, matchingProfile, updateMatchingProfile } from './cv-extraction.service';
 import { matchStudentJobs } from './job-matching.service';
 import { taskSubmissions, submitTask } from './task.service';
+import { studyPeriods, studyOverview } from './study-period.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -18,6 +19,8 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.get('/students/me/study-periods', ...read, handle(r => studyPeriods(r.query, r.user)));
+router.get('/students/me/study-overview', ...read, handle(r => studyOverview(r.query, r.user)));
 router.post('/students/me/cv/analyses', ...own, requireJsonBody,
   handle(r => analyzeCurrentCv(r.body, r.user)));
 

@@ -143,25 +143,35 @@ export function ResourceState({
     </>
   );
 }
-export function StudentSemesterSelect() {
+export function StudentAcademicPeriodSelect({ label = 'Học kỳ theo dõi' }: { label?: string } = {}) {
   const portal = useStudentPortal();
   return (
     <label className="block space-y-2 text-sm font-medium text-slate-600 sm:min-w-60">
-      Đợt OJT
+      {label}
       <select
-        aria-label="Chọn đợt OJT"
+        aria-label={label === 'Học kỳ theo dõi' ? 'Chọn học kỳ theo dõi' : `Chọn ${label.toLocaleLowerCase('vi')}`}
         className={inputClass + ' text-slate-800'}
-        disabled={portal.loading || !portal.semesters.length}
-        value={portal.semesterId ?? ''}
-        onChange={(e) => portal.selectSemester(Number(e.target.value))}
+        disabled={portal.loading || portal.academicPeriodsLoading || !portal.academicPeriods.length}
+        value={portal.academicPeriodId ?? ''}
+        onChange={(e) => portal.selectAcademicPeriod(Number(e.target.value))}
       >
-        <option value="" disabled>Chưa có đợt OJT</option>
-        {portal.semesters.map((semester) => (
-          <option key={semester.id} value={semester.id}>{semester.name}</option>
+        <option value="" disabled>{portal.academicPeriodsLoading ? 'Đang tải học kỳ…' : 'Chưa có dữ liệu học kỳ'}</option>
+        {portal.academicPeriods.map((semester) => (
+          <option key={semester.id} value={semester.id}>{semester.name}{semester.curriculumSemester == null ? '' : ` · Kỳ ${semester.curriculumSemester}`}{semester.isCurrent ? ' · Đang học' : ' · Đã học'}</option>
         ))}
       </select>
     </label>
   );
+}
+
+export function StudentCurrentAcademicPeriod({ currentSemester }: { currentSemester?: number | null } = {}) {
+  const portal = useStudentPortal();
+  const period = portal.academicPeriods.find(item => item.isCurrent);
+  const stage = currentSemester ?? period?.curriculumSemester ?? portal.profile?.currentSemester;
+  return <div className="text-sm sm:text-right"><p className="text-xs text-slate-500">Học kỳ đang học</p><p className="mt-1 font-semibold text-slate-800">{period
+    ? `${period.name}${stage == null ? '' : ` · Kỳ ${stage}`}`
+    : stage != null ? `Kỳ ${stage} · Theo hồ sơ sinh viên`
+    : portal.academicPeriodsLoading ? 'Đang xác định học kỳ…' : 'Chưa xác định học kỳ đang học'}</p></div>;
 }
 
 export function StudentPage({
@@ -169,7 +179,7 @@ export function StudentPage({
   description,
   children,
   needsSemester = true,
-  showSemesterInBanner = true,
+  showSemesterInBanner = false,
   compactTopSpacing = false,
 }: {
   title: string;
@@ -187,7 +197,7 @@ export function StudentPage({
         title={title}
         description={description}
         badge={null}
-        extra={showSemesterInBanner ? <StudentSemesterSelect /> : undefined}
+        extra={showSemesterInBanner ? <StudentAcademicPeriodSelect /> : undefined}
       />
       <ResourceState
         loading={portal.loading}

@@ -5,11 +5,11 @@ import { RiskInsights } from '@/components/student/ojt-risk/RiskInsights';
 import { LearningRoadmap, RoadmapNotes } from '@/components/student/ojt-risk/LearningRoadmap';
 import { RecommendationSummary } from '@/components/student/ojt-risk/RecommendationSummary';
 import { riskTheme } from '@/components/student/ojt-risk/risk-ui';
-import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentSemesterSelect, statusText } from '@/components/student/PortalUI';
+import { Blockers, dateText, Empty, ResourceState, StudentPage, StudentCurrentAcademicPeriod, statusText } from '@/components/student/PortalUI';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { useStudentRisk } from '@/hooks/student/useStudentRisk';
-import { getStudentAcademicProgress, getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
+import { getStudentDashboardSummary, getStudentNotifications } from '@/services/studentService';
 
 const card = 'min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6';
 const heading = 'text-sm font-semibold text-slate-800 sm:text-base';
@@ -21,26 +21,24 @@ export const StudentDashboard = () => {
   const resource = useStudentResource(
     !loading && profile && semesterId ? 'dashboard-summary:' + profile.id + ':' + semesterId + ':' + revision : null,
     (signal) => getStudentDashboardSummary(semesterId!, signal),
-    { snapshot: true },
   );
   const notifications = useStudentResource(
     !loading && profile ? 'dashboard-notifications:' + profile.id + ':' + revision : null,
     signal => getStudentNotifications(1, signal, undefined, 1),
     { snapshot: true },
   );
-  // Academic records remain available before a student is linked to an OJT semester.
-  const academic = useStudentResource(
-    !loading && profile && !semesterId ? 'academic-progress:' + profile.id + ':' + revision : null,
-    signal => getStudentAcademicProgress(profile!.id, signal),
-    { snapshot: true },
-  );
   const windows = registrationWindows.filter(window => window.ojtSemesterId === semesterId).slice(0, 5);
-  const data = resource.data;
-  const progress = data?.academic.academicProgress ?? academic.data;
+  const data = assessment.currentAcademic ? {
+    academic: { ...assessment.currentAcademic,
+      officialEligibility: resource.data?.academic.officialEligibility ?? null,
+      admissionEligibility: resource.data?.academic.admissionEligibility ?? profile?.admissionEligibility },
+    internship: { assignment: resource.data?.internship.assignment ?? null },
+  } : null;
+  const progress = assessment.currentAcademic?.academicProgress;
   const credits = progress?.credits;
   const assignment = data?.internship.assignment ?? null;
   const complete = !!assignment;
-  const admission = data?.academic.admissionEligibility ?? profile?.admissionEligibility;
+  const admission = data?.academic.admissionEligibility;
   const eligible = admission?.status === 'ELIGIBLE' && !admission.isStale;
   const percent = credits?.total != null && credits.total > 0
     ? Math.max(0, Math.min(100, Math.round(credits.earned / credits.total * 100))) : null;
@@ -52,19 +50,18 @@ export const StudentDashboard = () => {
 
   return <StudentPage title={'Xin chào, ' + (profile?.fullName ?? 'bạn') + '!'}
     description="Tổng quan học tập, điều kiện OJT, nhiệm vụ thực tập và thông báo của bạn."
-    showRefreshAction={false} showSemesterInBanner={false} compactTopSpacing>
+    needsSemester={false} showRefreshAction={false} showSemesterInBanner={false} compactTopSpacing>
     <ResourceState loading={resource.loading} refreshing={resource.refreshing} error={resource.error} retry={resource.reload} />
-    <ResourceState loading={academic.loading} refreshing={academic.refreshing} error={academic.error} retry={academic.reload} />
     <OjtRiskPanel key={'ojt-risk:' + (profile?.id ?? 'pending') + ':' + revision}
       assessment={assessment} showRefreshAction={false} renderDashboard={risk => <div className="space-y-4">
         <section className={card} aria-labelledby="student-ojt-overview">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
-            <div><h2 id="student-ojt-overview" className="text-lg font-bold text-slate-900 sm:text-xl">Tổng quan OJT</h2>
+            <div><h2 id="student-ojt-overview" className="text-lg font-bold text-slate-900 sm:text-xl">Tổng quan học tập &amp; chuẩn bị OJT</h2>
               <p className="mt-1 text-sm text-slate-500">{profile?.fullName}{profile?.studentCode && <> · {profile.studentCode}</>}</p></div>
-            <div className="w-full sm:w-60"><StudentSemesterSelect /></div>
+            <StudentCurrentAcademicPeriod currentSemester={assessment.data?.student.currentSemester} />
           </div>
           <div className="grid gap-5 py-5 lg:grid-cols-3 lg:gap-0">
-            <div className="min-w-0 lg:pr-5"><h3 className={heading}>Mức cảnh báo AI về OJT</h3>
+            <div className="min-w-0 lg:pr-5"><h3 className={heading}>Mức cảnh báo OJT hiện tại</h3>
               {risk ? <><RiskLevelChart level={risk.risk.level} />
                 <p className={`mx-auto mt-3 w-fit rounded-full border px-3 py-1 text-sm font-bold ${riskTheme[risk.risk.level].badge}`}>{riskTheme[risk.risk.level].label}</p>
                 <p className="mt-3 text-sm leading-relaxed text-slate-500">{riskTheme[risk.risk.level].description}</p>
@@ -75,7 +72,7 @@ export const StudentDashboard = () => {
               <CreditProgressChart percent={percent} />
               <p className="mt-3 text-center text-xl font-bold text-slate-900">{credits?.earned ?? '—'} / {credits?.total ?? '—'} <span className="text-sm font-medium text-slate-500">tín chỉ</span></p>
               <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" />Đã tích lũy</span><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-200" />Còn lại</span></div>
-              <p className="mt-2 text-sm text-slate-500">{progress ? statusText(progress.status) : resource.pending || academic.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ'}</p>
+              <p className="mt-2 text-sm text-slate-500">{progress ? statusText(progress.status) : assessment.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ'}</p>
               <Link to="/student/academic-profile" className={`${link} mt-3 inline-block`}>Xem bảng điểm và chương trình</Link>
             </div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
@@ -83,7 +80,7 @@ export const StudentDashboard = () => {
               <dl className="mt-3 space-y-2 text-sm">
                 <div><dt className="text-slate-500">Bàn giao từ Phòng Đào tạo</dt><dd className={eligible ? 'font-bold text-emerald-700' : 'font-semibold text-slate-800'}>{admission ? admission.isStale ? 'Dữ liệu đã thay đổi, cần rà soát' : statusText(admission.status) : resource.pending ? 'Đang tải…' : 'Chưa có dữ liệu'}</dd></div>
                 <div><dt className="text-slate-500">Kết quả chính thức</dt><dd className="font-semibold text-slate-800">{data?.academic.officialEligibility?.isStale ? 'Đã cũ, chờ xét lại' : data ? statusText(data.academic.officialEligibility?.status) : resource.pending ? 'Đang tải…' : 'Chưa có dữ liệu'}</dd></div>
-                {data?.academic.currentEligibility && <div><dt className="text-slate-500">Đối chiếu hiện tại</dt><dd className="font-semibold text-slate-800">{statusText(data.academic.currentEligibility.status)}</dd></div>}
+                {data?.academic.currentEligibility && <div><dt className="text-slate-500">Đối chiếu từ dữ liệu học kỳ đang học</dt><dd className="font-semibold text-slate-800">{statusText(data.academic.currentEligibility.status)}</dd></div>}
               </dl>
               <Blockers values={data?.academic.officialEligibility?.reasons ?? data?.academic.currentEligibility?.reasons} />
               {data?.academic.currentEligibility?.rule && <p className="mt-3 text-xs leading-relaxed text-slate-500">Ngưỡng theo quy định: {data.academic.currentEligibility.rule.minCredits} tín chỉ, tối đa {data.academic.currentEligibility.rule.maxUnpassedCourses} môn nợ.</p>}
