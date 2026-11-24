@@ -33,7 +33,7 @@ export function earlyWarning(input: WarningInput) {
     };
     message=reasons.map(reason=>descriptions[reason]).join(' ');
   } else if (input.eligibilityStatus === 'ELIGIBLE') {
-    message=`Bạn đã tích lũy ${input.earnedCredits} tín chỉ và còn ${input.failedCourseCount} môn chưa đạt, hiện đáp ứng ngưỡng tín chỉ và số môn nợ để xét OJT. Kết quả chính thức phụ thuộc đợt xét và xác nhận của nhà trường.`;
+    message=`Bạn đã tích lũy ${input.earnedCredits} tín chỉ và còn ${input.failedCourseCount} môn chưa đạt, hiện đáp ứng ${input.maxUnpassedCourses===null?'ngưỡng tín chỉ':'ngưỡng tín chỉ và số môn nợ'} để xét OJT. Kết quả chính thức phụ thuộc đợt xét và xác nhận của nhà trường.`;
   } else {
     const details=[`Bạn đang ở kỳ ${input.currentSemester}, đã tích lũy ${input.earnedCredits} tín chỉ.`];
     if(input.missingCredits!==null && input.missingCredits>0)details.push(`Bạn còn thiếu ${input.missingCredits} tín chỉ so với ngưỡng xét OJT.`);

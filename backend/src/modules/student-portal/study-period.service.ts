@@ -84,12 +84,15 @@ export async function studyOverview(params: Row, actor: Actor) {
       JOIN "CohortCurriculumPeriods" plan ON plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode" AND plan."CurriculumSemester"=6
       JOIN "OJTSemesters" o ON o."AcademicPeriodID"=plan."AcademicPeriodID"
       WHERE placement."StudentID"=$1 ORDER BY o."StartDate" LIMIT 1)) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
-    const configuredRule = await activeRule(c, student.ProgramID, target ?? 0);
-    const rule = configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
+    const latestCondition = historical ? null : (await c.query(
+      'SELECT "Version","MinCredits" FROM "OJTConditions" ORDER BY "Version" DESC LIMIT 1'
+    )).rows[0] ?? null;
+    const configuredRule = latestCondition ?? await activeRule(c, student.ProgramID, target ?? 0);
+    const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
       && (configuredRule.OJTSemesterID === null || configuredRule.OJTSemesterID === target) ? configuredRule : null;
     const current = evaluateEligibility({ student, semester: { OJTSemesterID: target }, rule, progress, attempts: source.attempts, aliases: source.aliases });
     const reads: AssessmentReadContext = { source, studyPeriod: { curriculumSemester: currentSemester, referenceDate: cutoff ? new Date(cutoff + '+07:00') : new Date() } };
-    const academic = await summaryWithClient(c, student.StudentID, target, source, { current, official: null }, reads);
+    const academic = await summaryWithClient(c, student.StudentID, target, source, { current, official: null }, reads, latestCondition ? rule : undefined);
     academic.academicWarning.computedAt = new Date().toISOString();
     // Historic terms are for transcripts and accumulated progress only.
     // Risk and the personal roadmap are evaluated only for the ongoing semester.
@@ -104,8 +107,12 @@ export async function studyOverview(params: Row, actor: Actor) {
     const courseResults = source.attempts.map(item => ({ ...item, periodStartDate: item.periodStartDate instanceof Date
       ? `${item.periodStartDate.getFullYear()}-${String(item.periodStartDate.getMonth()+1).padStart(2,'0')}-${String(item.periodStartDate.getDate()).padStart(2,'0')}`
       : item.periodStartDate }));
+    // The student transcript displays a weighted average of stored ten-point scores.
+    const displayProgress = progressFromData({ ...source, policy: { GpaScale: 10 } }, false, false);
     return { period, currentSemester, historical, cutoff,
-      academic: { ...academic, academicWarning: historical ? null : academic.academicWarning,
+      academic: { ...academic, academicProgress: displayProgress, gpa: displayProgress.gpa,
+        gpaScale: displayProgress.gpaScale, issues: displayProgress.issues,
+        academicWarning: historical ? null : academic.academicWarning,
         earlyWarning: historical ? null : academic.earlyWarning }, assessment, courseResults,
       basis: historical ? 'STORED_GRADES_THROUGH_PERIOD_CURRENT_CURRICULUM' : 'CURRENT_STORED_ACADEMIC_DATA',
       note: historical

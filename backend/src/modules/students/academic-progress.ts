@@ -6,7 +6,7 @@ type Row=Record<string,any>;
 const excludedOjtCredit = /(?:\bGDTC\b|\bGDQP\b|\bQPAN\b|\bPE\b|PHE[_ -]?COM|\bphysical\s+education\b|\bmilitary\b|quoc\s+phong|giao\s+duc\s+the\s+chat|the\s+duc|nhac\s+cu|musical\s+instrument)/i;
 const normalizedCourseText=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d');
 // Pure calculation: no guessed passing threshold, conversion scale, or legacy global course credits.
-export function calculateProgress(program:Row|undefined,courses:Row[],attempts:Row[],aliases:Row[],options:Row[],policy:Row|undefined,configurationIssues:string[]=[],curriculumGradeWeights:Row[]=[]) {
+export function calculateProgress(program:Row|undefined,courses:Row[],attempts:Row[],aliases:Row[],options:Row[],policy:Row|undefined,configurationIssues:string[]=[],curriculumGradeWeights:Row[]=[],requireConfirmedSlotChoices=true) {
   const issues=[...configurationIssues];
   if (!program) return {status:'INSUFFICIENT_CONFIGURATION',gpa:null,retakePolicy:'LATEST',credits:{earned:0,total:null,remaining:null},issues:['STUDENT_PROGRAM_NOT_ASSIGNED'],requirements:[]};
   if (program.Status !== undefined && program.Status !== 'PUBLISHED') issues.push('CURRICULUM_NOT_PUBLISHED');
@@ -38,7 +38,7 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
         const weights=new Set(allowed.map(o=>o.Credits===null?null:Number(o.Credits)));
         if (weights.size===1 && !weights.has(null)) credits=[...weights][0] as number;
       }
-      if (!choices.length) issues.push(`SLOT_CHOICES_UNCONFIRMED:${c.ProgramCourseID}`);
+      if (requireConfirmedSlotChoices && !choices.length) issues.push(`SLOT_CHOICES_UNCONFIRMED:${c.ProgramCourseID}`);
       requirements.push({id:c.ProgramCourseID,courseId:null,courseCode:c.CourseCode,name:c.CourseName,kind:c.EntryKind,credits,required:c.IsRequired,choices});
     }
   }
@@ -198,10 +198,10 @@ export async function loadAcademicProgress(client:PoolClient, studentId:number,p
 }
 
 export type AcademicProgressData = Awaited<ReturnType<typeof loadAcademicProgress>>;
-export function progressFromData(data:AcademicProgressData,assumeInProgressPassed=false) {
+export function progressFromData(data:AcademicProgressData,assumeInProgressPassed=false,requireConfirmedSlotChoices=true) {
   const {studentId,program,courses,attempts,aliases,options,policy,issues,gradeWeights}=data;
   const grades=assumeInProgressPassed?attempts.map(r=>r.status==='IN_PROGRESS'?{...r,status:'RECOGNIZED'}:r):attempts;
-  return {studentId,...calculateProgress(program,courses,grades,aliases,options,policy,issues,gradeWeights)};
+  return {studentId,...calculateProgress(program,courses,grades,aliases,options,policy,issues,gradeWeights,requireConfirmedSlotChoices)};
 }
 export async function academicProgressWithClient(client:PoolClient,studentId:number,prospective?:{comboId:number;courseIds:number[]},assumeInProgressPassed=false) {
   return progressFromData(await loadAcademicProgress(client,studentId,prospective),assumeInProgressPassed);

@@ -83,7 +83,7 @@ export const StudentDashboard = () => {
                 {data?.academic.currentEligibility && <div><dt className="text-slate-500">Đối chiếu từ dữ liệu học kỳ đang học</dt><dd className="font-semibold text-slate-800">{statusText(data.academic.currentEligibility.status)}</dd></div>}
               </dl>
               <Blockers values={data?.academic.officialEligibility?.reasons ?? data?.academic.currentEligibility?.reasons} />
-              {data?.academic.currentEligibility?.rule && <p className="mt-3 text-xs leading-relaxed text-slate-500">Ngưỡng theo quy định: {data.academic.currentEligibility.rule.minCredits} tín chỉ, tối đa {data.academic.currentEligibility.rule.maxUnpassedCourses} môn nợ.</p>}
+              {data?.academic.currentEligibility?.rule && <p className="mt-3 text-xs leading-relaxed text-slate-500">Ngưỡng theo quy định: {data.academic.currentEligibility.rule.minCredits} tín chỉ{data.academic.currentEligibility.rule.maxUnpassedCourses != null ? `, tối đa ${data.academic.currentEligibility.rule.maxUnpassedCourses} môn nợ` : ''}.</p>}
               {admission?.appliedCondition && <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-sm"><p className="font-semibold text-slate-800">Điều kiện Phòng Đào tạo đã dùng</p><p className="mt-1 text-slate-700">Phiên bản {admission.appliedCondition.version} · tối thiểu {admission.appliedCondition.minCredits} tín chỉ</p><p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">{admission.appliedCondition.issuingDocument}</p></div>}
             </div>
           </div>

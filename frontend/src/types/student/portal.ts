@@ -63,7 +63,7 @@ export interface Eligibility {
   unpassedCourseCount: number;
   reasons: string[];
   academicIssues?: string[];
-  rule?: { minCredits: number; maxUnpassedCourses: number } | null;
+  rule?: { minCredits: number; maxUnpassedCourses: number | null } | null;
 }
 export interface AdmissionEligibility extends Eligibility {
   source: 'FRONTEND_HANDOFF' | 'OFFICIAL_CHECK';

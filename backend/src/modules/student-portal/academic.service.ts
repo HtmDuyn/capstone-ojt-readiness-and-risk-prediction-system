@@ -14,22 +14,24 @@ import { ownStudent, publicEligibility, type Row, type Actor } from './shared';
 import { earlyWarning } from './early-warning';
 import type { AssessmentReadContext } from './assessment-read-context';
 
-export async function summaryWithClient(c:PoolClient,studentId:number,semesterId:number|null,loaded?:AcademicProgressData,eligibilityData?:Row,assessmentReads?:AssessmentReadContext) {
+export async function summaryWithClient(c:PoolClient,studentId:number,semesterId:number|null,loaded?:AcademicProgressData,eligibilityData?:Row,assessmentReads?:AssessmentReadContext,warningRule?:Row) {
   const source=loaded??await loadAcademicProgress(c,studentId);
   const progress=progressFromData(source);
   const decision=eligibilityData??await eligibility(studentId,{ojtSemesterId:semesterId},c,progress,source);
   const current=decision.current,official=decision.official;
   const placement=assessmentReads?.studyPeriod ? {semester:assessmentReads.studyPeriod.curriculumSemester} : (await c.query(`SELECT "StudentCurriculumSemester"(p."StudentID",p."CurrentAcademicPeriodID") AS semester
     FROM "StudentAcademicPlacements" p WHERE p."StudentID"=$1`,[studentId])).rows[0];
+  const warningProgress=warningRule ? progressFromData(source,false,false) : progress;
+  const warningIssues=warningRule ? warningProgress.issues.filter(issue=>!issue.startsWith('GPA_')) : progress.issues;
   const warning=earlyWarning({currentSemester:placement?.semester??null,earnedCredits:current.earnedCredits,
-    completeConfiguration:!!progress.credits.completeConfiguration,issues:progress.issues,
+    completeConfiguration:!!warningProgress.credits.completeConfiguration,issues:warningIssues,
     eligibilityStatus:current.status,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,
     maxUnpassedCourses:current.rule?.maxUnpassedCourses??null});
   const results=source.attempts;
   const outstanding=progress.requirements.filter((r:Row)=>!r.completed).map((r:Row)=>({...r,learningStatus:current.unpassedCourses.some((u:Row)=>r.choices.includes(u.courseId))?'FAILED':results.some(a=>r.choices.includes(a.courseId)&&a.status==='IN_PROGRESS')?'IN_PROGRESS':'NOT_STUDIED'}));
   // Requirements are unique curriculum slots; a scenario never counts a retake twice.
-  const scenarioProgress=progress.credits.completeConfiguration?progressFromData(source,true):null;
-  const potential=scenarioProgress?.credits.completeConfiguration?Math.max(0,scenarioProgress.credits.earned-current.earnedCredits):null;
+  const scenarioProgress=warningProgress.credits.completeConfiguration?progressFromData(source,true,!warningRule):null;
+  const potential=scenarioProgress?.credits.completeConfiguration?Math.max(0,(warningRule ? scenarioProgress.credits.historyOjtEarned : scenarioProgress.credits.earned)-current.earnedCredits):null;
   const deadline=semesterId ? (await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0]??null : null;
   const stage=placement?.semester??null;
   const due=progress.requirements.filter(r=>r.required&&!r.completed&&source.courses.some(p=>p.ProgramCourseID===r.id&&p.RecommendedSemester!==null&&p.RecommendedSemester<stage));
@@ -45,7 +47,7 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
   const debtIds=new Set<number>(current.unpassedCourses.map((r:Row)=>r.courseId));
   const blockingIds=new Set<number>(groups.filter(g=>due.some(r=>r.id===g.requirementId)&&g.courseIds.filter((id:number)=>achieved.has(canonical(id))).length<g.minimumPassed)
     .flatMap(g=>g.courseIds.map(canonical).filter((id:number)=>debtIds.has(id))));
-  const scenarioRule=warning.available?await activeRule(c,source.program?.ProgramID,semesterId??0):null;
+  const scenarioRule=warning.available?(warningRule??await activeRule(c,source.program?.ProgramID,semesterId??0)):null;
   const projected= scenarioProgress&&scenarioRule?evaluateEligibility({student:{StudentID:studentId,Status:'ACTIVE',AccountStatus:'ACTIVE'},
     semester:{OJTSemesterID:semesterId},rule:scenarioRule,progress:scenarioProgress,
     attempts:source.attempts.map(a=>a.status==='IN_PROGRESS'?{...a,status:'RECOGNIZED'}:a),aliases:source.aliases}):null;
