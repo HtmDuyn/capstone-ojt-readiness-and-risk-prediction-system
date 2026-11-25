@@ -13,7 +13,7 @@ export async function studentDossier(studentId: number, params: Row, actor: Acto
   const semesterId = positiveId(params.ojtSemesterId, 'ojtSemesterId');
   return readTransaction(async client => {
     const student = (await client.query(`SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",
-      u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,s."ClassName" AS "className",
+      u."FullName" AS "fullName",u."Email" AS email,u."Phone" AS phone,
       s."Status" AS status,s."EnrollmentYear" AS "enrollmentYear",s."CurrentSemester" AS "currentSemester",
       program."ProgramCode" AS "programCode",program."ProgramName" AS "programName",
       major."SpecializationCode" AS "majorCode",major."SpecializationName" AS "majorName",

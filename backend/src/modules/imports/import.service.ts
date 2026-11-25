@@ -151,7 +151,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     }
     if (input.kind==='STUDENT') academicImportId=await saveHistory(client,{kind:'STUDENT',key:input.idempotencyKey,hash:payloadHash,status:'COMPLETED',summary,sourceAccountBatchId:batchId},actorId,plans.map(p=>({raw:safeRow(p.row,'STUDENT'),normalized:{userId:p.userId,action:p.action},status:'IMPORTED'})));
     const ojtAssessment = input.kind === 'STUDENT'
-      ? await assessImportedStudents(client, plans.map(plan => plan.entityId!), actorId, batchId) : undefined;
+      ? await assessImportedStudents(client, actorId, batchId) : undefined;
     const completedSummary = ojtAssessment ? { ...summary, ojtAssessment } : summary;
     if (ojtAssessment) await client.query('UPDATE "AccountImportBatches" SET "Summary"=$2 WHERE "BatchID"=$1',
       [batchId, JSON.stringify(completedSummary)]);
@@ -165,7 +165,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     if ((error as { code?: string }).code === '23514') {
       if ((body as any)?.kind === 'ENTERPRISE') {
         if ((error as { constraint?: string }).constraint === 'AccountImportBatches_check')
-          throw fail('Database chưa cập nhật luồng tạo tài khoản doanh nghiệp. Cần chạy khối ENTERPRISE ACCOUNT IMPORT V2 trong backend/DB.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
+          throw fail('Database chưa đồng bộ schema import tài khoản doanh nghiệp. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
         throw fail('Thông tin tài khoản doanh nghiệp không đáp ứng ràng buộc dữ liệu.',422,'INVALID_ENTERPRISE_ACCOUNT');
       }
       throw fail((error as Error).message, 422, 'INVALID_STUDY_HISTORY');
@@ -174,17 +174,20 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
   } finally { client.release(); }
 }
 
-async function assessImportedStudents(client: PoolClient, studentIds: number[], actorId: number, batchId: string | number) {
+async function assessImportedStudents(client: PoolClient, actorId: number, batchId: string | number) {
   // The import has passed deferred validation. An assessment error must not
   // invalidate the imported transcript or roll back account provisioning.
   await client.query('SAVEPOINT import_ojt_assessment');
   try {
     const condition = await latestEffectiveOjtCondition(client);
-    const checkedCount = condition
-      ? await assessOjtStudents(client, { studentIds }, condition, actorId, `import-ojt:${batchId}`) : 0;
+    const assessment = condition
+      ? await assessOjtStudents(client, condition, actorId, `import-ojt:${batchId}`, 'IMPORT') : null;
+    const checkedCount = assessment?.checkedCount ?? 0;
     const status = condition ? 'COMPLETED' : 'NO_EFFECTIVE_CONDITION';
     await client.query('RELEASE SAVEPOINT import_ojt_assessment');
-    return { status, checkedCount };
+    return { status, checkedCount, eligibleCount: assessment?.eligibleCount ?? 0,
+      assignedCount: assessment?.assignedCount ?? 0, waitingCount: assessment?.waitingCount ?? 0,
+      excludedPassedOjt202Count: assessment?.excludedPassedOjt202Count ?? 0 };
   } catch (error) {
     await client.query('ROLLBACK TO SAVEPOINT import_ojt_assessment');
     await client.query('RELEASE SAVEPOINT import_ojt_assessment');

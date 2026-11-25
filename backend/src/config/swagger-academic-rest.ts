@@ -68,7 +68,7 @@ export function describeAcademicRest(spec: Spec): Spec {
     '/curricula/{id}/ojt-grade-mappings/{semesterId}':['get','put'], '/ojt-rule-sets/{id}':['patch'], '/ojt-rule-sets/{id}/publish':['post'],
     '/academic/alerts/notifications':['post'], '/academic/academic-summary-notifications':['post'], '/academic/eligibility-notifications':['post'],
     '/academic/advisory-runs':['get'], '/academic/advisory-runs/{id}':['get'], '/curriculum-imports/preview':['post'], '/curriculum-imports/commit':['post'],
-    '/imports/preview':['post'], '/imports/commit':['post'], '/ojt-semesters/{id}/eligible-student-handoffs':['get','post'],
+    '/imports/preview':['post'], '/imports/commit':['post'], '/ojt-semesters/{id}/eligible-student-handoffs':['get'],
     '/students/{id}/course-results':['get'], '/students/{id}/combo-selections':['get'], '/students/{id}/eligibility':['get'], '/students/{id}/eligibility-checks':['get'],
   };
   for (const [path,methods] of Object.entries(retired)) for (const method of methods) {
@@ -78,7 +78,5 @@ export function describeAcademicRest(spec: Spec): Spec {
     else delete item[method];
     if(!Object.keys(item).length)delete spec.paths['/api'+path];
   }
-  const eligibilitySchema=spec.paths['/api/eligibility-check-runs']?.post?.requestBody?.content?.['application/json']?.schema;
-  if(eligibilitySchema?.properties)eligibilitySchema.properties.confirmResults={type:'boolean',default:true,description:'false: chỉ tính và cập nhật StudentOJTEligibility, không xác nhận kết quả chính thức. FE dùng false cho lần xét nền sau import.'};
   return spec;
 }

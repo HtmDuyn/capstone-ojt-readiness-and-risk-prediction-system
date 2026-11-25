@@ -263,7 +263,6 @@ const EducationStudentImport: React.FC = () => {
                       "Họ tên",
                       "Email",
                       "Số điện thoại",
-                      "Lớp",
                       "Chương trình",
                       "Chuyên ngành",
                       "Trạng thái học vụ",
@@ -292,7 +291,6 @@ const EducationStudentImport: React.FC = () => {
                       <td className="px-4 py-3">{row.fullName}</td>
                       <td className="px-4 py-3">{row.email}</td>
                       <td className="whitespace-nowrap px-4 py-3">{row.academic.phone ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3">{row.academic.className ?? '—'}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium">{catalogs?.programs.find(p => p.id === row.academic.programId)?.aliases.find(alias => !alias.includes(' ') && /[A-Za-z]/.test(alias)) ?? `ID ${row.academic.programId}`}</p>
                         {catalogs?.programs.find(

@@ -57,10 +57,10 @@ const blockerLabels: Record<string, string> = {
   ELIGIBLE_HANDOFF_REQUIRED:
     'Chưa có kết quả đủ điều kiện tham gia OJT.',
   CONFIRMED_ELIGIBILITY_REQUIRED:
-    'Chưa có xác nhận đủ điều kiện OJT hiện hành.',
+    'Chưa có kết quả xét OJT đủ điều kiện hiện hành.',
   OFFICIAL_ELIGIBILITY_REQUIRED: 'Chưa có xác nhận đủ điều kiện OJT hiện hành.',
   ELIGIBILITY_CHECK_STALE: 'Kết quả xét đã cũ, cần được xét lại.',
-  ELIGIBILITY_HANDOFF_STALE: 'Dữ liệu đã thay đổi sau bàn giao; liên hệ Phòng Đào tạo để rà soát.',
+  ELIGIBILITY_HANDOFF_STALE: 'Kết quả xét OJT đã cũ do dữ liệu học tập thay đổi; liên hệ Phòng Đào tạo để rà soát.',
   REGISTRATION_REQUIRED: 'Cần nộp hồ sơ đăng ký OJT.',
   REGISTRATION_EXISTS: 'Đã có hồ sơ đăng ký.',
   OJT_REGISTRATION_WINDOW_UNAVAILABLE: 'Đợt đăng ký chưa mở hoặc đã hết hạn.',

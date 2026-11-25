@@ -270,7 +270,7 @@ const EducationStudentProgress: React.FC = () => {
                             chỉ và có không quá {OJT_MAX_NOT_PASSED_SUBJECTS}{" "}
                             môn chưa đạt.
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả tham khảo đã tính và lưu; không thay thế quyết định OJT chính thức.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức.' : 'Chưa có kết quả đã lưu.'}</p>
+                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'BACKEND' || selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả xét điều kiện đã lưu trên hệ thống.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức.' : 'Chưa có kết quả đã lưu.'}</p>
                         </div>
                       </div>
                     </div>

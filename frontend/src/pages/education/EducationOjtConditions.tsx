@@ -3,13 +3,13 @@ import { useEducationStudentCredits } from '@/hooks/education/useEducationStuden
 import { PageBanner } from '@/components/common/PageBanner';
 import { educationOjtReason } from '@/utils/education/educationOjtReason';
 import { ojtDisplayStatusLabels, sortOjtTargets, type OjtSortDirection, type OjtSortKey } from '@/utils/education/educationOjtSorting';
-import { ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, Save, Search, ShieldCheck, Eye, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, Search, ShieldCheck, Eye, X } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ojtSourceLabels, type OjtSourceKey } from '@/utils/education/ojtEligibilityLoad';
 
 const EducationOjtConditions: React.FC = () => {
-  const { fullCheck, runAll, saveResults, visible, pages, checked, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, saving, error, results, savedResults, pendingResults, failures, notice, search, setSearch, filter, setFilter, setPage, currentPage, rule, selectionLocked, discardPending } = useEducationOjtEligibility();
+  const { runAll, visible, pages, statusByStudent, statusCounts, targets, loading, retrying, dataLoaded, sourceLoaded, sourceErrors, retryFailedSources, busy, error, results, savedResults, failures, notice, search, setSearch, filter, setFilter, setPage, currentPage, rule, selectionLocked } = useEducationOjtEligibility();
   const failedSources = Object.entries(sourceErrors) as [OjtSourceKey, NonNullable<(typeof sourceErrors)[OjtSourceKey]>][];
   const [detailStudentId, setDetailStudentId] = React.useState<number | null>(null);
   const detailTarget = targets.find(target => target.student.id === detailStudentId);
@@ -62,21 +62,15 @@ const EducationOjtConditions: React.FC = () => {
       {rule?.issuingDocument && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Văn bản ban hành: {rule.issuingDocument}</p>}
       <p className="text-sm text-slate-600">Tín chỉ xét lấy theo khung chương trình, loại trừ Giáo dục thể chất, Quốc phòng – An ninh và học phần nhạc cụ. Hệ thống tự xét theo ngày kết thúc đã lưu của Block 10, Block 3 và học kỳ. Có thể dùng nút xét để chạy thủ công khi cần.</p>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => void runAll()} disabled={loading || busy || saving || !fullCheck.length || selectionLocked}
+        <button type="button" onClick={() => void runAll()} disabled={loading || busy || selectionLocked}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
-          <CheckCircle2 size={18} />{saving ? 'Đang lưu kết quả...' : busy ? 'Đang xét điều kiện...' : !dataLoaded ? 'Chưa đủ dữ liệu để xét' : `Xét sinh viên (${fullCheck.length})`}
+          <CheckCircle2 size={18} />{busy ? 'Đang xét điều kiện...' : 'Xét toàn bộ sinh viên'}
         </button>
-        {checked.length > 0 && !busy && <button onClick={() => void saveResults()} disabled={saving || !dataLoaded} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"><Save size={18} />{saving ? 'Đang lưu kết quả...' : `Thử lưu lại (${checked.length})`}</button>}
-      </div>
-      <div className="flex gap-3">
-        {checked.length > 0 && <button type="button" disabled={busy || saving} className="text-sm underline"
-          onClick={() => { if (window.confirm('Bỏ các kết quả chưa lưu?')) discardPending(); }}>Bỏ kết quả chưa lưu</button>}
       </div>
       {!loading && targets.length > 0 && <p className="text-xs text-slate-500">Hệ thống có thể chưa phát hiện mọi thay đổi cấu hình học vụ; PĐT có thể xét lại sau đối soát khi đã bổ sung dữ liệu.</p>}
-      {checked.length > 0 && <p className="text-xs text-slate-500">{checked.length} kết quả đang chờ lưu. Phòng QHDN tự động thấy sinh viên đủ điều kiện sau khi lưu thành công.</p>}
       {loading && <p role="status" className="text-sm text-slate-500">Đang tải danh sách sinh viên...</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {failedSources.length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p className="font-medium">Chưa tải được một số dữ liệu. Dữ liệu đã tải thành công vẫn được giữ nguyên{dataLoaded ? '.' : '; hiện chưa thể xét hoặc lưu kết quả.'}</p><ul className="mt-2 space-y-1">{failedSources.map(([key, issue]) => <li key={key}>• {ojtSourceLabels[key]}: {issue.message}</li>)}</ul><button type="button" disabled={retrying || busy || saving} onClick={() => void retryFailedSources()} className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 font-medium hover:bg-red-100 disabled:opacity-50">{retrying ? 'Đang thử tải lại…' : 'Thử tải lại dữ liệu'}</button></div>}
+      {failedSources.length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p className="font-medium">Chưa tải được một số dữ liệu. Dữ liệu đã tải thành công vẫn được giữ nguyên{dataLoaded ? '.' : '; hiện chưa thể xét.'}</p><ul className="mt-2 space-y-1">{failedSources.map(([key, issue]) => <li key={key}>• {ojtSourceLabels[key]}: {issue.message}</li>)}</ul><button type="button" disabled={retrying || busy} onClick={() => void retryFailedSources()} className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 font-medium hover:bg-red-100 disabled:opacity-50">{retrying ? 'Đang thử tải lại…' : 'Thử tải lại dữ liệu'}</button></div>}
       {sortingCredits && loadingCredits && <p role="status" className="text-sm text-slate-600">Đang tải tín chỉ để sắp xếp toàn bộ kết quả lọc…</p>}
       {creditFailures.length > 0 && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Chưa tải được tín chỉ học tập của {creditFailures.length} sinh viên từ hồ sơ. <button type="button" disabled={loadingCredits} onClick={retryCreditFailures} className="ml-2 underline disabled:opacity-50">Thử tải lại</button></div>}
       {showNotice && <p role="status" className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>}
@@ -105,7 +99,7 @@ const EducationOjtConditions: React.FC = () => {
           <td className="px-3 py-2.5 text-xs">{t.student.program?.code ?? '—'}</td>
           <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{r?.earnedCredits ?? academicCredits[t.student.id] ?? '—'}{r?.rule && <span className="block text-xs text-slate-500">Ngưỡng {r.rule.minCredits}</span>}</td>
           <td className="px-3 py-2.5"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs ${sourceLoaded.results && displayStatus === 'ELIGIBLE' ? 'bg-green-50 text-green-700' : sourceLoaded.results && displayStatus === 'NOT_ELIGIBLE' ? 'bg-red-50 text-red-700' : sourceLoaded.results && displayStatus === 'ERROR' ? 'bg-red-50 text-red-700' : sourceLoaded.results && displayStatus === 'REVIEW_REQUIRED' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{sourceLoaded.results ? statusLabel : 'Chưa tải được kết quả'}</span></td>
-          <td className="min-w-48 max-w-sm whitespace-normal break-words px-3 py-2.5 text-xs leading-5 text-slate-600">{sourceLoaded.results ? educationOjtReason(r, failures[t.student.id], t.reason) : 'Chưa tải được kết quả xét.'}{pendingResults[t.student.id] ? <span className="mt-1 block text-blue-700">Kết quả chưa lưu</span> : savedResults[t.student.id] && <span className="mt-1 block text-emerald-700">Đã lưu kết quả</span>}</td>
+          <td className="min-w-48 max-w-sm whitespace-normal break-words px-3 py-2.5 text-xs leading-5 text-slate-600">{sourceLoaded.results ? educationOjtReason(r, failures[t.student.id], t.reason) : 'Chưa tải được kết quả xét.'}{savedResults[t.student.id] && <span className="mt-1 block text-emerald-700">Đã lưu kết quả</span>}</td>
 
           <td className="px-3 py-2 text-center"><button type="button" title="Xem chi tiết" aria-label={`Xem chi tiết ${t.student.studentCode}`} onClick={() => setDetailStudentId(t.student.id)} className="inline-flex rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"><Eye size={18} aria-hidden="true" /></button></td>
         </tr>;
@@ -133,7 +127,7 @@ const EducationOjtConditions: React.FC = () => {
             <div><dt className="text-slate-500">Kết quả đang hiển thị</dt><dd>{!sourceLoaded.results ? 'Chưa tải được kết quả xét' : ojtDisplayStatusLabels[statusByStudent[detailTarget.student.id]]}</dd></div>
             <div className="sm:col-span-2"><dt className="text-slate-500">Lý do chi tiết</dt><dd>{educationOjtReason(detailResult, failures[detailTarget.student.id], detailTarget.reason)}</dd></div>
             <div><dt className="text-slate-500">Thời gian xét</dt><dd>{detailResult?.checkedAt ? new Date(detailResult.checkedAt).toLocaleString('vi-VN') : 'Chưa có dữ liệu xác nhận'}</dd></div>
-            <div><dt className="text-slate-500">Tình trạng lưu</dt><dd>{pendingResults[detailTarget.student.id] ? 'Kết quả chưa lưu' : detailSaved ? 'Đã lưu kết quả' : 'Chưa có kết quả đã lưu'}</dd></div>
+            <div><dt className="text-slate-500">Tình trạng lưu</dt><dd>{detailSaved ? 'Đã lưu kết quả' : 'Chưa có kết quả đã lưu'}</dd></div>
           </dl></section>
         </div>
       </div>

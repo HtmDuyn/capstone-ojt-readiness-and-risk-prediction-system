@@ -93,7 +93,6 @@ describe('/ojt-rule-sets/{id}', { patch: 'Sửa bộ quy tắc chưa ban hành' 
 describe('/ojt-rule-sets/{id}/publish', { post: 'Ban hành bộ quy tắc OJT' });
 describe('/students/{id}/eligibility-checks', { get: 'Lịch sử kiểm tra điều kiện OJT' });
 describe('/students/{id}/eligibility', { get: 'Kết quả OJT và điều kiện còn thiếu' });
-describe('/eligibility-check-runs', { post: ['Xét điều kiện OJT hàng loạt và cập nhật trạng thái', 'Truyền phạm vi sinh viên bằng JSON body. Trả kết quả ngay và ghi nhận kết quả chính thức trong cùng lần gọi; không cần xác nhận riêng.'] });
 describe('/imports/emails/resend', { post: 'Resend email' });
 describe('/ojt-registration-windows', { get: ['Danh sách đợt đăng ký OJT', 'Sinh viên chỉ thấy đợt phù hợp, kèm kỳ học, hồ sơ đã nộp và điều kiện đăng ký.'], post: ['Tạo đợt đăng ký OJT', 'Mặc định dành cho kỳ chuyên ngành 5, tính theo lộ trình thực tế.'] });
 describe('/ojt-registration-windows/{id}', { patch: ['Cập nhật hoặc mở/đóng đợt đăng ký OJT', 'Gửi status OPEN/CLOSED và reason để chuyển trạng thái.'] });
@@ -103,7 +102,7 @@ describe('/job-applications', {
   get: 'Sinh viên xem lịch sử hồ sơ đã nộp; QHDN xem danh sách hồ sơ theo quyền.',
   post: ['Sinh viên nộp hồ sơ trực tiếp đến doanh nghiệp', 'Gửi windowId, postId và positionId; hồ sơ và trạng thái chờ doanh nghiệp được tạo nguyên tử.']
 });
-describe('/ojt-semesters/{id}/eligible-student-handoffs', { get: 'Lịch sử bàn giao sinh viên cho QHDN', post: 'Bàn giao sinh viên đủ điều kiện cho QHDN' });
+describe('/ojt-semesters/{id}/eligible-student-handoffs', { get: 'Lịch sử bàn giao cũ; danh sách hiện tại lấy từ roster tuyển dụng' });
 describe('/ojt-semesters/{id}/students', { get: 'Theo dõi trạng thái OJT theo kỳ' });
 describe('/ojt-results', { get: 'Danh sách điểm OJT chính thức do doanh nghiệp đánh giá' });
 describe('/ojt-semesters/{id}/results/export', { get: 'Xuất báo cáo kết quả OJT theo kỳ' });
@@ -150,7 +149,7 @@ const pathEntities: Record<string, string> = {
   students:'StudentID',accounts:'UserID','academic-years':'AcademicYearID','academic-periods':'AcademicPeriodID',
   'ojt-semesters':'OJTSemesterID',cohorts:'CohortID',curricula:'ProgramID',courses:'CourseID',combos:'ProgramComboID',
   'course-results':'ResultID trong StudentCourseResults','academic-imports':'BatchID trong AcademicImportBatches',
-  'ojt-rule-sets':'RuleSetID','eligibility-checks':'CheckID','eligibility-check-runs':'RunID',
+  'ojt-rule-sets':'RuleSetID','eligibility-checks':'CheckID',
   'ojt-registration-windows':'WindowID trong OJTRegistrationWindows','ojt-registrations':'RegistrationID',
   'ojt-results':'EvaluationID trong InternshipEvaluations (điểm chính thức doanh nghiệp)'
 };

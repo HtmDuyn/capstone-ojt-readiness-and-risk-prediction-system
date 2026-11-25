@@ -1,3 +1,7 @@
+-- Canonical database script: db/backend.
+-- Complete schema, routines, seed data, and current OJT workflow for the whole system.
+-- Run from the repository root with: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/backend
+-- This is a fresh-build script: it resets and recreates application-owned tables.
 BEGIN;
 SET LOCAL lock_timeout='5s';
 SET LOCAL search_path=public,pg_catalog;
@@ -1423,7 +1427,6 @@ CREATE TABLE public."Students" (
   "ProgramID" integer,
   "EnrollmentYear" integer,
   "CurrentSemester" integer,
-  "ClassName" character varying(20),
   "Status" character varying(30),
   "CohortCode" character varying(20),
   "DeletedAt" timestamp with time zone,
@@ -7677,10 +7680,9 @@ ON CONFLICT DO NOTHING;
 SET CONSTRAINTS "TR_Placement_ProgramCohort", "TR_Placement_StudyHistory", "TR_Result_StudyHistory",
   "TR_Student_ProgramCohort", "TR_Student_StudyHistory" DEFERRED;
 
-INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","ClassName","Status","CohortCode")
+INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","Status","CohortCode")
 SELECT u."UserID",r."StudentCode",r."ProgramID",
   2025,5,
-  CASE r."ProgramID" WHEN 11 THEN 'AI-K25' WHEN 22 THEN 'IA-K25' WHEN 30 THEN 'IS-K25' ELSE 'SE-K25' END,
   'ACTIVE',r."CohortCode"
 FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email" AND u."RoleID"=(SELECT "RoleID" FROM public."Roles" WHERE "RoleCode"='STUDENT')
 WHERE NOT EXISTS (SELECT 1 FROM public."Students" s WHERE s."UserID"=u."UserID" OR s."StudentCode"=r."StudentCode")
@@ -8202,14 +8204,21 @@ BEGIN
   JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=r."AcademicPeriodID"
   LEFT JOIN "ProgramCourses" pc ON pc."ProgramID"=student."ProgramID" AND pc."CourseID"=r."CourseID" AND pc."EntryKind"='COURSE'
   WHERE r."StudentID"=student_id LOOP
-  -- The OJT eligibility decision authorizes the automatic OJT202 enrollment.
+  -- Eligibility authorizes enrollment during registration; an existing registration
+  -- also authorizes the corresponding history row during migration or seed repair.
   IF attempt."SourceReference"='AUTO_OJT_ENROLLMENT' AND attempt."Status"='IN_PROGRESS'
    AND upper(attempt."CourseCode")='OJT202' AND attempt."ProgramCourseID" IS NOT NULL
    AND attempt."SemesterTaken"=6
    AND attempt."AcademicPeriodID"="DefaultOJTAcademicPeriod"(student_id) AND attempt."Score" IS NULL AND attempt."Grade" IS NULL
    AND attempt."GradePoints" IS NULL
-   AND EXISTS(SELECT 1 FROM "StudentOJTCalculatedResults" saved
-    WHERE saved."StudentID"=student_id AND saved."Status"='ELIGIBLE') THEN
+   AND (
+    EXISTS(SELECT 1 FROM "StudentOJTCalculatedResults" saved
+      WHERE saved."StudentID"=student_id AND saved."Status"='ELIGIBLE')
+    OR EXISTS(SELECT 1 FROM "OJTRegistrations" registration
+      JOIN "OJTSemesters" term USING ("OJTSemesterID")
+      WHERE registration."StudentID"=student_id
+        AND term."AcademicPeriodID"=attempt."AcademicPeriodID")
+   ) THEN
    CONTINUE;
   END IF;
   IF attempt."SemesterTaken" IS DISTINCT FROM "StudentCurriculumSemester"(student_id,attempt."AcademicPeriodID") THEN
@@ -8268,54 +8277,147 @@ BEGIN
  END IF;
 END $function$
 ;
-CREATE OR REPLACE FUNCTION public."EnrollAssignedOJTStudents"(target_student integer, target_semester integer)
-RETURNS void LANGUAGE sql SET search_path=public,pg_catalog AS $enroll$
- INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Status","AcademicPeriodID","SourceReference")
- SELECT roster."StudentID",pc."CourseID",6,period."AcademicYearID",'IN_PROGRESS',period."AcademicPeriodID",'AUTO_OJT_ENROLLMENT'
- FROM "OJTRecruitmentRoster" roster
- JOIN "Students" student USING ("StudentID")
- JOIN "ProgramCourses" pc ON pc."ProgramID"=student."ProgramID"
- JOIN "Courses" course ON course."CourseID"=pc."CourseID"
- JOIN "OJTSemesters" term ON term."OJTSemesterID"=roster."OJTSemesterID"
- JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID"
- WHERE roster."RoundID" IS NOT NULL
-   AND (target_student IS NULL OR roster."StudentID"=target_student)
-   AND (target_semester IS NULL OR roster."OJTSemesterID"=target_semester)
-   AND upper(course."CourseCode")='OJT202' AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6
-   AND NOT EXISTS(SELECT 1 FROM "StudentCourseResults" existing
-     JOIN "AcademicPeriods" recorded_period ON recorded_period."AcademicPeriodID"=existing."AcademicPeriodID"
-     WHERE existing."StudentID"=roster."StudentID" AND existing."CourseID"=pc."CourseID"
-       AND COALESCE(recorded_period."ParentPeriodID",recorded_period."AcademicPeriodID")=period."AcademicPeriodID")
- ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
- WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING;
-$enroll$;
-
-CREATE OR REPLACE FUNCTION public."SyncAssignedOJTEnrollment"()
-RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_catalog AS $sync$
-BEGIN
- IF TG_TABLE_NAME='StudentOJTCalculatedResults' THEN
-  IF NEW."Status"='ELIGIBLE' THEN
-   PERFORM "EnrollAssignedOJTStudents"(NEW."StudentID",NULL);
-  END IF;
- ELSIF NEW."Status"='OPEN' THEN
-  PERFORM "EnrollAssignedOJTStudents"(NULL,NEW."OJTSemesterID");
- END IF;
- RETURN NULL;
-END $sync$;
-
 DROP TRIGGER IF EXISTS "TR_OJTEnrollAfterEligibility" ON public."StudentOJTCalculatedResults";
-CREATE TRIGGER "TR_OJTEnrollAfterEligibility" AFTER INSERT OR UPDATE OF "Status"
- ON public."StudentOJTCalculatedResults" FOR EACH ROW EXECUTE FUNCTION public."SyncAssignedOJTEnrollment"();
 DROP TRIGGER IF EXISTS "TR_OJTEnrollAfterRoundOpen" ON public."RecruitmentWindows";
-CREATE TRIGGER "TR_OJTEnrollAfterRoundOpen" AFTER INSERT OR UPDATE OF "Status","EndsAt","ApplicationEndsAt"
- ON public."RecruitmentWindows" FOR EACH ROW EXECUTE FUNCTION public."SyncAssignedOJTEnrollment"();
+DROP FUNCTION IF EXISTS public."SyncAssignedOJTEnrollment"();
+DROP FUNCTION IF EXISTS public."EnrollAssignedOJTStudents"(integer,integer);
 
-SELECT public."EnrollAssignedOJTStudents"(NULL,NULL);
-REVOKE ALL ON FUNCTION public."EnrollAssignedOJTStudents"(integer,integer), public."SyncAssignedOJTEnrollment"() FROM PUBLIC;
-DO $permissions$ BEGIN
- IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
-  GRANT EXECUTE ON FUNCTION public."EnrollAssignedOJTStudents"(integer,integer) TO service_role;
- END IF;
-END $permissions$;
+-- Remove rows that the former triggers created before a student submitted registration.
+DELETE FROM public."StudentCourseResults" enrollment
+USING public."Courses" course,public."AcademicPeriods" period
+WHERE enrollment."CourseID"=course."CourseID" AND enrollment."AcademicPeriodID"=period."AcademicPeriodID"
+  AND enrollment."SourceReference"='AUTO_OJT_ENROLLMENT' AND enrollment."Status"='IN_PROGRESS'
+  AND upper(btrim(course."CourseCode"))='OJT202'
+  AND NOT EXISTS (
+    SELECT 1 FROM public."OJTRegistrations" registration
+    JOIN public."OJTSemesters" term USING ("OJTSemesterID")
+    JOIN public."AcademicPeriods" target ON target."AcademicPeriodID"=term."AcademicPeriodID"
+    WHERE registration."StudentID"=enrollment."StudentID"
+      AND COALESCE(target."ParentPeriodID",target."AcademicPeriodID")=COALESCE(period."ParentPeriodID",period."AcademicPeriodID")
+  );
+
+-- Preserve course enrollment for students who already submitted an OJT registration.
+INSERT INTO public."StudentCourseResults"
+  ("StudentID","CourseID","SemesterTaken","AcademicYearID","Status","AcademicPeriodID","AttemptNumber","SourceReference","RecordedBy")
+SELECT registration."StudentID",pc."CourseID",6,period."AcademicYearID",'IN_PROGRESS',period."AcademicPeriodID",
+  COALESCE((SELECT max(previous."AttemptNumber") FROM public."StudentCourseResults" previous
+    JOIN public."AcademicPeriods" previous_period ON previous_period."AcademicPeriodID"=previous."AcademicPeriodID"
+    JOIN public."Courses" previous_course ON previous_course."CourseID"=previous."CourseID"
+    WHERE previous."StudentID"=registration."StudentID" AND upper(btrim(previous_course."CourseCode"))='OJT202'
+      AND COALESCE(previous_period."ParentPeriodID",previous_period."AcademicPeriodID")=period."AcademicPeriodID"),0)+1,
+  'AUTO_OJT_ENROLLMENT',registration."SubmittedBy"
+FROM public."OJTRegistrations" registration
+JOIN public."Students" student USING ("StudentID")
+JOIN public."OJTSemesters" term USING ("OJTSemesterID")
+JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID"
+JOIN public."ProgramCourses" pc ON pc."ProgramID"=student."ProgramID" AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6
+JOIN public."Courses" course ON course."CourseID"=pc."CourseID" AND upper(btrim(course."CourseCode"))='OJT202'
+WHERE period."Kind"='SEMESTER'
+  AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" passed JOIN public."Courses" passed_course USING ("CourseID")
+    WHERE passed."StudentID"=registration."StudentID" AND upper(btrim(passed_course."CourseCode"))='OJT202' AND passed."Status"='PASSED')
+  AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing
+    JOIN public."AcademicPeriods" existing_period ON existing_period."AcademicPeriodID"=existing."AcademicPeriodID"
+    JOIN public."Courses" existing_course ON existing_course."CourseID"=existing."CourseID"
+    WHERE existing."StudentID"=registration."StudentID" AND upper(btrim(existing_course."CourseCode"))='OJT202'
+      AND COALESCE(existing_period."ParentPeriodID",existing_period."AcademicPeriodID")=period."AcademicPeriodID")
+ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
+  WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING;
 
 COMMIT;
+
+-- BEGIN OJT202 ELIGIBILITY GATE V1 (20261127)
+-- Existing databases can apply this block; the full db/backend script rebuilds the database.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+
+-- Correct persisted eligibility decisions made before OJT202 completion was
+-- included in the recruitment rule.
+UPDATE public."StudentOJTCalculatedResults" saved
+SET "Status"='NOT_ELIGIBLE',
+    "CheckedAt"=clock_timestamp(),
+    "SavedAt"=clock_timestamp(),
+    "Result"=jsonb_set(
+      jsonb_set(
+        jsonb_set(saved."Result",'{status}','"NOT_ELIGIBLE"'::jsonb,true),
+        '{checkedAt}',to_jsonb(clock_timestamp()),true),
+      '{reasons}',
+      CASE WHEN COALESCE(saved."Result"->'reasons','[]'::jsonb)
+        @> '["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."]'::jsonb
+        THEN COALESCE(saved."Result"->'reasons','[]'::jsonb)
+        ELSE COALESCE(saved."Result"->'reasons','[]'::jsonb) ||
+          '["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."]'::jsonb
+      END,
+      true
+    )
+WHERE saved."Status"='ELIGIBLE'
+  AND EXISTS (
+    SELECT 1 FROM public."StudentCourseResults" grade
+    JOIN public."Courses" course USING ("CourseID")
+    WHERE grade."StudentID"=saved."StudentID"
+      AND upper(btrim(course."CourseCode"))='OJT202'
+      AND grade."Status"='PASSED'
+  );
+
+CREATE OR REPLACE VIEW public."OJTRecruitmentRoster" WITH (security_invoker=true) AS
+SELECT s."StudentID", target."OJTSemesterID", round."WindowID" AS "RoundID",
+  round."Name" AS "RoundName", saved."BatchID", saved."CheckedAt"
+FROM public."Students" s
+JOIN public."Users" u ON u."UserID"=s."UserID"
+JOIN public."StudentOJTCalculatedResults" saved USING ("StudentID")
+LEFT JOIN public."OJTSemesters" target
+  ON target."AcademicPeriodID"=public."DefaultOJTAcademicPeriod"(s."StudentID")
+LEFT JOIN LATERAL (
+  SELECT w."WindowID",w."Name"
+  FROM public."RecruitmentWindows" w
+  WHERE w."OJTSemesterID"=target."OJTSemesterID"
+    AND target."Status" NOT IN ('CLOSED','ARCHIVED')
+    AND EXISTS (
+      SELECT 1 FROM public."ProgramCourses" pc
+      JOIN public."Courses" c USING ("CourseID")
+      JOIN public."TrainingPrograms" program USING ("ProgramID")
+      WHERE pc."ProgramID"=s."ProgramID" AND program."Status"='PUBLISHED'
+        AND upper(btrim(c."CourseCode"))='OJT202' AND pc."EntryKind"='COURSE'
+        AND pc."RecommendedSemester"=6
+    )
+    AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
+    AND w."EndsAt">statement_timestamp()
+    AND COALESCE(w."ApplicationEndsAt",w."EndsAt")>statement_timestamp()
+  ORDER BY COALESCE(w."ApplicationStartsAt",w."StartsAt"),w."WindowID"
+  LIMIT 1
+) round ON true
+WHERE saved."Status"='ELIGIBLE'
+  AND s."Status"='ACTIVE' AND u."Status"='ACTIVE' AND s."DeletedAt" IS NULL
+  AND saved."ProgramID" IS NOT DISTINCT FROM s."ProgramID"
+  AND CASE WHEN saved."ConditionID" IS NOT NULL THEN
+    saved."ConditionID" IS NOT DISTINCT FROM (saved."Result"->'rule'->>'conditionId')::int
+    AND saved."ConditionID" IS NOT DISTINCT FROM (
+      SELECT condition."ConditionID" FROM public."OJTConditions" condition
+      WHERE condition."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+      ORDER BY condition."EffectiveFrom" DESC,condition."Version" DESC LIMIT 1
+    )
+    ELSE COALESCE((saved."Result"->>'policyVersion')::int,0)=COALESCE(
+      (SELECT max(policy."Version") FROM public."OJTConditionPolicies" policy),0
+    )
+  END
+  AND NOT EXISTS (
+    SELECT 1 FROM public."StudentAcademicPlacements" placement
+    WHERE placement."StudentID"=s."StudentID" AND placement."UpdatedAt">saved."CheckedAt"
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM public."StudentCourseResults" history
+    WHERE history."StudentID"=s."StudentID"
+      AND COALESCE(history."UpdatedAt",history."CreatedAt")>saved."CheckedAt"
+      AND (history."SourceReference" IS DISTINCT FROM 'AUTO_OJT_ENROLLMENT'
+        OR history."Status" IS DISTINCT FROM 'IN_PROGRESS')
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM public."StudentCourseResults" grade
+    JOIN public."Courses" course USING ("CourseID")
+    WHERE grade."StudentID"=s."StudentID"
+      AND upper(btrim(course."CourseCode"))='OJT202'
+      AND grade."Status"='PASSED'
+  );
+
+COMMIT;
+-- END OJT202 ELIGIBILITY GATE V1

@@ -1,5 +1,4 @@
-import { studentProgressService, educationOjtWorkflowService } from '@/services/educationService';
-import { progressHandoffStatus } from '@/utils/education/educationOjtCheckQueue';
+import { studentProgressService } from '@/services/educationService';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import React from 'react';
@@ -25,21 +24,14 @@ export function useEducationStudentProgress() {
       setLoadWarning(null);
 
       try {
-        const [result, handoffs] = await Promise.all([
-          studentProgressService.loadAll(controller.signal),
-          educationOjtWorkflowService.getHandoffs(undefined, controller.signal).then(
-            rows => ({ rows, error: false }),
-            () => ({ rows: [], error: true }),
-          ),
-        ]);
+        const result = await studentProgressService.loadAll(controller.signal);
         if (active) {
-          setStudents(result.map(student => ({ ...student, handoffStatus: progressHandoffStatus(Number(student.id), handoffs.error ? null : handoffs.rows) })));
+          setStudents(result);
           const partialCount = result.filter(
             (student) => student.dataWarning,
           ).length;
           setLoadWarning([
             partialCount > 0 ? `${partialCount} hồ sơ chưa tải đủ thông tin chi tiết. Các trường chưa có dữ liệu sẽ hiển thị “—”.` : '',
-            handoffs.error ? 'Không tải được lịch sử bàn giao; trạng thái bàn giao đang hiển thị “Chưa xác định”.' : '',
           ].filter(Boolean).join(' ') || null);
         }
       } catch (error) {

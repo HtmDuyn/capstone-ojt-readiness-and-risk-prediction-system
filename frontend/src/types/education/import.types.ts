@@ -26,7 +26,6 @@ export type StudentAcademicStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADU
 export interface StudentAcademicData {
   programId: number;
   phone?: string;
-  className?: string;
   status?: StudentAcademicStatus;
   placement: StudentPlacement;
   courseResults: StudentCourseResult[];
@@ -98,7 +97,6 @@ export interface ImportedStudent {
   fullName: string;
   email: string;
   phone: string | null;
-  className: string | null;
   status: string;
   accountStatus: string;
   programId: number | null;

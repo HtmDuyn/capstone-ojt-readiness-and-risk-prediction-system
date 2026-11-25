@@ -16,7 +16,7 @@ const blockers: Record<string, string> = {
   ELIGIBLE_HANDOFF_REQUIRED: 'Chưa có kết quả đủ điều kiện OJT.',
   CONFIRMED_ELIGIBILITY_REQUIRED: 'Chưa có kết quả đủ điều kiện OJT hiện hành. Liên hệ Phòng Đào tạo để kiểm tra.',
   ELIGIBILITY_CHECK_STALE: 'Kết quả xét điều kiện cần được cập nhật.',
-  ELIGIBILITY_HANDOFF_STALE: 'Dữ liệu học tập đã thay đổi sau bàn giao; liên hệ Phòng Đào tạo để rà soát.',
+  ELIGIBILITY_HANDOFF_STALE: 'Kết quả xét OJT đã cũ do dữ liệu học tập thay đổi; liên hệ Phòng Đào tạo để rà soát.',
   APPLICATION_ALREADY_IN_PROCESS: 'Bạn đã có đơn đang chờ xử lý hoặc đã được tiếp nhận trong đợt này.',
   STUDENT_ALREADY_CONFIRMED: 'Bạn đã được xác nhận nơi thực tập trong kỳ nên không thể ứng tuyển mới, kể cả ở đợt bổ sung.',
   APPLICATION_ROUND_ALREADY_SUBMITTED: 'Hồ sơ đợt này được giữ nguyên. Bạn có thể nộp hồ sơ mới khi đợt bổ sung mở ứng tuyển.',

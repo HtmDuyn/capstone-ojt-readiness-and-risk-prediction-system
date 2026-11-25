@@ -10,7 +10,7 @@ export async function recruitmentSchemaReady(c: PoolClient): Promise<boolean> {
   return result.rows[0].ready===true;
 }
 export async function requireRecruitmentSchema(c: PoolClient) {
-  if(!await recruitmentSchemaReady(c))throw invalid('Database chưa cập nhật luồng tuyển dụng. Chạy riêng khối từ -- BEGIN OJT RECRUITMENT CAMPAIGN V2 đến -- END OJT RECRUITMENT CAMPAIGN V2 trong backend/DB trên Supabase SQL Editor, sau đó tải lại trang. Không chạy toàn bộ file DB vì sẽ reset dữ liệu.',503,'RECRUITMENT_MIGRATION_REQUIRED');
+  if(!await recruitmentSchemaReady(c))throw invalid('Database chưa đồng bộ schema đợt tuyển dụng. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
 }
 
 export function hasPhaseSchedule(w: Row): boolean {
@@ -26,7 +26,7 @@ export function phaseIsOpen(w: Row, action:'POSTING'|'APPLICATION'|'RESULTS'): b
 }
 export async function requireThreePhaseSchema(c: PoolClient) {
  if(!(await c.query(`SELECT to_regprocedure('public."ExpireRecruitmentResponses"()') IS NOT NULL AS ready`)).rows[0].ready)
-  throw invalid('Cần chạy riêng khối OJT RECRUITMENT THREE PHASES V3 trong backend/DB trước khi tạo đợt ba hạn. Không chạy toàn bộ DB vì sẽ reset dữ liệu.',503,'RECRUITMENT_MIGRATION_REQUIRED');
+  throw invalid('Database chưa đồng bộ schema đợt tuyển dụng ba giai đoạn. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
 }
 export async function expireRecruitmentResponses(c: PoolClient) {
  const ready=(await c.query(`SELECT to_regprocedure('public."ExpireRecruitmentResponses"()') IS NOT NULL AS ready`)).rows[0].ready;

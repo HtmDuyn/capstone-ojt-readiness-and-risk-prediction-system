@@ -33,6 +33,7 @@ export const StudentAcademicProfile = () => {
     (item.courseCode + ' ' + item.courseName).toLocaleLowerCase().includes(query)
   ), [results.data, query]);
   const requirementsById = useMemo(() => new Map(progress?.requirements.map(item => [item.id, item])), [progress?.requirements]);
+  const ojtEligibleCredits = progress?.credits.historyOjtEarned ?? progress?.credits.ojtEarned;
   const courses = curriculum.data?.courses ?? [];
   return (
     <StudentPage
@@ -55,7 +56,6 @@ export const StudentAcademicProfile = () => {
                 <div><dt className="text-slate-500">Chuyên ngành</dt><dd className="break-words text-slate-800">{profile.program?.majorName || 'Chưa cập nhật'}</dd></div>
               </div>
               <div className="min-w-0 space-y-3">
-                <div><dt className="text-slate-500">Lớp</dt><dd className="break-words text-slate-800">{profile.className || 'Chưa cập nhật'}</dd></div>
                 <div><dt className="text-slate-500">Chương trình</dt><dd className="break-words text-slate-800">{profile.program?.name || 'Chưa cập nhật'}</dd></div>
               </div>
               <div className="min-w-0 space-y-3">
@@ -66,14 +66,24 @@ export const StudentAcademicProfile = () => {
             <p className="mt-4 text-xs leading-6 text-slate-500">Chỉ số tích lũy tính đến học kỳ được chọn. Bảng điểm bên dưới hiển thị các môn thuộc học kỳ đó; chương trình đào tạo là phiên bản hiện hành.</p>
             {study.data?.historical && <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-6 text-blue-900">{study.data.note}</p>}
             <ResourceState loading={academic.loading} refreshing={academic.refreshing} error={academic.error} retry={academic.reload} />
-            {progress && <dl className="mt-5 grid grid-cols-2 gap-y-4 border-t border-slate-200 pt-5 lg:grid-cols-4">
-              {[
-                { label: 'GPA', value: progress.gpa == null ? 'Chưa có dữ liệu' : progress.gpa + ' / ' + (progress.gpaScale ?? '—') },
-                { label: 'Tín chỉ đã đạt', value: progress.credits.earned },
-                { label: 'Tổng tín chỉ chương trình', value: valueText(progress.credits.total) },
-                { label: 'Tín chỉ còn lại', value: valueText(progress.credits.remaining) },
-              ].map((metric, index) => <div key={metric.label} className={`min-w-0 ${index % 2 ? 'border-l border-slate-200 pl-4' : ''} ${index > 1 ? 'lg:border-l lg:pl-5' : ''} ${index === 1 ? 'lg:border-l lg:pl-5' : ''}`}><dt className="text-xs text-slate-500">{metric.label}</dt><dd className="mt-1 text-xl font-bold text-slate-900">{metric.value}</dd></div>)}
-            </dl>}
+            {progress && <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2">
+              <article className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <h3 className="text-sm font-semibold text-slate-600">Tín chỉ tích lũy</h3>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+                  {progress.credits.earned}<span className="ml-1 text-base font-medium text-slate-500">/ {valueText(progress.credits.total)}</span>
+                </p>
+                <p className="mt-1 text-xs text-slate-500">Tín chỉ đã đạt hoặc được công nhận trong chương trình.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {progress.credits.remaining == null ? 'Chưa xác định số tín chỉ còn lại' : `Còn ${progress.credits.remaining} tín chỉ`}
+                  {' · GPA '}{progress.gpa == null ? 'chưa có dữ liệu' : `${progress.gpa} / ${progress.gpaScale ?? '—'}`}
+                </p>
+              </article>
+              <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <h3 className="text-sm font-semibold text-amber-900">Tín chỉ xét OJT</h3>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-amber-950">{valueText(ojtEligibleCredits)}</p>
+                <p className="mt-1 text-xs text-amber-800">Chỉ tính các môn đủ điều kiện theo quy định xét OJT.</p>
+              </article>
+            </div>}
             {!!progress?.issues.length && <div className="mt-5 border-t border-slate-200 pt-4"><h3 className="text-sm font-semibold text-slate-800">Dữ liệu cần đối soát</h3><p className="mt-1 text-sm text-amber-700">{progress.issues.join(' · ')}</p></div>}
           </section>
           <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -119,19 +129,26 @@ export const StudentAcademicProfile = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((item) => (
-                        <tr key={item.id} className="border-b border-slate-200 bg-white transition-colors duration-150 hover:bg-slate-50">
-                          <td className="p-3 whitespace-nowrap">
-                            <strong className="text-slate-800">{item.courseCode}</strong>
-                          </td>
-                          <td className="p-3 text-slate-800">{item.courseName}</td>
-                          <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
-                          <td className="px-3 whitespace-nowrap">{(item.courseCode === 'OJT202' && (item.periodName || study.data?.period.name)) || item.periodCode || 'Chưa cập nhật'}</td>
-                          <td>{item.attemptNumber}</td>
-                          <td className={item.score == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.score ?? '—'}</td>
-                          <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.status === 'IN_PROGRESS' ? 'Đang học' : statusText(item.status)}</td>
-                        </tr>
-                      ))}
+                      {filtered.map((item) => {
+                        const excludedFromOjt = item.excludedFromOjtCredits === true;
+                        const markedCell = excludedFromOjt ? 'border-y border-amber-400 bg-amber-50' : '';
+                        return (
+                          <tr key={item.id} className={`border-b border-slate-200 transition-colors duration-150 hover:bg-slate-50 ${excludedFromOjt ? 'bg-amber-50/60' : 'bg-white'}`}>
+                            <td className={`p-3 whitespace-nowrap ${markedCell} ${excludedFromOjt ? 'border-l-2' : ''}`}>
+                              <strong className="text-slate-800">{item.courseCode}</strong>
+                            </td>
+                            <td className={`p-3 text-slate-800 ${markedCell} ${excludedFromOjt ? 'border-r-2' : ''}`}>
+                              {item.courseName}
+                              {excludedFromOjt && <span className="mt-1 block text-xs font-semibold text-amber-800">Không tính vào tín chỉ xét OJT</span>}
+                            </td>
+                            <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
+                            <td className="px-3 whitespace-nowrap">{(item.courseCode === 'OJT202' && (item.periodName || study.data?.period.name)) || item.periodCode || 'Chưa cập nhật'}</td>
+                            <td>{item.attemptNumber}</td>
+                            <td className={item.score == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.score ?? '—'}</td>
+                            <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.status === 'IN_PROGRESS' ? 'Đang học' : statusText(item.status)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -153,6 +170,7 @@ export const StudentAcademicProfile = () => {
                   {curriculum.data.name} · {curriculum.data.code} · Phiên bản{' '}
                   {curriculum.data.version}
                 </p>
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">Môn được viền vàng không được tính vào tín chỉ xét OJT.</p>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px] text-left text-sm">
                     <thead>
@@ -167,11 +185,15 @@ export const StudentAcademicProfile = () => {
                     <tbody>
                       {courses.map((course) => {
                         const requirement = requirementsById.get(course.id);
+                        const excludedFromOjt = requirement?.excludedFromOjtCredits === true;
                         return (
-                          <tr key={course.id} className="border-b border-slate-200 bg-white transition-colors duration-150 hover:bg-slate-50">
+                          <tr key={course.id} className={`border-b border-slate-200 transition-colors duration-150 hover:bg-slate-50 ${excludedFromOjt ? 'bg-amber-50/60' : 'bg-white'}`}>
                             <td className="p-3">
-                              <strong className="text-slate-800">{course.courseCode}</strong>
-                              <p className="mt-0.5 text-xs text-slate-500">{course.name}</p>
+                              <div className={excludedFromOjt ? 'rounded-lg border border-amber-400 bg-amber-50 p-2' : ''}>
+                                <strong className="text-slate-800">{course.courseCode}</strong>
+                                <p className="mt-0.5 text-xs text-slate-500">{course.name}</p>
+                                {excludedFromOjt && <p className="mt-1 text-xs font-semibold text-amber-800">Không tính vào tín chỉ xét OJT</p>}
+                              </div>
                             </td>
                             <td>{course.semester ?? '—'}</td>
                             <td>{course.credits ?? '—'}</td>

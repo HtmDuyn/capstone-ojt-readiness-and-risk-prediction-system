@@ -1,13 +1,28 @@
+import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { query } from '../../config/database';
 import { academicTransaction } from '../academic/academic.repository';
 import { loadAcademicProgress, progressFromData } from '../students/academic-progress';
+import { invalid } from '../students/student.validation';
 import { evaluateEligibility } from './eligibility.service';
-import { saveFrontendResults } from './frontend-results.service';
+import { saveOjtEligibilityResults } from './frontend-results.service';
 import { latestEffectiveOjtCondition } from './ojt-policy.service';
 
 type Milestone = 'BLOCK10' | 'BLOCK3' | 'SEMESTER';
 type Period = { id: number; end: string; block10End: string | null; block3End: string | null; completed: Milestone[] };
+type Condition = { ConditionID: number; Version: number; MinCredits: string | number; IssuingDocument: string; MaxUnpassedCourses?: number | null };
+type AssessmentSource = 'AUTOMATIC' | 'IMPORT' | 'MANUAL';
+export type OjtAssessmentSummary = {
+  checkedCount: number;
+  savedCount: number;
+  eligibleCount: number;
+  notEligibleCount: number;
+  reviewRequiredCount: number;
+  assignedCount: number;
+  waitingCount: number;
+  excludedPassedOjt202Count: number;
+};
+
 const endOfDay = (date: string) => Date.parse(date + 'T00:00:00+07:00') + 86_400_000;
 
 export async function nextOjtAssessment(client?: PoolClient) {
@@ -35,8 +50,7 @@ export async function nextOjtAssessment(client?: PoolClient) {
     ];
     return milestones.flatMap(({ milestone, date }) => date && date <= period.end && !period.completed.includes(milestone)
       ? [{ periodId: period.id, milestone, dueAt: endOfDay(date) }] : []);
-  })
-    .sort((a, b) => a.dueAt - b.dueAt || a.periodId - b.periodId);
+  }).sort((a, b) => a.dueAt - b.dueAt || a.periodId - b.periodId);
   return milestones[0] ?? null;
 }
 
@@ -56,56 +70,116 @@ export async function processDueOjtAssessment(calendarLock: 'try' | 'wait' = 'tr
     if (!actor) return false;
 
     const { periodId, milestone, dueAt } = next;
-    await assessOjtStudents(client, { periodId }, condition, actor.UserID, `auto-ojt:${periodId}:${milestone}`);
+    await assessOjtStudents(client, condition, actor.UserID,
+      `auto-ojt:${periodId}:${milestone}:${condition.Version}`, 'AUTOMATIC');
     await client.query(`INSERT INTO "OJTAutomaticAssessments" ("AcademicPeriodID","Milestone","DueAt","ConditionID")
       VALUES ($1,$2,$3,$4)`, [periodId, milestone, new Date(dueAt), condition.ConditionID]);
     return true;
   }, undefined, calendarLock);
 }
 
+export async function runManualOjtAssessment(actorId: number): Promise<OjtAssessmentSummary> {
+  return academicTransaction(async client => {
+    const condition = await latestEffectiveOjtCondition(client);
+    if (!condition) throw invalid('Chưa có điều kiện OJT đang có hiệu lực.', 409, 'OJT_CONDITION_NOT_EFFECTIVE');
+    return assessOjtStudents(client, condition, actorId, `manual-ojt:${randomUUID()}`, 'MANUAL');
+  });
+}
+
 export async function assessOjtStudents(
   client: PoolClient,
-  scope: { studentIds: number[] } | { periodId: number },
-  condition: { ConditionID: number; Version: number; MinCredits: string | number; IssuingDocument: string },
+  condition: Condition,
   actorId: number,
   batchKey: string,
-) {
+  source: AssessmentSource,
+): Promise<OjtAssessmentSummary> {
+  // Serialize every entry point so import, cron, and manual runs cannot overwrite
+  // each other's result snapshots while reading the same academic history.
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('ojt-eligibility-assessment'))");
+
+  const excludedPassedOjt202Count = Number((await client.query(`SELECT count(*)::int AS count
+    FROM "Students" s JOIN "Users" u USING ("UserID")
+    WHERE s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
+      AND EXISTS (SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
+        WHERE grade."StudentID"=s."StudentID" AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED')`)).rows[0].count);
+  const passedReason = 'Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT.';
+  await client.query(`UPDATE "StudentOJTCalculatedResults" saved
+    SET "Status"='NOT_ELIGIBLE',"ProgramID"=s."ProgramID","ConditionID"=$2,
+      "CheckedAt"=clock_timestamp(),"SavedAt"=clock_timestamp(),"SavedBy"=$6,
+      "Result"=jsonb_set(
+        jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              jsonb_set(COALESCE(saved."Result",'{}'::jsonb),'{status}','"NOT_ELIGIBLE"'::jsonb,true),
+              '{checkedAt}',to_jsonb(clock_timestamp()),true),
+            '{rule}',jsonb_build_object('id',$2,'conditionId',$2,'version',$3,'minCredits',$4,'issuingDocument',$5),true),
+          '{source}','"BACKEND"'::jsonb,true),
+        '{reasons}',
+        CASE WHEN COALESCE(saved."Result"->'reasons','[]'::jsonb) @> jsonb_build_array($1::text)
+          THEN COALESCE(saved."Result"->'reasons','[]'::jsonb)
+          ELSE COALESCE(saved."Result"->'reasons','[]'::jsonb) || jsonb_build_array($1::text) END,
+        true
+      )
+    FROM "Students" s WHERE s."StudentID"=saved."StudentID" AND EXISTS (
+      SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
+      WHERE grade."StudentID"=saved."StudentID"
+        AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
+    )`, [passedReason, condition.ConditionID, condition.Version, Number(condition.MinCredits), condition.IssuingDocument, actorId]);
+
   const { rows: students } = await client.query(`
     SELECT s."StudentID",s."Status",u."Status" AS "AccountStatus"
-    FROM "Students" s
-    JOIN "Users" u USING ("UserID")
-    WHERE (${'studentIds' in scope
-      ? 's."StudentID"=ANY($1::int[])'
-      : `EXISTS (SELECT 1 FROM "StudentAcademicPlacements" placement
-        JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
-        WHERE placement."StudentID"=s."StudentID" AND COALESCE(p."ParentPeriodID",p."AcademicPeriodID")=$1)`})
-      AND s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
-      AND NOT EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=s."StudentID")
-      AND NOT EXISTS (SELECT 1 FROM "StudentOJTCalculatedResults" saved
-        WHERE saved."StudentID"=s."StudentID" AND saved."Status"='ELIGIBLE')
-    ORDER BY s."StudentID" FOR UPDATE OF s FOR SHARE OF u`, ['studentIds' in scope ? scope.studentIds : scope.periodId]);
+    FROM "Students" s JOIN "Users" u USING ("UserID")
+    WHERE s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
+        WHERE grade."StudentID"=s."StudentID"
+          AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
+      )
+    ORDER BY s."StudentID" FOR UPDATE OF s`);
+
+  const summary: OjtAssessmentSummary = {
+    checkedCount: students.length, savedCount: 0, eligibleCount: 0, notEligibleCount: 0,
+    reviewRequiredCount: 0, assignedCount: 0, waitingCount: 0, excludedPassedOjt202Count,
+  };
   const rule = {
     conditionId: condition.ConditionID, version: condition.Version,
     minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument,
   };
+
   for (let offset = 0; offset < students.length; offset += 10000) {
     const results = [];
     for (const student of students.slice(offset, offset + 10000)) {
-      const source = await loadAcademicProgress(client, student.StudentID);
+      const progress = await loadAcademicProgress(client, student.StudentID);
       const decision = evaluateEligibility({
         student, semester: { OJTSemesterID: null }, rule: condition,
-        progress: progressFromData(source), attempts: source.attempts, aliases: source.aliases,
+        progress: progressFromData(progress), attempts: progress.attempts, aliases: progress.aliases,
       });
       results.push({
-        studentId: student.StudentID, status: decision.status, earnedCredits: decision.earnedCredits,
-        unpassedCourseCount: decision.unpassedCourseCount, reasons: decision.missingCredits && decision.missingCredits > 0
-          ? [`Còn thiếu ${decision.missingCredits} tín chỉ so với mức ${rule.minCredits}.`] : [],
-        academicIssues: [], checkedAt: new Date().toISOString(),
+        studentId: student.StudentID,
+        status: decision.status,
+        earnedCredits: decision.earnedCredits,
+        unpassedCourseCount: decision.unpassedCourseCount,
+        reasons: decision.reasons.map((reason: string) => reason === 'MIN_CREDITS_NOT_MET'
+          ? `Còn thiếu ${decision.missingCredits} tín chỉ so với mức ${rule.minCredits}.`
+          : reason === 'MAX_UNPASSED_COURSES_EXCEEDED'
+            ? `Số môn chưa đạt (${decision.unpassedCourseCount}) vượt quá giới hạn ${condition.MaxUnpassedCourses}.`
+            : reason === 'STUDENT_NOT_ACTIVE' ? 'Sinh viên hoặc tài khoản không hoạt động.' : reason),
+        academicIssues: decision.academicIssues,
+        checkedAt: new Date().toISOString(),
       });
     }
-    await saveFrontendResults({
-      source: 'FRONTEND', idempotencyKey: `${batchKey}:${offset}`, rule, results,
-    }, actorId, client);
+
+    if (!results.length) continue;
+    const saved = await saveOjtEligibilityResults({
+      source: 'BACKEND', idempotencyKey: `${batchKey}:${offset}`, rule, results,
+    }, actorId, client, source);
+    summary.savedCount += saved.savedCount;
+    summary.eligibleCount += saved.eligibleCount;
+    summary.assignedCount += saved.assignedCount;
+    summary.waitingCount += saved.waitingCount;
+    summary.notEligibleCount += results.filter(result => result.status === 'NOT_ELIGIBLE').length;
+    summary.reviewRequiredCount += results.filter(result => result.status === 'REVIEW_REQUIRED').length;
   }
-  return students.length;
+
+  return summary;
 }

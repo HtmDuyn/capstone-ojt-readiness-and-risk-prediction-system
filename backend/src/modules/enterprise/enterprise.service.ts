@@ -28,7 +28,6 @@ const student = `jsonb_build_object(
     'programName',(SELECT tp."ProgramName" FROM "TrainingPrograms" tp WHERE tp."ProgramID"=s."ProgramID"),
     'enrollmentYear',s."EnrollmentYear",
     'currentSemester',s."CurrentSemester",
-    'className',s."ClassName",
     'cohortId',(SELECT sap."CohortID" FROM "StudentAcademicPlacements" sap WHERE sap."StudentID"=s."StudentID"),
     'groupCode',(SELECT sap."GroupCode" FROM "StudentAcademicPlacements" sap WHERE sap."StudentID"=s."StudentID")
   )`;

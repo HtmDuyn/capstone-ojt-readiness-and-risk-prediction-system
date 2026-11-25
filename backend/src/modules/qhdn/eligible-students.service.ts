@@ -55,6 +55,17 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       roster."OJTSemesterID" AS "ojtSemesterId",term."Name" AS "semesterName",
       roster."RoundID" AS "roundId",roster."RoundName" AS "roundName",roster."CheckedAt" AS "checkedAt",
       CASE WHEN roster."RoundID" IS NULL THEN 'WAITING' ELSE 'ASSIGNED' END AS "rosterStatus",
+      COALESCE((SELECT jsonb_agg(jsonb_build_object(
+        'resultId',history."ResultID",'courseCode',course."CourseCode",'courseName',course."CourseName",
+        'semesterTaken',history."SemesterTaken",'periodName',period."Name",'score',history."Score",
+        'grade',history."Grade",'status',history."Status")
+        ORDER BY history."SemesterTaken",course."CourseCode",history."AttemptNumber")
+        FROM "StudentCourseResults" history
+        JOIN "Courses" course USING ("CourseID")
+        LEFT JOIN "AcademicPeriods" period USING ("AcademicPeriodID")
+        WHERE history."StudentID"=s."StudentID"
+          AND NOT (upper(btrim(course."CourseCode"))='OJT202' AND history."Status"='PASSED')
+      ),'[]'::jsonb) AS "academicHistory",
       r."RegistrationID" AS "registrationId",${registrationStatus} AS "registrationStatus"
       ${from} ORDER BY roster."RoundID" NULLS LAST, s."StudentCode",s."StudentID"
       LIMIT $${args.length + 1} OFFSET $${args.length + 2}`, [...args,page.limit,page.offset])).rows;

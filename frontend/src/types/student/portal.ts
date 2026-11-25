@@ -33,11 +33,13 @@ export interface CV {
 export interface Requirement {
   id: number;
   courseId: number | null;
+  matchedCourseId?: number | null;
   courseCode: string;
   name: string;
   credits: number | null;
   completed: boolean;
   choices: number[];
+  excludedFromOjtCredits?: boolean;
   learningStatus?: string;
 }
 export interface AcademicProgress {
@@ -77,6 +79,7 @@ export interface AdmissionEligibility extends Eligibility {
 export interface CourseResult {
   academicPeriodId?: number;
   periodStartDate?: string;
+  excludedFromOjtCredits?: boolean;
   id: number;
   courseId: number;
   courseCode: string;
@@ -113,7 +116,6 @@ export interface Profile {
   email: string;
   phone: string | null;
   currentSemester: number | null;
-  className: string | null;
   programId: number | null;
   program:
     (Named & { majorName?: string; totalCredits?: number | null }) | null;

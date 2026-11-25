@@ -8,7 +8,7 @@ import type { PoolClient } from 'pg';
 
 export async function requireLifecycleSchema(c:PoolClient){
  if(!(await c.query(`SELECT to_regprocedure('public."CarryForwardRecruitmentPosts"(integer)') IS NOT NULL AS ready`)).rows[0].ready)
-  throw invalid('Chạy riêng khối OJT RECRUITMENT LIFECYCLE V4 trong backend/DB để dùng gia hạn và đợt bổ sung; không chạy toàn bộ file vì sẽ reset dữ liệu.',503,'RECRUITMENT_MIGRATION_REQUIRED');
+  throw invalid('Database chưa đồng bộ schema gia hạn đợt OJT. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
 }
 export async function extendWindow(id:number,body:unknown,actor:number){
  const b=inputObject(body,['postingEndsAt','applicationEndsAt','resultsEndsAt']);

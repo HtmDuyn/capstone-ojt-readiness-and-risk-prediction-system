@@ -22,6 +22,11 @@ export async function studentAdmission(client: PoolClient, studentId: number, se
       appliedCondition: result.rule?.conditionId ? { id: result.rule.conditionId, version: result.rule.version, minCredits: result.rule.minCredits, issuingDocument: result.rule.issuingDocument ?? '' } : null,
     };
   }
+  const passedOjt202 = (await client.query(`SELECT EXISTS (
+    SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
+    WHERE grade."StudentID"=$1 AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
+  ) AS passed`, [studentId])).rows[0]?.passed;
+  if (passedOjt202) return null;
   const handoff = (await client.query(`SELECT i."HandoffID",i."CheckID",i."CalculatedBatchID",i."Snapshot",h."CreatedAt"
     FROM ojt_history."StudentEligibilityItems" i JOIN ojt_history."EligibilityBatches" h ON h."HandoffID"=i."HandoffID"
     WHERE i."StudentID"=$1 AND i."OJTSemesterID"=$2 ORDER BY i."HandoffID" DESC LIMIT 1`, [studentId, semesterId])).rows[0];

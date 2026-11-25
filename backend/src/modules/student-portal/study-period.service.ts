@@ -111,7 +111,24 @@ export async function studyOverview(params: Row, actor: Actor) {
       assessment = buildRiskAndRoadmap({ id: student.StudentID, fullName: identity.FullName, studentCode: student.StudentCode,
         currentSemester, ojtSemesterId: target, academic, academicProgress: progress }, plan);
     }
-    const courseResults = source.attempts.map(item => ({ ...item, periodStartDate: item.periodStartDate instanceof Date
+    const aliasMap = new Map<number, number>(source.aliases.map(alias => [alias.SourceCourseID, alias.TargetCourseID]));
+    const canonicalCourseId = (courseId: number) => {
+      const seen = new Set<number>();
+      while (aliasMap.has(courseId)) {
+        if (seen.has(courseId)) return -1;
+        seen.add(courseId);
+        courseId = aliasMap.get(courseId)!;
+      }
+      return courseId;
+    };
+    const excludedOjtCourseIds = new Set(progress.requirements
+      .filter((requirement: Row) => requirement.excludedFromOjtCredits)
+      .flatMap((requirement: Row) => [requirement.courseId, requirement.matchedCourseId, ...requirement.choices])
+      .filter((courseId: unknown): courseId is number => typeof courseId === 'number')
+      .map(canonicalCourseId));
+    const courseResults = source.attempts.map(item => ({ ...item,
+      excludedFromOjtCredits: excludedOjtCourseIds.has(canonicalCourseId(item.courseId)),
+      periodStartDate: item.periodStartDate instanceof Date
       ? `${item.periodStartDate.getFullYear()}-${String(item.periodStartDate.getMonth()+1).padStart(2,'0')}-${String(item.periodStartDate.getDate()).padStart(2,'0')}`
       : item.periodStartDate }));
     // The student transcript displays a weighted average of stored ten-point scores.

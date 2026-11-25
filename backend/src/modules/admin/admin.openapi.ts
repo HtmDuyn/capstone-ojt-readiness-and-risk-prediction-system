@@ -14,7 +14,7 @@ export function addAdminOperations(spec:Schema):Schema {
  };
  add('post','/api/auth/users/password-reset','Queue temporary password email and revoke previous JWTs',{userId:id},['userId'],undefined,202);
  add('post','/api/admin/dashboard','System overview',{section:{...status('all','summary'),default:'summary'}});
- add('post','/api/students','Create profile for an existing active STUDENT account',{userId:id,studentCode:text(20),programId:id,enrollmentYear:{type:'integer',minimum:1900,maximum:2200},currentSemester:{type:'integer',minimum:1,maximum:100},className:text(20)},['userId','studentCode'],undefined,201);
+ add('post','/api/students','Create profile for an existing active STUDENT account',{userId:id,studentCode:text(20),programId:id,enrollmentYear:{type:'integer',minimum:1900,maximum:2200},currentSemester:{type:'integer',minimum:1,maximum:100}},['userId','studentCode'],undefined,201);
  add('patch','/api/companies/{id}','Update company',company);
  add('post','/api/admin/audit-logs/list','Danh sách nhật ký hoạt động chi tiết',{...paged,logId:id,userId:id,entityType:text(100),entityId:id,action:text(100)});
  const logList=spec.paths['/api/admin/audit-logs/list'].post;

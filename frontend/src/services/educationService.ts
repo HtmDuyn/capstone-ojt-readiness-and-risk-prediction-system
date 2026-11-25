@@ -10,13 +10,10 @@ import { dashboardSummary } from '@/utils/education/educationDashboardSummary';
 import type { QueryParams } from '@/types/education/dashboard.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
 import { clearSharedReads, sharedRead } from '../utils/shared/sharedRead';
-import type { Handoff, OjtFinalResult } from '@/types/education/ojtWorkflow.types';
+import type { OjtFinalResult } from '@/types/education/ojtWorkflow.types';
 import type { ImportCommitResponse, ImportPreviewResponse, StudentImportPayload } from '@/types/education/import.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult, StudentImportBatch } from '@/types/education/import.types';
-import type { Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
-import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/education/localOjtEligibility';
-import { localOjtSavePayload } from '@/utils/education/localOjtSavePayload';
-import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityBatch, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
+import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { savedOjtProgressLabel } from '@/utils/education/savedOjtEligibility';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
@@ -762,8 +759,6 @@ export const educationOverviewService = {
 };
 
 export const educationOjtWorkflowService = {
-  getHandoffs: (ojtSemesterId?: number, signal?: AbortSignal) =>
-    getAllItems<Handoff>('/eligible-student-handoffs', ojtSemesterId ? { ojtSemesterId } : {}, signal),
   getFinalResults: (query: Query, signal?: AbortSignal) =>
     getPage<OjtFinalResult>('/ojt-results', query, signal),
 };
@@ -890,83 +885,45 @@ export const importService = {
   },
 };
 
-// Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
-export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
-export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
+// The backend reads academic history, evaluates the active condition, saves the result,
+// and refreshes the QHDN roster in the same transaction.
+export const OJT_ELIGIBILITY_RESULTS_ENDPOINT = '/ojt-eligibility-results';
+export const loadSavedOjtEligibilityResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(OJT_ELIGIBILITY_RESULTS_ENDPOINT, {}, signal);
+export type OjtAssessmentSummary = {
+  checkedCount: number;
+  savedCount: number;
+  eligibleCount: number;
+  notEligibleCount: number;
+  reviewRequiredCount: number;
+  assignedCount: number;
+  waitingCount: number;
+  excludedPassedOjt202Count: number;
+};
+export async function runOjtEligibilityAssessment(): Promise<OjtAssessmentSummary> {
+  const response = await API.post<{ success: boolean; message?: string; data?: OjtAssessmentSummary }>(OJT_ELIGIBILITY_RESULTS_ENDPOINT, {});
+  if (response.data.success !== true || !response.data.data)
+    throw new Error(friendlyErrorMessage(response.data.message, 'Chưa nhận được kết quả xét OJT từ máy chủ.'));
+  clearSharedReads();
+  return response.data.data;
+}
 export const loadStudentAcademicCredits = async (studentId: number, signal?: AbortSignal): Promise<number | null> => {
   const profile = apiData<ImportedStudentProfile>(await getJson(`/students/${studentId}`, { section: 'academicProgress' }, signal));
   const earned = profile.academicProgress?.credits?.earned;
   return typeof earned === 'number' && Number.isFinite(earned) ? earned : null;
 };
-export type CurrentOjtRule = LocalOjtRule & { effectiveFrom: string; isEffective: boolean; createdAt?: string | null; createdByName?: string | null };
+export type CurrentOjtRule = { id: number; version: number; minCredits: number; issuingDocument: string; effectiveFrom: string; isEffective: boolean; createdAt?: string | null; createdByName?: string | null };
 export const loadOjtConditions = async (signal?: AbortSignal): Promise<CurrentOjtRule[]> =>
   apiData<CurrentOjtRule[]>(await getJson('/ojt-conditions', {}, signal));
 export const createOjtCondition = async (minCredits: number, issuingDocument: string, effectiveFrom: string): Promise<CurrentOjtRule> =>
   apiData<CurrentOjtRule>((await API.post('/ojt-conditions', { minCredits, issuingDocument, effectiveFrom })).data);
-export type OjtCreditThreshold = { id: number; minCredits: number };
-export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
-  apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
-export const createOjtCreditThreshold = async (minCredits: number) =>
-  apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
 export const latestEffectiveOjtRule = (conditions: CurrentOjtRule[]) => conditions
   .filter(condition => condition.isEffective)
   .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom) || b.version - a.version)[0] ?? null;
-export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
-  const conditions = await loadOjtConditions(signal);
-  const active = latestEffectiveOjtRule(conditions);
-  if (!active) throw new Error('Chưa có điều kiện xét OJT đến ngày áp dụng.');
-  return active;
-};
 export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; code: string; name: string; status: string; reasons: string[] }[] };
 export const previewOjtPolicy = async (minCredits: number, maxUnpassedCourses: number) =>
   apiData<OjtPolicyPreview>((await API.post('/ojt-condition-policy/preview', { minCredits, maxUnpassedCourses })).data);
 export const publishOjtPolicy = async (minCredits: number, maxUnpassedCourses: number, token: string) =>
   apiData<CurrentOjtRule>((await API.post('/ojt-condition-policy', { minCredits, maxUnpassedCourses, token })).data);
-export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<{ savedCount: number; handedOffCount: number }> {
-  if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
-  try {
-    const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number; handedOffCount?: number } }>(
-      LOCAL_OJT_SAVE_ENDPOINT, localOjtSavePayload(results, idempotencyKey, rule),
-    );
-    const body = response.data;
-    if (body.success !== true || body.data?.savedCount !== results.length) {
-      throw new Error(friendlyErrorMessage(body.message, 'Chưa xác nhận được kết quả lưu. Vui lòng kiểm tra trạng thái trước khi tiếp tục.'));
-    }
-    clearSharedReads();
-    return { savedCount: body.data.savedCount, handedOffCount: body.data.handedOffCount ?? 0 };
-  } catch (error) {
-    const response = (error as { response?: { status?: number; data?: { message?: string; errorCode?: string } } } | null)?.response;
-    const status = response?.status;
-    if ([404, 405, 501].includes(status ?? 0)) {
-      throw new Error('Hiện chưa thể lưu kết quả xét OJT. Vui lòng liên hệ quản trị viên để được hỗ trợ.');
-    }
-    const apiMessage = response?.data?.message;
-    if (apiMessage) {
-      const translations: Record<string, string> = {
-        'Invalid OJT policy snapshot.': 'Quy tắc xét OJT gửi lên không hợp lệ. Vui lòng xét lại trước khi lưu.',
-        'OJT policy changed. Recalculate before saving.': 'Quy tắc xét OJT đã thay đổi. Vui lòng xét lại trước khi lưu.',
-        'Course history changed after calculation. Recalculate before saving.': 'Bảng điểm đã thay đổi sau lần xét. Vui lòng xét lại trước khi lưu.',
-        'All students and their accounts must be active.': 'Có sinh viên hoặc tài khoản không còn hoạt động. Vui lòng tải lại và xét lại.',
-      };
-      throw new Error(translations[apiMessage] ?? friendlyErrorMessage(apiMessage, 'Không lưu được kết quả. Vui lòng thử lại.'));
-    }
-    throw error;
-  }
-}
-
-export async function loadAndCalculateLocalEligibility(studentId: number, rule: LocalOjtRule, signal?: AbortSignal): Promise<LocalOjtResult> {
-  const profile = apiData<Profile>(await getJson(`/students/${studentId}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
-  const first = profile.courseResults;
-  if (!first || !Array.isArray(first.items) || !Number.isSafeInteger(first.total) || first.total < 0) throw new Error('Không tải được đầy đủ bảng điểm.');
-  const attempts = [...first.items];
-  for (let page = first.page + 1; attempts.length < first.total; page++) {
-    const next = apiData<Profile>(await getJson(`/students/${studentId}`, { include: 'courseResults', resultsPage: page, resultsLimit: 100 }, signal)).courseResults;
-    if (!next?.items.length) throw new Error('Bảng điểm chưa tải đầy đủ; chưa thể xét điều kiện.');
-    attempts.push(...next.items);
-  }
-  return calculateLocalOjtEligibility(studentId, profile, attempts, rule);
-}
-
 const eligibilityApiOrigin = API_ORIGIN;
 
 const TOKEN_KEY = "ojt_auth_token";
@@ -1130,8 +1087,6 @@ export const ojtEligibilityService = {
     apiData<{ eligibility: StudentEligibility }>(await getJson(`/students/${studentId}`, { include: "eligibility", ojtSemesterId }, signal)).eligibility,
   history: async (studentId: number, ojtSemesterId: number, page = 1, signal?: AbortSignal) =>
     apiData<{ eligibilityChecks: import("@/types/education/api.types").Page<EligibilityCheck> }>(await getJson(`/students/${studentId}`, { include: "eligibilityChecks", ojtSemesterId, checksPage: page, checksLimit: 10 }, signal)).eligibilityChecks,
-  checkBatch: async (payload: { ojtSemesterId: number; programIds?: number[]; studentIds?: number[]; idempotencyKey: string; confirmResults?: boolean }) =>
-    apiData<EligibilityBatch>(await postJson('/api/eligibility-check-runs', payload)),
   assessment: async (semesterId: number, signal?: AbortSignal) =>
     (await getPage<AssessmentWindow>("/assessment-windows", { ojtSemesterId: semesterId, page: 1, limit: 1 }, signal)).items[0] ?? null,
   saveAssessment: async (semesterId: number, payload: { blockPeriodId: number; opensAt: string; closesAt: string; reason: string }) =>
@@ -1246,7 +1201,6 @@ async function loadStudent(
     studentCode: progressText(profile.studentCode),
     fullName: progressText(profile.fullName),
     cohort: progressText(profile.cohort?.code ?? profile.cohortCode),
-    studentClass: progressText(profile.className),
     curriculumCode: progressText(program.code),
     currentCurriculumSemester: number(profile.currentSemester),
     courseSemesterTag: number(profile.courseSemesterTag),
@@ -1260,7 +1214,7 @@ async function loadStudent(
     delayTerms: null,
     progressStatus: "Chưa xác định",
     eligibilityStatus,
-    eligibilitySource: saved ? 'FRONTEND' : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
+    eligibilitySource: saved ? (saved.source ?? 'BACKEND') : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
     subjects,
     dataWarning:
       [
@@ -1276,7 +1230,7 @@ async function loadStudent(
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
     const curricula = new Map<number, Promise<Row>>();
-    const [students, saved] = await Promise.all([getAllItems<Row>("/students", {}, signal), loadSavedLocalOjtResults(signal)]);
+    const [students, saved] = await Promise.all([getAllItems<Row>("/students", {}, signal), loadSavedOjtEligibilityResults(signal)]);
     const savedResults = new Map(saved.map(result => [result.studentId, result]));
     const items: StudentProgress[] = new Array(students.length);
     let next = 0;
@@ -1297,13 +1251,13 @@ export const studentProgressService = {
                   : "Không tải được hồ sơ");
             items[index] = {
               id: String(row.id), studentCode: progressText(row.studentCode), fullName: progressText(row.fullName),
-              cohort: progressText(row.cohort?.code ?? row.cohortCode), studentClass: progressText(row.className),
+              cohort: progressText(row.cohort?.code ?? row.cohortCode),
               curriculumCode: progressText(row.program?.code), currentCurriculumSemester: number(row.currentSemester),
               currentTerm: progressText(row.currentAcademicPeriod?.name), currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null, gpa: null,
               completedCredits: null, totalCredits: null, plannedOjtTerm: '—',
               currentEstimatedOjtTerm: '—', delayTerms: null, progressStatus: 'Chưa xác định',
               eligibilityStatus: savedOjtProgressLabel(savedResults.get(Number(row.id))),
-              eligibilitySource: savedResults.has(Number(row.id)) ? 'FRONTEND' : null,
+              eligibilitySource: savedResults.get(Number(row.id))?.source ?? (savedResults.has(Number(row.id)) ? 'BACKEND' : null),
               subjects: [], dataWarning: message, detailsUnavailable: true,
             };
           }

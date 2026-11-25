@@ -67,7 +67,7 @@ const FIELD_NAMES: Record<string, string> = {
   lastloginat: 'Đăng nhập gần nhất', deletedat: 'Ngày xóa', studentid: 'ID sinh viên',
   studentcode: 'Mã sinh viên', enterpriseid: 'ID doanh nghiệp', companyid: 'ID doanh nghiệp',
   programid: 'ID chương trình', ojtsemesterid: 'ID kỳ OJT', semesterid: 'ID học kỳ',
-  academicperiodid: 'ID kỳ học', cohortid: 'ID khóa', groupcode: 'Nhóm', classname: 'Lớp',
+  academicperiodid: 'ID kỳ học', cohortid: 'ID khóa', groupcode: 'Nhóm',
   name: 'Tên', code: 'Mã', reason: 'Lý do', message: 'Nội dung', description: 'Mô tả',
   before: 'Trước thay đổi', after: 'Sau thay đổi', detail: 'Nội dung chi tiết',
   logid: 'ID nhật ký', action: 'Hành động', actionat: 'Thời gian thực hiện',

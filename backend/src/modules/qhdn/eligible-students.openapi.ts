@@ -251,6 +251,23 @@
  *                               "checkedAt": {
  *                                 "type": "string",
  *                                 "format": "date-time"
+ *                               },
+ *                               "academicHistory": {
+ *                                 "description": "Lịch sử môn học; các bản ghi OJT202 đã PASSED không được trả về.",
+ *                                 "type": "array",
+ *                                 "items": {
+ *                                   "type": "object",
+ *                                   "properties": {
+ *                                     "resultId": { "type": "integer" },
+ *                                     "courseCode": { "type": "string" },
+ *                                     "courseName": { "type": "string" },
+ *                                     "semesterTaken": { "type": "integer" },
+ *                                     "periodName": { "type": "string", "nullable": true },
+ *                                     "score": { "type": "number", "nullable": true },
+ *                                     "grade": { "type": "string", "nullable": true },
+ *                                     "status": { "type": "string" }
+ *                                   }
+ *                                 }
  *                               }
  *                             }
  *                           }

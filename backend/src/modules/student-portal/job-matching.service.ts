@@ -122,7 +122,7 @@ export async function matchStudentJobs(body:unknown,actor:Actor) {
     const promise = work();running.set(key,promise);
     try {return await promise;} finally {running.delete(key);}
   } catch(error:any) {
-    if(error.code==='42P01'||error.code==='42703')throw invalid('Cần cài khối CV extraction và RECRUITMENT EXTRACTION V1 trong backend/DB.',503,'MATCHING_SCHEMA_REQUIRED');
+    if(error.code==='42P01'||error.code==='42703')throw invalid('Database chưa đồng bộ schema CV và trích xuất tin tuyển dụng. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'MATCHING_SCHEMA_REQUIRED');
     throw error;
   }
 }

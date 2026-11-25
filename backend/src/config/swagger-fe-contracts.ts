@@ -18,7 +18,7 @@ const combo=obj({id,comboId:id,...fields('code','name','purpose'),confirmedAt:ti
 const template=nil(obj({id,...fields('code','name','status'),version:id,criteria:arr({type:'object',additionalProperties:true})}));
 const evaluation=nil(obj({id,templateId:nil(id),scoreDetails:{type:'object',nullable:true,additionalProperties:true},completionScore:num,attitudeScore:num,skillScore:num,overallScore:num,...fields('comments','status'),evaluatedAt:time,evaluatedBy:id}));
 const result=nil(obj({id,status:text,version:id,officialScore:num,outcome:nil(text),confirmedAt:time}));
-const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','className','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},
+const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},
   entryAcademicPeriodId:nil(id),currentAcademicPeriodId:nil(id),enrollmentYear:id,
   courseSemesterTag:{type:'integer',minimum:0,maximum:9,nullable:true,description:'Kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình; null khi không có môn đang học.'},
   latestOjtCheck:nil(obj({status:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']},checkedAt:time,ojtSemesterId:id,isStale:{type:'boolean'}})),

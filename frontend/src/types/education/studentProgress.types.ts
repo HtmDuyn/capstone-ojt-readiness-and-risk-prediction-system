@@ -23,7 +23,6 @@ export interface StudentProgress {
   studentCode: string;
   fullName: string;
   cohort: string;
-  studentClass: string;
   curriculumCode: string;
   currentCurriculumSemester: number | null;
   courseSemesterTag?: number | null;
@@ -37,8 +36,7 @@ export interface StudentProgress {
   delayTerms: number | null;
   progressStatus: ProgressStatus;
   eligibilityStatus: OjtEligibilityStatus;
-  handoffStatus?: 'Đã bàn giao' | 'Chưa bàn giao' | 'Chưa xác định';
-  eligibilitySource?: 'FRONTEND' | 'OFFICIAL' | null;
+  eligibilitySource?: 'BACKEND' | 'FRONTEND' | 'OFFICIAL' | null;
   subjects: StudentSubject[];
   dataWarning?: string;
   detailsUnavailable?: boolean;
