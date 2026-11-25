@@ -17,15 +17,19 @@ export function parseOjtEligibilityResults(body: unknown) {
   const input = inputObject(body, ['idempotencyKey', 'source', 'rule', 'results']);
   const idempotencyKey = requiredText(input.idempotencyKey, 'idempotencyKey', 100);
   if (input.source !== 'BACKEND') throw invalid('source must be BACKEND.');
-  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses', 'thresholdId', 'conditionId', 'issuingDocument']);
+  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses', 'thresholdId', 'conditionId', 'issuingDocument', 'defaultRule']);
+  if (rule.defaultRule !== undefined && typeof rule.defaultRule !== 'boolean') throw invalid('defaultRule must be a boolean.');
   const thresholdId = rule.thresholdId === undefined ? undefined : positiveId(rule.thresholdId, 'thresholdId');
   const conditionId = rule.conditionId === undefined ? undefined : positiveId(rule.conditionId, 'conditionId');
-  if (conditionId === undefined && thresholdId === undefined && rule.maxUnpassedCourses === undefined)
+  const defaultRule = rule.defaultRule === true;
+  if (conditionId === undefined && thresholdId === undefined && rule.maxUnpassedCourses === undefined && !defaultRule)
     throw invalid('Hãy chọn một mức tín chỉ đã tạo trước khi lưu kết quả xét OJT.');
   if (typeof rule.version !== 'number' || !Number.isSafeInteger(rule.version) || rule.version < 0 ||
       typeof rule.minCredits !== 'number' || !Number.isFinite(rule.minCredits) || rule.minCredits < 0 ||
       (rule.maxUnpassedCourses !== undefined && (typeof rule.maxUnpassedCourses !== 'number' || !Number.isSafeInteger(rule.maxUnpassedCourses) || rule.maxUnpassedCourses < 0)))
     throw invalid('Invalid OJT policy snapshot.');
+  if (defaultRule && (conditionId !== undefined || thresholdId !== undefined || rule.version !== 0 || rule.minCredits !== 70 || rule.maxUnpassedCourses !== undefined))
+    throw invalid('The default OJT rule must be exactly 70 credits and cannot reference a published condition.');
   if (!Array.isArray(input.results) || !input.results.length || input.results.length > 10000) throw invalid('Provide 1 to 10000 results.');
   const seen = new Set<number>();
   const results = input.results.map((raw, index): OjtEligibilityResult => {
@@ -52,7 +56,7 @@ export function parseOjtEligibilityResults(body: unknown) {
     return { studentId, status, earnedCredits, unpassedCourseCount: row.unpassedCourseCount, reasons, academicIssues, checkedAt: checkedAt.toISOString() };
   }).sort((a, b) => a.studentId - b.studentId);
   const requestHash = createHash('sha256').update(JSON.stringify({ source: input.source, rule, results })).digest('hex');
-  return { idempotencyKey, source: 'BACKEND' as const, results, requestHash, rule, thresholdId, conditionId };
+  return { idempotencyKey, source: 'BACKEND' as const, results, requestHash, rule, thresholdId, conditionId, defaultRule };
 }
 
 async function recruitmentRosterSummary(client: PoolClient, batchId: number) {
@@ -82,7 +86,9 @@ export async function saveOjtEligibilityResults(
       'SELECT "MinCredits" FROM "OJTCreditThresholds" WHERE "ThresholdID"=$1', [input.thresholdId])).rows[0];
     if (input.thresholdId !== undefined && !threshold)
       throw invalid('Mức tín chỉ đã chọn không tồn tại.', 409, 'OJT_THRESHOLD_NOT_FOUND');
-    const active: Record<string, any> = condition ? { version: condition.Version, minCredits: Number(condition.MinCredits), conditionId: condition.ConditionID, issuingDocument: condition.IssuingDocument } : threshold ? { ...defaults, minCredits: Number(threshold.MinCredits), thresholdId: input.thresholdId } : defaults;
+    const active: Record<string, any> = condition ? { version: condition.Version, minCredits: Number(condition.MinCredits), conditionId: condition.ConditionID, issuingDocument: condition.IssuingDocument }
+      : input.defaultRule ? { version: 0, minCredits: 70, defaultRule: true }
+      : threshold ? { ...defaults, minCredits: Number(threshold.MinCredits), thresholdId: input.thresholdId } : defaults;
     if (input.rule.version !== active.version || input.rule.minCredits !== active.minCredits || (condition && (input.rule.issuingDocument !== condition.IssuingDocument || input.rule.conditionId !== condition.ConditionID)) || (!condition && input.rule.maxUnpassedCourses !== undefined && input.rule.maxUnpassedCourses !== defaults.maxUnpassedCourses))
       throw invalid('OJT policy changed. Recalculate before saving.', 409, 'OJT_POLICY_CHANGED');
     const actor = (await client.query(`SELECT r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID") WHERE u."UserID"=$1 AND u."Status"='ACTIVE' FOR SHARE OF u`, [actorId])).rows[0];
@@ -121,7 +127,9 @@ export async function saveOjtEligibilityResults(
     const programs = new Map(students.map(row => [row.StudentID, row.ProgramID]));
     // One set-based upsert; no recalculation or per-student write round trips.
     const { maxUnpassedCourses, ...creditRule } = active;
-    const savedRule = condition ? { id: condition.ConditionID, conditionId: condition.ConditionID, version: condition.Version, minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument } : input.rule.maxUnpassedCourses === undefined ? creditRule : { ...creditRule, maxUnpassedCourses };
+    const savedRule = condition ? { id: condition.ConditionID, conditionId: condition.ConditionID, version: condition.Version, minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument }
+      : input.defaultRule ? { version: 0, minCredits: 70, defaultRule: true, ruleSource: 'SYSTEM_DEFAULT' }
+      : input.rule.maxUnpassedCourses === undefined ? creditRule : { ...creditRule, maxUnpassedCourses };
     const records = input.results.map(result => {
       const student = studentById.get(result.studentId)!;
       const meetsCondition = result.earnedCredits !== null && result.earnedCredits >= active.minCredits
@@ -155,7 +163,10 @@ export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result.
       OR result."ConditionID" IS DISTINCT FROM (SELECT condition."ConditionID" FROM "OJTConditions" condition
         WHERE condition."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
         ORDER BY condition."EffectiveFrom" DESC, condition."Version" DESC LIMIT 1)
-      ELSE COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0) END
+      ELSE CASE WHEN COALESCE(result."Result"->'rule'->'defaultRule','false'::jsonb)='true'::jsonb THEN EXISTS (
+        SELECT 1 FROM "OJTConditions" condition
+        WHERE condition."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+      ) ELSE COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0) END END
     OR ${studentAlias}."Status"<>'ACTIVE'
     OR EXISTS(SELECT 1 FROM "StudentAcademicPlacements" placement WHERE placement."StudentID"=${studentAlias}."StudentID" AND placement."UpdatedAt">result."CheckedAt")
     OR EXISTS(SELECT 1 FROM "StudentCourseResults" history WHERE history."StudentID"=${studentAlias}."StudentID" AND COALESCE(history."UpdatedAt",history."CreatedAt")>result."CheckedAt"

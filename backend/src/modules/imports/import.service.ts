@@ -1,5 +1,5 @@
 import { assessOjtStudents } from '../eligibility/automatic-assessment.service';
-import { latestEffectiveOjtCondition } from '../eligibility/ojt-policy.service';
+import { ojtAssessmentCondition } from '../eligibility/ojt-policy.service';
 import { logger } from '../../config/logger';
 import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -179,15 +179,15 @@ async function assessImportedStudents(client: PoolClient, actorId: number, batch
   // invalidate the imported transcript or roll back account provisioning.
   await client.query('SAVEPOINT import_ojt_assessment');
   try {
-    const condition = await latestEffectiveOjtCondition(client);
-    const assessment = condition
-      ? await assessOjtStudents(client, condition, actorId, `import-ojt:${batchId}`, 'IMPORT') : null;
-    const checkedCount = assessment?.checkedCount ?? 0;
-    const status = condition ? 'COMPLETED' : 'NO_EFFECTIVE_CONDITION';
+    const condition = await ojtAssessmentCondition(client);
+    const assessment = await assessOjtStudents(client, condition, actorId, `import-ojt:${batchId}`, 'IMPORT');
+    const checkedCount = assessment.checkedCount;
+    const status = 'COMPLETED';
     await client.query('RELEASE SAVEPOINT import_ojt_assessment');
-    return { status, checkedCount, eligibleCount: assessment?.eligibleCount ?? 0,
-      assignedCount: assessment?.assignedCount ?? 0, waitingCount: assessment?.waitingCount ?? 0,
-      excludedPassedOjt202Count: assessment?.excludedPassedOjt202Count ?? 0 };
+    return { status, checkedCount, eligibleCount: assessment.eligibleCount,
+      assignedCount: assessment.assignedCount, waitingCount: assessment.waitingCount,
+      excludedPassedOjt202Count: assessment.excludedPassedOjt202Count,
+      conditionSource: condition.IsDefault ? 'DEFAULT_70_CREDITS' : 'PUBLISHED' };
   } catch (error) {
     await client.query('ROLLBACK TO SAVEPOINT import_ojt_assessment');
     await client.query('RELEASE SAVEPOINT import_ojt_assessment');

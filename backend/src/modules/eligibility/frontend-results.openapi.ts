@@ -7,7 +7,7 @@ export function describeOjtEligibilityResults(spec: Record<string, any>) {
   spec.paths['/api/ojt-eligibility-results'] = {
     post: {
       tags: ['OJT eligibility'], summary: 'Chạy xét điều kiện OJT và lưu kết quả từ backend',
-      description: 'ADMIN/ACADEMIC. Không cần năm học/kỳ OJT. Xét toàn bộ sinh viên đang hoạt động theo điều kiện có hiệu lực, loại sinh viên đã PASSED OJT202, lưu trạng thái và cập nhật roster QHDN. Nút thủ công, import và cron dùng chung service xét. Roster tự trả ASSIGNED khi có đợt mở hoặc WAITING khi chưa có đợt.',
+      description: 'ADMIN/ACADEMIC. Không cần năm học/kỳ OJT. Dùng điều kiện OJT mới đang có hiệu lực; nếu chưa có điều kiện hiệu lực thì mặc định tối thiểu 70 tín chỉ. Loại sinh viên đã PASSED OJT202, lưu trạng thái và cập nhật roster QHDN. Nút thủ công, import và cron dùng chung service xét. Roster tự trả ASSIGNED khi có đợt mở hoặc WAITING khi chưa có đợt.',
       security: [{ bearerAuth: [] }],
       requestBody: { required: true, content: { 'application/json': {
         schema: { type: 'object', additionalProperties: false },
@@ -21,7 +21,7 @@ export function describeOjtEligibilityResults(spec: Record<string, any>) {
           waitingCount: { type: 'integer', minimum: 0 }, excludedPassedOjt202Count: { type: 'integer', minimum: 0 },
         } } } }, example: { success: true, data: { checkedCount: 100, savedCount: 100, eligibleCount: 38, notEligibleCount: 57, reviewRequiredCount: 5, assignedCount: 20, waitingCount: 18, excludedPassedOjt202Count: 4 } } } } },
         400: response('Body phải là object rỗng.'), 401: response('Chưa đăng nhập.'),
-        403: response('Không có quyền chạy xét OJT.'), 409: response('Chưa có điều kiện OJT đang có hiệu lực.'),
+        403: response('Không có quyền chạy xét OJT.'), 409: response('Điều kiện OJT hoặc dữ liệu thay đổi trong lúc lưu kết quả.'),
       },
     },
     get: {

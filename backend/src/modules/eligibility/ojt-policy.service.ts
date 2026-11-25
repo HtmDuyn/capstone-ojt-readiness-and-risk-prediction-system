@@ -10,6 +10,21 @@ export async function latestEffectiveOjtCondition(client: PoolClient) {
     ORDER BY "EffectiveFrom" DESC, "Version" DESC LIMIT 1`)).rows[0] ?? null;
 }
 
+// The current published condition takes precedence. Until one is effective,
+// assess against the system baseline of 70 credits.
+export async function ojtAssessmentCondition(client: PoolClient) {
+  const condition = await latestEffectiveOjtCondition(client);
+  if (condition) return { ...condition, IsDefault: false };
+  return {
+    ConditionID: null,
+    Version: 0,
+    MinCredits: 70,
+    IssuingDocument: null,
+    CreatedBy: null,
+    IsDefault: true,
+  };
+}
+
 export async function listOjtConditions() {
   return academicTransaction(async client => {
     const rows = (await client.query(`SELECT c.*,to_char(c."EffectiveFrom",'YYYY-MM-DD') AS "EffectiveDate",

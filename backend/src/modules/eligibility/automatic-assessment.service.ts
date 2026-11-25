@@ -3,14 +3,13 @@ import type { PoolClient } from 'pg';
 import { query } from '../../config/database';
 import { academicTransaction } from '../academic/academic.repository';
 import { loadAcademicProgress, progressFromData } from '../students/academic-progress';
-import { invalid } from '../students/student.validation';
 import { evaluateEligibility } from './eligibility.service';
 import { saveOjtEligibilityResults } from './frontend-results.service';
-import { latestEffectiveOjtCondition } from './ojt-policy.service';
+import { ojtAssessmentCondition } from './ojt-policy.service';
 
 type Milestone = 'BLOCK10' | 'BLOCK3' | 'SEMESTER';
 type Period = { id: number; end: string; block10End: string | null; block3End: string | null; completed: Milestone[] };
-type Condition = { ConditionID: number; Version: number; MinCredits: string | number; IssuingDocument: string; MaxUnpassedCourses?: number | null };
+type Condition = { ConditionID: number | null; Version: number; MinCredits: string | number; IssuingDocument: string | null; CreatedBy?: number | null; IsDefault?: boolean; MaxUnpassedCourses?: number | null };
 type AssessmentSource = 'AUTOMATIC' | 'IMPORT' | 'MANUAL';
 export type OjtAssessmentSummary = {
   checkedCount: number;
@@ -61,8 +60,7 @@ export async function processDueOjtAssessment(calendarLock: 'try' | 'wait' = 'tr
     const next = await nextOjtAssessment(client);
     if (!next || next.dueAt > now) return false;
 
-    const condition = await latestEffectiveOjtCondition(client);
-    if (!condition) return false;
+    const condition = await ojtAssessmentCondition(client);
     const { rows: [actor] } = await client.query(`
       SELECT u."UserID" FROM "Users" u JOIN "Roles" r USING ("RoleID")
       WHERE u."Status"='ACTIVE' AND r."RoleCode" IN ('ACADEMIC','ADMIN')
@@ -80,8 +78,7 @@ export async function processDueOjtAssessment(calendarLock: 'try' | 'wait' = 'tr
 
 export async function runManualOjtAssessment(actorId: number): Promise<OjtAssessmentSummary> {
   return academicTransaction(async client => {
-    const condition = await latestEffectiveOjtCondition(client);
-    if (!condition) throw invalid('Chưa có điều kiện OJT đang có hiệu lực.', 409, 'OJT_CONDITION_NOT_EFFECTIVE');
+    const condition = await ojtAssessmentCondition(client);
     return assessOjtStudents(client, condition, actorId, `manual-ojt:${randomUUID()}`, 'MANUAL');
   });
 }
@@ -103,16 +100,20 @@ export async function assessOjtStudents(
       AND EXISTS (SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
         WHERE grade."StudentID"=s."StudentID" AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED')`)).rows[0].count);
   const passedReason = 'Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT.';
+  const rule = condition.IsDefault
+    ? { version: 0, minCredits: 70, defaultRule: true }
+    : { id: condition.ConditionID, conditionId: condition.ConditionID, version: condition.Version,
+      minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument };
   await client.query(`UPDATE "StudentOJTCalculatedResults" saved
     SET "Status"='NOT_ELIGIBLE',"ProgramID"=s."ProgramID","ConditionID"=$2,
-      "CheckedAt"=clock_timestamp(),"SavedAt"=clock_timestamp(),"SavedBy"=$6,
+      "CheckedAt"=clock_timestamp(),"SavedAt"=clock_timestamp(),"SavedBy"=$3,
       "Result"=jsonb_set(
         jsonb_set(
           jsonb_set(
             jsonb_set(
               jsonb_set(COALESCE(saved."Result",'{}'::jsonb),'{status}','"NOT_ELIGIBLE"'::jsonb,true),
               '{checkedAt}',to_jsonb(clock_timestamp()),true),
-            '{rule}',jsonb_build_object('id',$2,'conditionId',$2,'version',$3,'minCredits',$4,'issuingDocument',$5),true),
+            '{rule}',$4::jsonb,true),
           '{source}','"BACKEND"'::jsonb,true),
         '{reasons}',
         CASE WHEN COALESCE(saved."Result"->'reasons','[]'::jsonb) @> jsonb_build_array($1::text)
@@ -124,7 +125,7 @@ export async function assessOjtStudents(
       SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
       WHERE grade."StudentID"=saved."StudentID"
         AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
-    )`, [passedReason, condition.ConditionID, condition.Version, Number(condition.MinCredits), condition.IssuingDocument, actorId]);
+    )`, [passedReason, condition.ConditionID, actorId, JSON.stringify(rule)]);
 
   const { rows: students } = await client.query(`
     SELECT s."StudentID",s."Status",u."Status" AS "AccountStatus"
@@ -141,17 +142,17 @@ export async function assessOjtStudents(
     checkedCount: students.length, savedCount: 0, eligibleCount: 0, notEligibleCount: 0,
     reviewRequiredCount: 0, assignedCount: 0, waitingCount: 0, excludedPassedOjt202Count,
   };
-  const rule = {
-    conditionId: condition.ConditionID, version: condition.Version,
-    minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument,
-  };
+  const ruleSnapshot = condition.IsDefault
+    ? { version: 0, minCredits: 70, defaultRule: true }
+    : { conditionId: condition.ConditionID!, version: condition.Version,
+      minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument };
 
   for (let offset = 0; offset < students.length; offset += 10000) {
     const results = [];
     for (const student of students.slice(offset, offset + 10000)) {
       const progress = await loadAcademicProgress(client, student.StudentID);
       const decision = evaluateEligibility({
-        student, semester: { OJTSemesterID: null }, rule: condition,
+        student, semester: { OJTSemesterID: null }, rule: { ...condition, MaxUnpassedCourses: null },
         progress: progressFromData(progress), attempts: progress.attempts, aliases: progress.aliases,
       });
       results.push({
@@ -171,7 +172,7 @@ export async function assessOjtStudents(
 
     if (!results.length) continue;
     const saved = await saveOjtEligibilityResults({
-      source: 'BACKEND', idempotencyKey: `${batchKey}:${offset}`, rule, results,
+      source: 'BACKEND', idempotencyKey: `${batchKey}:${offset}`, rule: ruleSnapshot, results,
     }, actorId, client, source);
     summary.savedCount += saved.savedCount;
     summary.eligibleCount += saved.eligibleCount;

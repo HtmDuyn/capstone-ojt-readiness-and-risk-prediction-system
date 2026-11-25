@@ -7,10 +7,18 @@ import { list as listResults } from '../ojt-results/result.service';
 import { currentAssignment, notifications, summaryWithClient, supplementaryWithClient } from './academic.service';
 import { ownStudent, publicEligibility, type Actor, type Row } from './shared';
 import { loadAcademicProgress, progressFromData } from '../students/academic-progress';
-import { eligibility } from '../eligibility/eligibility.service';
+import { eligibility, evaluateEligibility } from '../eligibility/eligibility.service';
+import { ojtAssessmentCondition } from '../eligibility/ojt-policy.service';
 import { pagination, positiveId, invalid, enumValue } from '../students/student.validation';
 import { enrichStudentTasks, studentTaskProgress } from './task.service';
 import { studentAdmission } from './admission.service';
+
+async function currentConditionDecision(c:PoolClient,s:Row,term:number,source:Awaited<ReturnType<typeof loadAcademicProgress>>) {
+  const condition=await ojtAssessmentCondition(c),rule={...condition,MaxUnpassedCourses:null};
+  const current=evaluateEligibility({student:{StudentID:s.StudentID,Status:s.Status,AccountStatus:s.AccountStatus},
+    semester:{OJTSemesterID:term},rule,progress:progressFromData(source),attempts:source.attempts,aliases:source.aliases});
+  return {current,rule};
+}
 
 export async function internships(params:Row,actor:Actor,existingClient?:PoolClient) {
   const allowed=['ojtSemesterId','assignmentId','resultId','tasksPage','tasksLimit','resultsPage','resultsLimit','include'];
@@ -74,17 +82,22 @@ export async function dashboard(params:Row,actor:Actor) {
       const source=await loadAcademicProgress(c,s.StudentID);
       const progress=progressFromData(source);
       const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progress,source);
+      const conditionDecision=await currentConditionDecision(c,s,term,source);
       const deadline=(await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[term])).rows[0]??null;
       return {
         academic:{studentId:s.StudentID,academicProgress:progress,
-          earnedCredits:decision.current.earnedCredits,missingCredits:decision.current.missingCredits,
-          failedCourseCount:decision.current.unpassedCourseCount,gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,
-          currentEligibility:publicEligibility(decision.current),officialEligibility:publicEligibility(decision.official),
+          earnedCredits:conditionDecision.current.earnedCredits,missingCredits:conditionDecision.current.missingCredits,
+          failedCourseCount:conditionDecision.current.unpassedCourseCount,gpa:progress.gpa,gpaScale:progress.gpaScale,issues:progress.issues,
+          currentEligibility:publicEligibility(conditionDecision.current),officialEligibility:publicEligibility(decision.official),
           admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:decision.official}),deadline},
         internship:{assignment:await currentAssignment({ojtSemesterId:term},actor,c)},
       };
     }
-    const academic=await summaryWithClient(c,s.StudentID,term);
+    const source=await loadAcademicProgress(c,s.StudentID);
+    const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progressFromData(source),source);
+    const conditionDecision=await currentConditionDecision(c,s,term,source);
+    const academic=await summaryWithClient(c,s.StudentID,term,source,
+      {...decision,current:conditionDecision.current},undefined,conditionDecision.rule);
     if(view==='overview')return {
       academic:{...academic,admissionEligibility:await studentAdmission(c,s.StudentID,term,{official:academic.officialEligibility})},
       registrationWindows:await studentWindows('ojt',{ojtSemesterId:term,limit:5},actor,c),

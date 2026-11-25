@@ -1,4 +1,4 @@
-import { latestEffectiveOjtCondition } from '../eligibility/ojt-policy.service';
+import { ojtAssessmentCondition } from '../eligibility/ojt-policy.service';
 import type { PoolClient } from 'pg';
 import { readTransaction } from '../qhdn/read.repository';
 import { invalid, positiveId } from '../students/student.validation';
@@ -93,13 +93,13 @@ export async function studyOverview(params: Row, actor: Actor) {
       (SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1),
       (SELECT o."OJTSemesterID" FROM "OJTSemesters" o
       WHERE o."AcademicPeriodID"="DefaultOJTAcademicPeriod"($1))) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
-    const latestCondition = historical ? null : await latestEffectiveOjtCondition(c);
+    const currentCondition = historical ? null : await ojtAssessmentCondition(c);
     const configuredRule = historical ? await activeRule(c, student.ProgramID, target ?? 0) : null;
-    const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
+    const rule = currentCondition ? { ...currentCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
       && (configuredRule.OJTSemesterID === null || configuredRule.OJTSemesterID === target) ? configuredRule : null;
     const current = evaluateEligibility({ student, semester: { OJTSemesterID: target }, rule, progress, attempts: source.attempts, aliases: source.aliases });
     const reads: AssessmentReadContext = { source, studyPeriod: { curriculumSemester: currentSemester, referenceDate: cutoff ? new Date(cutoff + '+07:00') : new Date() } };
-    const academic = await summaryWithClient(c, student.StudentID, target, source, { current, official: null }, reads, latestCondition ? rule : undefined);
+    const academic = await summaryWithClient(c, student.StudentID, target, source, { current, official: null }, reads, currentCondition ? rule : undefined);
     academic.academicWarning.computedAt = new Date().toISOString();
     // Historic terms are for transcripts and accumulated progress only.
     // Risk and the personal roadmap are evaluated only for the ongoing semester.

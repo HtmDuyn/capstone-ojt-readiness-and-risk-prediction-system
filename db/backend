@@ -7941,10 +7941,11 @@ CREATE TABLE IF NOT EXISTS public."OJTAutomaticAssessments" (
   "AcademicPeriodID" integer NOT NULL REFERENCES public."AcademicPeriods"("AcademicPeriodID") ON DELETE CASCADE,
   "Milestone" text NOT NULL CHECK ("Milestone" IN ('BLOCK10','BLOCK3','SEMESTER')),
   "DueAt" timestamptz NOT NULL,
-  "ConditionID" integer NOT NULL REFERENCES public."OJTConditions"("ConditionID"),
+  "ConditionID" integer REFERENCES public."OJTConditions"("ConditionID"),
   "CompletedAt" timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY ("AcademicPeriodID","Milestone")
 );
+ALTER TABLE public."OJTAutomaticAssessments" ALTER COLUMN "ConditionID" DROP NOT NULL;
 ALTER TABLE public."OJTAutomaticAssessments" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public."OJTAutomaticAssessments" FROM PUBLIC;
 DO $$ BEGIN
@@ -8396,9 +8397,12 @@ WHERE saved."Status"='ELIGIBLE'
       WHERE condition."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
       ORDER BY condition."EffectiveFrom" DESC,condition."Version" DESC LIMIT 1
     )
-    ELSE COALESCE((saved."Result"->>'policyVersion')::int,0)=COALESCE(
+    ELSE CASE WHEN COALESCE(saved."Result"->'rule'->'defaultRule','false'::jsonb)='true'::jsonb THEN NOT EXISTS (
+      SELECT 1 FROM public."OJTConditions" condition
+      WHERE condition."EffectiveFrom"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+    ) ELSE COALESCE((saved."Result"->>'policyVersion')::int,0)=COALESCE(
       (SELECT max(policy."Version") FROM public."OJTConditionPolicies" policy),0
-    )
+    ) END
   END
   AND NOT EXISTS (
     SELECT 1 FROM public."StudentAcademicPlacements" placement
