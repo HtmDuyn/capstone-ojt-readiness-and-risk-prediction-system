@@ -126,10 +126,10 @@ export const StudentAcademicProfile = () => {
                           </td>
                           <td className="p-3 text-slate-800">{item.courseName}</td>
                           <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
-                          <td className="px-3 whitespace-nowrap">{item.periodCode || 'Chưa cập nhật'}</td>
+                          <td className="px-3 whitespace-nowrap">{(item.courseCode === 'OJT202' && (item.periodName || study.data?.period.name)) || item.periodCode || 'Chưa cập nhật'}</td>
                           <td>{item.attemptNumber}</td>
                           <td className={item.score == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.score ?? '—'}</td>
-                          <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{statusText(item.status)}</td>
+                          <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.status === 'IN_PROGRESS' ? 'Đang học' : statusText(item.status)}</td>
                         </tr>
                       ))}
                     </tbody>

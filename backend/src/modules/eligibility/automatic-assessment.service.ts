@@ -80,7 +80,7 @@ export async function assessOjtStudents(
         JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
         WHERE placement."StudentID"=s."StudentID" AND COALESCE(p."ParentPeriodID",p."AcademicPeriodID")=$1)`})
       AND s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
-      AND NOT EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=s."StudentID")
+      AND NOT EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=s."StudentID")
       AND NOT EXISTS (SELECT 1 FROM "StudentOJTCalculatedResults" saved
         WHERE saved."StudentID"=s."StudentID" AND saved."Status"='ELIGIBLE')
     ORDER BY s."StudentID" FOR UPDATE OF s FOR SHARE OF u`, ['studentIds' in scope ? scope.studentIds : scope.periodId]);

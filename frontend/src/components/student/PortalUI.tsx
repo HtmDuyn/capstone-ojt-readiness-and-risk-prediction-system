@@ -157,7 +157,7 @@ export function StudentAcademicPeriodSelect({ label = 'Học kỳ theo dõi' }: 
       >
         <option value="" disabled>{portal.academicPeriodsLoading ? 'Đang tải học kỳ…' : 'Chưa có dữ liệu học kỳ'}</option>
         {portal.academicPeriods.map((semester) => (
-          <option key={semester.id} value={semester.id}>{semester.name}{semester.curriculumSemester == null ? '' : ` · Kỳ ${semester.curriculumSemester}`}{semester.isCurrent ? ' · Đang học' : ' · Đã học'}</option>
+          <option key={semester.id} value={semester.id}>{semester.name}{semester.curriculumSemester == null ? '' : ` · Kỳ ${semester.curriculumSemester}`}{semester.isCurrent || semester.hasOjtEnrollment ? ' · Đang học' : ' · Đã học'}</option>
         ))}
       </select>
     </label>

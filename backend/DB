@@ -4,6 +4,8 @@ SET LOCAL search_path=public,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 SELECT pg_advisory_xact_lock(hashtext('ojt_full_fresh_build_20261121'));
 
+DROP SCHEMA IF EXISTS ojt_history CASCADE;
+
 -- Reset only the application tables owned by this OJT system. All existing rows in these tables are removed.
 DO $reset_ojt_tables$
 DECLARE table_name text;
@@ -123,6 +125,7 @@ BEGIN
   DROP SEQUENCE IF EXISTS public."EligibilityChecks_CheckID_seq" CASCADE;
   DROP SEQUENCE IF EXISTS public."OJTRuleSets_RuleSetID_seq" CASCADE;
 END $reset_ojt_tables$;
+DROP FUNCTION IF EXISTS public."GuardAcademicHandoff"();
 
 CREATE SEQUENCE public."EligibilityCheckRuns_RunID_seq" AS integer START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1;
 CREATE SEQUENCE public."EligibilityChecks_CheckID_seq" AS integer START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1;
@@ -551,33 +554,6 @@ CREATE TABLE public."EligibilityRunStudents" (
   CONSTRAINT "EligibilityRunStudents_check" CHECK (((("Status")::text = 'COMPLETED'::text) = ("CheckID" IS NOT NULL))),
   CONSTRAINT "EligibilityRunStudents_pkey" PRIMARY KEY ("RunID", "StudentID")
 );
-CREATE TABLE public."EligibleStudentHandoffItems" (
-  "HandoffID" integer NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "RegistrationID" integer,
-  "StudentID" integer NOT NULL,
-  "CheckID" integer,
-  "Snapshot" jsonb NOT NULL,
-  "CalculatedBatchID" int,
-  CONSTRAINT "EligibleStudentHandoffItems_RegistrationID_key" UNIQUE ("RegistrationID"),
-  CONSTRAINT "EligibleStudentHandoffItems_pkey" PRIMARY KEY ("HandoffID", "StudentID")
-);
-CREATE TABLE public."EligibleStudentHandoffs" (
-  "HandoffID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."EligibleStudentHandoffs_HandoffID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
-  "OJTSemesterID" integer NOT NULL,
-  "IdempotencyKey" character varying(100) NOT NULL,
-  "RequestHash" text NOT NULL,
-  "RegistrationIDs" jsonb NOT NULL,
-  "Reason" character varying(2000) NOT NULL,
-  "CreatedBy" integer NOT NULL,
-  "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  "RecipientRole" character varying(20) DEFAULT 'OJT_COORD'::character varying NOT NULL,
-  CONSTRAINT "EligibleStudentHandoffs_HandoffID_OJTSemesterID_key" UNIQUE ("HandoffID", "OJTSemesterID"),
-  CONSTRAINT "EligibleStudentHandoffs_IdempotencyKey_key" UNIQUE ("IdempotencyKey"),
-  CONSTRAINT "EligibleStudentHandoffs_RecipientRole_check" CHECK ((("RecipientRole")::text = 'OJT_COORD'::text)),
-  CONSTRAINT "EligibleStudentHandoffs_RegistrationIDs_check" CHECK ((jsonb_typeof("RegistrationIDs") = 'array'::text)),
-  CONSTRAINT "EligibleStudentHandoffs_pkey" PRIMARY KEY ("HandoffID")
-);
 CREATE TABLE public."EmailOutbox" (
   "EmailID" bigint GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."EmailOutbox_EmailID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1) NOT NULL,
   "UserID" integer NOT NULL,
@@ -927,7 +903,7 @@ CREATE TABLE public."OJTRegistrationEvents" (
   "CreatedBy" integer NOT NULL,
   "CreatedAt" timestamp with time zone DEFAULT now() NOT NULL,
   "Reason" character varying(2000),
-  CONSTRAINT "OJTRegistrationEvents_Action_check" CHECK ((("Action")::text = ANY ((ARRAY['SUBMITTED'::character varying, 'RESUBMITTED'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'HANDED_OFF'::character varying])::text[]))),
+  CONSTRAINT "OJTRegistrationEvents_Action_check" CHECK ((("Action")::text = ANY ((ARRAY['SUBMITTED'::character varying, 'RESUBMITTED'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[]))),
   CONSTRAINT "OJTRegistrationEvents_RegistrationID_IdempotencyKey_key" UNIQUE ("RegistrationID", "IdempotencyKey"),
   CONSTRAINT "OJTRegistrationEvents_pkey" PRIMARY KEY ("EventID")
 );
@@ -991,9 +967,9 @@ CREATE TABLE public."OJTRegistrations" (
   "ReviewedAt" timestamp with time zone,
   "ReviewReason" character varying(2000),
   "PathwaySnapshot" jsonb,
-  CONSTRAINT "CK_NewRegistrationStatus" CHECK ((("WindowID" IS NULL) OR (("Status" IS NOT NULL) AND (("Status")::text = ANY ((ARRAY['SUBMITTED'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'HANDED_OFF'::character varying])::text[]))))),
+  CONSTRAINT "CK_NewRegistrationStatus" CHECK ((("WindowID" IS NULL) OR (("Status" IS NOT NULL) AND (("Status")::text = ANY ((ARRAY['SUBMITTED'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[]))))),
   CONSTRAINT "CK_RegistrationApplicationIdentity" CHECK ((("WindowID" IS NULL) OR (("ProgramID" IS NOT NULL) AND ("SubmittedBy" IS NOT NULL)))),
-  CONSTRAINT "CK_RegistrationReviewState" CHECK ((("WindowID" IS NULL) OR ((("Status")::text = 'SUBMITTED'::text) AND ("ReviewCheckID" IS NULL) AND ("ReviewedBy" IS NULL) AND ("ReviewedAt" IS NULL) AND ("ReviewReason" IS NULL)) OR ((("Status")::text = ANY ((ARRAY['APPROVED'::character varying, 'HANDED_OFF'::character varying])::text[])) AND ("ReviewCheckID" IS NOT NULL) AND ("ReviewedBy" IS NOT NULL) AND ("ReviewedAt" IS NOT NULL) AND ("ReviewReason" IS NOT NULL) AND (length(btrim(("ReviewReason")::text)) > 0)) OR ((("Status")::text = 'REJECTED'::text) AND ("ReviewedBy" IS NOT NULL) AND ("ReviewedAt" IS NOT NULL) AND ("ReviewReason" IS NOT NULL) AND (length(btrim(("ReviewReason")::text)) > 0)))),
+  CONSTRAINT "CK_RegistrationReviewState" CHECK ((("WindowID" IS NULL) OR ((("Status")::text = 'SUBMITTED'::text) AND ("ReviewCheckID" IS NULL) AND ("ReviewedBy" IS NULL) AND ("ReviewedAt" IS NULL) AND ("ReviewReason" IS NULL)) OR ((("Status")::text = ANY ((ARRAY['APPROVED'::character varying])::text[])) AND ("ReviewCheckID" IS NOT NULL) AND ("ReviewedBy" IS NOT NULL) AND ("ReviewedAt" IS NOT NULL) AND ("ReviewReason" IS NOT NULL) AND (length(btrim(("ReviewReason")::text)) > 0)) OR ((("Status")::text = 'REJECTED'::text) AND ("ReviewedBy" IS NOT NULL) AND ("ReviewedAt" IS NOT NULL) AND ("ReviewReason" IS NOT NULL) AND (length(btrim(("ReviewReason")::text)) > 0)))),
   CONSTRAINT "OJTRegistrations_Application_check" CHECK ((jsonb_typeof("Application") = 'object'::text)),
   CONSTRAINT "OJTRegistrations_pkey" PRIMARY KEY ("RegistrationID"),
   CONSTRAINT "UQ_OJTRegistration" UNIQUE ("StudentID", "OJTSemesterID"),
@@ -1530,7 +1506,6 @@ CREATE INDEX "IX_ComboEvents_StudentWindow" ON public."StudentComboSelectionEven
 CREATE INDEX "IX_EligibilityPending" ON public."EligibilityRunStudents" USING btree ("RunID", "StudentID") WHERE (("Status")::text = 'PENDING'::text);
 CREATE INDEX "IX_EligibilityStudentHistory" ON public."EligibilityChecks" USING btree ("StudentID", "OJTSemesterID", "CheckID" DESC);
 CREATE INDEX "IX_EmailOutbox_Pending" ON public."EmailOutbox" USING btree ("Status", "NextAttemptAt");
-CREATE INDEX "IX_HandoffStudentSemester" ON public."EligibleStudentHandoffItems" USING btree ("StudentID", "OJTSemesterID");
 CREATE INDEX "IX_InternshipAssignments_Enterprise" ON public."InternshipAssignments" USING btree ("EnterpriseID");
 CREATE INDEX "IX_InternshipAssignments_Student" ON public."InternshipAssignments" USING btree ("StudentID");
 CREATE INDEX "IX_InternshipPositions_Enterprise" ON public."InternshipPositions" USING btree ("EnterpriseID");
@@ -1694,35 +1669,53 @@ BEGIN
  RETURN NEW;
 END $function$
 ;
-CREATE OR REPLACE FUNCTION public."GuardAcademicHandoff"()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
+CREATE SCHEMA IF NOT EXISTS ojt_history;
+REVOKE ALL ON SCHEMA ojt_history FROM PUBLIC;
+DO $archive$
 BEGIN
- PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
- IF NOT EXISTS (SELECT 1 FROM "EligibilityChecks" e JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID"
-   WHERE e."CheckID"=NEW."CheckID" AND e."StudentID"=NEW."StudentID" AND e."OJTSemesterID"=NEW."OJTSemesterID" AND e."Status"='ELIGIBLE') THEN
-  RAISE EXCEPTION 'Handoff requires a confirmed eligible check for this student and semester' USING ERRCODE='23514';
- END IF;
- IF EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" i WHERE i."StudentID"=NEW."StudentID" AND i."OJTSemesterID"=NEW."OJTSemesterID") THEN
-  RAISE EXCEPTION 'Student already handed off for this semester' USING ERRCODE='23505';
- END IF;
- RETURN NEW;
-END $function$
-;
+  IF to_regclass('ojt_history."StudentEligibilityItems"') IS NULL THEN
+    CREATE VIEW ojt_history."StudentEligibilityItems" AS
+    SELECT NULL::integer AS "HandoffID", NULL::integer AS "OJTSemesterID",
+      NULL::integer AS "RegistrationID", NULL::integer AS "StudentID", NULL::integer AS "CheckID",
+      NULL::jsonb AS "Snapshot", NULL::integer AS "CalculatedBatchID"
+    WHERE false;
+    CREATE VIEW ojt_history."EligibilityBatches" AS
+    SELECT NULL::integer AS "HandoffID", NULL::integer AS "OJTSemesterID",
+      NULL::jsonb AS "RegistrationIDs", NULL::text AS "Reason",
+      NULL::integer AS "CreatedBy", NULL::timestamptz AS "CreatedAt", NULL::text AS "RecipientRole"
+    WHERE false;
+  END IF;
+  REVOKE ALL ON ojt_history."StudentEligibilityItems", ojt_history."EligibilityBatches" FROM PUBLIC;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN
+    REVOKE ALL ON SCHEMA ojt_history FROM anon;
+    REVOKE ALL ON ojt_history."StudentEligibilityItems", ojt_history."EligibilityBatches" FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
+    REVOKE ALL ON SCHEMA ojt_history FROM authenticated;
+    REVOKE ALL ON ojt_history."StudentEligibilityItems", ojt_history."EligibilityBatches" FROM authenticated;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+    REVOKE ALL ON ojt_history."StudentEligibilityItems", ojt_history."EligibilityBatches" FROM service_role;
+    GRANT USAGE ON SCHEMA ojt_history TO service_role;
+    GRANT SELECT ON ojt_history."StudentEligibilityItems", ojt_history."EligibilityBatches" TO service_role;
+  END IF;
+END $archive$;
+
 CREATE OR REPLACE FUNCTION public."GuardHandedOffRegistration"()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
+RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_catalog AS $guard$
 BEGIN
- IF TG_OP<>'INSERT' AND OLD."Status"='HANDED_OFF' AND EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" i WHERE i."RegistrationID"=OLD."RegistrationID") THEN
- RAISE EXCEPTION 'Handed-off academic application is immutable' USING ERRCODE='23514'; END IF;
- IF TG_OP='DELETE' THEN RETURN OLD; END IF;
- IF NEW."WindowID" IS NOT NULL AND NEW."Status"='HANDED_OFF' AND NOT EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" i WHERE i."RegistrationID"=NEW."RegistrationID") THEN
- RAISE EXCEPTION 'Handed-off application requires a handoff record' USING ERRCODE='23514'; END IF;
- RETURN NEW;
-END $function$
-;
+  IF TG_OP<>'INSERT' AND OLD."Status"='HANDED_OFF' AND EXISTS (
+    SELECT 1 FROM ojt_history."StudentEligibilityItems" i WHERE i."RegistrationID"=OLD."RegistrationID"
+  ) THEN
+    RAISE EXCEPTION 'Historical OJT registration is immutable' USING ERRCODE='23514';
+  END IF;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  IF NEW."Status"='HANDED_OFF' AND (TG_OP='INSERT' OR OLD."Status" IS DISTINCT FROM 'HANDED_OFF') THEN
+    RAISE EXCEPTION 'The handoff status is retired' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public."GuardOJTResult"()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1878,7 +1871,7 @@ BEGIN
   IF NEW."RequiredRelativeSemester"<>6 OR NEW."AcademicPeriodID" IS DISTINCT FROM period_id OR period_id IS NULL THEN
    RAISE EXCEPTION 'The registration window must target OJT semester 6 and its linked academic period.' USING ERRCODE='23514';
   END IF;
- ELSIF TG_TABLE_NAME='OJTRegistrations' OR TG_TABLE_NAME='EligibleStudentHandoffItems' THEN
+ ELSIF TG_TABLE_NAME='OJTRegistrations' THEN
   PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",NEW."OJTSemesterID");
  ELSIF TG_TABLE_NAME='InternshipAssignments' THEN
   SELECT "OJTSemesterID" INTO term_id FROM "InternshipPositions" WHERE "PositionID"=NEW."PositionID";
@@ -5884,11 +5877,6 @@ ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStuden
 ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStudents_RuleSetID_fkey" FOREIGN KEY ("RuleSetID") REFERENCES "OJTRuleSets"("RuleSetID");
 ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStudents_RunID_fkey" FOREIGN KEY ("RunID") REFERENCES "EligibilityCheckRuns"("RunID");
 ALTER TABLE public."EligibilityRunStudents" ADD CONSTRAINT "EligibilityRunStudents_StudentID_fkey" FOREIGN KEY ("StudentID") REFERENCES "Students"("StudentID");
-ALTER TABLE public."EligibleStudentHandoffItems" ADD CONSTRAINT "EligibleStudentHandoffItems_CheckID_StudentID_OJTSemesterI_fkey" FOREIGN KEY ("CheckID", "StudentID", "OJTSemesterID") REFERENCES "EligibilityChecks"("CheckID", "StudentID", "OJTSemesterID");
-ALTER TABLE public."EligibleStudentHandoffItems" ADD CONSTRAINT "EligibleStudentHandoffItems_HandoffID_OJTSemesterID_fkey" FOREIGN KEY ("HandoffID", "OJTSemesterID") REFERENCES "EligibleStudentHandoffs"("HandoffID", "OJTSemesterID");
-ALTER TABLE public."EligibleStudentHandoffItems" ADD CONSTRAINT "EligibleStudentHandoffItems_RegistrationID_StudentID_OJTSe_fkey" FOREIGN KEY ("RegistrationID", "StudentID", "OJTSemesterID") REFERENCES "OJTRegistrations"("RegistrationID", "StudentID", "OJTSemesterID");
-ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_CreatedBy_fkey" FOREIGN KEY ("CreatedBy") REFERENCES "Users"("UserID");
-ALTER TABLE public."EligibleStudentHandoffs" ADD CONSTRAINT "EligibleStudentHandoffs_OJTSemesterID_fkey" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."EmailOutbox" ADD CONSTRAINT "EmailOutbox_UserID_fkey" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID");
 ALTER TABLE public."EnterpriseUsers" ADD CONSTRAINT "FK_EnterpriseUsers_Enterprise" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID") ON DELETE CASCADE;
 ALTER TABLE public."EnterpriseUsers" ADD CONSTRAINT "FK_EnterpriseUsers_User" FOREIGN KEY ("UserID") REFERENCES "Users"("UserID") ON DELETE CASCADE;
@@ -6063,10 +6051,6 @@ CREATE TRIGGER "TR_AppendOnly_ComboExtensionStudents" BEFORE DELETE OR UPDATE ON
 CREATE TRIGGER "TR_AppendOnly_ComboWindowExtensions" BEFORE DELETE OR UPDATE ON "ComboWindowExtensions" FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
 CREATE TRIGGER "TR_AppendOnly_EligibilityChecks" BEFORE DELETE OR UPDATE ON "EligibilityChecks" FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
 CREATE TRIGGER "TR_AppendOnly_EligibilityConfirmations" BEFORE DELETE OR UPDATE ON "EligibilityConfirmations" FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
-CREATE TRIGGER "TR_AppendOnly_EligibleStudentHandoffItems" BEFORE DELETE OR UPDATE ON "EligibleStudentHandoffItems" FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
-CREATE TRIGGER "TR_FixedOJT_Handoff" BEFORE INSERT ON "EligibleStudentHandoffItems" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
-CREATE TRIGGER "TR_ValidateAcademicHandoff" BEFORE INSERT ON "EligibleStudentHandoffItems" FOR EACH ROW EXECUTE FUNCTION "GuardAcademicHandoff"();
-CREATE TRIGGER "TR_AppendOnly_EligibleStudentHandoffs" BEFORE DELETE OR UPDATE ON "EligibleStudentHandoffs" FOR EACH ROW EXECUTE FUNCTION "GuardComboHistory"();
 CREATE TRIGGER "TR_FixedOJT_Assignment" BEFORE INSERT OR UPDATE OF "StudentID", "PositionID" ON "InternshipAssignments" FOR EACH ROW EXECUTE FUNCTION "GuardFixedOJTSemester6"();
 CREATE TRIGGER "TR_JobApplications_Updated" BEFORE UPDATE ON "JobApplications" FOR EACH ROW EXECUTE FUNCTION "TouchUpdatedAt"();
 CREATE TRIGGER "TR_ActiveOJTRule" BEFORE INSERT OR UPDATE ON "OJTActiveRuleSets" FOR EACH ROW EXECUTE FUNCTION "CheckActiveOJTRule"();
@@ -6129,8 +6113,6 @@ ALTER TABLE public."EligibilityCheckRuns" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityChecks" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityConfirmations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EligibilityRunStudents" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."EligibleStudentHandoffItems" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."EligibleStudentHandoffs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EmailOutbox" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."EnterpriseUsers" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."Enterprises" ENABLE ROW LEVEL SECURITY;
@@ -6226,8 +6208,6 @@ BEGIN
   ('EligibilityChecks','TABLE'),
   ('EligibilityConfirmations','TABLE'),
   ('EligibilityRunStudents','TABLE'),
-  ('EligibleStudentHandoffItems','TABLE'),
-  ('EligibleStudentHandoffs','TABLE'),
   ('EmailOutbox','TABLE'),
   ('EnterpriseUsers','TABLE'),
   ('Enterprises','TABLE'),
@@ -6308,7 +6288,6 @@ BEGIN
   ('Courses_CourseID_seq','SEQUENCE'),
   ('EligibilityCheckRuns_RunID_seq','SEQUENCE'),
   ('EligibilityChecks_CheckID_seq','SEQUENCE'),
-  ('EligibleStudentHandoffs_HandoffID_seq','SEQUENCE'),
   ('EmailOutbox_EmailID_seq','SEQUENCE'),
   ('EnterpriseUsers_EnterpriseUserID_seq','SEQUENCE'),
   ('Enterprises_EnterpriseID_seq','SEQUENCE'),
@@ -6410,9 +6389,6 @@ BEGIN
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibilityChecks_CheckID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityConfirmations" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibilityRunStudents" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffItems" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE replace('GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public."EligibleStudentHandoffs" TO "service_role"','MAINTAIN, ',CASE WHEN current_setting('server_version_num')::int >= 170000 THEN 'MAINTAIN, ' ELSE '' END); END IF;
- IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EligibleStudentHandoffs_HandoffID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."EnterpriseUsers" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."EnterpriseUsers_EnterpriseUserID_seq" TO "service_role"'; END IF;
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."Enterprises" TO "service_role"'; END IF;
@@ -6524,7 +6500,6 @@ BEGIN
  EXECUTE 'REVOKE ALL ON FUNCTION public."GuardComboHistory"() FROM PUBLIC';
  EXECUTE 'REVOKE ALL ON FUNCTION public."GuardOJTRuleSet"() FROM PUBLIC';
  EXECUTE 'REVOKE ALL ON FUNCTION public."CheckActiveOJTRule"() FROM PUBLIC';
- EXECUTE 'REVOKE ALL ON FUNCTION public."GuardAcademicHandoff"() FROM PUBLIC';
  EXECUTE 'REVOKE ALL ON FUNCTION public."GuardHandedOffRegistration"() FROM PUBLIC';
  EXECUTE 'REVOKE ALL ON FUNCTION public."GuardOJTResult"() FROM PUBLIC';
  EXECUTE 'REVOKE ALL ON FUNCTION public."GuardOfficialOJTGrade"() FROM PUBLIC';
@@ -6544,7 +6519,6 @@ BEGIN
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."AssertStudentOJTTerm6"(student_id integer, semester_id integer) TO PUBLIC';
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."CheckActiveOJTRule"() TO PUBLIC';
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."CurriculumCohortCodes"(program_code text) TO PUBLIC';
- EXECUTE 'GRANT EXECUTE ON FUNCTION public."GuardAcademicHandoff"() TO PUBLIC';
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."GuardAssessmentTemplate"() TO PUBLIC';
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."GuardComboHistory"() TO PUBLIC';
  EXECUTE 'GRANT EXECUTE ON FUNCTION public."GuardFixedOJTSemester6"() TO PUBLIC';
@@ -6633,62 +6607,6 @@ BEGIN
   GRANT USAGE,SELECT ON SEQUENCE public."OJTEligibilityResultBatches_BatchID_seq" TO service_role;
  END IF;
 END $security$;
-
-ALTER TABLE public."EligibleStudentHandoffItems" ADD CONSTRAINT "FK_EligibleStudentHandoffItems_CalculatedBatchID_Merged" FOREIGN KEY ("CalculatedBatchID") REFERENCES public."OJTEligibilityResultBatches"("BatchID");
-DO $handoff_constraint$
-BEGIN
- IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public."EligibleStudentHandoffItems"'::regclass AND conname='CK_Handoff_EligibilitySource') THEN
-  ALTER TABLE public."EligibleStudentHandoffItems" ADD CONSTRAINT "CK_Handoff_EligibilitySource"
-    CHECK (("CheckID" IS NOT NULL) <> ("CalculatedBatchID" IS NOT NULL));
- END IF;
-END $handoff_constraint$;
-CREATE OR REPLACE FUNCTION public."GuardAcademicHandoff"()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO 'public', 'pg_catalog'
-AS $function$
-DECLARE saved record; student record; expected jsonb;
-BEGIN
- PERFORM pg_advisory_xact_lock(hashtext('academic-calendar'));
- IF NEW."CalculatedBatchID" IS NOT NULL THEN
-  SELECT s."ProgramID",s."Status",s."DeletedAt",s."CurrentSemester",u."Status" AS account_status,
-    p."CurrentAcademicPeriodID",p."UpdatedAt" AS placement_updated,
-    "StudentCurriculumSemester"(s."StudentID",p."CurrentAcademicPeriodID") AS stage
-  INTO student FROM "Students" s JOIN "Users" u USING("UserID")
-    LEFT JOIN "StudentAcademicPlacements" p USING("StudentID")
-  WHERE s."StudentID"=NEW."StudentID" FOR UPDATE OF s FOR SHARE OF u;
-  IF NOT FOUND OR student."DeletedAt" IS NOT NULL OR student."Status"<>'ACTIVE' OR student.account_status<>'ACTIVE'
-    OR student."CurrentSemester" IS DISTINCT FROM 5 OR student.stage IS DISTINCT FROM 5 THEN
-   RAISE EXCEPTION 'Handoff requires an active semester 5 student' USING ERRCODE='23514';
-  END IF;
-  SELECT * INTO saved FROM "StudentOJTCalculatedResults" WHERE "StudentID"=NEW."StudentID" FOR SHARE;
-  IF NOT FOUND OR saved."BatchID" IS DISTINCT FROM NEW."CalculatedBatchID" OR saved."Status"<>'ELIGIBLE'
-    OR saved."ProgramID" IS DISTINCT FROM student."ProgramID" OR student.placement_updated>saved."CheckedAt"
-    OR EXISTS (SELECT 1 FROM "StudentCourseResults" h WHERE h."StudentID"=NEW."StudentID" AND COALESCE(h."UpdatedAt",h."CreatedAt")>saved."CheckedAt") THEN
-   RAISE EXCEPTION 'Handoff requires a current saved eligible frontend result' USING ERRCODE='23514';
-  END IF;
-  IF EXISTS (SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=NEW."OJTSemesterID" AND "Status" IN ('CLOSED','ARCHIVED')) THEN
-   RAISE EXCEPTION 'Target OJT semester is closed' USING ERRCODE='23514';
-  END IF;
-  PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",NEW."OJTSemesterID");
-  expected := saved."Result" || jsonb_build_object('source','FRONTEND','batchId',saved."BatchID",'savedAt',saved."SavedAt",'savedBy',saved."SavedBy",'isStale',false);
-  IF NEW."Snapshot"->'calculatedEligibility' IS DISTINCT FROM expected
-    OR NEW."Snapshot"->'studentId' IS DISTINCT FROM to_jsonb(NEW."StudentID")
-    OR NEW."Snapshot"->'currentSemester' IS DISTINCT FROM '5'::jsonb
-    OR NEW."Snapshot"->'targetSemester' IS DISTINCT FROM '6'::jsonb THEN
-   RAISE EXCEPTION 'Handoff snapshot must match the saved eligibility result' USING ERRCODE='23514';
-  END IF;
- ELSE
-  IF NOT EXISTS (SELECT 1 FROM "EligibilityChecks" e JOIN "EligibilityConfirmations" f ON f."CheckID"=e."CheckID"
-    WHERE e."CheckID"=NEW."CheckID" AND e."StudentID"=NEW."StudentID" AND e."OJTSemesterID"=NEW."OJTSemesterID" AND e."Status"='ELIGIBLE') THEN
-   RAISE EXCEPTION 'Handoff requires a confirmed eligible check for this student and semester' USING ERRCODE='23514';
-  END IF;
- END IF;
- IF EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" i WHERE i."StudentID"=NEW."StudentID" AND i."OJTSemesterID"=NEW."OJTSemesterID") THEN
-  RAISE EXCEPTION 'Student already handed off for this semester' USING ERRCODE='23505';
- END IF;
- RETURN NEW;
-END $function$;
 
 CREATE INDEX IF NOT EXISTS "IX_EnterpriseRecruitment_Continuation" ON public."RecruitmentPosts"("OJTSemesterID","WindowID")
  WHERE "EnterpriseManaged" AND "Status" IN ('PUBLISHED','CLOSED');
@@ -8092,36 +8010,61 @@ CREATE TRIGGER "TR_OjtScheduleConditions"
 COMMIT;
 BEGIN;
 
+-- Preserve the semester once OJT202 has been recorded. Until then use the
+-- first regular semester after the student's current semester (or block parent).
+CREATE OR REPLACE FUNCTION public."DefaultOJTAcademicPeriod"(student_id integer)
+RETURNS integer LANGUAGE sql STABLE SET search_path=public,pg_catalog AS $period$
+ SELECT COALESCE(
+   (SELECT grade."AcademicPeriodID" FROM "StudentCourseResults" grade
+    JOIN "Courses" course USING ("CourseID")
+    WHERE grade."StudentID"=student_id AND grade."SourceReference"='AUTO_OJT_ENROLLMENT'
+      AND upper(course."CourseCode")='OJT202'
+    ORDER BY grade."ResultID" LIMIT 1),
+   (SELECT next_period."AcademicPeriodID"
+    FROM "StudentAcademicPlacements" placement
+    JOIN "AcademicPeriods" current_period ON current_period."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
+    JOIN "AcademicPeriods" semester ON semester."AcademicPeriodID"=COALESCE(current_period."ParentPeriodID",current_period."AcademicPeriodID")
+    JOIN "AcademicPeriods" next_period ON next_period."Kind"='SEMESTER' AND next_period."StartDate">semester."EndDate"
+    WHERE placement."StudentID"=student_id
+    ORDER BY next_period."StartDate",next_period."AcademicPeriodID"
+    LIMIT 1)
+ );
+$period$;
+
 CREATE OR REPLACE VIEW public."OJTRecruitmentRoster" WITH (security_invoker=true) AS
 SELECT s."StudentID", target."OJTSemesterID", round."WindowID" AS "RoundID",
   round."Name" AS "RoundName", saved."BatchID", saved."CheckedAt"
 FROM public."Students" s
 JOIN public."Users" u ON u."UserID"=s."UserID"
 JOIN public."StudentOJTCalculatedResults" saved USING ("StudentID")
-LEFT JOIN public."StudentAcademicPlacements" placement USING ("StudentID")
-LEFT JOIN public."CohortCurriculumPeriods" plan ON plan."CohortID"=placement."CohortID"
-  AND plan."GroupCode"=placement."GroupCode" AND plan."CurriculumSemester"=6
-LEFT JOIN public."OJTSemesters" target ON target."AcademicPeriodID"=plan."AcademicPeriodID"
+LEFT JOIN public."OJTSemesters" target
+  ON target."AcademicPeriodID"=public."DefaultOJTAcademicPeriod"(s."StudentID")
 LEFT JOIN LATERAL (
   SELECT w."WindowID",w."Name"
   FROM public."RecruitmentWindows" w
   WHERE w."OJTSemesterID"=target."OJTSemesterID" AND target."Status" NOT IN ('CLOSED','ARCHIVED')
+    AND EXISTS (
+      SELECT 1 FROM public."ProgramCourses" pc
+      JOIN public."Courses" c USING ("CourseID")
+      JOIN public."TrainingPrograms" program USING ("ProgramID")
+      WHERE pc."ProgramID"=s."ProgramID" AND program."Status"='PUBLISHED'
+        AND upper(c."CourseCode")='OJT202' AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6
+    )
     AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
     AND w."EndsAt">statement_timestamp() AND COALESCE(w."ApplicationEndsAt",w."EndsAt")>statement_timestamp()
   ORDER BY COALESCE(w."ApplicationStartsAt",w."StartsAt"),w."WindowID"
   LIMIT 1
 ) round ON true
 WHERE saved."Status"='ELIGIBLE' AND s."Status"='ACTIVE' AND u."Status"='ACTIVE' AND s."DeletedAt" IS NULL
-  AND NOT EXISTS (SELECT 1 FROM public."OJTResults" result WHERE result."StudentID"=s."StudentID")
   AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" grade JOIN public."Courses" course USING ("CourseID")
     WHERE grade."StudentID"=s."StudentID" AND upper(course."CourseCode")='OJT202'
-      AND grade."Status" IN ('PASSED','FAILED','RECOGNIZED'));
+      AND grade."Status"='PASSED');
 
 -- Historical registrations and handoffs remain visible in existing dossiers.
 CREATE OR REPLACE VIEW public."OJTRecruitmentAccess" WITH (security_invoker=true) AS
 SELECT "StudentID","OJTSemesterID" FROM public."OJTRecruitmentRoster" WHERE "OJTSemesterID" IS NOT NULL
 UNION
-SELECT "StudentID","OJTSemesterID" FROM public."EligibleStudentHandoffItems"
+SELECT "StudentID","OJTSemesterID" FROM ojt_history."StudentEligibilityItems"
 UNION
 SELECT "StudentID","OJTSemesterID" FROM public."OJTRegistrations"
 WHERE "PathwaySnapshot"->>'admissionSource'='SAVED_ELIGIBILITY';
@@ -8138,5 +8081,241 @@ DO $$ BEGIN
     GRANT SELECT ON public."OJTRecruitmentRoster",public."OJTRecruitmentAccess" TO service_role;
   END IF;
 END $$;
+
+COMMIT;
+
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
+
+CREATE OR REPLACE FUNCTION public."AssertStudentOJTTerm6"(student_id integer, semester_id integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+DECLARE entry_start date; target_start date; target_kind text; relative_term int;
+BEGIN
+ SELECT entry."StartDate" INTO entry_start FROM "StudentAcademicPlacements" placement
+ JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID"
+ WHERE placement."StudentID"=student_id AND entry."Kind"='SEMESTER';
+ SELECT target."StartDate",target."Kind" INTO target_start,target_kind FROM "OJTSemesters" term
+ JOIN "AcademicPeriods" target ON target."AcademicPeriodID"=term."AcademicPeriodID"
+ WHERE term."OJTSemesterID"=semester_id;
+ IF entry_start IS NULL OR target_start IS NULL OR target_kind<>'SEMESTER' THEN
+  RAISE EXCEPTION 'OJT requires an actual student entry semester and a target semester.' USING ERRCODE='23514';
+ END IF;
+ SELECT "StudentCurriculumSemester"(student_id,"AcademicPeriodID") INTO relative_term FROM "OJTSemesters" WHERE "OJTSemesterID"=semester_id;
+ IF relative_term IS DISTINCT FROM 6 AND NOT EXISTS (
+  SELECT 1 FROM "StudentCourseResults" grade JOIN "OJTSemesters" term USING ("AcademicPeriodID")
+  JOIN "Courses" course ON course."CourseID"=grade."CourseID"
+  WHERE term."OJTSemesterID"=semester_id AND grade."StudentID"=student_id
+    AND upper(course."CourseCode")='OJT202' AND grade."SourceReference"='AUTO_OJT_ENROLLMENT' AND grade."SemesterTaken"=6
+ ) THEN
+  RAISE EXCEPTION 'OJT is fixed in relative semester 6; student % is in semester % for this target.',student_id,relative_term USING ERRCODE='23514';
+ END IF;
+END $function$
+;
+CREATE OR REPLACE FUNCTION public."GuardFixedOJTSemester6"()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+DECLARE term_id int; period_id int; root_period int; relative_term int; entry_start date; target_start date; is_ojt boolean;
+BEGIN
+ IF TG_TABLE_NAME='ProgramCourses' THEN
+  SELECT upper("CourseCode")='OJT202' INTO is_ojt FROM "Courses" WHERE "CourseID"=NEW."CourseID";
+  IF is_ojt AND (NEW."RecommendedSemester" IS DISTINCT FROM 6 OR NEW."EntryKind"<>'COURSE') THEN
+   RAISE EXCEPTION 'OJT202 must be a concrete curriculum course in semester 6.' USING ERRCODE='23514';
+  END IF;
+ ELSIF TG_TABLE_NAME='OJTRegistrationWindows' THEN
+  SELECT "AcademicPeriodID" INTO period_id FROM "OJTSemesters" WHERE "OJTSemesterID"=NEW."OJTSemesterID";
+  IF NEW."RequiredRelativeSemester"<>6 OR NEW."AcademicPeriodID" IS DISTINCT FROM period_id OR period_id IS NULL THEN
+   RAISE EXCEPTION 'The registration window must target OJT semester 6 and its linked academic period.' USING ERRCODE='23514';
+  END IF;
+ ELSIF TG_TABLE_NAME='OJTRegistrations' THEN
+  PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",NEW."OJTSemesterID");
+ ELSIF TG_TABLE_NAME='InternshipAssignments' THEN
+  SELECT "OJTSemesterID" INTO term_id FROM "InternshipPositions" WHERE "PositionID"=NEW."PositionID";
+  PERFORM "AssertStudentOJTTerm6"(NEW."StudentID",term_id);
+ ELSIF TG_TABLE_NAME='ProgramOJTGradeMappings' THEN
+  IF NOT EXISTS(SELECT 1 FROM "ProgramCourses" pc JOIN "Courses" c USING("CourseID") WHERE pc."ProgramID"=NEW."ProgramID" AND pc."CourseID"=NEW."CourseID" AND upper(c."CourseCode")='OJT202' AND pc."RecommendedSemester"=6 AND pc."EntryKind"='COURSE') THEN
+   RAISE EXCEPTION 'OJT grade mapping must use the curriculum OJT202 course in semester 6.' USING ERRCODE='23514';
+  END IF;
+  SELECT "AcademicPeriodID" INTO period_id FROM "OJTSemesters" WHERE "OJTSemesterID"=NEW."OJTSemesterID";
+  SELECT CASE WHEN "Kind"='BLOCK3' THEN "ParentPeriodID" ELSE "AcademicPeriodID" END INTO root_period FROM "AcademicPeriods" WHERE "AcademicPeriodID"=NEW."AcademicPeriodID";
+  IF root_period IS DISTINCT FROM period_id OR root_period IS NULL THEN
+   RAISE EXCEPTION 'OJT grades must be recorded in the target OJT semester, or its Block 3.' USING ERRCODE='23514';
+  END IF;
+ ELSIF TG_TABLE_NAME='StudentCourseResults' THEN
+  SELECT upper("CourseCode")='OJT202' INTO is_ojt FROM "Courses" WHERE "CourseID"=NEW."CourseID";
+  IF is_ojt THEN
+   SELECT entry."StartDate" INTO entry_start FROM "StudentAcademicPlacements" placement JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID" WHERE placement."StudentID"=NEW."StudentID";
+   SELECT root."StartDate" INTO target_start FROM "AcademicPeriods" p JOIN "AcademicPeriods" root ON root."AcademicPeriodID"=CASE WHEN p."Kind"='BLOCK3' THEN p."ParentPeriodID" ELSE p."AcademicPeriodID" END WHERE p."AcademicPeriodID"=NEW."AcademicPeriodID" AND root."Kind"='SEMESTER';
+   relative_term := "StudentCurriculumSemester"(NEW."StudentID",NEW."AcademicPeriodID");
+   IF NEW."SemesterTaken" IS DISTINCT FROM 6 OR (relative_term IS DISTINCT FROM 6 AND (
+     NEW."SourceReference" IS DISTINCT FROM 'AUTO_OJT_ENROLLMENT'
+     OR NEW."AcademicPeriodID" IS DISTINCT FROM "DefaultOJTAcademicPeriod"(NEW."StudentID")
+    )) OR entry_start IS NULL OR target_start IS NULL THEN
+    RAISE EXCEPTION 'OJT202 results must belong to the student relative semester 6.' USING ERRCODE='23514';
+   END IF;
+  END IF;
+ END IF;
+ RETURN NEW;
+END $function$
+;
+CREATE OR REPLACE FUNCTION public."ValidateStudentStudyHistory"(student_id integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+DECLARE student record; attempt record; required_group record; stage int; passed_count int;
+BEGIN
+ SELECT s.*,p."Status" AS program_status INTO student FROM "Students" s
+ LEFT JOIN "TrainingPrograms" p ON p."ProgramID"=s."ProgramID" WHERE s."StudentID"=student_id;
+ IF NOT FOUND THEN RETURN; END IF;
+ -- New student accounts may be provisioned before academic placement/import.
+ -- Only bypass history validation for a completely unassigned profile.
+ -- Once a program, term, placement, or result exists, full rules apply.
+ IF student."ProgramID" IS NULL
+    AND student."CurrentSemester" IS NULL
+    AND NOT EXISTS (SELECT 1 FROM "StudentAcademicPlacements" ap WHERE ap."StudentID"=student_id)
+    AND NOT EXISTS (SELECT 1 FROM "StudentCourseResults" cr WHERE cr."StudentID"=student_id)
+ THEN
+   RETURN;
+ END IF;
+ IF student."ProgramID" IS NULL OR student.program_status IS DISTINCT FROM 'PUBLISHED' THEN
+  RAISE EXCEPTION 'Student % requires a published curriculum.',student_id USING ERRCODE='23514';
+ END IF;
+ IF student."CurrentSemester" IS NULL OR student."CurrentSemester" NOT BETWEEN 0 AND 9 THEN
+  RAISE EXCEPTION 'Student curriculum stage must be between 0 and 9.' USING ERRCODE='23514';
+ END IF;
+ SELECT "StudentCurriculumSemester"(student_id,p."CurrentAcademicPeriodID") INTO stage
+ FROM "StudentAcademicPlacements" p WHERE p."StudentID"=student_id;
+ IF stage IS DISTINCT FROM student."CurrentSemester" THEN
+  RAISE EXCEPTION 'Student % requires a placement matching the current curriculum stage.',student_id USING ERRCODE='23514';
+ END IF;
+ IF stage>0 AND NOT EXISTS(SELECT 1 FROM "StudentCourseResults" r WHERE r."StudentID"=student_id AND r."SemesterTaken"<stage) THEN
+  RAISE EXCEPTION 'Student % requires earlier course history.',student_id USING ERRCODE='23514';
+ END IF;
+ FOR attempt IN SELECT r.*,p."StartDate",pc."ProgramCourseID", c."CourseCode" FROM "StudentCourseResults" r
+  JOIN "Courses" c ON c."CourseID"=r."CourseID"
+  JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=r."AcademicPeriodID"
+  LEFT JOIN "ProgramCourses" pc ON pc."ProgramID"=student."ProgramID" AND pc."CourseID"=r."CourseID" AND pc."EntryKind"='COURSE'
+  WHERE r."StudentID"=student_id LOOP
+  -- The OJT eligibility decision authorizes the automatic OJT202 enrollment.
+  IF attempt."SourceReference"='AUTO_OJT_ENROLLMENT' AND attempt."Status"='IN_PROGRESS'
+   AND upper(attempt."CourseCode")='OJT202' AND attempt."ProgramCourseID" IS NOT NULL
+   AND attempt."SemesterTaken"=6
+   AND attempt."AcademicPeriodID"="DefaultOJTAcademicPeriod"(student_id) AND attempt."Score" IS NULL AND attempt."Grade" IS NULL
+   AND attempt."GradePoints" IS NULL
+   AND EXISTS(SELECT 1 FROM "StudentOJTCalculatedResults" saved
+    WHERE saved."StudentID"=student_id AND saved."Status"='ELIGIBLE') THEN
+   CONTINUE;
+  END IF;
+  IF attempt."SemesterTaken" IS DISTINCT FROM "StudentCurriculumSemester"(student_id,attempt."AcademicPeriodID") THEN
+   RAISE EXCEPTION 'Course history must match the mapped curriculum stage.' USING ERRCODE='23514';
+  END IF;
+  IF attempt."SemesterTaken">stage THEN
+   RAISE EXCEPTION 'Course history must match the mapped curriculum stage and cannot exceed student progress.' USING ERRCODE='23514';
+  END IF;
+  -- Concrete subjects and approved combo options retain their own curriculum tag.
+  IF NOT EXISTS(SELECT 1 FROM "ProgramCourses" pc WHERE pc."ProgramID"=student."ProgramID"
+    AND pc."CourseID"=attempt."CourseID" AND pc."EntryKind"='COURSE')
+   AND NOT EXISTS(SELECT 1 FROM "ProgramCombos" b JOIN "ComboCourses" cc USING("ProgramComboID")
+    WHERE b."ProgramID"=student."ProgramID" AND b."CoursesReviewed" AND cc."CourseID"=attempt."CourseID") THEN
+   RAISE EXCEPTION 'Course % is outside the curriculum.',attempt."CourseID" USING ERRCODE='23514';
+  END IF;
+  -- Prerequisite prose is not proof that a subject has no prerequisites.
+  IF EXISTS (
+    SELECT 1 FROM "ProgramCourses" pc WHERE pc."ProgramCourseID"=attempt."ProgramCourseID"
+      AND lower(btrim(COALESCE(pc."PrerequisiteText",''))) NOT IN ('','none','n/a','na','không','no','-')
+  ) AND NOT EXISTS (
+    SELECT 1 FROM "ProgramPrerequisiteGroups" g WHERE g."ProgramID"=student."ProgramID" AND g."ProgramCourseID"=attempt."ProgramCourseID"
+  ) THEN
+    RAISE EXCEPTION 'Course % requires structured prerequisite configuration before importing history.',attempt."CourseID" USING ERRCODE='23514';
+  END IF;
+  IF attempt."ProgramCourseID" IS NULL AND EXISTS (
+    SELECT 1 FROM "ComboCourses" cc JOIN "ProgramCombos" b USING("ProgramComboID")
+    WHERE b."ProgramID"=student."ProgramID" AND cc."CourseID"=attempt."CourseID"
+      AND b."CoursesReviewed" AND lower(btrim(COALESCE(cc."PrerequisiteText",''))) NOT IN ('','none','n/a','na','không','no','-')
+  ) AND NOT EXISTS (
+    SELECT 1 FROM "ProgramPrerequisiteGroups" g JOIN "ProgramSlotOptions" opt ON opt."ProgramCourseID"=g."ProgramCourseID"
+    JOIN "ComboCourses" cc ON cc."ComboCourseID"=opt."ComboCourseID"
+    WHERE g."ProgramID"=student."ProgramID" AND cc."CourseID"=attempt."CourseID"
+  ) THEN
+    RAISE EXCEPTION 'Combo course % requires structured prerequisite configuration before importing history.',attempt."CourseID" USING ERRCODE='23514';
+  END IF;
+  FOR required_group IN SELECT g.* FROM "ProgramPrerequisiteGroups" g
+   WHERE g."ProgramID"=student."ProgramID" AND (g."ProgramCourseID"=attempt."ProgramCourseID"
+    OR g."ProgramCourseID" IN (
+      SELECT opt."ProgramCourseID" FROM "ProgramSlotOptions" opt
+      JOIN "ComboCourses" cc ON cc."ComboCourseID"=opt."ComboCourseID"
+      JOIN "ProgramCombos" b ON b."ProgramComboID"=cc."ProgramComboID"
+      WHERE b."ProgramID"=student."ProgramID" AND b."CoursesReviewed" AND cc."CourseID"=attempt."CourseID"
+    )) LOOP
+   SELECT count(*) INTO passed_count FROM "ProgramPrerequisiteMembers" m WHERE m."GroupID"=required_group."GroupID"
+    AND EXISTS(SELECT 1 FROM "StudentCourseResults" passed
+     WHERE passed."StudentID"=student_id AND passed."CourseID"=m."CourseID"
+      AND passed."Status" IN ('PASSED','RECOGNIZED') AND passed."SemesterTaken"<attempt."SemesterTaken");
+   IF passed_count<required_group."MinimumPassed" THEN
+    RAISE EXCEPTION 'Course % requires passed prerequisite group % in an earlier stage.',attempt."CourseID",required_group."GroupCode" USING ERRCODE='23514';
+   END IF;
+  END LOOP;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM "StudentCourseResults" r LEFT JOIN "AcademicPeriods" p USING("AcademicPeriodID")
+  WHERE r."StudentID"=student_id AND (p."AcademicPeriodID" IS NULL OR r."AcademicYearID" IS DISTINCT FROM p."AcademicYearID")) THEN
+  RAISE EXCEPTION 'Course history requires a matching academic year and period.' USING ERRCODE='23514';
+ END IF;
+END $function$
+;
+CREATE OR REPLACE FUNCTION public."EnrollAssignedOJTStudents"(target_student integer, target_semester integer)
+RETURNS void LANGUAGE sql SET search_path=public,pg_catalog AS $enroll$
+ INSERT INTO "StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Status","AcademicPeriodID","SourceReference")
+ SELECT roster."StudentID",pc."CourseID",6,period."AcademicYearID",'IN_PROGRESS',period."AcademicPeriodID",'AUTO_OJT_ENROLLMENT'
+ FROM "OJTRecruitmentRoster" roster
+ JOIN "Students" student USING ("StudentID")
+ JOIN "ProgramCourses" pc ON pc."ProgramID"=student."ProgramID"
+ JOIN "Courses" course ON course."CourseID"=pc."CourseID"
+ JOIN "OJTSemesters" term ON term."OJTSemesterID"=roster."OJTSemesterID"
+ JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID"
+ WHERE roster."RoundID" IS NOT NULL
+   AND (target_student IS NULL OR roster."StudentID"=target_student)
+   AND (target_semester IS NULL OR roster."OJTSemesterID"=target_semester)
+   AND upper(course."CourseCode")='OJT202' AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6
+   AND NOT EXISTS(SELECT 1 FROM "StudentCourseResults" existing
+     JOIN "AcademicPeriods" recorded_period ON recorded_period."AcademicPeriodID"=existing."AcademicPeriodID"
+     WHERE existing."StudentID"=roster."StudentID" AND existing."CourseID"=pc."CourseID"
+       AND COALESCE(recorded_period."ParentPeriodID",recorded_period."AcademicPeriodID")=period."AcademicPeriodID")
+ ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
+ WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING;
+$enroll$;
+
+CREATE OR REPLACE FUNCTION public."SyncAssignedOJTEnrollment"()
+RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_catalog AS $sync$
+BEGIN
+ IF TG_TABLE_NAME='StudentOJTCalculatedResults' THEN
+  IF NEW."Status"='ELIGIBLE' THEN
+   PERFORM "EnrollAssignedOJTStudents"(NEW."StudentID",NULL);
+  END IF;
+ ELSIF NEW."Status"='OPEN' THEN
+  PERFORM "EnrollAssignedOJTStudents"(NULL,NEW."OJTSemesterID");
+ END IF;
+ RETURN NULL;
+END $sync$;
+
+DROP TRIGGER IF EXISTS "TR_OJTEnrollAfterEligibility" ON public."StudentOJTCalculatedResults";
+CREATE TRIGGER "TR_OJTEnrollAfterEligibility" AFTER INSERT OR UPDATE OF "Status"
+ ON public."StudentOJTCalculatedResults" FOR EACH ROW EXECUTE FUNCTION public."SyncAssignedOJTEnrollment"();
+DROP TRIGGER IF EXISTS "TR_OJTEnrollAfterRoundOpen" ON public."RecruitmentWindows";
+CREATE TRIGGER "TR_OJTEnrollAfterRoundOpen" AFTER INSERT OR UPDATE OF "Status","EndsAt","ApplicationEndsAt"
+ ON public."RecruitmentWindows" FOR EACH ROW EXECUTE FUNCTION public."SyncAssignedOJTEnrollment"();
+
+SELECT public."EnrollAssignedOJTStudents"(NULL,NULL);
+REVOKE ALL ON FUNCTION public."EnrollAssignedOJTStudents"(integer,integer), public."SyncAssignedOJTEnrollment"() FROM PUBLIC;
+DO $permissions$ BEGIN
+ IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+  GRANT EXECUTE ON FUNCTION public."EnrollAssignedOJTStudents"(integer,integer) TO service_role;
+ END IF;
+END $permissions$;
 
 COMMIT;

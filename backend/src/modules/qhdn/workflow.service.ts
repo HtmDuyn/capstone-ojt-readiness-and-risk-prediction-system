@@ -22,7 +22,7 @@ async function registration(c:PoolClient,id:number){
       return r;
     }
   }
-  const handoff=(await c.query(`SELECT "RegistrationID","CheckID","CalculatedBatchID" FROM "EligibleStudentHandoffItems"
+  const handoff=(await c.query(`SELECT "RegistrationID","CheckID","CalculatedBatchID" FROM ojt_history."StudentEligibilityItems"
     WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 AND ("RegistrationID" IS NULL OR "RegistrationID"=$3)
     ORDER BY ("RegistrationID"=$3) DESC LIMIT 1`,[r.StudentID,r.OJTSemesterID,r.RegistrationID])).rows[0];
   if(!['SUBMITTED','APPROVED','HANDED_OFF','REJECTED'].includes(r.Status)||!handoff)throw invalid('A valid handed-off registration is required.',409,'REGISTRATION_NOT_HANDED_OFF');

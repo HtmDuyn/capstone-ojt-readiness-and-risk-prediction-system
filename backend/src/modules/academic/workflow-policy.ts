@@ -22,8 +22,14 @@ export async function assertOjtSemesterSix(c:PoolClient,studentId:number,semeste
  if(!term?.AcademicPeriodID)throw invalid('OJT semester must reference an actual academic period.',409,'OJT_PERIOD_REQUIRED');
  const target=await actualPeriod(c,term.AcademicPeriodID);
  if(target.Kind!=='SEMESTER')throw invalid('OJT must use a regular semester.',409,'OJT_PERIOD_REQUIRED');
- const relative=await relativeSemester(c,studentId,target.AcademicPeriodID);
- if(relative!==6)throw invalid('OJT is fixed in relative semester 6; the selected target is semester '+relative+'.',409,'OJT_FIXED_SEMESTER_REQUIRED');
+ const { rows: [{ relative }] } = await c.query(
+  'SELECT "StudentCurriculumSemester"($1,$2) AS relative',[studentId,target.AcademicPeriodID]);
+ if(relative!==6){
+  const enrollment=await c.query(`SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
+   WHERE grade."StudentID"=$1 AND grade."AcademicPeriodID"=$2 AND grade."SemesterTaken"=6
+     AND grade."SourceReference"='AUTO_OJT_ENROLLMENT' AND upper(course."CourseCode")='OJT202'`,[studentId,target.AcademicPeriodID]);
+  if(!enrollment.rowCount)throw invalid('The selected term must match the student’s OJT enrollment.',409,'OJT_FIXED_SEMESTER_REQUIRED');
+ }
  return {relativeSemester:6};
 }
 export async function registrationPeriod(c:PoolClient,w:Row) {

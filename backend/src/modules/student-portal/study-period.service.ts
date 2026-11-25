@@ -10,8 +10,7 @@ import { buildRiskAndRoadmap } from './ojt-risk.service';
 import { coursePlanWithClient } from './course-plan.service';
 import type { AssessmentReadContext } from './assessment-read-context';
 
-// Only this student's calendar mapping, recorded study periods, and current period
-// are offered. Neither future calendar entries nor another cohort's terms are exposed.
+// Show this student's study periods and any upcoming semester with a recorded OJT enrollment.
 export async function studyPeriodsWithClient(c: PoolClient, student: Row) {
   const items = (await c.query(`WITH owner AS (
     SELECT placement.*,COALESCE(parent."AcademicPeriodID",current_period."AcademicPeriodID") AS current_id,
@@ -21,20 +20,29 @@ export async function studyPeriodsWithClient(c: PoolClient, student: Row) {
     LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=current_period."ParentPeriodID"
     WHERE s."StudentID"=$1
   ), candidates AS (
-    SELECT p.*,owner.current_id,
+    SELECT p.*,owner.current_id,ojt.enrolled AS "hasOjtEnrollment",
       COALESCE("StudentCurriculumSemester"($1,p."AcademicPeriodID"),
         (SELECT max(r."SemesterTaken") FROM "StudentCourseResults" r JOIN "AcademicPeriods" rp ON rp."AcademicPeriodID"=r."AcademicPeriodID"
           WHERE r."StudentID"=$1 AND COALESCE(rp."ParentPeriodID",rp."AcademicPeriodID")=p."AcademicPeriodID"),
         CASE WHEN p."AcademicPeriodID"=owner.current_id THEN $2::int END) AS stage
     FROM "AcademicPeriods" p CROSS JOIN owner
-    WHERE p."Kind"='SEMESTER' AND p."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
-      AND (owner.current_start IS NULL OR p."StartDate"<=owner.current_start)
+    CROSS JOIN LATERAL (
+      SELECT EXISTS (
+        SELECT 1 FROM "StudentCourseResults" r JOIN "Courses" c USING ("CourseID")
+        WHERE r."StudentID"=$1 AND r."AcademicPeriodID"=p."AcademicPeriodID"
+          AND r."SourceReference"='AUTO_OJT_ENROLLMENT' AND r."Status"='IN_PROGRESS'
+          AND upper(c."CourseCode")='OJT202'
+      ) AS enrolled
+    ) ojt
+    WHERE p."Kind"='SEMESTER' AND (ojt.enrolled OR (
+      p."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+      AND (owner.current_start IS NULL OR p."StartDate"<=owner.current_start)))
       AND (p."AcademicPeriodID"=owner.current_id
         OR EXISTS (SELECT 1 FROM "CohortCurriculumPeriods" plan WHERE plan."CohortID"=owner."CohortID" AND plan."GroupCode"=owner."GroupCode" AND plan."AcademicPeriodID"=p."AcademicPeriodID")
         OR EXISTS (SELECT 1 FROM "StudentCourseResults" r JOIN "AcademicPeriods" rp ON rp."AcademicPeriodID"=r."AcademicPeriodID" WHERE r."StudentID"=$1 AND COALESCE(rp."ParentPeriodID",rp."AcademicPeriodID")=p."AcademicPeriodID"))
   ) SELECT "AcademicPeriodID" AS id,"PeriodCode" AS code,"Name" AS name,
     to_char("StartDate",'YYYY-MM-DD') AS "startDate",to_char("EndDate",'YYYY-MM-DD') AS "endDate",
-    stage AS "curriculumSemester",
+    stage AS "curriculumSemester","hasOjtEnrollment",
     COALESCE("AcademicPeriodID"=current_id AND "EndDate">=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,false) AS "isCurrent"
     FROM candidates ORDER BY "StartDate" DESC,"AcademicPeriodID" DESC`, [student.StudentID, student.CurrentSemester])).rows;
   return { items, currentAcademicPeriodId: items.find(item => item.isCurrent)?.id ?? items[0]?.id ?? null };
@@ -83,10 +91,8 @@ export async function studyOverview(params: Row, actor: Actor) {
     // Resolve the single OJT target internally; it is not the student's study filter.
     const target = (await c.query(`SELECT COALESCE(
       (SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1),
-      (SELECT o."OJTSemesterID" FROM "StudentAcademicPlacements" placement
-      JOIN "CohortCurriculumPeriods" plan ON plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode" AND plan."CurriculumSemester"=6
-      JOIN "OJTSemesters" o ON o."AcademicPeriodID"=plan."AcademicPeriodID"
-      WHERE placement."StudentID"=$1 ORDER BY o."StartDate" LIMIT 1)) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
+      (SELECT o."OJTSemesterID" FROM "OJTSemesters" o
+      WHERE o."AcademicPeriodID"="DefaultOJTAcademicPeriod"($1))) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
     const latestCondition = historical ? null : await latestEffectiveOjtCondition(c);
     const configuredRule = historical ? await activeRule(c, student.ProgramID, target ?? 0) : null;
     const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
@@ -116,7 +122,9 @@ export async function studyOverview(params: Row, actor: Actor) {
         academicWarning: historical ? null : academic.academicWarning,
         earlyWarning: historical ? null : academic.earlyWarning }, assessment, courseResults,
       basis: historical ? 'STORED_GRADES_THROUGH_PERIOD_CURRENT_CURRICULUM' : 'CURRENT_STORED_ACADEMIC_DATA',
-      note: historical
+      note: historical && period?.hasOjtEnrollment
+        ? 'Học kỳ này có bản ghi OJT202 đang học.'
+        : historical
         ? 'Tiến độ và bảng điểm kỳ cũ được tính lại từ dữ liệu đang lưu theo khung hiện hành. Đánh giá rủi ro và lộ trình đề xuất luôn sử dụng học kỳ đang học.'
         : 'Tín chỉ, điều kiện, rủi ro và lộ trình được tính từ dữ liệu học vụ mới nhất và kỳ cao nhất có ít nhất hai môn khác nhau trong lịch sử học vụ.' };
   });

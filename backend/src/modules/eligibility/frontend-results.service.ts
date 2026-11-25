@@ -78,7 +78,7 @@ export async function saveFrontendResults(body: unknown, actorId: number, automa
     if (existing) {
       if (existing.RequestHash !== input.requestHash) throw invalid('This idempotency key belongs to different results.', 409, 'IDEMPOTENCY_CONFLICT');
       const { rows: [handoff] } = await client.query(
-        'SELECT count(*)::int AS count FROM "EligibleStudentHandoffItems" WHERE "CalculatedBatchID"=$1', [existing.BatchID]);
+        'SELECT count(*)::int AS count FROM ojt_history."StudentEligibilityItems" WHERE "CalculatedBatchID"=$1', [existing.BatchID]);
       return { batchId: existing.BatchID, savedCount: existing.SavedCount, handedOffCount: handoff.count, replayed: true };
     }
     const latest = await latestEffectiveOjtCondition(client);
@@ -92,7 +92,7 @@ export async function saveFrontendResults(body: unknown, actorId: number, automa
     if (students.length !== ids.length) throw invalid('One or more students do not exist or have been deleted.', 409, 'RESULT_STUDENT_NOT_FOUND');
     if (students.some(row => row.Status !== 'ACTIVE' || row.AccountStatus !== 'ACTIVE')) throw invalid('All students and their accounts must be active.', 409, 'RESULT_STUDENT_INACTIVE');
     const handedOff = await client.query(
-      'SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=ANY($1::int[]) LIMIT 1', [ids]);
+      'SELECT 1 FROM ojt_history."StudentEligibilityItems" WHERE "StudentID"=ANY($1::int[]) LIMIT 1', [ids]);
     if (handedOff.rowCount) throw invalid('Có sinh viên đã được bàn giao. Tải lại danh sách trước khi xét lại.', 409, 'STUDENT_ALREADY_HANDED_OFF');
     const inputTimes = new Map(input.results.map(row => [row.studentId, new Date(row.checkedAt).getTime()]));
     if (students.some(row => row.HistoryUpdatedAt && new Date(row.HistoryUpdatedAt).getTime() > inputTimes.get(row.StudentID)!)) throw invalid('Course history changed after calculation. Recalculate before saving.', 409, 'ELIGIBILITY_RESULT_STALE');
@@ -130,7 +130,8 @@ export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result.
       ELSE COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0) END
     OR ${studentAlias}."Status"<>'ACTIVE'
     OR EXISTS(SELECT 1 FROM "StudentAcademicPlacements" placement WHERE placement."StudentID"=${studentAlias}."StudentID" AND placement."UpdatedAt">result."CheckedAt")
-    OR EXISTS(SELECT 1 FROM "StudentCourseResults" history WHERE history."StudentID"=${studentAlias}."StudentID" AND COALESCE(history."UpdatedAt",history."CreatedAt")>result."CheckedAt"))
+    OR EXISTS(SELECT 1 FROM "StudentCourseResults" history WHERE history."StudentID"=${studentAlias}."StudentID" AND COALESCE(history."UpdatedAt",history."CreatedAt")>result."CheckedAt"
+      AND (history."SourceReference" IS DISTINCT FROM 'AUTO_OJT_ENROLLMENT' OR history."Status" IS DISTINCT FROM 'IN_PROGRESS')))
   FROM "StudentOJTCalculatedResults" result WHERE result."StudentID"=${studentAlias}."StudentID")`;
 
 export async function listFrontendResults(params: Record<string, unknown>) {

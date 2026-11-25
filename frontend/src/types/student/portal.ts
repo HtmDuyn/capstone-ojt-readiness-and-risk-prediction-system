@@ -17,6 +17,7 @@ export interface Named {
   code?: string;
 }
 export interface StudyPeriod extends Named {
+  hasOjtEnrollment?: boolean;
   startDate: string;
   endDate: string;
   curriculumSemester: number | null;

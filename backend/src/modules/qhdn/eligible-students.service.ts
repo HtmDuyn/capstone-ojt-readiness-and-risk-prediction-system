@@ -21,7 +21,7 @@ export async function eligibleStudents(params: Row, actor: Actor) {
   })) if (params[key] !== undefined) add(column, positiveId(params[key], key));
   if (params.handoffId !== undefined) {
     args.push(positiveId(params.handoffId, 'handoffId'));
-    where.push(`EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" history WHERE history."HandoffID"=$${args.length}
+    where.push(`EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" history WHERE history."HandoffID"=$${args.length}
       AND history."StudentID"=s."StudentID" AND history."OJTSemesterID"=roster."OJTSemesterID")`);
   }
   if (params.groupCode !== undefined) add('placement."GroupCode"', enumValue(params.groupCode, ['A','B','C','D'], 'groupCode'));
@@ -43,7 +43,8 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       LEFT JOIN "TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
       LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
       LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=placement."CohortID"
-      LEFT JOIN "OJTSemesters" term ON term."OJTSemesterID"=roster."OJTSemesterID"
+      LEFT JOIN "RecruitmentWindows" round ON round."WindowID"=roster."RoundID"
+      LEFT JOIN "OJTSemesters" term ON term."OJTSemesterID"=round."OJTSemesterID"
       LEFT JOIN "OJTRegistrations" r ON r."StudentID"=s."StudentID" AND r."OJTSemesterID"=roster."OJTSemesterID"
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}`;
     const total = (await client.query(`SELECT count(*)::int AS total ${from}`, args)).rows[0].total;

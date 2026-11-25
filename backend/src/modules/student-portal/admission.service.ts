@@ -23,7 +23,7 @@ export async function studentAdmission(client: PoolClient, studentId: number, se
     };
   }
   const handoff = (await client.query(`SELECT i."HandoffID",i."CheckID",i."CalculatedBatchID",i."Snapshot",h."CreatedAt"
-    FROM "EligibleStudentHandoffItems" i JOIN "EligibleStudentHandoffs" h ON h."HandoffID"=i."HandoffID"
+    FROM ojt_history."StudentEligibilityItems" i JOIN ojt_history."EligibilityBatches" h ON h."HandoffID"=i."HandoffID"
     WHERE i."StudentID"=$1 AND i."OJTSemesterID"=$2 ORDER BY i."HandoffID" DESC LIMIT 1`, [studentId, semesterId])).rows[0];
   if (!handoff) return null;
   let result: Row | null;

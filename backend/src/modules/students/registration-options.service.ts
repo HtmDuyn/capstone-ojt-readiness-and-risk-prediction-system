@@ -51,7 +51,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     }else{
       from='FROM "OJTRegistrationWindows" w';
       // Bind the authenticated student, never a studentId supplied by the caller.
-      where.push('(EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID")) OR EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID"))');
+      where.push('(EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID")) OR EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID"))');
       for(const [key,value,type]of [['programIds',s.ProgramID,'int'],['cohortIds',s.CohortID,'int'],['majorIds',s.SpecializationID,'int'],['studentIds',s.StudentID,'int'],['groupCodes',s.GroupCode,'text']] as const){
         args.push(value??null);where.push(`(NOT (w."Scope" ? '${key}') OR w."Scope"->'${key}' @> jsonb_build_array($${args.length}::${type}))`);
       }

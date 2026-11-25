@@ -7,8 +7,8 @@
  *         "tags": [
  *           "QHDN core"
  *         ],
- *         "summary": "Danh sách sinh viên đủ điều kiện và chưa có kết quả OJT",
- *         "description": "Phòng QHDN xem sinh viên đã có kết quả xét đủ điều kiện. Sinh viên được xếp vào đợt mở theo kỳ 6 của nhóm khóa. Danh sách chờ gồm sinh viên chưa có đợt phù hợp.",
+ *         "summary": "Danh sách sinh viên đủ điều kiện và chưa có bản ghi OJT202 đã đạt",
+ *         "description": "Phòng QHDN xem sinh viên đã có kết quả xét đủ điều kiện. Sinh viên được xếp vào đợt mở theo học kỳ chính kế tiếp trên lịch đào tạo. Danh sách chờ gồm sinh viên chưa có đợt phù hợp.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -233,6 +233,7 @@
  *                                 "nullable": true
  *                               },
  *                               "semesterName": {
+ *                                 "description": "Tên kỳ của đợt được xếp. Giá trị null khi còn chờ mở đợt.",
  *                                 "type": "string",
  *                                 "nullable": true
  *                               },

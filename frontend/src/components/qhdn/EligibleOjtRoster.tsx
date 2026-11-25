@@ -29,7 +29,7 @@ export function EligibleOjtRoster({ semesterId, refreshKey }: { semesterId: stri
   }, [semesterId, refreshKey, status, page]);
 
   return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-    <h2 className="font-semibold text-slate-900">Sinh viên đủ điều kiện và chưa có kết quả OJT</h2>
+    <h2 className="font-semibold text-slate-900">Sinh viên đủ điều kiện và chưa có bản ghi OJT202 đã đạt</h2>
     <div className="flex flex-wrap gap-2">
       {(['ASSIGNED','WAITING'] as const).map(key => <button key={key} type="button" aria-pressed={status === key}
         onClick={() => { setStatus(key); setPage(1); }}
@@ -45,7 +45,7 @@ export function EligibleOjtRoster({ semesterId, refreshKey }: { semesterId: stri
           <thead className="bg-slate-50"><tr>{['Mã sinh viên','Họ tên','Chương trình','Kỳ OJT','Đợt OJT'].map(label => <th key={label} scope="col" className="px-3 py-2">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">{data.items.map(student => <tr key={student.id}>
             <td className="px-3 py-2">{student.studentCode}</td><td className="px-3 py-2">{student.fullName}</td>
-            <td className="px-3 py-2">{student.programName ?? '—'}</td><td className="px-3 py-2">{student.semesterName ?? 'Chưa xác định'}</td>
+            <td className="px-3 py-2">{student.programName ?? '—'}</td><td className="px-3 py-2">{student.semesterName}</td>
             <td className="px-3 py-2">{student.roundName ?? 'Chờ đợt mở'}</td>
           </tr>)}</tbody>
         </table></div>
