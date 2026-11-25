@@ -16,7 +16,7 @@ import { studentAdmission } from './admission.service';
 async function currentConditionDecision(c:PoolClient,s:Row,term:number,source:Awaited<ReturnType<typeof loadAcademicProgress>>) {
   const condition=await ojtAssessmentCondition(c),rule={...condition,MaxUnpassedCourses:null};
   const current=evaluateEligibility({student:{StudentID:s.StudentID,Status:s.Status,AccountStatus:s.AccountStatus},
-    semester:{OJTSemesterID:term},rule,progress:progressFromData(source),attempts:source.attempts,aliases:source.aliases});
+    semester:{OJTSemesterID:term},rule,progress:progressFromData(source,false,false),attempts:source.attempts,aliases:source.aliases});
   return {current,rule};
 }
 
@@ -80,7 +80,7 @@ export async function dashboard(params:Row,actor:Actor) {
       // The overview card needs current credits/eligibility, not scenario,
       // prerequisite, failed-course enrichment or roadmap calculations.
       const source=await loadAcademicProgress(c,s.StudentID);
-      const progress=progressFromData(source);
+      const progress=progressFromData(source,false,false);
       const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progress,source);
       const conditionDecision=await currentConditionDecision(c,s,term,source);
       const deadline=(await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[term])).rows[0]??null;
@@ -94,7 +94,7 @@ export async function dashboard(params:Row,actor:Actor) {
       };
     }
     const source=await loadAcademicProgress(c,s.StudentID);
-    const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progressFromData(source),source);
+    const decision=await eligibility(s.StudentID,{ojtSemesterId:term},c,progressFromData(source,false,false),source);
     const conditionDecision=await currentConditionDecision(c,s,term,source);
     const academic=await summaryWithClient(c,s.StudentID,term,source,
       {...decision,current:conditionDecision.current},undefined,conditionDecision.rule);

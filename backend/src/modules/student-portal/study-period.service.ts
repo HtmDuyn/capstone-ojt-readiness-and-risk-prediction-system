@@ -87,7 +87,7 @@ export async function studyOverview(params: Row, actor: Actor) {
     // no cutoff inherited from an expired academic period.
     const source = await loadAcademicProgress(c, student.StudentID, undefined, cutoff ?? undefined);
     const currentSemester = historical ? period!.curriculumSemester : inferStudySemester(source.attempts);
-    const progress = progressFromData(source);
+    const progress = progressFromData(source,false,false);
     // Resolve the single OJT target internally; it is not the student's study filter.
     const target = (await c.query(`SELECT COALESCE(
       (SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1),
