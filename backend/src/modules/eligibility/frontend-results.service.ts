@@ -15,9 +15,10 @@ export function parseFrontendResults(body: unknown) {
   const input = inputObject(body, ['idempotencyKey', 'source', 'rule', 'results']);
   const idempotencyKey = requiredText(input.idempotencyKey, 'idempotencyKey', 100);
   if (input.source !== 'FRONTEND') throw invalid('source must be FRONTEND.');
-  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses', 'thresholdId']);
+  const rule = inputObject(input.rule, ['version', 'minCredits', 'maxUnpassedCourses', 'thresholdId', 'conditionId', 'issuingDocument']);
   const thresholdId = rule.thresholdId === undefined ? undefined : positiveId(rule.thresholdId, 'thresholdId');
-  if (thresholdId === undefined && rule.maxUnpassedCourses === undefined)
+  const conditionId = rule.conditionId === undefined ? undefined : positiveId(rule.conditionId, 'conditionId');
+  if (conditionId === undefined && thresholdId === undefined && rule.maxUnpassedCourses === undefined)
     throw invalid('Hãy chọn một mức tín chỉ đã tạo trước khi lưu kết quả xét OJT.');
   if (typeof rule.version !== 'number' || !Number.isSafeInteger(rule.version) || rule.version < 0 ||
       typeof rule.minCredits !== 'number' || !Number.isFinite(rule.minCredits) || rule.minCredits < 0 ||
@@ -48,7 +49,7 @@ export function parseFrontendResults(body: unknown) {
     return { studentId, status, earnedCredits, unpassedCourseCount: row.unpassedCourseCount, reasons, academicIssues, checkedAt: checkedAt.toISOString() };
   }).sort((a, b) => a.studentId - b.studentId);
   const requestHash = createHash('sha256').update(JSON.stringify({ source: 'FRONTEND', rule, results })).digest('hex');
-  return { idempotencyKey, results, requestHash, rule, thresholdId };
+  return { idempotencyKey, results, requestHash, rule, thresholdId, conditionId };
 }
 
 export async function saveFrontendResults(body: unknown, actorId: number) {
@@ -56,12 +57,14 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
   return academicTransaction(async client => {
     const policy = (await client.query('SELECT "Version","MinCredits","MaxUnpassedCourses" FROM "OJTConditionPolicies" ORDER BY "Version" DESC LIMIT 1')).rows[0];
     const defaults = policy ? { version: policy.Version, minCredits: Number(policy.MinCredits), maxUnpassedCourses: policy.MaxUnpassedCourses } : { version: 0, minCredits: 70, maxUnpassedCourses: 2 };
+    const condition = input.conditionId === undefined ? undefined : (await client.query('SELECT "ConditionID","Version","MinCredits","IssuingDocument" FROM "OJTConditions" WHERE "ConditionID"=$1',[input.conditionId])).rows[0];
+    if (input.conditionId !== undefined && !condition) throw invalid('Điều kiện xét đã chọn không tồn tại. Hãy tải lại danh sách điều kiện.',409,'OJT_CONDITION_NOT_FOUND');
     const threshold = input.thresholdId === undefined ? undefined : (await client.query(
       'SELECT "MinCredits" FROM "OJTCreditThresholds" WHERE "ThresholdID"=$1', [input.thresholdId])).rows[0];
     if (input.thresholdId !== undefined && !threshold)
       throw invalid('Mức tín chỉ đã chọn không tồn tại.', 409, 'OJT_THRESHOLD_NOT_FOUND');
-    const active = threshold ? { ...defaults, minCredits: Number(threshold.MinCredits), thresholdId: input.thresholdId } : defaults;
-    if (input.rule.version !== active.version || input.rule.minCredits !== active.minCredits || (input.rule.maxUnpassedCourses !== undefined && input.rule.maxUnpassedCourses !== active.maxUnpassedCourses))
+    const active: Record<string, any> = condition ? { version: condition.Version, minCredits: Number(condition.MinCredits), conditionId: condition.ConditionID, issuingDocument: condition.IssuingDocument } : threshold ? { ...defaults, minCredits: Number(threshold.MinCredits), thresholdId: input.thresholdId } : defaults;
+    if (input.rule.version !== active.version || input.rule.minCredits !== active.minCredits || (condition && (input.rule.issuingDocument !== condition.IssuingDocument || input.rule.conditionId !== condition.ConditionID)) || (!condition && input.rule.maxUnpassedCourses !== undefined && input.rule.maxUnpassedCourses !== defaults.maxUnpassedCourses))
       throw invalid('OJT policy changed. Recalculate before saving.', 409, 'OJT_POLICY_CHANGED');
     const actor = (await client.query(`SELECT r."RoleCode" FROM "Users" u JOIN "Roles" r USING("RoleID") WHERE u."UserID"=$1 AND u."Status"='ACTIVE' FOR SHARE OF u`, [actorId])).rows[0];
     if (!actor || !['ADMIN', 'ACADEMIC'].includes(actor.RoleCode)) throw invalid('Academic access required.', 403, 'FORBIDDEN');
@@ -93,14 +96,14 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
     const programs = new Map(students.map(row => [row.StudentID, row.ProgramID]));
     // One set-based upsert; no recalculation or per-student write round trips.
     const { maxUnpassedCourses, ...creditRule } = active;
-    const savedRule = input.rule.maxUnpassedCourses === undefined ? creditRule : { ...creditRule, maxUnpassedCourses };
+    const savedRule = condition ? { id: condition.ConditionID, conditionId: condition.ConditionID, version: condition.Version, minCredits: Number(condition.MinCredits), issuingDocument: condition.IssuingDocument } : input.rule.maxUnpassedCourses === undefined ? creditRule : { ...creditRule, maxUnpassedCourses };
     const records = input.results.map(result => ({ ...result, policyVersion: active.version, rule: savedRule, programId: programs.get(result.studentId) ?? null }));
-    await client.query(`INSERT INTO "StudentOJTCalculatedResults" ("StudentID","BatchID","ProgramID","Status","Result","CheckedAt","SavedAt","SavedBy")
-      SELECT (item->>'studentId')::int,$2,(item->>'programId')::int,item->>'status',item-'programId',(item->>'checkedAt')::timestamptz,$3,$4
+    await client.query(`INSERT INTO "StudentOJTCalculatedResults" ("StudentID","BatchID","ProgramID","Status","Result","CheckedAt","SavedAt","SavedBy","ConditionID")
+      SELECT (item->>'studentId')::int,$2,(item->>'programId')::int,item->>'status',item-'programId',(item->>'checkedAt')::timestamptz,$3,$4,$5
       FROM jsonb_array_elements($1::jsonb) item
       ON CONFLICT ("StudentID") DO UPDATE SET "BatchID"=EXCLUDED."BatchID","ProgramID"=EXCLUDED."ProgramID","Status"=EXCLUDED."Status",
-        "Result"=EXCLUDED."Result","CheckedAt"=EXCLUDED."CheckedAt","SavedAt"=EXCLUDED."SavedAt","SavedBy"=EXCLUDED."SavedBy"`,
-      [JSON.stringify(records), batch.BatchID, batch.SavedAt, actorId]);
+        "Result"=EXCLUDED."Result","CheckedAt"=EXCLUDED."CheckedAt","SavedAt"=EXCLUDED."SavedAt","SavedBy"=EXCLUDED."SavedBy","ConditionID"=EXCLUDED."ConditionID"`,
+      [JSON.stringify(records), batch.BatchID, batch.SavedAt, actorId, condition?.ConditionID ?? null]);
     await audit(client, actorId, 'OJTEligibilityResultBatches', batch.BatchID, 'SAVE_FRONTEND_ELIGIBILITY', null, { savedCount: ids.length, studentIds: ids });
     const { handoffSavedEligibleStudents } = await import('../ojt-registration/handoff.service.js');
     const eligibleIds = records.filter(result => result.status === 'ELIGIBLE').map(result => result.studentId);
@@ -110,8 +113,12 @@ export async function saveFrontendResults(body: unknown, actorId: number) {
 }
 
 export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result."Result" || jsonb_build_object('source','FRONTEND','batchId',result."BatchID",'savedAt',result."SavedAt",'savedBy',result."SavedBy",
+      'conditionId',result."ConditionID",
   'isStale',result."ProgramID" IS DISTINCT FROM ${studentAlias}."ProgramID"
-    OR COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0)
+    OR CASE WHEN result."ConditionID" IS NOT NULL THEN
+      result."ConditionID" IS DISTINCT FROM (result."Result"->'rule'->>'conditionId')::int
+      OR NOT EXISTS(SELECT 1 FROM "OJTConditions" condition WHERE condition."ConditionID"=result."ConditionID")
+      ELSE COALESCE((result."Result"->>'policyVersion')::int,0)<>COALESCE((SELECT max(p."Version") FROM "OJTConditionPolicies" p),0) END
     OR ${studentAlias}."Status"<>'ACTIVE'
     OR EXISTS(SELECT 1 FROM "StudentAcademicPlacements" placement WHERE placement."StudentID"=${studentAlias}."StudentID" AND placement."UpdatedAt">result."CheckedAt")
     OR EXISTS(SELECT 1 FROM "StudentCourseResults" history WHERE history."StudentID"=${studentAlias}."StudentID" AND COALESCE(history."UpdatedAt",history."CreatedAt")>result."CheckedAt"))

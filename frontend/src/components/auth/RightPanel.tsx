@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PasswordResetForm from "./PasswordResetForm";
 
 interface RightPanelProps {
@@ -75,7 +75,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
   errorMessage,
   onSubmit,
 }) => {
-  const [resetOpen, setResetOpen] = useState(false);
+  const [{ linkEmail, linkToken }] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { linkEmail: params.get('resetEmail') || '', linkToken: params.get('resetToken') || '' };
+  });
+  useEffect(() => {
+    if (linkToken) window.history.replaceState(null, '', window.location.pathname);
+  }, [linkToken]);
+  const [resetOpen, setResetOpen] = useState(Boolean(linkEmail && linkToken));
   const [resetMessage, setResetMessage] = useState("");
   const fadeStyle = (delay = 0) => ({
     opacity: animateIn ? 1 : 0,
@@ -84,7 +91,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   });
 
   return (
-    <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
+    <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full lg:min-h-[33rem] bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
       {/* Top Header Row with Language switcher */}
       <div className="relative z-10 flex items-center justify-between pb-4">
         {/* Language selector */}
@@ -107,12 +114,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
       <div className="relative z-10 my-auto max-w-md mx-auto w-full py-2">
         {resetOpen ? (
           <PasswordResetForm
-            initialEmail={account}
-            onBack={() => setResetOpen(false)}
+            initialEmail={linkEmail || account}
+            initialToken={linkToken}
+            onBack={() => { window.history.replaceState(null, '', window.location.pathname); setResetOpen(false); }}
             onComplete={(email, message) => {
               onAccountChange(email);
               onPasswordChange("");
               setResetMessage(message);
+              window.history.replaceState(null, '', window.location.pathname);
               setResetOpen(false);
             }}
           />

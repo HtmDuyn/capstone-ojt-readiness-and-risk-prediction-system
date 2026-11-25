@@ -169,6 +169,22 @@ export function describeStudentRest(spec: Schema): Schema {
           dependentCourses:array({type:'object',additionalProperties:true}),downstreamCourses:array({type:'object',additionalProperties:true}),
           requirementId:id,recommendedSemester:{type:'integer',minimum:0,maximum:5},credits:number,isAlternative:{type:'boolean'},availability:{type:'string',enum:['NOT_MANAGED']}}))})})),
       400:{description:'Không nhận query hoặc body'},401:{description:'Chưa đăng nhập'},403:{description:'Chỉ dành cho sinh viên'},404:{description:'Không có hồ sơ sinh viên'}}}};
+  const studyPeriod=object({id,code:text,name:text,startDate:{type:'string',format:'date'},endDate:{type:'string',format:'date'},
+    curriculumSemester:{type:'integer',minimum:0,maximum:9,nullable:true},isCurrent:{type:'boolean'}});
+  const studyOperation={tags:['Sinh viên'],'x-roles':['STUDENT'],security:[{bearerAuth:[]}],
+    responses:{401:{description:'Chưa đăng nhập'},403:{description:'Chỉ sinh viên sở hữu dữ liệu được xem'}}};
+  spec.paths['/api/students/me/study-periods']={get:{...studyOperation,
+    summary:'Học kỳ đang học và đã học của sinh viên',parameters:[],
+    description:'Tự xác định sinh viên từ tài khoản. Chỉ trả kỳ SEMESTER thuộc lịch học, kỳ có kết quả hoặc kỳ hiện tại của chính sinh viên; không trả kỳ tương lai. Không dùng đợt OJT làm bộ lọc học tập.',
+    responses:{...studyOperation.responses,200:envelope(object({items:array(studyPeriod),currentAcademicPeriodId:nullable(id)}))}}};
+  spec.paths['/api/students/me/study-overview']={get:{...studyOperation,
+    summary:'Tiến độ, bảng điểm theo học kỳ và cảnh báo của kỳ đang học',
+    parameters:[{in:'query',name:'academicPeriodId',schema:id,description:'Học kỳ xem lịch sử; không gửi cùng view=current.'},
+      {in:'query',name:'view',schema:{type:'string',enum:['current']},description:'Dữ liệu học vụ mới nhất và kỳ hiện tại theo hồ sơ, không phụ thuộc bộ lọc kỳ hoặc lịch học đã hết hạn.'}],
+    description:'view=current dùng cho Dashboard và cảnh báo: đọc dữ liệu học vụ mới nhất, xác định kỳ hiện tại từ hồ sơ/lộ trình sinh viên; không bị chặn khi chưa có kỳ lịch đang diễn ra hoặc đợt OJT. Trả period=null nếu không có kỳ lịch đang diễn ra, cutoff=null và currentSemester theo hồ sơ. Mỗi lần đọc tính lại tín chỉ, nợ môn, điều kiện và rủi ro từ cùng nguồn dữ liệu. Nếu gửi academicPeriodId thì chỉ chấp nhận kỳ thuộc study-periods của chính sinh viên, tích lũy đến cuối kỳ đã chọn hoặc hiện tại nếu đang học; kỳ cũ trả assessment=null, academicWarning=null, earlyWarning=null. Kỳ cũ chỉ phục vụ bảng điểm và tiến độ. Đối chiếu khung và quy tắc hiện hành; không phải bản chụp lịch sử hoặc kết quả xét OJT chính thức. Không ghi dữ liệu.',
+    responses:{...studyOperation.responses,200:envelope(object({period:nullable(studyPeriod),currentSemester:{type:'integer',nullable:true},historical:{type:'boolean'},cutoff:nullable(text),basis:text,note:text,
+      academic:{type:'object',additionalProperties:true},assessment:nullable(data('/api/students/me/ojt-risk-assessment')),courseResults:array(courseResult)})),
+      400:{description:'Cần academicPeriodId hoặc view=current; không gửi đồng thời hai bộ chọn'},404:{description:'Học kỳ không thuộc phạm vi đang/đã học của sinh viên'}}}};
   for (const [path, item] of Object.entries(spec.paths) as [string, Schema][]) {
     for (const method of ['get', 'post', 'put', 'patch', 'delete']) {
       const op = item[method];

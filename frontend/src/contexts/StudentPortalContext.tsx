@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from 'react';
@@ -13,13 +12,16 @@ import { studentSnapshots } from '@/utils/student/studentSnapshots';
 import {
   allStudentPages,
   getOwnStudentIdentity,
+  getStudyPeriods,
 } from '@/services/studentService';
 import type {
   Named,
   StudentIdentityProfile,
   Registration,
   Window,
+  StudyPeriod,
 } from '@/types/student/portal';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
 
 interface PortalContext {
   profile: StudentIdentityProfile | null;
@@ -29,9 +31,12 @@ interface PortalContext {
   warnings: string[];
   registrationWindows: Window[];
   windowsLoading: boolean;
-  semesters: Named[];
   semesterId: number | null;
-  selectSemester: (id: number) => void;
+  semesters: Named[];
+  academicPeriods: StudyPeriod[];
+  academicPeriodId: number | null;
+  academicPeriodsLoading: boolean;
+  selectAcademicPeriod: (id: number) => void;
   refresh: () => void;
   revision: number;
   mustChangePassword: boolean;
@@ -55,10 +60,21 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [semesterId, setSemesterId] = useState<number | null>(null);
+  const [studyChoice, setStudyChoice] = useState<{ owner: string; id: number } | null>(null);
   const [revision, setRevision] = useState(0);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const studyCatalog = useStudentResource(
+    profile && !loading ? `study-periods:${profile.id}:${revision}` : null,
+    signal => getStudyPeriods(signal), { snapshot: true },
+  );
+  const academicPeriods = studyCatalog.data?.items ?? [];
+  const studyOwner = profile ? `${token}:${profile.id}` : '';
+  const academicPeriodId = studyChoice?.owner === studyOwner && academicPeriods.some(item => item.id === studyChoice.id)
+    ? studyChoice.id : studyCatalog.data?.currentAcademicPeriodId ?? academicPeriods[0]?.id ?? null;
+  const selectAcademicPeriod = (id: number) => {
+    if (studyOwner && academicPeriods.some(item => item.id === id)) setStudyChoice({ owner: studyOwner, id });
+  };
 
   // Leaving the Student portal (including logout) releases all displayed snapshots.
   useEffect(() => () => studentSnapshots.invalidate(), []);
@@ -153,37 +169,13 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, [token, user?.id, user?.email, logout, revision]);
 
-  const semesters = useMemo(() => {
-    if (!profile) return [];
-    const values = new Map<number, Named>();
-    if (profile?.ojtSemesterId)
-      values.set(profile.ojtSemesterId, {
-        id: profile.ojtSemesterId,
-        name: `Đợt OJT #${profile.ojtSemesterId}`,
-      });
-    for (const row of [
-      ...registrations,
-      ...(profile?.ojtRegistrations.items ?? []),
-      ...windows,
-    ]) {
-      if (!row.ojtSemesterId) continue;
-      const name = row.semester?.name || row.semester?.code;
-      if (name || !values.has(row.ojtSemesterId))
-        values.set(row.ojtSemesterId, {
-          id: row.ojtSemesterId,
-          name: name || `Đợt OJT #${row.ojtSemesterId}`,
-        });
-    }
-    return [...values.values()];
-  }, [profile, registrations, windows]);
-  useEffect(() => {
-    if (loading) return;
-    setSemesterId((previous) =>
-      semesters.some((item) => item.id === previous)
-        ? previous
-        : (profile?.ojtSemesterId ?? semesters[0]?.id ?? null),
-    );
-  }, [loading, semesters, profile]);
+  // The internship target is owned by the student, not a user-selectable study filter.
+  const semesterId = profile?.ojtSemesterId ?? registrations[0]?.ojtSemesterId ?? null;
+  // Read-only metadata for the internship screens; there is no OJT filter action.
+  const semesters: Named[] = semesterId ? [{ id: semesterId,
+    name: windows.find(window => window.ojtSemesterId === semesterId)?.semester?.name
+      ?? registrations.find(registration => registration.ojtSemesterId === semesterId)?.semester?.name
+      ?? `Đợt OJT #${semesterId}` }] : [];
 
   return (
     <Context.Provider
@@ -192,12 +184,15 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
         loading,
         refreshing,
         error,
-        warnings,
+        warnings: [...warnings, ...(studyCatalog.error ? ['Học kỳ theo dõi: ' + studyCatalog.error] : [])],
         registrationWindows: profile ? windows : [],
         windowsLoading,
-        semesters,
         semesterId,
-        selectSemester: setSemesterId,
+        semesters,
+        academicPeriods,
+        academicPeriodId,
+        academicPeriodsLoading: studyCatalog.pending,
+        selectAcademicPeriod,
         refresh,
         revision,
         mustChangePassword,

@@ -12,6 +12,7 @@ import {
   Users,
   Activity,
   ClipboardCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 import type { NavItem } from '@/types/common.types';
@@ -160,6 +161,16 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
         },
       },
     ],
+  },
+  {
+    id: 'grading-management',
+    label: 'Chấm điểm',
+    path: '',
+    icon: <SlidersHorizontal size={20} />,
+    children: [{
+      id: 'grading-criteria', label: 'Quản lý chấm điểm', path: '/education/grading-criteria', icon: <ClipboardCheck size={20} />,
+      banner: { title: 'Quản lý chấm điểm OJT', description: 'Thiết lập tiêu chí và tỷ lệ chấm điểm theo kỳ OJT áp dụng.', badge: 'Phòng Đào tạo' },
+    }],
   },
 
   // =========================

@@ -3,6 +3,7 @@ import { Sparkles, LoaderCircle, RefreshCw, MapPin } from 'lucide-react';
 import { matchStudentJobs, type JobMatchingResult } from '@/services/studentService';
 import { buttonClass, dateText } from './PortalUI';
 import { explainOjtBlockers, workModeText, type Opportunity } from './ojt';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 export function StudentJobMatches({windowId,cvFileId,opportunities,onApply}:{
   windowId:number;cvFileId:number|null;opportunities:Opportunity[];onApply:(opportunity:Opportunity)=>void;
@@ -20,7 +21,7 @@ export function StudentJobMatches({windowId,cvFileId,opportunities,onApply}:{
       const data=await matchStudentJobs(windowId,controller.signal);
       if(!controller.signal.aborted)setResult(data);
     } catch(error) {
-      if(!controller.signal.aborted)setError(error instanceof Error?error.message:'Chưa tìm được gợi ý. Vui lòng thử lại.');
+      if(!controller.signal.aborted)setError(friendlyErrorMessage(error,'Chưa tìm được gợi ý. Vui lòng thử lại.'));
     } finally {
       pending.current=null;
       if(!controller.signal.aborted)setBusy(false);

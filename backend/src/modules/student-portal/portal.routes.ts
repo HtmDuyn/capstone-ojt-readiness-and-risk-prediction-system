@@ -6,10 +6,10 @@ import { inputObject, invalid, positiveId } from '../students/student.validation
 import { dashboard,internships } from './overview.service';
 import { applyToPosition, studentOpportunities } from '../students/job-application.service';
 import { notifications, readNotification } from './academic.service';
-import { assessOjtRisk } from './ojt-risk.service';
 import { analyzeCurrentCv, matchingProfile, updateMatchingProfile } from './cv-extraction.service';
 import { matchStudentJobs } from './job-matching.service';
 import { taskSubmissions, submitTask } from './task.service';
+import { studyPeriods, studyOverview } from './study-period.service';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -18,6 +18,8 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.get('/students/me/study-periods', ...read, handle(r => studyPeriods(r.query, r.user)));
+router.get('/students/me/study-overview', ...read, handle(r => studyOverview(r.query, r.user)));
 router.post('/students/me/cv/analyses', ...own, requireJsonBody,
   handle(r => analyzeCurrentCv(r.body, r.user)));
 
@@ -38,7 +40,7 @@ router.post('/students/me/job-matches', ...own, requireJsonBody, handle(r => {
 router.get('/students/me/ojt-risk-assessment', ...read, handle(r => {
   if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
   if(Number(r.headers['content-length']??0)>0||r.headers['transfer-encoding'])throw invalid('This endpoint does not accept a request body.');
-  return assessOjtRisk(r.user);
+  return studyOverview({view:'current'},r.user).then(result=>result.assessment);
 }));
 router.get('/students/me/notifications', ...read, handle(r => notifications(r.query, r.user)));
 router.patch('/students/me/notifications/:id', ...own, requireJsonBody, handle(r => {

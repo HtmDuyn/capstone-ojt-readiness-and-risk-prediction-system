@@ -43,25 +43,23 @@ const LeftPanel: React.FC<LeftPanelProps> = () => {
         </div>
       </div>
 
-      {/* Hero Content (max-w-[72%] strictly prevents any text from touching notch tabs on the right) */}
-      <div className="relative z-10 my-auto py-4 lg:py-6 max-w-[72%]">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-orange-200/70 shadow-2xs mb-4">
+      <div className="relative z-10 my-auto w-full max-w-[32rem] py-4 lg:py-6">
+        <div className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-orange-200/70 bg-white/90 px-3.5 py-1.5 shadow-2xs backdrop-blur-md">
           <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping flex-shrink-0" />
-          <span className="text-[11px] sm:text-xs font-bold text-orange-950 tracking-wide font-inter uppercase">
-            Hệ thống quản lý OJT tích hợp AI
+          <span className="whitespace-nowrap text-[11px] font-bold tracking-wide text-orange-950 font-inter uppercase sm:text-xs">
+            Nền tảng OJT thông minh
           </span>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl lg:text-[2.25rem] font-black font-inter text-slate-950 leading-[1.2] mb-3 tracking-tight">
-          OJT Readiness & <br />
-          <span className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 bg-clip-text text-transparent font-inter">
+        <h1 className="mb-4 text-[1.75rem] font-black leading-[1.08] tracking-tight text-slate-950 font-inter sm:text-3xl lg:text-[2.125rem] xl:text-[2.3rem]">
+          <span className="block lg:whitespace-nowrap">OJT Readiness&nbsp;&amp;</span>
+          <span className="block bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 bg-clip-text text-transparent lg:whitespace-nowrap font-inter">
             Risk Prediction System
           </span>
         </h1>
 
-        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-inter mt-3 font-medium">
-          Giải pháp toàn diện kết nối <strong className="font-bold text-orange-950">Sinh viên — Nhà trường — Doanh nghiệp</strong>. 
-          Dự báo rủi ro thực tập và cá nhân hóa lộ trình phát triển.
+        <p className="mt-3 max-w-[38ch] text-sm font-medium leading-relaxed text-slate-800 font-inter">
+          Kết nối sinh viên, nhà trường và doanh nghiệp trên một nền tảng OJT thống nhất.
         </p>
       </div>
 

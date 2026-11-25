@@ -628,7 +628,7 @@ export const QhdnDashboard: React.FC = () => {
           {(catalog.loading || isLoading || eligibleLoading) && (
             <span className="text-xs text-orange-600 flex items-center gap-1.5 animate-pulse mr-1">
               <RefreshCw size={13} className="animate-spin" />
-              Đang đồng bộ API...
+              Đang cập nhật dữ liệu...
             </span>
           )}
 

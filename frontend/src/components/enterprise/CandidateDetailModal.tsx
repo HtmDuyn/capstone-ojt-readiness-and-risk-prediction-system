@@ -3,6 +3,7 @@ import { CheckCircle2, Download, Eye, FileText, Loader2, RefreshCw, XCircle } fr
 import { enterpriseService, type EnterpriseCandidateItem } from '@/services/enterpriseService';
 import { WorkflowModal, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { downloadFile } from '@/utils/shared/downloadFile';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 const dateText = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value : 'Chưa cập nhật';
@@ -14,9 +15,9 @@ async function cvError(error: unknown) {
   const data = (error as { response?: { data?: unknown } })?.response?.data;
   if (data instanceof Blob) {
     // Backend có thể trả lỗi JSON dưới dạng Blob khi tải CV.
-    try { const body = JSON.parse(await data.text()); if (body.message) return String(body.message); } catch { /* Dùng thông báo mặc định nếu Blob không phải JSON. */ }
+    try { const body = JSON.parse(await data.text()); if (body.message) return friendlyErrorMessage(body.message, 'Không thể tải CV lúc này. Vui lòng thử lại.'); } catch { /* Dùng thông báo mặc định nếu Blob không phải JSON. */ }
   }
-  return error instanceof Error ? error.message : 'Không thể tải CV. Vui lòng thử lại.';
+  return friendlyErrorMessage(error, 'Không thể tải CV lúc này. Vui lòng thử lại.');
 }
 
 function Fields({ items }: { items: [string, ReactNode][] }) {

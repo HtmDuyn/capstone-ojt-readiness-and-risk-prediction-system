@@ -1,4 +1,5 @@
 import axios, { type AxiosError } from 'axios';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { enterpriseService, type PaginatedResponse, type RecruitmentPost, type RecruitmentWindow } from '../../services/enterpriseService';
 import { loadAllPages as loadPages } from '../shared/loadAllPages';
 
@@ -123,8 +124,8 @@ export function recruitmentError(error: unknown) {
     };
     if (body?.errorCode && messages[body.errorCode]) return messages[body.errorCode];
     if (body?.message?.includes('within the academic semester')) return 'Thời hạn do QHDN thiết lập đang không thỏa điều kiện cập nhật của hệ thống. Vui lòng nhờ QHDN kiểm tra lại thời hạn; nội dung bạn nhập vẫn được giữ, chưa được lưu.';
-    if (body?.message) return body.message;
-    if (!apiError.response) return 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.';
+    if (body?.message) return friendlyErrorMessage(apiError, 'Không thể thực hiện yêu cầu lúc này. Vui lòng thử lại.');
+    if (!apiError.response) return friendlyErrorMessage(apiError, 'Không thể kết nối lúc này. Vui lòng kiểm tra mạng và thử lại.');
   }
-  return error instanceof Error ? error.message : 'Không thể xử lý yêu cầu. Vui lòng thử lại.';
+  return friendlyErrorMessage(error, 'Không thể xử lý yêu cầu. Vui lòng thử lại.');
 }

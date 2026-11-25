@@ -19,6 +19,7 @@ import { localOjtSavePayload } from '@/utils/education/localOjtSavePayload';
 import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityBatch, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { savedOjtProgressLabel } from '@/utils/education/savedOjtEligibility';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 export const cleanQuery = (params: Query = {}) =>
   Object.fromEntries(
@@ -37,7 +38,7 @@ export async function getJson<T>(
 export function apiData<T>(response: unknown): T {
   const root = response as { success?: boolean; message?: string; data?: T };
   if (root?.success === false)
-    throw new Error(root.message || "Yêu cầu không thành công.");
+    throw new Error(friendlyErrorMessage(root.message, 'Yêu cầu chưa thể hoàn thành. Vui lòng thử lại.'));
   return (root?.data ?? response) as T;
 }
 export async function getPage<T>(
@@ -47,7 +48,7 @@ export async function getPage<T>(
 ): Promise<Page<T>> {
   const result = apiData<Page<T>>(await getJson(path, params, signal));
   if (!Array.isArray(result?.items))
-    throw new Error("Backend trả danh sách không hợp lệ.");
+    throw new Error("Chưa thể tải danh sách lúc này. Vui lòng thử lại.");
   return result;
 }
 export async function getAllItems<T>(
@@ -131,19 +132,24 @@ const authorizedFetch = async (
 ): Promise<Response> => {
   const token = getAuthToken();
 
-  return fetch(`${academicApiOrigin}${path}`, {
-    cache:'no-store',
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    ...(payload === undefined
-      ? {}
-      : {
-          body: JSON.stringify(payload),
-        }),
-  });
+  try {
+    return await fetch(`${academicApiOrigin}${path}`, {
+      cache:'no-store',
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      ...(payload === undefined
+        ? {}
+        : {
+            body: JSON.stringify(payload),
+          }),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new Error(friendlyErrorMessage(error, 'Không thể kết nối lúc này. Vui lòng kiểm tra mạng và thử lại.'));
+  }
 };
 
 const readJson = async <T>(response: Response): Promise<T> => {
@@ -156,7 +162,7 @@ const readJson = async <T>(response: Response): Promise<T> => {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error("Phản hồi từ máy chủ không đúng định dạng JSON.");
+    throw new Error("Chưa thể xử lý dữ liệu lúc này. Vui lòng thử lại sau.");
   }
 };
 
@@ -186,10 +192,10 @@ const getErrorMessage = (
   }
 
   if (status === 409) {
-    return error.message || "Dữ liệu bị xung đột với thông tin đã tồn tại.";
+    return friendlyErrorMessage({ response: { status, data: error } }, "Dữ liệu bị xung đột với thông tin đã tồn tại.");
   }
 
-  return error.message || fallback;
+  return friendlyErrorMessage({ response: { status, data: error } }, fallback);
 };
 
 const checkResponse = (
@@ -368,6 +374,8 @@ const searchOjtSemesters = async (
 // ======================================================
 
 export const academicService = {
+  getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number;effectiveFrom:string;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
+  saveOjtGradingCriteria: async (payload:{ojtSemesterId:number;name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
   getCalendar: async (id: number, signal?: AbortSignal) => apiData<AcademicCalendar>(await getJson(`/academic-years/${id}/calendar`, {}, signal)),
   updateCalendar: async (id: number, semesters: SemesterDates[], revision: string) =>
     apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision })).data),
@@ -416,7 +424,7 @@ export const academicReportingService = {
       if (body instanceof Blob) {
         let message: string | undefined;
         try { message = JSON.parse(await body.text()).message; } catch { /* Use the original HTTP error. */ }
-        if (message) throw new Error(message);
+        if (message) throw new Error(friendlyErrorMessage(message, 'Không thể tải báo cáo lúc này. Vui lòng thử lại.'));
       }
       throw error;
     }
@@ -434,7 +442,7 @@ const previewCurriculumImport = async (payload: CurriculumImportPayload): Promis
   approvedImports.delete(payload.idempotencyKey);
   const resource = apiData<ImportResource>((await API.post('/curriculum-imports', payload)).data);
   if (!Number.isSafeInteger(resource.id) || resource.id <= 0 || !['VALIDATED', 'COMMITTED'].includes(resource.status) || resource.preview?.preview !== true || !resource.preview.canCommit) {
-    throw new Error('Backend chưa xác nhận khung chương trình hợp lệ để import.');
+    throw new Error('Chưa thể xác nhận dữ liệu chương trình đào tạo hợp lệ. Vui lòng kiểm tra lại file và thử lại.');
   }
   if (resource.preview.action !== 'CREATE') throw new Error('Mã chương trình đã tồn tại. Chỉ được import khung mới; không thay thế khung đã nhập.');
   if (approvedImports.size >= 100) approvedImports.delete(approvedImports.keys().next().value!);
@@ -445,7 +453,7 @@ const commitCurriculumImport = async (payload: CurriculumImportPayload) => {
   const approved = approvedImports.get(payload.idempotencyKey);
   if (!approved || approved.payload !== JSON.stringify(payload)) throw new Error('Cần kiểm tra và xác nhận đúng khung chương trình trước khi import.');
   const resource = apiData<ImportResource>((await API.patch('/curriculum-imports', { id: approved.id, status: 'COMMITTED' })).data);
-  if (resource.status !== 'COMMITTED' || !resource.result) throw new Error('Backend chưa xác nhận hoàn tất import chương trình.');
+  if (resource.status !== 'COMMITTED' || !resource.result) throw new Error('Chưa xác nhận được kết quả nhập chương trình đào tạo. Vui lòng tải lại danh sách để kiểm tra.');
   return { success: true, data: resource.result };
 };
 
@@ -709,9 +717,7 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
 
   if (!programs.length || !cohortOptions.length || !periodOptions.length) {
     throw new Error(
-      "Thiếu danh mục chương trình, khóa hoặc kỳ học từ Backend. " +
-        "Đặc biệt, danh sách CTĐT phải trả về programId hoặc program.id; " +
-        "id trong danh sách curricula là ProgramID.",
+      "Chưa tải đủ danh mục chương trình đào tạo, khóa hoặc kỳ học. Vui lòng tải lại trang để thử lại.",
     );
   }
 
@@ -800,11 +806,9 @@ const sendImportRequest = async <T>(
     result = await response.json();
   } catch {
     if (response.status === 404) {
-      throw new Error("Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).");
+      throw new Error("Không tìm thấy dữ liệu cần thiết. Vui lòng tải lại trang.");
     }
-    throw new Error(
-      `Backend trả về dữ liệu không hợp lệ (HTTP ${response.status}).`,
-    );
+    throw new Error("Chưa thể xử lý dữ liệu lúc này. Vui lòng thử lại sau.");
   }
 
   const body =
@@ -822,23 +826,21 @@ const sendImportRequest = async <T>(
 
   if (response.status === 404) {
     if (body?.errorCode === 'ROUTE_NOT_FOUND') {
-      throw new Error(`Không tìm thấy đường dẫn API ${endpoint} (HTTP 404).`);
+      throw new Error('Chức năng này hiện chưa khả dụng. Vui lòng liên hệ quản trị viên nếu cần hỗ trợ.');
     }
     throw new Error(
       typeof body?.message === 'string' && body.message.trim()
-        ? body.message
-        : "Không tìm thấy tài nguyên hoặc đường dẫn yêu cầu (HTTP 404).",
+        ? friendlyErrorMessage({ response: { status: response.status, data: body } }, 'Không tìm thấy dữ liệu cần thiết. Vui lòng tải lại trang.')
+        : "Không tìm thấy dữ liệu cần thiết. Vui lòng tải lại trang.",
     );
   }
 
   if (!response.ok || body?.success === false) {
-    throw new Error(
-      body?.message || `${fallbackError} (HTTP ${response.status}).`,
-    );
+    throw new Error(friendlyErrorMessage({ response: { status: response.status, data: body } }, fallbackError));
   }
 
   if (!body) {
-    throw new Error("Backend trả về cấu trúc kết quả không hợp lệ.");
+    throw new Error("Chưa thể xử lý dữ liệu lúc này. Vui lòng thử lại sau.");
   }
 
   clearSharedReads();
@@ -877,7 +879,7 @@ export const importService = {
     );
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'VALIDATED' || resource.preview?.preview !== true)
-      throw new Error('Backend chưa xác nhận dữ liệu import hợp lệ.');
+      throw new Error('Chưa thể xác nhận dữ liệu sinh viên hợp lệ. Vui lòng kiểm tra lại file và thử lại.');
     return { ...resource.preview, success: true, importId: resource.id };
   },
 
@@ -888,7 +890,7 @@ export const importService = {
     );
     const resource = apiData<StudentImportResource>(response);
     if (resource.status !== 'COMMITTED' || !resource.result)
-      throw new Error('Backend chưa xác nhận hoàn tất import.');
+      throw new Error('Chưa xác nhận được kết quả nhập dữ liệu sinh viên. Vui lòng tải lại danh sách để kiểm tra.');
     return { ...resource.result, importId: resource.id, students: resource.students, success: true };
   },
 };
@@ -901,14 +903,21 @@ export const loadStudentAcademicCredits = async (studentId: number, signal?: Abo
   const earned = profile.academicProgress?.credits?.earned;
   return typeof earned === 'number' && Number.isFinite(earned) ? earned : null;
 };
-export type CurrentOjtRule = LocalOjtRule & { thresholdId?: number; id?: number | null; maxUnpassedCourses: number; updatedAt?: string | null; effectiveAt?: string | null; updatedByName?: string | null };
+export type CurrentOjtRule = LocalOjtRule & { createdAt?: string | null; createdByName?: string | null };
+export const loadOjtConditions = async (signal?: AbortSignal): Promise<CurrentOjtRule[]> =>
+  apiData<CurrentOjtRule[]>(await getJson('/ojt-conditions', {}, signal));
+export const createOjtCondition = async (minCredits: number, issuingDocument: string): Promise<CurrentOjtRule> =>
+  apiData<CurrentOjtRule>((await API.post('/ojt-conditions', { minCredits, issuingDocument })).data);
 export type OjtCreditThreshold = { id: number; minCredits: number };
 export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
   apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
 export const createOjtCreditThreshold = async (minCredits: number) =>
   apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
-export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> =>
-  apiData<CurrentOjtRule>(await getJson('/ojt-condition-policy', {}, signal));
+export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
+  const conditions = await loadOjtConditions(signal);
+  if (!conditions.length) throw new Error('Chưa có điều kiện xét OJT. Vui lòng thêm điều kiện trước khi xét.');
+  return conditions[0];
+};
 export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; code: string; name: string; status: string; reasons: string[] }[] };
 export const previewOjtPolicy = async (minCredits: number, maxUnpassedCourses: number) =>
   apiData<OjtPolicyPreview>((await API.post('/ojt-condition-policy/preview', { minCredits, maxUnpassedCourses })).data);
@@ -922,7 +931,7 @@ export async function saveLocalOjtResults(results: LocalOjtResult[], idempotency
     );
     const body = response.data;
     if (body.success !== true || body.data?.savedCount !== results.length) {
-      throw new Error(body.message || 'Backend chưa xác nhận lưu đầy đủ kết quả. Hãy kiểm tra trạng thái lưu trước khi tiếp tục.');
+      throw new Error(friendlyErrorMessage(body.message, 'Chưa xác nhận được kết quả lưu. Vui lòng kiểm tra trạng thái trước khi tiếp tục.'));
     }
     clearSharedReads();
     return { savedCount: body.data.savedCount, handedOffCount: body.data.handedOffCount ?? 0 };
@@ -930,7 +939,7 @@ export async function saveLocalOjtResults(results: LocalOjtResult[], idempotency
     const response = (error as { response?: { status?: number; data?: { message?: string; errorCode?: string } } } | null)?.response;
     const status = response?.status;
     if ([404, 405, 501].includes(status ?? 0)) {
-      throw new Error('Chưa lưu được kết quả: backend chưa hỗ trợ API lưu kết quả xét từ FE.');
+      throw new Error('Hiện chưa thể lưu kết quả xét OJT. Vui lòng liên hệ quản trị viên để được hỗ trợ.');
     }
     const apiMessage = response?.data?.message;
     if (apiMessage) {
@@ -940,7 +949,7 @@ export async function saveLocalOjtResults(results: LocalOjtResult[], idempotency
         'Course history changed after calculation. Recalculate before saving.': 'Bảng điểm đã thay đổi sau lần xét. Vui lòng xét lại trước khi lưu.',
         'All students and their accounts must be active.': 'Có sinh viên hoặc tài khoản không còn hoạt động. Vui lòng tải lại và xét lại.',
       };
-      throw new Error(translations[apiMessage] ?? (/[À-ỹ]/.test(apiMessage) ? apiMessage : `Không lưu được kết quả: ${apiMessage}`));
+      throw new Error(translations[apiMessage] ?? friendlyErrorMessage(apiMessage, 'Không lưu được kết quả. Vui lòng thử lại.'));
     }
     throw error;
   }
@@ -1001,11 +1010,20 @@ const requestJson = async <T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${eligibilityApiOrigin}${path}`, {
-    ...options,
-    cache:'no-store',
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${eligibilityApiOrigin}${path}`, {
+      ...options,
+      cache:'no-store',
+      headers,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new OjtEligibilityApiError(
+      friendlyErrorMessage(error, 'Không thể kết nối lúc này. Vui lòng kiểm tra mạng và thử lại.'),
+      0,
+    );
+  }
 
   let responseData: unknown = null;
 
@@ -1023,7 +1041,7 @@ const requestJson = async <T>(
     } | null;
 
     throw new OjtEligibilityApiError(
-      errorBody?.message || `Request failed with status ${response.status}.`,
+      friendlyErrorMessage({ response: { status: response.status, data: errorBody } }, 'Không thể tải dữ liệu điều kiện OJT. Vui lòng thử lại.'),
       response.status,
       errorBody?.errorCode,
       errorBody?.data,

@@ -6,7 +6,6 @@ import {
 import {
   Users,
   Activity,
-  Bot,
 } from 'lucide-react';
 
 import type { NavItem } from '@/types/common.types';
@@ -40,27 +39,14 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 
   {
     id: 'system-metrics',
-    label: 'Giám sát hệ thống',
+    label: 'Giám sát hoạt động tài khoản',
     path: '/admin/metrics',
     icon: <Activity size={20} />,
     banner: {
-      title: 'Giám sát & Nhật ký hoạt động',
+      title: 'Giám sát hoạt động tài khoản',
       description:
-        'Tra cứu nhật ký thực tế và chi tiết thao tác trên hệ thống.',
-      badge: 'Nhật ký hệ thống',
-    },
-  },
-
-  {
-    id: 'ai-config',
-    label: 'Tích hợp AI tư vấn',
-    path: '/admin/ai-config',
-    icon: <Bot size={20} />,
-    banner: {
-      title: 'Tích hợp AI tư vấn',
-      description:
-        'Trạng thái tích hợp mô hình AI ngoài cho chức năng tư vấn.',
-      badge: 'Chưa tích hợp',
+        'Tra cứu nhật ký quản lý tài khoản và bảo mật tài khoản.',
+      badge: 'Nhật ký tài khoản',
     },
   },
 

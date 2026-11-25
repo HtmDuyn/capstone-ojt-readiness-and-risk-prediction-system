@@ -5,6 +5,7 @@ import type { UserRole } from "@/types/auth.types";
 import { useAuth } from "@/hooks/shared/useAuth";
 import { useRoleRedirect } from "@/hooks/shared/useRoleRedirect";
 import { authService } from "@/services/authService";
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 const roleByCode: Record<string, UserRole> = {
   ADMIN: "admin",
@@ -42,7 +43,10 @@ const getApiErrorMessage = (error: unknown): string | undefined => {
     return undefined;
   }
 
-  return data.message;
+  if ((error as { response?: { status?: number } }).response?.status === 401) {
+    return 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng thử lại.';
+  }
+  return friendlyErrorMessage(error, 'Thông tin đăng nhập chưa chính xác hoặc tài khoản chưa thể truy cập. Vui lòng thử lại.');
 };
 
 const LoginPage: React.FC = () => {
@@ -96,16 +100,15 @@ const LoginPage: React.FC = () => {
         name: profile.fullName || profile.username,
         email: profile.email,
         role,
+        roleCode: profile.roleCode?.toUpperCase() ?? undefined,
       });
       redirectToDashboard(role);
     } catch (error) {
       const apiErrorMessage = getApiErrorMessage(error);
       if (apiErrorMessage) {
         setErrorMessage(apiErrorMessage);
-      } else if (error instanceof Error) {
-        setErrorMessage(error.message);
       } else {
-        setErrorMessage("Không thể đăng nhập. Vui lòng thử lại.");
+        setErrorMessage(friendlyErrorMessage(error, "Không thể đăng nhập. Vui lòng thử lại."));
       }
     } finally {
       setIsLoading(false);

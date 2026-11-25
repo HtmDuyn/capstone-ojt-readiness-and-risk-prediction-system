@@ -3,7 +3,7 @@ import { Building2, ChevronRight, FileText, MapPin, Search, Send, BriefcaseBusin
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { ApiError, allStudentPages, studentGet, studentQuery, type StudentCertificate } from '@/services/studentService';
-import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage, StudentSemesterSelect } from '@/components/student/PortalUI';
+import { buttonClass, dateText, Empty, inputClass, Pagination, ResourceState, statusText, StudentPage } from '@/components/student/PortalUI';
 import { StudentCvCard } from '@/components/student/StudentCvCard';
 import { StudentJobMatches } from '@/components/student/StudentJobMatches';
 import { StudentDialog } from '@/components/student/StudentDialog';
@@ -57,9 +57,9 @@ function RegistrationContent() {
   const [activeTab, setActiveTab] = useState<'apply' | 'records'>('apply');
   const [recordsRequested, setRecordsRequested] = useState(false);
   const scope = `${profile?.id}:${semesterId}:${revision}`;
-  const windows = useStudentResource('ojt-windows:' + scope,
+  const windows = useStudentResource(profile && semesterId ? 'ojt-windows:' + scope : null,
     (signal) => allStudentPages<RegistrationWindow>('/ojt-registration-windows' + studentQuery({ ojtSemesterId: semesterId }), signal), { snapshot: true });
-  const applications = useStudentResource(recordsRequested ? 'ojt-applications:' + scope + ':' + applicationPage : null,
+  const applications = useStudentResource(recordsRequested && profile && semesterId ? 'ojt-applications:' + scope + ':' + applicationPage : null,
     (signal) => studentGet<Page<Application>>('/job-applications' + studentQuery({ ojtSemesterId: semesterId, page: applicationPage, limit: 20 }), signal), { snapshot: true });
   const chosenWindow = windows.data?.find((item) => String(item.id) === windowChoice)
     ?? windows.data?.find((item) => item.status === 'OPEN') ?? windows.data?.[0];
@@ -80,8 +80,7 @@ function RegistrationContent() {
   const currentCompanyPage = Math.min(companyPage, Math.max(1, Math.ceil(filteredCompanies.length / 20)));
   const applicationItems = applications.data?.items ?? [];
   const cv = savedCv ?? profile?.cv ?? null;
-  const blockers = opportunities.data?.blockers ?? [];
-  const canApply = !!chosenWindow && !profileRefreshing && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
+  const canApply = !!semesterId && !!chosenWindow && !profileRefreshing && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
   const refreshRecruitment = () => { windows.reload(); opportunities.reload(); applications.reload(); };
   const openApplication = (position?: Opportunity) => {
     if (!canApply) return;
@@ -97,7 +96,7 @@ function RegistrationContent() {
         </div>
         <div role="tabpanel" id="apply-panel" aria-labelledby="apply-tab" hidden={activeTab !== 'apply'} className="space-y-4 pt-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="min-w-0"><StudentSemesterSelect /></div>
+          <div className="min-w-0 space-y-2 text-sm"><p className="font-medium text-slate-600">Kỳ OJT của bạn</p><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800">{semesterId ? 'Theo đợt OJT được nhà trường liên kết với hồ sơ' : 'Chưa được liên kết đợt OJT'}</p></div>
           <label className="block min-w-0 space-y-2 text-sm font-medium text-slate-600">Đợt đăng ký
             <select aria-label="Chọn đợt đăng ký" className={inputClass} value={chosenWindow?.id ?? ''} disabled={windows.loading || !windows.data?.length} onChange={(event) => { setWindowChoice(event.target.value); setCompanyPage(1); setSearch(''); }}>
               {!windows.data?.length && <option value="">Chưa có đợt đăng ký</option>}
@@ -108,9 +107,8 @@ function RegistrationContent() {
         <ResourceState loading={windows.loading} refreshing={windows.refreshing} error={windows.error} retry={windows.reload} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {chosenWindow && <p className="text-sm text-slate-600">Nhận hồ sơ: {dateText(chosenWindow.startsAt)} – {dateText(chosenWindow.endsAt)}</p>}
-          <button type="button" onClick={() => openApplication()} disabled={!canApply} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
+          <button type="button" onClick={() => openApplication()} disabled={!canApply} title={!semesterId ? 'Cần có đợt OJT để nộp đơn đăng ký' : undefined} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
         </div>
-        {!!blockers.length && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{explainOjtBlockers(blockers)} Bạn vẫn có thể xem thông tin doanh nghiệp bên dưới.</p>}
         {chosenWindow && <StudentJobMatches key={`${scope}:${chosenWindow.id}:${cv?.id??'no-cv'}`} windowId={chosenWindow.id} cvFileId={cv?.id??null} opportunities={opportunities.data?.items??[]} onApply={openApplication}/>}
       <div className="border-t border-slate-200 pt-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -141,7 +139,7 @@ function RegistrationContent() {
         <section aria-label="Hồ sơ đã nộp" className="min-w-0 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <header className="flex items-start gap-3"><span className="rounded-xl bg-orange-50 p-2.5 text-orange-600"><BriefcaseBusiness size={22}/></span><div><h2 className="text-lg font-semibold text-slate-800">Hồ sơ đã nộp</h2><p className="mt-1 text-sm text-slate-500">Theo dõi các vị trí thực tập mà bạn đã ứng tuyển.</p></div></header>
           {applications.loading&&<div role="status" aria-label="Đang tải hồ sơ đã nộp" className="animate-pulse space-y-3">{[0,1,2].map(i=><div key={i} className="h-20 rounded-xl bg-slate-100"/>)}</div>}
-          {applications.error&&<div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4"><AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600"/><div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-slate-800">Không thể tải danh sách hồ sơ</h3><p className="mt-1 text-sm text-slate-600">Đã xảy ra sự cố khi tải dữ liệu. Vui lòng thử lại.</p><button type="button" onClick={applications.reload} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><RefreshCw size={15}/>Thử lại</button><details className="mt-3 text-xs text-slate-500"><summary className="cursor-pointer">Chi tiết kỹ thuật</summary><p className="mt-2 break-words">{applications.error}</p></details></div></div>}
+          {applications.error&&<div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4"><AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600"/><div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-slate-800">Không thể tải danh sách hồ sơ</h3><p className="mt-1 text-sm text-slate-600">Đã xảy ra sự cố khi tải dữ liệu. Vui lòng thử lại.</p><button type="button" onClick={applications.reload} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><RefreshCw size={15}/>Thử lại</button></div></div>}
           {!applications.loading && !applications.error && !applicationItems.length && <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center"><span className="rounded-full bg-white p-3 text-slate-400"><Inbox size={28}/></span><h3 className="mt-3 text-sm font-semibold text-slate-700">Bạn chưa có hồ sơ ứng tuyển nào</h3><p className="mt-1 text-sm text-slate-500">Các vị trí bạn đã ứng tuyển sẽ được hiển thị tại đây.</p></div>}
           <div className="space-y-3">
             {applicationItems.map((application) => <article key={application.id} className="min-w-0 space-y-2 rounded-xl border border-slate-200 p-4 transition hover:border-orange-200 sm:p-5">
@@ -185,7 +183,7 @@ function RegistrationContent() {
 
 export default function StudentOjtRegistration() {
   const { profile, semesterId } = useStudentPortal();
-  return <StudentPage title="OJT & hồ sơ ứng tuyển" description="Khám phá doanh nghiệp liên kết, quản lý CV và theo dõi đơn đăng ký thực tập." showSemesterInBanner={false} compactTopSpacing>
+  return <StudentPage title="OJT & hồ sơ ứng tuyển" description="Khám phá doanh nghiệp liên kết, quản lý CV và theo dõi đơn đăng ký thực tập." needsSemester={false} showSemesterInBanner={false} compactTopSpacing>
     <RegistrationContent key={`${profile?.id}:${semesterId}`} />
   </StudentPage>;
 }

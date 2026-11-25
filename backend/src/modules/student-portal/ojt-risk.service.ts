@@ -1,11 +1,6 @@
-import { readTransaction } from '../qhdn/read.repository';
-import { studentProfile } from '../students/student-profile.service';
-import { ownStudent,type Actor,type Row } from './shared';
 import { assessAcademicWarning } from './academic-warning';
-import { coursePlanWithClient } from './course-plan.service';
 import { OJT_ROADMAP_TARGET_SEMESTER } from './course-plan';
-import type { AssessmentReadContext } from './assessment-read-context';
-import type { PoolClient } from 'pg';
+import type { Row } from './shared';
 
 export function buildRiskAndRoadmap(profile:Row,plan:Row|null) {
   const academic=profile.academic;
@@ -33,16 +28,4 @@ export function buildRiskAndRoadmap(profile:Row,plan:Row|null) {
         'Đề xuất không thay đổi điểm, đăng ký môn hoặc kết quả xét OJT chính thức.'],
     },
   };
-}
-
-export async function assessOjtRisk(actor:Actor,existingClient?:PoolClient) {
-  return readTransaction(async c=>{
-    const student=await ownStudent(c,actor);
-    const reads:AssessmentReadContext={};
-    const profile=await studentProfile(student.StudentID,{include:'academic,academicProgress'},actor,c,reads);
-    // Assess first. No personal course roadmap is produced without a valid assessment.
-    const canPlan=profile.academic?.earlyWarning?.available&&profile.academic?.academicWarning?.level!=='INSUFFICIENT_DATA';
-    const plan=canPlan?await coursePlanWithClient(c,student.StudentID,reads):null;
-    return buildRiskAndRoadmap(profile,plan);
-  },existingClient);
 }

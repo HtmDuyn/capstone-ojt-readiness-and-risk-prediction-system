@@ -2,6 +2,7 @@ import { resolveCurriculumCourseIds } from '@/services/educationService';
 import React from "react";
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Upload, X } from "lucide-react";
 import { curriculumService } from '@/services/educationService';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import type { CurriculumDetail, CurriculumImportPayload, CurriculumImportPreviewResponse, Major } from '@/types/education/curriculum.types';
 
 /* =========================================================
@@ -143,7 +144,7 @@ export const CurriculumImportActions:
         const { downloadCurriculumTemplate } = await import('@/utils/education/curriculumTemplateWorkbook');
         downloadCurriculumTemplate();
       } catch (error) {
-        setTemplateError(error instanceof Error ? error.message : "Không tải được file mẫu.");
+        setTemplateError(friendlyErrorMessage(error, "Không tải được file mẫu. Vui lòng thử lại."));
       } finally {
         setDownloadingTemplate(false);
       }
@@ -267,7 +268,7 @@ export const CurriculumImportActions:
               type: "error",
 
               text:
-                "Backend đã kiểm tra nhưng dữ liệu chưa đủ điều kiện để nhập.",
+                "Dữ liệu chưa đủ điều kiện để nhập. Vui lòng kiểm tra các mục được đánh dấu bên dưới.",
             });
           }
         } catch (error) {
@@ -275,9 +276,7 @@ export const CurriculumImportActions:
             type: "error",
 
             text:
-              error instanceof Error
-                ? error.message
-                : "Không thể kiểm tra dữ liệu import.",
+              friendlyErrorMessage(error, "Không thể kiểm tra dữ liệu nhập. Vui lòng thử lại."),
           });
         } finally {
           setIsChecking(
@@ -343,9 +342,7 @@ export const CurriculumImportActions:
             type: "error",
 
             text:
-              error instanceof Error
-                ? error.message
-                : "Không thể nhập chương trình đào tạo.",
+              friendlyErrorMessage(error, "Không thể nhập chương trình đào tạo. Vui lòng thử lại."),
           });
         } finally {
           setIsCommitting(
@@ -571,7 +568,7 @@ export const CurriculumImportActions:
                             </h4>
 
                             <p className="mt-1 text-sm text-slate-500">
-                              Dữ liệu dưới đây đã được backend kiểm tra và chuẩn hóa.
+                              Dữ liệu dưới đây đã được kiểm tra và chuẩn hóa.
                             </p>
                           </div>
 

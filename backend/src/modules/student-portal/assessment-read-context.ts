@@ -5,4 +5,5 @@ import type { AcademicProgressData } from '../students/academic-progress';
 export interface AssessmentReadContext {
   source?: AcademicProgressData;
   prerequisiteGroups?: Record<string, any>[];
+  studyPeriod?: { curriculumSemester: number | null; referenceDate: Date };
 }

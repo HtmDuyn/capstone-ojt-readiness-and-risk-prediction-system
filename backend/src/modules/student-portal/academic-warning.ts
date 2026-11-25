@@ -1,3 +1,7 @@
+import { OJT_ROADMAP_TARGET_SEMESTER } from './course-plan';
+
+const OJT_SEMESTER = OJT_ROADMAP_TARGET_SEMESTER + 1;
+
 export type WarningLevel='LOW'|'MEDIUM'|'HIGH'|'INSUFFICIENT_DATA';
 type Input={available:boolean;gateReasons:string[];semester:number|null;status:string;
   earnedCredits:number|null;missingCredits:number|null;debt:number;maxDebt:number|null;
@@ -18,11 +22,11 @@ export function assessAcademicWarning(input:Input) {
   const reason=(code:string,message:string)=>reasons.push({code,message});
   if(!input.available){reason('MONITORING_UNAVAILABLE','Chưa đủ điều kiện theo dõi sớm hoặc dữ liệu cần đối soát.');}
   else if(input.status==='ELIGIBLE'){
-    level='LOW';reason('CURRENT_REQUIREMENTS_MET','Hiện đáp ứng ngưỡng tín chỉ và môn nợ để xét OJT.');
+    level='LOW';reason('CURRENT_REQUIREMENTS_MET',input.maxDebt===null ? 'Hiện đáp ứng ngưỡng tín chỉ để xét OJT.' : 'Hiện đáp ứng ngưỡng tín chỉ và môn nợ để xét OJT.');
     actions.push('Duy trì kết quả học tập và theo dõi xác nhận chính thức của nhà trường.');
-  }else if(deadlinePassed || (input.semester!==null&&input.semester>=6)){
+  }else if(deadlinePassed || (input.semester!==null&&input.semester>=OJT_SEMESTER)){
     level='HIGH';reason(deadlinePassed?'ASSESSMENT_DEADLINE_PASSED':'OJT_STAGE_REACHED',deadlinePassed?'Đã đến hoặc qua hạn xét nhưng chưa đáp ứng điều kiện.':'Đã đến giai đoạn OJT nhưng hiện chưa đáp ứng điều kiện.');
-  }else if(input.semester===5){
+  }else if(input.semester===OJT_ROADMAP_TARGET_SEMESTER){
     if(input.projectedStatus===null||input.projectedStatus==='REVIEW_REQUIRED')reason('SCENARIO_UNAVAILABLE','Chưa đủ dữ liệu cho kịch bản đạt các môn đang học.');
     else if(input.projectedStatus==='ELIGIBLE'){
       level='MEDIUM';reason('CURRENT_COURSES_COULD_CLOSE_GAP','Nếu đạt toàn bộ môn đang học, phép tính đạt ngưỡng OJT; cần theo dõi điểm và thời hạn.');

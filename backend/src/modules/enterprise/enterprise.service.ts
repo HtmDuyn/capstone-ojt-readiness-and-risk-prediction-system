@@ -2,6 +2,7 @@ import { cvMetadataSql } from '../students/cv.service';
 import { decryptCv } from '../student-portal/cv.service';
 import { postSelect,postApi } from '../recruitment/recruitment.repository';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
+import { gradingCriteriaSelection } from '../academic/grading-criteria.service';
 import { enrichListRows } from '../../shared/list-context';
 import { readTransaction } from '../qhdn/read.repository';
 import { templateField } from '../qhdn/context-fields';
@@ -244,7 +245,7 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       CASE WHEN supervisor."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',supervisor."UserID",'fullName',supervisor."FullName",'email',supervisor."Email",'phone',supervisor."Phone") END AS "academicSupervisor",
       CASE WHEN v."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object(
         'id',v."EvaluationID",'templateId',v."TemplateID",'scoreDetails',v."ScoreDetails",'evaluatedBy',v."EvaluatedBy",'completionScore',v."CompletionScore",'attitudeScore',v."AttitudeScore",
-        'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",
+        'skillScore',v."SkillScore",'overallScore',v."OverallScore",'comments',v."Comments",'criteria',tmpl."Criteria",
         'status',v."Status",'evaluatedAt',v."EvaluatedAt") END AS evaluation,
       ${templateField},CASE WHEN result."ResultID" IS NULL THEN NULL ELSE jsonb_build_object('id',result."ResultID",'status',result."Status",'version',result."Version",'officialScore',result."OfficialScore",'outcome',result."Outcome",'publishedAt',result."PublishedAt") END AS result,
       result."Status" AS "resultStatus",(COALESCE(v."Status"='SUBMITTED',false) OR result."ResultID" IS NOT NULL) AS "evaluationLocked"
@@ -257,7 +258,8 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       LEFT JOIN "Users" supervisor ON supervisor."UserID"=a."AcademicSupervisorID"
       LEFT JOIN "InternshipEvaluations" v ON v."AssignmentID"=a."AssignmentID"
       LEFT JOIN ${officialEvaluationRelation} result ON result."AssignmentID"=a."AssignmentID"
-      LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=v."TemplateID"
+      LEFT JOIN LATERAL (${gradingCriteriaSelection('r."OJTSemesterID"')}) applicable_template ON true
+      LEFT JOIN "AssessmentTemplates" tmpl ON tmpl."TemplateID"=CASE WHEN v."Status"='SUBMITTED' THEN v."TemplateID" ELSE applicable_template."TemplateID" END
       WHERE ${where.join(' AND ')}`;
     const items = (await c.query(
       hasPagination

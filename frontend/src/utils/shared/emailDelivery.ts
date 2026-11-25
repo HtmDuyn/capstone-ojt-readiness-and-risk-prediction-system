@@ -28,5 +28,5 @@ export function deliveryIssue(issue: EmailDeliveryResult['issue']): string | und
   if (issue === 'AUTH') return 'Gửi email bị từ chối xác thực. Quản trị viên cần kiểm tra cấu hình nhà cung cấp email.';
   if (issue === 'PERMISSION') return 'Dịch vụ gửi email từ chối quyền gửi. Quản trị viên cần kiểm tra cấu hình.';
   if (issue === 'RATE_LIMIT') return 'Đã chạm giới hạn gửi email. Hệ thống sẽ thử lại.';
-  if (issue === 'CONFIGURATION') return 'Chưa cấu hình dịch vụ gửi email. Quản trị viên cần kiểm tra backend.';
+  if (issue === 'CONFIGURATION') return 'Dịch vụ gửi email chưa được cấu hình. Vui lòng liên hệ quản trị viên để được hỗ trợ.';
 }

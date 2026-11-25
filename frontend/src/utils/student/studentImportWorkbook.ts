@@ -72,7 +72,7 @@ const resolveOption = (
 
   if (matches.length === 0) {
     throw new Error(
-      `Dòng ${row}: ${label} "${input}" không có trong danh mục Backend.`,
+      `Dòng ${row}: ${label} "${input}" không có trong danh mục hiện có.`,
     );
   }
 
@@ -123,7 +123,7 @@ const readRows = (
     : [...COURSE_RESULT_COLUMNS, 'Học kỳ ghi nhận', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu', 'MSSV', 'code', 'courseCode', 'academicPeriodId', 'attemptNumber', 'status', 'score', 'gradePoints', 'grade', 'sourceReference'];
   const supported = new Set(aliases.map(normalize));
   const unknown = [...new Set(data.flatMap(row => Object.keys(row).filter(key => !supported.has(normalize(key)) && text(row[key]) !== '')))];
-  if (unknown.length) throw new Error(`Sheet ${sheetName}: cột chưa được API import hỗ trợ hoặc sai tên: ${unknown.join(', ')}. Hãy dùng mẫu chuẩn để tránh bỏ sót dữ liệu.`);
+  if (unknown.length) throw new Error(`Sheet ${sheetName}: tên cột chưa đúng hoặc chưa được hỗ trợ: ${unknown.join(', ')}. Hãy dùng mẫu chuẩn để tránh bỏ sót dữ liệu.`);
 
   if (!data.length) {
     if (optional) return [];
@@ -259,7 +259,7 @@ export const parseStudentImportWorkbook = async (
     const majorCode = getCell(row, ['Chuyên ngành', 'Mã chuyên ngành', 'majorCode']);
     if (majorCode) {
       const program = catalogs.programs.find(item => item.id === programId);
-      if (!program?.majorCode) throw new Error(`Dòng ${number}: Chưa xác định được chuyên ngành của chương trình đào tạo từ danh mục Backend.`);
+      if (!program?.majorCode) throw new Error(`Dòng ${number}: Chưa xác định được chuyên ngành từ danh mục chương trình đào tạo.`);
       if (normalize(majorCode) !== normalize(program.majorCode)) throw new Error(`Dòng ${number}: Chuyên ngành "${majorCode}" không khớp mã chuyên ngành ${program.majorCode} của chương trình đào tạo.`);
     }
 

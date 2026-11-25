@@ -5,6 +5,7 @@ import { handoffTarget, type HandoffCohort } from '@/utils/education/ojtHandoff'
 import type { Handoff } from '@/types/education/ojtWorkflow.types';
 import type { ImportedStudent } from '@/types/education/import.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 type Candidate = { student: ImportedStudent; result: SavedOjtEligibility; blocked: string; targetName: string; targetId?: number };
 
@@ -95,7 +96,7 @@ export function useEducationOjtHandoff() {
       setRevision(value => value + 1); reloadSemesters();
       return true;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Bàn giao không thành công.');
+      setError(friendlyErrorMessage(error, 'Bàn giao không thành công. Vui lòng thử lại.'));
       setRevision(value => value + 1);
       return false;
     } finally { setSaving(false); }

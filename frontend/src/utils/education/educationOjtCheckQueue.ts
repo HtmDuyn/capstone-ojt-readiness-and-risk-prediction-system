@@ -20,8 +20,8 @@ export function selectAutoCheckTargets<T extends Target>(targets: T[], saved: Re
   return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && !pending[student.id] && (!saved[student.id] || saved[student.id].isStale));
 }
 
-export function selectFullCheckTargets<T extends Target>(targets: T[], handedOff: Set<number>): T[] {
-  return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id));
+export function selectFullCheckTargets<T extends Target>(targets: T[], handedOff: Set<number>, saved: Record<number, { status?: string; isStale?: boolean }> = {}): T[] {
+  return targets.filter(({ student, reason }) => !reason && !handedOff.has(student.id) && !(saved[student.id]?.status === 'ELIGIBLE' && !saved[student.id]?.isStale));
 }
 
 export function selectPendingSaveResults<T extends { studentId: number }>(pending: Record<number, T>): T[] {

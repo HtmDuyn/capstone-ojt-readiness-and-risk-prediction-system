@@ -1,3 +1,5 @@
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+
 export const ojtSourceEndpoints = {
   students: '/students',
   results: '/ojt-eligibility-results',
@@ -15,17 +17,15 @@ export const ojtSourceLabels = {
 } as const;
 
 export type OjtSourceKey = keyof typeof ojtSourceEndpoints;
-export type OjtLoadIssue = { endpoint: string; status?: number; errorCode?: string; message: string };
+export type OjtLoadIssue = { message: string };
 
 export function ojtLoadIssue(key: OjtSourceKey, error: unknown): OjtLoadIssue {
-  const response = (error as { response?: { status?: number; data?: { errorCode?: string; message?: string } } })?.response;
+  void key;
   return {
-    endpoint: ojtSourceEndpoints[key],
-    status: response?.status,
-    errorCode: response?.data?.errorCode,
-    message: response?.data?.message || (error instanceof Error ? error.message : 'Không rõ nguyên nhân.'),
+    message: friendlyErrorMessage(error, 'Tạm thời chưa thể tải dữ liệu này. Vui lòng thử lại.'),
   };
 }
+
 
 export function partitionOjtLoad(keys: readonly OjtSourceKey[], settled: readonly PromiseSettledResult<unknown>[]) {
   const values: Partial<Record<OjtSourceKey, unknown>> = {};

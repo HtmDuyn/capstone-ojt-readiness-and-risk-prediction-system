@@ -13,6 +13,7 @@ import type { EnterpriseProfileData } from '@/types/enterprise/enterpriseTypes';
 import { isAxiosError } from 'axios';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { EnterpriseFirstPassword } from '@/components/enterprise/EnterpriseFirstPassword';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 // ─── Enterprise Context ────────────────────────────────────────────────────────
 // Lưu thông tin doanh nghiệp (bao gồm companyId) sau khi đăng nhập.
@@ -66,7 +67,7 @@ export function EnterpriseProvider({ children }: EnterpriseProviderProps) {
         setAccess('password');
         return;
       }
-      const message = err instanceof Error ? err.message : 'Lỗi kết nối khi tải hồ sơ doanh nghiệp.';
+      const message = friendlyErrorMessage(err, 'Không tải được hồ sơ doanh nghiệp. Vui lòng thử lại.');
       setError(message);
       if (initial) setAccess('error');
       console.error('[EnterpriseContext] Failed to load profile:', err);

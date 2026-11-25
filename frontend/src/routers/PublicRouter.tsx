@@ -27,7 +27,6 @@ const StudentAccount = lazy(() => import("@/pages/student/StudentAccount"));
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
 const AdminUsers = lazy(() => import("@/pages/admin/AdminUsers"));
 const AdminSystemMetrics = lazy(() => import("@/pages/admin/AdminSystemMetrics"));
-const AdminAiConfig = lazy(() => import("@/pages/admin/AdminAiConfig"));
 const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
 const QhdnNotifications = lazy(() => import("@/pages/qhdn/QhdnNotifications"));
 const QhdnDashboard = lazy(() => import("@/pages/qhdn/QhdnDashboard"));
@@ -209,6 +208,10 @@ const educationRoutes: RouteObject = {
           path: "/education/ojt-final-results",
           lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtFinalResults")).default }),
         },
+        {
+          path: "/education/grading-criteria",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationGradingCriteria")).default }),
+        },
 
         /* =========================
            ĐỀ XUẤT LỚP HỖ TRỢ TỪ AI
@@ -273,8 +276,6 @@ export const router = createBrowserRouter([
                   <AdminUsers />
                 ) : item.path === "/admin/metrics" ? (
                   <AdminSystemMetrics />
-                ) : item.path === "/admin/ai-config" ? (
-                  <AdminAiConfig />
                 ) : (
                   <RolePlaceholderPage role="admin" />
                 ),

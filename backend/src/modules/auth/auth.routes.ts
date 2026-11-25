@@ -92,11 +92,6 @@ router.post('/change-password', authenticate, requireJsonBody, async (req, res, 
  *               value:
  *                 email: ojt.coord@ojtrpa.edu.vn
  *                 password: Ojt@123
- *             student01:
- *               summary: Student01 — Sinh viên
- *               value:
- *                 email: student01@student.edu.vn
- *                 password: Student@123
  *             enterprise01:
  *               summary: Enterprise
  *               value:

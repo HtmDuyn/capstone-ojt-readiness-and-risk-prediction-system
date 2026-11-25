@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRightLeft, Clock3, FileText, Globe, UserRound, X } from 'lucide-react';
 import { formatDate, ROLE_NAMES, type AuditLog } from '@/services/adminService';
-import { actionLabel, entityLabel, fieldLabel, isRecord, parseLogValue, valuesEqual } from './audit-display';
+import { accountActionLabel, entityLabel, fieldLabel, isRecord, parseLogValue, valuesEqual } from './audit-display';
 
 function LogValue({ value, name = '' }: { value: unknown; name?: string }) {
   const parsed = parseLogValue(value);
@@ -89,7 +89,7 @@ export default function AuditLogDetails({ log, onClose }: { log: AuditLog; onClo
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-6" onClick={onClose}>
       <section ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={event => event.stopPropagation()}>
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-7">
-          <div className="flex items-center gap-3"><div className="rounded-xl bg-orange-50 p-3 text-orange-600"><FileText size={22} /></div><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Nhật ký #{log.id}</p><h2 id={titleId} className="mt-1 text-lg font-bold text-slate-900">{actionLabel(log.action)}</h2><p className="mt-1 text-xs text-slate-500">{log.action}</p></div></div>
+          <div className="flex items-center gap-3"><div className="rounded-xl bg-orange-50 p-3 text-orange-600"><FileText size={22} /></div><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Nhật ký #{log.id}</p><h2 id={titleId} className="mt-1 text-lg font-bold text-slate-900">{accountActionLabel(log.action)}</h2><p className="mt-1 text-xs text-slate-500">{log.action}</p></div></div>
           <button ref={closeButton} aria-label="Đóng chi tiết nhật ký" onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-orange-500"><X size={21} /></button>
         </header>
         <div className="space-y-5 overflow-y-auto bg-slate-50/60 p-5 sm:p-7">

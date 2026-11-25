@@ -9,6 +9,7 @@ import { handoff,handoffHistory } from '../ojt-registration/handoff.service';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';
 import { enumValue } from '../students/student.validation';
 import { retakeClassProposals } from '../academic-reporting/retake-class.service';
+import { getGradingCriteria, saveGradingCriteria } from './grading-criteria.service';
 const router=Router(),staff=[authenticate,authorizeRoles('ADMIN','ACADEMIC')];
 const handle=(fn:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await fn(req)});}catch(error){next(error);}};
 router.get('/assessment-windows',...staff,handle(r=>assessmentWindows(r.query)));
@@ -16,6 +17,8 @@ router.post('/assessment-windows',...staff,handle(r=>createAssessment(r.body,r.u
 router.patch('/assessment-windows',...staff,handle(r=>updateAssessment(r.body,r.user)));
 router.patch('/ojt-rule-sets',...staff,handle(r=>updateRule(r.body,r.user)));
 router.get('/ojt-semesters',...staff,handle(r=>semesters(r.query)));
+router.get('/ojt-grading-criteria',...staff,handle(r=>getGradingCriteria(r.query)));
+router.put('/ojt-grading-criteria',...staff,handle(r=>saveGradingCriteria(r.body,r.user),201));
 router.get('/ojt-semesters/:id',...staff,handle(r=>semesterDossier(positiveId(r.params.id),r.query,r.user)));
 router.put('/ojt-grade-mappings',...staff,handle(r=>{
   const b=inputObject(r.body,['programId','ojtSemesterId','courseId','academicPeriodId','gradeBands','reason']),{programId,ojtSemesterId,...mapping}=b;

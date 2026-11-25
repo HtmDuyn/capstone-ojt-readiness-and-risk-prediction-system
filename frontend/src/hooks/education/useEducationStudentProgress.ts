@@ -1,6 +1,7 @@
 import { studentProgressService, educationOjtWorkflowService } from '@/services/educationService';
 import { progressHandoffStatus } from '@/utils/education/educationOjtCheckQueue';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import React from 'react';
 
 export function useEducationStudentProgress() {
@@ -37,7 +38,7 @@ export function useEducationStudentProgress() {
             (student) => student.dataWarning,
           ).length;
           setLoadWarning([
-            partialCount > 0 ? `${partialCount} hồ sơ chưa tải đủ dữ liệu chi tiết từ API. Các trường chưa có dữ liệu sẽ hiển thị “—”.` : '',
+            partialCount > 0 ? `${partialCount} hồ sơ chưa tải đủ thông tin chi tiết. Các trường chưa có dữ liệu sẽ hiển thị “—”.` : '',
             handoffs.error ? 'Không tải được lịch sử bàn giao; trạng thái bàn giao đang hiển thị “Chưa xác định”.' : '',
           ].filter(Boolean).join(' ') || null);
         }
@@ -46,7 +47,7 @@ export function useEducationStudentProgress() {
           setStudents([]);
           setLoadError(
             error instanceof Error
-              ? error.message
+              ? friendlyErrorMessage(error, 'Không tải được tiến độ học tập. Vui lòng thử lại.')
               : "Không thể tải danh sách sinh viên.",
           );
         }

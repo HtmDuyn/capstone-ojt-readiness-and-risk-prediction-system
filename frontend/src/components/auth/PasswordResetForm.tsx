@@ -1,9 +1,10 @@
-import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
 import { authService } from "@/services/authService";
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 interface Props {
   initialEmail: string;
+  initialToken?: string;
   onBack: () => void;
   onComplete: (email: string, message: string) => void;
 }
@@ -11,12 +12,13 @@ interface Props {
 const inputClass = "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
 const labelClass = "mb-1 block text-xs font-bold text-gray-700";
 
-export default function PasswordResetForm({ initialEmail, onBack, onComplete }: Props) {
+export default function PasswordResetForm({ initialEmail, initialToken = "", onBack, onComplete }: Props) {
+  const fromLink = Boolean(initialToken);
   const [email, setEmail] = useState(initialEmail);
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialToken);
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(fromLink ? "Nhập mật khẩu mới để hoàn tất yêu cầu." : "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [canResend, setCanResend] = useState(false);
@@ -36,9 +38,7 @@ export default function PasswordResetForm({ initialEmail, onBack, onComplete }: 
       setNotice(message);
       setCanResend(false);
     } catch (failure) {
-      setError(isAxiosError<{ message?: string }>(failure)
-        ? failure.response?.data?.message || "Không thể gửi mã. Vui lòng thử lại."
-        : "Không thể gửi mã. Vui lòng thử lại.");
+      setError(friendlyErrorMessage(failure, "Không thể gửi mã. Vui lòng thử lại."));
     } finally {
       setBusy(false);
     }
@@ -65,9 +65,7 @@ export default function PasswordResetForm({ initialEmail, onBack, onComplete }: 
       const { message } = await authService.resetPassword(email.trim(), code, password);
       onComplete(email.trim(), message);
     } catch (failure) {
-      setError(isAxiosError<{ message?: string }>(failure)
-        ? failure.response?.data?.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại."
-        : "Không thể đặt lại mật khẩu. Vui lòng thử lại.");
+      setError(friendlyErrorMessage(failure, "Không thể đặt lại mật khẩu. Vui lòng thử lại."));
     } finally {
       setBusy(false);
     }
@@ -88,13 +86,13 @@ export default function PasswordResetForm({ initialEmail, onBack, onComplete }: 
           </div>
           {notice && (
             <>
-              <p role="status" className="text-sm text-gray-700">{notice} Mã có hiệu lực trong 10 phút.</p>
-              <div>
+              <p role="status" className="text-sm text-gray-700">{notice} {fromLink ? 'Liên kết có hiệu lực trong 10 phút.' : 'Mã có hiệu lực trong 10 phút.'}</p>
+              {!fromLink && <div>
                 <label htmlFor="reset-code" className={labelClass}>Mã xác nhận gồm 6 chữ số</label>
                 <input id="reset-code" type="text" inputMode="numeric" autoComplete="one-time-code"
                   pattern="[0-9]{6}" maxLength={6} required className={inputClass} value={code}
                   onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, ""))} />
-              </div>
+              </div>}
               <div>
                 <label htmlFor="reset-password" className={labelClass}>Mật khẩu mới</label>
                 <input id="reset-password" type="password" autoComplete="new-password" minLength={12}
@@ -116,7 +114,7 @@ export default function PasswordResetForm({ initialEmail, onBack, onComplete }: 
           </button>
           <div className="flex flex-wrap justify-between gap-3 text-sm font-semibold text-orange-700">
             <button type="button" className="hover:underline" onClick={onBack}>Quay lại đăng nhập</button>
-            {notice && (
+            {notice && !fromLink && (
               <button type="button" disabled={!canResend} className="enabled:hover:underline disabled:text-gray-500" onClick={sendCode}>
                 {canResend ? "Gửi lại mã" : "Có thể gửi lại sau 60 giây"}
               </button>

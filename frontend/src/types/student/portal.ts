@@ -16,6 +16,12 @@ export interface Named {
   name: string;
   code?: string;
 }
+export interface StudyPeriod extends Named {
+  startDate: string;
+  endDate: string;
+  curriculumSemester: number | null;
+  isCurrent: boolean;
+}
 export interface CV {
   id: number;
   fileName: string;
@@ -43,6 +49,8 @@ export interface AcademicProgress {
     earned: number;
     total: number | null;
     remaining: number | null;
+    ojtEarned?: number;
+    historyOjtEarned?: number;
     completeConfiguration?: boolean;
   };
   requirements: Requirement[];
@@ -55,15 +63,18 @@ export interface Eligibility {
   unpassedCourseCount: number;
   reasons: string[];
   academicIssues?: string[];
-  rule?: { minCredits: number; maxUnpassedCourses: number } | null;
+  rule?: { minCredits: number; maxUnpassedCourses: number | null } | null;
 }
 export interface AdmissionEligibility extends Eligibility {
   source: 'FRONTEND_HANDOFF' | 'OFFICIAL_CHECK';
   handoffId: number;
   batchId?: number;
   handedOffAt?: string;
+  appliedCondition?: import('../education/eligibility.types').OjtAppliedCondition | null;
 }
 export interface CourseResult {
+  academicPeriodId?: number;
+  periodStartDate?: string;
   id: number;
   courseId: number;
   courseCode: string;
