@@ -182,6 +182,8 @@ export interface EnterpriseCandidateStudent {
   programCode?: string;
   programName?: string;
   enrollmentYear?: number;
+  cohortName?: string | null;
+  groupCode?: string | null;
 }
 
 export interface EnterpriseCandidatePosition {
@@ -262,6 +264,7 @@ export interface EnterpriseInternshipItem {
   id: number; // AssignmentID
   studentId: number;
   ojtSemesterId: number;
+  semester?: { id: number; code?: string; name?: string } | null;
   positionId: number;
   coordinationId: number;
   registrationId: number;

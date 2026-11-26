@@ -7,6 +7,7 @@ import type { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from './StudentWorkflowUi';
 import { Field, Notice, errorMessage } from './QhdnUi';
 import { RecruitmentDateInput } from './RecruitmentDateInput';
+import { RecruitmentConfirmationContent } from './RecruitmentConfirmation';
 import { emptySchedule, formatScheduleDate as formatDateTime, newRecruitmentSchedule, updateScheduleDraft, recruitmentScheduleAccess, scheduleFields, validateRecruitmentSchedule, type ScheduleDraft, type ScheduleErrors, type ScheduleField } from '@/utils/qhdn/qhdnRecruitmentSchedule';
 
 type Round=Partial<PhaseSchedule>&{canEditSchedule?:boolean;canDelete?:boolean;editableScheduleFields?:string[];canPost?:boolean;canApply?:boolean;canRespond?:boolean;id:number;name:string;campaignId?:number;campaignName?:string;roundNumber?:number;status:string;currentPhase:string;startsAt:string;endsAt:string;resultsFinalizedAt?:string;pendingCount:number;canOpen:boolean;openBlockedReason?:string;canFinalize:boolean;resultsSummary?:{total:number;accepted:number;rejected:number;withdrawn:number;pending?:number}};
@@ -31,12 +32,17 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
  const [showAllDateErrors,setShowAllDateErrors]=useState(false);
  const [apiDateErrors,setApiDateErrors]=useState<ScheduleErrors>({});
  const [nameError,setNameError]=useState(''),[reasonError,setReasonError]=useState('');
+ const [pendingSave,setPendingSave]=useState<{name:string;reason:string}|null>(null);
+ const [pendingOpen,setPendingOpen]=useState<Round|null>(null);
+ const [formDetails,setFormDetails]=useState<{name:string;reason:string}|null>(null);
+ const creationForm=useRef<HTMLFormElement>(null);
+ const submission=useRef(false);
  const manuallyEdited=useRef(new Set<ScheduleField>());
  const touchedFields=useRef(new Set<ScheduleField>());
  const hasRecruitment=items.length>0||campaigns.length>0;
  const canCreate=!busy&&!loading&&roundsLoaded&&!loadError&&!migrationRequired&&catalog.canOpenRecruitment&&!hasRecruitment;
  const resetDates=(time:number)=>{
-  setNow(time);touchedFields.current.clear();setLastChanged(undefined);setShowAllDateErrors(false);setApiDateErrors({});setError('');setNameError('');setReasonError('');
+  setNow(time);touchedFields.current.clear();setLastChanged(undefined);setShowAllDateErrors(false);setApiDateErrors({});setError('');setNameError('');setReasonError('');setPendingSave(null);setFormDetails(null);
  };
  const startCreate=()=>{
   if(!canCreate)return;
@@ -81,12 +87,12 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    (key==='resultsEndsAt'&&touched.has('applicationEndsAt'));
   return <RecruitmentDateInput key={key} name={key} label={label} displayLabel={displayLabel} value={draft[key]} onValueChange={value=>changeDate(key,value)} minDate={vietnamTaskMinute(new Date(now)).slice(0,10)} disabled={busy||!!editing&&!editing.editableScheduleFields?.includes(key)} error={apiDateErrors[key]??(showError?liveErrors[key]:undefined)}/>;
  };
- const reportScheduleError=(failure:unknown,form:HTMLFormElement,fields:readonly ScheduleField[])=>{
+ const reportScheduleError=(failure:unknown,form:HTMLFormElement|null,fields:readonly ScheduleField[])=>{
   const field=(failure as { response?: { data?: { field?: ScheduleField } } })?.response?.data?.field;
   const message=errorMessage(failure);
   if(field&&fields.includes(field)){
-   const errors={[field]:message};setApiDateErrors(errors);
-   requestAnimationFrame(()=>focusScheduleError(form,errors));
+   const errors={[field]:message};setApiDateErrors(errors);setPendingSave(null);
+   requestAnimationFrame(()=>{const target=form?.isConnected?form:creationForm.current;if(target)focusScheduleError(target,errors);});
   }else setError(message);
  };
  useEffect(()=>{if(createRequest)startCreate();},[createRequest]);
@@ -101,17 +107,30 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    .catch(e=>{if(active){setLoadError(errorMessage(e));setMigrationRequired(e?.response?.status===503);}}).finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;};
  },[catalog.selectedPeriod?.id,catalog.selectedPeriod?.status,revision,refreshKey]);
- const create=async(e:FormEvent<HTMLFormElement>)=>{
+ const create=(e:FormEvent<HTMLFormElement>)=>{
   e.preventDefault();
   if(busy||(!editing&&!canCreate))return;
   const form=e.currentTarget,f=new FormData(form),time=Date.now();
   const name=String(f.get('name')??'').trim(),reason=String(f.get('reason')??'').trim();
-  const {errors,schedule}=validateDates(time,lastChanged);
+  const {errors}=validateDates(time,lastChanged);
   setNow(time);setShowAllDateErrors(true);setApiDateErrors({});setError('');
   setNameError(name?'':'Nhập tên đợt tuyển dụng.');setReasonError(!editing||reason?'':'Nhập lý do sửa lịch.');
   if(!name){form.querySelector<HTMLInputElement>('[name="name"]')?.focus();return;}
   if(Object.keys(errors).length){focusScheduleError(form,errors);return;}
   if(editing&&!reason){form.querySelector<HTMLTextAreaElement>('[name="reason"]')?.focus();return;}
+  setFormDetails({name,reason});setPendingSave({name,reason});
+ };
+ const saveReviewed=async()=>{
+  if(!pendingSave||submission.current||busy||(!editing&&!canCreate))return;
+  const time=Date.now(),{errors,schedule}=validateDates(time,lastChanged);
+  setNow(time);setError('');
+  if(Object.keys(errors).length){
+   setApiDateErrors(errors);setShowAllDateErrors(true);setPendingSave(null);
+   requestAnimationFrame(()=>{if(creationForm.current)focusScheduleError(creationForm.current,errors);});
+   return;
+  }
+  const {name,reason}=pendingSave;
+  submission.current=true;
   setBusy(true);
   try{
    if(editing)await API.patch(`/recruitment/windows/${editing.id}/schedule`,{name,...schedule,reason});
@@ -121,11 +140,11 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
     const campaign=response.data.data;
     setCampaigns([campaign]);setItems(campaign.rounds);
    }
-   setCreating(false);setRevision(v=>v+1);onChanged?.();setMessage(editing?'Đã cập nhật lịch đợt tuyển dụng.':'Đã tạo đợt tuyển dụng. Hệ thống sẽ gửi thông báo đến doanh nghiệp đang hoạt động.');setEditing(null);
+   setPendingSave(null);setCreating(false);setRevision(v=>v+1);onChanged?.();setMessage(editing?'Đã cập nhật lịch đợt tuyển dụng.':'Đã tạo đợt tuyển dụng. Hệ thống sẽ gửi thông báo đến doanh nghiệp đang hoạt động.');setEditing(null);
   }catch(e){
-   reportScheduleError(e,form,scheduleFields);
+   reportScheduleError(e,creationForm.current,scheduleFields);
    if((e as {response?:{data?:{errorCode?:string}}})?.response?.data?.errorCode==='RECRUITMENT_CAMPAIGN_EXISTS')setRevision(v=>v+1);
-  }finally{setBusy(false);}
+  }finally{submission.current=false;setBusy(false);}
  };
  const extend=async(e:FormEvent<HTMLFormElement>)=>{
   e.preventDefault();if(!extending||busy)return;
@@ -145,15 +164,21 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
    setExtending(null);setRevision(v=>v+1);onChanged?.();setMessage('Đã gia hạn đợt tuyển dụng.');
   }catch(e){reportScheduleError(e,form,extensionFields);}finally{setBusy(false);}
  };
- const openRound=async(round:Round)=>{
+ const openRound=(round:Round)=>{
   if(busy||!catalog.canOpenRecruitment||!round.canOpen)return;
+  setError('');setPendingOpen(round);
+ };
+ const confirmOpen=async()=>{
+  const round=items.find(item=>item.id===pendingOpen?.id);
+  if(submission.current||busy||loading||!catalog.canOpenRecruitment||!round?.canOpen)return;
+  submission.current=true;
   setBusy(true);setError('');setMessage('');
   try{
    await API.patch(
     `/recruitment/windows/${round.id}`,{status:'OPEN',reason:'QHDN mở đợt tuyển dụng theo lịch đã thiết lập.'});
-   setRevision(v=>v+1);onChanged?.();
+   setPendingOpen(null);setRevision(v=>v+1);onChanged?.();
    setMessage('Đã mở đợt tuyển dụng.');
-  }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
+  }catch(e){setError(errorMessage(e));}finally{submission.current=false;setBusy(false);}
  };
  const confirm=async(e:FormEvent<HTMLFormElement>)=>{
   e.preventDefault();if(!action)return;setBusy(true);setError('');
@@ -171,7 +196,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
   {catalog.selectedPeriod?.status==='CLOSED'&&<p className="text-sm text-slate-500">Chỉ tạo và mở đợt tuyển dụng trong học kỳ đang diễn ra.</p>}
   {hasRecruitment&&<p className="text-xs text-slate-500">Học kỳ này đã có đợt tuyển dụng. Mỗi học kỳ chỉ tạo một đợt duy nhất, kể cả khi đợt đã kết thúc hoặc chốt tổng hợp.</p>}
   <p className="text-sm font-medium text-slate-700">{catalog.selectedPeriod?.name||'Chọn học kỳ chính ở bộ lọc phía trên.'}</p>
-  {(loadError||(!creating&&!extending&&!action&&error))&&<Notice>{loadError||error}</Notice>}{message&&<Notice>{message}</Notice>}
+  {(loadError||(!creating&&!extending&&!action&&!pendingOpen&&error))&&<Notice>{loadError||error}</Notice>}{message&&<Notice>{message}</Notice>}
   <p className="text-xs text-slate-500">Giờ bắt đầu xét tuyển được gợi ý theo giờ bắt đầu ứng tuyển và có thể chỉnh tay; hạn phản hồi kết thúc bằng hoặc sau hạn ứng tuyển. Đợt chưa mở được sửa lịch và xóa; đợt đã mở không được xóa. Khi đang mở, chỉ sửa các mốc còn thời gian, không mở lại hạn đã hết.</p>
   {migrationRequired?<button className={workflowSecondary} onClick={()=>setRevision(v=>v+1)}>Kiểm tra lại sau khi cập nhật database</button>:loading?<p className="text-sm text-slate-500">Đang tải…</p>:items.length>0&&<div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200">{items.map((r,i)=>{
    const canOpen=catalog.canOpenRecruitment&&r.canOpen;
@@ -184,13 +209,18 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
     {!r.resultsFinalizedAt&&<div className="flex flex-wrap items-center gap-3">{r.status==='DRAFT'&&r.campaignId&&<button className={workflowPrimary} disabled={!canOpen||busy||loading} title={r.openBlockedReason||undefined} onClick={()=>openRound(r)}>Mở đợt</button>}{r.status==='OPEN'&&(r.canPost||r.canApply||r.canRespond)&&<button className={workflowSecondary} disabled={busy||loading} onClick={()=>startExtend(r)}>Gia hạn</button>}{r.canEditSchedule&&<button className={workflowSecondary} disabled={busy||loading} onClick={()=>startEdit(r)}>Sửa lịch</button>}{r.canDelete&&<button className={workflowSecondary+' text-red-600'} disabled={busy||loading} onClick={()=>{setError('');setAction({round:r,type:'delete'});}}>Xóa đợt</button>}{r.canFinalize&&<button className={workflowSecondary} disabled={busy||loading} onClick={()=>setAction({round:r,type:'finalize'})}><CheckCheck size={16}/>Chốt tổng hợp</button>}<span className="text-xs text-slate-500">{r.pendingCount?`${r.pendingCount} hồ sơ chờ phản hồi`:r.currentPhase==='SCHEDULED'?'Chưa tới giờ bắt đầu. Bạn có thể chỉnh sửa lịch.':!canOpen&&r.status==='DRAFT'?r.openBlockedReason:r.currentPhase==='ENDED'?'Đợt đã kết thúc. Chốt tổng hợp kết quả tuyển dụng.':null}</span></div>}
    </article>;
   })}</div>}
-  {creating&&<WorkflowModal wide title={editing?'Sửa lịch đợt tuyển dụng':'Tạo đợt tuyển dụng'} busy={busy} onClose={()=>setCreating(false)}><form noValidate className="space-y-5" onSubmit={create}>{error&&<Notice>{error}</Notice>}{!editing&&hasRecruitment?<Notice>Học kỳ này đã có đợt tuyển dụng. Không được tạo thêm đợt.</Notice>:<>
-   <Field label="Tên đợt tuyển dụng"><input name="name" defaultValue={editing?.name} className={workflowInput+(nameError?' !border-red-400':'')} required maxLength={150} placeholder="Ví dụ: Tuyển dụng OJT tháng 12" aria-invalid={!!nameError} aria-describedby={nameError?'recruitment-name-error':undefined} onChange={()=>setNameError('')}/>{nameError&&<span id="recruitment-name-error" role="alert" className="text-xs text-red-600">{nameError}</span>}</Field>
+  {creating&&<WorkflowModal wide={!pendingSave} title={pendingSave?(editing?'Xác nhận lưu lịch đợt OJT':'Xác nhận tạo đợt OJT'):(editing?'Sửa lịch đợt tuyển dụng':'Tạo đợt tuyển dụng')} busy={busy} onClose={()=>{if(pendingSave)setPendingSave(null);else setCreating(false);}}>
+   {pendingSave?<>{error&&<Notice>{error}</Notice>}<RecruitmentConfirmationContent action={editing?'save':'create'} semesterName={catalog.selectedPeriod?.name} roundName={pendingSave.name} busy={busy} disabled={!editing&&!canCreate} onBack={()=>{setError('');setPendingSave(null);}} onConfirm={()=>void saveReviewed()} /></>:<form ref={creationForm} noValidate className="space-y-5" onSubmit={create}>{error&&<Notice>{error}</Notice>}{!editing&&hasRecruitment?<Notice>Học kỳ này đã có đợt tuyển dụng. Không được tạo thêm đợt.</Notice>:<>
+   <Field label="Tên đợt tuyển dụng"><input name="name" defaultValue={formDetails?.name??editing?.name} className={workflowInput+(nameError?' !border-red-400':'')} required maxLength={150} placeholder="Ví dụ: Tuyển dụng OJT tháng 12" aria-invalid={!!nameError} aria-describedby={nameError?'recruitment-name-error':undefined} onChange={()=>setNameError('')}/>{nameError&&<span id="recruitment-name-error" role="alert" className="text-xs text-red-600">{nameError}</span>}</Field>
    <div className="divide-y divide-slate-100">{recruitmentPhases.map(phase=><fieldset key={phase.key} className="min-w-0 space-y-3 py-4 first:pt-0"><legend className="sr-only">{phase.label}</legend><div><h3 className="text-sm font-semibold text-slate-800">{phase.label}</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">{phase.description}</p></div><div className="grid gap-3 sm:grid-cols-2">{dateField((phase.key+'StartsAt') as ScheduleField,'Bắt đầu '+phase.label.toLowerCase())}{dateField((phase.key+'EndsAt') as ScheduleField,'Kết thúc '+phase.label.toLowerCase())}</div></fieldset>)}</div>
    <p className="text-xs leading-relaxed text-slate-500">{editing?'Mốc đã qua của đợt đang mở được khóa khi sửa lịch.':'Hạn 2 được gợi ý kết thúc sau 7 ngày kể từ mốc bắt đầu. Bạn có thể chỉnh ngày giờ kết thúc Hạn 2. Chọn mốc kết thúc Hạn 3 bằng hoặc sau khi Hạn 2 kết thúc.'}</p></>}
-   {editing&&<Field label="Lý do sửa lịch"><textarea name="reason" className={workflowInput+(reasonError?' !border-red-400':'')} required maxLength={2000} aria-invalid={!!reasonError} aria-describedby={reasonError?'recruitment-reason-error':undefined} onChange={()=>setReasonError('')}/>{reasonError&&<span id="recruitment-reason-error" role="alert" className="text-xs text-red-600">{reasonError}</span>}</Field>}
+   {editing&&<Field label="Lý do sửa lịch"><textarea name="reason" defaultValue={formDetails?.reason??''} className={workflowInput+(reasonError?' !border-red-400':'')} required maxLength={2000} aria-invalid={!!reasonError} aria-describedby={reasonError?'recruitment-reason-error':undefined} onChange={()=>setReasonError('')}/>{reasonError&&<span id="recruitment-reason-error" role="alert" className="text-xs text-red-600">{reasonError}</span>}</Field>}
    <div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={()=>setCreating(false)}>Đóng</button>{(!!editing||!hasRecruitment)&&<button className={workflowPrimary} disabled={busy||migrationRequired||(!editing&&!canCreate)}>{busy?'Đang lưu…':editing?'Lưu lịch':'Tạo đợt tuyển dụng'}</button>}</div>
-  </form></WorkflowModal>}
+  </form>}</WorkflowModal>}
+  {pendingOpen&&<WorkflowModal title="Xác nhận mở đợt OJT" busy={busy} onClose={()=>setPendingOpen(null)}>
+   {error&&<Notice>{error}</Notice>}
+   <RecruitmentConfirmationContent action="open" semesterName={catalog.selectedPeriod?.name} roundName={pendingOpen.name} busy={busy} disabled={loading||!catalog.canOpenRecruitment||!items.find(item=>item.id===pendingOpen.id)?.canOpen} onBack={()=>{setError('');setPendingOpen(null);}} onConfirm={()=>void confirmOpen()} />
+  </WorkflowModal>}
   {extending&&<WorkflowModal title="Gia hạn đợt tuyển dụng" busy={busy} onClose={()=>setExtending(null)}><form noValidate className="space-y-4" onSubmit={extend}>{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">Chỉ kéo dài thời điểm kết thúc của giai đoạn đang mở. Không mở lại ứng tuyển đã đóng.</p>{extensionPhases.map(phase=>dateField(`${phase.key}EndsAt`,'Kết thúc mới: '+phase.label,'Kết thúc mới: '+phase.label))}<button className={workflowPrimary} disabled={busy}>{busy?'Đang cập nhật…':'Xác nhận gia hạn'}</button></form></WorkflowModal>}
   {action&&<WorkflowModal title={action.type==='delete'?'Xóa đợt chưa mở':'Chốt tổng hợp kết quả'} busy={busy} onClose={()=>setAction(null)}><form onSubmit={confirm} className="space-y-4">{error&&<Notice>{error}</Notice>}<p className="text-sm text-slate-600">{action.round.name} · {fmt(action.round.startsAt)} – {fmt(action.round.endsAt)}</p>{action.type==='delete'&&<Notice>Chỉ xóa đợt chưa từng mở và chưa có dữ liệu liên quan. Thao tác sẽ xóa cả lịch ứng tuyển đi kèm.</Notice>}<Field label="Lý do xác nhận"><textarea name="reason" className={workflowInput} required maxLength={2000}/></Field><button className={workflowPrimary} disabled={busy}>{busy?'Đang xử lý…':'Xác nhận'}</button></form></WorkflowModal>}
  </section>

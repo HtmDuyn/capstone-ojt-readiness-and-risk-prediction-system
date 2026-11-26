@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Loader2, Pencil, Save, Search, Send } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Loader2, Pencil, Save, Search, Send } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { StudentDialog } from '@/components/student/StudentDialog';
+import { InternshipEvaluationDetailsDialog } from '@/components/enterprise/InternshipEvaluationDetailsDialog';
 import { enterpriseService, type EnterpriseInternshipItem, type EnterpriseInternshipTask } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
@@ -12,6 +13,7 @@ import { applyEvaluationScore, evaluationAverage, parseEvaluationScore, taskScor
 
 interface EvaluationRow extends EvaluationScores {
   id: number;
+  internship: EnterpriseInternshipItem;
   fullName: string;
   studentCode: string;
   position: string;
@@ -46,7 +48,7 @@ function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask
   const completed = tasks.filter(task => task.enterpriseStatus === 'DONE').length;
   const suggestion = tasksAvailable ? taskScoreSuggestion(completed, tasks.length) : null;
   return {
-    id: item.id, fullName: item.student?.fullName || '', studentCode: item.student?.studentCode || '',
+    id: item.id, internship: item, fullName: item.student?.fullName || '', studentCode: item.student?.studentCode || '',
     position: item.position?.title || '', semesterId: item.ojtSemesterId,
     semester: tasks[0]?.semesterCode || `Kỳ OJT #${item.ojtSemesterId}`,
     comments: ev?.comments || '', status: ev?.status === 'SUBMITTED' ? 'SUBMITTED' : ev ? 'DRAFT' : 'NEW',
@@ -68,7 +70,7 @@ const secondaryClass = 'inline-flex items-center justify-center gap-2 rounded-xl
 const primaryClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50';
 
 export function EnterpriseEvaluation() {
-  const { loading: profileLoading, companyId } = useEnterprise();
+  const { loading: profileLoading, companyId, profile } = useEnterprise();
   const [rows, setRows] = useState<EvaluationRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,7 @@ export function EnterpriseEvaluation() {
   const [page, setPage] = useState(1);
   const [confirming, setConfirming] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [evaluationDetailId, setEvaluationDetailId] = useState<number | null>(null);
   const [editor, setEditor] = useState<ScoreEditor | null>(null);
   const [editorError, setEditorError] = useState('');
   const requestRef = useRef<AbortController | null>(null);
@@ -142,9 +145,9 @@ export function EnterpriseEvaluation() {
     return () => { mounted = false; requestRef.current?.abort(); };
   }, [fetchRows]);
   useEffect(() => {
-    if (editor || confirming || busy || loading) return;
+    if (editor || confirming || evaluationDetailId !== null || busy || loading) return;
     return subscribeVisibleRefresh(() => void fetchRows(true), { interval: 60_000, canRefresh: () => !requestRef.current });
-  }, [fetchRows, editor, confirming, busy, loading]);
+  }, [fetchRows, editor, confirming, evaluationDetailId, busy, loading]);
   const hasUnsaved = rows.some(row => row.dirty);
   useEffect(() => {
     if (!hasUnsaved) return;
@@ -172,6 +175,7 @@ export function EnterpriseEvaluation() {
     ? selectedRows[0].criteria : [];
   const mixedTemplates = new Set(filtered.map(row => row.templateId).filter(id => id !== null)).size > 1;
   const detail = rows.find(row => row.id === detailId);
+  const evaluationDetail = rows.find(row => row.id === evaluationDetailId);
   const editingRow = rows.find(row => row.id === editor?.id);
   const semesters = Array.from(new Map(rows.map(row => [row.semesterId, row.semester])).entries());
   useEffect(() => { setPage(1); }, [search, status, semester]);
@@ -237,6 +241,9 @@ export function EnterpriseEvaluation() {
       setRows(current => current.map(row => {
         const ev = saved.get(row.id);
         return ev ? { ...row, status: target, dirty: false, locked: target === 'SUBMITTED',
+          internship: { ...row.internship, evaluation: { ...row.internship.evaluation, ...ev, status: target,
+            criteria: ev.criteria?.length ? ev.criteria : row.criteria, scoreDetails: ev.scoreDetails ?? null,
+            overallScore: ev.overallScore ?? null, comments: ev.comments === undefined ? row.comments.trim() || null : ev.comments } },
           submittedAverage: ev.overallScore ?? null,
           gradingChanged: false, scoreDetails:Object.fromEntries(row.criteria.map(c=>[c.key,String(ev.scoreDetails?.[c.key]??'')])) } : row;
       }));
@@ -287,7 +294,7 @@ export function EnterpriseEvaluation() {
                 <th className="w-32 px-3 py-4">Task</th>
                 {tableColumns.map(field => <th key={field.columnId} className="w-36 px-3 py-4 text-center">{field.label}<span className="block font-normal">{field.weight}%</span>{mixedTemplates && <span className="mt-1 block font-normal text-slate-400">{field.templateName}</span>}</th>)}
                 <th className="w-32 px-3 py-4 text-center">Điểm tổng</th><th className="w-36 px-4 py-4">Trạng thái</th>
-                <th className="w-36 px-4 py-4 text-right">Thao tác</th>
+                <th className="w-48 px-4 py-4 text-right">Thao tác</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">{!visible.length ? <tr><td colSpan={tableColumns.length + 6} className="py-14 text-center text-slate-500">Không có sinh viên phù hợp với bộ lọc.</td></tr> : visible.map(row => {
                 const completed = row.tasks.filter(task => task.enterpriseStatus === 'DONE').length;
@@ -317,7 +324,10 @@ export function EnterpriseEvaluation() {
                     </div>
                   </td>
                   <td className="px-4 py-4"><span className={'inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ' + (row.status === 'SUBMITTED' ? 'bg-emerald-50 text-emerald-700' : row.dirty ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-600')}>{row.status === 'SUBMITTED' ? 'Đã gửi QHDN' : row.dirty ? 'Chưa lưu thay đổi' : row.status === 'DRAFT' ? 'Bản nháp' : 'Chưa lưu'}</span>{!row.templateId && row.status !== 'SUBMITTED' ? <p className="mt-2 text-xs text-amber-700">Chờ Đào tạo ban hành tiêu chí</p> : row.gradingChanged && !row.locked ? <p className="mt-2 text-xs text-amber-700">Cần chấm lại theo quy ước mới</p> : average === null && !row.locked && <p className="mt-2 text-xs text-rose-600">Thiếu điểm</p>}</td>
-                  <td className="px-4 py-4 text-right"><button type="button" className={secondaryClass + ' whitespace-nowrap !px-3 !py-2 !text-xs'} disabled={busy || row.locked} aria-label={`Chỉnh sửa điểm của ${row.fullName} (${row.studentCode})`} onClick={() => openEditor(row)}>{!row.locked && <Pencil size={14} />}{row.locked ? 'Đã khóa' : 'Chỉnh sửa'}</button></td>
+                  <td className="px-4 py-4 text-right"><div className="flex items-center justify-end gap-2">
+                    <button type="button" className={secondaryClass + ' !h-9 !w-9 shrink-0 !rounded-lg !p-0'} disabled={busy} title="Xem thông tin sinh viên và đánh giá doanh nghiệp" aria-label={`Xem thông tin sinh viên và đánh giá của ${row.fullName} (${row.studentCode})`} onClick={() => setEvaluationDetailId(row.id)}><Eye size={16} aria-hidden="true" /></button>
+                    <button type="button" className={secondaryClass + ' whitespace-nowrap !px-3 !py-2 !text-xs'} disabled={busy || row.locked} aria-label={`Chỉnh sửa điểm của ${row.fullName} (${row.studentCode})`} onClick={() => openEditor(row)}>{!row.locked && <Pencil size={14} />}{row.locked ? 'Đã khóa' : 'Chỉnh sửa'}</button>
+                  </div></td>
                 </tr>;
               })}</tbody>
             </table>
@@ -332,6 +342,7 @@ export function EnterpriseEvaluation() {
         <div className="flex gap-3"><button type="button" className={secondaryClass} disabled={busy || loading || !selectedRows.length} onClick={() => void save('DRAFT')}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}Lưu nháp</button><button type="button" className={primaryClass} disabled={busy || loading || !selectedRows.length} onClick={() => { if (validate(true)) setConfirming(true); }}><Send size={16} />Lưu chính thức</button></div>
       </div>
     </section>
+    {evaluationDetail && <InternshipEvaluationDetailsDialog internship={evaluationDetail.internship} semesterLabel={evaluationDetail.semester} companyName={profile?.name} hasUnsavedChanges={evaluationDetail.dirty} onClose={() => setEvaluationDetailId(null)} />}
     {editor && editingRow && <StudentDialog title={`Chỉnh sửa điểm · ${editingRow.fullName}`} busy={busy} onClose={() => setEditor(null)}>
       <form onSubmit={event => { event.preventDefault(); updateScores(); }} className="space-y-5">
         <p className="text-sm text-slate-500">{editingRow.studentCode} · {editingRow.position || 'Chưa có vị trí'} · Thang điểm 0–10</p>
