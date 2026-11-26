@@ -14,7 +14,7 @@ import { academicPeriodStatusSql } from '../academic/period-status';
 export function validateCampaignSchedule(body:Row) {
  const start=scheduleDate(body.startsAt,'postingStartsAt'),end=scheduleDate(body.endsAt,'resultsEndsAt');
  if(end<=start)throw scheduleFieldError('resultsEndsAt','Ngày kết thúc đợt OJT phải sau ngày bắt đầu.');
- if(!Array.isArray(body.rounds)||body.rounds.length<1||body.rounds.length>30)throw invalid('Khai báo từ 1 đến 30 đợt con.');
+ if(!Array.isArray(body.rounds)||body.rounds.length!==1)throw invalid('Mỗi học kỳ chỉ được tạo đúng một đợt tuyển dụng.',400,'RECRUITMENT_SINGLE_ROUND_REQUIRED');
  const rounds=body.rounds.map((value:unknown)=>{
   const keys=Object.keys(scheduleColumns) as (keyof typeof scheduleColumns)[];
   const r=inputObject(value,['name',...keys]);
@@ -84,6 +84,15 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
   }
   const periodId=positiveId(b.academicPeriodId,'academicPeriodId'),period=await actualPeriod(c,periodId);
   if(period.Kind!=='SEMESTER'||period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ tạo đợt tuyển dụng trong học kỳ chính đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
+  const semesterId=await ensureOjtSemesterForPeriod(c,periodId);
+  // academicTransaction holds the shared calendar lock before this check,
+  // so simultaneous create requests cannot both create the first intake.
+  const existing=(await c.query(`SELECT EXISTS(SELECT 1 FROM "RecruitmentWindows"
+   WHERE "AcademicPeriodID"=$1 OR "OJTSemesterID"=$2)
+   OR EXISTS(SELECT 1 FROM "RecruitmentCampaigns" WHERE "OJTSemesterID"=$2) AS "hasRecruitment"`,[periodId,semesterId])).rows[0].hasRecruitment;
+  if(existing)throw invalid('Học kỳ này đã có đợt tuyển dụng. Mỗi học kỳ chỉ được tạo một đợt duy nhất.',409,'RECRUITMENT_CAMPAIGN_EXISTS');
+  if(b.supplemental!==undefined&&typeof b.supplemental!=='boolean')throw invalid('supplemental must be boolean.');
+  if(b.supplemental)throw invalid('Không tạo đợt bổ sung. Mỗi học kỳ chỉ được tạo một đợt tuyển dụng.',409,'RECRUITMENT_SUPPLEMENTAL_NOT_ALLOWED');
   await requireThreePhaseSchema(c);
   await requireLifecycleSchema(c);
   const schedule=validateCampaignSchedule(b);
@@ -91,29 +100,16 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
   if(schedule.end>periodBounds(period).end)throw scheduleFieldError('resultsEndsAt','Thời hạn không được vượt quá ngày kết thúc học kỳ.');
   const databaseNow=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
   if(schedule.start<=databaseNow)throw scheduleFieldError('postingStartsAt',futureScheduleMessage(databaseNow));
-  const semesterId=await ensureOjtSemesterForPeriod(c,periodId);
-  if(b.supplemental!==undefined&&typeof b.supplemental!=='boolean')throw invalid('supplemental must be boolean.');
-  let campaign=(await c.query('SELECT * FROM "RecruitmentCampaigns" WHERE "OJTSemesterID"=$1 FOR UPDATE',[semesterId])).rows[0];
-  let roundOffset=0;
-  if(campaign){
-   if(!b.supplemental)throw invalid('Kỳ OJT đã có đợt tuyển dụng; hoàn tất và chốt đợt trước rồi tạo đợt bổ sung.',409,'RECRUITMENT_CAMPAIGN_EXISTS');
-   const previous=(await c.query('SELECT * FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 ORDER BY "StartsAt"',[semesterId])).rows;
-   if(previous.some(w=>!w.ResultsFinalizedAt||new Date(w.EndsAt)>databaseNow))throw invalid('Phải hoàn tất và chốt tất cả đợt trước khi tạo đợt bổ sung.',409,'PREVIOUS_ROUND_NOT_FINALIZED');
-   roundOffset=Math.max(0,...previous.map(w=>Number(w.RoundNumber)||0));
-   await c.query('UPDATE "RecruitmentCampaigns" SET "EndsAt"=GREATEST("EndsAt",$2::timestamptz) WHERE "CampaignID"=$1',[campaign.CampaignID,schedule.end]);
-  }else{
-   if(b.supplemental)throw invalid('Chưa có đợt tuyển dụng gốc để tạo đợt bổ sung.',409);
-   campaign=(await c.query(`INSERT INTO "RecruitmentCampaigns" ("OJTSemesterID","Name","CreatedBy","StartsAt","EndsAt","ScheduleVersion")
+  const campaign=(await c.query(`INSERT INTO "RecruitmentCampaigns" ("OJTSemesterID","Name","CreatedBy","StartsAt","EndsAt","ScheduleVersion")
     VALUES ($1,$2,$3,$4,$5,3) RETURNING *`,[semesterId,requiredText(b.name,'name',150),actor,schedule.start,schedule.end])).rows[0];
-  }
   if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "StartsAt"<$3 AND "EndsAt">$2`,[semesterId,schedule.start,schedule.end])).rowCount)
    throw invalid('Lịch tuyển dụng trùng với đợt đã có.',409,'RECRUITMENT_WINDOW_CONFLICT');
   const createdByQhdn=(await c.query(`SELECT 1 FROM "Users" u JOIN "Roles" r USING("RoleID")
    WHERE u."UserID"=$1 AND u."Status"='ACTIVE' AND r."RoleCode"='OJT_COORD'`,[actor])).rowCount;
   const children=[];
-  for(const [i,r] of schedule.rounds.entries()){
+  for(const r of schedule.rounds){
    const row=(await c.query(`INSERT INTO "RecruitmentWindows" ("AcademicPeriodID","OJTSemesterID","Name","StartsAt","EndsAt","CreatedBy","CampaignID","RoundNumber","PostingStartsAt","PostingEndsAt","ApplicationStartsAt","ApplicationEndsAt","ResultsStartsAt","ResultsEndsAt")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING "WindowID"`,[periodId,semesterId,r.name,r.start,r.end,actor,campaign.CampaignID,roundOffset+i+1,r.postingStartsAt,r.postingEndsAt,r.applicationStartsAt,r.applicationEndsAt,r.resultsStartsAt,r.resultsEndsAt])).rows[0];
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING "WindowID"`,[periodId,semesterId,r.name,r.start,r.end,actor,campaign.CampaignID,1,r.postingStartsAt,r.postingEndsAt,r.applicationStartsAt,r.applicationEndsAt,r.resultsStartsAt,r.resultsEndsAt])).rows[0];
    await c.query(`INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","AcademicPeriodID","Name","Scope","StartsAt","EndsAt","CreatedBy","RecruitmentRoundID")
     VALUES ($1,$2,$3,'{}'::jsonb,$4,$5,$6,$7)`,[semesterId,periodId,r.name,r.applicationStartsAt,r.applicationEndsAt,actor,row.WindowID]);
    const after=await windowRecord(c,row.WindowID);children.push(windowApi(after));
