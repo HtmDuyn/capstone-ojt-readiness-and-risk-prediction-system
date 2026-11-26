@@ -3,7 +3,7 @@ import { academicTransaction, audit } from '../academic/academic.repository';
 import { readTransaction } from './read.repository';
 import { invalid, inputObject, positiveId, requiredText, enumValue } from '../students/student.validation';
 import { requireStudentAdmission } from '../student-portal/admission.service';
-import { assertOjtSemesterSix } from '../academic/workflow-policy';
+import { assertOjtPathway } from '../academic/workflow-policy';
 import { recordOjt202InProgress } from '../academic/ojt-course-enrollment';
 import { staff, record, refreshSlots } from './catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
@@ -68,7 +68,7 @@ export async function supplementPlacement(body:unknown,actor:Actor){
   await requirePlacementSchema(c);
   const s=(await c.query(`SELECT s.* FROM "Students" s JOIN "Users" u USING("UserID") WHERE s."StudentID"=$1 AND s."Status"='ACTIVE' AND u."Status"='ACTIVE' AND s."DeletedAt" IS NULL FOR UPDATE OF s`,[studentId])).rows[0];
   if(!s)throw invalid('Sinh viên không còn hoạt động.',409);
-  await requireStudentAdmission(c,studentId,semesterId);await assertOjtSemesterSix(c,studentId,semesterId);await recordOjt202InProgress(c,studentId,semesterId,actor.userId);
+  await requireStudentAdmission(c,studentId,semesterId);await assertOjtPathway(c,studentId,semesterId);await recordOjt202InProgress(c,studentId,semesterId,actor.userId);
   if((await c.query(`SELECT 1 FROM "OJTActualReceipts" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 UNION ALL
     SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."StudentID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
     UNION ALL SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED'`,[studentId,semesterId])).rowCount)throw invalid('Sinh viên đã có nơi thực tập trong kỳ này.',409,'ASSIGNMENT_EXISTS');

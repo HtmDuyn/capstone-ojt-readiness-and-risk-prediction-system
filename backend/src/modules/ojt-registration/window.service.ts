@@ -32,7 +32,7 @@ async function saveWindowFields(body:unknown,actor:number,id:number|undefined,cl
  w.AcademicPeriodID=positiveId(b.academicPeriodId??before?.AcademicPeriodID??term.AcademicPeriodID,'academicPeriodId');
  if(w.AcademicPeriodID!==term.AcademicPeriodID)throw invalid('academicPeriodId must match the selected OJT semester.',409,'REGISTRATION_PERIOD_MISMATCH');
  w.RequiredRelativeSemester=positiveId(b.requiredRelativeSemester??6,'requiredRelativeSemester');
- if(w.RequiredRelativeSemester!==6)throw invalid('OJT is fixed in relative semester 6.',409,'OJT_FIXED_SEMESTER_REQUIRED');
+ if(w.RequiredRelativeSemester!==6)throw invalid('Registration windows use relative curriculum semester 6 as the minimum OJT pathway.',409,'OJT_MINIMUM_SEMESTER_REQUIRED');
  if(!before) {
   const period=await actualPeriod(c,w.AcademicPeriodID);
   if(period.Kind!=='SEMESTER'||period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ tạo đợt đăng ký OJT trong học kỳ đang diễn ra.',409,'REGISTRATION_PERIOD_NOT_ACTIVE');

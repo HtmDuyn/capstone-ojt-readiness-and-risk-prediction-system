@@ -18,6 +18,12 @@ export async function recordOjt202InProgress(
   if (!target || target.Kind !== 'SEMESTER')
     throw invalid('Kỳ OJT phải gắn với một học kỳ thực tế.', 409, 'OJT_PERIOD_REQUIRED');
 
+  const relativeSemester = (await client.query(
+    'SELECT "StudentCurriculumSemester"($1,$2) AS relative',[studentId,target.AcademicPeriodID],
+  )).rows[0]?.relative;
+  if (!Number.isInteger(relativeSemester) || relativeSemester < 6)
+    throw invalid('OJT có thể bắt đầu từ học kỳ tương đối thứ 6 trở đi.',409,'OJT_MINIMUM_SEMESTER_REQUIRED');
+
   const { rows: [student] } = await client.query(`
     SELECT s."ProgramID" FROM "Students" s
     WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL AND s."Status"='ACTIVE' FOR UPDATE`, [studentId]);
@@ -53,7 +59,7 @@ export async function recordOjt202InProgress(
   const { rows: [inserted] } = await client.query(`
     INSERT INTO "StudentCourseResults"
       ("StudentID","CourseID","SemesterTaken","AcademicYearID","Status","AcademicPeriodID","AttemptNumber","SourceReference","RecordedBy")
-    SELECT $1,$2,6,$3,'IN_PROGRESS',$4,
+    SELECT $1,$2,$7,$3,'IN_PROGRESS',$4,
       COALESCE((SELECT max(history."AttemptNumber") FROM "StudentCourseResults" history
         JOIN "AcademicPeriods" previous_period ON previous_period."AcademicPeriodID"=history."AcademicPeriodID"
         JOIN "Courses" previous_course ON previous_course."CourseID"=history."CourseID"
@@ -76,7 +82,7 @@ export async function recordOjt202InProgress(
     )
     ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
       WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING
-    RETURNING "ResultID","AttemptNumber"`, [studentId, course.CourseID, target.AcademicYearID, target.AcademicPeriodID, target.RootPeriodID, actorId]);
+    RETURNING "ResultID","AttemptNumber"`, [studentId, course.CourseID, target.AcademicYearID, target.AcademicPeriodID, target.RootPeriodID, actorId, relativeSemester]);
 
   if (!inserted) {
     if ((await client.query(`SELECT 1 FROM "StudentCourseResults" passed JOIN "Courses" course USING ("CourseID")
@@ -91,7 +97,7 @@ export async function recordOjt202InProgress(
   }
 
   await audit(client, actorId, 'StudentCourseResults', inserted.ResultID, 'RECORD_OJT202_IN_PROGRESS', null, {
-    studentId, courseId: course.CourseID, semesterTaken: 6,
+    studentId, courseId: course.CourseID, semesterTaken: relativeSemester,
     academicYearId: target.AcademicYearID, academicPeriodId: target.AcademicPeriodID,
     attemptNumber: inserted.AttemptNumber,
     status: 'IN_PROGRESS', sourceReference: 'AUTO_OJT_ENROLLMENT',

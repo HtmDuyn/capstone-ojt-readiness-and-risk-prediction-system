@@ -8,7 +8,7 @@ import { currentCV, cvMetadataSql } from './cv.service';
 import { validateCertificateLinks } from './certificate.service';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
 import { requireStudentAdmission, studentAdmission } from '../student-portal/admission.service';
-import { assertOjtSemesterSix } from '../academic/workflow-policy';
+import { assertOjtPathway } from '../academic/workflow-policy';
 import { recordOjt202InProgress } from '../academic/ojt-course-enrollment';
 import { invalid, inputObject, positiveId, optionalText, pagination, enumValue } from './student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
@@ -115,7 +115,7 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       throw invalid('Sinh viên chưa được xếp vào đợt OJT này.',409,'OJT_ROUND_NOT_ASSIGNED');
     const cv=await currentCV(c,s.StudentID);
     if(!cv)throw invalid('Upload a PDF CV before applying.',409,'CV_REQUIRED');
-    const pathway={...await assertOjtSemesterSix(c,s.StudentID,semesterId),admissionSource:admission.source};
+    const pathway={...await assertOjtPathway(c,s.StudentID,semesterId),admissionSource:admission.source};
     await recordOjt202InProgress(c,s.StudentID,semesterId,actor.userId);
     if(!r){
       const row=(await c.query(`INSERT INTO "OJTRegistrations"
