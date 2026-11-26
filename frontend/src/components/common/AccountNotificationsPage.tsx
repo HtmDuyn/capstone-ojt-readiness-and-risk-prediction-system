@@ -15,11 +15,13 @@ export function AccountNotificationsPage({
   badge,
   bannerVariant = 'default',
   banner,
+  showRefreshAction = true,
 }: {
   description: string;
   badge: string;
   bannerVariant?: 'default' | 'enterprise' | 'qhdn';
   banner?: ReactNode;
+  showRefreshAction?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
@@ -78,9 +80,9 @@ export function AccountNotificationsPage({
           <h2 className="font-semibold text-slate-900">Thông báo của bạn</h2>
           <p className="mt-1 text-sm text-slate-500">{data ? `${data.unreadCount} chưa đọc · ${data.total} thông báo` : 'Thông báo mới nhất từ hệ thống'}</p>
         </div>
-        <button type="button" className={buttonClass} disabled={loading || savingId !== null} onClick={reload}><RefreshCw size={16} />Tải lại</button>
+        {showRefreshAction && <button type="button" className={buttonClass} disabled={loading || savingId !== null} onClick={reload}><RefreshCw size={16} />Tải lại</button>}
       </div>
-      {(error || actionError) && <div role="alert" className="border-b border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">{error || actionError}{error && <button type="button" onClick={reload} className="ml-2 underline">Thử lại</button>}</div>}
+      {(error || actionError) && <div role="alert" className="border-b border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">{error || actionError}{error && showRefreshAction && <button type="button" onClick={reload} className="ml-2 underline">Thử lại</button>}</div>}
       {loading ? <div role="status" className="flex items-center justify-center gap-2 p-12 text-sm text-slate-500"><Loader2 size={20} className="animate-spin" />Đang tải thông báo…</div>
         : !error && !data?.items.length ? <div className="flex flex-col items-center gap-3 p-12 text-sm text-slate-500"><Bell size={30} className="text-slate-300" />Chưa có thông báo.</div>
         : !error && data?.items.map(item => <article key={item.id} className={'flex flex-col gap-3 border-b border-slate-100 p-4 last:border-b-0 sm:flex-row sm:items-start sm:px-6 ' + (item.isRead ? '' : 'bg-orange-50/50')}>

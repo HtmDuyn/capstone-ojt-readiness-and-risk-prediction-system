@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { EligibleOjtRoster } from '@/components/qhdn/EligibleOjtRoster';
 import { RecruitmentRounds } from '@/components/qhdn/RecruitmentRounds';
@@ -74,7 +74,6 @@ export default function QhdnRegistrationWindows() {
     <PageBanner variant="qhdn" title="Quản lý các đợt OJT" description="Thiết lập đợt OJT, quản lý lịch tuyển dụng, mở đợt con và chốt tổng hợp kết quả theo học kỳ." badge="Phòng QHDN" />
     <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
       <AcademicPeriodFilter selection={semester} disabled={busy} />
-      <button type="button" className={workflowSecondary} disabled={semester.loading || loading || busy} onClick={() => { semester.reload(); refresh(); }}><RefreshCw size={16} />Tải lại các đợt</button>
     </section>
     {semester.error && <Notice>{semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}

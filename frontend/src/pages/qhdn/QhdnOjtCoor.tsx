@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw, UserPlus, Eye } from 'lucide-react';
+import { UserPlus, Eye } from 'lucide-react';
 import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
 import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
@@ -156,7 +156,7 @@ export default function QhdnOjtCoordination() {
       </button>)}
     </div>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.75fr)_minmax(0,1.5fr)_minmax(0,1fr)_auto]">
+      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.75fr)_minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="min-w-0 sm:col-span-2 xl:col-span-1">
           <Field label="Tìm sinh viên">
             <input className={filterInput} placeholder="Tìm mã hoặc tên sinh viên…" aria-label="Tìm sinh viên" value={search} onChange={e => setSearch(e.target.value)} />
@@ -169,7 +169,6 @@ export default function QhdnOjtCoordination() {
             {placementStatuses.map(status => <option key={status} value={status}>{placementStatusLabels[status]}</option>)}
           </select>
         </Field>
-        <button className={workflowSecondary + ' h-11 whitespace-nowrap sm:justify-self-end'} disabled={loading || busy} onClick={refresh}><RefreshCw size={16} />Tải lại</button>
       </fieldset>
       <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" disabled={busy} checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({data?.items.filter(s => s.needsFollowUp).length ?? 0})</label>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-orange-50/50 px-5 py-3">
@@ -241,7 +240,7 @@ export default function QhdnOjtCoordination() {
           <td className={cell + ' text-right tabular-nums'}>{Math.max(0, company.actualCount - company.capacity)}</td>
         </tr>)}</tbody>
       </table></div>
-      {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu. Vui lòng thử tải lại.':'Chưa có doanh nghiệp tiếp nhận trong học kỳ này.'}</p>}
+      {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu.':'Chưa có doanh nghiệp tiếp nhận trong học kỳ này.'}</p>}
     </section>
     {detail && <StudentProfileModal key={detail.id + ':' + semester.semesterId} studentId={detail.id} ojtSemesterId={Number(semester.semesterId)} fullName={detail.fullName} onClose={() => setDetail(null)} />}
     {task && <WorkflowModal wide title={task.bulk ? `Điều phối hàng loạt ${task.students.length} sinh viên` : 'Điều phối sinh viên đến doanh nghiệp'} busy={busy} onClose={() => setTask(null)}>
@@ -257,7 +256,7 @@ export default function QhdnOjtCoordination() {
             <input type="hidden" name="source" value="QHDN_COORDINATION"/>
             <Field label="Danh sách tiếp nhận hồ sơ"><select name="companyId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp tiếp nhận</option>{companies.map(company=><option key={company.key} value={company.id??''} disabled={!company.id}>{company.name} · Còn {company.availableSlots} slot</option>)}</select></Field>
             {!companies.length&&<p className="text-sm text-amber-700">Chưa có doanh nghiệp tiếp nhận trong học kỳ này.</p>}
-            {companies.length>0&&!companies.some(company=>company.id)&&<p className="text-sm text-amber-700">Chưa thể xác định doanh nghiệp tiếp nhận. Vui lòng tải lại danh sách hoặc liên hệ quản trị viên.</p>}
+            {companies.length>0&&!companies.some(company=>company.id)&&<p className="text-sm text-amber-700">Chưa thể xác định doanh nghiệp tiếp nhận. Vui lòng liên hệ quản trị viên.</p>}
           </>:<>
             <input type="hidden" name="source" value="QHDN_COORDINATION"/>
             <Field label="Doanh nghiệp và vị trí"><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{data?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>

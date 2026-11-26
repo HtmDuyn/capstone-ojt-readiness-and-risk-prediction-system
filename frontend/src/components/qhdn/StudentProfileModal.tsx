@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Eye, FileText, GraduationCap, LoaderCircle, RefreshCw, UserRound } from 'lucide-react';
+import { Download, Eye, FileText, GraduationCap, LoaderCircle, UserRound } from 'lucide-react';
 import { getCvFile, getQhdnStudentDossier } from '@/services/qhdnService';
 import type { QhdnStudentCv, QhdnStudentDossier } from '@/types/qhdn/qhdnTypes';
 import { downloadFile } from '@/utils/shared/downloadFile';
@@ -69,7 +69,7 @@ function CvDocument({ studentId, cv, label }: { studentId: number; cv: QhdnStude
 
 export function StudentProfileModal({ studentId, ojtSemesterId, fullName, onClose }: { studentId: number; ojtSemesterId: number; fullName: string; onClose: () => void }) {
   const [profile, setProfile] = useState<QhdnStudentDossier | null>(null), [loading, setLoading] = useState(true);
-  const [error, setError] = useState(''), [revision, setRevision] = useState(0);
+  const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
     setProfile(null); setLoading(true); setError('');
@@ -78,10 +78,10 @@ export function StudentProfileModal({ studentId, ojtSemesterId, fullName, onClos
       .catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [studentId, ojtSemesterId, revision]);
+  }, [studentId, ojtSemesterId]);
   return <WorkflowModal wide title="Chi tiết hồ sơ sinh viên" subtitle={fullName} onClose={onClose}>
     {loading && <p role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500"><LoaderCircle size={18} className="animate-spin" />Đang tải hồ sơ sinh viên…</p>}
-    {error && <div className="space-y-3"><Notice>{error}</Notice><button className={workflowSecondary} onClick={() => setRevision(value => value + 1)}><RefreshCw size={15} />Thử lại</button></div>}
+    {error && <Notice>{error}</Notice>}
     {profile && <div className="max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto pr-1">
       <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><UserRound size={17} className="text-orange-600" />Thông tin sinh viên</h3>
         <ProfileFields fields={[

@@ -45,7 +45,7 @@ export const QhdnDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loadError, setLoadError] = useState("");
 
-  const catalog = useQhdnAcademicPeriods();
+  const catalog = useQhdnAcademicPeriods("", false, true);
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
   const [revision, setRevision] = useState(0);
@@ -62,9 +62,7 @@ export const QhdnDashboard: React.FC = () => {
   const quotas = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.quotas : undefined;
   const hasRecruitmentRounds = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.hasRecruitmentRounds : undefined;
   const periodNotice = !catalog.loading && !catalog.error && catalog.selectedPeriod && (
-    catalog.selectedPeriod.kind === 'SEMESTER' && (!selectedSemesterId || hasRecruitmentRounds === false)
-      ? missingRecruitmentRounds
-      : catalog.selectedPeriod.kind === 'BLOCK3' && !selectedSemesterId ? 'Block 3 này chưa liên kết kỳ OJT.' : ''
+    !selectedSemesterId || hasRecruitmentRounds === false ? missingRecruitmentRounds : ''
   );
   const isLoading = !!selectedSemesterId && !quotas && !internshipError;
 
@@ -417,16 +415,12 @@ export const QhdnDashboard: React.FC = () => {
             selection={catalog}
             controlClassName="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
           />
-          <button type="button" disabled={catalog.loading || isLoading || eligibleLoading} onClick={() => setRevision(value => value + 1)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50">
-            <RefreshCw size={14} />Tải lại
-          </button>
         </div>
       </div>
 
       {catalog.error && <Notice>{catalog.error}</Notice>}
-      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện: {eligibleError}. Chọn Tải lại để thử lại.</Notice>}
-      {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}. Chọn Tải lại để thử lại.</Notice>}
+      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện: {eligibleError}.</Notice>}
+      {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}.</Notice>}
       {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
 
       {/* Charts Grid */}
@@ -538,12 +532,6 @@ export const QhdnDashboard: React.FC = () => {
                       return (
                         <div className="space-y-4">
                           <Notice>{loadError}</Notice>
-                          <button
-                            className="rounded-xl border p-3"
-                            onClick={() => window.location.reload()}
-                          >
-                            Thử lại
-                          </button>
                         </div>
                       );
                     return (

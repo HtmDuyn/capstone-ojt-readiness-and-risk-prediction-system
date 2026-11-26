@@ -8,7 +8,6 @@ import {
   MoreHorizontal,
   LockKeyhole,
   UnlockKeyhole,
-  RefreshCw,
   Search,
   FileSpreadsheet,
   UserPlus,
@@ -314,14 +313,6 @@ export default function QhdnEnterpriseManagement() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 xl:shrink-0">
-                <button
-                  className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"}
-                  disabled={loading || positionsLoading}
-                  onClick={() => setRevision((v) => v + 1)}
-                >
-                  <RefreshCw size={16} />
-                  Làm mới
-                </button>
                 <button type="button" className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"} onClick={() => setImporting('file')}>
                   <FileSpreadsheet size={17} />Import danh sách doanh nghiệp
                 </button>
@@ -399,13 +390,7 @@ export default function QhdnEnterpriseManagement() {
             </div>
             {positionsError && (
               <Notice>
-                Không tải được chỉ tiêu: {positionsError}{" "}
-                <button
-                  className="ml-2 font-bold underline"
-                  onClick={() => setRevision((v) => v + 1)}
-                >
-                  Thử lại
-                </button>
+                Không tải được chỉ tiêu: {positionsError}
               </Notice>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Inbox, RefreshCw, Send } from 'lucide-react';
+import { Download, Inbox, Send } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { listOjtResults, exportQhdnReport, exportOjtResults, publishOjtResults } from '@/services/qhdnService';
 import { downloadFile } from '@/utils/shared/downloadFile';
@@ -67,7 +67,6 @@ export default function QhdnEnterpriseEvaluations(){
    </div>
    <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-4">
     <AcademicPeriodFilter selection={catalog} disabled={busy||publishBusy}/>
-    {tab==='results'&&<button type="button" className={workflowSecondary+' sm:ml-auto'} disabled={busy||publishBusy||results.busy||!semesterId} onClick={results.reload}><RefreshCw size={15} className={results.busy?'animate-spin':''}/>Tải lại</button>}
    </div>
    <div className="space-y-3 px-5 empty:hidden">{(catalog.error||error)&&<div className="pt-4"><Notice>{catalog.error||error}</Notice></div>}{message&&<p role="status" className="pt-4 text-sm font-medium text-emerald-700">{message}</p>}</div>
    <div id={`report-panel-${tab}`} role="tabpanel" aria-labelledby={`report-tab-${tab}`}>
