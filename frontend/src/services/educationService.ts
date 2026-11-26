@@ -725,36 +725,47 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
   };
 };
 
-interface OverviewStudent {
-  id: number;
-  accountStatus: string;
-  cohortId: number | null;
-  cohort?: { id: number; name: string; code: string } | null;
-  calculatedEligibility?: SavedOjtEligibility | null;
-}
-
 export const educationOverviewService = {
-  async load(scope: QueryParams = {}, signal?: AbortSignal, onStudentsLoaded?: (total: number) => void) {
-    const students = (await sharedRead(`overview:students:${scope.cohortId ?? ''}`, () => getAllItems<OverviewStudent>('/students', {
-      status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
-    }), signal)).filter(student => student.accountStatus === 'ACTIVE');
-    signal?.throwIfAborted();
-    onStudentsLoaded?.(students.length);
-    const rows = students.map(student => {
-      const saved = student.calculatedEligibility;
-      const status = saved && !saved.isStale ? saved.status : undefined;
-      const category = !saved || saved.isStale ? 'AWAITING_CONFIRMATION' : status === 'REVIEW_REQUIRED' ? 'INSUFFICIENT_DATA' : status;
-      return { studentId: student.id, cohortId: student.cohortId, category,
-        evaluation: { status: status ?? 'NOT_CHECKED' }, officialStale: saved?.isStale ?? false };
-    });
-    const data = dashboardSummary([{
-      rows,
-      cohorts: students.flatMap(student => student.cohort ? [{ CohortID: student.cohort.id, Name: student.cohort.name, CohortCode: student.cohort.code }] : []),
-    }]);
-    const staleCount = students.filter(student => student.calculatedEligibility?.isStale).length;
-    return { ...data, unavailableProfiles: 0,
-      warning: staleCount ? `${staleCount} kết quả đã cũ do dữ liệu học vụ thay đổi. Cần xét lại trước khi sử dụng.` : '',
-    };
+  async load(scope: QueryParams = {}, signal?: AbortSignal) {
+    try {
+      return apiData<Row>(await getJson('/students/overview', scope, signal));
+    } catch (error) {
+      const response = (error as { response?: { status?: number; data?: { errorCode?: string; message?: string } } })?.response;
+      const missingOverviewRoute = response?.status === 404 || (
+        response?.status === 400 && response.data?.errorCode === 'INVALID_ACADEMIC_INPUT' &&
+        response.data.message === 'id must be a positive integer.'
+      );
+      if (!missingOverviewRoute) throw error;
+
+      // Keep local development and older deployed backends working during a
+      // staggered deploy. Newer backends use the compact aggregate endpoint.
+      type OverviewStudent = {
+        id: number;
+        accountStatus: string;
+        cohortId: number | null;
+        cohort?: { id: number; name: string; code: string } | null;
+        calculatedEligibility?: SavedOjtEligibility | null;
+      };
+      const students = (await getAllItems<OverviewStudent>('/students', {
+        status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
+      }, signal)).filter(student => student.accountStatus === 'ACTIVE');
+      signal?.throwIfAborted();
+      const rows = students.map(student => {
+        const saved = student.calculatedEligibility;
+        const status = saved && !saved.isStale ? saved.status : undefined;
+        const category = !saved || saved.isStale ? 'AWAITING_CONFIRMATION' : status === 'REVIEW_REQUIRED' ? 'INSUFFICIENT_DATA' : status;
+        return { studentId: student.id, cohortId: student.cohortId, category,
+          evaluation: { status: status ?? 'NOT_CHECKED' }, officialStale: saved?.isStale ?? false };
+      });
+      const data = dashboardSummary([{
+        rows,
+        cohorts: students.flatMap(student => student.cohort ? [{ CohortID: student.cohort.id, Name: student.cohort.name, CohortCode: student.cohort.code }] : []),
+      }]);
+      const staleCount = students.filter(student => student.calculatedEligibility?.isStale).length;
+      return { ...data, unavailableProfiles: 0,
+        warning: staleCount ? `${staleCount} kết quả đã cũ do dữ liệu học vụ thay đổi. Cần xét lại trước khi sử dụng.` : '',
+      };
+    }
   },
 };
 
@@ -1110,14 +1121,27 @@ async function loadStudent(
   savedResults: Map<number, SavedOjtEligibility>,
   signal?: AbortSignal,
 ): Promise<StudentProgress> {
+  // The program ID is already available in the list row. Start loading its
+  // curriculum while the heavier student profile/history request is in flight.
+  let curriculumRequest: Promise<Row | null> | null = null;
+  let curriculumWarning = "";
+  const listedProgramId = number(row.programId);
+  if (listedProgramId) {
+    if (!curricula.has(listedProgramId))
+      curricula.set(listedProgramId, getJson(`/curricula/${listedProgramId}`, {}, signal)
+        .then(response => apiData<Row>(response)));
+    curriculumRequest = curricula.get(listedProgramId)!.catch(() => {
+      curriculumWarning = "Không tải được khung chương trình để hiển thị kỳ khuyến nghị và môn tiên quyết.";
+      return null;
+    });
+  }
   const profile = apiData<Row>(await getJson(`/students/${row.id}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
   const progress = profile.academicProgress ?? {},
     program = profile.program ?? {},
     credits = progress.credits ?? {};
-  let curriculum: Row | null = null,
-    curriculumWarning = "";
+  let curriculum: Row | null = null;
   const programId = profile.programId ?? program.id;
-  if (programId) {
+  if (programId && !curriculumRequest) {
     if (!curricula.has(programId))
       curricula.set(
         programId,
@@ -1125,13 +1149,12 @@ async function loadStudent(
           apiData<Row>(response),
         ),
       );
-    try {
-      curriculum = await curricula.get(programId)!;
-    } catch {
-      curriculumWarning =
-        "Không tải được khung chương trình để hiển thị kỳ khuyến nghị và môn tiên quyết.";
-    }
+    curriculumRequest = curricula.get(programId)!.catch(() => {
+      curriculumWarning = "Không tải được khung chương trình để hiển thị kỳ khuyến nghị và môn tiên quyết.";
+      return null;
+    });
   }
+  if (curriculumRequest) curriculum = await curriculumRequest;
   const first = profile.courseResults;
   const attempts: Row[] = [...(first?.items ?? [])];
   // Results are a paginated section of the student profile.
@@ -1207,6 +1230,8 @@ async function loadStudent(
     currentTerm: progressText(profile.currentAcademicPeriod?.name),
     currentTermStartDate: profile.currentAcademicPeriod?.startDate ?? null,
     gpa: number(progress.gpa),
+    gpaScale: number(progress.gpaScale),
+    gpaLoaded: true,
     completedCredits: number(credits.earned),
     totalCredits: number(credits.total ?? program.totalCredits),
     plannedOjtTerm: "—",
@@ -1216,6 +1241,16 @@ async function loadStudent(
     eligibilityStatus,
     eligibilitySource: saved ? (saved.source ?? 'BACKEND') : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
     subjects,
+    courseHistory: attempts.map((attempt: Row) => ({
+      id: String(attempt.id),
+      code: progressText(attempt.courseCode),
+      name: progressText(attempt.courseName),
+      academicPeriod: progressText(attempt.academicPeriod?.name ?? attempt.periodName ?? attempt.periodCode ?? attempt.academicPeriodId),
+      attemptNumber: Number(attempt.attemptNumber),
+      status: String(attempt.status ?? ''),
+      score: number(attempt.score),
+      grade: attempt.grade == null ? null : String(attempt.grade),
+    })),
     dataWarning:
       [
         curriculumWarning,
@@ -1227,43 +1262,106 @@ async function loadStudent(
         .join(" ") || undefined,
   };
 }
+let progressRows = new Map<number, Row>();
+let progressSavedResults = new Map<number, SavedOjtEligibility>();
+let progressCurricula = new Map<number, Promise<Row>>();
+let progressDetailCache = new Map<number, Promise<StudentProgress>>();
+let progressGpaCache = new Map<number, Promise<{
+  gpa: number | null; gpaScale: number | null;
+  completedCredits: number | null; totalCredits: number | null;
+}>>();
+let progressSession: string | null = null;
+
+function progressSummary(row: Row): StudentProgress {
+  const saved = row.calculatedEligibility as SavedOjtEligibility | null | undefined;
+  const freshSaved = saved && !saved.isStale ? saved : undefined;
+  const gpaLoaded = row.gpaLoaded === true;
+  return {
+    id: String(row.id),
+    studentCode: progressText(row.studentCode),
+    fullName: progressText(row.fullName),
+    cohort: progressText(row.cohort?.code ?? row.cohortCode),
+    curriculumCode: progressText(row.program?.code),
+    currentCurriculumSemester: number(row.currentSemester),
+    courseSemesterTag: number(row.courseSemesterTag),
+    currentTerm: progressText(row.currentAcademicPeriod?.name),
+    currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null,
+    gpa: gpaLoaded ? number(row.cachedGpa) : null,
+    gpaScale: gpaLoaded ? number(row.cachedGpaScale) : null,
+    gpaLoaded,
+    completedCredits: gpaLoaded ? number(row.cachedEarnedCredits) : null,
+    totalCredits: (gpaLoaded ? number(row.cachedTotalCredits) : null) ?? number(row.program?.totalCredits),
+    plannedOjtTerm: '—',
+    currentEstimatedOjtTerm: '—',
+    delayTerms: null,
+    progressStatus: 'Chưa xác định',
+    eligibilityStatus: savedOjtProgressLabel(saved ?? undefined),
+    eligibilitySource: saved?.source ?? (saved ? 'BACKEND' : null),
+    subjects: [],
+    detailsLoaded: false,
+    unpassedCourseCount: freshSaved?.unpassedCourseCount ?? null,
+  };
+}
+
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
-    const curricula = new Map<number, Promise<Row>>();
-    const [students, saved] = await Promise.all([getAllItems<Row>("/students", {}, signal), loadSavedOjtEligibilityResults(signal)]);
-    const savedResults = new Map(saved.map(result => [result.studentId, result]));
-    const items: StudentProgress[] = new Array(students.length);
-    let next = 0;
-    await Promise.all(
-      Array.from({ length: Math.min(4, students.length) }, async () => {
-        while (next < students.length) {
-          signal?.throwIfAborted();
-          const index = next++;
-          try {
-            items[index] = await loadStudent(students[index], curricula, savedResults, signal);
-          } catch (error) {
-            signal?.throwIfAborted();
-            const row = students[index];
-            const message = progressText(row.studentCode) +
-                ": " +
-                (error instanceof Error
-                  ? error.message
-                  : "Không tải được hồ sơ");
-            items[index] = {
-              id: String(row.id), studentCode: progressText(row.studentCode), fullName: progressText(row.fullName),
-              cohort: progressText(row.cohort?.code ?? row.cohortCode),
-              curriculumCode: progressText(row.program?.code), currentCurriculumSemester: number(row.currentSemester),
-              currentTerm: progressText(row.currentAcademicPeriod?.name), currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null, gpa: null,
-              completedCredits: null, totalCredits: null, plannedOjtTerm: '—',
-              currentEstimatedOjtTerm: '—', delayTerms: null, progressStatus: 'Chưa xác định',
-              eligibilityStatus: savedOjtProgressLabel(savedResults.get(Number(row.id))),
-              eligibilitySource: savedResults.get(Number(row.id))?.source ?? (savedResults.has(Number(row.id)) ? 'BACKEND' : null),
-              subjects: [], dataWarning: message, detailsUnavailable: true,
-            };
-          }
-        }
-      }),
-    );
-    return items;
+    const token = localStorage.getItem('ojt_auth_token');
+    const rows = await getAllItems<Row>('/students', {}, signal);
+    progressSession = token;
+    progressRows = new Map(rows.map(row => [Number(row.id), row]));
+    progressSavedResults = new Map(rows.flatMap(row => row.calculatedEligibility
+      ? [[Number(row.id), row.calculatedEligibility as SavedOjtEligibility] as const]
+      : []));
+    progressCurricula = new Map();
+    progressDetailCache = new Map();
+    progressGpaCache = new Map();
+    return rows.map(progressSummary);
+  },
+
+  async loadGpa(studentIds: number[]) {
+    if (progressSession !== localStorage.getItem('ojt_auth_token')) {
+      throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng tải lại danh sách sinh viên.');
+    }
+    const ids = [...new Set(studentIds)].filter(id => progressRows.has(id));
+    const missing = ids.filter(id => !progressGpaCache.has(id));
+    for (let offset = 0; offset < missing.length; offset += 100) {
+      const batch = missing.slice(offset, offset + 100);
+      const response = apiData<Row>(await getJson('/students/gpa-summaries', { ids: batch.join(',') }));
+      const items = Array.isArray(response.items) ? response.items as Row[] : [];
+      const returned = new Map(items.map(item => [Number(item.studentId), {
+        gpa: number(item.gpa), gpaScale: number(item.gpaScale),
+        completedCredits: number(item.earnedCredits), totalCredits: number(item.totalCredits),
+      }]));
+      for (const id of batch) {
+        const summary = returned.get(id);
+        if (!summary) throw new Error(`Không tải được GPA của sinh viên ${id}.`);
+        progressGpaCache.set(id, Promise.resolve(summary));
+      }
+    }
+    const entries = await Promise.all(ids.map(async id => [id, await progressGpaCache.get(id)!] as const));
+    return new Map(entries);
+  },
+
+  async loadDetails(studentId: number): Promise<StudentProgress> {
+    if (progressSession !== localStorage.getItem('ojt_auth_token')) {
+      throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng tải lại danh sách sinh viên.');
+    }
+    const cached = progressDetailCache.get(studentId);
+    if (cached) return cached;
+    const row = progressRows.get(studentId);
+    if (!row) throw new Error('Không tìm thấy sinh viên trong danh sách hiện tại.');
+
+    const request = loadStudent(row, progressCurricula, progressSavedResults)
+      .then(student => ({
+        ...student,
+        detailsLoaded: true,
+        unpassedCourseCount: student.subjects.filter(subject => subject.status === 'Not Passed').length,
+      }))
+      .catch(error => {
+        progressDetailCache.delete(studentId);
+        throw error;
+      });
+    progressDetailCache.set(studentId, request);
+    return request;
   },
 };

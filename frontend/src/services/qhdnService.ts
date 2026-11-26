@@ -25,6 +25,7 @@ export const getQhdnDashboardSummary = async (ojtSemesterId: number, signal?: Ab
   if(!progress||![progress.completed,progress.inProgress,progress.evaluated].every(count=>Number.isSafeInteger(count)&&count>=0))throw new Error('Chưa tải được đầy đủ thống kê kết quả OJT. Vui lòng thử lại.');
   return response.data.data;
 };
+
 import type {
   CompanyListResponse,
   PositionListResponse,

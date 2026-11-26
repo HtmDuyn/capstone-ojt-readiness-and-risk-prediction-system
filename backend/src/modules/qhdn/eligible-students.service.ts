@@ -55,6 +55,13 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       roster."OJTSemesterID" AS "ojtSemesterId",term."Name" AS "semesterName",
       roster."RoundID" AS "roundId",roster."RoundName" AS "roundName",roster."CheckedAt" AS "checkedAt",
       CASE WHEN roster."RoundID" IS NULL THEN 'WAITING' ELSE 'ASSIGNED' END AS "rosterStatus",
+      CASE WHEN EXISTS (
+        SELECT 1 FROM "StudentEnterpriseCoordination" completed_coordination
+        JOIN "InternshipAssignments" completed_assignment
+          ON completed_assignment."CoordinationID"=completed_coordination."CoordinationID"
+        WHERE completed_coordination."RegistrationID"=r."RegistrationID"
+          AND completed_assignment."Status"='COMPLETED'
+      ) THEN 'COMPLETED' WHEN roster."RoundID" IS NOT NULL THEN 'ASSIGNED' ELSE 'WAITING' END AS "participationStatus",
       COALESCE((SELECT jsonb_agg(jsonb_build_object(
         'resultId',history."ResultID",'courseCode',course."CourseCode",'courseName',course."CourseName",
         'semesterTaken',history."SemesterTaken",'periodName',period."Name",'score',history."Score",

@@ -22,6 +22,7 @@ export function useEducationStudentProgress() {
       setLoading(true);
       setLoadError(null);
       setLoadWarning(null);
+      setStudents([]);
 
       try {
         const result = await studentProgressService.loadAll(controller.signal);
@@ -56,5 +57,41 @@ export function useEducationStudentProgress() {
     };
   }, [revision]);
 
-  return { students, loading, loadError, loadWarning, reload };
+  const loadDetails = React.useCallback(async (studentId: number) => {
+    const detail = await studentProgressService.loadDetails(studentId);
+    setStudents(current => current.map(student => student.id === detail.id ? detail : student));
+    return detail;
+  }, []);
+
+  const loadGpa = React.useCallback(async (studentIds: string[]) => {
+    const pending = [...new Set(studentIds)].filter(id => {
+      const student = students.find(item => item.id === id);
+      return student && !student.gpaLoaded && !student.gpaLoading && !student.detailsLoaded;
+    });
+    if (!pending.length) return;
+    setStudents(current => current.map(student => pending.includes(student.id)
+      ? { ...student, gpaLoading: true }
+      : student));
+    let resolved: Map<number, {
+      gpa: number | null; gpaScale: number | null;
+      completedCredits: number | null; totalCredits: number | null;
+    }>;
+    try {
+      resolved = await studentProgressService.loadGpa(pending.map(Number));
+    } catch {
+      resolved = new Map();
+    }
+    setStudents(current => current.map(student => {
+      if (!pending.includes(student.id)) return student;
+      const value = resolved.get(Number(student.id));
+      return {
+        ...student,
+        ...(value ?? {}),
+        gpaLoaded: Boolean(value),
+        gpaLoading: false,
+      };
+    }));
+  }, [students]);
+
+  return { students, loading, loadError, loadWarning, reload, loadDetails, loadGpa };
 }

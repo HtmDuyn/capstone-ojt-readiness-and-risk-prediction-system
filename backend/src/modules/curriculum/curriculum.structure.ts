@@ -111,6 +111,8 @@ export async function writeComboCourses(client:PoolClient,id:number,comboId:numb
 
 // A subject can fill only one slot. Check choice-group capacity with a small max-flow network.
 export function validateComboCapacity(value:Row) {
+  // Incomplete slot mappings are allowed; capacity cannot be assessed until options are mapped.
+  if (value.courses.some((course:Row)=>!course.slotCourseIds?.length)) return;
   const graph=new Map<string,Map<string,number>>();
   const edge=(a:string,b:string,n:number)=>{if(!graph.has(a))graph.set(a,new Map());if(!graph.has(b))graph.set(b,new Map());graph.get(a)!.set(b,n);graph.get(b)!.set(a,0);};
   let required=0;

@@ -38,7 +38,7 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
   const {user}=useAuth();
   const fallback=useStudentRisk(!assessment);
   const resource=assessment??fallback;
-  const {data,error,reload:refresh}=resource;
+  const {data,error,reload:refresh,currentAcademic}=resource;
   const loading=resource.pending;
   return <section id="ojt-risk" aria-label="Rủi ro và lộ trình OJT" aria-busy={loading} className={renderDashboard||compactLayout?'min-w-0 scroll-mt-6 space-y-4':`min-w-0 scroll-mt-6 space-y-5 rounded-[24px] bg-[#F8FAFC] sm:space-y-6 ${compactTop ? 'px-3 pb-3 pt-0 sm:px-5 sm:pb-5 lg:px-6 lg:pb-6' : 'p-3 sm:p-5 lg:p-6'}`}>
     {error&&<div role="alert" className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-4"><div className="flex items-start gap-3"><CircleAlert size={20} className="mt-0.5 shrink-0 text-rose-600" aria-hidden="true"/><div><p className="text-sm font-semibold text-rose-900">{data?'Chưa thể cập nhật đánh giá':'Không tải được đánh giá OJT'}</p><p className="mt-1 max-w-xl text-sm leading-relaxed text-rose-700">{error}</p>{data&&<p className="mt-1 text-xs text-rose-700">Đang hiển thị kết quả đã tải trước đó.</p>}</div></div><div className="flex flex-wrap items-end gap-3"><button type="button" disabled={loading} onClick={refresh} className={`inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 disabled:opacity-50 ${focusClass}`}><RefreshCw size={14} aria-hidden="true"/>Thử lại</button></div></div>}
@@ -46,7 +46,7 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
     {renderDashboard?renderDashboard(data):loading&&!data?<AssessmentSkeleton/>:data&&compactLayout?<>
       <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
       <section className={`${cardClass} min-w-0 p-5 sm:p-6`} aria-label="Tiến độ và phân tích OJT">
-        <AcademicMetrics data={data} embedded />
+        <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress} embedded />
         <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 lg:grid-cols-2 lg:gap-0">
           <div className="min-w-0 lg:pr-6"><RiskInsights data={data} embedded /></div>
           <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"><LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} embedded /></div>
@@ -56,7 +56,7 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
       <section className={`${cardClass} min-w-0 p-5 sm:p-6`}><RecommendationSummary data={data} embedded /></section>
     </>:data?<>
       <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
-      <AcademicMetrics data={data}/>
+      <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress}/>
       <RiskInsights data={data}/>
       <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap}/>
       <RecommendationSummary data={data}/>

@@ -18,6 +18,17 @@ export interface StudentSubject {
   prerequisite: string[];
 }
 
+export interface StudentCourseAttempt {
+  id: string;
+  code: string;
+  name: string;
+  academicPeriod: string;
+  attemptNumber: number;
+  status: string;
+  score: number | null;
+  grade: string | null;
+}
+
 export interface StudentProgress {
   id: string;
   studentCode: string;
@@ -29,6 +40,9 @@ export interface StudentProgress {
   currentTerm: string;
   currentTermStartDate: string | null;
   gpa: number | null;
+  gpaScale?: number | null;
+  gpaLoaded?: boolean;
+  gpaLoading?: boolean;
   completedCredits: number | null;
   totalCredits: number | null;
   plannedOjtTerm: string;
@@ -38,6 +52,9 @@ export interface StudentProgress {
   eligibilityStatus: OjtEligibilityStatus;
   eligibilitySource?: 'BACKEND' | 'FRONTEND' | 'OFFICIAL' | null;
   subjects: StudentSubject[];
+  courseHistory?: StudentCourseAttempt[];
+  detailsLoaded?: boolean;
+  unpassedCourseCount?: number | null;
   dataWarning?: string;
   detailsUnavailable?: boolean;
 }

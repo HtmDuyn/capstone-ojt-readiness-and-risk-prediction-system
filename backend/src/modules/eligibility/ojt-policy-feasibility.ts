@@ -64,7 +64,6 @@ export function assessProgram(data: Row, threshold: number, publicationIssues: s
     const relevantCombos = combos.filter(combo => (combo.courses ?? []).some((course: Row) => (course.slotCourseIds ?? []).some((id: number) => beforeSlotIds.has(id))));
     for (const slot of slots) {
       const options = combos.flatMap(combo => (combo.courses ?? []).filter((course: Row) => (course.slotCourseIds ?? []).includes(slot.courseId)));
-      if (!options.length) reasons.push(`Ô lựa chọn ${slot.courseCode} chưa có môn thay thế được duyệt.`);
       if (options.some((course: Row) => course.semester !== slot.semester || Number(course.credits) !== slot.credits))
         reasons.push(`Phương án combo của ${slot.courseCode} không khớp học kỳ hoặc tín chỉ.`);
     }
@@ -78,7 +77,7 @@ export function assessProgram(data: Row, threshold: number, publicationIssues: s
       if (!slotGroups.has(id)) slotGroups.set(id, new Set());
       slotGroups.get(id)!.add(combo.selectionGroup ?? '');
     }
-    for (const slot of slots) if (slotGroups.get(slot.courseId)?.size !== 1)
+    for (const slot of slots) if ((slotGroups.get(slot.courseId)?.size ?? 0) > 1)
       reasons.push(`Không xác định được một nhóm combo duy nhất cho ô ${slot.courseCode}.`);
     for (const combo of relevantCombos) {
       const groupSlots = [...slotGroups].filter(([, groups]) => groups.has(combo.selectionGroup ?? '')).map(([id]) => id);
@@ -95,7 +94,8 @@ export function assessProgram(data: Row, threshold: number, publicationIssues: s
           selectedCount += group.maxCourses;
         }
       }
-      if (selectedCount !== covered.size) reasons.push(`Combo ${combo.code} chọn ${selectedCount} môn nhưng có ${covered.size} ô chương trình.`);
+      if (combo.courses.every((course: Row) => (course.slotCourseIds ?? []).length > 0) && selectedCount !== covered.size)
+        reasons.push(`Combo ${combo.code} chọn ${selectedCount} môn nhưng có ${covered.size} ô chương trình.`);
       try { validateComboCapacity(combo); } catch { reasons.push(`Combo ${combo.code} không thể ghép các môn lựa chọn vào các ô riêng biệt.`); }
     }
     for (const group of data.prerequisites ?? []) {

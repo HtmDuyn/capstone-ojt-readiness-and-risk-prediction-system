@@ -31,7 +31,6 @@ export async function publicationIssuesForData(client:PoolClient,data:Row) {
   if(!data.gpaScale || data.retakePolicy!=='LATEST')issues.push('Confirm GPA scale 4/10 and latest-attempt policy.');
   if(!data.courses.length)issues.push('Curriculum must contain courses.');
   if(!data.prerequisitesReviewed)issues.push('Review and set prerequisites explicitly (an empty array confirms no prerequisites).');
-  if(!data.equivalencesReviewed)issues.push('Review and set course equivalences explicitly.');
   try{
     const normalized=await normalizeCourses(client,data.courses.map((c:Row)=>({courseId:c.courseId,credits:c.credits,semester:c.semester,isRequired:c.isRequired,entryKind:c.entryKind,prerequisiteText:c.prerequisiteText})));
     const aliases=await normalizeEquivalences(client,data.equivalences.map((e:Row)=>({sourceCourseId:e.sourceCourseId,targetCourseId:e.targetCourseId,reason:e.reason})),normalized,data.combos.flatMap((c:Row)=>c.courses));
@@ -46,9 +45,7 @@ export async function publicationIssuesForData(client:PoolClient,data:Row) {
     for(const combo of data.combos) {
       if(!combo.coursesReviewed || !combo.courses.length)issues.push(`Review courses and choice groups for combo ${combo.code}.`);
       const n=await normalizeCombo(client,{courses:combo.courses.map((c:Row)=>({courseId:c.courseId,credits:Number(c.credits),semester:c.semester,prerequisiteText:c.prerequisiteText,note:c.note,slotCourseIds:c.slotCourseIds})),choiceGroups:combo.choiceGroups},normalized);validateComboCapacity(n);comboCourses.push(...n.courses.filter((c:Row)=>n.choiceGroups.some((g:Row)=>g.maxCourses>0&&g.courseIds.includes(c.courseId))));
-      if(n.courses.some((c:Row)=>!c.slotCourseIds.length))issues.push(`Every course in combo ${combo.code} must map to an explicit curriculum slot.`);
     }
-    for(const slot of normalized.filter(c=>c.entryKind!=='COURSE'))if(!comboCourses.some(c=>c.slotCourseIds.includes(slot.courseId)))issues.push(`Slot ${slot.courseId} has no approved options.`);
     const prerequisites=normalizePrerequisites(data.prerequisites,normalized,comboCourses),canonicalEdges=new Map<number,Set<number>>();
     for(const group of prerequisites){
       const target=canonical(group.courseId),members=new Set<number>(group.prerequisiteCourseIds.map(canonical));
