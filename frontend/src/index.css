@@ -661,3 +661,59 @@ body {
   .qhdn-workspace :is(button, a, input, select) { transition: none; }
   .qhdn-workspace button:not(:disabled):is(:hover, :active) { transform: none; }
 }
+
+/* Shared page background */
+.app-background,
+.login-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  background:
+    radial-gradient(ellipse at 4% 18%, #fed7aa 0%, transparent 52%),
+    radial-gradient(ellipse at 96% 8%, #bfdbfe 0%, transparent 52%),
+    radial-gradient(ellipse at 88% 94%, #ddd0fa 0%, transparent 56%),
+    radial-gradient(ellipse at 8% 98%, #ffedd5 0%, transparent 48%),
+    #f7f9ff;
+}
+
+.login-background-icon {
+  --icon-angle: -12deg;
+  position: absolute;
+  width: clamp(44px, 6.4vw, 104px);
+  aspect-ratio: 1;
+  color: #e88438;
+  opacity: .38;
+  animation: login-icon-drift 7.5s ease-in-out infinite;
+}
+
+.login-background-icon svg { width: 100%; height: 100%; }
+.login-background-icon--graduation { top: 5%; left: 4%; }
+.login-background-icon--briefcase { --icon-angle: 14deg; top: 7%; right: 5%; color: #488cd0; animation-delay: -4s; }
+.login-background-icon--book { --icon-angle: 12deg; bottom: 4%; right: 3%; color: #9470cf; animation-delay: -7s; }
+.login-background-icon--network { --icon-angle: -8deg; bottom: 5%; left: 5%; color: #7b80d5; animation-delay: -2s; }
+.login-background-icon--chart { --icon-angle: 8deg; top: 43%; left: 1%; width: clamp(40px, 4vw, 64px); color: #e89b58; animation-delay: -8s; }
+.login-background-icon--users { --icon-angle: -10deg; top: 43%; right: 1%; width: clamp(40px, 4vw, 64px); color: #5e9ed3; animation-delay: -5s; }
+.login-background-icon--award { --icon-angle: 10deg; bottom: -3%; left: 45%; width: clamp(48px, 4.5vw, 72px); color: #ab86d8; animation-delay: -9s; }
+
+@keyframes login-icon-drift {
+  0%, 100% { transform: translateY(0) rotate(var(--icon-angle)); }
+  50% { transform: translate(14px, -36px) rotate(calc(var(--icon-angle) + 14deg)) scale(1.06); }
+}
+
+@media (max-width: 640px) {
+  .login-background-icon { opacity: .3; }
+  .login-background-icon--graduation { top: 1%; left: -5%; }
+  .login-background-icon--briefcase { top: 4%; right: -5%; }
+  .login-background-icon--network { bottom: 2%; left: -5%; }
+  .login-background-icon--book { bottom: 1%; right: -5%; }
+  .login-background-icon--chart,
+  .login-background-icon--users,
+  .login-background-icon--award { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-background-icon { animation: none; transform: rotate(var(--icon-angle)); }
+}

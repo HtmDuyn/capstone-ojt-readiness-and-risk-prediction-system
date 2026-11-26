@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
 import { getOjtResult, getOjtResults } from '@/services/studentService';
+import { StudentDialog } from '@/components/student/StudentDialog';
 import {
   buttonClass,
   Card,
@@ -92,8 +93,8 @@ function ResultsContent() {
             />
           </>
       </Card>
-      {selected && (
-        <Card title="Chi tiết đánh giá OJT">
+      {selected !== null && (
+        <StudentDialog title="Chi tiết đánh giá OJT" onClose={() => setSelected(null)}>
           <ResourceState
             loading={detail.loading}
             error={detail.error}
@@ -127,14 +128,14 @@ function ResultsContent() {
                 type="button"
                 onClick={() => exportResult(detail.data!)}
               >
-                Tải kết quả JSON
+                Tải kết quả
               </button>
             </>
           )}
           {detail.data === null && !detail.loading && !detail.error && (
             <Empty>Không tìm thấy kết quả đã công bố.</Empty>
           )}
-        </Card>
+        </StudentDialog>
       )}
     </>
   );

@@ -47,11 +47,15 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
       <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
       <section className={`${cardClass} min-w-0 p-5 sm:p-6`} aria-label="Tiến độ và phân tích OJT">
         <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress} embedded />
-        <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 lg:grid-cols-2 lg:gap-0">
-          <div className="min-w-0 lg:pr-6"><RiskInsights data={data} embedded /></div>
-          <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"><LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} embedded /></div>
+        <div className="mt-5 border-t border-slate-200 pt-5">
+          <RiskInsights data={data} embedded />
         </div>
-        <RoadmapNotes roadmap={data.roadmap} />
+        <div className="mt-5 border-t border-slate-200 pt-5">
+          <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} embedded />
+          <div className="mt-5 border-t border-slate-200 pt-4">
+            <RoadmapNotes roadmap={data.roadmap} />
+          </div>
+        </div>
       </section>
       <section className={`${cardClass} min-w-0 p-5 sm:p-6`}><RecommendationSummary data={data} embedded /></section>
     </>:data?<>

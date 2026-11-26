@@ -6,18 +6,17 @@ export function RecruitmentSemesterNotice({ semesterName }: { semesterName?: str
   return <div className="space-y-4">
     <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 sm:p-5">
       <p className="text-sm leading-7 text-slate-700">
-        Đợt tuyển dụng được tổ chức trong <strong className="font-semibold text-slate-900">{semesterName ? `học kỳ ${semesterName}` : 'học kỳ hiện tại'}</strong> để chuẩn bị cho kỳ thực tập tiếp theo.
-        {' '}Sinh viên thuộc danh sách của đợt sẽ tham gia OJT vào <strong className="font-semibold text-orange-700">học kỳ kế tiếp</strong>.
+        Sinh viên đủ điều kiện OJT trong <strong className="font-semibold text-slate-900">{semesterName ? `học kỳ ${semesterName}` : 'học kỳ hiện tại'}</strong> được đăng ký doanh nghiệp trong đợt này và sẽ bắt đầu thực tập vào <strong className="font-semibold text-orange-700">học kỳ kế tiếp</strong>.
       </p>
     </div>
     <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
       <div className="rounded-xl border border-slate-200 p-4">
-        <p className="flex items-center gap-2 text-xs font-medium text-slate-500"><CalendarDays size={16} className="text-orange-600" />Học kỳ tổ chức tuyển dụng</p>
+        <p className="flex items-center gap-2 text-xs font-medium text-slate-500"><CalendarDays size={16} className="text-orange-600" />Học kỳ xét điều kiện và đăng ký doanh nghiệp</p>
         <p className="mt-2 text-sm font-semibold text-slate-900">{semesterName || 'Học kỳ hiện tại'}</p>
       </div>
       <ArrowRight size={18} className="hidden text-slate-400 sm:block" aria-hidden="true" />
       <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-        <p className="flex items-center gap-2 text-xs font-medium text-slate-500"><GraduationCap size={17} className="text-blue-600" />Học kỳ sinh viên tham gia OJT</p>
+        <p className="flex items-center gap-2 text-xs font-medium text-slate-500"><GraduationCap size={17} className="text-blue-600" />Học kỳ bắt đầu thực tập OJT</p>
         <p className="mt-2 text-sm font-semibold text-blue-800">Học kỳ kế tiếp</p>
       </div>
     </div>
