@@ -1,32 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  PointElement,
-  LineElement,
-  LineController,
-  Tooltip,
-  Legend,
-  ChartConfiguration,
-  TooltipItem,
-} from 'chart.js';
-import type { SemesterProgress } from '@/types/student/studentDashboardTypes';
-
-// Đăng ký các module Chart.js cần thiết (Tree-shaking tối ưu dung lượng)
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  PointElement,
-  LineElement,
-  LineController,
-  Tooltip,
-  Legend
-);
+import React, { useState } from 'react';
+import { Bar, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { useReducedMotion } from "@/hooks/shared/useReducedMotion";
+import type { SemesterProgress } from "@/types/student/studentDashboardTypes";
 
 interface ProgressChartCardProps {
   data: SemesterProgress[];
@@ -34,189 +10,10 @@ interface ProgressChartCardProps {
 
 export const ProgressChartCard: React.FC<ProgressChartCardProps> = ({ data }) => {
   const [filterMode, setFilterMode] = useState<'6months' | 'all'>('all');
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const chartInstanceRef = useRef<ChartJS | null>(null);
+  const reducedMotion = useReducedMotion();
 
   // Lọc dữ liệu theo chế độ: 6 tháng (3 kỳ gần nhất) hoặc toàn khóa
   const displayItems = filterMode === '6months' ? data.slice(-3) : data;
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    // Hủy instance cũ trước khi tạo mới để tránh memory leak và đè canvas
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.destroy();
-    }
-
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    // Chuẩn bị nhãn và mảng màu sắc linh hoạt theo trạng thái từng kỳ
-    const labels = displayItems.map((item) => item.semesterName);
-    const creditsData = displayItems.map((item) => item.credits);
-    const gpaData = displayItems.map((item) => item.gpa);
-
-    const barBackgroundColors = displayItems.map((item) => {
-      if (item.isCurrent) return '#f97316'; // Cam FPT nổi bật
-      if (item.isForecast) return 'rgba(192, 132, 252, 0.35)'; // Tím nhạt dự báo
-      return '#fed7aa'; // Cam peach nhạt cho các kỳ trước
-    });
-
-    const barHoverColors = displayItems.map((item) => {
-      if (item.isCurrent) return '#ea580c';
-      if (item.isForecast) return 'rgba(192, 132, 252, 0.6)';
-      return '#fdba74';
-    });
-
-    const barBorderColors = displayItems.map((item) => {
-      if (item.isCurrent) return '#ea580c';
-      if (item.isForecast) return '#c084fc';
-      return '#fb923c';
-    });
-
-    const config: ChartConfiguration = {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          {
-            type: 'bar' as const,
-            label: 'Tín chỉ',
-            data: creditsData,
-            backgroundColor: barBackgroundColors,
-            hoverBackgroundColor: barHoverColors,
-            borderColor: barBorderColors,
-            borderWidth: displayItems.map((item) => (item.isForecast ? 1.5 : 0)),
-            borderRadius: 8,
-            borderSkipped: false,
-            yAxisID: 'yCredits',
-            order: 2,
-            barPercentage: 0.55,
-            categoryPercentage: 0.7,
-          },
-          {
-            type: 'line' as const,
-            label: 'GPA',
-            data: gpaData,
-            borderColor: '#10b981', // Xanh ngọc lục bảo
-            backgroundColor: '#10b981',
-            borderWidth: 2.5,
-            tension: 0.35,
-            pointRadius: 4.5,
-            pointHoverRadius: 7,
-            pointBackgroundColor: '#ffffff',
-            pointBorderColor: '#10b981',
-            pointBorderWidth: 2.5,
-            yAxisID: 'yGPA',
-            order: 1,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: {
-          duration: 750,
-          easing: 'easeOutQuart',
-        },
-        interaction: {
-          mode: 'index',
-          intersect: false,
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            backgroundColor: '#0f172a',
-            titleColor: '#ffffff',
-            bodyColor: '#f8fafc',
-            titleFont: { family: 'Outfit, sans-serif', size: 12, weight: 'bold' },
-            bodyFont: { family: 'Outfit, sans-serif', size: 11 },
-            padding: 10,
-            cornerRadius: 8,
-            boxPadding: 4,
-            callbacks: {
-              title: (tooltipItems: TooltipItem<'bar' | 'line'>[]) => {
-                const idx = tooltipItems[0].dataIndex;
-                const item = displayItems[idx];
-                if (item.isCurrent) return `${item.semesterName} (Kỳ hiện tại)`;
-                if (item.isForecast) return `${item.semesterName} (Dự kiến OJT)`;
-                return item.semesterName;
-              },
-              label: (context: TooltipItem<'bar' | 'line'>) => {
-                if (context.dataset.label === 'Tín chỉ') {
-                  return `  Tín chỉ: ${context.parsed.y} tín chỉ`;
-                }
-                if (context.dataset.label === 'GPA') {
-                  return `  GPA: ${(context.parsed.y as number).toFixed(2)} / 4.00`;
-                }
-                return '';
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            grid: {
-              display: false,
-            },
-            ticks: {
-              color: '#64748b',
-              font: { family: 'Outfit, sans-serif', size: 11, weight: 'bold' },
-            },
-          },
-          yCredits: {
-            type: 'linear',
-            position: 'left',
-            beginAtZero: true,
-            max: 50,
-            grid: {
-              color: '#f1f5f9',
-            },
-            ticks: {
-              stepSize: 10,
-              color: '#94a3b8',
-              font: { family: 'Outfit, sans-serif', size: 10 },
-              callback: (value: string | number) => `${value} TC`,
-            },
-            border: {
-              dash: [4, 4],
-              display: false,
-            },
-          },
-          yGPA: {
-            type: 'linear',
-            position: 'right',
-            beginAtZero: false,
-            min: 2.0,
-            max: 4.0,
-            grid: {
-              display: false,
-            },
-            ticks: {
-              stepSize: 0.5,
-              color: '#10b981',
-              font: { family: 'Outfit, sans-serif', size: 10, weight: 'bold' },
-              callback: (value: string | number) => `${Number(value).toFixed(1)}`,
-            },
-            border: {
-              display: false,
-            },
-          },
-        },
-      } as any,
-    };
-
-    chartInstanceRef.current = new ChartJS(ctx, config);
-
-    return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-        chartInstanceRef.current = null;
-      }
-    };
-  }, [displayItems]);
 
   return (
     <div className="card-glass p-5 sm:p-6">
@@ -256,9 +53,23 @@ export const ProgressChartCard: React.FC<ProgressChartCardProps> = ({ data }) =>
         </div>
       </div>
 
-      {/* Chart.js Canvas Container */}
+      {/* Credits and GPA chart */}
       <div className="relative w-full h-64 sm:h-72 pt-2">
-        <canvas ref={canvasRef} />
+        <ChartContainer config={{ credits: { label: 'Tín chỉ', color: '#f97316' }, gpa: { label: 'GPA', color: '#10b981' } }} className="h-full w-full aspect-auto" role="img" aria-label="Tín chỉ và GPA theo học kỳ">
+          <ComposedChart accessibilityLayer data={displayItems} margin={{ top: 12, right: 4, left: -16, bottom: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="semesterName" axisLine={false} tickLine={false} tickMargin={10} minTickGap={18} />
+            <YAxis yAxisId="credits" axisLine={false} tickLine={false} allowDecimals={false} tickFormatter={value => value + ' TC'} />
+            <YAxis yAxisId="gpa" orientation="right" domain={[0, 4]} axisLine={false} tickLine={false} width={35} tickFormatter={value => Number(value).toFixed(1)} />
+            <ChartTooltip content={<ChartTooltipContent indicator="line"
+              labelFormatter={(label, payload) => { const item = payload[0]?.payload; return String(label) + (item?.isCurrent ? ' (Kỳ hiện tại)' : item?.isForecast ? ' (Dự kiến OJT)' : ''); }}
+              formatter={(value, name) => <div className="flex w-full justify-between gap-6"><span className="text-slate-500">{name === 'gpa' ? 'GPA' : 'Tín chỉ'}</span><strong>{name === 'gpa' ? Number(value).toFixed(2) + ' / 4.00' : value + ' tín chỉ'}</strong></div>} />} />
+            <Bar dataKey="credits" yAxisId="credits" radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={!reducedMotion}>
+              {displayItems.map(item => <Cell key={item.id} fill={item.isCurrent ? '#f97316' : item.isForecast ? '#e9d5ff' : '#fed7aa'} stroke={item.isForecast ? '#c084fc' : 'none'} strokeDasharray={item.isForecast ? '4 3' : undefined} />)}
+            </Bar>
+            <Line dataKey="gpa" yAxisId="gpa" type="monotone" stroke="var(--color-gpa)" strokeWidth={2.5} dot={{ r: 4, fill: 'white', strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={!reducedMotion} />
+          </ComposedChart>
+        </ChartContainer>
       </div>
 
       {/* Interactive Legend & Indicator Summary */}

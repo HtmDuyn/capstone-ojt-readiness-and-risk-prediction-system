@@ -13,6 +13,10 @@ import {
   Clock3,
   CalendarClock,
 } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis } from 'recharts';
+import { DonutChart } from '@/components/common/DonutChart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { useReducedMotion } from '@/hooks/shared/useReducedMotion';
 import { displayTaskTime } from '@/utils/shared/taskTime';
 import { PageBanner } from '@/components/common/PageBanner';
 import {
@@ -62,8 +66,7 @@ interface CandidateStage {
 const TaskCompletionDonut: React.FC<{
   completed: number;
   total: number;
-  animated: boolean;
-}> = ({ completed, total, animated }) => {
+}> = ({ completed, total }) => {
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
     <div
@@ -71,28 +74,10 @@ const TaskCompletionDonut: React.FC<{
       aria-label={`Biểu đồ tròn tiến độ task toàn sinh viên: ${percentage}% hoàn thành, ${completed}/${total} task`}
       className="relative mx-auto h-56 w-56 shrink-0"
     >
-      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden="true">
-        <defs>
-          <linearGradient id="task-completion-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#14b8a6" />
-            <stop offset="100%" stopColor="#6366f1" />
-          </linearGradient>
-        </defs>
-        <circle cx="60" cy="60" r="46" fill="none" stroke="#e2e8f0" strokeWidth="12" />
-        <circle
-          cx="60"
-          cy="60"
-          r="46"
-          pathLength="100"
-          fill="none"
-          stroke="url(#task-completion-gradient)"
-          strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${animated ? percentage : 0} 100`}
-          className="transition-[stroke-dasharray] duration-1000 ease-out"
-          data-chart-label={`Task hoàn thành: ${percentage}%`}
-        />
-      </svg>
+      <DonutChart segments={total > 0 ? [
+        { label: 'Đã hoàn thành', value: completed, color: '#14b8a6' },
+        { label: 'Chưa hoàn thành', value: Math.max(0, total - completed), color: '#e2e8f0' },
+      ] : []} label={'Tiến độ task: ' + completed + '/' + total} unit="task" />
       <div className="pointer-events-none absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
         <span className="text-4xl font-black tracking-tight text-slate-900">{percentage}%</span>
         <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -119,7 +104,7 @@ export const EnterpriseDashboard: React.FC = () => {
   const [pendingCandidates, setPendingCandidates] = useState<DashboardCandidate[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [chartAnimated, setChartAnimated] = useState(false);
+  const reducedMotion = useReducedMotion();
   const statsRequest = useRef<AbortController | null>(null);
 
   // Tải thống kê bằng hai request song song để dashboard xuất hiện nhanh hơn.
@@ -199,17 +184,6 @@ export const EnterpriseDashboard: React.FC = () => {
   }, [refreshDashboard, loading]);
 
   useEffect(() => {
-    if (statsLoading || statsError || tasksLoading || tasksError) {
-      setChartAnimated(false);
-      return;
-    }
-
-    // Kích hoạt animation ở frame kế tiếp để tránh làm giật bố cục ban đầu.
-    const frame = window.requestAnimationFrame(() => setChartAnimated(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, [statsLoading, statsError, tasksLoading, tasksError]);
-
-  useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
     if (!companyId) return;
     const controller = new AbortController();
@@ -243,10 +217,6 @@ export const EnterpriseDashboard: React.FC = () => {
     { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: '#10b981' },
     { label: 'Đã từ chối', value: dashboardStats.rejectedCandidates, color: '#f43f5e' },
   ], [dashboardStats]);
-  const maxCandidateStage = useMemo(
-    () => Math.max(1, ...candidateStages.map(stage => stage.value)),
-    [candidateStages],
-  );
   const candidateChartLabel = useMemo(
     () => candidateStages.map(stage => `${stage.label}: ${stage.value}`).join(', '),
     [candidateStages],
@@ -386,7 +356,6 @@ export const EnterpriseDashboard: React.FC = () => {
                   <TaskCompletionDonut
                     completed={taskSummary.completed}
                     total={taskSummary.total}
-                    animated={chartAnimated}
                   />
                   <div className="mt-5 grid grid-cols-3 gap-2">
                     {[
@@ -444,46 +413,18 @@ export const EnterpriseDashboard: React.FC = () => {
                     aria-label={`Biểu đồ cột trạng thái sinh viên: ${candidateChartLabel}`}
                     className="relative h-64"
                   >
-                    <div className="absolute inset-x-7 bottom-11 top-2 flex flex-col justify-between" aria-hidden="true">
-                      {[0, 1, 2, 3, 4].map(tick => (
-                        <span key={tick} className="border-t border-dashed border-slate-200" />
-                      ))}
-                    </div>
-                    <div className="absolute inset-x-0 bottom-11 top-2 flex items-end justify-around">
-                      {candidateStages.map((stage, index) => {
-                        const height = chartAnimated && stage.value > 0
-                          ? Math.max((stage.value / maxCandidateStage) * 100, 4)
-                          : 0;
-                      return (
-                        <div key={stage.label} className="relative flex h-full w-1/5 items-end justify-center">
-                          <span
-                            className="absolute z-10 text-xs font-extrabold tabular-nums text-slate-700"
-                            style={{ bottom: `calc(${height}% + 7px)` }}
-                          >
-                            {stage.value}
-                          </span>
-                          <div
-                            data-chart-status={stage.label}
-                            className="w-10 rounded-t-xl transition-[height] duration-1000 ease-out sm:w-14"
-                            style={{
-                              height: `${height}%`,
-                              background: `linear-gradient(180deg, ${stage.color} 0%, ${stage.color}cc 100%)`,
-                              boxShadow: `0 8px 18px ${stage.color}33`,
-                              transitionDelay: `${index * 100}ms`,
-                            }}
-                            title={`${stage.label}: ${stage.value}`}
-                          />
-                        </div>
-                      );
-                    })}
-                    </div>
-                    <div className="absolute inset-x-0 bottom-0 flex h-10 items-center justify-around">
-                      {candidateStages.map(stage => (
-                        <span key={stage.label} className="w-1/4 px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-600">
-                          {stage.label}
-                        </span>
-                      ))}
-                    </div>
+                    <ChartContainer config={{ value: { label: 'Sinh viên', color: 'var(--chart-1)' } }} className="h-full w-full aspect-auto">
+                      <BarChart accessibilityLayer data={candidateStages} margin={{ top: 24, right: 8, left: -24, bottom: 8 }}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="label" axisLine={false} tickLine={false} tickMargin={10} interval={0} fontSize={10} />
+                        <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48} isAnimationActive={!reducedMotion}>
+                          {candidateStages.map(stage => <Cell key={stage.label} fill={stage.color} />)}
+                          <LabelList dataKey="value" position="top" className="fill-slate-600 text-xs font-semibold" />
+                        </Bar>
+                      </BarChart>
+                    </ChartContainer>
                   </div>
                 </>
               )}

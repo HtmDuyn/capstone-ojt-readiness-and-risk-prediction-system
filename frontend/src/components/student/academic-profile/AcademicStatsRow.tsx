@@ -1,4 +1,5 @@
 import React from 'react';
+import { DonutChart } from '@/components/common/DonutChart';
 import type { AcademicProfileStats } from '@/types/student/academicProfileTypes';
 import { StarIcon, BookOpenIcon, HourglassIcon, TrendUpIcon } from '@/components/common/icons/AppIcons';
 
@@ -8,25 +9,13 @@ interface AcademicStatsRowProps {
 
 /* ─── Circular Progress Ring ───────────────────────────────── */
 const ProgressRing: React.FC<{ percent: number }> = ({ percent }) => {
-  const rounded = Math.round(percent);
+  const rounded = Number.isFinite(percent) ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
   return (
     <div className="relative w-16 h-16 flex-shrink-0">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-        <path
-          strokeWidth="3.5"
-          stroke="#e2e8f0"
-          fill="none"
-          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-        />
-        <path
-          strokeDasharray={`${rounded}, 100`}
-          strokeWidth="3.8"
-          strokeLinecap="round"
-          stroke="#b45309"
-          fill="none"
-          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-        />
-      </svg>
+      <DonutChart segments={[
+        { label: 'Hoàn thành', value: rounded, color: '#b45309' },
+        { label: 'Còn lại', value: 100 - rounded, color: '#e2e8f0' },
+      ]} label={'Tiến độ chương trình: ' + rounded + '%'} />
       <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-800 font-outfit">
         {rounded}%
       </span>

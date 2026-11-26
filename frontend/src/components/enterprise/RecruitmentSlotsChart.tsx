@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Chart, ArcElement, DoughnutController, Tooltip } from 'chart.js';
+import { useMemo } from 'react';
+import { DonutChart } from "@/components/common/DonutChart";
 import { BriefcaseBusiness, ChevronRight, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { RecruitmentPost } from '@/services/enterpriseService';
-
-Chart.register(ArcElement, DoughnutController, Tooltip);
 
 const colors = ['#6366f1', '#14b8a6', '#f59e0b', '#ec4899', '#38bdf8', '#a78bfa'];
 
@@ -13,7 +11,6 @@ export function RecruitmentSlotsChart({ posts, loading, error }: {
   loading: boolean;
   error: string | null;
 }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
   const slots = useMemo(() => {
     const seen = new Set<number>();
     return [...posts].sort((a, b) => a.id - b.id).map(post => ({
@@ -30,37 +27,6 @@ export function RecruitmentSlotsChart({ posts, loading, error }: {
     ...slots.slice(0, 5),
     { id: -1, title: `${slots.length - 5} tin khác`, remaining: slots.slice(5).reduce((sum, post) => sum + post.remaining, 0) },
   ] : slots, [slots]);
-
-  useEffect(() => {
-    if (!canvas.current || loading || error || !total) return;
-    const chart = new Chart(canvas.current, {
-      type: 'doughnut',
-      data: {
-        labels: segments.map(segment => segment.title),
-        datasets: [{
-          data: segments.map(segment => segment.remaining),
-          backgroundColor: colors,
-          borderColor: '#ffffff', borderWidth: 4, borderRadius: 7,
-          hoverOffset: 9,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '74%',
-        layout: { padding: 12 },
-        animation: { duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 850 },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#0f172a', padding: 12, cornerRadius: 12,
-            callbacks: {
-              label: context => ` ${context.parsed} slot còn trống · ${Math.round(context.parsed / total * 100)}%`,
-            },
-          },
-        },
-      },
-    });
-    return () => chart.destroy();
-  }, [segments, total, loading, error]);
 
   return (
     <article className="overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_16px_50px_-36px_rgba(30,41,59,0.45)]">
@@ -87,7 +53,8 @@ export function RecruitmentSlotsChart({ posts, loading, error }: {
           <>
             <div className="relative mx-auto h-60 w-60">
               {total > 0 ? (
-                <canvas ref={canvas} role="img" aria-label={`Số slot còn trống theo tin tuyển dụng: ${segments.map(segment => `${segment.title}: ${segment.remaining}`).join(', ')}`} />
+                <DonutChart segments={segments.map((segment, index) => ({ label: segment.title, value: segment.remaining, color: colors[index] }))}
+                  label={`Số slot còn trống theo tin tuyển dụng: ${segments.map(segment => `${segment.title}: ${segment.remaining}`).join(", ")}`} unit="slot" />
               ) : <div className="absolute inset-4 rounded-full border-[24px] border-slate-100" />}
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-4xl font-black tracking-tight text-slate-900">{total}</span>

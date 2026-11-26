@@ -1,15 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  Chart as ChartJS,
-  ArcElement,
-  DoughnutController,
-  Tooltip,
-  TooltipItem,
-} from 'chart.js';
+import React, { useState } from 'react';
+import { DonutChart } from "@/components/common/DonutChart";
 import { InfoIcon } from '@/components/common/icons/AppIcons';
 import type { AIRiskScoreData } from '@/types/student/studentDashboardTypes';
-
-ChartJS.register(ArcElement, DoughnutController, Tooltip);
 
 interface AIRiskScoreCardProps {
   data: AIRiskScoreData;
@@ -17,8 +9,6 @@ interface AIRiskScoreCardProps {
 
 export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
   const [showTooltip, setShowTooltip] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const chartInstanceRef = useRef<ChartJS | null>(null);
 
   // Chọn màu sắc theo mức độ rủi ro của sinh viên
   const getRiskColor = (level: AIRiskScoreData['level']) => {
@@ -53,75 +43,6 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
 
   const riskTheme = getRiskColor(data.level);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.destroy();
-    }
-
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    const remaining = Math.max(0, data.maxScore - data.score);
-
-    chartInstanceRef.current = new ChartJS(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Điểm rủi ro AI', 'Khoảng an toàn'],
-        datasets: [
-          {
-            data: [data.score, remaining],
-            backgroundColor: [riskTheme.primary, '#f1f5f9'],
-            hoverBackgroundColor: [riskTheme.primary, '#e2e8f0'],
-            borderWidth: 0,
-            borderRadius: [10, 0],
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '78%',
-        rotation: -90,
-        circumference: 360,
-        animation: {
-          animateRotate: true,
-          duration: 900,
-          easing: 'easeOutQuart',
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            enabled: true,
-            backgroundColor: '#0f172a',
-            padding: 8,
-            cornerRadius: 8,
-            titleFont: { family: 'Outfit, sans-serif', size: 11 },
-            bodyFont: { family: 'Outfit, sans-serif', size: 11 },
-            callbacks: {
-              label: (context: TooltipItem<'doughnut'>) => {
-                if (context.dataIndex === 0) {
-                  return ` Điểm rủi ro: ${data.score} / ${data.maxScore}`;
-                }
-                return ` Còn lại: ${remaining} điểm`;
-              },
-            },
-          },
-        },
-      },
-    });
-
-    return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-        chartInstanceRef.current = null;
-      }
-    };
-  }, [data, riskTheme.primary]);
-
   return (
     <div className="card-glass p-5 sm:p-6 flex flex-col items-center relative">
       {/* Header with Title and Info Tooltip */}
@@ -154,9 +75,12 @@ export const AIRiskScoreCard: React.FC<AIRiskScoreCardProps> = ({ data }) => {
         </div>
       </div>
 
-      {/* Donut Gauge with Chart.js Canvas */}
+      {/* Risk score chart */}
       <div className="relative w-44 h-44 my-2 flex items-center justify-center">
-        <canvas ref={canvasRef} />
+        <DonutChart segments={[
+          { label: "Điểm rủi ro AI", value: Math.min(Math.max(0, data.score), Math.max(0, data.maxScore)), color: riskTheme.primary },
+          { label: "Khoảng an toàn", value: Math.max(0, data.maxScore - data.score), color: "#f1f5f9" },
+        ]} label={`Điểm rủi ro AI: ${data.score}/${data.maxScore}`} unit="điểm" />
 
         {/* Center Content Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">

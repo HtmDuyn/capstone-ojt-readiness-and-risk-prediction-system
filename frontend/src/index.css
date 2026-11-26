@@ -4,6 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --chart-1: #6366f1;
+    --chart-2: #14b8a6;
+    --chart-3: #f59e0b;
+    --chart-4: #f43f5e;
+    --chart-5: #8b5cf6;
+  }
+}
+
 /* ─── Reset & Base ─────────────────────────────────────────── */
 
 *,
@@ -550,7 +565,7 @@ body {
 }
 .qhdn-chart-card[data-visible='true']::before { animation: qhdn-chart-light 1.8s .2s ease-out both; }
 .qhdn-chart-card > .flex:first-child { min-height: 48px; gap: 12px; }
-.qhdn-chart-card canvas { cursor: crosshair; }
+.qhdn-chart-card .recharts-surface { cursor: crosshair; }
 .qhdn-chart-card h2 { letter-spacing: -.025em; }
 .qhdn-chart-card .bg-slate-100 { background-color: rgb(224 231 255 / .45); }
 .qhdn-chart-card .bg-white { background-color: rgb(255 255 255 / .8); }

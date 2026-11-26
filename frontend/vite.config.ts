@@ -24,21 +24,21 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'chart.js', 'lucide-react'],
+    include: ['react', 'react-dom', 'react-router-dom', 'recharts', 'lucide-react'],
   },
   build: {
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'vendor';
-            }
-            if (id.includes('chart.js')) {
+            if (id.includes('/recharts/') || id.includes('/d3-') || id.includes('/@reduxjs/') || id.includes('/react-redux/') || id.includes('/redux') || id.includes('/reselect/')) {
               return 'charts';
             }
             if (id.includes('lucide-react')) {
               return 'icons';
+            }
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor';
             }
           }
         },
