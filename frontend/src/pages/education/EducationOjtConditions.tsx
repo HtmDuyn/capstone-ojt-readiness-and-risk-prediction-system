@@ -54,7 +54,7 @@ const EducationOjtConditions: React.FC = () => {
   const passedOjt202Count = targets.filter(({ student }) => student.hasPassedOjt202).length;
   const reviewTargetCount = targets.length - passedOjt202Count;
   return <div className="space-y-4">
-    <PageBanner title="Xét điều kiện đi OJT" description="Xét sinh viên cần xét từ tín chỉ tích lũy và bảng điểm, không cần chọn năm học hoặc kỳ OJT." badge="Phòng Đào tạo" />
+    <PageBanner variant="education" title="Xét điều kiện đi OJT" description="Xét sinh viên cần xét từ tín chỉ tích lũy và bảng điểm, không cần chọn năm học hoặc kỳ OJT." badge="Phòng Đào tạo" />
     <section className="space-y-3 rounded-2xl border border-orange-100 bg-white px-5 py-4 shadow-sm">
       <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ShieldCheck size={20} className="text-orange-600" />{rule ? `Điều kiện đang áp dụng: ${rule.minCredits} tín chỉ · phiên bản ${rule.version}` : 'Chưa có điều kiện OJT đến ngày áp dụng'}</h2>
       <div className="flex flex-wrap items-end gap-3">

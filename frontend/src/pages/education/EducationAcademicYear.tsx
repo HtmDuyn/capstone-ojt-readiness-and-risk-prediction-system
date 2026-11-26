@@ -144,7 +144,7 @@ const EducationAcademicYear: React.FC = () => {
     .map(period => [period.parentPeriodId, period]));
   const selectedSemesters = selectedCalendar?.semesters.slice().sort((a, b) => a.startDate.localeCompare(b.startDate)) ?? [];
   return <div className="space-y-6">
-    <PageBanner title="Quản lý năm học và học kỳ" description={null} badge="Phòng Đào tạo" />
+    <PageBanner variant="education" title="Quản lý năm học và học kỳ" description={null} badge="Phòng Đào tạo" />
     {model.notice && <p role="status" className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"><CheckCircle2 size={18} />{model.notice}</p>}
     {model.error && !creating && !editing && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{model.error}</p>}
     {model.catalogError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Không tải được danh mục: {model.catalogError}</p>}

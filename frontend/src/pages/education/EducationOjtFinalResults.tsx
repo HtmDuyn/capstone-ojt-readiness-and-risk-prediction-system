@@ -19,6 +19,7 @@ const EducationOjtFinalResults: React.FC = () => {
   return (
     <div className="space-y-4">
       <PageBanner
+        variant="education"
         title="Kết quả OJT cuối kỳ"
         description="Kết quả OJT do Phòng Quan hệ Doanh nghiệp công bố."
         badge="Phòng Đào tạo"

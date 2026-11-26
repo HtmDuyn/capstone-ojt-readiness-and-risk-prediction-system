@@ -31,7 +31,7 @@ export default function EducationOjtPolicy() {
     finally { setBusy(false); }
   }
   return <div className="space-y-4">
-    <PageBanner title="Điều kiện xét OJT" description="Thiết lập ngưỡng tín chỉ, văn bản ban hành và ngày bắt đầu áp dụng." badge="Phòng Đào tạo" />
+    <PageBanner variant="education" title="Điều kiện xét OJT" description="Thiết lập ngưỡng tín chỉ, văn bản ban hành và ngày bắt đầu áp dụng." badge="Phòng Đào tạo" />
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-slate-900">Thêm điều kiện</h2>
       <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-2">

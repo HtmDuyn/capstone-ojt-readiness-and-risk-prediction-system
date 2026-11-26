@@ -62,6 +62,7 @@ const EducationCurriculumPlan: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageBanner
+        variant="education"
         title="Khung chương trình đào tạo"
         description="Nhập và tra cứu khung chương trình, môn học và combo. Không sửa, xóa hoặc thay thế dữ liệu đã nhập."
         badge="Phòng Đào tạo"

@@ -162,6 +162,7 @@ const EducationStudentImport: React.FC = () => {
   return (
     <div className="space-y-6 pb-8">
       <PageBanner
+        variant="education"
         title="Import sinh viên và bảng điểm"
         description="Tải file sinh viên và bảng điểm lên, xem lại thông tin rồi xác nhận import."
         badge="Phòng Đào tạo"

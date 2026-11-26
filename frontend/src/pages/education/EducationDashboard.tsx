@@ -24,6 +24,7 @@ export const EducationDashboard: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6">
       <PageBanner
+        variant="education"
         title="Tổng quan học vụ và OJT"
         badge="Phòng Đào tạo"
         description="Theo dõi tình hình học tập, điều kiện thực tập OJT và các chỉ số học vụ của sinh viên."
