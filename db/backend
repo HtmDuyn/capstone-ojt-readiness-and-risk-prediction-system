@@ -7570,7 +7570,9 @@ JOIN public."Users" account ON account."Email"=link."Email"
 JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=link."EnterpriseCode"
 ON CONFLICT ("UserID") DO UPDATE SET "EnterpriseID"=EXCLUDED."EnterpriseID","PositionTitle"=EXCLUDED."PositionTitle";
 
--- Seed 20 students in three academic-history cases: six eligible, eight below 70 OJT credits, and six with OJT202 passed.
+-- Seed 20 students with transcript history; only completed-OJT students receive the ELIGIBLE label.
+-- Among the 14 students without OJT history, numbers 13,14,17,18,21,22,81-84
+-- have study history capped at semester 5; 85-88 retain only current-semester history.
 -- K22 IS placements use the available SE curriculum because no K22 IS curriculum exists in the source data.
 -- Resolve curricula by code and reuse existing course, slot, and prerequisite mappings.
 -- Synthetic instrument choices exercise the TMI_ELE mappings without creating new courses.
@@ -7582,9 +7584,8 @@ SELECT g.n AS "Number",
   identity."StudentCode",
   program."ProgramID",
   cohort."CohortCode",
-  CASE WHEN g.n IN (1,2,5,6,9,10) THEN 'COMPLETED_OJT'
-       WHEN g.n IN (13,14,17,18,21,22) THEN 'ELIGIBLE'
-       ELSE 'NOT_ELIGIBLE' END AS "SeedScenario",
+  CASE WHEN g.n IN (1,2,5,6,9,10) THEN 'ELIGIBLE' END AS "SeedScenario",
+  (g.n IN (1,2,5,6,9,10)) AS "CompletedOJT",
   NULL::text AS "RegistrationStatus"
 FROM (VALUES
   (1,'Nguyễn Hoàng Minh','minhnh'),
@@ -7934,7 +7935,10 @@ DO $schedule_study_history$
 DECLARE student record; stage integer; candidate record; assigned_count integer;
 BEGIN
   FOR student IN
-    SELECT s."StudentID",s."ProgramID",s."CurrentSemester"
+    SELECT s."StudentID",s."ProgramID",
+      CASE WHEN roster."CompletedOJT" THEN s."CurrentSemester"
+           WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 5
+           ELSE LEAST(s."CurrentSemester",2) END AS "CurrentSemester"
     FROM qhdn_student_roster roster
     JOIN public."Users" account ON account."Email"=roster."Email"
     JOIN public."Students" s ON s."UserID"=account."UserID" AND s."ProgramID"=roster."ProgramID"
@@ -7979,50 +7983,46 @@ BEGIN
   END LOOP;
 END $schedule_study_history$;
 
--- A deterministic sample of students has one failed attempt in Block 10 and
--- passes the same course on attempt 2 in the following Block 3 of that term.
-CREATE TEMP TABLE qhdn_student_course_retries ON COMMIT DROP AS
-SELECT DISTINCT ON (schedule."StudentID") schedule."StudentID",schedule."ProgramID",
-  schedule."ProgramCourseID",schedule."CourseID",schedule."SemesterTaken"
+
+
+-- Record one currently failed course for each of the 10 higher-credit non-OJT
+-- students and two currently failed courses for each of the four lower-credit students.
+CREATE TEMP TABLE qhdn_student_course_failures ON COMMIT DROP AS
+WITH ranked_courses AS (
+SELECT schedule."StudentID",schedule."ProgramID",schedule."ProgramCourseID",
+  schedule."CourseID",schedule."SemesterTaken",roster."Number",
+  row_number() OVER (PARTITION BY schedule."StudentID"
+    ORDER BY schedule."SemesterTaken" DESC,schedule."RecommendedSemester" DESC,schedule."CourseID" DESC) AS "FailureNumber"
 FROM qhdn_student_study_schedule schedule
 JOIN public."Students" student ON student."StudentID"=schedule."StudentID"
 JOIN public."Users" account ON account."UserID"=student."UserID"
 JOIN qhdn_student_roster roster ON roster."Email"=account."Email" AND roster."ProgramID"=schedule."ProgramID"
-WHERE (roster."Number"%7=0 OR roster."Number" IN (1,5,84)) AND schedule."SemesterTaken">0
-ORDER BY schedule."StudentID",schedule."RecommendedSemester",schedule."CourseID";
+WHERE NOT roster."CompletedOJT" AND schedule."SemesterTaken">0
+  AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing
+    WHERE existing."StudentID"=schedule."StudentID" AND existing."CourseID"=schedule."CourseID"
+      AND existing."Status" IN ('PASSED','RECOGNIZED'))
+)
+SELECT "StudentID","ProgramID","ProgramCourseID","CourseID","SemesterTaken"
+FROM ranked_courses
+WHERE "FailureNumber"<=CASE WHEN "Number" IN (85,86,87,88) THEN 2 ELSE 1 END;
 
 DO $seed_study_history$
 DECLARE stage integer;
 BEGIN
   FOR stage IN 0..9 LOOP
     INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
-    SELECT retry."StudentID",retry."CourseID",retry."SemesterTaken",period."AcademicYearID",4.00,'F','FAILED',period."AcademicPeriodID",1,0.00,'QHDN_HANDOFF_2026_RETAKE',academic."UserID"
-    FROM qhdn_student_course_retries retry
-    JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=retry."StudentID"
+    SELECT failure."StudentID",failure."CourseID",failure."SemesterTaken",period."AcademicYearID",4.00,'F','FAILED',period."AcademicPeriodID",1,0.00,'QHDN_HANDOFF_2026_FAILED_COURSE',academic."UserID"
+    FROM qhdn_student_course_failures failure
+    JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=failure."StudentID"
     JOIN public."CohortCurriculumPeriods" curriculum_period
       ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
-      AND curriculum_period."CurriculumSemester"=retry."SemesterTaken"
+      AND curriculum_period."CurriculumSemester"=failure."SemesterTaken"
     JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
     JOIN public."Users" academic ON academic."Username"='academic01'
-    WHERE retry."SemesterTaken"=stage
+    WHERE failure."SemesterTaken"=stage
       AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
-        WHERE old."StudentID"=retry."StudentID" AND old."CourseID"=retry."CourseID"
+        WHERE old."StudentID"=failure."StudentID" AND old."CourseID"=failure."CourseID"
           AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
-
-    INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
-    SELECT retry."StudentID",retry."CourseID",retry."SemesterTaken",period."AcademicYearID",8.00,'B','PASSED',block3."AcademicPeriodID",2,3.00,'QHDN_HANDOFF_2026_RETAKE',academic."UserID"
-    FROM qhdn_student_course_retries retry
-    JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=retry."StudentID"
-    JOIN public."CohortCurriculumPeriods" curriculum_period
-      ON curriculum_period."CohortID"=placement."CohortID" AND curriculum_period."GroupCode"=placement."GroupCode"
-      AND curriculum_period."CurriculumSemester"=retry."SemesterTaken"
-    JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
-    JOIN public."AcademicPeriods" block3 ON block3."ParentPeriodID"=period."AcademicPeriodID" AND block3."Kind"='BLOCK3'
-    JOIN public."Users" academic ON academic."Username"='academic01'
-    WHERE retry."SemesterTaken"=stage
-      AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
-        WHERE old."StudentID"=retry."StudentID" AND old."CourseID"=retry."CourseID"
-          AND old."AcademicPeriodID"=block3."AcademicPeriodID" AND old."AttemptNumber"=2);
 
     INSERT INTO public."StudentCourseResults" ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
     SELECT schedule."StudentID",schedule."CourseID",schedule."SemesterTaken",period."AcademicYearID",8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,'QHDN_HANDOFF_2026',academic."UserID"
@@ -8034,13 +8034,128 @@ BEGIN
     JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
     JOIN public."Users" academic ON academic."Username"='academic01'
     WHERE schedule."SemesterTaken"=stage
-      AND NOT EXISTS (SELECT 1 FROM qhdn_student_course_retries retry
-        WHERE retry."StudentID"=schedule."StudentID" AND retry."ProgramCourseID"=schedule."ProgramCourseID")
+      AND NOT EXISTS (SELECT 1 FROM qhdn_student_course_failures failure
+        WHERE failure."StudentID"=schedule."StudentID" AND failure."ProgramCourseID"=schedule."ProgramCourseID")
       AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" old
         WHERE old."StudentID"=schedule."StudentID" AND old."CourseID"=schedule."CourseID"
           AND old."AcademicPeriodID"=period."AcademicPeriodID" AND old."AttemptNumber"=1);
   END LOOP;
 END $seed_study_history$;
+
+-- Add the missing transcript grades for the six completed-OJT students.
+-- PrerequisiteText was reviewed manually: each comma-separated requirement
+-- below must have a prior passing course; alternatives separated by | are OR.
+-- These rows are inserted directly into StudentCourseResults; curriculum
+-- prerequisites and mapping tables remain untouched.
+DO $seed_completed_transcript_grades$
+DECLARE stage integer;
+BEGIN
+  FOR stage IN 1..5 LOOP
+    INSERT INTO public."StudentCourseResults"
+      ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status",
+       "AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
+    WITH course_rows AS (
+      SELECT * FROM (VALUES
+        ('BIT_IS_K18D_19A','MAE101',1,NULL::text,NULL::text,NULL::text),
+        ('BIT_IS_K18D_19A','CSD201',3,'PRO192',NULL,NULL),
+        ('BIT_IS_K18D_19A','LAB211',3,'PRO192',NULL,NULL),
+        ('BIT_IS_K18D_19A','MAS291',4,'MAE101|MAC101',NULL,NULL),
+        ('BIT_IS_K18D_19A','JPD123',4,'JPD113',NULL,NULL),
+        ('BIT_IS_K18D_19A','SWE201c',4,'PRO192',NULL,NULL),
+        ('BIT_IS_K18D_19A','PRJ302',4,'DBI202','PRO192',NULL),
+        ('BIT_IS_K18D_19A','ISP392',5,'PRJ302','SWE201c','LAB211'),
+        ('BIT_IS_K18D_19A','ITA301',5,'ITA203c','DBI202',NULL),
+        ('BIT_SE_K18D_19A','CSD201',3,'PRO192',NULL,NULL),
+        ('BIT_SE_K18D_19A','LAB211',3,'PRO192',NULL,NULL),
+        ('BIT_SE_K18D_19A','MAS291',4,'MAE101|MAC101',NULL,NULL),
+        ('BIT_SE_K18D_19A','JPD123',4,'JPD113',NULL,NULL),
+        ('BIT_SE_K18D_19A','SWE201c',4,'PRO192',NULL,NULL),
+        ('BIT_SE_K18D_19A','PRJ301',4,'DBI202','PRO192',NULL),
+        ('BIT_SE_K18D_19A','SWP391',5,'PRJ301','SWE201c|SWE202c','LAB211'),
+        ('BIT_SE_K18D_19A','SWR302',5,'SWE102|SWE201c|SWE202c',NULL,NULL),
+        ('BIT_SE_K18D_19A','SWT301',5,'SWE102|SWE201c|SWE202c',NULL,NULL)
+      ) AS rows("ProgramCode","CourseCode","SemesterTaken","PrerequisiteClause1","PrerequisiteClause2","PrerequisiteClause3")
+    ), targets AS (
+      SELECT roster."Number",student."StudentID",student."ProgramID",program."ProgramCode",
+        course_row."CourseID",pc."ProgramCourseID",curriculum_period."AcademicPeriodID",period."AcademicYearID",
+        period."StartDate",row."PrerequisiteClause1",row."PrerequisiteClause2",row."PrerequisiteClause3"
+      FROM qhdn_student_roster roster
+      JOIN public."Users" account ON account."Email"=roster."Email"
+      JOIN public."Students" student ON student."UserID"=account."UserID" AND student."ProgramID"=roster."ProgramID"
+      JOIN public."TrainingPrograms" program ON program."ProgramID"=student."ProgramID"
+      JOIN course_rows row ON row."ProgramCode"=program."ProgramCode" AND row."SemesterTaken"=stage
+      JOIN public."Courses" course_row ON upper(course_row."CourseCode")=upper(row."CourseCode")
+      JOIN public."ProgramCourses" pc ON pc."ProgramID"=student."ProgramID" AND pc."CourseID"=course_row."CourseID"
+        AND pc."EntryKind"='COURSE' AND pc."IsRequired"=true AND pc."Credits">0
+        AND pc."RecommendedSemester"=row."SemesterTaken"
+      JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=student."StudentID"
+      JOIN public."CohortCurriculumPeriods" curriculum_period ON curriculum_period."CohortID"=placement."CohortID"
+        AND curriculum_period."GroupCode"=placement."GroupCode" AND curriculum_period."CurriculumSemester"=stage
+      JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
+      WHERE roster."CompletedOJT"
+    )
+    SELECT target."StudentID",target."CourseID",stage,
+      CASE WHEN pass_period."AcademicPeriodID"=target."AcademicPeriodID"
+        THEN target."AcademicYearID" ELSE block3."AcademicYearID" END,
+      8.00,'B','PASSED',pass_period."AcademicPeriodID",
+      COALESCE((
+        SELECT max(existing."AttemptNumber") FROM public."StudentCourseResults" existing
+        LEFT JOIN public."AcademicPeriods" existing_period ON existing_period."AcademicPeriodID"=existing."AcademicPeriodID"
+        WHERE existing."StudentID"=target."StudentID" AND existing."CourseID"=target."CourseID"
+          AND (existing."AcademicPeriodID"=target."AcademicPeriodID" OR existing_period."ParentPeriodID"=target."AcademicPeriodID")
+      ),0)+1,
+      3.00,'QHDN_HANDOFF_2026_PREREQUISITE_GRADE',academic."UserID"
+    FROM targets target
+    JOIN public."Users" academic ON academic."Username"='academic01'
+    LEFT JOIN LATERAL (
+      SELECT block."AcademicPeriodID",block."AcademicYearID"
+      FROM public."AcademicPeriods" block
+      WHERE block."ParentPeriodID"=target."AcademicPeriodID" AND block."Kind"='BLOCK3'
+      ORDER BY block."StartDate" LIMIT 1
+    ) block3 ON true
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" existing
+        WHERE existing."StudentID"=target."StudentID" AND existing."CourseID"=target."CourseID"
+          AND existing."AcademicPeriodID"=target."AcademicPeriodID"
+      ) THEN COALESCE(block3."AcademicPeriodID",target."AcademicPeriodID")
+        ELSE target."AcademicPeriodID" END AS "AcademicPeriodID"
+    ) pass_period
+    WHERE NOT EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" existing
+        LEFT JOIN public."AcademicPeriods" existing_period ON existing_period."AcademicPeriodID"=existing."AcademicPeriodID"
+        WHERE existing."StudentID"=target."StudentID" AND existing."CourseID"=target."CourseID"
+          AND existing."Status" IN ('PASSED','RECOGNIZED')
+          AND (existing."AcademicPeriodID"=target."AcademicPeriodID" OR existing_period."ParentPeriodID"=target."AcademicPeriodID")
+      )
+      AND (target."PrerequisiteClause1" IS NULL OR EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" prior
+        JOIN public."Courses" prerequisite ON prerequisite."CourseID"=prior."CourseID"
+        JOIN public."AcademicPeriods" prior_period ON prior_period."AcademicPeriodID"=prior."AcademicPeriodID"
+        WHERE prior."StudentID"=target."StudentID" AND prior."Status" IN ('PASSED','RECOGNIZED')
+          AND prior_period."StartDate"<target."StartDate"
+          AND upper(prerequisite."CourseCode")=ANY(string_to_array(upper(target."PrerequisiteClause1"),'|'))
+      ))
+      AND (target."PrerequisiteClause2" IS NULL OR EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" prior
+        JOIN public."Courses" prerequisite ON prerequisite."CourseID"=prior."CourseID"
+        JOIN public."AcademicPeriods" prior_period ON prior_period."AcademicPeriodID"=prior."AcademicPeriodID"
+        WHERE prior."StudentID"=target."StudentID" AND prior."Status" IN ('PASSED','RECOGNIZED')
+          AND prior_period."StartDate"<target."StartDate"
+          AND upper(prerequisite."CourseCode")=ANY(string_to_array(upper(target."PrerequisiteClause2"),'|'))
+      ))
+      AND (target."PrerequisiteClause3" IS NULL OR EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" prior
+        JOIN public."Courses" prerequisite ON prerequisite."CourseID"=prior."CourseID"
+        JOIN public."AcademicPeriods" prior_period ON prior_period."AcademicPeriodID"=prior."AcademicPeriodID"
+        WHERE prior."StudentID"=target."StudentID" AND prior."Status" IN ('PASSED','RECOGNIZED')
+          AND prior_period."StartDate"<target."StartDate"
+          AND upper(prerequisite."CourseCode")=ANY(string_to_array(upper(target."PrerequisiteClause3"),'|'))
+      ))
+    ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
+      WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING;
+  END LOOP;
+END $seed_completed_transcript_grades$;
 
 -- Pick a concrete instrument from each student's existing TMI_ELE slot options.
 CREATE TEMP TABLE qhdn_student_instruments ON COMMIT DROP AS
@@ -8059,13 +8174,16 @@ JOIN LATERAL (
   JOIN public."Courses" instrument ON instrument."CourseID"=cc."CourseID"
   WHERE slot."ProgramID"=s."ProgramID" AND slot."EntryKind"='ELECTIVE_SLOT'
     AND placeholder."CourseCode"='TMI_ELE' AND cc."Semester"=slot."RecommendedSemester"
+    AND slot."RecommendedSemester"<=CASE WHEN roster."CompletedOJT" THEN s."CurrentSemester"
+      WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 5 ELSE 2 END
   ORDER BY instrument."CourseCode",cc."ComboCourseID"
   OFFSET ((roster."Number"-1)%7) LIMIT 1
 ) choice ON true
 JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
 JOIN public."CohortCurriculumPeriods" mapping ON mapping."CohortID"=placement."CohortID"
   AND mapping."GroupCode"=placement."GroupCode" AND mapping."CurriculumSemester"=choice."RecommendedSemester"
-JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=mapping."AcademicPeriodID";
+JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=mapping."AcademicPeriodID"
+WHERE roster."CompletedOJT";
 
 INSERT INTO public."StudentComboSelections" ("StudentID","ProgramID","ProgramComboID","SelectedAt","SelectionSource","ConfirmedAt","ConfirmedBy")
 SELECT instrument."StudentID",instrument."ProgramID",instrument."ProgramComboID",NULL,'SYNTHETIC',instrument."EndDate"::timestamp,academic."UserID"
@@ -8087,6 +8205,8 @@ FROM qhdn_student_instruments instrument
 JOIN public."Users" academic ON academic."Username"='academic01'
 ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
   WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING;
+
+
 
 -- Only the six completed-OJT samples receive historic approved registrations; no future application is fabricated.
 INSERT INTO public."OJTRegistrations" ("StudentID","OJTSemesterID","RegisteredAt","Status","WindowID","ProgramID","Application","SubmittedBy","ReviewedBy","ReviewedAt","ReviewReason")
@@ -8118,8 +8238,8 @@ SELECT s."StudentID",term."OJTSemesterID",'MANUAL','ELIGIBLE',
   md5('QHDN-HANDOFF:'||s."StudentCode"||':'||term."OJTSemesterID"),
   jsonb_build_object('source','QHDN_HANDOFF','studentCode',s."StudentCode",'programId',s."ProgramID"),
   jsonb_build_object('eligible',true,'reason','Seeded completed OJT history'),coordinator."UserID",
-  CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMPTZ '2024-01-04 09:00:00+07'
-    WHEN 'K19' THEN TIMESTAMPTZ '2025-01-04 09:00:00+07' ELSE TIMESTAMPTZ '2026-01-04 09:00:00+07' END
+  CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMPTZ '2023-10-25 09:00:00+07'
+    WHEN 'K19' THEN TIMESTAMPTZ '2024-10-25 09:00:00+07' ELSE TIMESTAMPTZ '2025-10-25 09:00:00+07' END
 FROM qhdn_student_roster r
 JOIN public."Users" u ON u."Email"=r."Email"
 JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
@@ -8127,19 +8247,21 @@ JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=(
   SELECT "AcademicPeriodID" FROM public."AcademicPeriods"
   WHERE "PeriodCode"=CASE s."CohortCode" WHEN 'K18' THEN 'SPRING2024' WHEN 'K19' THEN 'SPRING2025' ELSE 'SPRING2026' END)
 CROSS JOIN public."Users" coordinator
-WHERE r."SeedScenario"='COMPLETED_OJT' AND coordinator."Username"='ojt.coord01'
+WHERE r."CompletedOJT" AND coordinator."Username"='ojt.coord01'
   AND NOT EXISTS (SELECT 1 FROM public."EligibilityChecks" existing
     WHERE existing."StudentID"=s."StudentID" AND existing."OJTSemesterID"=term."OJTSemesterID"
       AND existing."SourceHash"=md5('QHDN-HANDOFF:'||s."StudentCode"||':'||term."OJTSemesterID"));
 
 INSERT INTO public."OJTRegistrations" ("StudentID","OJTSemesterID","RegisteredAt","Status","WindowID","ProgramID","Application","SubmittedBy","ReviewCheckID","ReviewedBy","ReviewedAt","ReviewReason")
 SELECT s."StudentID",term."OJTSemesterID",
-  (CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMP '2023-10-15 09:00:00'
-    WHEN 'K19' THEN TIMESTAMP '2024-10-15 09:00:00' ELSE TIMESTAMP '2025-10-15 09:00:00' END)
+  (CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMP '2023-10-30 09:00:00'
+    WHEN 'K19' THEN TIMESTAMP '2024-10-30 09:00:00' ELSE TIMESTAMP '2025-10-30 09:00:00' END)
     +(r."Number"-CASE s."CohortCode" WHEN 'K18' THEN 1 WHEN 'K19' THEN 21 ELSE 41 END)*INTERVAL '1 day',
   'APPROVED',registration_window."WindowID",s."ProgramID",jsonb_build_object('source','QHDN_HANDOFF','studentCode',s."StudentCode"),u."UserID",
-  eligibility."CheckID",coordinator."UserID",(CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMP '2024-01-05 09:00:00'
-    WHEN 'K19' THEN TIMESTAMP '2025-01-05 09:00:00' ELSE TIMESTAMP '2026-01-05 09:00:00' END),
+  eligibility."CheckID",coordinator."UserID",
+  (CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMP '2023-11-15 09:00:00'
+    WHEN 'K19' THEN TIMESTAMP '2024-11-15 09:00:00' ELSE TIMESTAMP '2025-11-15 09:00:00' END)
+    +(r."Number"-CASE s."CohortCode" WHEN 'K18' THEN 1 WHEN 'K19' THEN 21 ELSE 41 END)*INTERVAL '1 day',
   'Hồ sơ OJT mẫu đã được duyệt để ghi nhận thực tập hoàn thành.'
 FROM qhdn_student_roster r
 JOIN public."Users" u ON u."Email"=r."Email"
@@ -8153,7 +8275,7 @@ JOIN public."EligibilityChecks" eligibility ON eligibility."StudentID"=s."Studen
   AND eligibility."OJTSemesterID"=term."OJTSemesterID" AND eligibility."SourceHash"=
     md5('QHDN-HANDOFF:'||s."StudentCode"||':'||term."OJTSemesterID") AND eligibility."Status"='ELIGIBLE'
 CROSS JOIN public."Users" coordinator
-WHERE r."SeedScenario"='COMPLETED_OJT' AND coordinator."Username"='ojt.coord01'
+WHERE r."CompletedOJT" AND coordinator."Username"='ojt.coord01'
   AND NOT EXISTS (SELECT 1 FROM public."OJTRegistrations" existing
     WHERE existing."StudentID"=s."StudentID" AND existing."OJTSemesterID"=term."OJTSemesterID");
 
@@ -8169,7 +8291,7 @@ JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."Academic
 JOIN public."ProgramCourses" course_row ON course_row."ProgramID"=s."ProgramID"
   AND course_row."EntryKind"='COURSE' AND course_row."RecommendedSemester"=6
 JOIN public."Courses" course ON course."CourseID"=course_row."CourseID" AND upper(course."CourseCode")='OJT202'
-WHERE roster."SeedScenario"='COMPLETED_OJT'
+WHERE roster."CompletedOJT"
   AND period."PeriodCode"=CASE s."CohortCode" WHEN 'K18' THEN 'SPRING2024' WHEN 'K19' THEN 'SPRING2025' ELSE 'SPRING2026' END;
 
 INSERT INTO public."OJTRegistrationEvents" ("RegistrationID","Action","IdempotencyKey","Snapshot","CreatedBy","CreatedAt","Reason")
@@ -8214,8 +8336,7 @@ SELECT term."OJTSemesterID",period."AcademicPeriodID",period."PeriodCode",period
 FROM public."OJTSemesters" term
 JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID"
 WHERE (period."PeriodCode" ~ '^(SPRING|SUMMER|FALL)202[2-6]$'
-  AND period."StartDate"<=DATE '2026-08-31')
-   OR period."PeriodCode"='FALL2026';
+  AND period."StartDate"<=DATE '2026-08-31');
 
 INSERT INTO public."RecruitmentCampaigns" ("OJTSemesterID","Name","CreatedBy","CreatedAt","StartsAt","EndsAt","ScheduleVersion")
 SELECT schedule."OJTSemesterID",'Tuyển dụng OJT - '||schedule."PeriodName",coordinator."UserID",
@@ -8333,7 +8454,7 @@ INSERT INTO public."JobApplications"
    "ReviewedBy","ReviewNote","PositionSnapshot","ApplicationSnapshot")
 SELECT success."RegistrationID",success."StudentID",success."OJTSemesterID",post."PostID",job_position."PositionID",
   enterprise."EnterpriseID",'ACCEPTED',schedule."ApplicationStartsAt"+INTERVAL '1 day',
-  success."StartDate"-INTERVAL '10 days',enterprise_user."UserID",
+  schedule."ResultsStartsAt"+INTERVAL '3 days',enterprise_user."UserID",
   'Hồ sơ OJT đã được doanh nghiệp tiếp nhận trong đợt tuyển dụng mẫu.',
   jsonb_build_object('id',job_position."PositionID",'enterpriseId',enterprise."EnterpriseID",
     'ojtSemesterId',job_position."OJTSemesterID",'title',job_position."Title",'description',job_position."Description",
@@ -8599,7 +8720,7 @@ BEGIN
     RAISE EXCEPTION 'Expected no OJT registrations before the seeded eligibility assessment runs.';
   END IF;
   IF (SELECT count(*) FROM qhdn_student_ojt_success)<>
-       (SELECT count(*) FROM qhdn_student_roster WHERE "SeedScenario"='COMPLETED_OJT')
+       (SELECT count(*) FROM qhdn_student_roster WHERE "CompletedOJT")
     OR (SELECT count(*) FROM public."OJTResults" result JOIN qhdn_student_ojt_success success
         ON success."StudentID"=result."StudentID" AND success."OJTSemesterID"=result."OJTSemesterID"
         WHERE result."Status"='CONFIRMED' AND result."OfficialScore"=8.50 AND result."Outcome"='PASSED') <>
@@ -8650,25 +8771,15 @@ BEGIN
     RAISE EXCEPTION 'Expected each completed OJT assignment to include one student-completed task and a published enterprise evaluation.';
   END IF;
   IF (SELECT count(*) FROM qhdn_student_roster)<>20
-    OR (SELECT count(*) FROM qhdn_student_roster WHERE "SeedScenario" IN ('COMPLETED_OJT','ELIGIBLE','NOT_ELIGIBLE')) <>
-       (SELECT count(*) FROM qhdn_student_roster) THEN
-    RAISE EXCEPTION 'Expected all 20 seeded students to have a completed, eligible, or below-threshold scenario.';
+    OR (SELECT count(*) FROM qhdn_student_roster WHERE "SeedScenario"='ELIGIBLE')<>6
+    OR EXISTS (SELECT 1 FROM qhdn_student_roster
+      WHERE "SeedScenario" IS NOT NULL AND "SeedScenario"<>'ELIGIBLE') THEN
+    RAISE EXCEPTION 'Expected 20 seeded students and an ELIGIBLE label only for the six students with completed OJT.';
   END IF;
-  IF EXISTS (
-    SELECT scenario FROM (VALUES ('COMPLETED_OJT'),('ELIGIBLE'),('NOT_ELIGIBLE')) cases(scenario)
-    WHERE NOT EXISTS (SELECT 1 FROM qhdn_student_roster roster
-      JOIN public."Users" account ON account."Email"=roster."Email"
-      JOIN public."Students" student ON student."UserID"=account."UserID" AND student."ProgramID"=roster."ProgramID"
-      JOIN public."StudentCourseResults" grade ON grade."StudentID"=student."StudentID" AND grade."Status"='FAILED'
-      WHERE roster."SeedScenario"=cases.scenario AND grade."SourceReference" LIKE 'QHDN_HANDOFF_2026%')
-  ) THEN RAISE EXCEPTION 'Each student scenario must include at least one failed course attempt.'; END IF;
-  IF EXISTS (
-    SELECT 1 FROM public."StudentCourseResults" failed
-    JOIN public."StudentCourseResults" passed ON passed."StudentID"=failed."StudentID" AND passed."CourseID"=failed."CourseID"
-      AND passed."SemesterTaken"=failed."SemesterTaken" AND passed."AttemptNumber"=2 AND passed."Status"='PASSED'
-    WHERE failed."SourceReference"='QHDN_HANDOFF_2026_RETAKE' AND failed."AttemptNumber"=1 AND failed."Status"='FAILED'
-      AND passed."AcademicPeriodID" IS NULL
-  ) THEN RAISE EXCEPTION 'Retake pass records must retain their academic period.'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" grade
+    WHERE grade."Status"='FAILED' AND grade."SourceReference" LIKE 'QHDN_HANDOFF_2026%') THEN
+    RAISE EXCEPTION 'Expected seeded transcript history to include failed course attempts.';
+  END IF;
   IF EXISTS (
     SELECT result."StudentID",result."AcademicPeriodID"
     FROM public."StudentCourseResults" result
@@ -9367,6 +9478,20 @@ CREATE TABLE public."OjtCompletionCertificates" (
   "UploadedRole" varchar(20) NOT NULL CHECK ("UploadedRole" IN ('ENTERPRISE','OJT_COORD','ADMIN')),
   "UploadedAt" timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+
+-- READ ONLY: list the original 20 QHDN seed students without exposing passwords.
+SELECT s."StudentCode", roster."FullName", roster."Email", roster."CohortCode",
+       program."ProgramCode", roster."SeedScenario",
+       CASE
+         WHEN roster."CompletedOJT" THEN 'COMPLETED_OJT_AND_ELIGIBLE_TRANSCRIPT'
+         WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 'TRANSCRIPT_OVER_70_NO_OJT_HISTORY'
+         ELSE 'TRANSCRIPT_UNDER_70_NO_OJT_HISTORY'
+       END AS "TranscriptScenario"
+FROM qhdn_student_roster roster
+JOIN public."Users" account ON account."Email"=roster."Email"
+JOIN public."Students" s ON s."UserID"=account."UserID"
+JOIN public."TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
+ORDER BY s."StudentCode";
 
 COMMIT;
 -- END OJT202 ELIGIBILITY GATE V1

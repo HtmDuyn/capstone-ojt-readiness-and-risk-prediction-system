@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ChevronDown, KeyRound } from "lucide-react";
 import PasswordResetForm from "./PasswordResetForm";
 
 interface RightPanelProps {
@@ -12,7 +13,17 @@ interface RightPanelProps {
   isLoading: boolean;
   errorMessage: string;
   onSubmit: (e: React.FormEvent) => void;
+  onQuickLogin: (email: string, password: string) => void;
 }
+
+const quickAccounts = [
+  { role: "Admin", email: "admin@ojtrpa.edu.vn", password: "Admin@123" },
+  { role: "Phòng Đào tạo", email: "academic@ojtrpa.edu.vn", password: "Academic@123" },
+  { role: "Phòng QHDN", email: "ojt.coord@ojtrpa.edu.vn", password: "Ojt@123" },
+  { role: "Doanh nghiệp", email: "hr@techviet.example", password: "Enterprise@123" },
+  { role: "Sinh viên Minh", email: "minhnhis181601@fpt.edu.vn", password: "Student@123" },
+  { role: "Sinh viên Anh", email: "anhltnse181602@fpt.edu.vn", password: "Student@123" },
+];
 
 interface InputFieldProps {
   id?: string;
@@ -74,6 +85,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   isLoading,
   errorMessage,
   onSubmit,
+  onQuickLogin,
 }) => {
   const [{ linkEmail, linkToken }] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -84,6 +96,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   }, [linkToken]);
   const [resetOpen, setResetOpen] = useState(Boolean(linkEmail && linkToken));
   const [resetMessage, setResetMessage] = useState("");
+  const [quickLoginOpen, setQuickLoginOpen] = useState(false);
   const fadeStyle = (delay = 0) => ({
     opacity: animateIn ? 1 : 0,
     transform: animateIn ? "translateY(0)" : "translateY(16px)",
@@ -92,6 +105,46 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   return (
     <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full lg:min-h-[33rem] bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
+      <div className="relative z-20 flex justify-end pb-4">
+        <div className="relative mr-2">
+          <button
+            type="button"
+            id="quick-login-toggle"
+            aria-label="Mở danh sách đăng nhập nhanh"
+            aria-haspopup="menu"
+            aria-expanded={quickLoginOpen}
+            onClick={() => setQuickLoginOpen((open) => !open)}
+            className="flex items-center gap-1.5 rounded-full border border-orange-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-2xs transition hover:border-orange-400 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-400/40"
+          >
+            <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Đăng nhập nhanh</span>
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${quickLoginOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+          </button>
+          {quickLoginOpen && (
+            <div role="menu" aria-labelledby="quick-login-toggle" className="absolute right-0 top-full mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white p-1.5 shadow-xl">
+              <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Chọn tài khoản để đăng nhập</p>
+              {quickAccounts.map(({ role, email, password }) => (
+                <button
+                  key={email}
+                  type="button"
+                  role="menuitem"
+                  disabled={isLoading}
+                  onClick={() => {
+                    setQuickLoginOpen(false);
+                    onAccountChange(email);
+                    onPasswordChange(password);
+                    onQuickLogin(email, password);
+                  }}
+                  className="flex w-full flex-col rounded-xl px-3 py-2 text-left transition hover:bg-orange-50 focus:bg-orange-50 focus:outline-none disabled:opacity-50"
+                >
+                  <span className="text-xs font-semibold text-gray-800">{role}</span>
+                  <span className="text-[11px] text-gray-500">{email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
       {/* Main Form Content */}
       <div className="relative z-10 my-auto max-w-md mx-auto w-full py-2">
         {resetOpen ? (
