@@ -1,47 +1,82 @@
-import { useState } from 'react';
-import { ArrowRight,BookOpen,CheckCircle2,ChevronDown,ChevronUp,GitBranch,GraduationCap,Info,LockKeyhole } from 'lucide-react';
+import { useId, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronUp, Info, LockKeyhole, Sparkles } from 'lucide-react';
 import type { RiskAssessment } from '@/services/studentService';
-import { Badge,cardClass,focusClass,SectionTitle } from './risk-ui';
+import { focusClass } from './risk-ui';
 
-export function LearningRoadmap({roadmap,embedded=false}:{roadmap:RiskAssessment['roadmap'];embedded?:boolean}){
-  const [expanded,setExpanded]=useState(false);
-  const visible=expanded?roadmap.items:roadmap.items.slice(0,4);
-  return <section aria-label="Lộ trình học tập đề xuất" className={embedded?'min-w-0':`${cardClass} p-5 sm:p-6`}>
-    {embedded ? <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-base font-semibold text-slate-900">Lộ trình học tập đề xuất</h3><p className="mt-1 text-sm leading-relaxed text-slate-500">{roadmap.status==='READY'?roadmap.objective:roadmap.message}</p></div><Badge className="border-blue-100 bg-blue-50 text-blue-700">Đến hết kỳ {roadmap.targetSemester}</Badge></div>
-      : <SectionTitle eyebrow="Từng bước cải thiện tiến độ" title="Lộ trình học tập đề xuất" description={roadmap.status==='READY'?roadmap.objective:roadmap.message}
-        aside={<Badge className="border-blue-100 bg-blue-50 text-blue-700"><GraduationCap size={14} aria-hidden="true"/>Đến hết kỳ {roadmap.targetSemester}</Badge>}/>}
-    {roadmap.status!=='READY'?<div className="mt-5 flex items-start gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5"><Info className="mt-0.5 shrink-0 text-slate-400" size={20} aria-hidden="true"/><div><h4 className="text-sm font-semibold text-slate-700">{roadmap.status==='NOT_AVAILABLE'?'Lộ trình chưa sẵn sàng':'Cần đối soát chương trình đào tạo'}</h4><p className="mt-1 text-sm leading-relaxed text-slate-500">Chưa có đủ dữ liệu hợp lệ để đề xuất môn học. Bạn có thể xem các hướng xử lý bên dưới.</p></div></div>
-    :roadmap.items.length===0?<div className="mt-5 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5"><CheckCircle2 className="shrink-0 text-emerald-600" size={22} aria-hidden="true"/><div><h4 className="text-sm font-semibold text-slate-800">Chưa có môn cần bổ sung trong danh sách đề xuất</h4><p className="mt-1 text-sm leading-relaxed text-slate-500">Tiếp tục hoàn thành các môn đang học và theo dõi kết quả xét OJT của nhà trường.</p></div></div>
-    :<><div className="mt-5 flex items-start gap-2 rounded-xl bg-blue-50/60 px-3.5 py-3 text-xs leading-relaxed text-blue-800"><Info size={15} className="mt-0.5 shrink-0" aria-hidden="true"/><p>Lộ trình chuẩn bị trước khi đi OJT, chỉ gồm môn đến hết kỳ {roadmap.targetSemester}. Không bao gồm môn thực tập OJT202. Thứ tự ưu tiên không phải lịch đăng ký môn.</p></div>
-      <ol className={`mt-4 ${embedded?'grid gap-3 lg:grid-cols-2 2xl:grid-cols-3':'space-y-0'}`}>{visible.map((course,index)=>{
-        const missing=course.prerequisites.filter(p=>!p.satisfied);
-        return <li key={course.courseId} className={embedded?'relative min-w-0':'relative pb-5 pl-10 last:pb-0 sm:pl-12'}>
-          {!embedded&&index<visible.length-1&&<span aria-hidden="true" className="absolute bottom-0 left-3.5 top-8 w-px bg-slate-200 sm:left-4"/>}
-          <span aria-hidden="true" className={`absolute ${embedded?'left-3 top-3 size-7':'left-0 top-1 size-7 sm:size-8'} z-10 grid place-items-center rounded-full border-2 border-white text-xs font-bold ring-1 ${course.canPlan?'bg-orange-500 text-white ring-orange-200':'bg-slate-100 text-slate-500 ring-slate-200'}`}>{course.priority}</span>
-          <article className={embedded?'h-full overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors hover:border-blue-200':'overflow-hidden rounded-2xl border border-slate-200 bg-white transition-shadow hover:shadow-md hover:shadow-slate-200/40 motion-reduce:transition-none'}><div className={embedded?'h-full py-3 pl-12 pr-3':'p-4 sm:p-5'}>
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Bước {course.priority}</p><h4 className="flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={17} className="shrink-0 text-slate-400" aria-hidden="true"/>{course.courseCode??course.name??'Môn học'}</h4>{course.courseCode&&course.name&&<p className="mt-1 text-xs text-slate-500">{course.name}</p>}</div><div className="flex flex-wrap gap-2"><Badge className={course.action==='RETAKE'?'border-orange-200 bg-orange-50 text-orange-800':'border-slate-200 bg-slate-50 text-slate-600'}>{course.action==='RETAKE'?'Học lại':'Học mới'}</Badge><Badge className={course.canPlan?'border-emerald-100 bg-emerald-50 text-emerald-700':'border-amber-100 bg-amber-50 text-amber-800'}>{course.canPlan?<CheckCircle2 size={12} aria-hidden="true"/>:<LockKeyhole size={12} aria-hidden="true"/>}{course.canPlan?'Có thể ưu tiên':'Cần tiên quyết'}</Badge></div></div>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">{course.explanation}</p>
-            {!!course.dependentCourses?.length&&<div className="mt-4 rounded-xl bg-slate-50 p-3"><p className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><GitBranch size={14} aria-hidden="true"/>Liên quan điều kiện tiên quyết của</p><div className="mt-2 flex flex-wrap gap-1.5">{course.dependentCourses.map(c=><span key={c.courseId} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600"><ArrowRight size={11} aria-hidden="true"/>{c.courseCode??c.name??'Môn trong chương trình'}</span>)}</div></div>}
-            {missing.length>0&&<div className="mt-3 space-y-2 rounded-xl border border-amber-100 bg-amber-50/60 p-3">{missing.map((group,i)=><p key={i} className="text-xs leading-relaxed text-amber-900"><span className="font-semibold">Cần đạt thêm {group.remainingRequired} môn</span> trong nhóm: {group.courses.filter(c=>!c.passed).map(c=>c.courseCode??'Môn chưa có mã').join(', ')}.</p>)}</div>}
-            {course.isAlternative&&<p className="mt-3 text-xs leading-relaxed text-slate-500">Đây là một phương án trong nhóm môn lựa chọn; không bắt buộc học tất cả các phương án.</p>}
-          </div><div className="flex items-start gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 text-xs leading-relaxed text-slate-500 sm:px-5">{course.canPlan?<CheckCircle2 size={13} className="mt-0.5 shrink-0" aria-hidden="true"/>:<LockKeyhole size={13} className="mt-0.5 shrink-0" aria-hidden="true"/>}{course.canPlan?'Đáp ứng tiên quyết hiện tại. Cần kiểm tra lịch mở lớp trước khi đăng ký.':'Hoàn thành các điều kiện tiên quyết còn thiếu trước khi lên kế hoạch học môn này.'}</div></article>
-        </li>;
-      })}</ol>
-      {roadmap.items.length>4&&<button type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)} className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 ${focusClass}`}>{expanded?'Thu gọn lộ trình':`Xem thêm ${roadmap.items.length-4} môn trong lộ trình`}<ChevronDown size={16} className={expanded?'rotate-180':''} aria-hidden="true"/></button>}
-    </>}
+export function LearningRoadmap({ roadmap, embedded = false }: {
+  roadmap: RiskAssessment['roadmap'];
+  embedded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
+  const visible = expanded ? roadmap.items : roadmap.items.slice(0, 4);
+
+  return <section aria-label="Lộ trình học tập đề xuất" className="min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <Sparkles size={18} className="mt-0.5 shrink-0 text-indigo-500" aria-hidden="true" />
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-slate-900">Lộ trình học tập đề xuất</h3>
+          <p className="mt-1 text-sm leading-relaxed text-slate-500">{roadmap.status === 'READY' ? roadmap.objective : roadmap.message}</p>
+        </div>
+      </div>
+      <span className="text-xs font-medium leading-6 text-slate-400">Đến hết kỳ {roadmap.targetSemester}</span>
+    </div>
+
+    {roadmap.status !== 'READY' ? <div className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed text-slate-500">
+      <Info size={17} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+      <div><p className="font-medium text-slate-700">{roadmap.status === 'NOT_AVAILABLE' ? 'Lộ trình chưa sẵn sàng' : 'Cần đối soát chương trình đào tạo'}</p>
+        <p className="mt-1">Chưa đủ dữ liệu hợp lệ để đề xuất môn học. Bạn có thể xem các hướng xử lý bên dưới.</p></div>
+    </div> : roadmap.items.length === 0 ? <div className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed text-slate-500">
+      <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" aria-hidden="true" />
+      <p>Chưa có môn cần bổ sung. Tiếp tục hoàn thành các môn đang học và theo dõi kết quả xét OJT.</p>
+    </div> : <div className="mt-4 sm:pl-7">
+      <p className="text-sm leading-relaxed text-slate-600">Bạn nên hoàn thành các môn sau theo thứ tự ưu tiên:</p>
+      <ol id={listId} className="mt-3 list-decimal space-y-3.5 pl-5 marker:font-semibold marker:text-slate-400">
+        {visible.map(course => {
+          const missing = course.prerequisites.filter(group => !group.satisfied);
+          return <li key={course.courseId} value={course.priority} className="min-w-0 pl-1">
+            <p className="break-words text-sm leading-7 text-slate-600">
+              <strong className="font-semibold text-slate-900">{course.action === 'RETAKE' ? 'Học lại' : 'Học mới'} {course.courseCode ?? course.name ?? 'môn trong chương trình'}</strong>
+              {course.courseCode && course.name && <> — {course.name}</>}
+            </p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-6">
+              <span className={`inline-flex items-center gap-1.5 ${course.canPlan ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {course.canPlan ? <CheckCircle2 size={12} aria-hidden="true" /> : <LockKeyhole size={12} aria-hidden="true" />}
+                {course.canPlan ? 'Có thể ưu tiên' : 'Hoàn thành tiên quyết trước khi lên kế hoạch'}
+              </span>
+              {!!course.dependentCourses?.length && <span className="text-slate-500">Liên quan tiên quyết của {course.dependentCourses.map(c => c.courseCode ?? c.name ?? 'môn trong chương trình').join(', ')}.</span>}
+            </div>
+            {missing.map((group, index) => <p key={index} className="mt-1 text-xs leading-6 text-amber-800">
+              Cần đạt thêm <strong className="font-semibold">{group.remainingRequired} môn</strong> trong nhóm: {group.courses.filter(c => !c.passed).map(c => c.courseCode ?? 'Môn chưa có mã').join(', ')}.
+            </p>)}
+            {course.isAlternative && <p className="mt-1 text-xs leading-6 text-slate-500">Đây là một phương án trong nhóm lựa chọn, không cần học tất cả phương án.</p>}
+          </li>;
+        })}
+      </ol>
+      {roadmap.items.length > 4 && <button type="button" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)} className={`mt-4 inline-flex items-center gap-1.5 rounded py-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 ${focusClass}`}>
+        {expanded ? 'Thu gọn lộ trình' : `Xem thêm ${roadmap.items.length - 4} môn`}
+        <ChevronDown size={15} className={expanded ? 'rotate-180' : ''} aria-hidden="true" />
+      </button>}
+      <p className="mt-4 text-xs leading-relaxed text-slate-400">Chỉ gồm môn đến hết kỳ {roadmap.targetSemester}, không bao gồm OJT202. Thứ tự ưu tiên không phải lịch đăng ký môn; cần kiểm tra lịch mở lớp trước khi đăng ký.</p>
+    </div>}
     {!embedded && <RoadmapNotes roadmap={roadmap} />}
   </section>;
 }
 
 export function RoadmapNotes({roadmap}:{roadmap:RiskAssessment['roadmap']}){
-  return <details className="group mt-4 rounded-lg border border-slate-200 bg-white" onToggle={event => event.currentTarget.querySelector('summary')?.setAttribute('aria-expanded', String(event.currentTarget.open))}>
-    <summary aria-expanded={false} className={`flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 transition-colors duration-150 hover:bg-slate-100 [&::-webkit-details-marker]:hidden ${focusClass}`}>
-      <span>Lưu ý về lộ trình đề xuất</span>
-      <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-700">
+  return <details className="group mt-4 border-t border-slate-200/80 pt-3" onToggle={event => event.currentTarget.querySelector('summary')?.setAttribute('aria-expanded', String(event.currentTarget.open))}>
+    <summary aria-expanded={false} className={`flex cursor-pointer list-none items-center justify-between gap-3 rounded py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 [&::-webkit-details-marker]:hidden ${focusClass}`}>
+      <span>Giải thích &amp; lưu ý về lộ trình</span>
+      <span className="flex shrink-0 items-center gap-2 text-xs font-medium">
         <span className="group-open:hidden">Xem chi tiết</span><span className="hidden group-open:inline">Thu gọn</span>
-        <ChevronDown size={20} className="group-open:hidden" aria-hidden="true"/><ChevronUp size={20} className="hidden group-open:block" aria-hidden="true"/>
+        <ChevronDown size={16} className="group-open:hidden" aria-hidden="true"/><ChevronUp size={16} className="hidden group-open:block" aria-hidden="true"/>
       </span>
     </summary>
-    <div className="border-t border-slate-200 p-4 text-sm leading-relaxed text-slate-700"><p>{roadmap.message}</p><ul className="mt-2 list-disc space-y-2 pl-4">{roadmap.limitations.map((l,i)=><li key={i}>{l}</li>)}</ul></div>
+    <div className="pt-3 text-sm leading-relaxed text-slate-600">
+      <p>{roadmap.message}</p>
+      {roadmap.status === 'READY' && roadmap.items.some(course => course.explanation) && <ul className="mt-3 list-disc space-y-2 pl-4">{roadmap.items.filter(course => course.explanation).map(course => <li key={course.courseId}><strong className="font-medium text-slate-800">{course.courseCode ?? course.name ?? 'Môn học'}</strong>: {course.explanation}</li>)}</ul>}
+      <ul className="mt-3 list-disc space-y-2 pl-4">{roadmap.limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul>
+    </div>
   </details>;
 }
