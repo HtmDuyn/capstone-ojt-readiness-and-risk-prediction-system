@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ClipboardCheck, GraduationCap, UserRound } from 'lucide-react';
 import { StudentDialog } from '@/components/student/StudentDialog';
+import { OjtCertificatePanel } from '@/components/common/OjtCertificateDialog';
 import type { EnterpriseInternshipItem } from '@/services/enterpriseService';
 import { parseEvaluationScore } from '@/utils/enterprise/enterpriseEvaluation';
 
@@ -32,6 +33,7 @@ export function InternshipEvaluationDetailsDialog({ internship, semesterLabel, c
   onClose: () => void;
 }) {
   const { student, evaluation, template, academicSupervisor } = internship;
+  const [certificateBusy,setCertificateBusy] = useState(false);
   const templateMatches = !evaluation || evaluation.templateId === template?.id;
   // An older evaluation must keep its own issued criteria and weights.
   const criteria = evaluation?.criteria?.length ? evaluation.criteria : templateMatches ? template?.criteria ?? [] : [];
@@ -39,7 +41,7 @@ export function InternshipEvaluationDetailsDialog({ internship, semesterLabel, c
   const status = evaluation?.status === 'SUBMITTED' ? 'Đã gửi QHDN' : evaluation && complete ? 'Đã lưu' : 'Thiếu điểm';
   const templateName = templateMatches && template ? `${template.name} · Phiên bản ${template.version}` : 'Bộ tiêu chí theo đánh giá đã lưu';
 
-  return <StudentDialog title={`Chi tiết sinh viên và đánh giá · ${student.fullName || student.studentCode}`} onClose={onClose}>
+  return <StudentDialog title={`Chi tiết sinh viên và đánh giá · ${student.fullName || student.studentCode}`} onClose={onClose} busy={certificateBusy}>
     <div className="space-y-6">
       <section aria-labelledby="evaluation-student-heading" className="space-y-3">
         <h3 id="evaluation-student-heading" className="flex items-center gap-2 text-base font-semibold text-slate-900"><UserRound size={18} className="text-orange-600" />Thông tin sinh viên</h3>
@@ -90,7 +92,8 @@ export function InternshipEvaluationDetailsDialog({ internship, semesterLabel, c
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-600">{evaluation?.comments?.trim() || 'Doanh nghiệp chưa có nhận xét.'}</p>
         </div>
       </section>
-      <div className="flex justify-end border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Đóng</button></div>
+      {['ASSIGNED','ACTIVE','IN_PROGRESS','COMPLETED'].includes(internship.status?.toUpperCase())&&<div className="border-t border-slate-200 pt-4"><OjtCertificatePanel key={internship.id} assignmentId={internship.id} onBusyChange={setCertificateBusy}/></div>}
+      <div className="flex justify-end border-t border-slate-100 pt-4"><button type="button" onClick={onClose} disabled={certificateBusy} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Đóng</button></div>
     </div>
   </StudentDialog>;
 }

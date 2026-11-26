@@ -1,8 +1,12 @@
 import { useState } from 'react';
+import { Download, Eye, FileCheck2 } from 'lucide-react';
+import { downloadOjtCertificate, getStudentOjtCertificates, type OjtCertificate } from '@/services/ojtCertificateService';
+import { OjtCertificatePreviewDialog } from '@/components/common/OjtCertificatePreviewDialog';
+import { PublishedOjtEvaluation } from '@/components/student/PublishedOjtEvaluation';
+import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
-import { getOjtResult, getOjtResults } from '@/services/studentService';
-import { StudentDialog } from '@/components/student/StudentDialog';
+import { getOjtResults } from '@/services/studentService';
 import {
   buttonClass,
   dateText,
@@ -11,31 +15,19 @@ import {
   ResourceState,
   StudentPage,
 } from '@/components/student/PortalUI';
-import type { OjtResult } from '@/types/student/portal';
-
-function exportResult(result: OjtResult) {
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' }),
-  );
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'ket-qua-ojt-' + result.id + '.json';
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 function ResultsContent() {
   const { profile, semesterId, revision } = useStudentPortal();
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [downloadingCertificate, setDownloadingCertificate] = useState<number|null>(null);
+  const [viewingCertificate, setViewingCertificate] = useState<OjtCertificate|null>(null);
+  const [certificateDownloadError, setCertificateDownloadError] = useState('');
   const key = profile!.id + ':' + semesterId + ':' + revision;
   const list = useStudentResource(semesterId ? 'ojt-results:' + key + ':' + page : null, (signal) =>
     getOjtResults(semesterId!, page, signal),
   );
-  const detail = useStudentResource(
-    selected && semesterId ? 'ojt-result:' + key + ':' + selected : null,
-    (signal) => getOjtResult(selected!, semesterId!, signal),
-  );
   const items = list.data?.items ?? [];
+  const certificates = useStudentResource(semesterId ? 'ojt-certificates:' + key : null,
+    signal => getStudentOjtCertificates(semesterId!, signal));
   return (
     <>
       <div className="min-w-0 space-y-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -47,33 +39,7 @@ function ResultsContent() {
           retry={list.reload}
         />
         <>
-            {items.map((result) => (
-              <article
-                key={result.id}
-                className="flex flex-col gap-3 border-b border-slate-200 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0 space-y-1">
-                <h3 className="break-words font-semibold text-slate-900">
-                  {result.enterpriseName} · {result.semesterCode}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  QHDN công bố: {dateText(result.publishedAt)}
-                </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 sm:shrink-0">
-                <p className="text-sm text-slate-600">
-                  Điểm OJT: <strong className="tabular-nums text-slate-900">{result.overallScore == null ? 'Chưa có' : result.overallScore.toFixed(2)}</strong>
-                </p>
-                <button
-                  className={buttonClass}
-                  type="button"
-                  onClick={() => setSelected(result.id)}
-                >
-                  Xem chi tiết đánh giá
-                </button>
-                </div>
-              </article>
-            ))}
+            {items.map(result => <PublishedOjtEvaluation key={result.id} result={result}/>)}
             {!list.loading && !list.error && !items.length && (
               <Empty>{semesterId ? 'Chưa có kết quả OJT được công bố trong đợt này.' : 'Chưa có điểm và nhận xét. Kết quả sẽ được cập nhật sau khi bạn tham gia OJT và được công bố đánh giá.'}</Empty>
             )}
@@ -82,7 +48,6 @@ function ResultsContent() {
               total={list.data?.total ?? 0}
               onChange={(value) => {
                 setPage(value);
-                setSelected(null);
               }}
               disabled={list.loading || !semesterId}
             />}
@@ -91,62 +56,24 @@ function ResultsContent() {
       <section aria-labelledby="ojt-certificates-heading" className="space-y-3 border-t border-slate-200 pt-5">
         <h2 id="ojt-certificates-heading" className="text-lg font-semibold text-slate-900">Chứng chỉ</h2>
         <p className="text-sm text-slate-600">Chứng chỉ hoàn thành OJT</p>
-        <Empty>Chưa có chứng chỉ được cập nhật{semesterId ? ' cho kỳ OJT này' : ''}.</Empty>
+        <ResourceState loading={certificates.loading} error={certificates.error} retry={certificates.reload}/>
+        {certificateDownloadError&&<p role="alert" className="text-sm text-rose-700">{certificateDownloadError}</p>}
+        {!!certificates.data?.length&&<ul className="divide-y divide-slate-100">{certificates.data.map(certificate=><li key={certificate.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div className="flex min-w-0 items-start gap-3"><FileCheck2 size={20} className="mt-0.5 shrink-0 text-emerald-600" aria-hidden="true"/><div className="min-w-0"><p className="break-all text-sm font-semibold text-slate-900">{certificate.fileName}</p><p className="mt-1 text-xs text-slate-500">{certificate.enterpriseName} · {certificate.semesterCode} · {dateText(certificate.uploadedAt)}</p></div></div>
+          <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700" onClick={()=>setViewingCertificate(certificate)}><Eye size={15}/>Xem chứng chỉ</button>
+          <button type="button" disabled={downloadingCertificate!==null} className={buttonClass+' inline-flex items-center gap-2'} onClick={async()=>{
+            if(downloadingCertificate!==null)return;
+            setDownloadingCertificate(certificate.id);setCertificateDownloadError('');
+            try{await downloadOjtCertificate(certificate,true);}catch(e){setCertificateDownloadError(friendlyErrorMessage(e,'Không tải được chứng chỉ.'));}
+            finally{setDownloadingCertificate(null);}
+          }}><Download size={15}/>{downloadingCertificate===certificate.id?'Đang tải…':'Tải về'}</button>
+          </div>
+        </li>)}</ul>}
+        {!certificates.loading&&!certificates.error&&!certificates.data?.length&&<Empty>Chưa có chứng chỉ được công bố{semesterId ? ' cho kỳ OJT này' : ''}.</Empty>}
       </section>
       </div>
-      {selected !== null && (
-        <StudentDialog title="Chi tiết đánh giá OJT" onClose={() => setSelected(null)}>
-          <ResourceState
-            loading={detail.loading}
-            error={detail.error}
-            retry={detail.reload}
-          />
-          {detail.data && (
-            <div className="space-y-4 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
-                <h3 className="break-words text-base font-semibold text-slate-900">{detail.data.enterpriseName}</h3>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />Đã công bố</span>
-              </div>
-              <dl className="divide-y divide-slate-100">
-                {[
-                  {
-                    label: 'Điểm trung bình',
-                    value: detail.data.overallScore == null ? '—' : detail.data.overallScore.toFixed(2),
-                  },
-                  {
-                    label: 'Kỹ năng chuyên ngành',
-                    value: detail.data.completionScore ?? '—',
-                  },
-                  { label: 'Thái độ', value: detail.data.attitudeScore ?? '—' },
-                  { label: 'Kỹ năng mềm', value: detail.data.skillScore ?? '—' },
-                ].map(({ label, value }, index) => (
-                  <div key={label} className="flex items-center justify-between gap-4 py-2.5">
-                    <dt className={index === 0 ? 'font-semibold text-slate-800' : 'text-slate-600'}>{label}</dt>
-                    <dd className={`shrink-0 tabular-nums ${index === 0 ? 'text-xl font-bold text-orange-600' : 'font-semibold text-slate-900'}`}>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="border-t border-slate-200 pt-3">
-                <h4 className="font-semibold text-slate-800">Nhận xét từ doanh nghiệp</h4>
-                <p className="mt-1.5 whitespace-pre-wrap break-words leading-relaxed text-slate-600">{detail.data.comments || 'Chưa có nhận xét'}</p>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-                <p className="text-xs text-slate-500">Ngày công bố: {dateText(detail.data.publishedAt)}</p>
-                <button
-                  className={buttonClass}
-                  type="button"
-                  onClick={() => exportResult(detail.data!)}
-                >
-                  Tải kết quả
-                </button>
-              </div>
-            </div>
-          )}
-          {detail.data === null && !detail.loading && !detail.error && (
-            <Empty>Không tìm thấy kết quả đã công bố.</Empty>
-          )}
-        </StudentDialog>
-      )}
+      {viewingCertificate&&<OjtCertificatePreviewDialog key={viewingCertificate.id} certificate={viewingCertificate} student onClose={()=>setViewingCertificate(null)}/>}
     </>
   );
 }

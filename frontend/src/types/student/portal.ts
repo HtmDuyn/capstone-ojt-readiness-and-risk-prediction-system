@@ -318,6 +318,8 @@ export interface OjtResult {
   comments: string | null;
   outcome: string | null;
   status: string;
+  template?: { criteria: { key: string; label: string; weight: number }[] } | null;
+  scoreDetails?: Record<string, number | null> | null;
 }
 export interface Supplementary {
   items: {

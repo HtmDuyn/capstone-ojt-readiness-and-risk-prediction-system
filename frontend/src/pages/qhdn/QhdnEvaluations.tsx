@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bell, ClipboardCheck, Download, Eye, Inbox, Loader2, Mail, Send } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
+import { OjtCertificateDialog } from '@/components/common/OjtCertificateDialog';
 import { listOjtResults, exportQhdnReport, exportOjtResults, publishOjtResults } from '@/services/qhdnService';
 import { downloadFile } from '@/utils/shared/downloadFile';
 import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
@@ -23,6 +24,7 @@ const scoreColumns=[
 ] as const;
 
 export default function QhdnEnterpriseEvaluations(){
+ const [certificateTarget,setCertificateTarget]=useState<{id:number;name:string}|null>(null);
  const [publishTarget,setPublishTarget]=useState<{evaluationIds?:number[];studentName?:string}|null>(null);
  const [tab,setTab]=useState<'results'|'reports'>('results');
  const catalog=useQhdnAcademicPeriods('',false,true);
@@ -33,9 +35,9 @@ export default function QhdnEnterpriseEvaluations(){
  const [limit,setLimit]=useState(10);
  const results=usePaged((page,signal)=>listOjtResults({ojtSemesterId:Number(semesterId),page,limit},signal).then(r=>r.data),`${semesterId}:${limit}`,!!semesterId&&tab==='results');
  useEffect(()=>{
-  if(tab!=='results'||!semesterId||results.busy||publishBusy)return;
+  if(tab!=='results'||!semesterId||results.busy||publishBusy||certificateTarget)return;
   return subscribeVisibleRefresh(results.reload, { interval: 30_000 });
- },[tab,semesterId,results.busy,results.reload,publishBusy]);
+ },[tab,semesterId,results.busy,results.reload,publishBusy,certificateTarget]);
  useEffect(()=>{setMessage('');setError('');},[catalog.periodId,type,tab]);
  const run=async(work:()=>Promise<unknown>,success:string)=>{
   if(busy||publishBusy||!semesterId)return;
@@ -72,8 +74,8 @@ export default function QhdnEnterpriseEvaluations(){
    <div id={`report-panel-${tab}`} role="tabpanel" aria-labelledby={`report-tab-${tab}`}>
     {tab==='results'?<>
      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><h2 className="font-semibold text-slate-900">Kết quả OJT</h2><p className="mt-1 text-xs text-slate-500">{results.busy?'Đang tải dữ liệu…':`${results.data.total} kết quả trong học kỳ đã chọn`}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={workflowPrimary+' !py-2'} disabled={busy||publishBusy||results.busy||!semesterId||!results.data.total} onClick={openPublishAll}><Send size={14}/>{publishBusy?'Đang công bố…':'Công bố hàng loạt'}</button>{(['csv','pdf'] as const).map(format=><button key={format} type="button" className={workflowSecondary+' !py-2'} disabled={busy||publishBusy||results.busy||!semesterId} onClick={()=>exportResults(format)}><Download size={14}/>{format.toUpperCase()}</button>)}</div></div>
-     {results.error?<div className="px-5 pb-5"><Notice>{results.error}</Notice></div>:<Table headers={['STT','Sinh viên','Doanh nghiệp',...scoreColumns.map(column=>column.label),'Trạng thái','Thao tác']}>
-      {results.busy?<tr><td colSpan={9} className="h-40 text-center text-slate-500" role="status">Đang tải kết quả…</td></tr>:!results.data.items.length?<tr><td colSpan={9}><div className="flex min-h-48 flex-col items-center justify-center gap-2 text-slate-400"><Inbox size={30} strokeWidth={1.5}/><p className="text-sm text-slate-500">{!semesterId?'Chọn học kỳ có kỳ OJT để xem kết quả.':'Chưa có điểm đánh giá doanh nghiệp trong học kỳ này.'}</p></div></td></tr>:results.data.items.map((result,index)=><tr key={result.evaluationId??result.id} className="hover:bg-slate-50/70"><td className="text-center tabular-nums text-slate-400">{(results.page-1)*results.data.limit+index+1}</td><td><p className="font-medium text-slate-800">{result.fullName||'—'}</p><p className="mt-0.5 text-xs text-slate-500">{result.studentCode}</p></td><td className="text-slate-600">{result.enterpriseName||result.company?.name||'—'}</td>{scoreColumns.map(column=><td key={column.key} className={'tabular-nums '+(column.key==='overallScore'?'font-bold text-orange-600':'font-semibold')}>{result[column.key]==null?'—':Number(result[column.key])}</td>)}<td><span className="whitespace-nowrap rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{statusLabels[result.status]||result.status}</span></td><td>{result.publishedToStudent?<span className="whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Đã công bố</span>:result.evaluationId?<button type="button" className="whitespace-nowrap rounded-lg border border-orange-200 px-2.5 py-1.5 text-xs font-semibold text-orange-700 transition hover:bg-orange-50 disabled:opacity-50" disabled={busy||publishBusy||results.busy} onClick={()=>{const evaluationId=result.evaluationId;if(evaluationId)openPublishOne(evaluationId,result.fullName);}}>Công bố</button>:<span className="text-xs text-slate-400">—</span>}</td></tr>)}
+     {results.error?<div className="px-5 pb-5"><Notice>{results.error}</Notice></div>:<Table headers={['STT','Sinh viên','Doanh nghiệp',...scoreColumns.map(column=>column.label),'Trạng thái','Chứng chỉ','Thao tác']}>
+      {results.busy?<tr><td colSpan={10} className="h-40 text-center text-slate-500" role="status">Đang tải kết quả…</td></tr>:!results.data.items.length?<tr><td colSpan={10}><div className="flex min-h-48 flex-col items-center justify-center gap-2 text-slate-400"><Inbox size={30} strokeWidth={1.5}/><p className="text-sm text-slate-500">{!semesterId?'Chọn học kỳ có kỳ OJT để xem kết quả.':'Chưa có điểm đánh giá doanh nghiệp trong học kỳ này.'}</p></div></td></tr>:results.data.items.map((result,index)=><tr key={result.evaluationId??result.id} className="hover:bg-slate-50/70"><td className="text-center tabular-nums text-slate-400">{(results.page-1)*results.data.limit+index+1}</td><td><p className="font-medium text-slate-800">{result.fullName||'—'}</p><p className="mt-0.5 text-xs text-slate-500">{result.studentCode}</p></td><td className="text-slate-600">{result.enterpriseName||result.company?.name||'—'}</td>{scoreColumns.map(column=><td key={column.key} className={'tabular-nums '+(column.key==='overallScore'?'font-bold text-orange-600':'font-semibold')}>{result[column.key]==null?'—':Number(result[column.key])}</td>)}<td><span className="whitespace-nowrap rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{statusLabels[result.status]||result.status}</span></td><td><button type="button" className="whitespace-nowrap rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-orange-50 disabled:opacity-50" disabled={busy||publishBusy||!result.assignmentId} onClick={()=>setCertificateTarget({id:result.assignmentId,name:result.fullName})}>Chứng chỉ</button></td><td>{result.publishedToStudent?<span className="whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Đã công bố</span>:result.evaluationId?<button type="button" className="whitespace-nowrap rounded-lg border border-orange-200 px-2.5 py-1.5 text-xs font-semibold text-orange-700 transition hover:bg-orange-50 disabled:opacity-50" disabled={busy||publishBusy||results.busy} onClick={()=>{const evaluationId=result.evaluationId;if(evaluationId)openPublishOne(evaluationId,result.fullName);}}>Công bố</button>:<span className="text-xs text-slate-400">—</span>}</td></tr>)}
      </Table>}
      <div className="border-t border-slate-100 px-5 py-4"><Pager page={results.page} total={results.data.total} limit={limit} busy={busy||results.busy} onChange={results.setPage} onLimitChange={size=>{results.setPage(1);setLimit(size);}}/></div>
     </>:<div className="space-y-5 p-5 sm:p-6">
@@ -84,6 +86,7 @@ export default function QhdnEnterpriseEvaluations(){
     </div>}
    </div>
   </section>
+  {certificateTarget&&<OjtCertificateDialog assignmentId={certificateTarget.id} studentName={certificateTarget.name} onClose={()=>setCertificateTarget(null)}/>}
   {publishTarget&&<WorkflowModal title="Xác nhận công bố điểm OJT" subtitle="Kiểm tra thông tin trước khi công bố cho sinh viên." busy={publishBusy} onClose={()=>setPublishTarget(null)}>
    <div className="space-y-5" aria-busy={publishBusy}>
     <div className="flex items-start gap-3">
