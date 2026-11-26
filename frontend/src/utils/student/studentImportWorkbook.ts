@@ -15,10 +15,10 @@ const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> =
 
 export const STUDENT_IMPORT_COLUMNS = [
   'Họ và tên', 'Mã sinh viên', 'Email', 'Số điện thoại',
-  'Mã chương trình đào tạo', 'Chuyên ngành', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
+  'Mã chương trình đào tạo', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
 ];
 export const COURSE_RESULT_COLUMNS = [
-  'Mã sinh viên', 'Mã môn', 'Tên môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
+  'Mã sinh viên', 'Mã môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
 ];
 
 const text = (value: unknown): string =>
@@ -138,8 +138,8 @@ const readRows = (
 export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   const book = XLSX.utils.book_new();
   const sheets: [string, string[], number[], number[]][] = [
-    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 23, 20, 12, 24], [1, 3, 4, 5, 7, 8, 9]],
-    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 38, 20, 14, 19, 15], [0, 1, 3, 5]],
+    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 20, 12, 24], [1, 3, 4, 6, 7, 8]],
+    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 20, 14, 19, 15], [0, 1, 2, 4]],
   ];
   for (const [name, headers, widths, textColumns] of sheets) {
     const sheet = XLSX.utils.aoa_to_sheet([headers]);
@@ -388,8 +388,6 @@ const parseCourseResultImportWorkbook = (
     const code = getCell(row, ["Mã sinh viên", "MSSV", "code"]);
 
     const courseCode = getCell(row, ["Mã môn", "courseCode"]);
-    // Tên môn is for the person filling the sheet; the existing import contract resolves the course by code.
-
     const period = getCell(row, ['Học kỳ ghi nhận', "Kỳ học", "academicPeriodId"]);
 
     if (!code || !courseCode || !period) {
