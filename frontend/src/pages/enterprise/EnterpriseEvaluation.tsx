@@ -284,7 +284,6 @@ export function EnterpriseEvaluation() {
           <label className="text-xs font-semibold text-slate-600">Nhập điểm<input type="number" min={0} max={10} step="0.01" inputMode="decimal" placeholder="0–10" className={inputClass + ' mt-1.5 block w-32'} value={bulkScore} disabled={busy || loading} aria-invalid={bulkScore !== '' && parseEvaluationScore(bulkScore) === null} onChange={e => setBulkScore(e.target.value)} /></label>
           <label className="text-xs font-semibold text-slate-600">Chọn cột điểm<select className={inputClass + ' mt-1.5 block'} value={column} disabled={busy || loading || !selectedRows.length} onChange={e => setColumn(e.target.value)}><option value="">Tất cả tiêu chí</option>{bulkColumns.map(field => <option key={field.key} value={field.key}>{field.label} ({field.weight}%)</option>)}</select></label>
           <button type="button" className={primaryClass} disabled={busy || loading || !selectedRows.length} onClick={() => void saveBulkScores()}><Save size={16} />Lưu điểm</button>
-          <span className="pb-2 text-xs text-slate-500">Lưu trực tiếp cho {selectedRows.length} sinh viên đã chọn, kể cả ở trang khác.</span>
           <button type="button" className="pb-2 text-xs font-semibold text-orange-600 hover:underline disabled:opacity-50" disabled={busy || loading || !filtered.some(row => !row.locked)} onClick={() => setSelected(new Set(filtered.filter(row => !row.locked).map(row => row.id)))}>Chọn tất cả kết quả lọc</button>
         </div>
         <p className="text-xs leading-relaxed text-slate-500">Nhập điểm cho đúng các tiêu chí được ban hành. Khi chọn sinh viên thuộc nhiều bộ tiêu chí, áp dụng hàng loạt sẽ điền điểm vào tất cả tiêu chí của từng sinh viên.</p>
@@ -373,8 +372,18 @@ export function EnterpriseEvaluation() {
       </form>
     </StudentDialog>}
     {confirming && <StudentDialog title="Xác nhận đánh giá" busy={busy} onClose={() => setConfirming(false)}>
-      <p className="text-sm leading-6 text-slate-600">Bạn sắp gửi điểm của <strong className="text-slate-900">{selectedRows.length} sinh viên</strong> đến Phòng Quan hệ doanh nghiệp. Điểm sẽ được cập nhật ngay và không thể chỉnh sửa trực tiếp sau khi gửi.</p>
-      <div className="mt-4 max-h-80 space-y-3 overflow-auto">{selectedRows.map(row => <div key={row.id} className="rounded-xl border border-slate-200 p-3"><p className="font-semibold text-slate-800">{row.fullName} · {row.studentCode}</p><p className="mt-1 text-xs text-slate-500">{row.templateName}</p><dl className="mt-2 space-y-1 text-sm">{row.criteria.map(field => <div key={field.key} className="flex justify-between gap-4"><dt>{field.label} ({field.weight}%)</dt><dd className="tabular-nums">{row.scoreDetails[field.key]}</dd></div>)}<div className="flex justify-between border-t pt-2 font-bold text-orange-600"><dt>Điểm tổng</dt><dd>{evaluationAverage(row)?.toFixed(2) ?? '—'}</dd></div></dl></div>)}</div>
+      <p className="text-sm leading-6 text-slate-600">Bạn sắp gửi đánh giá của <strong className="text-slate-900">{selectedRows.length} sinh viên</strong> đến Phòng QHDN. Sau khi gửi, điểm sẽ được khóa chỉnh sửa. Sinh viên chỉ xem được điểm và nhận thông báo khi Phòng QHDN công bố kết quả.</p>
+      <ol aria-label="Danh sách sinh viên gửi đánh giá" className="mt-4 max-h-80 divide-y divide-slate-100 overflow-y-auto border-y border-slate-100 pr-2">
+        {selectedRows.map((row, index) => <li key={row.id} className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-3 py-3.5">
+          <span className="pt-0.5 text-xs font-medium tabular-nums text-slate-400">{index + 1}</span>
+          <div className="min-w-0">
+            <p className="break-words text-sm font-semibold text-slate-800">{row.fullName}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{row.studentCode}</p>
+            <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-relaxed text-slate-500">{row.criteria.map(field => <div key={field.key} className="flex flex-wrap gap-x-1"><dt>{field.label} ({field.weight}%):</dt><dd className="font-medium tabular-nums text-slate-700">{row.scoreDetails[field.key]}</dd></div>)}</dl>
+          </div>
+          <div className="text-right"><p className="text-[10px] text-slate-400">Điểm tổng</p><p className="mt-1 text-base font-bold tabular-nums text-orange-600">{evaluationAverage(row)?.toFixed(2) ?? '—'}</p></div>
+        </li>)}
+      </ol>
       {confirmationError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{confirmationError}</p>}
       <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={busy} className={secondaryClass} onClick={() => setConfirming(false)}>Quay lại chỉnh sửa</button><button type="button" disabled={busy} className={primaryClass} onClick={() => void confirmEvaluations()}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}{busy ? 'Đang gửi…' : 'Xác nhận gửi QHDN'}</button></div>
     </StudentDialog>}

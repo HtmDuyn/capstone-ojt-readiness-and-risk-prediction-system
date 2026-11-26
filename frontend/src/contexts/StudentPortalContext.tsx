@@ -36,7 +36,7 @@ interface PortalContext {
   academicPeriods: StudyPeriod[];
   academicPeriodId: number | null;
   academicPeriodsLoading: boolean;
-  selectAcademicPeriod: (id: number) => void;
+  selectAcademicPeriod: (id: number | null) => void;
   refresh: () => void;
   revision: number;
   mustChangePassword: boolean;
@@ -60,7 +60,7 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
-  const [studyChoice, setStudyChoice] = useState<{ owner: string; id: number } | null>(null);
+  const [studyChoice, setStudyChoice] = useState<{ owner: string; id: number | null } | null>(null);
   const [revision, setRevision] = useState(0);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
@@ -70,10 +70,11 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   );
   const academicPeriods = studyCatalog.data?.items ?? [];
   const studyOwner = profile ? `${token}:${profile.id}` : '';
-  const academicPeriodId = studyChoice?.owner === studyOwner && academicPeriods.some(item => item.id === studyChoice.id)
+  const academicPeriodId = studyChoice?.owner === studyOwner
+    && (studyChoice.id === null || academicPeriods.some(item => item.id === studyChoice.id))
     ? studyChoice.id : studyCatalog.data?.currentAcademicPeriodId ?? academicPeriods[0]?.id ?? null;
-  const selectAcademicPeriod = (id: number) => {
-    if (studyOwner && academicPeriods.some(item => item.id === id)) setStudyChoice({ owner: studyOwner, id });
+  const selectAcademicPeriod = (id: number | null) => {
+    if (studyOwner && (id === null || academicPeriods.some(item => item.id === id))) setStudyChoice({ owner: studyOwner, id });
   };
 
   // Leaving the Student portal (including logout) releases all displayed snapshots.

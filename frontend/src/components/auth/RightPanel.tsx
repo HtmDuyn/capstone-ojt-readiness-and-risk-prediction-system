@@ -92,6 +92,15 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   return (
     <div className="right-panel relative flex flex-col w-full lg:w-[55%] h-full lg:min-h-[33rem] bg-white/40 backdrop-blur-2xl p-6 lg:p-10 justify-between overflow-y-auto custom-scrollbar flex-1">
+      <div className="relative z-10 flex justify-end pb-4">
+        <span className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-600 shadow-2xs">
+          <svg className="h-3.5 w-3.5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+          </svg>
+          Tiếng Việt
+        </span>
+      </div>
       {/* Main Form Content */}
       <div className="relative z-10 my-auto max-w-md mx-auto w-full py-2">
         {resetOpen ? (

@@ -5,13 +5,10 @@ import { getOjtResult, getOjtResults } from '@/services/studentService';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import {
   buttonClass,
-  Card,
   dateText,
   Empty,
-  Metrics,
   Pagination,
   ResourceState,
-  statusText,
   StudentPage,
 } from '@/components/student/PortalUI';
 import type { OjtResult } from '@/types/student/portal';
@@ -39,16 +36,11 @@ function ResultsContent() {
     (signal) => getOjtResult(selected!, semesterId!, signal),
   );
   const items = list.data?.items ?? [];
-  const latest = items[0];
   return (
     <>
-      <Metrics values={[
-        { label: 'Điểm tổng OJT', value: latest?.overallScore == null ? '—' : latest.overallScore.toFixed(2) },
-        { label: 'Doanh nghiệp đánh giá', value: latest?.enterpriseName || '—' },
-        { label: 'Kỳ OJT', value: latest?.semesterCode || '—' },
-        { label: 'Ngày công bố', value: latest?.publishedAt ? dateText(latest.publishedAt) : '—' },
-      ]} />
-      <Card title="Kết quả đã công bố">
+      <div className="min-w-0 space-y-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <section aria-labelledby="published-results-heading" className="space-y-4">
+        <h2 id="published-results-heading" className="border-b border-slate-200 pb-3 text-lg font-semibold text-slate-900">Kết quả đã công bố</h2>
         <ResourceState
           loading={list.loading}
           error={list.error}
@@ -58,17 +50,19 @@ function ResultsContent() {
             {items.map((result) => (
               <article
                 key={result.id}
-                className="rounded-2xl border border-slate-200 p-5 space-y-3"
+                className="flex flex-col gap-3 border-b border-slate-200 py-4 sm:flex-row sm:items-center sm:justify-between"
               >
-                <h3 className="font-bold text-lg">
+                <div className="min-w-0 space-y-1">
+                <h3 className="break-words font-semibold text-slate-900">
                   {result.enterpriseName} · {result.semesterCode}
                 </h3>
-                <p className="text-sm">
-                  Điểm trung bình OJT:{' '}
-                  <strong>{result.overallScore == null ? 'Chưa có' : result.overallScore.toFixed(2)}</strong>
-                </p>
-                <p className="text-sm text-slate-500">
+                <p className="text-xs text-slate-500">
                   QHDN công bố: {dateText(result.publishedAt)}
+                </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 sm:shrink-0">
+                <p className="text-sm text-slate-600">
+                  Điểm OJT: <strong className="tabular-nums text-slate-900">{result.overallScore == null ? 'Chưa có' : result.overallScore.toFixed(2)}</strong>
                 </p>
                 <button
                   className={buttonClass}
@@ -77,12 +71,13 @@ function ResultsContent() {
                 >
                   Xem chi tiết đánh giá
                 </button>
+                </div>
               </article>
             ))}
             {!list.loading && !list.error && !items.length && (
               <Empty>{semesterId ? 'Chưa có kết quả OJT được công bố trong đợt này.' : 'Chưa có điểm và nhận xét. Kết quả sẽ được cập nhật sau khi bạn tham gia OJT và được công bố đánh giá.'}</Empty>
             )}
-            <Pagination
+            {(list.data?.total ?? 0) > 20 && <Pagination
               page={page}
               total={list.data?.total ?? 0}
               onChange={(value) => {
@@ -90,9 +85,15 @@ function ResultsContent() {
                 setSelected(null);
               }}
               disabled={list.loading || !semesterId}
-            />
+            />}
           </>
-      </Card>
+      </section>
+      <section aria-labelledby="ojt-certificates-heading" className="space-y-3 border-t border-slate-200 pt-5">
+        <h2 id="ojt-certificates-heading" className="text-lg font-semibold text-slate-900">Chứng chỉ</h2>
+        <p className="text-sm text-slate-600">Chứng chỉ hoàn thành OJT</p>
+        <Empty>Chưa có chứng chỉ được cập nhật{semesterId ? ' cho kỳ OJT này' : ''}.</Empty>
+      </section>
+      </div>
       {selected !== null && (
         <StudentDialog title="Chi tiết đánh giá OJT" onClose={() => setSelected(null)}>
           <ResourceState
@@ -101,10 +102,13 @@ function ResultsContent() {
             retry={detail.reload}
           />
           {detail.data && (
-            <>
-              <h3 className="font-bold">{detail.data.enterpriseName}</h3>
-              <Metrics
-                values={[
+            <div className="space-y-4 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                <h3 className="break-words text-base font-semibold text-slate-900">{detail.data.enterpriseName}</h3>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />Đã công bố</span>
+              </div>
+              <dl className="divide-y divide-slate-100">
+                {[
                   {
                     label: 'Điểm trung bình',
                     value: detail.data.overallScore == null ? '—' : detail.data.overallScore.toFixed(2),
@@ -115,22 +119,28 @@ function ResultsContent() {
                   },
                   { label: 'Thái độ', value: detail.data.attitudeScore ?? '—' },
                   { label: 'Kỹ năng mềm', value: detail.data.skillScore ?? '—' },
-                ]}
-              />
-              <p className="text-sm whitespace-pre-wrap">
-                Nhận xét: {detail.data.comments || 'Chưa có nhận xét'}
-              </p>
-              <p className="text-sm">
-                Trạng thái: Đã công bố · {dateText(detail.data.publishedAt)}
-              </p>
-              <button
-                className={buttonClass}
-                type="button"
-                onClick={() => exportResult(detail.data!)}
-              >
-                Tải kết quả
-              </button>
-            </>
+                ].map(({ label, value }, index) => (
+                  <div key={label} className="flex items-center justify-between gap-4 py-2.5">
+                    <dt className={index === 0 ? 'font-semibold text-slate-800' : 'text-slate-600'}>{label}</dt>
+                    <dd className={`shrink-0 tabular-nums ${index === 0 ? 'text-xl font-bold text-orange-600' : 'font-semibold text-slate-900'}`}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="border-t border-slate-200 pt-3">
+                <h4 className="font-semibold text-slate-800">Nhận xét từ doanh nghiệp</h4>
+                <p className="mt-1.5 whitespace-pre-wrap break-words leading-relaxed text-slate-600">{detail.data.comments || 'Chưa có nhận xét'}</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                <p className="text-xs text-slate-500">Ngày công bố: {dateText(detail.data.publishedAt)}</p>
+                <button
+                  className={buttonClass}
+                  type="button"
+                  onClick={() => exportResult(detail.data!)}
+                >
+                  Tải kết quả
+                </button>
+              </div>
+            </div>
           )}
           {detail.data === null && !detail.loading && !detail.error && (
             <Empty>Không tìm thấy kết quả đã công bố.</Empty>

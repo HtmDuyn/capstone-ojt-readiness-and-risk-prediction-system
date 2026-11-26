@@ -674,7 +674,7 @@ body {
   background:
     radial-gradient(ellipse at 4% 18%, #fed7aa 0%, transparent 52%),
     radial-gradient(ellipse at 96% 8%, #bfdbfe 0%, transparent 52%),
-    radial-gradient(ellipse at 88% 94%, #ddd0fa 0%, transparent 56%),
+    radial-gradient(ellipse at 88% 94%, #bfdbfe 0%, transparent 56%),
     radial-gradient(ellipse at 8% 98%, #ffedd5 0%, transparent 48%),
     #f7f9ff;
 }
@@ -746,8 +746,8 @@ body {
   --bubble-size: clamp(84px, 11vw, 180px);
   --bubble-right: 4%;
   --bubble-bottom: 4%;
-  --bubble-tint: rgb(196 181 253 / .06);
-  --bubble-shadow: rgb(139 92 246 / .03);
+  --bubble-tint: rgb(147 197 253 / .06);
+  --bubble-shadow: rgb(59 130 246 / .03);
   animation-delay: -6s;
 }
 
@@ -773,8 +773,8 @@ body {
   --bubble-size: clamp(44px, 4.5vw, 72px);
   --bubble-right: 25%;
   --bubble-top: 56%;
-  --bubble-tint: rgb(165 180 252 / .05);
-  --bubble-shadow: rgb(99 102 241 / .025);
+  --bubble-tint: rgb(147 197 253 / .05);
+  --bubble-shadow: rgb(59 130 246 / .025);
   animation-delay: -1s;
 }
 

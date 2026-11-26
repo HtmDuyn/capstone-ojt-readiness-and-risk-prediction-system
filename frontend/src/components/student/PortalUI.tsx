@@ -153,9 +153,11 @@ export function StudentAcademicPeriodSelect({ label = 'Học kỳ theo dõi' }: 
         className={inputClass + ' text-slate-800'}
         disabled={portal.loading || portal.academicPeriodsLoading || !portal.academicPeriods.length}
         value={portal.academicPeriodId ?? ''}
-        onChange={(e) => portal.selectAcademicPeriod(Number(e.target.value))}
+        onChange={(e) => portal.selectAcademicPeriod(e.target.value === '' ? null : Number(e.target.value))}
       >
-        <option value="" disabled>{portal.academicPeriodsLoading ? 'Đang tải học kỳ…' : 'Chưa có dữ liệu học kỳ'}</option>
+        <option value="" disabled={portal.academicPeriodsLoading || !portal.academicPeriods.length}>
+          {portal.academicPeriodsLoading ? 'Đang tải học kỳ…' : portal.academicPeriods.length ? 'Tất cả học kỳ' : 'Chưa có dữ liệu học kỳ'}
+        </option>
         {portal.academicPeriods.map((semester) => (
           <option key={semester.id} value={semester.id}>{semester.name}{semester.curriculumSemester == null ? '' : ` · Kỳ ${semester.curriculumSemester}`}{semester.isCurrent || semester.hasOjtEnrollment ? ' · Đang học' : ' · Đã học'}</option>
         ))}

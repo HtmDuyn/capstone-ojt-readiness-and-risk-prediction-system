@@ -269,11 +269,11 @@ export const EducationSidebar: React.FC<SidebarProps> = ({
 
         {/* Các hành động ở dưới cùng */}
         <div className="p-2.5 border-t border-white/10 space-y-2 overflow-hidden">
-          {/* Nút Đăng xuất hệ thống */}
+          {/* Nút Đăng xuất */}
           <button
             type="button"
             onClick={onLogout}
-            title={!isExpanded ? "Đăng xuất hệ thống" : undefined}
+            title={!isExpanded ? "Đăng xuất" : undefined}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs sm:text-sm font-semibold transition-all duration-200 group overflow-hidden cursor-pointer"
           >
             <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center group-hover:-translate-x-0.5 transition-transform">
@@ -286,7 +286,7 @@ export const EducationSidebar: React.FC<SidebarProps> = ({
                   : "opacity-0 max-w-0 -translate-x-2 pointer-events-none"
               }`}
             >
-              Đăng xuất hệ thống
+              Đăng xuất
             </span>
           </button>
         </div>

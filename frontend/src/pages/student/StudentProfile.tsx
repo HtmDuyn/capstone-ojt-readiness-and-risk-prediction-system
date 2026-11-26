@@ -14,13 +14,14 @@ import {
 } from '@/components/student/PortalUI';
 
 export const StudentAcademicProfile = () => {
-  const { profile, revision, loading } = useStudentPortal();
+  const { profile, revision, loading, academicPeriodId, academicPeriodsLoading } = useStudentPortal();
   const [courseSearch, setCourseSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'results' | 'curriculum'>('results');
   const [curriculumRequested, setCurriculumRequested] = useState(false);
   const study = useStudentAcademicView();
+  const selectedPeriodStart = study.data?.period?.startDate;
   const results = { ...study, data: study.data?.courseResults.filter(item =>
-    item.periodStartDate && item.periodStartDate.slice(0, 10) >= study.data!.period.startDate) ?? null };
+    academicPeriodId === null || (selectedPeriodStart && item.periodStartDate && item.periodStartDate.slice(0, 10) >= selectedPeriodStart)) ?? null };
   const curriculum = useStudentResource(
     !loading && profile && curriculumRequested ? 'curriculum:' + profile.id + ':' + revision : null,
     (signal) => getCurriculum(profile!.id, signal),
@@ -63,10 +64,12 @@ export const StudentAcademicProfile = () => {
                 <div><dt className="text-slate-500">Học kỳ hiện tại</dt><dd className="break-words text-slate-800">{profile.currentAcademicPeriod?.name || profile.currentSemester || 'Chưa cập nhật'}</dd></div>
               </div>
             </dl>
-            <p className="mt-4 text-xs leading-6 text-slate-500">Chỉ số tích lũy tính đến học kỳ được chọn. Bảng điểm bên dưới hiển thị các môn thuộc học kỳ đó; chương trình đào tạo là phiên bản hiện hành.</p>
+            <p className="mt-4 text-xs leading-6 text-slate-500">{academicPeriodId === null && !academicPeriodsLoading
+              ? 'Chỉ số tích lũy tính theo dữ liệu học vụ mới nhất. Bảng điểm bên dưới hiển thị các môn thuộc tất cả học kỳ; chương trình đào tạo là phiên bản hiện hành.'
+              : 'Chỉ số tích lũy tính đến học kỳ được chọn. Bảng điểm bên dưới hiển thị các môn thuộc học kỳ đó; chương trình đào tạo là phiên bản hiện hành.'}</p>
             {study.data?.historical && <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-6 text-blue-900">{study.data.note}</p>}
             <ResourceState loading={academic.loading} refreshing={academic.refreshing} error={academic.error} retry={academic.reload} />
-            {progress && <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2">
+            {progress && <div className="mt-5 grid gap-4 border-t border-slate-200 pt-5 sm:grid-cols-2 lg:grid-cols-3">
               <article className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                 <h3 className="text-sm font-semibold text-slate-600">Tín chỉ tích lũy</h3>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
@@ -82,6 +85,11 @@ export const StudentAcademicProfile = () => {
                 <h3 className="text-sm font-semibold text-amber-900">Tín chỉ xét OJT</h3>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-amber-950">{valueText(ojtEligibleCredits)}</p>
                 <p className="mt-1 text-xs text-amber-800">Chỉ tính các môn đủ điều kiện theo quy định xét OJT.</p>
+              </article>
+              <article className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                <h3 className="text-sm font-semibold text-blue-900">Tín chỉ còn thiếu</h3>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-blue-950">{valueText(progress.credits.remaining)}</p>
+                <p className="mt-1 text-xs text-blue-800">Số tín chỉ còn cần hoàn thành trong chương trình đào tạo.</p>
               </article>
             </div>}
             {!!progress?.issues.length && <div className="mt-5 border-t border-slate-200 pt-4"><h3 className="text-sm font-semibold text-slate-800">Dữ liệu cần đối soát</h3><p className="mt-1 text-sm text-amber-700">{progress.issues.join(' · ')}</p></div>}
@@ -115,10 +123,11 @@ export const StudentAcademicProfile = () => {
             </div>
             {results.data && (
               <>
-                <div className="overflow-x-auto">
+                <div role="region" aria-label="Bảng điểm học tập có thể cuộn" tabIndex={0} className="max-h-[560px] overflow-auto rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
                   <table className="w-full min-w-[760px] text-sm text-left">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-slate-50">
                       <tr className="border-b border-slate-200 bg-slate-50 text-slate-700 [&>th]:font-semibold">
+                        <th scope="col" className="w-14 p-3 text-center whitespace-nowrap">STT</th>
                         <th className="p-3 whitespace-nowrap">Mã môn</th>
                         <th className="p-3">Tên môn</th>
                         <th className="px-3 whitespace-nowrap">Kỳ</th>
@@ -129,11 +138,12 @@ export const StudentAcademicProfile = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((item) => {
+                      {filtered.map((item, index) => {
                         const excludedFromOjt = item.excludedFromOjtCredits === true;
                         const markedCell = excludedFromOjt ? 'border-y border-amber-400 bg-amber-50' : '';
                         return (
                           <tr key={item.id} className={`border-b border-slate-200 transition-colors duration-150 hover:bg-slate-50 ${excludedFromOjt ? 'bg-amber-50/60' : 'bg-white'}`}>
+                            <td className="p-3 text-center tabular-nums text-slate-500">{index + 1}</td>
                             <td className={`p-3 whitespace-nowrap ${markedCell} ${excludedFromOjt ? 'border-l-2' : ''}`}>
                               <strong className="text-slate-800">{item.courseCode}</strong>
                             </td>
@@ -142,7 +152,7 @@ export const StudentAcademicProfile = () => {
                               {excludedFromOjt && <span className="mt-1 block text-xs font-semibold text-amber-800">Không tính vào tín chỉ xét OJT</span>}
                             </td>
                             <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
-                            <td className="px-3 whitespace-nowrap">{(item.courseCode === 'OJT202' && (item.periodName || study.data?.period.name)) || item.periodCode || 'Chưa cập nhật'}</td>
+                            <td className="px-3 whitespace-nowrap">{(item.courseCode === 'OJT202' && (item.periodName || study.data?.period?.name)) || item.periodCode || 'Chưa cập nhật'}</td>
                             <td>{item.attemptNumber}</td>
                             <td className={item.score == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.score ?? '—'}</td>
                             <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.status === 'IN_PROGRESS' ? 'Đang học' : statusText(item.status)}</td>
@@ -171,10 +181,11 @@ export const StudentAcademicProfile = () => {
                   {curriculum.data.version}
                 </p>
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">Môn được viền vàng không được tính vào tín chỉ xét OJT.</p>
-                <div className="overflow-x-auto">
+                <div role="region" aria-label="Chương trình môn học có thể cuộn" tabIndex={0} className="max-h-[560px] overflow-auto rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">
                   <table className="w-full min-w-[760px] text-left text-sm">
-                    <thead>
+                    <thead className="sticky top-0 z-10 bg-slate-50">
                       <tr className="border-b border-slate-200 bg-slate-50 text-slate-700 [&>th]:font-semibold">
+                        <th scope="col" className="w-14 p-3 text-center whitespace-nowrap">STT</th>
                         <th className="p-3">Môn học</th>
                         <th>Kỳ gợi ý</th>
                         <th>Tín chỉ</th>
@@ -183,11 +194,12 @@ export const StudentAcademicProfile = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {courses.map((course) => {
+                      {courses.map((course, index) => {
                         const requirement = requirementsById.get(course.id);
                         const excludedFromOjt = requirement?.excludedFromOjtCredits === true;
                         return (
                           <tr key={course.id} className={`border-b border-slate-200 transition-colors duration-150 hover:bg-slate-50 ${excludedFromOjt ? 'bg-amber-50/60' : 'bg-white'}`}>
+                            <td className="p-3 text-center tabular-nums text-slate-500">{index + 1}</td>
                             <td className="p-3">
                               <div className={excludedFromOjt ? 'rounded-lg border border-amber-400 bg-amber-50 p-2' : ''}>
                                 <strong className="text-slate-800">{course.courseCode}</strong>

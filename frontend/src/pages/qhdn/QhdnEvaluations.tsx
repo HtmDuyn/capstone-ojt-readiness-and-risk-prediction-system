@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Inbox, Send } from 'lucide-react';
+import { Bell, ClipboardCheck, Download, Eye, Inbox, Loader2, Mail, Send } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { listOjtResults, exportQhdnReport, exportOjtResults, publishOjtResults } from '@/services/qhdnService';
 import { downloadFile } from '@/utils/shared/downloadFile';
@@ -84,15 +84,31 @@ export default function QhdnEnterpriseEvaluations(){
     </div>}
    </div>
   </section>
-  {publishTarget&&<WorkflowModal title="Xác nhận công bố điểm OJT" subtitle={publishTarget.evaluationIds?`Sinh viên: ${publishTarget.studentName||'đã chọn'}`:'Toàn bộ kết quả đủ điều kiện trong kỳ OJT đang chọn'} busy={publishBusy} onClose={()=>setPublishTarget(null)}>
-   <div className="space-y-5 p-5 sm:p-6">
-    <div className="rounded-2xl border border-orange-100 bg-orange-50 p-4 text-sm leading-relaxed text-orange-900">
-     {publishTarget.evaluationIds?'Thông báo gồm điểm của sinh viên này.':'Hệ thống sẽ rà soát toàn bộ kết quả đủ điều kiện trong kỳ; chỉ gửi mới những kết quả chưa công bố.'}
-     {' '}Điểm và nhận xét sẽ hiển thị ngay tại mục Kết quả đánh giá OJT của sinh viên. Hệ thống tạo thông báo và xếp email vào hàng đợi gửi cho sinh viên có email.
+  {publishTarget&&<WorkflowModal title="Xác nhận công bố điểm OJT" subtitle="Kiểm tra thông tin trước khi công bố cho sinh viên." busy={publishBusy} onClose={()=>setPublishTarget(null)}>
+   <div className="space-y-5" aria-busy={publishBusy}>
+    <div className="flex items-start gap-3">
+     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-600">{publishBusy?<Loader2 size={21} className="animate-spin" aria-hidden="true"/>:<ClipboardCheck size={21} aria-hidden="true"/>}</span>
+     <div className="min-w-0">
+      <p role="status" className="text-sm font-semibold text-orange-700">{publishBusy?'Đang công bố kết quả':'Chuẩn bị xác nhận'}</p>
+      <p className="mt-1 text-sm leading-relaxed text-slate-500">{publishBusy?'Vui lòng chờ hệ thống xử lý.':'Kết quả sẽ được gửi sau khi bạn bấm Xác nhận công bố.'}</p>
+     </div>
     </div>
-    <div className="flex justify-end gap-2">
+    <dl className="divide-y divide-slate-100 border-y border-slate-200 text-sm">
+     <div className="grid gap-1 py-3 sm:grid-cols-[100px_1fr] sm:gap-4"><dt className="text-slate-500">Học kỳ</dt><dd className="break-words font-medium text-slate-900">{catalog.selectedPeriod?.name||'Học kỳ đang chọn'}</dd></div>
+     <div className="grid gap-1 py-3 sm:grid-cols-[100px_1fr] sm:gap-4"><dt className="text-slate-500">Phạm vi</dt><dd className="break-words font-medium text-slate-900">{publishTarget.evaluationIds?publishTarget.studentName||'Sinh viên đã chọn':'Toàn bộ kết quả đủ điều kiện trong kỳ OJT'}</dd></div>
+    </dl>
+    <div>
+     <h3 className="text-sm font-semibold text-slate-900">Sau khi công bố</h3>
+     <ul className="mt-3 space-y-3 text-sm leading-relaxed text-slate-600">
+      <li className="flex items-start gap-2.5"><Eye size={17} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true"/><span>Sinh viên xem được điểm và nhận xét tại mục <strong className="font-medium text-slate-800">Kết quả đánh giá OJT</strong>.</span></li>
+      <li className="flex items-start gap-2.5"><Bell size={17} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true"/><span>Sinh viên nhận thông báo trên hệ thống.</span></li>
+      <li className="flex items-start gap-2.5"><Mail size={17} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true"/><span>Thông báo qua email sẽ được gửi đến sinh viên có địa chỉ email.</span></li>
+     </ul>
+    </div>
+    {!publishTarget.evaluationIds&&<p className="border-l-2 border-orange-300 pl-3 text-xs leading-relaxed text-slate-500">Chỉ công bố kết quả đủ điều kiện chưa được công bố trước đó.</p>}
+    <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end sm:gap-3">
      <button type="button" className={workflowSecondary} disabled={publishBusy} onClick={()=>setPublishTarget(null)}>Hủy</button>
-     <button type="button" className={workflowPrimary} disabled={publishBusy||!semesterId} onClick={confirmPublish}><Send size={15}/>{publishBusy?'Đang công bố…':'Xác nhận công bố'}</button>
+     <button type="button" className={workflowPrimary} disabled={publishBusy||!semesterId} onClick={confirmPublish}>{publishBusy?<Loader2 size={16} className="animate-spin" aria-hidden="true"/>:<Send size={16} aria-hidden="true"/>}{publishBusy?'Đang công bố…':'Xác nhận công bố'}</button>
     </div>
    </div>
   </WorkflowModal>}
