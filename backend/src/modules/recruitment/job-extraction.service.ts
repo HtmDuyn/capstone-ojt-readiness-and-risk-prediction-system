@@ -26,7 +26,7 @@ const sourceCte = jobSourceCte;
 async function guarded<T>(work: () => Promise<T>) {
   try { return await work(); }
   catch (error: any) {
-    if (error.code === '42P01' || error.code === '42703') throw invalid('Cần chạy riêng khối RECRUITMENT EXTRACTION V1 trong backend/DB trước khi đọc tin tuyển dụng.', 503, 'JOB_EXTRACTION_MIGRATION_REQUIRED');
+    if (error.code === '42P01' || error.code === '42703') throw invalid('Database chưa đồng bộ schema trích xuất tin tuyển dụng. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.', 503, 'JOB_EXTRACTION_MIGRATION_REQUIRED');
     throw error;
   }
 }

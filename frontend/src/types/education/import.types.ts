@@ -26,7 +26,6 @@ export type StudentAcademicStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADU
 export interface StudentAcademicData {
   programId: number;
   phone?: string;
-  className?: string;
   status?: StudentAcademicStatus;
   placement: StudentPlacement;
   courseResults: StudentCourseResult[];
@@ -71,6 +70,7 @@ export interface ImportCommitResponse {
   total: number;
   batchId?: string;
   academicImportId?: string;
+  ojtAssessment?: { status: 'COMPLETED' | 'NO_EFFECTIVE_CONDITION' | 'FAILED'; checkedCount: number };
   replayed?: boolean;
   students?: { studentCode: string; email?: string; action: string; emailStatus: string; emailLastError?: string | null }[];
 }
@@ -97,9 +97,9 @@ export interface ImportedStudent {
   fullName: string;
   email: string;
   phone: string | null;
-  className: string | null;
   status: string;
   accountStatus: string;
+  hasPassedOjt202?: boolean;
   programId: number | null;
   cohortId: number | null;
   groupCode: string | null;

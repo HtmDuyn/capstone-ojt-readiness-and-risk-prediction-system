@@ -73,6 +73,14 @@ export const StudentDashboard = () => {
               <p className="mt-3 text-center text-xl font-bold text-slate-900">{credits?.earned ?? '—'} / {credits?.total ?? '—'} <span className="text-sm font-medium text-slate-500">tín chỉ</span></p>
               <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" />Đã tích lũy</span><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-200" />Còn lại</span></div>
               <p className="mt-2 text-sm text-slate-500">{progress ? statusText(progress.status) : assessment.pending ? 'Đang tải tiến độ…' : 'Chưa có dữ liệu tiến độ'}</p>
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-center">
+                <p className="text-xs font-medium text-blue-800">GPA tích lũy</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+                  {progress?.gpa == null ? '—' : progress.gpa.toFixed(2)}
+                  <span className="ml-1 text-sm font-medium text-slate-500">/ {progress?.gpaScale ?? '—'}</span>
+                </p>
+                {progress?.gpa == null && <p className="mt-1 text-xs text-slate-500">Chưa đủ dữ liệu hoặc cấu hình để tính GPA.</p>}
+              </div>
               <Link to="/student/academic-profile" className={`${link} mt-3 inline-block`}>Xem bảng điểm và chương trình</Link>
             </div>
             <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">

@@ -10,13 +10,10 @@ import { dashboardSummary } from '@/utils/education/educationDashboardSummary';
 import type { QueryParams } from '@/types/education/dashboard.types';
 import type { SavedOjtEligibility } from '@/utils/education/savedOjtEligibility';
 import { clearSharedReads, sharedRead } from '../utils/shared/sharedRead';
-import type { Handoff, OjtFinalResult } from '@/types/education/ojtWorkflow.types';
+import type { OjtFinalResult } from '@/types/education/ojtWorkflow.types';
 import type { ImportCommitResponse, ImportPreviewResponse, StudentImportPayload } from '@/types/education/import.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult, StudentImportBatch } from '@/types/education/import.types';
-import type { Profile, LocalOjtResult } from '@/types/education/localEligibility.types';
-import { calculateLocalOjtEligibility, type LocalOjtRule } from '@/utils/education/localOjtEligibility';
-import { localOjtSavePayload } from '@/utils/education/localOjtSavePayload';
-import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityBatch, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
+import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityCheck, OjtRuleSetMutationResponse, PublishOjtRuleSetPayload, PublishOjtRuleSetResponse, SearchOjtRuleSetsPayload, SearchOjtRuleSetsResponse, StudentEligibility, UpdateOjtRuleSetPayload } from '@/types/education/eligibility.types';
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { savedOjtProgressLabel } from '@/utils/education/savedOjtEligibility';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
@@ -377,8 +374,8 @@ export const academicService = {
   getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number;effectiveFrom:string;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
   saveOjtGradingCriteria: async (payload:{ojtSemesterId:number;name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
   getCalendar: async (id: number, signal?: AbortSignal) => apiData<AcademicCalendar>(await getJson(`/academic-years/${id}/calendar`, {}, signal)),
-  updateCalendar: async (id: number, semesters: SemesterDates[], revision: string) =>
-    apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision })).data),
+  updateCalendar: async (id: number, semesters: SemesterDates[], revision: string, blocks?: SemesterDates[], block10?: SemesterDates[]) =>
+    apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision, blocks, block10 })).data),
   createAcademicYear,
   searchAcademicYears,
 
@@ -399,7 +396,7 @@ export const academicReportingService = {
     }catch(error){
       const body=(error as {response?:{data?:{errorCode?:string}}}).response?.data;
       if(body?.errorCode==='BLOCK_OUTSIDE_PARENT_SEMESTER')throw new Error('Block 3 phải nằm trong thời gian của kỳ học đã chọn. Vui lòng kiểm tra lịch đã cấu hình.');
-      if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Học kỳ đã chọn không đủ thời gian cho Block 10, một tuần nghỉ và Block 3. Vui lòng kiểm tra ngày của học kỳ.');
+      if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Học kỳ đã chọn không đủ thời gian cho Block 10 và Block 3. Vui lòng kiểm tra ngày của học kỳ.');
       if(body?.errorCode==='SEMESTER_REQUIRED')throw new Error('Vui lòng chọn kỳ học chính để tự tính lịch Block 3.');
       const messages:Record<string,string>={UPCOMING_SEMESTER_REQUIRED:'Vui lòng chọn học kỳ sắp tới.',BLOCK3_REQUIRED:'Vui lòng chọn kỳ học loại Block 3.',BLOCK_PERIOD_NOT_FOUND:'Không tìm thấy kỳ Block 3 đã chọn.',BLOCK_PARENT_INVALID:'Kỳ Block 3 chưa được gắn đúng với học kỳ chính. Vui lòng đối soát cấu hình.',BLOCK_NOT_OPEN_FOR_PLANNING:'Kỳ Block 3 này không còn ở trạng thái có thể lập kế hoạch.',BLOCK_ALREADY_ENDED:'Kỳ Block 3 đã kết thúc. Vui lòng chọn kỳ sắp tới hoặc đang diễn ra.',BLOCK_DATES_INVALID:'Ngày bắt đầu và kết thúc Block 3 chưa hợp lệ.'};
       throw new Error(messages[body?.errorCode??'']??'Không tải được đề xuất mở lớp. Vui lòng kiểm tra kết nối và thử lại.');
@@ -728,47 +725,51 @@ export const loadAcademicCatalogs = async (): Promise<AcademicCatalogs> => {
   };
 };
 
-interface OverviewStudent {
-  id: number;
-  accountStatus: string;
-  cohortId: number | null;
-  cohort?: { id: number; name: string; code: string } | null;
-  calculatedEligibility?: SavedOjtEligibility | null;
-}
-
 export const educationOverviewService = {
-  async load(scope: QueryParams = {}, signal?: AbortSignal, onStudentsLoaded?: (total: number) => void) {
-    const students = (await sharedRead(`overview:students:${scope.cohortId ?? ''}`, () => getAllItems<OverviewStudent>('/students', {
-      status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
-    }), signal)).filter(student => student.accountStatus === 'ACTIVE');
-    signal?.throwIfAborted();
-    onStudentsLoaded?.(students.length);
-    const rows = students.map(student => {
-      const saved = student.calculatedEligibility;
-      const status = saved && !saved.isStale ? saved.status : undefined;
-      const category = !saved || saved.isStale ? 'AWAITING_CONFIRMATION' : status === 'REVIEW_REQUIRED' ? 'INSUFFICIENT_DATA' : status;
-      return { studentId: student.id, cohortId: student.cohortId, category,
-        evaluation: { status: status ?? 'NOT_CHECKED' }, officialStale: saved?.isStale ?? false };
-    });
-    const data = dashboardSummary([{
-      rows,
-      cohorts: students.flatMap(student => student.cohort ? [{ CohortID: student.cohort.id, Name: student.cohort.name, CohortCode: student.cohort.code }] : []),
-    }]);
-    const staleCount = students.filter(student => student.calculatedEligibility?.isStale).length;
-    return { ...data, unavailableProfiles: 0,
-      warning: staleCount ? `${staleCount} kết quả đã cũ do dữ liệu học vụ thay đổi. Cần xét lại trước khi sử dụng.` : '',
-    };
+  async load(scope: QueryParams = {}, signal?: AbortSignal) {
+    try {
+      return apiData<Row>(await getJson('/students/overview', scope, signal));
+    } catch (error) {
+      const response = (error as { response?: { status?: number; data?: { errorCode?: string; message?: string } } })?.response;
+      const missingOverviewRoute = response?.status === 404 || (
+        response?.status === 400 && response.data?.errorCode === 'INVALID_ACADEMIC_INPUT' &&
+        response.data.message === 'id must be a positive integer.'
+      );
+      if (!missingOverviewRoute) throw error;
+
+      // Keep local development and older deployed backends working during a
+      // staggered deploy. Newer backends use the compact aggregate endpoint.
+      type OverviewStudent = {
+        id: number;
+        accountStatus: string;
+        cohortId: number | null;
+        cohort?: { id: number; name: string; code: string } | null;
+        calculatedEligibility?: SavedOjtEligibility | null;
+      };
+      const students = (await getAllItems<OverviewStudent>('/students', {
+        status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
+      }, signal)).filter(student => student.accountStatus === 'ACTIVE');
+      signal?.throwIfAborted();
+      const rows = students.map(student => {
+        const saved = student.calculatedEligibility;
+        const status = saved && !saved.isStale ? saved.status : undefined;
+        const category = !saved || saved.isStale ? 'AWAITING_CONFIRMATION' : status === 'REVIEW_REQUIRED' ? 'INSUFFICIENT_DATA' : status;
+        return { studentId: student.id, cohortId: student.cohortId, category,
+          evaluation: { status: status ?? 'NOT_CHECKED' }, officialStale: saved?.isStale ?? false };
+      });
+      const data = dashboardSummary([{
+        rows,
+        cohorts: students.flatMap(student => student.cohort ? [{ CohortID: student.cohort.id, Name: student.cohort.name, CohortCode: student.cohort.code }] : []),
+      }]);
+      const staleCount = students.filter(student => student.calculatedEligibility?.isStale).length;
+      return { ...data, unavailableProfiles: 0,
+        warning: staleCount ? `${staleCount} kết quả đã cũ do dữ liệu học vụ thay đổi. Cần xét lại trước khi sử dụng.` : '',
+      };
+    }
   },
 };
 
 export const educationOjtWorkflowService = {
-  getHandoffs: (ojtSemesterId?: number, signal?: AbortSignal) =>
-    getAllItems<Handoff>('/eligible-student-handoffs', ojtSemesterId ? { ojtSemesterId } : {}, signal),
-  async handoff(payload: { ojtSemesterId: number; studentIds: number[]; reason: string; idempotencyKey: string }) {
-    return apiData<{ handoffId: number; total: number; recipientRole: string }>(
-      (await API.post('/eligible-student-handoffs', payload)).data,
-    );
-  },
   getFinalResults: (query: Query, signal?: AbortSignal) =>
     getPage<OjtFinalResult>('/ojt-results', query, signal),
 };
@@ -895,79 +896,45 @@ export const importService = {
   },
 };
 
-// Shared contract with the deployed backend; see docs/ojt-eligibility-save-api.md.
-export const LOCAL_OJT_SAVE_ENDPOINT = '/ojt-eligibility-results';
-export const loadSavedLocalOjtResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(LOCAL_OJT_SAVE_ENDPOINT, {}, signal);
+// The backend reads academic history, evaluates the active condition, saves the result,
+// and refreshes the QHDN roster in the same transaction.
+export const OJT_ELIGIBILITY_RESULTS_ENDPOINT = '/ojt-eligibility-results';
+export const loadSavedOjtEligibilityResults = (signal?: AbortSignal) => getAllItems<SavedOjtEligibility & { studentId: number }>(OJT_ELIGIBILITY_RESULTS_ENDPOINT, {}, signal);
+export type OjtAssessmentSummary = {
+  checkedCount: number;
+  savedCount: number;
+  eligibleCount: number;
+  notEligibleCount: number;
+  reviewRequiredCount: number;
+  assignedCount: number;
+  waitingCount: number;
+  excludedPassedOjt202Count: number;
+};
+export async function runOjtEligibilityAssessment(): Promise<OjtAssessmentSummary> {
+  const response = await API.post<{ success: boolean; message?: string; data?: OjtAssessmentSummary }>(OJT_ELIGIBILITY_RESULTS_ENDPOINT, {});
+  if (response.data.success !== true || !response.data.data)
+    throw new Error(friendlyErrorMessage(response.data.message, 'Chưa nhận được kết quả xét OJT từ máy chủ.'));
+  clearSharedReads();
+  return response.data.data;
+}
 export const loadStudentAcademicCredits = async (studentId: number, signal?: AbortSignal): Promise<number | null> => {
   const profile = apiData<ImportedStudentProfile>(await getJson(`/students/${studentId}`, { section: 'academicProgress' }, signal));
   const earned = profile.academicProgress?.credits?.earned;
   return typeof earned === 'number' && Number.isFinite(earned) ? earned : null;
 };
-export type CurrentOjtRule = LocalOjtRule & { createdAt?: string | null; createdByName?: string | null };
+export type CurrentOjtRule = { id: number; version: number; minCredits: number; issuingDocument: string; effectiveFrom: string; isEffective: boolean; createdAt?: string | null; createdByName?: string | null };
 export const loadOjtConditions = async (signal?: AbortSignal): Promise<CurrentOjtRule[]> =>
   apiData<CurrentOjtRule[]>(await getJson('/ojt-conditions', {}, signal));
-export const createOjtCondition = async (minCredits: number, issuingDocument: string): Promise<CurrentOjtRule> =>
-  apiData<CurrentOjtRule>((await API.post('/ojt-conditions', { minCredits, issuingDocument })).data);
-export type OjtCreditThreshold = { id: number; minCredits: number };
-export const loadOjtCreditThresholds = async (signal?: AbortSignal) =>
-  apiData<OjtCreditThreshold[]>(await getJson('/ojt-credit-thresholds', {}, signal));
-export const createOjtCreditThreshold = async (minCredits: number) =>
-  apiData<OjtCreditThreshold>((await API.post('/ojt-credit-thresholds', { minCredits })).data);
-export const loadCurrentOjtRule = async (signal?: AbortSignal): Promise<CurrentOjtRule> => {
-  const conditions = await loadOjtConditions(signal);
-  if (!conditions.length) throw new Error('Chưa có điều kiện xét OJT. Vui lòng thêm điều kiện trước khi xét.');
-  return conditions[0];
-};
+export const createOjtCondition = async (minCredits: number, issuingDocument: string, effectiveFrom: string): Promise<CurrentOjtRule> =>
+  apiData<CurrentOjtRule>((await API.post('/ojt-conditions', { minCredits, issuingDocument, effectiveFrom })).data);
+export const latestEffectiveOjtRule = (conditions: CurrentOjtRule[]) => conditions
+  .filter(condition => condition.isEffective)
+  .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom) || b.version - a.version)[0] ?? null;
 export type OjtPolicyPreview = { allowed: boolean; token: string; programs: { programId: number; code: string; name: string; status: string; reasons: string[] }[] };
 export const previewOjtPolicy = async (minCredits: number, maxUnpassedCourses: number) =>
   apiData<OjtPolicyPreview>((await API.post('/ojt-condition-policy/preview', { minCredits, maxUnpassedCourses })).data);
 export const publishOjtPolicy = async (minCredits: number, maxUnpassedCourses: number, token: string) =>
   apiData<CurrentOjtRule>((await API.post('/ojt-condition-policy', { minCredits, maxUnpassedCourses, token })).data);
-export async function saveLocalOjtResults(results: LocalOjtResult[], idempotencyKey: string, rule: CurrentOjtRule): Promise<{ savedCount: number; handedOffCount: number }> {
-  if (!results.length) throw new Error('Chưa có kết quả xét để lưu.');
-  try {
-    const response = await API.post<{ success: boolean; message?: string; data?: { savedCount: number; handedOffCount?: number } }>(
-      LOCAL_OJT_SAVE_ENDPOINT, localOjtSavePayload(results, idempotencyKey, rule),
-    );
-    const body = response.data;
-    if (body.success !== true || body.data?.savedCount !== results.length) {
-      throw new Error(friendlyErrorMessage(body.message, 'Chưa xác nhận được kết quả lưu. Vui lòng kiểm tra trạng thái trước khi tiếp tục.'));
-    }
-    clearSharedReads();
-    return { savedCount: body.data.savedCount, handedOffCount: body.data.handedOffCount ?? 0 };
-  } catch (error) {
-    const response = (error as { response?: { status?: number; data?: { message?: string; errorCode?: string } } } | null)?.response;
-    const status = response?.status;
-    if ([404, 405, 501].includes(status ?? 0)) {
-      throw new Error('Hiện chưa thể lưu kết quả xét OJT. Vui lòng liên hệ quản trị viên để được hỗ trợ.');
-    }
-    const apiMessage = response?.data?.message;
-    if (apiMessage) {
-      const translations: Record<string, string> = {
-        'Invalid OJT policy snapshot.': 'Quy tắc xét OJT gửi lên không hợp lệ. Vui lòng xét lại trước khi lưu.',
-        'OJT policy changed. Recalculate before saving.': 'Quy tắc xét OJT đã thay đổi. Vui lòng xét lại trước khi lưu.',
-        'Course history changed after calculation. Recalculate before saving.': 'Bảng điểm đã thay đổi sau lần xét. Vui lòng xét lại trước khi lưu.',
-        'All students and their accounts must be active.': 'Có sinh viên hoặc tài khoản không còn hoạt động. Vui lòng tải lại và xét lại.',
-      };
-      throw new Error(translations[apiMessage] ?? friendlyErrorMessage(apiMessage, 'Không lưu được kết quả. Vui lòng thử lại.'));
-    }
-    throw error;
-  }
-}
-
-export async function loadAndCalculateLocalEligibility(studentId: number, rule: LocalOjtRule, signal?: AbortSignal): Promise<LocalOjtResult> {
-  const profile = apiData<Profile>(await getJson(`/students/${studentId}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
-  const first = profile.courseResults;
-  if (!first || !Array.isArray(first.items) || !Number.isSafeInteger(first.total) || first.total < 0) throw new Error('Không tải được đầy đủ bảng điểm.');
-  const attempts = [...first.items];
-  for (let page = first.page + 1; attempts.length < first.total; page++) {
-    const next = apiData<Profile>(await getJson(`/students/${studentId}`, { include: 'courseResults', resultsPage: page, resultsLimit: 100 }, signal)).courseResults;
-    if (!next?.items.length) throw new Error('Bảng điểm chưa tải đầy đủ; chưa thể xét điều kiện.');
-    attempts.push(...next.items);
-  }
-  return calculateLocalOjtEligibility(studentId, profile, attempts, rule);
-}
-
 const eligibilityApiOrigin = API_ORIGIN;
 
 const TOKEN_KEY = "ojt_auth_token";
@@ -1131,8 +1098,6 @@ export const ojtEligibilityService = {
     apiData<{ eligibility: StudentEligibility }>(await getJson(`/students/${studentId}`, { include: "eligibility", ojtSemesterId }, signal)).eligibility,
   history: async (studentId: number, ojtSemesterId: number, page = 1, signal?: AbortSignal) =>
     apiData<{ eligibilityChecks: import("@/types/education/api.types").Page<EligibilityCheck> }>(await getJson(`/students/${studentId}`, { include: "eligibilityChecks", ojtSemesterId, checksPage: page, checksLimit: 10 }, signal)).eligibilityChecks,
-  checkBatch: async (payload: { ojtSemesterId: number; programIds?: number[]; studentIds?: number[]; idempotencyKey: string; confirmResults?: boolean }) =>
-    apiData<EligibilityBatch>(await postJson('/api/eligibility-check-runs', payload)),
   assessment: async (semesterId: number, signal?: AbortSignal) =>
     (await getPage<AssessmentWindow>("/assessment-windows", { ojtSemesterId: semesterId, page: 1, limit: 1 }, signal)).items[0] ?? null,
   saveAssessment: async (semesterId: number, payload: { blockPeriodId: number; opensAt: string; closesAt: string; reason: string }) =>
@@ -1156,14 +1121,27 @@ async function loadStudent(
   savedResults: Map<number, SavedOjtEligibility>,
   signal?: AbortSignal,
 ): Promise<StudentProgress> {
+  // The program ID is already available in the list row. Start loading its
+  // curriculum while the heavier student profile/history request is in flight.
+  let curriculumRequest: Promise<Row | null> | null = null;
+  let curriculumWarning = "";
+  const listedProgramId = number(row.programId);
+  if (listedProgramId) {
+    if (!curricula.has(listedProgramId))
+      curricula.set(listedProgramId, getJson(`/curricula/${listedProgramId}`, {}, signal)
+        .then(response => apiData<Row>(response)));
+    curriculumRequest = curricula.get(listedProgramId)!.catch(() => {
+      curriculumWarning = "Không tải được khung chương trình để hiển thị kỳ khuyến nghị và môn tiên quyết.";
+      return null;
+    });
+  }
   const profile = apiData<Row>(await getJson(`/students/${row.id}`, { include: 'academicProgress,courseResults', resultsLimit: 100 }, signal));
   const progress = profile.academicProgress ?? {},
     program = profile.program ?? {},
     credits = progress.credits ?? {};
-  let curriculum: Row | null = null,
-    curriculumWarning = "";
+  let curriculum: Row | null = null;
   const programId = profile.programId ?? program.id;
-  if (programId) {
+  if (programId && !curriculumRequest) {
     if (!curricula.has(programId))
       curricula.set(
         programId,
@@ -1171,13 +1149,12 @@ async function loadStudent(
           apiData<Row>(response),
         ),
       );
-    try {
-      curriculum = await curricula.get(programId)!;
-    } catch {
-      curriculumWarning =
-        "Không tải được khung chương trình để hiển thị kỳ khuyến nghị và môn tiên quyết.";
-    }
+    curriculumRequest = curricula.get(programId)!.catch(() => {
+      curriculumWarning = "Không tải được khung chương trình để hiển thị kỳ khuyến nghị và môn tiên quyết.";
+      return null;
+    });
   }
+  if (curriculumRequest) curriculum = await curriculumRequest;
   const first = profile.courseResults;
   const attempts: Row[] = [...(first?.items ?? [])];
   // Results are a paginated section of the student profile.
@@ -1247,13 +1224,14 @@ async function loadStudent(
     studentCode: progressText(profile.studentCode),
     fullName: progressText(profile.fullName),
     cohort: progressText(profile.cohort?.code ?? profile.cohortCode),
-    studentClass: progressText(profile.className),
     curriculumCode: progressText(program.code),
     currentCurriculumSemester: number(profile.currentSemester),
     courseSemesterTag: number(profile.courseSemesterTag),
     currentTerm: progressText(profile.currentAcademicPeriod?.name),
     currentTermStartDate: profile.currentAcademicPeriod?.startDate ?? null,
     gpa: number(progress.gpa),
+    gpaScale: number(progress.gpaScale),
+    gpaLoaded: true,
     completedCredits: number(credits.earned),
     totalCredits: number(credits.total ?? program.totalCredits),
     plannedOjtTerm: "—",
@@ -1261,8 +1239,18 @@ async function loadStudent(
     delayTerms: null,
     progressStatus: "Chưa xác định",
     eligibilityStatus,
-    eligibilitySource: saved ? 'FRONTEND' : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
+    eligibilitySource: saved ? (saved.source ?? 'BACKEND') : official || ['ELIGIBLE', 'NOT_ELIGIBLE', 'REVIEW_REQUIRED'].includes(decision) ? 'OFFICIAL' : null,
     subjects,
+    courseHistory: attempts.map((attempt: Row) => ({
+      id: String(attempt.id),
+      code: progressText(attempt.courseCode),
+      name: progressText(attempt.courseName),
+      academicPeriod: progressText(attempt.academicPeriod?.name ?? attempt.periodName ?? attempt.periodCode ?? attempt.academicPeriodId),
+      attemptNumber: Number(attempt.attemptNumber),
+      status: String(attempt.status ?? ''),
+      score: number(attempt.score),
+      grade: attempt.grade == null ? null : String(attempt.grade),
+    })),
     dataWarning:
       [
         curriculumWarning,
@@ -1274,43 +1262,106 @@ async function loadStudent(
         .join(" ") || undefined,
   };
 }
+let progressRows = new Map<number, Row>();
+let progressSavedResults = new Map<number, SavedOjtEligibility>();
+let progressCurricula = new Map<number, Promise<Row>>();
+let progressDetailCache = new Map<number, Promise<StudentProgress>>();
+let progressGpaCache = new Map<number, Promise<{
+  gpa: number | null; gpaScale: number | null;
+  completedCredits: number | null; totalCredits: number | null;
+}>>();
+let progressSession: string | null = null;
+
+function progressSummary(row: Row): StudentProgress {
+  const saved = row.calculatedEligibility as SavedOjtEligibility | null | undefined;
+  const freshSaved = saved && !saved.isStale ? saved : undefined;
+  const gpaLoaded = row.gpaLoaded === true;
+  return {
+    id: String(row.id),
+    studentCode: progressText(row.studentCode),
+    fullName: progressText(row.fullName),
+    cohort: progressText(row.cohort?.code ?? row.cohortCode),
+    curriculumCode: progressText(row.program?.code),
+    currentCurriculumSemester: number(row.currentSemester),
+    courseSemesterTag: number(row.courseSemesterTag),
+    currentTerm: progressText(row.currentAcademicPeriod?.name),
+    currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null,
+    gpa: gpaLoaded ? number(row.cachedGpa) : null,
+    gpaScale: gpaLoaded ? number(row.cachedGpaScale) : null,
+    gpaLoaded,
+    completedCredits: gpaLoaded ? number(row.cachedEarnedCredits) : null,
+    totalCredits: (gpaLoaded ? number(row.cachedTotalCredits) : null) ?? number(row.program?.totalCredits),
+    plannedOjtTerm: '—',
+    currentEstimatedOjtTerm: '—',
+    delayTerms: null,
+    progressStatus: 'Chưa xác định',
+    eligibilityStatus: savedOjtProgressLabel(saved ?? undefined),
+    eligibilitySource: saved?.source ?? (saved ? 'BACKEND' : null),
+    subjects: [],
+    detailsLoaded: false,
+    unpassedCourseCount: freshSaved?.unpassedCourseCount ?? null,
+  };
+}
+
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
-    const curricula = new Map<number, Promise<Row>>();
-    const [students, saved] = await Promise.all([getAllItems<Row>("/students", {}, signal), loadSavedLocalOjtResults(signal)]);
-    const savedResults = new Map(saved.map(result => [result.studentId, result]));
-    const items: StudentProgress[] = new Array(students.length);
-    let next = 0;
-    await Promise.all(
-      Array.from({ length: Math.min(4, students.length) }, async () => {
-        while (next < students.length) {
-          signal?.throwIfAborted();
-          const index = next++;
-          try {
-            items[index] = await loadStudent(students[index], curricula, savedResults, signal);
-          } catch (error) {
-            signal?.throwIfAborted();
-            const row = students[index];
-            const message = progressText(row.studentCode) +
-                ": " +
-                (error instanceof Error
-                  ? error.message
-                  : "Không tải được hồ sơ");
-            items[index] = {
-              id: String(row.id), studentCode: progressText(row.studentCode), fullName: progressText(row.fullName),
-              cohort: progressText(row.cohort?.code ?? row.cohortCode), studentClass: progressText(row.className),
-              curriculumCode: progressText(row.program?.code), currentCurriculumSemester: number(row.currentSemester),
-              currentTerm: progressText(row.currentAcademicPeriod?.name), currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null, gpa: null,
-              completedCredits: null, totalCredits: null, plannedOjtTerm: '—',
-              currentEstimatedOjtTerm: '—', delayTerms: null, progressStatus: 'Chưa xác định',
-              eligibilityStatus: savedOjtProgressLabel(savedResults.get(Number(row.id))),
-              eligibilitySource: savedResults.has(Number(row.id)) ? 'FRONTEND' : null,
-              subjects: [], dataWarning: message, detailsUnavailable: true,
-            };
-          }
-        }
-      }),
-    );
-    return items;
+    const token = localStorage.getItem('ojt_auth_token');
+    const rows = await getAllItems<Row>('/students', {}, signal);
+    progressSession = token;
+    progressRows = new Map(rows.map(row => [Number(row.id), row]));
+    progressSavedResults = new Map(rows.flatMap(row => row.calculatedEligibility
+      ? [[Number(row.id), row.calculatedEligibility as SavedOjtEligibility] as const]
+      : []));
+    progressCurricula = new Map();
+    progressDetailCache = new Map();
+    progressGpaCache = new Map();
+    return rows.map(progressSummary);
+  },
+
+  async loadGpa(studentIds: number[]) {
+    if (progressSession !== localStorage.getItem('ojt_auth_token')) {
+      throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng tải lại danh sách sinh viên.');
+    }
+    const ids = [...new Set(studentIds)].filter(id => progressRows.has(id));
+    const missing = ids.filter(id => !progressGpaCache.has(id));
+    for (let offset = 0; offset < missing.length; offset += 100) {
+      const batch = missing.slice(offset, offset + 100);
+      const response = apiData<Row>(await getJson('/students/gpa-summaries', { ids: batch.join(',') }));
+      const items = Array.isArray(response.items) ? response.items as Row[] : [];
+      const returned = new Map(items.map(item => [Number(item.studentId), {
+        gpa: number(item.gpa), gpaScale: number(item.gpaScale),
+        completedCredits: number(item.earnedCredits), totalCredits: number(item.totalCredits),
+      }]));
+      for (const id of batch) {
+        const summary = returned.get(id);
+        if (!summary) throw new Error(`Không tải được GPA của sinh viên ${id}.`);
+        progressGpaCache.set(id, Promise.resolve(summary));
+      }
+    }
+    const entries = await Promise.all(ids.map(async id => [id, await progressGpaCache.get(id)!] as const));
+    return new Map(entries);
+  },
+
+  async loadDetails(studentId: number): Promise<StudentProgress> {
+    if (progressSession !== localStorage.getItem('ojt_auth_token')) {
+      throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng tải lại danh sách sinh viên.');
+    }
+    const cached = progressDetailCache.get(studentId);
+    if (cached) return cached;
+    const row = progressRows.get(studentId);
+    if (!row) throw new Error('Không tìm thấy sinh viên trong danh sách hiện tại.');
+
+    const request = loadStudent(row, progressCurricula, progressSavedResults)
+      .then(student => ({
+        ...student,
+        detailsLoaded: true,
+        unpassedCourseCount: student.subjects.filter(subject => subject.status === 'Not Passed').length,
+      }))
+      .catch(error => {
+        progressDetailCache.delete(studentId);
+        throw error;
+      });
+    progressDetailCache.set(studentId, request);
+    return request;
   },
 };

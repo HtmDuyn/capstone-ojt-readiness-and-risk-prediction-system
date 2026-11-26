@@ -147,16 +147,6 @@ export interface StudentEligibility {
   official: EligibilityCheck | null;
 }
 
-export interface EligibilityBatch {
-  runId: number;
-  total: number;
-  eligible: number;
-  notEligible: number;
-  reviewRequired: number;
-  items: EligibilityCheck[];
-  replayed: boolean;
-}
-
 export interface AssessmentWindow {
   BlockPeriodID: number;
   OpensAt: string;

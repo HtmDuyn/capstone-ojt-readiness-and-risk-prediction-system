@@ -130,3 +130,6 @@ tmp/
 temp/
 uploads/
 # Serverless directories
+
+# Local PostgreSQL portable runtime and data
+.local/postgres/

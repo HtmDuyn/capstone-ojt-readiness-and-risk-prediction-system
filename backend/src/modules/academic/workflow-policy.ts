@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from './academic.repository';
 import { invalid,inputObject,positiveId,requiredText,enumValue,score,optionalText } from '../students/student.validation';
-import { timestamp,ids } from '../combo-registration/combo.validation';
+import { timestamp } from '../combo-registration/combo.validation';
 import { academicPeriodStatusSql } from './period-status';
 type Row=Record<string,any>;
 export const dayString=(d:Date|string)=>d instanceof Date?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:d;
@@ -12,46 +12,30 @@ export async function actualPeriod(c:PoolClient,id:number) {
 }
 export async function relativeSemester(c:PoolClient,studentId:number,targetId:number) {
  await actualPeriod(c,targetId);
- const stage=(await c.query('SELECT "StudentCurriculumSemester"($1,$2) AS stage',[studentId,targetId])).rows[0]?.stage;
+ const stage=(await c.query('SELECT public."StudentCurriculumSemester"($1,$2) AS stage',[studentId,targetId])).rows[0]?.stage;
  if(stage===null||stage===undefined)throw invalid('Map this cohort curriculum stage (0–9) to the selected calendar semester first.',409,'ACTUAL_PATHWAY_REQUIRED');
  return stage as number;
 }
-// OJT is a fixed curriculum stage; cohort placement determines the calendar target.
-export async function assertOjtSemesterSix(c:PoolClient,studentId:number,semesterId:number) {
+// OJT202 is recommended in semester 6, but students may start OJT later if their pathway is delayed.
+export async function assertOjtPathway(c:PoolClient,studentId:number,semesterId:number) {
  const term=(await c.query('SELECT "AcademicPeriodID" FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0];
  if(!term?.AcademicPeriodID)throw invalid('OJT semester must reference an actual academic period.',409,'OJT_PERIOD_REQUIRED');
  const target=await actualPeriod(c,term.AcademicPeriodID);
  if(target.Kind!=='SEMESTER')throw invalid('OJT must use a regular semester.',409,'OJT_PERIOD_REQUIRED');
  const relative=await relativeSemester(c,studentId,target.AcademicPeriodID);
- if(relative!==6)throw invalid('OJT is fixed in relative semester 6; the selected target is semester '+relative+'.',409,'OJT_FIXED_SEMESTER_REQUIRED');
- return {relativeSemester:6};
+ if(relative<6)throw invalid('OJT dapat dimulai mulai semester kurikulum ke-6; mahasiswa dengan jalur tertunda dapat mengikuti OJT pada semester berikutnya.',409,'OJT_MINIMUM_SEMESTER_REQUIRED');
+ return {relativeSemester:relative};
 }
 export async function registrationPeriod(c:PoolClient,w:Row) {
  if(!w.AcademicPeriodID)throw invalid('Configure the OJT target academic period before opening this window.',409,'REGISTRATION_PERIOD_REQUIRED');
  const target=await actualPeriod(c,w.AcademicPeriodID);
  const term=(await c.query('SELECT * FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[w.OJTSemesterID])).rows[0];
  if(!term)throw invalid('OJT semester not found.',404);
- if(target.Kind!=='SEMESTER'||term.AcademicPeriodID!==target.AcademicPeriodID||w.RequiredRelativeSemester!==6)throw invalid('The registration window must target OJT semester 6 and its linked academic period.',409,'REGISTRATION_PERIOD_MISMATCH');
+ if(target.Kind!=='SEMESTER'||term.AcademicPeriodID!==target.AcademicPeriodID||w.RequiredRelativeSemester!==6)throw invalid('The window must match its selected calendar period; relative curriculum semester 6 is the minimum OJT pathway.',409,'REGISTRATION_PERIOD_MISMATCH');
  return target;
 }
-export async function saveRegistrationExceptions(windowId:number,body:unknown,actor:number) {
- const b=inputObject(body,['studentIds','relativeSemester','expiresAt','reason']),students=ids(b.studentIds,'studentIds'),relative=positiveId(b.relativeSemester,'relativeSemester');
- if(!students.length)throw invalid('Select students.');
- if(relative!==6)throw invalid('OJT is fixed in semester 6; a semester exception cannot change this stage.',409,'OJT_FIXED_SEMESTER_REQUIRED');
- const expires=timestamp(b.expiresAt,'expiresAt'),reason=requiredText(b.reason,'reason',2000);
- return academicTransaction(async c=>{
-  const w=(await c.query('SELECT * FROM "OJTRegistrationWindows" WHERE "WindowID"=$1 FOR UPDATE',[windowId])).rows[0];if(!w)throw invalid('Registration window not found.',404);
-  await registrationPeriod(c,w);if(relative===w.RequiredRelativeSemester)throw invalid('No exception is needed for the standard semester.');
-  if(new Date(expires)<=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now||new Date(expires)>new Date(w.EndsAt))throw invalid('Exception expiry must be in the future and within the window deadline.');
-  for(const studentId of students){
-   const s=(await c.query(`SELECT s.*,p."CohortID",p."GroupCode",t."SpecializationID" FROM "Students" s LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" WHERE s."StudentID"=$1`,[studentId])).rows[0];
-   if(!s)throw invalid('Student not found.',404);
-   for(const [key,value]of [['programIds',s.ProgramID],['cohortIds',s.CohortID],['groupCodes',s.GroupCode],['majorIds',s.SpecializationID],['studentIds',studentId]])if(w.Scope[key]&&!w.Scope[key].includes(value))throw invalid('Exception student is outside the window scope.',409);
-   if(await relativeSemester(c,studentId,w.AcademicPeriodID)!==relative)throw invalid('Exception semester must match this student at the target period.',409);
-  }
-  const items=[];for(const studentId of students)items.push((await c.query(`INSERT INTO "OJTRegistrationExceptions" ("WindowID","StudentID","RelativeSemester","ExpiresAt","Reason","CreatedBy") VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,[windowId,studentId,relative,expires,reason,actor])).rows[0]);
-  await audit(c,actor,'OJTRegistrationWindows',windowId,'ALLOW_SEMESTER_EXCEPTION',null,items,reason);return items;
- });
+export async function saveRegistrationExceptions(_windowId:number,_body:unknown,_actor:number) {
+ throw invalid('OJT registration is allowed from relative semester 6 onward; delayed students do not need a semester exception.',409,'OJT_MINIMUM_SEMESTER_REQUIRED');
 }
 export async function revokeRegistrationException(windowId:number,id:number,body:unknown,actor:number) {
  const b=inputObject(body,['reason']),reason=requiredText(b.reason,'reason',2000);return academicTransaction(async c=>{
@@ -120,11 +104,11 @@ export async function changeAssessment(id:number,action:'open'|'close',body:unkn
  });
 }
 export async function assertOfficialAssessment(c:PoolClient,check:Row) {
- await assertOjtSemesterSix(c,check.StudentID,check.OJTSemesterID);
+ await assertOjtPathway(c,check.StudentID,check.OJTSemesterID);
  const w=await getAssessment(c,check.OJTSemesterID);await assessmentBounds(c,w);const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
  if(w.Status!=='OPEN'||!w.ResultsFinalizedAt||now<new Date(w.OpensAt)||now>=new Date(w.ClosesAt))throw invalid('Official assessment is not open.',409,'OJT_ASSESSMENT_NOT_OPEN');
  const relative=await relativeSemester(c,check.StudentID,w.BlockPeriodID);
- if(relative!==(w.RequiredRelativeSemester??5)&&!(await c.query('SELECT 1 FROM "OJTRegistrationExceptions" e JOIN "OJTRegistrationWindows" rw ON rw."WindowID"=e."WindowID" WHERE rw."OJTSemesterID"=$1 AND e."StudentID"=$2 AND e."RelativeSemester"=$3 AND e."RevokedAt" IS NULL AND e."ExpiresAt">clock_timestamp()',[check.OJTSemesterID,check.StudentID,relative])).rowCount)throw invalid('Official assessment requires semester 5 or an approved current semester exception.',409,'ASSESSMENT_SEMESTER_MISMATCH');
+ if(relative<(w.RequiredRelativeSemester??5)&&!(await c.query('SELECT 1 FROM "OJTRegistrationExceptions" e JOIN "OJTRegistrationWindows" rw ON rw."WindowID"=e."WindowID" WHERE rw."OJTSemesterID"=$1 AND e."StudentID"=$2 AND e."RelativeSemester"=$3 AND e."RevokedAt" IS NULL AND e."ExpiresAt">clock_timestamp()',[check.OJTSemesterID,check.StudentID,relative])).rowCount)throw invalid('Official assessment requires relative semester 5 or later, or an approved exception for an earlier pathway.',409,'ASSESSMENT_SEMESTER_MISMATCH');
  if(new Date(check.CheckedAt)<new Date(w.ResultsFinalizedAt))throw invalid('Run a new eligibility check after Block 3 results were finalized.',409,'OJT_CHECK_BEFORE_RESULTS_FINALIZED');return w;
 }
 function gradeBands(value:unknown,scale:number) {

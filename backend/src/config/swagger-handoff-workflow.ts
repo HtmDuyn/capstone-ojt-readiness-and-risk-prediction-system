@@ -2,18 +2,14 @@
 export function describeHandoffWorkflow(spec:Record<string,any>){
  const id={type:'integer',minimum:1,maximum:2147483647};
  const body=(properties:Record<string,any>,required:string[])=>({required:true,content:{'application/json':{schema:{type:'object',additionalProperties:false,properties,required}}}});
- const responses={200:{description:'Thành công'},400:{description:'Dữ liệu không hợp lệ'},401:{description:'Chưa đăng nhập'},403:{description:'Sai quyền'},404:{description:'Không tìm thấy'},409:{description:'Trạng thái hoặc dữ liệu không đáp ứng quy trình'}};
- const handoff=spec.paths['/api/ojt-semesters/{id}/eligible-student-handoffs'].post;
- handoff.summary='Bàn giao sinh viên đủ điều kiện cho QHDN trước đăng ký';
- handoff.description='ADMIN/ACADEMIC bàn giao sinh viên đang học kỳ 5, tài khoản hoạt động, có kết quả FE ELIGIBLE đã lưu trong DB và còn hiệu lực. Kỳ nhận phải là kỳ OJT thứ 6 theo lộ trình khóa/nhóm. Không tính lại điều kiện, không yêu cầu xác nhận EligibilityChecks hay hồ sơ đăng ký. Lưu snapshot kết quả và batch nguồn; toàn bộ danh sách cùng thành công hoặc rollback. Gửi lại cùng idempotencyKey và payload trả kết quả cũ. Lỗi 409: SAVED_ELIGIBILITY_REQUIRED, ELIGIBILITY_RESULT_STALE, HANDOFF_SEMESTER_5_REQUIRED, OJT_FIXED_SEMESTER_REQUIRED, HANDOFF_STUDENT_INACTIVE, HANDOFF_SEMESTER_CLOSED, STUDENT_ALREADY_HANDED_OFF, IDEMPOTENCY_CONFLICT.';
- handoff.requestBody=body({studentIds:{type:'array',items:id,minItems:1,maxItems:1000,uniqueItems:true},idempotencyKey:{type:'string',minLength:1,maxLength:100},reason:{type:'string',minLength:1,maxLength:2000}},['studentIds','idempotencyKey','reason']);
- handoff.responses={...responses,201:{description:'Danh sách đủ điều kiện đã bàn giao',content:{'application/json':{example:{success:true,data:{handoffId:1,ojtSemesterId:1,studentIds:[1],total:1,recipientRole:'OJT_COORD',replayed:false}}}}}};
+ const historicalHandoffs=spec.paths['/api/ojt-semesters/{id}/eligible-student-handoffs'];
+ if(historicalHandoffs)delete historicalHandoffs.post;
  const descriptions:Record<string,string>={
-  '/api/ojt-semesters/{id}/eligible-student-handoffs':'Lịch sử các đợt bàn giao danh sách đủ điều kiện. studentIds và studentCount lấy từ các mục bàn giao; registrationIds chỉ phục vụ lịch sử cũ.',
-  '/api/ojt-semesters/{id}/students':'Danh sách theo kỳ: QHDN chỉ thấy sinh viên được bàn giao, kể cả chưa đăng ký. registration, handoff, officialEligibility, assignment là các quy trình độc lập.',
-  '/api/qhdn/registered-students':'Danh sách sinh viên đã đăng ký và có bản ghi bàn giao thật cùng kỳ. Mỗi sinh viên một dòng; đăng ký trong registrations. Dùng ojt-semesters/students để nhận danh sách bàn giao trước đăng ký. Không suy ra bàn giao từ trạng thái HANDED_OFF cũ.',
-  '/api/ojt-registrations':'Hồ sơ đăng ký: QHDN xem các hồ sơ thuộc danh sách được bàn giao, STUDENT chỉ xem hồ sơ của mình. status/registrationStatus trả LEGACY_REVIEW_REQUIRED cho HANDED_OFF cũ; legacyStatus giữ nguyên giá trị lịch sử. handoffStatus luôn lấy từ bảng bàn giao.',
-  '/api/students/{id}/cv':'QHDN được xem CV sinh viên đã có bàn giao; không yêu cầu sinh viên phải đăng ký trước.'
+  '/api/ojt-semesters/{id}/eligible-student-handoffs':'Lịch sử bàn giao từ quy trình cũ; danh sách xét hiện tại lấy trực tiếp từ kết quả đủ điều kiện và roster tuyển dụng.',
+  '/api/ojt-semesters/{id}/students':'Danh sách theo kỳ: QHDN thấy roster đủ điều kiện hiện hành và hồ sơ lịch sử của kỳ. Sinh viên đủ điều kiện được vào đợt tuyển dụng đang mở hoặc ở trạng thái chờ; registration, handoff cũ, officialEligibility và assignment được trả riêng.',
+  '/api/qhdn/registered-students':'Danh sách hồ sơ đã đăng ký. Roster đủ điều kiện trước khi ứng tuyển lấy từ /api/qhdn/eligible-students; trạng thái truy cập hiện hành được cấp từ kết quả ELIGIBLE đã lưu, các handoff trong lịch sử chỉ phục vụ hồ sơ cũ.',
+  '/api/ojt-registrations':'Hồ sơ đăng ký: QHDN xem hồ sơ thuộc roster hiện hành hoặc hồ sơ lịch sử, STUDENT chỉ xem hồ sơ của mình. status/registrationStatus trả LEGACY_REVIEW_REQUIRED cho HANDED_OFF cũ; legacyStatus giữ nguyên giá trị lịch sử.',
+  '/api/students/{id}/cv':'QHDN được xem CV sinh viên đủ điều kiện trong roster hiện hành hoặc có hồ sơ lịch sử; không yêu cầu sinh viên phải đăng ký trước.'
  };
  for(const [path,description]of Object.entries(descriptions))if(spec.paths[path]?.get)spec.paths[path].get.description=description;
  for(const method of ['post','patch']){
@@ -22,18 +18,18 @@ export function describeHandoffWorkflow(spec:Record<string,any>){
    const schema=op.requestBody?.content?.['application/json']?.schema;
    if(schema?.required)schema.required=schema.required.filter((name:string)=>name!=='academicPeriodId');
    if(schema?.properties?.academicPeriodId)schema.properties.academicPeriodId.description='Mặc định từ kỳ OJT; nếu truyền phải khớp kỳ đã chọn.';
-   if(schema?.properties?.requiredRelativeSemester)schema.properties.requiredRelativeSemester.description='Metadata tương thích; quyền đăng ký dựa trên danh sách đã bàn giao.';
-   op.description='ADMIN/OJT_COORD tạo hoặc mở đợt đăng ký trong học kỳ chính đang diễn ra. Đợt được tạo ở trạng thái DRAFT. PATCH status OPEN/CLOSED và reason để mở hoặc đóng. Khi mở, phạm vi phải có sinh viên đã bàn giao. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là kỳ tương đối 6.';
+   if(schema?.properties?.requiredRelativeSemester)schema.properties.requiredRelativeSemester.description='Metadata tương thích; quyền đăng ký dựa trên roster đủ điều kiện hiện hành.';
+   op.description='ADMIN/OJT_COORD tạo hoặc mở đợt đăng ký trong học kỳ chính đang diễn ra. Đợt được tạo ở trạng thái DRAFT. PATCH status OPEN/CLOSED và reason để mở hoặc đóng. Khi mở, phạm vi phải có sinh viên thuộc roster đủ điều kiện hiện hành. academicPeriodId mặc định từ kỳ OJT và phải khớp kỳ đã chọn. requiredRelativeSemester là kỳ tương đối 6.';
   }
  }
- spec.paths['/api/ojt-registrations'].post.description='Endpoint tương thích cho hồ sơ đăng ký OJT cũ; luồng mới STUDENT chọn vị trí và gửi trực tiếp bằng POST /api/job-applications. STUDENT chỉ nộp hồ sơ của mình; ADMIN có thể nhập thay. Bắt buộc thuộc danh sách đã bàn giao cùng kỳ, đợt OPEN, trong thời hạn và đúng scope.';
+ spec.paths['/api/ojt-registrations'].post.description='Endpoint tương thích cho hồ sơ đăng ký OJT cũ; luồng mới STUDENT chọn vị trí và gửi trực tiếp bằng POST /api/job-applications. STUDENT chỉ nộp hồ sơ của mình; ADMIN có thể nhập thay. Bắt buộc thuộc roster đủ điều kiện cùng kỳ, đợt OPEN, trong thời hạn và đúng scope. Khi giao dịch đăng ký thành công, backend ghi OJT202 IN_PROGRESS theo kỳ OJT; khóa duy nhất và ON CONFLICT giữ thao tác lặp an toàn.';
  if(spec.paths['/api/students/me/opportunities']?.get){
   spec.paths['/api/students/me/opportunities'].get.summary='Danh sách vị trí doanh nghiệp để sinh viên ứng tuyển trực tiếp';
-  spec.paths['/api/students/me/opportunities'].get.description='Bắt buộc windowId của đợt đăng ký đang mở. Chỉ trả về vị trí phù hợp kỳ OJT; canApply và blockers phản ánh kết quả bàn giao, eligibility, scope, trạng thái hồ sơ và chỉ tiêu.';
+  spec.paths['/api/students/me/opportunities'].get.description='Bắt buộc windowId của đợt đăng ký đang mở. Chỉ trả về vị trí phù hợp kỳ OJT; canApply và blockers phản ánh roster eligibility, scope, trạng thái hồ sơ và chỉ tiêu.';
  }
  if(spec.paths['/api/job-applications']?.post){
   spec.paths['/api/job-applications'].post.summary='Sinh viên gửi hồ sơ trực tiếp đến doanh nghiệp';
-  spec.paths['/api/job-applications'].post.description='POST tạo JobApplication và StudentEnterpriseCoordination PENDING trong cùng transaction. QHDN không duyệt hoặc chuyển tiếp; khi doanh nghiệp chấp nhận, assignment được tạo tự động.';
+  spec.paths['/api/job-applications'].post.description='POST tạo JobApplication và StudentEnterpriseCoordination PENDING trong cùng transaction, đồng thời ghi OJT202 IN_PROGRESS cho kỳ OJT. Khóa duy nhất và ON CONFLICT giữ thao tác lặp an toàn. QHDN không duyệt hoặc chuyển tiếp; khi doanh nghiệp chấp nhận, assignment được tạo tự động.';
   spec.paths['/api/job-applications'].post.requestBody=body({
    windowId:id,postId:id,positionId:id,coverLetter:{type:'string',maxLength:5000},
    certificates:{type:'array',maxItems:5,items:{type:'object',additionalProperties:false,required:['name','url'],properties:{name:{type:'string',maxLength:200},url:{type:'string',format:'uri',maxLength:2000}}}},

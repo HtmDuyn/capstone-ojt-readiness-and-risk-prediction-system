@@ -1,7 +1,7 @@
-// Share concurrent requests only. Once a read finishes, the next read must
-// contact the server again. Keep results out of persistent storage.
+// Share concurrent requests and optionally retain selected reads in memory.
+// Entries are scoped to the current bearer token and never reach persistent storage.
 const MAX_ENTRIES = 1000;
-interface Entry { value: Promise<unknown> }
+interface Entry { value: Promise<unknown>; expiresAt: number }
 const entries = new Map<string, Entry>();
 let session: string | null | undefined;
 
@@ -9,16 +9,23 @@ export function clearSharedReads() {
   entries.clear();
 }
 
-export function sharedRead<T>(key: string, load: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+export function sharedRead<T>(key: string, load: () => Promise<T>, signal?: AbortSignal, ttlMs = 0): Promise<T> {
   signal?.throwIfAborted();
   const token = localStorage.getItem('ojt_auth_token');
   if (session !== token) { entries.clear(); session = token; }
   let entry = entries.get(key);
+  if (entry && entry.expiresAt <= Date.now() && entry.expiresAt !== 0) {
+    entries.delete(key);
+    entry = undefined;
+  }
   if (!entry) {
     if (entries.size >= MAX_ENTRIES) entries.delete(entries.keys().next().value!);
-    const created: Entry = { value: Promise.resolve().then(load) };
+    const created: Entry = { value: Promise.resolve().then(load), expiresAt: 0 };
     created.value = created.value.then(value => {
-      if (entries.get(key) === created) entries.delete(key);
+      if (entries.get(key) === created) {
+        if (ttlMs > 0) created.expiresAt = Date.now() + ttlMs;
+        else entries.delete(key);
+      }
       return value;
     }, error => {
       if (entries.get(key) === created) entries.delete(key);

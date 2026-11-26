@@ -290,8 +290,7 @@ export const parseStudentImportWorkbook = async (
       [key, STUDENT_STATUS_LABELS[key], ...(STUDENT_STATUS_ALIASES[key] ?? [])].some(label => normalize(label) === normalize(rawStatus))) : undefined;
     if (rawStatus && !status) throw new Error(`Dòng ${number}: Trạng thái sinh viên phải là Đang học, Bảo lưu hoặc Thôi học.`);
     const phone = getCell(row, ['Số điện thoại', 'phone']);
-    const className = getCell(row, ['Lớp', 'className']);
-    if (phone.length > 20 || className.length > 20) throw new Error(`Dòng ${number}: Điện thoại và lớp tối đa 20 ký tự.`);
+    if (phone.length > 20) throw new Error(`Dòng ${number}: Điện thoại tối đa 20 ký tự.`);
 
     return {
       code,
@@ -302,9 +301,6 @@ export const parseStudentImportWorkbook = async (
         ...(status ? { status } : {}),
         ...(getCell(row, ["Số điện thoại", "phone"])
           ? { phone: getCell(row, ["Số điện thoại", "phone"]) }
-          : {}),
-        ...(getCell(row, ["Lớp", "className"])
-          ? { className: getCell(row, ["Lớp", "className"]) }
           : {}),
         placement: {
           cohortId,

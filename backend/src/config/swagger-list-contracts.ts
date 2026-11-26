@@ -89,7 +89,7 @@ export function describeListResponses(spec:Schema):void {
  Object.assign(history.properties,{id,ojtSemesterId:id,registrationIds:{type:'array',items:id},recipientRole:text,reason:text,createdBy:id,createdAt:time,studentCount:{type:'integer',minimum:0}});
  for(const path of ['/api/enterprise/candidates','/api/enterprise/internships']){
   const fields=spec.paths[path].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;
-  Object.assign(fields.student.properties,{accountStatus:text,enrollmentYear:{type:'integer',nullable:true},currentSemester:{type:'integer',nullable:true},className:{...text,nullable:true}});
+  Object.assign(fields.student.properties,{accountStatus:text,enrollmentYear:{type:'integer',nullable:true},currentSemester:{type:'integer',nullable:true}});
   Object.assign(fields,{companyId:id,studentId:id,ojtSemesterId:id,registrationId:id,positionId:id,applicationId:{...id,nullable:true},jobApplication:obj({id,postId:id,coverLetter:{...text,nullable:true},appliedAt:time,status:text,cv:obj({id,studentId:id,filename:text,fileName:text,mimeType:text,sizeBytes:{type:'integer'},size:{type:'integer'},sha256:text,createdAt:time,uploadedAt:time})})});
  }
  const candidateFields=spec.paths['/api/enterprise/candidates'].get.responses['200'].content['application/json'].schema.properties.data.properties.items.items.properties;

@@ -18,7 +18,7 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, seme
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    sharedRead('catalog:qhdn-periods', () => loadAllPages(page => getAcademicPeriods({ page, limit: 100 })), controller.signal)
+    sharedRead('catalog:qhdn-periods', () => loadAllPages(page => getAcademicPeriods({ page, limit: 100 })), controller.signal, 5 * 60_000)
       .then((items) => { if (!controller.signal.aborted) setCatalog(items); })
       .catch((e) => { if (!controller.signal.aborted) setError(errorMessage(e)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });

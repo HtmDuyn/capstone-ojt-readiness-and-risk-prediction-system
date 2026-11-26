@@ -18,8 +18,8 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   };
   const requirements:Row[]=[],normal=new Map<number,Row>();
   for (const c of courses) {
-    if (c.IsRequired==null) issues.push(`REQUIREMENT_UNCONFIRMED:${c.ProgramCourseID}`);
     if (c.EntryKind==='COURSE') {
+      if (c.IsRequired==null) issues.push(`REQUIREMENT_UNCONFIRMED:${c.ProgramCourseID}`);
       const key=canonical(c.CourseID);
       if (key<0) continue;
       const previous=normal.get(key);
@@ -38,11 +38,12 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
         const weights=new Set(allowed.map(o=>o.Credits===null?null:Number(o.Credits)));
         if (weights.size===1 && !weights.has(null)) credits=[...weights][0] as number;
       }
-      if (requireConfirmedSlotChoices && !choices.length) issues.push(`SLOT_CHOICES_UNCONFIRMED:${c.ProgramCourseID}`);
+      if (c.IsRequired==null && (requireConfirmedSlotChoices || choices.length))
+        issues.push(`REQUIREMENT_UNCONFIRMED:${c.ProgramCourseID}`);
       requirements.push({id:c.ProgramCourseID,courseId:null,courseCode:c.CourseCode,name:c.CourseName,kind:c.EntryKind,credits,required:c.IsRequired,choices});
     }
   }
-  for (const r of requirements) if (r.credits===null) issues.push(`COURSE_CREDITS_MISSING:${r.id}`);
+  for (const r of requirements) if (r.credits===null && (r.kind==='COURSE' || r.choices.length)) issues.push(`COURSE_CREDITS_MISSING:${r.id}`);
   if (!requirements.length) issues.push('PROGRAM_COURSES_MISSING');
   const groups=new Map<number,Row[]>();
   for (const a of attempts) {
@@ -107,11 +108,10 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   for (const [key,rows] of groups) {
     const graded=rows.filter(r=>['PASSED','FAILED'].includes(r.status));
     if (!graded.length) continue;
-    if (graded.some(r=>!r.periodStartDate)) {gpaIssues.push(`RESULT_PERIOD_MISSING:${key}`);continue;}
-    graded.sort((a,b)=>new Date(b.periodStartDate).getTime()-new Date(a.periodStartDate).getTime()||b.attemptNumber-a.attemptNumber||b.id-a.id);
+    graded.sort((a,b)=>(new Date(b.periodStartDate??0).getTime()-new Date(a.periodStartDate??0).getTime())||b.attemptNumber-a.attemptNumber||b.id-a.id);
     // In-progress and recognized records do not replace a completed graded attempt.
     const latest=graded[0],value=scale===4?latest.gradePoints:latest.score,credit=weights.get(key);
-    if (credit===undefined) {gpaIssues.push(`GPA_CREDIT_UNMAPPED:${key}`);continue;}
+    if (credit===undefined) continue;
     if (value===null || value===undefined || !Number.isFinite(Number(value))) {gpaIssues.push(`GPA_SCORE_MISSING:${latest.id}`);continue;}
     // Scores and credits are stored to two decimal places. Integer accumulation
     // prevents a mathematical 7.305 GPA from rounding down to 7.30 in binary floats.
@@ -190,10 +190,6 @@ export async function loadAcademicProgress(client:PoolClient, studentId:number,p
     const program=curriculum.program??undefined, policy=curriculum.policy??undefined;
     const attempts=(await client.query(`${resultSelect} WHERE r."StudentID"=$1${studyCutoff ? ' AND p."StartDate"<=$2::timestamp' : ''}`,studyCutoff ? [studentId,studyCutoff] : [studentId])).rows;
     const issues=invalidGroups.map(id=>`COMBO_CHOICE_GROUP_INVALID:${id}`);
-    if (studyCutoff && (await client.query(`SELECT EXISTS(SELECT 1 FROM "StudentCourseResults" r
-      LEFT JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=r."AcademicPeriodID"
-      WHERE r."StudentID"=$1 AND p."AcademicPeriodID" IS NULL) AS missing`, [studentId])).rows[0].missing)
-      issues.push('STUDY_RESULT_PERIOD_MISSING');
     return {studentId,program,courses,attempts,aliases,options:invalidGroups.length?[]:options,policy,issues,gradeWeights};
 }
 
@@ -201,7 +197,8 @@ export type AcademicProgressData = Awaited<ReturnType<typeof loadAcademicProgres
 export function progressFromData(data:AcademicProgressData,assumeInProgressPassed=false,requireConfirmedSlotChoices=true) {
   const {studentId,program,courses,attempts,aliases,options,policy,issues,gradeWeights}=data;
   const grades=assumeInProgressPassed?attempts.map(r=>r.status==='IN_PROGRESS'?{...r,status:'RECOGNIZED'}:r):attempts;
-  return {studentId,...calculateProgress(program,courses,grades,aliases,options,policy,issues,gradeWeights,requireConfirmedSlotChoices)};
+  const configurationIssues=requireConfirmedSlotChoices ? issues : issues.filter(issue=>!issue.startsWith('COMBO_CHOICE_GROUP_INVALID:'));
+  return {studentId,...calculateProgress(program,courses,grades,aliases,options,policy,configurationIssues,gradeWeights,requireConfirmedSlotChoices)};
 }
 export async function academicProgressWithClient(client:PoolClient,studentId:number,prospective?:{comboId:number;courseIds:number[]},assumeInProgressPassed=false) {
   return progressFromData(await loadAcademicProgress(client,studentId,prospective),assumeInProgressPassed);

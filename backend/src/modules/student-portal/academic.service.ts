@@ -16,21 +16,20 @@ import type { AssessmentReadContext } from './assessment-read-context';
 
 export async function summaryWithClient(c:PoolClient,studentId:number,semesterId:number|null,loaded?:AcademicProgressData,eligibilityData?:Row,assessmentReads?:AssessmentReadContext,warningRule?:Row) {
   const source=loaded??await loadAcademicProgress(c,studentId);
-  const progress=progressFromData(source);
+  const progress=progressFromData(source,false,false);
   const decision=eligibilityData??await eligibility(studentId,{ojtSemesterId:semesterId},c,progress,source);
   const current=decision.current,official=decision.official;
   const placement=assessmentReads?.studyPeriod ? {semester:assessmentReads.studyPeriod.curriculumSemester} : (await c.query(`SELECT "StudentCurriculumSemester"(p."StudentID",p."CurrentAcademicPeriodID") AS semester
     FROM "StudentAcademicPlacements" p WHERE p."StudentID"=$1`,[studentId])).rows[0];
-  const warningProgress=warningRule ? progressFromData(source,false,false) : progress;
-  const warningIssues=warningRule ? warningProgress.issues.filter(issue=>!issue.startsWith('GPA_')) : progress.issues;
+  const warningIssues=progress.issues.filter(issue=>!issue.startsWith('GPA_'));
   const warning=earlyWarning({currentSemester:placement?.semester??null,earnedCredits:current.earnedCredits,
-    completeConfiguration:!!warningProgress.credits.completeConfiguration,issues:warningIssues,
+    completeConfiguration:!!progress.credits.completeConfiguration,issues:warningIssues,
     eligibilityStatus:current.status,missingCredits:current.missingCredits,failedCourseCount:current.unpassedCourseCount,
     maxUnpassedCourses:current.rule?.maxUnpassedCourses??null});
   const results=source.attempts;
   const outstanding=progress.requirements.filter((r:Row)=>!r.completed).map((r:Row)=>({...r,learningStatus:current.unpassedCourses.some((u:Row)=>r.choices.includes(u.courseId))?'FAILED':results.some(a=>r.choices.includes(a.courseId)&&a.status==='IN_PROGRESS')?'IN_PROGRESS':'NOT_STUDIED'}));
   // Requirements are unique curriculum slots; a scenario never counts a retake twice.
-  const scenarioProgress=warningProgress.credits.completeConfiguration?progressFromData(source,true,!warningRule):null;
+  const scenarioProgress=progress.credits.completeConfiguration?progressFromData(source,true,false):null;
   const potential=scenarioProgress?.credits.completeConfiguration?Math.max(0,(warningRule ? scenarioProgress.credits.historyOjtEarned : scenarioProgress.credits.earned)-current.earnedCredits):null;
   const deadline=semesterId ? (await c.query('SELECT "ClosesAt" AS "assessmentDeadline","AssessmentAcademicPeriodID" AS "assessmentAcademicPeriodId" FROM "OJTAssessmentWindows" WHERE "OJTSemesterID"=$1',[semesterId])).rows[0]??null : null;
   const stage=placement?.semester??null;
@@ -55,7 +54,7 @@ export async function summaryWithClient(c:PoolClient,studentId:number,semesterId
     earnedCredits:current.earnedCredits,missingCredits:current.missingCredits,debt:current.unpassedCourseCount,
     maxDebt:current.rule?.maxUnpassedCourses??null,
     overdueCredits:baselineComplete?due.reduce((sum,r)=>sum+(r.credits??0),0):null,overdueCourses:due.map(r=>r.courseCode??r.name),
-    blockingCourses:source.program?.PrerequisitesReviewed===true?[...blockingIds].map(id=>current.unpassedCourses.find((r:Row)=>r.courseId===id)?.courseCode??String(id)):null,
+    blockingCourses:[...blockingIds].map(id=>current.unpassedCourses.find((r:Row)=>r.courseId===id)?.courseCode??String(id)),
     projectedStatus:projected?.status??null,projectedCredits:projected?.earnedCredits??null,projectedDebt:projected?.unpassedCourseCount??null,
     deadline:deadline?.assessmentDeadline?new Date(deadline.assessmentDeadline).toISOString():null,
     now:assessmentReads?.studyPeriod?.referenceDate});

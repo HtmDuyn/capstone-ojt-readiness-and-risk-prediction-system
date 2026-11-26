@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
+import { EligibleOjtRoster } from '@/components/qhdn/EligibleOjtRoster';
 import { RecruitmentRounds } from '@/components/qhdn/RecruitmentRounds';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
@@ -78,6 +79,7 @@ export default function QhdnRegistrationWindows() {
     {semester.error && <Notice>{semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}
     <RecruitmentRounds key={semester.periodId} selection={semester} refreshKey={revision} onChanged={refresh} />
+    <EligibleOjtRoster semesterId={semester.semesterId} refreshKey={revision} />
     <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <summary className="cursor-pointer p-5 font-semibold text-slate-700">Các đợt đăng ký cũ <span className="ml-2 rounded-md bg-slate-100 px-2 py-1 text-xs tabular-nums text-slate-500">{windows.length}</span></summary>
       <div className="space-y-4 border-t border-slate-100 p-5">
@@ -107,7 +109,7 @@ export default function QhdnRegistrationWindows() {
       <form onSubmit={submit} className="space-y-4">
         {taskError && <Notice>{taskError}</Notice>}
         {task.kind === 'extend' ? <Field label={'Hạn mới (sau ' + localDate(task.window.endsAt) + ')'}><input name="endsAt" type="datetime-local" className={workflowInput} required /></Field> :
-          <Notice>{task.window.status === 'OPEN' ? 'Sinh viên sẽ ngừng nộp hồ sơ trong đợt này.' : 'Đợt cần còn hạn và có sinh viên được bàn giao trong phạm vi.'}</Notice>}
+          <Notice>{task.window.status === 'OPEN' ? 'Sinh viên sẽ ngừng nộp hồ sơ trong đợt này.' : 'Đợt cần còn hạn và có sinh viên đủ điều kiện trong phạm vi.'}</Notice>}
         <Field label="Lý do"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
           <button type="button" className={workflowSecondary} disabled={busy} onClick={() => setTask(null)}>Hủy</button>

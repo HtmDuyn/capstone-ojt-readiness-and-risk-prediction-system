@@ -7,8 +7,8 @@
  *         "tags": [
  *           "QHDN core"
  *         ],
- *         "summary": "Nhận danh sách sinh viên đủ điều kiện đã được Đào tạo bàn giao",
- *         "description": "ADMIN/OJT_COORD xem danh sách Đào tạo đã duyệt và gửi cho đúng kỳ OJT. Chỉ có kết quả ELIGIBLE đã xác nhận và bản ghi bàn giao thật mới xuất hiện; không yêu cầu có hồ sơ đăng ký. Mỗi sinh viên một dòng trong kỳ. eligibilityAtHandoff là kết quả tại thời điểm bàn giao, không kiểm tra lại hiệu lực hiện tại và không cấp quyền điều phối. Hồ sơ đã xóa mềm không hiển thị. API chỉ đọc; dữ liệu đăng ký/chương trình/khóa là hiện tại.",
+ *         "summary": "Danh sách sinh viên đủ điều kiện và chưa có bản ghi OJT202 đã đạt",
+ *         "description": "Phòng QHDN xem sinh viên đã có kết quả xét đủ điều kiện. Sinh viên được xếp vào đợt mở theo học kỳ chính kế tiếp trên lịch đào tạo. Danh sách chờ gồm sinh viên chưa có đợt phù hợp.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -18,12 +18,22 @@
  *           {
  *             "name": "ojtSemesterId",
  *             "in": "query",
- *             "required": true,
- *             "description": "Kỳ OJT mục tiêu đã được Đào tạo tạo và bàn giao danh sách; lấy ojtSemesterId từ GET /api/academic-periods?kind=SEMESTER.",
+ *             "description": "Lọc theo kỳ OJT mục tiêu.",
  *             "schema": {
  *               "type": "integer",
  *               "minimum": 1,
  *               "maximum": 2147483647
+ *             }
+ *           },
+ *           {
+ *             "name": "rosterStatus",
+ *             "in": "query",
+ *             "schema": {
+ *               "type": "string",
+ *               "enum": [
+ *                 "ASSIGNED",
+ *                 "WAITING"
+ *               ]
  *             }
  *           },
  *           {
@@ -123,7 +133,7 @@
  *         ],
  *         "responses": {
  *           "200": {
- *             "description": "Danh sách đã bàn giao; items rỗng nếu chưa có sinh viên phù hợp.",
+ *             "description": "Danh sách sinh viên phù hợp với bộ lọc.",
  *             "content": {
  *               "application/json": {
  *                 "schema": {
@@ -138,47 +148,8 @@
  *                         "ojtSemesterId": {
  *                           "type": "integer",
  *                           "minimum": 1,
- *                           "maximum": 2147483647
- *                         },
- *                         "semester": {
- *                           "type": "object",
- *                           "properties": {
- *                             "id": {
- *                               "type": "integer",
- *                               "minimum": 1,
- *                               "maximum": 2147483647
- *                             },
- *                             "code": {
- *                               "type": "string"
- *                             },
- *                             "name": {
- *                               "type": "string"
- *                             },
- *                             "academicYearId": {
- *                               "type": "integer",
- *                               "minimum": 1,
- *                               "maximum": 2147483647
- *                             },
- *                             "academicPeriodId": {
- *                               "type": "integer",
- *                               "minimum": 1,
- *                               "maximum": 2147483647,
- *                               "nullable": true
- *                             },
- *                             "startDate": {
- *                               "type": "string",
- *                               "format": "date",
- *                               "nullable": true
- *                             },
- *                             "endDate": {
- *                               "type": "string",
- *                               "format": "date",
- *                               "nullable": true
- *                             },
- *                             "status": {
- *                               "type": "string"
- *                             }
- *                           }
+ *                           "maximum": 2147483647,
+ *                           "nullable": true
  *                         },
  *                         "items": {
  *                           "type": "array",
@@ -205,29 +176,16 @@
  *                                 "type": "string",
  *                                 "format": "email"
  *                               },
- *                               "phone": {
- *                                 "type": "string",
- *                                 "nullable": true
- *                               },
- *                               "studentStatus": {
- *                                 "type": "string"
- *                               },
- *                               "accountStatus": {
- *                                 "type": "string"
- *                               },
  *                               "ojtSemesterId": {
- *                                 "type": "integer",
- *                                 "minimum": 1,
- *                                 "maximum": 2147483647
- *                               },
- *                               "programId": {
  *                                 "type": "integer",
  *                                 "minimum": 1,
  *                                 "maximum": 2147483647,
  *                                 "nullable": true
  *                               },
- *                               "programCode": {
- *                                 "type": "string",
+ *                               "programId": {
+ *                                 "type": "integer",
+ *                                 "minimum": 1,
+ *                                 "maximum": 2147483647,
  *                                 "nullable": true
  *                               },
  *                               "programName": {
@@ -254,92 +212,6 @@
  *                                 ],
  *                                 "nullable": true
  *                               },
- *                               "handoffStatus": {
- *                                 "type": "string",
- *                                 "enum": [
- *                                   "HANDED_OFF"
- *                                 ]
- *                               },
- *                               "handoff": {
- *                                 "type": "object",
- *                                 "properties": {
- *                                   "id": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647
- *                                   },
- *                                   "createdAt": {
- *                                     "type": "string",
- *                                     "format": "date-time"
- *                                   },
- *                                   "createdBy": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647
- *                                   },
- *                                   "createdByName": {
- *                                     "type": "string",
- *                                     "nullable": true
- *                                   },
- *                                   "reason": {
- *                                     "type": "string"
- *                                   }
- *                                 }
- *                               },
- *                               "eligibilityAtHandoff": {
- *                                 "type": "object",
- *                                 "description": "Kết quả đã được xác nhận dùng để bàn giao; không khẳng định hiệu lực hiện tại sau khi dữ liệu học vụ thay đổi.",
- *                                 "properties": {
- *                                   "checkId": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647
- *                                   },
- *                                   "status": {
- *                                     "type": "string",
- *                                     "enum": [
- *                                       "ELIGIBLE"
- *                                     ]
- *                                   },
- *                                   "checkedAt": {
- *                                     "type": "string",
- *                                     "format": "date-time"
- *                                   },
- *                                   "confirmedAt": {
- *                                     "type": "string",
- *                                     "format": "date-time"
- *                                   },
- *                                   "confirmedBy": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647
- *                                   },
- *                                   "ruleSetId": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647,
- *                                     "nullable": true
- *                                   },
- *                                   "earnedCredits": {
- *                                     "type": "number",
- *                                     "nullable": true
- *                                   },
- *                                   "missingCredits": {
- *                                     "type": "number",
- *                                     "nullable": true
- *                                   },
- *                                   "unpassedCourseCount": {
- *                                     "type": "integer",
- *                                     "nullable": true
- *                                   },
- *                                   "validity": {
- *                                     "type": "string",
- *                                     "enum": [
- *                                       "AT_HANDOFF"
- *                                     ]
- *                                   }
- *                                 }
- *                               },
  *                               "registrationId": {
  *                                 "type": "integer",
  *                                 "minimum": 1,
@@ -356,33 +228,44 @@
  *                                   "LEGACY_REVIEW_REQUIRED"
  *                                 ]
  *                               },
- *                               "registration": {
- *                                 "type": "object",
- *                                 "nullable": true,
- *                                 "properties": {
- *                                   "id": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647
- *                                   },
- *                                   "windowId": {
- *                                     "type": "integer",
- *                                     "minimum": 1,
- *                                     "maximum": 2147483647,
- *                                     "nullable": true
- *                                   },
- *                                   "registeredAt": {
- *                                     "type": "string",
- *                                     "format": "date-time"
- *                                   },
- *                                   "status": {
- *                                     "type": "string",
- *                                     "enum": [
- *                                       "SUBMITTED",
- *                                       "APPROVED",
- *                                       "REJECTED",
- *                                       "LEGACY_REVIEW_REQUIRED"
- *                                     ]
+ *                               "roundName": {
+ *                                 "type": "string",
+ *                                 "nullable": true
+ *                               },
+ *                               "semesterName": {
+ *                                 "description": "Tên kỳ của đợt được xếp. Giá trị null khi còn chờ mở đợt.",
+ *                                 "type": "string",
+ *                                 "nullable": true
+ *                               },
+ *                               "roundId": {
+ *                                 "type": "integer",
+ *                                 "nullable": true
+ *                               },
+ *                               "rosterStatus": {
+ *                                 "type": "string",
+ *                                 "enum": [
+ *                                   "ASSIGNED",
+ *                                   "WAITING"
+ *                                 ]
+ *                               },
+ *                               "checkedAt": {
+ *                                 "type": "string",
+ *                                 "format": "date-time"
+ *                               },
+ *                               "academicHistory": {
+ *                                 "description": "Lịch sử môn học; các bản ghi OJT202 đã PASSED không được trả về.",
+ *                                 "type": "array",
+ *                                 "items": {
+ *                                   "type": "object",
+ *                                   "properties": {
+ *                                     "resultId": { "type": "integer" },
+ *                                     "courseCode": { "type": "string" },
+ *                                     "courseName": { "type": "string" },
+ *                                     "semesterTaken": { "type": "integer" },
+ *                                     "periodName": { "type": "string", "nullable": true },
+ *                                     "score": { "type": "number", "nullable": true },
+ *                                     "grade": { "type": "string", "nullable": true },
+ *                                     "status": { "type": "string" }
  *                                   }
  *                                 }
  *                               }
@@ -403,95 +286,6 @@
  *                           "minimum": 1,
  *                           "maximum": 100
  *                         }
- *                       }
- *                     }
- *                   }
- *                 },
- *                 "examples": {
- *                   "receivedRoster": {
- *                     "summary": "Sinh viên đã bàn giao, chưa đăng ký",
- *                     "value": {
- *                       "success": true,
- *                       "data": {
- *                         "ojtSemesterId": 1,
- *                         "semester": {
- *                           "id": 1,
- *                           "code": "OJT-2027-01",
- *                           "name": "OJT kỳ 2027-01",
- *                           "academicYearId": 1,
- *                           "academicPeriodId": 6,
- *                           "startDate": "2027-01-01",
- *                           "endDate": "2027-04-30",
- *                           "status": "PLANNED"
- *                         },
- *                         "items": [
- *                           {
- *                             "id": 12,
- *                             "studentId": 12,
- *                             "studentCode": "SE180012",
- *                             "fullName": "Nguyễn Văn An",
- *                             "email": "an@example.edu.vn",
- *                             "phone": null,
- *                             "studentStatus": "ACTIVE",
- *                             "accountStatus": "ACTIVE",
- *                             "ojtSemesterId": 1,
- *                             "programId": 3,
- *                             "programCode": "IS-K18",
- *                             "programName": "Hệ thống thông tin",
- *                             "cohortId": 2,
- *                             "cohortName": "K18",
- *                             "groupCode": "A",
- *                             "handoffStatus": "HANDED_OFF",
- *                             "handoff": {
- *                               "id": 5,
- *                               "createdAt": "2026-10-23T03:00:00Z",
- *                               "createdBy": 8,
- *                               "createdByName": "Cán bộ Đào tạo",
- *                               "reason": "Duyệt danh sách cuối kỳ"
- *                             },
- *                             "eligibilityAtHandoff": {
- *                               "checkId": 100,
- *                               "status": "ELIGIBLE",
- *                               "checkedAt": "2026-10-23T02:00:00Z",
- *                               "confirmedAt": "2026-10-23T02:30:00Z",
- *                               "confirmedBy": 8,
- *                               "ruleSetId": 1,
- *                               "earnedCredits": 72,
- *                               "missingCredits": 0,
- *                               "unpassedCourseCount": 1,
- *                               "validity": "AT_HANDOFF"
- *                             },
- *                             "registrationId": null,
- *                             "registrationStatus": "NOT_REGISTERED",
- *                             "registration": null
- *                           }
- *                         ],
- *                         "total": 1,
- *                         "page": 1,
- *                         "limit": 20
- *                       }
- *                     }
- *                   },
- *                   "emptyRoster": {
- *                     "summary": "Chưa có danh sách phù hợp",
- *                     "value": {
- *                       "success": true,
- *                       "data": {
- *                         "ojtSemesterId": 1,
- *                         "semester": {
- *                           "id": 1,
- *                           "code": "OJT-2027-01",
- *                           "name": "OJT kỳ 2027-01",
- *                           "academicYearId": 1,
- *                           "academicPeriodId": 6,
- *                           "startDate": "2027-01-01",
- *                           "endDate": "2027-04-30",
- *                           "status": "PLANNED"
- *                         },
- *                         "items": [],
- *                         "total": 0,
- *                         "page": 1,
- *                         "limit": 20
  *                       }
  *                     }
  *                   }
@@ -517,4 +311,3 @@
  *   }
  * }
  */
-

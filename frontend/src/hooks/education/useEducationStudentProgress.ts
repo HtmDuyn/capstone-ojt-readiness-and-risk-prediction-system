@@ -1,5 +1,4 @@
-import { studentProgressService, educationOjtWorkflowService } from '@/services/educationService';
-import { progressHandoffStatus } from '@/utils/education/educationOjtCheckQueue';
+import { studentProgressService } from '@/services/educationService';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import React from 'react';
@@ -23,23 +22,17 @@ export function useEducationStudentProgress() {
       setLoading(true);
       setLoadError(null);
       setLoadWarning(null);
+      setStudents([]);
 
       try {
-        const [result, handoffs] = await Promise.all([
-          studentProgressService.loadAll(controller.signal),
-          educationOjtWorkflowService.getHandoffs(undefined, controller.signal).then(
-            rows => ({ rows, error: false }),
-            () => ({ rows: [], error: true }),
-          ),
-        ]);
+        const result = await studentProgressService.loadAll(controller.signal);
         if (active) {
-          setStudents(result.map(student => ({ ...student, handoffStatus: progressHandoffStatus(Number(student.id), handoffs.error ? null : handoffs.rows) })));
+          setStudents(result);
           const partialCount = result.filter(
             (student) => student.dataWarning,
           ).length;
           setLoadWarning([
             partialCount > 0 ? `${partialCount} hồ sơ chưa tải đủ thông tin chi tiết. Các trường chưa có dữ liệu sẽ hiển thị “—”.` : '',
-            handoffs.error ? 'Không tải được lịch sử bàn giao; trạng thái bàn giao đang hiển thị “Chưa xác định”.' : '',
           ].filter(Boolean).join(' ') || null);
         }
       } catch (error) {
@@ -64,5 +57,41 @@ export function useEducationStudentProgress() {
     };
   }, [revision]);
 
-  return { students, loading, loadError, loadWarning, reload };
+  const loadDetails = React.useCallback(async (studentId: number) => {
+    const detail = await studentProgressService.loadDetails(studentId);
+    setStudents(current => current.map(student => student.id === detail.id ? detail : student));
+    return detail;
+  }, []);
+
+  const loadGpa = React.useCallback(async (studentIds: string[]) => {
+    const pending = [...new Set(studentIds)].filter(id => {
+      const student = students.find(item => item.id === id);
+      return student && !student.gpaLoaded && !student.gpaLoading && !student.detailsLoaded;
+    });
+    if (!pending.length) return;
+    setStudents(current => current.map(student => pending.includes(student.id)
+      ? { ...student, gpaLoading: true }
+      : student));
+    let resolved: Map<number, {
+      gpa: number | null; gpaScale: number | null;
+      completedCredits: number | null; totalCredits: number | null;
+    }>;
+    try {
+      resolved = await studentProgressService.loadGpa(pending.map(Number));
+    } catch {
+      resolved = new Map();
+    }
+    setStudents(current => current.map(student => {
+      if (!pending.includes(student.id)) return student;
+      const value = resolved.get(Number(student.id));
+      return {
+        ...student,
+        ...(value ?? {}),
+        gpaLoaded: Boolean(value),
+        gpaLoading: false,
+      };
+    }));
+  }, [students]);
+
+  return { students, loading, loadError, loadWarning, reload, loadDetails, loadGpa };
 }

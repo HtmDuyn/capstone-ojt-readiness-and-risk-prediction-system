@@ -12,8 +12,8 @@
  *       '404': { description: 'Academic year not found.' }
  *   put:
  *     tags: [Academic]
- *     summary: Save Spring, Summer and Fall dates together
- *     description: "ACADEMIC/ADMIN. Send all three semesters in SPRING, SUMMER, FALL order with the revision from GET. Dates must fall inside the first year, be ordered and not overlap. IDs and linked history are preserved. Other dependent calendar constraints still apply."
+ *     summary: Save semester and block dates together
+ *     description: "ACADEMIC/ADMIN. Send all three semesters in SPRING, SUMMER, FALL order with the revision from GET. Dates must fall inside the first year, be ordered and not overlap. Optional blocks and block10 add or update dates within each parent semester. Omitted blocks are preserved. IDs and linked history are preserved. Other dependent calendar constraints still apply."
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -28,6 +28,22 @@
  *               semesters:
  *                 type: array
  *                 minItems: 3
+ *                 maxItems: 3
+ *                 items:
+ *                   type: object
+ *                   additionalProperties: false
+ *                   required: [term, startDate, endDate]
+ *                   properties:
+ *                     term: { type: string, enum: [SPRING, SUMMER, FALL] }
+ *                     startDate: { type: string, format: date }
+ *                     endDate: { type: string, format: date }
+ *               block10:
+ *                 type: array
+ *                 maxItems: 3
+ *                 items:
+ *                   $ref: '#/components/schemas/AcademicYearCreate/properties/blocks/items'
+ *               blocks:
+ *                 type: array
  *                 maxItems: 3
  *                 items:
  *                   type: object

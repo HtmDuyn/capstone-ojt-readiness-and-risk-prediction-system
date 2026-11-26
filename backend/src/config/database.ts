@@ -1,4 +1,5 @@
 import {
+  Client,
   Pool,
   type QueryResult,
   type QueryResultRow,
@@ -65,6 +66,17 @@ const idleTimeout = Number(process.env.DB_IDLE_TIMEOUT_MS ?? 30_000);
 if (!Number.isInteger(idleTimeout) || idleTimeout < 1000 || idleTimeout > 600_000) {
   throw new Error('DB_IDLE_TIMEOUT_MS must be an integer between 1000 and 600000.');
 }
+
+// LISTEN needs a dedicated session, independent of the API pool.
+const scheduleDatabaseUrl = process.env.OJT_SCHEDULE_DATABASE_URL || databaseConfig.url;
+export const createDatabaseListener = () => scheduleDatabaseUrl ? new Client({
+  connectionString: scheduleDatabaseUrl,
+  ssl: databaseConfig.ssl,
+  application_name: 'ojt-schedule-listener',
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10_000,
+  connectionTimeoutMillis: connectionTimeout,
+}) : null;
 
 export const pool = databaseConfig.url
   ? new Pool({

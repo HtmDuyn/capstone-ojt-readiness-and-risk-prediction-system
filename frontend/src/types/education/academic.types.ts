@@ -1,6 +1,8 @@
 export type AcademicYearStatus = "PLANNED" | "ACTIVE" | "COMPLETED" | "CLOSED";
 
 export interface CreateAcademicYearPayload {
+  blocks?: SemesterDates[];
+  block10?: SemesterDates[];
   yearCode: string;
 }
 
@@ -27,6 +29,12 @@ export interface CreateAcademicPeriodPayload {
   status?: AcademicPeriodStatus;
 }
 
+type CalendarRange = { startDate: string; endDate: string };
+export type SemesterBlockCalendar = {
+  mainSemester: CalendarRange;
+  block: CalendarRange;
+};
+
 export interface AcademicPeriod {
   id: number;
   academicYearId: number;
@@ -36,6 +44,9 @@ export interface AcademicPeriod {
   parentPeriodId: number | null;
   startDate: string;
   endDate: string;
+  block10StartDate?: string | null;
+  block10EndDate?: string | null;
+  blockCalendar?: SemesterBlockCalendar | null;
   status: AcademicPeriodStatus;
 }
 
@@ -74,7 +85,7 @@ export interface SemesterDates {
   endDate: string;
 }
 export interface AcademicCalendar {
-  year: AcademicYear;
+  year: AcademicYear & { periods?: Pick<AcademicPeriod, 'id' | 'kind' | 'parentPeriodId' | 'startDate' | 'endDate'>[] };
   semesters: AcademicPeriod[];
   revision: string;
 }

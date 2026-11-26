@@ -52,10 +52,9 @@ export function RetakeClassProposals({periods,cohorts,catalogLoading}:{periods:R
           {semester && <p className="mt-1 text-xs text-slate-500">{day(semester.startDate)} – {day(semester.endDate)}</p>}
           {data.calendarPreview && <p className="mt-1 text-xs text-slate-500">Lịch xem trước</p>}
         </div>
-        <dl className="grid gap-2 sm:grid-cols-3">
+        <dl className="grid gap-2 sm:grid-cols-2">
           {data.calendarPreview && <>
             <div className="rounded-lg border border-slate-200 bg-white px-3 py-2"><dt className="font-semibold">Block 10 · 10 tuần</dt><dd>{day(data.calendarPreview.mainSemester.startDate)} – {day(data.calendarPreview.mainSemester.endDate)}</dd></div>
-            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2"><dt className="font-semibold">Nghỉ · 1 tuần</dt><dd>{day(data.calendarPreview.break.startDate)} – {day(data.calendarPreview.break.endDate)}</dd></div>
           </>}
           <div className="rounded-lg border border-slate-200 bg-white px-3 py-2"><dt className="font-semibold">{data.calendarPreview ? 'Block 3 · 3 tuần' : 'Block 3 đã cấu hình'}</dt><dd>{day(data.block.startDate)} – {day(data.block.endDate)}</dd></div>
         </dl>

@@ -81,15 +81,11 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
     output.ojtRegistrations={items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit};
     }
     // The selected semester is independent of historical-registration pagination.
-    // Before registration exists, resolve curriculum stage 6 through the cohort calendar mapping;
-    // the current period can still be semester 5 while preparing for the upcoming OJT.
+    // Before registration exists, use the next OJT period after the student's current placement;
+    // delayed students are not forced back to their cohort's sixth semester.
     const semesterId=selected??(registrationSemester !== undefined ? registrationSemester : (await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID)??
-      (await c.query(`SELECT o."OJTSemesterID" FROM "StudentAcademicPlacements" placement
-       JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID" AND entry."Kind"='SEMESTER'
-       JOIN "AcademicPeriods" target ON target."Kind"='SEMESTER' AND target."StartDate">=entry."StartDate"
-       JOIN "OJTSemesters" o ON o."AcademicPeriodID"=target."AcademicPeriodID"
-       WHERE placement."StudentID"=$1 AND "StudentCurriculumSemester"(placement."StudentID",target."AcademicPeriodID")=6
-       ORDER BY target."StartDate",o."OJTSemesterID" LIMIT 1`,[id])).rows[0]?.OJTSemesterID??null;
+      (await c.query(`SELECT "OJTSemesterID" FROM "OJTSemesters"
+       WHERE "AcademicPeriodID"="DefaultOJTAcademicPeriod"($1) LIMIT 1`,[id])).rows[0]?.OJTSemesterID??null;
     output.ojtSemesterId=semesterId;
     const decision=semesterId&&(includes.has('eligibility')||includes.has('academic'))?await eligibility(id,{ojtSemesterId:semesterId},c,academicProgress,source):null;
     const official=decision?decision.official:(semesterId&&needsProgress?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null);

@@ -61,7 +61,6 @@ export interface QhdnStudentDossier {
   fullName: string;
   email: string;
   phone: string | null;
-  className: string | null;
   status: string;
   enrollmentYear: number | null;
   currentSemester: number | null;

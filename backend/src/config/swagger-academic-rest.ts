@@ -28,8 +28,7 @@ export function describeAcademicRest(spec: Spec): Spec {
   add('/ojt-semesters','get','/ojt-semesters/{id}/students','get','Danh sách kỳ OJT');
   add('/ojt-semesters/{id}','get','/ojt-semesters/{id}/students','get','Chi tiết kỳ OJT, sinh viên, bàn giao và kết quả');
   add('/ojt-grade-mappings','put','/curricula/{id}/ojt-grade-mappings/{semesterId}','put','Thiết lập quy đổi điểm OJT',{...object,required:['programId','ojtSemesterId'],properties:{programId:id,ojtSemesterId:id}});
-  const handoffBody=source['/api/ojt-semesters/{id}/eligible-student-handoffs'].post.requestBody.content['application/json'].schema;
-  for (const method of ['get','post']) add('/eligible-student-handoffs',method,'/ojt-semesters/{id}/eligible-student-handoffs',method,method==='get'?'Lịch sử bàn giao sinh viên':'Bàn giao sinh viên đủ điều kiện',method==='post'?{...handoffBody,required:['ojtSemesterId',...handoffBody.required],properties:{ojtSemesterId:id,...handoffBody.properties}}:undefined);
+  add('/eligible-student-handoffs','get','/ojt-semesters/{id}/eligible-student-handoffs','get','Lịch sử bàn giao sinh viên');
   add('/academic-notifications','get','/academic/advisory-runs','get','Lịch sử thông báo học vụ');
   add('/academic-notifications/{id}','get','/academic/advisory-runs/{id}','get','Chi tiết thông báo và trạng thái từng sinh viên');
   add('/academic-notifications','post','/academic/academic-summary-notifications','post','Tạo thông báo học vụ theo loại',{...object,required:['type'],properties:{type:{type:'string',enum:['ALERT','SUMMARY','ELIGIBILITY']}}});
@@ -56,7 +55,7 @@ export function describeAcademicRest(spec: Spec): Spec {
   spec.paths['/api/retake-class-proposals']={get:{tags:['Phòng đào tạo'],'x-roles':['ADMIN','ACADEMIC'],security:[{bearerAuth:[]}],
     summary:'Đề xuất chuẩn bị lớp học lại trong Block 3, sĩ số 35 sinh viên',
     description:'Chọn blockPeriodId thuộc BLOCK3, trạng thái PLANNED/ACTIVE. Bắt đầu đề xuất từ 18 sinh viên; 18–22 là ngưỡng chuẩn bị, không phải sĩ số tối đa. Mỗi lớp tối đa 35; phần dư dưới 18 tiếp tục theo dõi. Ví dụ 36 => 1 lớp và theo dõi 1; 52 => 1 lớp và theo dõi 17; 53 => 2 lớp. Đếm sinh viên còn chưa đạt, cần đăng ký học lại, khử trùng cùng môn qua các phạm vi OJT. Không tính môn mới hoặc học lại đang học. Tải lại để cập nhật số lượng; chưa tạo lớp, phân lớp, gửi thông báo hoặc xác nhận đăng ký.',
-    parameters:['blockPeriodId','semesterPeriodId','ojtSemesterId','cohortId','programId','courseId','page','limit'].map(name=>({name,in:'query',required:false,description:name==='semesterPeriodId'?'Chọn kỳ chính để tính lịch xem trước: 10 tuần chính + 1 tuần nghỉ + 3 tuần Block. Không gửi cùng blockPeriodId.':name==='blockPeriodId'?'Chọn Block 3 đã cấu hình. Không gửi cùng semesterPeriodId.':undefined,schema:{...id,...(name==='limit'?{maximum:100,default:20}:{})}})),
+    parameters:['blockPeriodId','semesterPeriodId','ojtSemesterId','cohortId','programId','courseId','page','limit'].map(name=>({name,in:'query',required:false,description:name==='semesterPeriodId'?'Chọn kỳ chính để tính lịch xem trước: 10 tuần Block 10, tiếp theo là 3 tuần Block 3. Không gửi cùng blockPeriodId.':name==='blockPeriodId'?'Chọn Block 3 đã cấu hình. Không gửi cùng semesterPeriodId.':undefined,schema:{...id,...(name==='limit'?{maximum:100,default:20}:{})}})),
     responses:{200:{description:'Số liệu đề xuất và số sinh viên tiếp tục theo dõi.',content:{'application/json':{schema:{type:'object',properties:{success:{type:'boolean'},data:{type:'object',properties:{
       block:object,calendarPreview:{...object,nullable:true,description:'Lịch tính từ kỳ chính; chỉ xem trước, chưa lưu hoặc sửa lịch chính thức.'},policy:{type:'object',properties:{minimumToPrepare:{type:'integer',enum:[18]},preparationRangeEnd:{type:'integer',enum:[22]},classCapacity:{type:'integer',enum:[35]}}},
       summary:object,excludedStudentCount:{type:'integer'},unresolvedAlternativeStudentCount:{type:'integer'},total:{type:'integer'},page:id,limit:id,computedAt:{type:'string',format:'date-time'},limitations:{type:'array',items:{type:'string'}},
@@ -69,7 +68,7 @@ export function describeAcademicRest(spec: Spec): Spec {
     '/curricula/{id}/ojt-grade-mappings/{semesterId}':['get','put'], '/ojt-rule-sets/{id}':['patch'], '/ojt-rule-sets/{id}/publish':['post'],
     '/academic/alerts/notifications':['post'], '/academic/academic-summary-notifications':['post'], '/academic/eligibility-notifications':['post'],
     '/academic/advisory-runs':['get'], '/academic/advisory-runs/{id}':['get'], '/curriculum-imports/preview':['post'], '/curriculum-imports/commit':['post'],
-    '/imports/preview':['post'], '/imports/commit':['post'], '/ojt-semesters/{id}/eligible-student-handoffs':['get','post'],
+    '/imports/preview':['post'], '/imports/commit':['post'], '/ojt-semesters/{id}/eligible-student-handoffs':['get'],
     '/students/{id}/course-results':['get'], '/students/{id}/combo-selections':['get'], '/students/{id}/eligibility':['get'], '/students/{id}/eligibility-checks':['get'],
   };
   for (const [path,methods] of Object.entries(retired)) for (const method of methods) {
@@ -79,7 +78,5 @@ export function describeAcademicRest(spec: Spec): Spec {
     else delete item[method];
     if(!Object.keys(item).length)delete spec.paths['/api'+path];
   }
-  const eligibilitySchema=spec.paths['/api/eligibility-check-runs']?.post?.requestBody?.content?.['application/json']?.schema;
-  if(eligibilitySchema?.properties)eligibilitySchema.properties.confirmResults={type:'boolean',default:true,description:'false: chỉ tính và cập nhật StudentOJTEligibility, không xác nhận kết quả chính thức. FE dùng false cho lần xét nền sau import.'};
   return spec;
 }

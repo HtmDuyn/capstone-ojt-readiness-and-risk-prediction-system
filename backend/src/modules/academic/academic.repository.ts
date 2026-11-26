@@ -2,11 +2,12 @@ import { enrichListRows } from '../../shared/list-context';
 import { pool, query } from '../../config/database';
 import type { PoolClient } from 'pg';
 import { academicError, pageInput, positiveId, statusInput } from './academic.schema';
+import { previewBlockCalendar } from '../academic-reporting/block-calendar';
 import { academicPeriodStatusSql } from './period-status';
 
 export const resources = {
   'academic-years': { table: 'AcademicYears', id: 'AcademicYearID', code: 'YearCode', fields: { yearCode: 'YearCode', startDate: 'StartDate', endDate: 'EndDate', status: 'Status' } },
-  'academic-periods': { table: 'AcademicPeriods', id: 'AcademicPeriodID', code: 'PeriodCode', fields: { academicYearId: 'AcademicYearID', periodCode: 'PeriodCode', name: 'Name', kind: 'Kind', parentPeriodId: 'ParentPeriodID', startDate: 'StartDate', endDate: 'EndDate', status: 'Status' } },
+  'academic-periods': { table: 'AcademicPeriods', id: 'AcademicPeriodID', code: 'PeriodCode', fields: { academicYearId: 'AcademicYearID', periodCode: 'PeriodCode', name: 'Name', kind: 'Kind', parentPeriodId: 'ParentPeriodID', block10StartDate: 'Block10StartDate', block10EndDate: 'Block10EndDate', startDate: 'StartDate', endDate: 'EndDate', status: 'Status' } },
   cohorts: { table: 'Cohorts', id: 'CohortID', code: 'CohortCode', fields: { cohortCode: 'CohortCode', name: 'Name', enrollmentYear: 'EnrollmentYear', status: 'Status' } },
 } as const;
 export type Resource = keyof typeof resources;
@@ -25,6 +26,12 @@ export function asApi(resource: Resource, row: AcademicRecord): AcademicRecord {
   if (resource === 'cohorts') value.groups = row.groups ?? [];
   if (resource === 'academic-years') value.periods = row.periods ?? [];
   if (resource === 'academic-periods') { value.ojt = row.ojt ?? null; value.ojtSemesterId = row.ojt?.id ?? null; }
+  if (resource === 'academic-periods' && value.kind === 'SEMESTER' && value.startDate && value.endDate) {
+    const savedBlock10 = value.block10StartDate && value.block10EndDate
+      ? { startDate: value.block10StartDate, endDate: value.block10EndDate } : undefined;
+    const preview = previewBlockCalendar(value.startDate, savedBlock10);
+    value.blockCalendar = preview.block.endDate <= value.endDate ? preview : null;
+  }
   if(resource==='academic-periods'&&row.comboPhaseSchedules!==undefined){value.comboPhaseSchedules=row.comboPhaseSchedules;value.advisorySchedule=row.advisorySchedule;}
   return value;
 }

@@ -8,7 +8,8 @@ import { currentCV, cvMetadataSql } from './cv.service';
 import { validateCertificateLinks } from './certificate.service';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
 import { requireStudentAdmission, studentAdmission } from '../student-portal/admission.service';
-import { assertOjtSemesterSix } from '../academic/workflow-policy';
+import { assertOjtPathway } from '../academic/workflow-policy';
+import { recordOjt202InProgress } from '../academic/ojt-course-enrollment';
 import { invalid, inputObject, positiveId, optionalText, pagination, enumValue } from './student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { assertPostPhase } from '../recruitment/round-policy';
@@ -28,7 +29,7 @@ const applicationSelect=`SELECT a."ApplicationID" AS id,a."RegistrationID" AS "r
  CASE WHEN cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('cv')} END AS cv,
  a."CertificateLinks" AS certificates,
  a."ApplicationSnapshot" AS "applicationSnapshot",
- r."Status" AS "registrationStatus",EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AS "handedOff",
+ r."Status" AS "registrationStatus",EXISTS(SELECT 1 FROM "OJTRecruitmentAccess" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AS "handedOff",
  (SELECT jsonb_build_object('id',co."CoordinationID",'decision',co."Decision",'rejectReason',co."RejectReason",'coordinatedAt',co."CoordinatedAt",'assignmentId',ass."AssignmentID",'assignmentStatus',ass."Status") FROM "StudentEnterpriseCoordination" co LEFT JOIN "InternshipAssignments" ass ON ass."CoordinationID"=co."CoordinationID" WHERE co."ApplicationID"=a."ApplicationID" ORDER BY co."CoordinationID" DESC LIMIT 1) AS coordination
  FROM "JobApplications" a JOIN "OJTRegistrations" r ON r."RegistrationID"=a."RegistrationID" JOIN "Students" s ON s."StudentID"=a."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID" LEFT JOIN "StudentCVFiles" cv ON cv."CVFileID"=a."CVFileID"`;
 
@@ -42,6 +43,7 @@ export async function applyToPosition(body:unknown,actor:Actor) {
   const form=b.application===undefined?{}:inputObject(b.application,['contactPhone','contactEmail','note']);
   return academicTransaction(async c=>{
     const s=await ownStudent(c,actor);
+    await c.query('SELECT "StudentID" FROM "Students" WHERE "StudentID"=$1 FOR UPDATE',[s.StudentID]);
     await requireLifecycleSchema(c);
     await assertPostPhase(c,postId,'APPLICATION');
     const applicationForm={
@@ -109,9 +111,12 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       throw invalid('Đơn đăng ký đang được doanh nghiệp xử lý hoặc đã được tiếp nhận.',409,'APPLICATION_ALREADY_IN_PROCESS');
     }
     const admission = await requireStudentAdmission(c,s.StudentID,semesterId);
+    if (admission.source==='SAVED_ELIGIBILITY' && (admission.roundId===null || admission.roundId!==p.PostWindowID))
+      throw invalid('Sinh viên chưa được xếp vào đợt OJT này.',409,'OJT_ROUND_NOT_ASSIGNED');
     const cv=await currentCV(c,s.StudentID);
     if(!cv)throw invalid('Upload a PDF CV before applying.',409,'CV_REQUIRED');
-    const pathway={...await assertOjtSemesterSix(c,s.StudentID,semesterId),admissionSource:'ACADEMIC_HANDOFF'};
+    const pathway={...await assertOjtPathway(c,s.StudentID,semesterId),admissionSource:admission.source};
+    await recordOjt202InProgress(c,s.StudentID,semesterId,actor.userId);
     if(!r){
       const row=(await c.query(`INSERT INTO "OJTRegistrations"
         ("StudentID","OJTSemesterID","WindowID","ProgramID","Application","Status","SubmittedBy","RegisteredAt","PathwaySnapshot")
@@ -188,7 +193,9 @@ export async function studentOpportunities(params:Row,actor:Actor,existingClient
       LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
       WHERE s."StudentID"=$1`,[s.StudentID])).rows[0];
     const blockers:string[]=[];
-    if(!(await c.query('SELECT 1 FROM "EligibleStudentHandoffItems" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2',[s.StudentID,semesterId])).rowCount)blockers.push('ELIGIBLE_HANDOFF_REQUIRED');
+    if(!admission)blockers.push('ELIGIBLE_HANDOFF_REQUIRED');
+    if(admission?.source==='SAVED_ELIGIBILITY' && (admission.roundId===null || (w.RecruitmentRoundID && admission.roundId!==w.RecruitmentRoundID)))
+      blockers.push('OJT_ROUND_NOT_ASSIGNED');
     if(admission&&(admission.status!=='ELIGIBLE'||admission.isStale))blockers.push(admission.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
     if(r&&r.ProgramID!==s.ProgramID)blockers.push('REGISTRATION_PROGRAM_CHANGED');
     if(w.Status!=='OPEN'||w.Now<new Date(w.StartsAt)||w.Now>=new Date(w.EndsAt))blockers.push('OJT_REGISTRATION_WINDOW_UNAVAILABLE');

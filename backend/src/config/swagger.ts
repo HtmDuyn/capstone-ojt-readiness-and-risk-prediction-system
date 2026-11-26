@@ -3,7 +3,7 @@ import { describeCvExtraction } from '../modules/student-portal/cv-extraction.op
 import { describeJobExtraction } from '../modules/recruitment/job-extraction.openapi';
 import { describeJobMatching } from '../modules/student-portal/job-matching.openapi';
 import { addStudentTaskOperations, describeStudentTaskResponses } from '../modules/student-portal/task.openapi';
-import { describeFrontendEligibilityResults } from '../modules/eligibility/frontend-results.openapi';
+import { describeOjtEligibilityResults } from '../modules/eligibility/frontend-results.openapi';
 import { describeHandoffWorkflow } from './swagger-handoff-workflow';
 import { describeAcademicContracts, describeAcademicOperationContracts } from './swagger-academic-contracts';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
@@ -384,7 +384,7 @@ describeOfficialResults(swaggerWithQhdn as Record<string, any>);
 describeMergedSearchResponses(swaggerWithQhdn);
 describeFeResponses(swaggerWithQhdn);
 const describedSpec = describeManualInputs(addPortalOperations(swaggerWithQhdn));
-describeFrontendEligibilityResults(describedSpec);
+describeOjtEligibilityResults(describedSpec);
 describeStudentWorkflow(describedSpec);
 describeListResponses(describedSpec);
 describeMergedDetailLists(describedSpec);

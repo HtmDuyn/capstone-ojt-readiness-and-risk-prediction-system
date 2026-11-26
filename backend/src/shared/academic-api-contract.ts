@@ -3,7 +3,7 @@ import type { RequestHandler } from 'express';
 export const academicOperations:Record<string,string[]> = {
   '/assessment-windows':['get','post','patch'],
   '/ojt-semesters':['get'], '/ojt-semesters/{id}':['get'],
-  '/ojt-grade-mappings':['put'], '/eligible-student-handoffs':['get','post'],
+  '/ojt-grade-mappings':['put'], '/eligible-student-handoffs':['get'],
   '/academic-notifications':['get','post'],
   '/student-imports':['get','post','patch'], '/student-imports/{id}':['get'],
   '/curriculum-imports':['get','post','patch'], '/curriculum-imports/{id}':['get'],
@@ -19,7 +19,6 @@ export const academicOperations:Record<string,string[]> = {
   '/majors':['get'], '/courses':['get'],
   '/curricula':['get'], '/curricula/{id}':['get'],
   '/ojt-rule-sets':['get','post','patch'],
-  '/eligibility-check-runs':['post'],
   '/ojt-semesters/{id}/students':['get'],
   '/students':['get'], '/students/{id}':['get','patch'],
   '/course-results/{id}':['patch'], '/academic-imports':['get'], '/ojt-results':['get'],

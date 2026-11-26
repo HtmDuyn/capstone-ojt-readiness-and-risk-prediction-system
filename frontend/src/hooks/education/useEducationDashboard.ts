@@ -92,9 +92,9 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
       setFiltersError("");
 
       const results = await Promise.allSettled([
-        sharedRead('catalog:years', () => getAllItems(API_PATHS.years), controller.signal),
-        sharedRead('catalog:periods', () => getAllItems(API_PATHS.periods), controller.signal),
-        sharedRead('catalog:cohorts', () => academicReportingService.cohorts(), controller.signal),
+        sharedRead('catalog:years', () => getAllItems(API_PATHS.years), controller.signal, 5 * 60_000),
+        sharedRead('catalog:periods', () => getAllItems(API_PATHS.periods), controller.signal, 5 * 60_000),
+        sharedRead('catalog:cohorts', () => academicReportingService.cohorts(), controller.signal, 5 * 60_000),
       ]);
 
       if (controller.signal.aborted) return;
@@ -176,8 +176,9 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
     const controller = new AbortController();
     setDashboardLoading(true); setDashboardError(''); setDashboardWarning('');
     setDashboardData(null); setStudentTotal(null);
-    educationOverviewService.load(overviewParams, controller.signal, total => {
-      if (!controller.signal.aborted) setStudentTotal(total);
+    sharedRead(`overview:${JSON.stringify(overviewParams)}`, () => educationOverviewService.load(overviewParams), controller.signal, 30_000).then(data => {
+      if (!controller.signal.aborted) setStudentTotal(data.summary.total);
+      return data;
     }).then(data => {
       if (!controller.signal.aborted) { setDashboardData(data); setDashboardWarning(data.warning); }
     }).catch(error => {

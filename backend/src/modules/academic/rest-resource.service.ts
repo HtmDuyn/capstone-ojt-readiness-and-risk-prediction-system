@@ -62,7 +62,7 @@ export async function semesters(params:Row,id?:number){
       o."AcademicYearID" AS "academicYearId",o."AcademicPeriodID" AS "academicPeriodId",o."StartDate" AS "startDate",o."EndDate" AS "endDate",o."Status" AS status,
       (SELECT to_jsonb(w) FROM "OJTAssessmentWindows" w WHERE w."OJTSemesterID"=o."OJTSemesterID") AS "assessmentWindow",
       (SELECT count(*)::int FROM "OJTRegistrations" r WHERE r."OJTSemesterID"=o."OJTSemesterID") AS "registrationCount",
-      (SELECT count(*)::int FROM "EligibleStudentHandoffItems" h WHERE h."OJTSemesterID"=o."OJTSemesterID") AS "handedOffStudentCount"
+      (SELECT count(*)::int FROM ojt_history."StudentEligibilityItems" h WHERE h."OJTSemesterID"=o."OJTSemesterID") AS "handedOffStudentCount"
       FROM "OJTSemesters" o WHERE ($1::int IS NULL OR o."OJTSemesterID"=$1) ORDER BY o."OJTSemesterID" DESC LIMIT $2 OFFSET $3`,[id??null,id?1:p.limit,id?0:p.offset])).rows;
     return {items:await enrichListRows(c,rows),total,page:p.page,limit:p.limit};
   });

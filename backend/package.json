@@ -13,7 +13,7 @@
     "test:enterprise-grading": "node --test tests/enterprise-grading.test.cjs",
     "pretest:study-periods": "npm run build",
     "test:study-periods": "node --test tests/study-periods.test.cjs",
-    "migrate:enterprise-grading": "node scripts/migrate-enterprise-grading.cjs",
+    "ojt:assess-due": "node dist/jobs/run-due-ojt-assessments.js",
     "jobs:provisioning": "node scripts/provisioning-jobs.cjs",
     "check:mail": "node scripts/check-mail.cjs",
     "check:notifications": "node scripts/check-notifications.cjs"
@@ -43,7 +43,7 @@
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.0",
-    "swagger-jsdoc": "^6.3.0",
+    "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {

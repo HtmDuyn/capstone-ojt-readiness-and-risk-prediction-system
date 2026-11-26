@@ -14,12 +14,30 @@ export function defaultSemesters(year: number): SemesterDates[] {
     { term: 'FALL', startDate: `${year}-09-01`, endDate: `${year}-12-31` },
   ];
 }
+const validCalendarDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+type DateRange = Pick<SemesterDates, 'startDate' | 'endDate'>;
+export function blockDateError(block: DateRange | undefined, semester: DateRange, label = 'Block 3'): string {
+  if (!block || !validCalendarDate(block.startDate) || !validCalendarDate(block.endDate))
+    return `Chọn đủ ngày bắt đầu và kết thúc ${label} hợp lệ.`;
+  if (block.startDate > block.endDate) return `Ngày kết thúc ${label} không được trước ngày bắt đầu.`;
+  if (block.startDate < semester.startDate || block.endDate > semester.endDate)
+    return `${label} phải nằm trong học kỳ tương ứng.`;
+  return '';
+}
+
+export function blockDateBounds(block: DateRange | undefined, semester: DateRange, field: keyof DateRange) {
+  const inside = (value?: string) => value && validCalendarDate(value) &&
+    semester.startDate <= value && value <= semester.endDate;
+  return {
+    min: field === 'endDate' && inside(block?.startDate) ? block?.startDate : semester.startDate,
+    max: field === 'startDate' && inside(block?.endDate) ? block?.endDate : semester.endDate,
+  };
+}
 export function calendarErrors(year: number, rows: SemesterDates[]): string[] {
   if (rows.length !== 3 || rows.some((row, i) => row.term !== CALENDAR_TERMS[i])) return ['Phải có đủ Spring → Summer → Fall theo đúng thứ tự.'];
   const errors: string[] = [];
   rows.forEach((row, i) => {
-    const valid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
-    if (!valid(row.startDate) || !valid(row.endDate)) errors.push(`${TERM_LABEL[row.term]}: nhập đủ ngày bắt đầu và kết thúc hợp lệ.`);
+    if (!validCalendarDate(row.startDate) || !validCalendarDate(row.endDate)) errors.push(`${TERM_LABEL[row.term]}: nhập đủ ngày bắt đầu và kết thúc hợp lệ.`);
     else if (row.startDate > row.endDate) errors.push(`${TERM_LABEL[row.term]}: ngày kết thúc không được trước ngày bắt đầu.`);
     else if (row.startDate < `${year}-01-01` || row.endDate > `${year}-12-31`) errors.push(`${TERM_LABEL[row.term]} phải nằm trong năm ${year}.`);
     if (i > 0 && row.startDate && rows[i - 1].endDate && row.startDate <= rows[i - 1].endDate) errors.push(`${TERM_LABEL[row.term]} phải bắt đầu sau ngày kết thúc ${TERM_LABEL[rows[i - 1].term]}.`);

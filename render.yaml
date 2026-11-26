@@ -1,0 +1,14 @@
+services:
+  - type: cron
+    name: ojt-assess-due
+    runtime: node
+    rootDir: backend
+    # Midnight in Vietnam (UTC+7).
+    schedule: "0 17 * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run ojt:assess-due
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_POOL_MAX
+        value: "1"

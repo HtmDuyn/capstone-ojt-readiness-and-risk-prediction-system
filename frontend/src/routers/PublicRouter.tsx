@@ -186,10 +186,6 @@ const educationRoutes: RouteObject = {
           path: "/education/ojt-policy",
           lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtPolicy")).default }),
         },
-        {
-          path: "/education/ojt-handoff",
-          lazy: async () => ({ Component: (await import("@/pages/education/EducationOjtHandoff")).default }),
-        },
 
         /* =========================
            QUẢN LÝ SINH VIÊN

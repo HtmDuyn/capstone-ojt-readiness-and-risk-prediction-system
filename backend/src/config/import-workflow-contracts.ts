@@ -7,7 +7,7 @@ export function describeImportWorkflow(spec: Record<string,any>) {
   }
   const integer={type:'integer',minimum:1};
   const academic={type:'object',additionalProperties:false,required:['programId','placement','courseResults'],properties:{
-    programId:integer,phone:{type:'string',nullable:true},className:{type:'string',nullable:true},status:{type:'string',enum:['ACTIVE','INACTIVE','SUSPENDED','GRADUATED','DROPPED_OUT']},
+    programId:integer,phone:{type:'string',nullable:true},status:{type:'string',enum:['ACTIVE','INACTIVE','SUSPENDED','GRADUATED','DROPPED_OUT']},
     placement:{type:'object',additionalProperties:false,required:['cohortId','groupCode','currentAcademicPeriodId'],properties:{cohortId:integer,groupCode:{type:'string',enum:['A','B','C','D']},entryAcademicPeriodId:integer,currentAcademicPeriodId:integer}},
     courseResults:{type:'array',maxItems:1000,items:{type:'object',additionalProperties:false,required:['courseCode','academicPeriodId','status'],properties:{courseCode:{type:'string'},academicPeriodId:integer,attemptNumber:{...integer,maximum:100},status:{type:'string',enum:['PASSED','FAILED','IN_PROGRESS','WITHDRAWN','RECOGNIZED']},score:{type:'number',minimum:0,maximum:10,nullable:true},gradePoints:{type:'number',minimum:0,maximum:4,nullable:true},grade:{type:'string',nullable:true},sourceReference:{type:'string',nullable:true}}}},
   }};
@@ -18,7 +18,7 @@ export function describeImportWorkflow(spec: Record<string,any>) {
     {properties:{kind:{enum:['ENTERPRISE']},rows:{items:{type:'object',required:['name']}}}},
   ];
   schema.properties.rows.items.properties.code.description='Mã sinh viên bắt buộc. Mã doanh nghiệp tự sinh theo dạng DN000001 khi bỏ trống; mã cũ vẫn được chấp nhận để tương thích file đã có.';
-  const studentExample={kind:'STUDENT',idempotencyKey:'student-full-001',rows:[{code:'SV001',email:'student@example.com',fullName:'Nguyễn Văn A',academic:{programId:1,className:'SE01',placement:{cohortId:1,groupCode:'A',currentAcademicPeriodId:1},courseResults:[{courseCode:'PRF192',academicPeriodId:1,status:'PASSED',score:8,gradePoints:3.5,grade:'B'}]}}]};
+  const studentExample={kind:'STUDENT',idempotencyKey:'student-full-001',rows:[{code:'SV001',email:'student@example.com',fullName:'Nguyễn Văn A',academic:{programId:1,placement:{cohortId:1,groupCode:'A',currentAcademicPeriodId:1},courseResults:[{courseCode:'PRF192',academicPeriodId:1,status:'PASSED',score:8,gradePoints:3.5,grade:'B'}]}}]};
   const enterpriseExample={kind:'ENTERPRISE',idempotencyKey:'enterprise-account-001',rows:[{email:'hr@example.com',fullName:'Người phụ trách',name:'Công ty ABC'}]};
   schema.example=enterpriseExample;
   for(const mode of ['preview','commit']){

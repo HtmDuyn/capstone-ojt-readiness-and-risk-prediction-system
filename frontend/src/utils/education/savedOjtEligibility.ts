@@ -12,7 +12,7 @@ export interface SavedOjtEligibility {
   savedBy?: number;
   batchId?: number;
   isStale: boolean;
-  source?: 'FRONTEND';
+  source?: 'FRONTEND' | 'BACKEND';
   rule?: OjtAppliedCondition;
 }
 

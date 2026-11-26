@@ -62,6 +62,11 @@ const SUBJECT_STATUS_LABELS: Partial<Record<SubjectStatus, string>> = {
   "Not Passed": "Không đạt",
 };
 
+const COURSE_RESULT_STATUS_LABELS: Record<string, string> = {
+  PASSED: 'Đạt', FAILED: 'Không đạt', IN_PROGRESS: 'Đang học',
+  WITHDRAWN: 'Đã rút', RECOGNIZED: 'Được công nhận',
+};
+
 const OJT_ELIGIBILITY_STYLES: Record<OjtEligibilityStatus, string> = {
   "Đủ điều kiện": "border-emerald-200 bg-emerald-50 text-emerald-700",
 
@@ -77,12 +82,47 @@ const OJT_ELIGIBILITY_STYLES: Record<OjtEligibilityStatus, string> = {
    ========================================================= */
 
 const EducationStudentProgress: React.FC = () => {
-  const { students, loading, loadError, loadWarning, reload } = useEducationStudentProgress();
+  const { students, loading, loadError, loadWarning, reload, loadDetails, loadGpa } = useEducationStudentProgress();
 
   const [selectedStudent, setSelectedStudent] =
     React.useState<StudentProgress | null>(null);
 
-  const handleCloseStudentDetail = () => setSelectedStudent(null);
+  const [selectedStudentLoading, setSelectedStudentLoading] = React.useState(false);
+  const [selectedStudentError, setSelectedStudentError] = React.useState<string | null>(null);
+  const selectionRequest = React.useRef(0);
+
+  const handleSelectStudent = async (student: StudentProgress) => {
+    const requestId = ++selectionRequest.current;
+    setSelectedStudent(student);
+    setSelectedStudentError(null);
+    if (student.detailsLoaded) {
+      setSelectedStudentLoading(false);
+      return;
+    }
+    setSelectedStudentLoading(true);
+    try {
+      const detail = await loadDetails(Number(student.id));
+      if (selectionRequest.current === requestId) setSelectedStudent(detail);
+    } catch (error) {
+      if (selectionRequest.current === requestId) {
+        setSelectedStudentError(error instanceof Error ? error.message : 'Không tải được hồ sơ chi tiết.');
+      }
+    } finally {
+      if (selectionRequest.current === requestId) setSelectedStudentLoading(false);
+    }
+  };
+
+  const handleCloseStudentDetail = () => {
+    selectionRequest.current += 1;
+    setSelectedStudent(null);
+    setSelectedStudentLoading(false);
+    setSelectedStudentError(null);
+  };
+
+  const handleReload = () => {
+    handleCloseStudentDetail();
+    reload();
+  };
 
   /* =======================================================
        SELECTED STUDENT DATA
@@ -125,7 +165,7 @@ const EducationStudentProgress: React.FC = () => {
         badge="Quản lý sinh viên"
       />
 
-      <StudentProgressList students={students} loading={loading} error={loadError} warning={loadWarning} onSelect={setSelectedStudent} onReload={reload} />
+      <StudentProgressList students={students} loading={loading} error={loadError} warning={loadWarning} onSelect={student => void handleSelectStudent(student)} onReload={handleReload} onLoadGpa={ids => void loadGpa(ids)} />
 
       {selectedStudent && (
         <div
@@ -158,6 +198,8 @@ const EducationStudentProgress: React.FC = () => {
             {/* BODY */}
 
             <div className="min-h-0 min-w-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto break-words px-4 py-6 sm:px-6">
+              {selectedStudentLoading && <p role="status" className="rounded-xl bg-blue-50 p-4 text-sm text-blue-800">Đang tải hồ sơ học tập chi tiết. Danh sách đã được tải trước để mở màn hình nhanh hơn.</p>}
+              {selectedStudentError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-800"><span>{selectedStudentError}</span><button onClick={() => void handleSelectStudent(selectedStudent)} className="font-semibold underline">Thử lại</button></div>}
               {selectedStudent.dataWarning && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">{selectedStudent.dataWarning}</p>}
               <div className="space-y-4">
               {/* STUDENT INFO */}
@@ -270,7 +312,7 @@ const EducationStudentProgress: React.FC = () => {
                             chỉ và có không quá {OJT_MAX_NOT_PASSED_SUBJECTS}{" "}
                             môn chưa đạt.
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả tham khảo đã tính và lưu; không thay thế quyết định OJT chính thức.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức.' : 'Chưa có kết quả đã lưu.'}</p>
+                          <p className="mt-1 text-xs text-slate-500">{selectedStudent.eligibilitySource === 'BACKEND' || selectedStudent.eligibilitySource === 'FRONTEND' ? 'Kết quả xét điều kiện đã lưu trên hệ thống.' : selectedStudent.eligibilitySource === 'OFFICIAL' ? 'Theo quyết định OJT chính thức.' : 'Chưa có kết quả đã lưu.'}</p>
                         </div>
                       </div>
                     </div>
@@ -472,6 +514,35 @@ const EducationStudentProgress: React.FC = () => {
               {/* =================================================
                     UNFINISHED SUBJECTS
                     ================================================= */}
+
+              <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
+                <div className="flex items-center gap-3">
+                  <GraduationCap size={20} className="text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold text-slate-800">Lịch sử các môn đã học</h3>
+                    <p className="text-xs text-slate-500">Tất cả kết quả và các lần học đã lưu</p>
+                  </div>
+                </div>
+                {selectedStudentLoading ? (
+                  <p role="status" className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Đang tải lịch sử môn học...</p>
+                ) : selectedStudent.courseHistory?.length ? (
+                  <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full min-w-[700px] text-left text-sm">
+                      <thead className="bg-blue-50 text-slate-700"><tr>{['Mã môn','Tên môn','Học kỳ','Lần học','Trạng thái','Điểm'].map(label => <th key={label} className="whitespace-nowrap px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
+                      <tbody>{selectedStudent.courseHistory.map(attempt => <tr key={attempt.id} className="border-t border-slate-100 hover:bg-blue-50/60">
+                        <td className="whitespace-nowrap px-4 py-3 font-medium">{attempt.code}</td>
+                        <td className="px-4 py-3">{attempt.name}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{attempt.academicPeriod}</td>
+                        <td className="px-4 py-3">{attempt.attemptNumber}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{(COURSE_RESULT_STATUS_LABELS[attempt.status] ?? attempt.status) || '—'}</td>
+                        <td className="px-4 py-3">{attempt.score ?? '—'}</td>
+                      </tr>)}</tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Chưa có kết quả môn học đã lưu cho sinh viên này.</p>
+                )}
+              </section>
 
               <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:px-5">
                 <div className="flex items-center gap-3">

@@ -102,11 +102,6 @@
  *             "maxLength": 20,
  *             "nullable": true
  *           },
- *           "className": {
- *             "type": "string",
- *             "maxLength": 20,
- *             "nullable": true
- *           },
  *           "status": {
  *             "type": "string",
  *             "enum": [

@@ -1,7 +1,5 @@
 import type { OjtAppliedCondition } from './eligibility.types';
 
-export type Handoff = { id: number; ojtSemesterId: number; semesterCode?: string; semester?: { id: number; name: string; code: string } | null; studentCount: number; studentIds: number[]; studentConditions?: { studentId: number; condition: OjtAppliedCondition | null }[]; createdAt: string; reason: string };
-
 export type OjtFinalResult = {
   id: number;
   studentCode: string;

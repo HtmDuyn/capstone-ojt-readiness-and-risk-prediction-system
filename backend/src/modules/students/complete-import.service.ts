@@ -6,7 +6,7 @@ import { inputObject, positiveId, requiredText, optionalText, enumValue, resultV
 
 // Profile and history share the provisioning transaction; one invalid row rolls back everything.
 export async function importAcademicProfile(c: PoolClient, studentId: number, raw: unknown, actorId: number) {
-  const b = inputObject(raw, ['programId','phone','className','status','placement','courseResults']);
+  const b = inputObject(raw, ['programId','phone','status','placement','courseResults']);
   const programId = positiveId(b.programId, 'programId');
   const placement = inputObject(b.placement, ['cohortId','groupCode','entryAcademicPeriodId','currentAcademicPeriodId']);
   positiveId(placement.cohortId, 'cohortId');
@@ -16,7 +16,6 @@ export async function importAcademicProfile(c: PoolClient, studentId: number, ra
   if (!student) throw invalid('Student not found or deleted.', 409);
   await assignPlacementWithClient(c, studentId, {...placement, programId, reason:'Complete student import'}, actorId);
   if (b.phone !== undefined) await c.query('UPDATE "Users" SET "Phone"=$2,"UpdatedAt"=now() WHERE "UserID"=$1', [student.UserID, optionalText(b.phone,'phone',20)]);
-  if (b.className !== undefined) await c.query('UPDATE "Students" SET "ClassName"=$2 WHERE "StudentID"=$1', [studentId, optionalText(b.className,'className',20)]);
   if (b.status !== undefined) await c.query('UPDATE "Students" SET "Status"=$2 WHERE "StudentID"=$1', [studentId, enumValue(b.status,['ACTIVE','INACTIVE','SUSPENDED','GRADUATED','DROPPED_OUT'],'status')]);
   const seen = new Set<string>();
   for (const rawResult of b.courseResults) {

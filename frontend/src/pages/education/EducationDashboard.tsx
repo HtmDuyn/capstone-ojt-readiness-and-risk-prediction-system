@@ -181,7 +181,7 @@ export const EducationDashboard: React.FC = () => {
               <MetricCard
                 label="Đủ điều kiện OJT"
                 value={eligibleStudents}
-                description="Theo kết quả FE đã lưu"
+                description="Theo kết quả xét OJT đã lưu"
                 icon={<CheckCircle2 size={18} />}
                 iconClass="bg-green-50 text-green-600"
                 loading={dashboardLoading}

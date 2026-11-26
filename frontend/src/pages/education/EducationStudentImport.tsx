@@ -263,7 +263,6 @@ const EducationStudentImport: React.FC = () => {
                       "Họ tên",
                       "Email",
                       "Số điện thoại",
-                      "Lớp",
                       "Chương trình",
                       "Chuyên ngành",
                       "Trạng thái học vụ",
@@ -292,7 +291,6 @@ const EducationStudentImport: React.FC = () => {
                       <td className="px-4 py-3">{row.fullName}</td>
                       <td className="px-4 py-3">{row.email}</td>
                       <td className="whitespace-nowrap px-4 py-3">{row.academic.phone ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3">{row.academic.className ?? '—'}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium">{catalogs?.programs.find(p => p.id === row.academic.programId)?.aliases.find(alias => !alias.includes(' ') && /[A-Za-z]/.test(alias)) ?? `ID ${row.academic.programId}`}</p>
                         {catalogs?.programs.find(
@@ -349,7 +347,9 @@ const EducationStudentImport: React.FC = () => {
                 {result.replayed ? " (yêu cầu đã được xử lý trước đó)" : ""}.</span>
             </p>
             <StudentImportEmailStatus result={result} />
-            <p>Để xét điều kiện OJT từ dữ liệu vừa nhập, chuyển đến trang Xét điều kiện đi OJT, chọn phạm vi và bấm xét điều kiện.</p>
+            {result.ojtAssessment?.status === 'COMPLETED' && <p>Đã xét OJT tự động cho {result.ojtAssessment.checkedCount} sinh viên trong đợt nhập.</p>}
+            {result.ojtAssessment?.status === 'NO_EFFECTIVE_CONDITION' && <p>Chưa xét OJT vì chưa có điều kiện đến ngày áp dụng.</p>}
+            {result.ojtAssessment?.status === 'FAILED' && <p role="alert">Dữ liệu đã lưu. Chưa hoàn tất xét OJT tự động, có thể xét lại trên trang xét điều kiện.</p>}
             <Link to="/education/ojt-conditions" className="inline-flex rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700">
               Chuyển đến Xét điều kiện đi OJT
             </Link>

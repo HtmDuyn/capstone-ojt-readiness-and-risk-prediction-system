@@ -56,9 +56,9 @@ export function useEducationAcademicCalendar() {
     years, periods, selectedId, setSelectedId, calendar, loading, calendarLoading, busy,
     error, catalogError, calendarError, notice,
     reload: () => { setError(''); setNotice(''); setRefresh(v => v + 1); },
-    create: (yearCode: string) => mutate(() => academicService.createAcademicYear({ yearCode }), `Đã tạo năm học ${yearCode} và đầy đủ 3 kỳ Spring → Summer → Fall.`),
-    save: (rows: SemesterDates[]) => calendar
-      ? mutate(() => academicService.updateCalendar(calendar.year.id, rows, calendar.revision), 'Đã cập nhật đồng thời cả 3 học kỳ.')
+    create: (yearCode: string, blocks: SemesterDates[], block10: SemesterDates[]) => mutate(() => academicService.createAcademicYear({ yearCode, blocks, block10 }), `Đã tạo năm học ${yearCode} và lịch Block 10 và Block 3 cho cả ba học kỳ.`),
+    save: (rows: SemesterDates[], blocks: SemesterDates[], block10: SemesterDates[]) => calendar
+      ? mutate(() => academicService.updateCalendar(calendar.year.id, rows, calendar.revision, blocks, block10), 'Đã cập nhật lịch học kỳ, Block 10 và Block 3.')
       : Promise.resolve(false),
   };
 }

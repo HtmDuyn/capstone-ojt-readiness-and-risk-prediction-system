@@ -26,7 +26,7 @@ export interface RetakeClassProposal {
 }
 export interface RetakeClassReport extends Page<RetakeClassProposal> {
   block:{id:number|null;source:'CALCULATED'|'CONFIGURED';periodCode:string;name:string;startDate:string;endDate:string;status:string};
-  calendarPreview?:{source:string;mainSemester:{startDate:string;endDate:string};break:{startDate:string;endDate:string};storedSemesterEndDate:string;requiresCalendarReview:boolean}|null;
+  calendarPreview?:{source:string;mainSemester:{startDate:string;endDate:string};storedSemesterEndDate:string;requiresCalendarReview:boolean}|null;
   policy:{minimumToPrepare:number;preparationRangeEnd:number;classCapacity:number};
   summary:{courseCount:number;proposedClassCount:number;waitingStudentCourseCount:number};
   excludedStudentCount:number;unresolvedAlternativeStudentCount:number;limitations:string[];computedAt:string;

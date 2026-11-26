@@ -1,3 +1,4 @@
+import { ojtAssessmentCondition } from '../eligibility/ojt-policy.service';
 import type { PoolClient } from 'pg';
 import { readTransaction } from '../qhdn/read.repository';
 import { invalid, positiveId } from '../students/student.validation';
@@ -9,8 +10,7 @@ import { buildRiskAndRoadmap } from './ojt-risk.service';
 import { coursePlanWithClient } from './course-plan.service';
 import type { AssessmentReadContext } from './assessment-read-context';
 
-// Only this student's calendar mapping, recorded study periods, and current period
-// are offered. Neither future calendar entries nor another cohort's terms are exposed.
+// Show this student's study periods and any upcoming semester with a recorded OJT enrollment.
 export async function studyPeriodsWithClient(c: PoolClient, student: Row) {
   const items = (await c.query(`WITH owner AS (
     SELECT placement.*,COALESCE(parent."AcademicPeriodID",current_period."AcademicPeriodID") AS current_id,
@@ -20,20 +20,29 @@ export async function studyPeriodsWithClient(c: PoolClient, student: Row) {
     LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=current_period."ParentPeriodID"
     WHERE s."StudentID"=$1
   ), candidates AS (
-    SELECT p.*,owner.current_id,
+    SELECT p.*,owner.current_id,ojt.enrolled AS "hasOjtEnrollment",
       COALESCE("StudentCurriculumSemester"($1,p."AcademicPeriodID"),
         (SELECT max(r."SemesterTaken") FROM "StudentCourseResults" r JOIN "AcademicPeriods" rp ON rp."AcademicPeriodID"=r."AcademicPeriodID"
           WHERE r."StudentID"=$1 AND COALESCE(rp."ParentPeriodID",rp."AcademicPeriodID")=p."AcademicPeriodID"),
         CASE WHEN p."AcademicPeriodID"=owner.current_id THEN $2::int END) AS stage
     FROM "AcademicPeriods" p CROSS JOIN owner
-    WHERE p."Kind"='SEMESTER' AND p."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
-      AND (owner.current_start IS NULL OR p."StartDate"<=owner.current_start)
+    CROSS JOIN LATERAL (
+      SELECT EXISTS (
+        SELECT 1 FROM "StudentCourseResults" r JOIN "Courses" c USING ("CourseID")
+        WHERE r."StudentID"=$1 AND r."AcademicPeriodID"=p."AcademicPeriodID"
+          AND r."SourceReference"='AUTO_OJT_ENROLLMENT' AND r."Status"='IN_PROGRESS'
+          AND upper(c."CourseCode")='OJT202'
+      ) AS enrolled
+    ) ojt
+    WHERE p."Kind"='SEMESTER' AND (ojt.enrolled OR (
+      p."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+      AND (owner.current_start IS NULL OR p."StartDate"<=owner.current_start)))
       AND (p."AcademicPeriodID"=owner.current_id
         OR EXISTS (SELECT 1 FROM "CohortCurriculumPeriods" plan WHERE plan."CohortID"=owner."CohortID" AND plan."GroupCode"=owner."GroupCode" AND plan."AcademicPeriodID"=p."AcademicPeriodID")
         OR EXISTS (SELECT 1 FROM "StudentCourseResults" r JOIN "AcademicPeriods" rp ON rp."AcademicPeriodID"=r."AcademicPeriodID" WHERE r."StudentID"=$1 AND COALESCE(rp."ParentPeriodID",rp."AcademicPeriodID")=p."AcademicPeriodID"))
   ) SELECT "AcademicPeriodID" AS id,"PeriodCode" AS code,"Name" AS name,
     to_char("StartDate",'YYYY-MM-DD') AS "startDate",to_char("EndDate",'YYYY-MM-DD') AS "endDate",
-    stage AS "curriculumSemester",
+    stage AS "curriculumSemester","hasOjtEnrollment",
     COALESCE("AcademicPeriodID"=current_id AND "EndDate">=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,false) AS "isCurrent"
     FROM candidates ORDER BY "StartDate" DESC,"AcademicPeriodID" DESC`, [student.StudentID, student.CurrentSemester])).rows;
   return { items, currentAcademicPeriodId: items.find(item => item.isCurrent)?.id ?? items[0]?.id ?? null };
@@ -78,23 +87,19 @@ export async function studyOverview(params: Row, actor: Actor) {
     // no cutoff inherited from an expired academic period.
     const source = await loadAcademicProgress(c, student.StudentID, undefined, cutoff ?? undefined);
     const currentSemester = historical ? period!.curriculumSemester : inferStudySemester(source.attempts);
-    const progress = progressFromData(source);
+    const progress = progressFromData(source,false,false);
     // Resolve the single OJT target internally; it is not the student's study filter.
     const target = (await c.query(`SELECT COALESCE(
       (SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1),
-      (SELECT o."OJTSemesterID" FROM "StudentAcademicPlacements" placement
-      JOIN "CohortCurriculumPeriods" plan ON plan."CohortID"=placement."CohortID" AND plan."GroupCode"=placement."GroupCode" AND plan."CurriculumSemester"=6
-      JOIN "OJTSemesters" o ON o."AcademicPeriodID"=plan."AcademicPeriodID"
-      WHERE placement."StudentID"=$1 ORDER BY o."StartDate" LIMIT 1)) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
-    const latestCondition = historical ? null : (await c.query(
-      'SELECT "Version","MinCredits" FROM "OJTConditions" ORDER BY "Version" DESC LIMIT 1'
-    )).rows[0] ?? null;
+      (SELECT o."OJTSemesterID" FROM "OJTSemesters" o
+      WHERE o."AcademicPeriodID"="DefaultOJTAcademicPeriod"($1))) AS "OJTSemesterID"`, [student.StudentID])).rows[0]?.OJTSemesterID ?? null;
+    const currentCondition = historical ? null : await ojtAssessmentCondition(c);
     const configuredRule = historical ? await activeRule(c, student.ProgramID, target ?? 0) : null;
-    const rule = latestCondition ? { ...latestCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
+    const rule = currentCondition ? { ...currentCondition, MaxUnpassedCourses: null } : configuredRule?.Status === 'PUBLISHED' && configuredRule.ProgramID === student.ProgramID
       && (configuredRule.OJTSemesterID === null || configuredRule.OJTSemesterID === target) ? configuredRule : null;
     const current = evaluateEligibility({ student, semester: { OJTSemesterID: target }, rule, progress, attempts: source.attempts, aliases: source.aliases });
     const reads: AssessmentReadContext = { source, studyPeriod: { curriculumSemester: currentSemester, referenceDate: cutoff ? new Date(cutoff + '+07:00') : new Date() } };
-    const academic = await summaryWithClient(c, student.StudentID, target, source, { current, official: null }, reads, latestCondition ? rule : undefined);
+    const academic = await summaryWithClient(c, student.StudentID, target, source, { current, official: null }, reads, currentCondition ? rule : undefined);
     academic.academicWarning.computedAt = new Date().toISOString();
     // Historic terms are for transcripts and accumulated progress only.
     // Risk and the personal roadmap are evaluated only for the ongoing semester.
@@ -106,7 +111,24 @@ export async function studyOverview(params: Row, actor: Actor) {
       assessment = buildRiskAndRoadmap({ id: student.StudentID, fullName: identity.FullName, studentCode: student.StudentCode,
         currentSemester, ojtSemesterId: target, academic, academicProgress: progress }, plan);
     }
-    const courseResults = source.attempts.map(item => ({ ...item, periodStartDate: item.periodStartDate instanceof Date
+    const aliasMap = new Map<number, number>(source.aliases.map(alias => [alias.SourceCourseID, alias.TargetCourseID]));
+    const canonicalCourseId = (courseId: number) => {
+      const seen = new Set<number>();
+      while (aliasMap.has(courseId)) {
+        if (seen.has(courseId)) return -1;
+        seen.add(courseId);
+        courseId = aliasMap.get(courseId)!;
+      }
+      return courseId;
+    };
+    const excludedOjtCourseIds = new Set(progress.requirements
+      .filter((requirement: Row) => requirement.excludedFromOjtCredits)
+      .flatMap((requirement: Row) => [requirement.courseId, requirement.matchedCourseId, ...requirement.choices])
+      .filter((courseId: unknown): courseId is number => typeof courseId === 'number')
+      .map(canonicalCourseId));
+    const courseResults = source.attempts.map(item => ({ ...item,
+      excludedFromOjtCredits: excludedOjtCourseIds.has(canonicalCourseId(item.courseId)),
+      periodStartDate: item.periodStartDate instanceof Date
       ? `${item.periodStartDate.getFullYear()}-${String(item.periodStartDate.getMonth()+1).padStart(2,'0')}-${String(item.periodStartDate.getDate()).padStart(2,'0')}`
       : item.periodStartDate }));
     // The student transcript displays a weighted average of stored ten-point scores.
@@ -117,7 +139,9 @@ export async function studyOverview(params: Row, actor: Actor) {
         academicWarning: historical ? null : academic.academicWarning,
         earlyWarning: historical ? null : academic.earlyWarning }, assessment, courseResults,
       basis: historical ? 'STORED_GRADES_THROUGH_PERIOD_CURRENT_CURRICULUM' : 'CURRENT_STORED_ACADEMIC_DATA',
-      note: historical
+      note: historical && period?.hasOjtEnrollment
+        ? 'Học kỳ này có bản ghi OJT202 đang học.'
+        : historical
         ? 'Tiến độ và bảng điểm kỳ cũ được tính lại từ dữ liệu đang lưu theo khung hiện hành. Đánh giá rủi ro và lộ trình đề xuất luôn sử dụng học kỳ đang học.'
         : 'Tín chỉ, điều kiện, rủi ro và lộ trình được tính từ dữ liệu học vụ mới nhất và kỳ cao nhất có ít nhất hai môn khác nhau trong lịch sử học vụ.' };
   });

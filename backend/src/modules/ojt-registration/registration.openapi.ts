@@ -220,7 +220,7 @@
  *             }
  *           }
  *         },
- *         "description": "Target academic period is mandatory for new windows. OJT is fixed at relative semester 6, calculated from the actual student entry period; requiredRelativeSemester is always 6. Eligibility assessment uses semester 5 and its Block 3. Target/scope cannot change after opening."
+ *         "description": "Target academic period is mandatory for new windows. OJT202 is recommended at relative semester 6; delayed students may register in any later semester after meeting eligibility. requiredRelativeSemester=6 is the minimum pathway. Eligibility assessment begins at semester 5 and may occur later for delayed students. Target/scope cannot change after opening."
  *       }
  *     },
  *     "/api/ojt-registration-windows/{id}": {
@@ -376,7 +376,7 @@
  *             }
  *           }
  *         },
- *         "description": "Target academic period is mandatory for new windows. OJT is fixed at relative semester 6, calculated from the actual student entry period; requiredRelativeSemester is always 6. Eligibility assessment uses semester 5 and its Block 3. Target/scope cannot change after opening."
+ *         "description": "Target academic period is mandatory for new windows. OJT202 is recommended at relative semester 6; delayed students may register in any later semester after meeting eligibility. requiredRelativeSemester=6 is the minimum pathway. Eligibility assessment begins at semester 5 and may occur later for delayed students. Target/scope cannot change after opening."
  *       }
  *     },
  *     "/api/ojt-registrations": {

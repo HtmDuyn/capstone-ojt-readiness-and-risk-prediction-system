@@ -4,16 +4,12 @@ export const ojtSourceEndpoints = {
   students: '/students',
   results: '/ojt-eligibility-results',
   policy: '/ojt-condition-policy',
-  handoffs: '/eligible-student-handoffs',
-  thresholds: '/ojt-credit-thresholds',
 } as const;
 
 export const ojtSourceLabels = {
   students: 'danh sách sinh viên',
   results: 'kết quả xét OJT',
   policy: 'điều kiện xét OJT',
-  handoffs: 'lịch sử bàn giao',
-  thresholds: 'mức tín chỉ',
 } as const;
 
 export type OjtSourceKey = keyof typeof ojtSourceEndpoints;

@@ -45,6 +45,15 @@ function parseResource(resource: Resource, input: unknown, old?: AcademicRecord)
   if (resource !== 'academic-years') row.academicYearId = positiveId(row.academicYearId, 'academicYearId');
   if (resource === 'academic-periods') {
     if (!['SEMESTER','BLOCK3'].includes(row.kind)) throw academicError('kind must be SEMESTER or BLOCK3.');
+    row.block10StartDate = row.block10StartDate ?? null;
+    row.block10EndDate = row.block10EndDate ?? null;
+    if (row.block10StartDate !== null || row.block10EndDate !== null) {
+      if (row.kind !== 'SEMESTER') throw academicError('Block 10 phải thuộc học kỳ chính.');
+      const start = dateInput(row.block10StartDate, 'block10StartDate');
+      const end = dateInput(row.block10EndDate, 'block10EndDate');
+      dateRange(start, end, 'Block 10');
+      if (start < row.startDate || end > row.endDate) throw academicError('Block 10 phải nằm trong học kỳ tương ứng.');
+    }
     row.parentPeriodId = row.parentPeriodId ?? null;
     if (row.kind === 'BLOCK3') row.parentPeriodId = positiveId(row.parentPeriodId, 'parentPeriodId');
     else if (row.parentPeriodId !== null) throw academicError('SEMESTER cannot have parentPeriodId. Set it to null when changing kind.');
@@ -71,6 +80,10 @@ async function validateCalendar(client: PoolClient) {
     LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=p."ParentPeriodID"
     WHERE p."StartDate"<y."StartDate" OR p."EndDate">y."EndDate"
     OR (p."Kind"='BLOCK3' AND (parent."AcademicPeriodID" IS NULL OR parent."Kind"<>'SEMESTER' OR parent."AcademicYearID"<>p."AcademicYearID" OR p."StartDate"<parent."StartDate" OR p."EndDate">parent."EndDate")) LIMIT 1`, 'Periods must be within their academic year, and Block 3 must be within its parent semester.');
+  await assertNoRows(client, `SELECT 1 FROM "AcademicPeriods" block
+    JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=block."ParentPeriodID"
+    WHERE block."Kind"='BLOCK3' AND parent."Block10EndDate">=block."StartDate" LIMIT 1`,
+    'Block 3 phải bắt đầu sau ngày kết thúc Block 10.');
   await assertNoRows(client, `SELECT 1 FROM "AcademicPeriods" a JOIN "AcademicPeriods" b ON a."AcademicPeriodID"<b."AcademicPeriodID"
     AND a."AcademicYearID"=b."AcademicYearID"
     AND a."ParentPeriodID" IS DISTINCT FROM b."AcademicPeriodID"

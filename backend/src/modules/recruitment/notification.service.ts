@@ -34,7 +34,7 @@ export async function notifyRegistrationSchedule(client: PoolClient, row: Row, p
     LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
     LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID"
     WHERE s."Status"='ACTIVE' AND s."DeletedAt" IS NULL AND u."Status"='ACTIVE'
-      AND EXISTS(SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=s."StudentID" AND h."OJTSemesterID"=$1)
+      AND EXISTS(SELECT 1 FROM "OJTRecruitmentAccess" h WHERE h."StudentID"=s."StudentID" AND h."OJTSemesterID"=$1)
       AND ($2::int[] IS NULL OR s."StudentID"=ANY($2))
       AND ($3::int[] IS NULL OR s."ProgramID"=ANY($3))
       AND ($4::int[] IS NULL OR p."CohortID"=ANY($4))

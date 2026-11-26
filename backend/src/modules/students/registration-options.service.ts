@@ -15,8 +15,8 @@ const blockerLabels:Record<string,string>={
   COMBO_OPTIONS_UNAVAILABLE:'Chưa có combo hợp lệ để lựa chọn.',REGISTRATION_ALREADY_EXISTS:'Hồ sơ đã được nộp hoặc đang được xử lý.',
   ACTUAL_PATHWAY_REQUIRED:'Chưa có lộ trình phù hợp với kỳ đăng ký.',OJT_REGISTRATION_SEMESTER_MISMATCH:'Chưa đúng kỳ chuyên ngành được đăng ký.',
   REGISTRATION_PERIOD_MISMATCH:'Kỳ đăng ký chưa khớp với kỳ OJT.',
-  ELIGIBILITY_HANDOFF_STALE:'Kết quả bàn giao đã cũ, cần Phòng Đào tạo rà soát.',
-  CONFIRMED_ELIGIBILITY_REQUIRED:'Chưa có kết quả bàn giao đủ điều kiện hiện hành.'
+  ELIGIBILITY_HANDOFF_STALE:'Kết quả xét OJT đã cũ do dữ liệu học vụ thay đổi; cần Phòng Đào tạo rà soát.',
+  CONFIRMED_ELIGIBILITY_REQUIRED:'Chưa có kết quả xét OJT đủ điều kiện hiện hành.'
 };
 
 async function ownStudent(c:PoolClient,actor:Actor):Promise<Row> {
@@ -51,7 +51,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     }else{
       from='FROM "OJTRegistrationWindows" w';
       // Bind the authenticated student, never a studentId supplied by the caller.
-      where.push('EXISTS (SELECT 1 FROM "EligibleStudentHandoffItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID")');
+      where.push('(EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID")) OR EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID"))');
       for(const [key,value,type]of [['programIds',s.ProgramID,'int'],['cohortIds',s.CohortID,'int'],['majorIds',s.SpecializationID,'int'],['studentIds',s.StudentID,'int'],['groupCodes',s.GroupCode,'text']] as const){
         args.push(value??null);where.push(`(NOT (w."Scope" ? '${key}') OR w."Scope"->'${key}' @> jsonb_build_array($${args.length}::${type}))`);
       }
@@ -83,11 +83,12 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       let pathway:unknown=null;
       const contextIssue=await blocker(async()=>{
         if(kind==='combo')await assertRosterContext(c,{studentId:s.StudentID,programId:w.RosterProgramID,scopeSnapshot:w.RosterSnapshot});
-        else pathway={admissionSource:'ACADEMIC_HANDOFF'};
+        else pathway={admissionSource:'SAVED_ELIGIBILITY'};
       });
       if(contextIssue)reasons.push(contextIssue);
       if(kind==='combo'&&!options.length)reasons.push('COMBO_OPTIONS_UNAVAILABLE');
       const admission=kind==='ojt'?await studentAdmission(c,s.StudentID,w.OJTSemesterID):null;
+      if(kind==='ojt')pathway={admissionSource:admission?.source??null};
       if(kind==='ojt'&&(!admission||admission.status!=='ELIGIBLE'||admission.isStale))reasons.push(
         admission?.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
       if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');

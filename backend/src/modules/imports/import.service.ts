@@ -1,3 +1,6 @@
+import { assessOjtStudents } from '../eligibility/automatic-assessment.service';
+import { ojtAssessmentCondition } from '../eligibility/ojt-policy.service';
+import { logger } from '../../config/logger';
 import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { pool } from '../../config/database';
@@ -147,7 +150,12 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       return {...summary,preview:true,rows:plans.map((p,i)=>({rowNumber:i+1,code:p.row.code,action:p.action}))};
     }
     if (input.kind==='STUDENT') academicImportId=await saveHistory(client,{kind:'STUDENT',key:input.idempotencyKey,hash:payloadHash,status:'COMPLETED',summary,sourceAccountBatchId:batchId},actorId,plans.map(p=>({raw:safeRow(p.row,'STUDENT'),normalized:{userId:p.userId,action:p.action},status:'IMPORTED'})));
-    const result={ ...summary, batchId, academicImportId, replayed: false };
+    const ojtAssessment = input.kind === 'STUDENT'
+      ? await assessImportedStudents(client, actorId, batchId) : undefined;
+    const completedSummary = ojtAssessment ? { ...summary, ojtAssessment } : summary;
+    if (ojtAssessment) await client.query('UPDATE "AccountImportBatches" SET "Summary"=$2 WHERE "BatchID"=$1',
+      [batchId, JSON.stringify(completedSummary)]);
+    const result={ ...completedSummary, batchId, academicImportId, replayed: false };
     if(onCommit)await onCommit(client,result);
     await client.query('COMMIT');
     return result;
@@ -157,11 +165,34 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     if ((error as { code?: string }).code === '23514') {
       if ((body as any)?.kind === 'ENTERPRISE') {
         if ((error as { constraint?: string }).constraint === 'AccountImportBatches_check')
-          throw fail('Database chưa cập nhật luồng tạo tài khoản doanh nghiệp. Cần chạy khối ENTERPRISE ACCOUNT IMPORT V2 trong backend/DB.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
+          throw fail('Database chưa đồng bộ schema import tài khoản doanh nghiệp. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
         throw fail('Thông tin tài khoản doanh nghiệp không đáp ứng ràng buộc dữ liệu.',422,'INVALID_ENTERPRISE_ACCOUNT');
       }
       throw fail((error as Error).message, 422, 'INVALID_STUDY_HISTORY');
     }
     throw error;
   } finally { client.release(); }
+}
+
+async function assessImportedStudents(client: PoolClient, actorId: number, batchId: string | number) {
+  // The import has passed deferred validation. An assessment error must not
+  // invalidate the imported transcript or roll back account provisioning.
+  await client.query('SAVEPOINT import_ojt_assessment');
+  try {
+    const condition = await ojtAssessmentCondition(client);
+    const assessment = await assessOjtStudents(client, condition, actorId, `import-ojt:${batchId}`, 'IMPORT');
+    const checkedCount = assessment.checkedCount;
+    const status = 'COMPLETED';
+    await client.query('RELEASE SAVEPOINT import_ojt_assessment');
+    return { status, checkedCount, eligibleCount: assessment.eligibleCount,
+      assignedCount: assessment.assignedCount, waitingCount: assessment.waitingCount,
+      excludedPassedOjt202Count: assessment.excludedPassedOjt202Count,
+      conditionSource: condition.IsDefault ? 'DEFAULT_70_CREDITS' : 'PUBLISHED' };
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT import_ojt_assessment');
+    await client.query('RELEASE SAVEPOINT import_ojt_assessment');
+    const failure = error as { code?: string; errorCode?: string };
+    logger.error('OJT assessment could not finish for the student import.', { batchId, code: failure?.code ?? failure?.errorCode });
+    return { status: 'FAILED', checkedCount: 0 };
+  }
 }

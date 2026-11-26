@@ -24,7 +24,7 @@ export function describeJobExtraction(spec: Record<string, any>) {
   } };
   spec.paths['/api/recruitment-extractions/{postId}/analyze'] = { post: { ...base,
     summary: 'Đưa tin vào hàng đợi đọc / thử lại (Swagger)',
-    description: 'Worker tự quét các tin EnterpriseManaged đã công bố và chưa hết hạn mỗi 15 giây, một tin mỗi lượt. Endpoint này hỗ trợ kiểm tra/thử lại, không cần sửa API đăng tin. No request body is needed; provide only postId in the path. READY/PROCESSING được giữ nguyên để không gọi trùng; FAILED/STALE được đưa lại PENDING. Bật RECRUITMENT_CLAUDE_ENABLED=true; dùng ANTHROPIC_API_KEY và CLAUDE_RECRUITMENT_MODEL (fallback CLAUDE_CV_MODEL). Chạy backend/DB (RECRUITMENT EXTRACTION V1 only; do not run the full reset) trên DB hiện có. Sau 202, GET cùng postId tới READY hoặc FAILED; lỗi tự thử lại tối đa 5 lượt, cách 5 phút. Không chạy Cohere Rerank ở bước này.',
+    description: 'Worker tự quét các tin EnterpriseManaged đã công bố và chưa hết hạn mỗi 15 giây, một tin mỗi lượt. Endpoint này hỗ trợ kiểm tra/thử lại, không cần sửa API đăng tin. No request body is needed; provide only postId in the path. READY/PROCESSING được giữ nguyên để không gọi trùng; FAILED/STALE được đưa lại PENDING. Bật RECRUITMENT_CLAUDE_ENABLED=true; dùng ANTHROPIC_API_KEY và CLAUDE_RECRUITMENT_MODEL (fallback CLAUDE_CV_MODEL). Schema chuẩn nằm tại db/backend; script này dựng lại các bảng ứng dụng. Sau 202, GET cùng postId tới READY hoặc FAILED; lỗi tự thử lại tối đa 5 lượt, cách 5 phút. Không chạy Cohere Rerank ở bước này.',
     responses: { ...base.responses, 202: result },
   } };
   return spec;

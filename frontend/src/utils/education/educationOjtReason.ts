@@ -5,7 +5,7 @@ export type OjtDisplayStatus = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'REVIEW_REQUIRED' |
 
 export function educationOjtDisplayStatus(result?: ReasonResult, failure?: string, inactiveReason?: string): OjtDisplayStatus {
   if (failure) return 'ERROR';
-  if (result?.isStale) return 'STALE';
+  if (result?.isStale && result.status !== 'ELIGIBLE') return 'STALE';
   if (inactiveReason) return 'INACTIVE';
   return result?.status ?? 'PENDING';
 }
@@ -21,17 +21,24 @@ function readableError(message: string): string {
   return 'Không thể tải hoặc xét dữ liệu sinh viên. Vui lòng thử lại.';
 }
 
-export function educationOjtReason(result?: ReasonResult, failure?: string, inactiveReason?: string): string {
-  if (failure) return readableError(failure);
-  if (result?.isStale) return 'Dữ liệu học tập đã thay đổi sau lần xét gần nhất.';
-  if (inactiveReason) return inactiveReason;
-  if (!result) return 'Chưa thực hiện xét điều kiện OJT.';
+export function educationOjtReason(result?: ReasonResult, failure?: string, inactiveReason?: string, hasPassedOjt202 = false): string {
+  let message: string;
+  if (failure) message = readableError(failure);
+  else if (result?.isStale) message = 'Dữ liệu học tập đã thay đổi sau lần xét gần nhất.';
+  else if (inactiveReason) message = inactiveReason;
+  else if (!result) message = 'Chưa thực hiện xét điều kiện OJT.';
+  else {
+    const details = result.status === 'REVIEW_REQUIRED'
+      ? [...(result.academicIssues ?? []), ...(result.reasons ?? [])].filter(Boolean)
+      : [...(result.reasons ?? []), ...(result.academicIssues ?? [])].filter(Boolean);
+    if (details.length) message = details.join(' ');
+    else if (result.status === 'ELIGIBLE') message = 'Đáp ứng yêu cầu xét OJT.';
+    else if (result.status === 'REVIEW_REQUIRED') message = 'Cần đối soát dữ liệu học tập trước khi kết luận.';
+    else message = 'Chưa đủ điều kiện OJT; kết quả xét chưa có lý do chi tiết.';
+  }
 
-  const details = result.status === 'REVIEW_REQUIRED'
-    ? [...(result.academicIssues ?? []), ...(result.reasons ?? [])].filter(Boolean)
-    : [...(result.reasons ?? []), ...(result.academicIssues ?? [])].filter(Boolean);
-  if (details.length) return details.join(' ');
-  if (result.status === 'ELIGIBLE') return 'Đáp ứng yêu cầu xét OJT.';
-  if (result.status === 'REVIEW_REQUIRED') return 'Cần đối soát dữ liệu học tập trước khi kết luận.';
-  return 'Chưa đủ điều kiện OJT; kết quả xét chưa có lý do chi tiết.';
+  if (hasPassedOjt202 && !/đã đạt môn OJT202/i.test(message)) {
+    return `${message} Đã đạt môn OJT202 nên không còn thuộc danh sách cần xét đợt OJT.`;
+  }
+  return message;
 }

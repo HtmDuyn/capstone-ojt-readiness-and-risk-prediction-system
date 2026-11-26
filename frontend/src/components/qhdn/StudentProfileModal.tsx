@@ -86,7 +86,7 @@ export function StudentProfileModal({ studentId, ojtSemesterId, fullName, onClos
       <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><UserRound size={17} className="text-orange-600" />Thông tin sinh viên</h3>
         <ProfileFields fields={[
           ['Họ và tên', profile.fullName], ['Mã sinh viên', profile.studentCode], ['Email', profile.email], ['Số điện thoại', profile.phone],
-          ['Lớp', profile.className], ['Trạng thái học vụ', studentStatuses[profile.status] || profile.status],
+          ['Trạng thái học vụ', studentStatuses[profile.status] || profile.status],
         ]} />
       </section>
       <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><GraduationCap size={17} className="text-orange-600" />Ngành học và chương trình đào tạo</h3>

@@ -182,7 +182,6 @@ export interface EnterpriseCandidateStudent {
   programCode?: string;
   programName?: string;
   enrollmentYear?: number;
-  className?: string;
 }
 
 export interface EnterpriseCandidatePosition {
