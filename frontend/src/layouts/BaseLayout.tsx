@@ -32,7 +32,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const isEnterprise = user?.role === 'enterprise';
   const isQhdn = user?.role === 'qhdn';
   const hideHeaderTools = user?.role === 'enterprise' || user?.role === 'qhdn';
-  const showNotifications = user?.roleCode !== 'ADMIN' && user?.role !== 'admin';
+  const showNotifications = !isEnterprise && user?.roleCode !== 'ADMIN' && user?.role !== 'admin';
   const RoleSidebar = isEducation ? EducationSidebar : Sidebar;
 
   const handleLogout = () => {
@@ -50,20 +50,8 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-[#fdfbf7] via-[#fff7ed] to-[#f5f3ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
-        {/* Nền xung quanh phù hợp với giao diện (theme) */}
-        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
-          <img
-            src="/login_bg.webp"
-            alt=""
-            decoding="async"
-            className="w-full h-full object-cover object-center opacity-15 scale-105 filter blur-[3px]"
-          />
-          <div className="absolute top-[-10%] left-[-5%] w-[55vw] h-[55vw] rounded-full bg-orange-400/25 blur-[140px]" />
-          <div className="absolute top-[20%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-400/20 blur-[150px]" />
-          <div className="absolute bottom-[-10%] left-[15%] w-[50vw] h-[50vw] rounded-full bg-amber-400/20 blur-[140px]" />
-          <div className="absolute bottom-[-5%] right-[-5%] w-[45vw] h-[45vw] rounded-full bg-pink-300/20 blur-[130px]" />
-        </div>
+      <div className="min-h-screen bg-[#f7f9ff] text-slate-800 flex flex-col antialiased selection:bg-orange-500 selection:text-white relative overflow-x-hidden">
+        <div className="app-background" aria-hidden="true" />
 
         {/* Điều hướng Sidebar */}
         <RoleSidebar

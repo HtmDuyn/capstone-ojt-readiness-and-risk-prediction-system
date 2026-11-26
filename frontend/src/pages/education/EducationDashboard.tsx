@@ -1,4 +1,5 @@
 import { EmptyState, ErrorNotice, MetricCard, SectionTitle } from '@/components/education/EducationUi';
+import { CohortResultsChart } from '@/components/education/CohortResultsChart';
 import { OjtResultDonut } from '@/components/education/OjtResultDonut';
 import { PageBanner } from '@/components/common/PageBanner';
 import { courseDemandOverview } from '@/utils/education/courseDemandOverview';
@@ -14,7 +15,6 @@ export const EducationDashboard: React.FC = () => {
 
   const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
   const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible + period.reviewRequired > 0);
-  const chartMax = Math.max(4, Math.ceil(Math.max(0, ...cohortResults.map(period => period.eligible + period.ineligible + period.reviewRequired)) / 4) * 4);
   const ojtGroups = [
     { label: 'Đủ điều kiện', count: eligibleStudents ?? 0, color: '#22c55e', dotClass: 'bg-green-500' },
     { label: 'Chưa đủ điều kiện', count: ineligibleStudents ?? 0, color: '#f87171', dotClass: 'bg-red-400' },
@@ -24,6 +24,7 @@ export const EducationDashboard: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6">
       <PageBanner
+        variant="education"
         title="Tổng quan học vụ và OJT"
         badge="Phòng Đào tạo"
         description="Theo dõi tình hình học tập, điều kiện thực tập OJT và các chỉ số học vụ của sinh viên."
@@ -273,35 +274,7 @@ export const EducationDashboard: React.FC = () => {
                     </span>
                     <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Cần đối soát</span>
                   </div>
-                  <div className="flex h-[270px] gap-2" role="group" aria-label="Biểu đồ kết quả xét điều kiện OJT theo khóa">
-                    <div className="flex h-[220px] w-8 shrink-0 flex-col justify-between text-right text-[11px] text-slate-500">
-                      {[chartMax, chartMax * 0.75, chartMax * 0.5, chartMax * 0.25, 0].map(value => <span key={value}>{value}</span>)}
-                    </div>
-                    <div className="min-w-0 flex-1 overflow-x-auto">
-                      <div className="relative h-[270px] w-max min-w-full">
-                        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 flex h-[220px] flex-col justify-between border-b border-l border-slate-300">
-                          {[0, 1, 2, 3, 4].map(value => <div key={value} className="border-t border-slate-100" />)}
-                        </div>
-                        <div className="relative z-10 flex h-full min-w-max items-start gap-4 px-4">
-                          {cohortResults.map((period, index) => {
-                            const total = period.eligible + period.ineligible + period.reviewRequired;
-                            const details = `${period.label}: ${period.eligible} sinh viên đủ điều kiện, ${period.ineligible} sinh viên chưa đủ điều kiện, ${period.reviewRequired} sinh viên cần đối soát`;
-                            return (
-                              <div key={`${period.label}-${index}`} className="flex h-full min-w-[88px] max-w-[130px] flex-1 flex-col items-center outline-none focus-visible:ring-2 focus-visible:ring-orange-400" title={details} role="img" aria-label={details} tabIndex={0}>
-                                <div className="flex h-[220px] w-full flex-col items-center justify-end">
-                                  <span className="mb-1 text-xs font-semibold text-slate-700">{total}</span>
-                                  <div className="flex w-12 flex-col-reverse rounded-t-sm" style={{ height: `${total / chartMax * 196}px` }}>
-                                    {([['Đủ điều kiện', period.eligible, 'bg-green-500'], ['Chưa đủ điều kiện', period.ineligible, 'bg-red-400'], ['Cần đối soát', period.reviewRequired, 'bg-orange-400']] as const).map(([label, count, color]) => count > 0 && <div key={label} tabIndex={0} title={`${period.label} · ${label}: ${count} sinh viên`} aria-label={`${period.label} · ${label}: ${count} sinh viên`} className={`relative cursor-pointer transition-[filter,transform] duration-200 hover:z-10 hover:scale-x-110 hover:brightness-110 focus:z-10 focus:scale-x-110 focus:brightness-110 ${color}`} style={{ height: `${count / total * 100}%` }} />)}
-                                  </div>
-                                </div>
-                                <span className="mt-2 w-full break-words text-center text-xs font-medium text-slate-700">{period.label}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <CohortResultsChart results={cohortResults} />
                   <p className="text-center text-xs text-slate-500">Khóa sinh viên · Số lượng sinh viên</p>
                 </div>
               )}

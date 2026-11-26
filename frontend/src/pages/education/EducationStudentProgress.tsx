@@ -160,6 +160,7 @@ const EducationStudentProgress: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageBanner
+        variant="education"
         title="Theo dõi Tiến độ Học tập"
         description="Tra cứu hồ sơ, tín chỉ tích lũy, kết quả môn học và trạng thái xét OJT của sinh viên."
         badge="Quản lý sinh viên"

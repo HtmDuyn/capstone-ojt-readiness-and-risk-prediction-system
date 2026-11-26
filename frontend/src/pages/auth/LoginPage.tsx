@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import LeftPanel from "@/components/auth/LeftPanel";
 import RightPanel from "@/components/auth/RightPanel";
+import { LoginBackground } from "@/components/auth/LoginBackground";
 import type { UserRole } from "@/types/auth.types";
 import { useAuth } from "@/hooks/shared/useAuth";
 import { useRoleRedirect } from "@/hooks/shared/useRoleRedirect";
@@ -117,20 +118,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-slate-950 overflow-y-auto">
-      {/* Fixed Fullscreen Wallpaper Background */}
-      <div className="fixed inset-0 w-screen h-screen z-0 overflow-hidden pointer-events-none select-none">
-        <img
-          src="/login_bg.webp"
-          alt=""
-          fetchPriority="high"
-          decoding="async"
-          className="w-full h-full object-cover object-center scale-105"
-        />
-        {/* Fullscreen darkening & translucent color mesh overlay */}
-        <div className="absolute inset-0 bg-slate-950/25 backdrop-blur-[2px]" />
-        <div className="absolute top-[-10%] left-[-5%] w-[50vw] h-[50vw] rounded-full bg-orange-500/15 blur-[140px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] rounded-full bg-amber-500/15 blur-[140px]" />
-      </div>
+      <LoginBackground />
 
       {/* Main Glassmorphic Container */}
       <div className="relative w-full max-w-5xl rounded-[28px] sm:rounded-[36px] overflow-hidden glass-card flex flex-col lg:flex-row shadow-2xl border border-white/50 z-10 transition-all duration-500 my-auto bg-white/35 backdrop-blur-2xl">

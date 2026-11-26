@@ -11,6 +11,7 @@
     "dev": "tsx watch src/server.ts",
     "check:db": "node scripts/check-db.cjs",
     "test:enterprise-grading": "node --test tests/enterprise-grading.test.cjs",
+    "test:recruitment": "node --test tests/recruitment-single-intake.test.cjs",
     "pretest:study-periods": "npm run build",
     "test:study-periods": "node --test tests/study-periods.test.cjs",
     "ojt:assess-due": "node dist/jobs/run-due-ojt-assessments.js",

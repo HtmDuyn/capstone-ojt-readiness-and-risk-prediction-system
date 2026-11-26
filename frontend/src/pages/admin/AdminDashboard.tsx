@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Building2, GraduationCap, UserRoundPlus, Users } from 'lucide-react';
-import { ArcElement, Chart, DoughnutController, Tooltip } from 'chart.js';
+import { DonutChart } from "@/components/common/DonutChart";
 import { PageBanner } from '@/components/common/PageBanner';
 import { getAccounts, getSummary, type AccountCount, type Summary } from '@/services/adminService';
-
-Chart.register(ArcElement, DoughnutController, Tooltip);
 
 const roles = [
   { code: 'STUDENT', label: 'Sinh viên', color: '#6366f1' },
@@ -26,22 +24,11 @@ const countBy = (rows: AccountCount[], key: 'roleCode' | 'status', value: string
   rows.reduce((sum, row) => sum + (row[key] === value ? row.count : 0), 0);
 
 function RoleDistribution({ counts, total }: { counts: AccountCount[]; total: number }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
   const values = useMemo(() => roles.map(role => countBy(counts, 'roleCode', role.code)), [counts]);
-  useEffect(() => {
-    if (!canvas.current || !values.some(Boolean)) return;
-    const chart = new Chart(canvas.current, {
-      type: 'doughnut',
-      data: { labels: roles.map(role => role.label), datasets: [{ data: values, backgroundColor: roles.map(role => role.color), borderColor: '#fff', borderWidth: 3, hoverOffset: 5 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: '76%',
-        animation: { duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300 },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.label}: ${number(context.parsed)} (${percentText(context.parsed, total)})` } } } },
-    });
-    return () => chart.destroy();
-  }, [values, total]);
   return <div className="mt-6 flex flex-col items-center gap-7 sm:flex-row sm:items-center">
     <div className="relative size-52 shrink-0 sm:size-56">
-      {values.some(Boolean) && <canvas ref={canvas} role="img" aria-label={roles.map((role, index) => `${role.label}: ${values[index]}`).join(', ')} />}
+      <DonutChart segments={roles.map((role, index) => ({ label: role.label, value: values[index], color: role.color }))}
+        label={roles.map((role, index) => `${role.label}: ${values[index]}`).join(", ")} unit="tài khoản" />
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <strong className="text-3xl font-extrabold tabular-nums text-slate-900">{number(total)}</strong>
         <span className="text-xs text-slate-500">Tài khoản</span>

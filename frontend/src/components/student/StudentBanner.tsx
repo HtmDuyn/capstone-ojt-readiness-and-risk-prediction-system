@@ -1,4 +1,5 @@
 import React from 'react';
+import { GraduationCap } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import type { StudentProfile } from '@/types/student/studentDashboardTypes';
 import { getStudentMenuItemById, getStudentMenuItemByPath } from '@/config/menus/studentMenu';
@@ -81,13 +82,7 @@ export const StudentBanner: React.FC<PageBannerProps> = ({
   const renderedDescription = description !== undefined ? description : presetBanner?.description;
 
   // Xác định badge hiển thị.
-  const renderedBadge = badge !== undefined ? badge : (
-    presetBanner?.badge ? (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-amber-300 border border-white/15 backdrop-blur-xs">
-        {presetBanner.badge}
-      </span>
-    ) : null
-  );
+  const renderedBadge = badge !== undefined ? badge : (presetBanner?.badge || 'Sinh viên');
 
   // Xác định hành động chính theo độ ưu tiên: props, tương thích cũ, cấu hình menu.
   let resolvedPrimary: BannerAction | null = null;
@@ -114,19 +109,18 @@ export const StudentBanner: React.FC<PageBannerProps> = ({
   return (
     <div className="space-y-4">
       <div
-        className={`relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300 ${className}`}
+        className={`qhdn-hero relative overflow-hidden text-white ${className}`}
       >
-        <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
-        <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
-
         <div className="relative z-10 max-w-3xl space-y-3">
-          {breadcrumb && <div className="mb-2">{breadcrumb}</div>}
+          <div className="mb-2">
+            {breadcrumb ?? <span className="qhdn-hero-eyebrow"><GraduationCap size={13} /> CỔNG SINH VIÊN · OJT</span>}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight text-white flex items-center gap-2">
+            <h1 className="font-extrabold tracking-tight text-white flex items-center gap-2">
               {renderedTitle}
             </h1>
-            {renderedBadge}
+            {renderedBadge && <span className="qhdn-hero-badge"><span />{renderedBadge}</span>}
           </div>
 
           {renderedDescription && (

@@ -117,9 +117,9 @@ export const StudentDashboard = () => {
               <Link className={`${link} mt-3 inline-block`} to="/student/ojt-registration">Xem toàn bộ đợt đăng ký</Link>
             </div>
           </div>
-          <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 lg:grid-cols-2 lg:gap-0">
-            <div className="min-w-0 lg:pr-6">{risk ? <RiskInsights data={risk} embedded /> : <><h3 className={heading}>Phân tích nguyên nhân rủi ro</h3><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải phân tích rủi ro…' : 'Chưa có dữ liệu phân tích. Các yếu tố rủi ro sẽ hiển thị khi có đánh giá.'}</p></>}</div>
-            <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">{risk ? <LearningRoadmap key={profile?.id + ':' + risk.risk.computedAt} roadmap={risk.roadmap} embedded /> : <><h3 className={heading}>Lộ trình học tập đề xuất</h3><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải lộ trình học tập…' : 'Chưa có lộ trình đề xuất. Bạn vẫn có thể xem bảng điểm và chương trình đào tạo.'}</p></>}</div>
+          <div className="mt-5 space-y-5 border-t border-slate-200 pt-5">
+            <div className="min-w-0">{risk ? <RiskInsights data={risk} embedded /> : <><h3 className={heading}>Phân tích nguyên nhân rủi ro</h3><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải phân tích rủi ro…' : 'Chưa có dữ liệu phân tích. Các yếu tố rủi ro sẽ hiển thị khi có đánh giá.'}</p></>}</div>
+            <div className="min-w-0 border-t border-slate-200 pt-5">{risk ? <LearningRoadmap key={profile?.id + ':' + risk.risk.computedAt} roadmap={risk.roadmap} embedded /> : <><h3 className={heading}>Lộ trình học tập đề xuất</h3><p className="mt-3 text-sm text-slate-500">{assessment.pending ? 'Đang tải lộ trình học tập…' : 'Chưa có lộ trình đề xuất. Bạn vẫn có thể xem bảng điểm và chương trình đào tạo.'}</p></>}</div>
           </div>
           {risk && <RoadmapNotes roadmap={risk.roadmap} />}
         </section>

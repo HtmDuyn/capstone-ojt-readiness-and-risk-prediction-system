@@ -15,26 +15,13 @@ import {
   Calendar,
   Layers,
   Search,
-  BarChart3,
+  ChartArea,
   List,
   RefreshCw,
   Send,
   Award,
   UserCheck,
 } from "lucide-react";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarController,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  type ChartConfiguration,
-} from "chart.js";
 import { PageBanner } from "@/components/common/PageBanner";
 import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
 import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
@@ -48,30 +35,17 @@ import {
   getQhdnDashboardSummary,
 } from "@/services/qhdnService";
 import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdn/qhdnDashboard';
-import { dashboardBarGradient, dashboardBarLabels, dashboardChartAnimation, dashboardCinema, dashboardPalette } from '@/utils/qhdn/qhdnDashboardCharts';
+import { OjtPipelineChart, EnterpriseQuotaChart } from "@/components/qhdn/QhdnDashboardCharts";
 import type {
   CoordinationItem,
   CompanyListItem,
 } from "@/types/qhdn/qhdnTypes";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarController,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-);
-type DashboardChart = ChartJS<'bar', (number | null)[], string>;
-
 export const QhdnDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loadError, setLoadError] = useState("");
 
-  const catalog = useQhdnAcademicPeriods();
+  const catalog = useQhdnAcademicPeriods("", false, true);
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
   const [revision, setRevision] = useState(0);
@@ -88,9 +62,7 @@ export const QhdnDashboard: React.FC = () => {
   const quotas = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.quotas : undefined;
   const hasRecruitmentRounds = internshipStats?.semesterId === selectedSemesterId ? internshipStats.data.hasRecruitmentRounds : undefined;
   const periodNotice = !catalog.loading && !catalog.error && catalog.selectedPeriod && (
-    catalog.selectedPeriod.kind === 'SEMESTER' && (!selectedSemesterId || hasRecruitmentRounds === false)
-      ? missingRecruitmentRounds
-      : catalog.selectedPeriod.kind === 'BLOCK3' && !selectedSemesterId ? 'Block 3 này chưa liên kết kỳ OJT.' : ''
+    !selectedSemesterId || hasRecruitmentRounds === false ? missingRecruitmentRounds : ''
   );
   const isLoading = !!selectedSemesterId && !quotas && !internshipError;
 
@@ -109,12 +81,6 @@ export const QhdnDashboard: React.FC = () => {
   const [quotaViewMode, setQuotaViewMode] = useState<"chart" | "list">("chart");
   const [quotaSearch, setQuotaSearch] = useState("");
 
-  // Canvas references for ChartJS
-  const pipelineChartRef = useRef<HTMLCanvasElement | null>(null);
-  const pipelineChartInstance = useRef<DashboardChart | null>(null);
-
-  const categoryChartRef = useRef<HTMLCanvasElement | null>(null);
-  const categoryChartInstance = useRef<DashboardChart | null>(null);
   const pipelineSectionRef = useRef<HTMLDivElement | null>(null);
   const quotaSectionRef = useRef<HTMLDivElement | null>(null);
   const [visibleCharts, setVisibleCharts] = useState({ pipeline: false, quota: false });
@@ -273,193 +239,6 @@ export const QhdnDashboard: React.FC = () => {
     };
   }, [placementStats, internshipStats, companies.length, companiesLoading, selectedSemesterId]);
 
-  // Render Chart 1: Tiến độ luồng OJT (Phễu điều phối & Thực tập)
-  useEffect(() => {
-    const canvas = pipelineChartRef.current;
-    if (!canvas || !visibleCharts.pipeline || eligibleLoading) return;
-
-    pipelineChartInstance.current?.destroy();
-    pipelineChartInstance.current = null;
-    ChartJS.getChart(canvas)?.destroy();
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const labels = [
-      "Đủ điều kiện OJT",
-      "Đã chốt DN",
-      "Chờ DN duyệt",
-      "Đang thực tập",
-      "Hoàn thành OJT",
-    ];
-
-    const dataValues = [
-      kpiStats.handedOff,
-      kpiStats.assigned,
-      kpiStats.waiting,
-      kpiStats.inProgress,
-      kpiStats.completed,
-    ];
-
-    const config: ChartConfiguration<'bar', (number | null)[], string> = {
-      type: "bar",
-      plugins: [dashboardCinema, dashboardBarLabels],
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "Số lượng sinh viên",
-            data: dataValues,
-            backgroundColor: context => dashboardBarGradient(context, dashboardPalette),
-            borderRadius: 12,
-            maxBarThickness: 50,
-            borderColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '55',
-            borderWidth: 1,
-            hoverBackgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + 'e6',
-            hoverBorderColor: '#ffffff', hoverBorderWidth: 2,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: dashboardChartAnimation(reducedMotion),
-        transitions: { active: { animation: { duration: reducedMotion ? 0 : 220 } } },
-        layout: { padding: { top: 24, right: 8 } },
-        interaction: { intersect: false, mode: 'index' },
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            backgroundColor: "rgba(15,23,42,.94)",
-            padding: 14,
-            cornerRadius: 12,
-            displayColors: true,
-            callbacks: {
-              label: (context) => ` ${context.raw} sinh viên`,
-              afterLabel: context => context.dataIndex === 4 ? 'Đã có điểm tổng kết doanh nghiệp hoặc đã hoàn thành hồ sơ thực tập.' : '',
-            },
-          },
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { font: { family: "Inter, sans-serif", size: 11 } },
-          },
-          y: {
-            beginAtZero: true,
-            border: { display: false },
-            grid: { color: "rgba(99,102,241,.07)" },
-            ticks: {
-              precision: 0,
-              font: { family: "Inter, sans-serif", size: 11 },
-              callback: (val) => `${val} SV`,
-            },
-          },
-        },
-      },
-    };
-
-    const chart = new ChartJS(ctx, config);
-    pipelineChartInstance.current = chart;
-
-    return () => {
-      chart.destroy();
-      if (pipelineChartInstance.current === chart) {
-        pipelineChartInstance.current = null;
-      }
-    };
-  }, [kpiStats, visibleCharts.pipeline, eligibleLoading, reducedMotion]);
-
-  // Render Chart 2: Top 8 Quota Doanh nghiệp
-  useEffect(() => {
-    const canvas = categoryChartRef.current;
-    if (quotaViewMode !== "chart" || !canvas || !visibleCharts.quota || isLoading || eligibleLoading) return;
-
-    categoryChartInstance.current?.destroy();
-    categoryChartInstance.current = null;
-    ChartJS.getChart(canvas)?.destroy();
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const entNames = top8Partners.map((e) => e.code || e.name);
-    const acceptedSlots = top8Partners.map((e) => e.acceptedCount);
-    const availableSlots = top8Partners.map((e) => e.availableQuota);
-
-    const config: ChartConfiguration<'bar', (number | null)[], string> = {
-      type: "bar",
-      plugins: [dashboardCinema, dashboardBarLabels],
-      data: {
-        labels: entNames.length > 0 ? entNames : ["Chưa có dữ liệu DN"],
-        datasets: [
-          {
-            label: "Đã tiếp nhận",
-            data: acceptedSlots.length > 0 ? acceptedSlots : [0],
-            backgroundColor: context => dashboardBarGradient(context, dashboardPalette, true),
-            hoverBackgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + 'e6',
-            borderColor: 'rgba(255,255,255,.6)', borderWidth: 1,
-            borderRadius: 8,
-            maxBarThickness: 34,
-          },
-          {
-            label: "Slot còn lại",
-            data: availableSlots.length > 0 ? availableSlots : [0],
-            backgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '18',
-            hoverBackgroundColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '30',
-            borderColor: context => dashboardPalette[context.dataIndex % dashboardPalette.length] + '28', borderWidth: 1,
-            borderRadius: 8,
-            maxBarThickness: 34,
-          },
-        ],
-      },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: dashboardChartAnimation(reducedMotion),
-        transitions: { active: { animation: { duration: reducedMotion ? 0 : 220 } } },
-        layout: { padding: { right: 24, top: 8 } },
-        plugins: {
-          legend: {
-            position: "top",
-            labels: { usePointStyle: true, boxWidth: 8, padding: 18, font: { family: "Inter, sans-serif", size: 11 } },
-          },
-          tooltip: {
-            backgroundColor: "rgba(15,23,42,.94)",
-            padding: 14, cornerRadius: 12,
-          },
-        },
-        scales: {
-          x: {
-            stacked: true,
-            border: { display: false },
-            grid: { color: "rgba(99,102,241,.07)" },
-            ticks: { font: { family: "Inter, sans-serif", size: 11 } },
-          },
-          y: {
-            stacked: true,
-            grid: { display: false },
-            ticks: {
-              font: { family: "Inter, sans-serif", size: 11, weight: "bold" },
-            },
-          },
-        },
-      },
-    };
-
-    const chart = new ChartJS(ctx, config);
-    categoryChartInstance.current = chart;
-
-    return () => {
-      chart.destroy();
-      if (categoryChartInstance.current === chart) {
-        categoryChartInstance.current = null;
-      }
-    };
-  }, [quotaViewMode, top8Partners, visibleCharts.quota, isLoading, eligibleLoading, reducedMotion]);
-
   return (
     <div className="qhdn-dashboard space-y-6 pb-12 font-sans" onPointerMove={event => {
       if (event.pointerType === 'touch' || reducedMotion || !(event.target instanceof Element)) return;
@@ -609,6 +388,7 @@ export const QhdnDashboard: React.FC = () => {
       </div>
 
       {/* Filter Toolbar: Năm học & Kỳ OJT Selector */}
+      {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
       <div className="qhdn-filter card-glass border border-slate-200/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
@@ -636,17 +416,12 @@ export const QhdnDashboard: React.FC = () => {
             selection={catalog}
             controlClassName="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 shadow-xs cursor-pointer"
           />
-          <button type="button" disabled={catalog.loading || isLoading || eligibleLoading} onClick={() => setRevision(value => value + 1)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50">
-            <RefreshCw size={14} />Tải lại
-          </button>
         </div>
       </div>
 
       {catalog.error && <Notice>{catalog.error}</Notice>}
-      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện: {eligibleError}. Chọn Tải lại để thử lại.</Notice>}
-      {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}. Chọn Tải lại để thử lại.</Notice>}
-      {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
+      {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện: {eligibleError}.</Notice>}
+      {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}.</Notice>}
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -658,14 +433,14 @@ export const QhdnDashboard: React.FC = () => {
                 Tiến độ Toàn trình OJT ({selectedSemesterName})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Đủ điều kiện ⟶ Doanh nghiệp tiếp nhận ⟶ Thực tập ⟶ Có kết quả OJT
+                Từ chối · Đã chốt DN · Chờ duyệt · Đang thực tập · Hoàn thành
               </p>
             </div>
             <TrendingUp className="text-slate-400" size={18} />
           </div>
           <div className="relative w-full h-72">
-            <canvas ref={pipelineChartRef} role="img" aria-label={`Tiến độ OJT: Đủ điều kiện ${kpiStats.handedOff??'chưa có dữ liệu'}, Đã chốt DN ${kpiStats.assigned??'chưa có dữ liệu'}, Chờ duyệt ${kpiStats.waiting??'chưa có dữ liệu'}, Đang thực tập ${kpiStats.inProgress??'chưa có dữ liệu'}, Hoàn thành OJT ${kpiStats.completed??'chưa có dữ liệu'}`} />
-            {kpiStats.handedOff === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            {visibleCharts.pipeline && !eligibleLoading ? <OjtPipelineChart stats={kpiStats} reducedMotion={reducedMotion} /> : <p role="status" className="flex h-full items-center justify-center text-sm text-slate-500">Đang tải tiến độ OJT…</p>}
+            {kpiStats.rejected === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="rounded-xl bg-white/95 px-4 py-2 text-sm text-slate-500">Chưa có dữ liệu thống kê tổng hợp.</p>
             </div>}
           </div>
@@ -681,7 +456,7 @@ export const QhdnDashboard: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 {quotaViewMode === "chart"
-                  ? "Biểu đồ Top 8 đối tác có quy mô tiếp nhận lớn nhất"
+                  ? "Đường tổng quota của Top 8 doanh nghiệp có chỉ tiêu lớn nhất"
                   : "Bảng xếp hạng đầy đủ chỉ tiêu tất cả đối tác"}
               </p>
             </div>
@@ -698,7 +473,7 @@ export const QhdnDashboard: React.FC = () => {
                 }`}
                 title="Xem dạng biểu đồ Top 8"
               >
-                <BarChart3 size={13} />
+                <ChartArea size={13} />
                 Top 8
               </button>
               <button
@@ -720,7 +495,7 @@ export const QhdnDashboard: React.FC = () => {
           {/* View Mode 1: Top 8 Chart */}
           {quotaViewMode === "chart" && (
             <div className="relative w-full h-72">
-              <canvas ref={categoryChartRef} role="img" aria-label={'Chỉ tiêu doanh nghiệp: '+top8Partners.map(company=>`${company.name}: tiếp nhận ${company.acceptedCount}, chỉ tiêu ${company.totalQuota}, còn ${company.availableQuota}`).join('; ')} />
+              {visibleCharts.quota && !isLoading && !eligibleLoading ? <EnterpriseQuotaChart partners={top8Partners} reducedMotion={reducedMotion} /> : <p role="status" className="flex h-full items-center justify-center text-sm text-slate-500">Đang tải chỉ tiêu doanh nghiệp…</p>}
             </div>
           )}
 
@@ -757,12 +532,6 @@ export const QhdnDashboard: React.FC = () => {
                       return (
                         <div className="space-y-4">
                           <Notice>{loadError}</Notice>
-                          <button
-                            className="rounded-xl border p-3"
-                            onClick={() => window.location.reload()}
-                          >
-                            Thử lại
-                          </button>
                         </div>
                       );
                     return (
@@ -791,9 +560,9 @@ export const QhdnDashboard: React.FC = () => {
                             </span>
                             <span>{fill}%</span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                          <div className="h-1.5 rounded-full bg-violet-100 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-orange-500"
+                              className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-400"
                               style={{ width: `${Math.min(100,fill)}%` }}
                             />
                           </div>

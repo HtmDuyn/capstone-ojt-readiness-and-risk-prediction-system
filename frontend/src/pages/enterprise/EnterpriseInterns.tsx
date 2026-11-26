@@ -98,16 +98,19 @@ export const EnterpriseInterns: React.FC = () => {
   const [apiError, setApiError] = useState<string | null>(null);
 
   const interns = useMemo(() => {
-    const counts = new Map<string, {total: number; completed: number}>();
+    const counts = new Map<string, {total: number; completed: number; overdue: number}>();
     for (const task of tasks) {
-      const entry = counts.get(task.internId) ?? {total: 0, completed: 0};
+      const entry = counts.get(task.internId) ?? {total: 0, completed: 0, overdue: 0};
       entry.total++;
       if (task.status === 'DONE') entry.completed++;
+      if (task.status === 'OVERDUE') entry.overdue++;
       counts.set(task.internId, entry);
     }
     return roster.map(item => {
       const count = counts.get(String(item.id));
-      return mapApiToIntern(item, count?.total ?? 0, count?.completed ?? 0);
+      const taskStatus: InternTask['status'] = count?.overdue ? 'OVERDUE'
+        : count?.total && count.completed === count.total ? 'DONE' : 'TODO';
+      return { ...mapApiToIntern(item, count?.total ?? 0, count?.completed ?? 0), taskStatus };
     });
   }, [roster, tasks]);
 
@@ -201,7 +204,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Filter & Search states for the main table (Using dropdowns instead of tabs)
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<InternStatusFilter>('ALL');
+  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('ALL');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('ALL');
 
   // Pagination for main table (optimized for 200+ students)
@@ -223,7 +226,7 @@ export const EnterpriseInterns: React.FC = () => {
         intern.studentCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         intern.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
         intern.mentorName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchStatus = statusFilter === 'ALL' || intern.status === statusFilter;
+      const matchStatus = statusFilter === 'ALL' || intern.taskStatus === statusFilter;
       return matchSearch && matchStatus;
     });
   }, [interns, searchTerm, statusFilter]);
@@ -589,14 +592,15 @@ export const EnterpriseInterns: React.FC = () => {
                 value={statusFilter}
                 onChange={(e) => {
                   const value = e.target.value;
-                  if (isInternStatusFilter(value)) setStatusFilter(value);
+                  if (isTaskStatusFilter(value)) setStatusFilter(value);
                   setCurrentPage(1);
                 }}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
                 <option value="ALL">Tất cả trạng thái ({interns.length})</option>
-                <option value="ONGOING">Tiến độ tốt ({interns.filter((i) => i.status !== 'RISK').length})</option>
-                <option value="RISK">Cần hỗ trợ / Chậm ({interns.filter((i) => i.status === 'RISK').length})</option>
+                {Object.entries(taskStatusLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label} ({interns.filter(i => i.taskStatus === value).length})</option>
+                ))}
               </select>
             </div>
 
@@ -716,7 +720,7 @@ export const EnterpriseInterns: React.FC = () => {
                           <span className="text-slate-500">Hoàn thành</span>
                           <span
                             className={
-                              intern.status === 'RISK' ? 'text-rose-600 font-bold' : 'text-slate-800 font-bold'
+                              intern.taskStatus === 'OVERDUE' ? 'text-rose-600 font-bold' : 'text-slate-800 font-bold'
                             }
                           >
                             {intern.progressPercent}%
@@ -725,7 +729,7 @@ export const EnterpriseInterns: React.FC = () => {
                         <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                           <div
                             className={`h-1.5 rounded-full transition-all ${
-                              intern.status === 'RISK' ? 'bg-rose-500' : 'bg-orange-500'
+                              intern.taskStatus === 'OVERDUE' ? 'bg-rose-500' : 'bg-orange-500'
                             }`}
                             style={{ width: `${intern.progressPercent}%` }}
                           />
@@ -744,12 +748,14 @@ export const EnterpriseInterns: React.FC = () => {
                       <td className="py-3 px-4 text-center">
                         <span
                           className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                            intern.status === 'RISK'
+                            intern.taskStatus === 'OVERDUE'
                               ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                              : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                              : intern.taskStatus === 'DONE'
+                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-100 text-amber-800 border border-amber-200'
                           }`}
                         >
-                          {intern.status === 'RISK' ? 'Chậm tiến độ' : 'Bình thường'}
+                          {taskStatusLabels[intern.taskStatus]}
                         </span>
                       </td>
 

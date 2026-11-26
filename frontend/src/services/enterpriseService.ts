@@ -182,6 +182,8 @@ export interface EnterpriseCandidateStudent {
   programCode?: string;
   programName?: string;
   enrollmentYear?: number;
+  cohortName?: string | null;
+  groupCode?: string | null;
 }
 
 export interface EnterpriseCandidatePosition {
@@ -262,6 +264,7 @@ export interface EnterpriseInternshipItem {
   id: number; // AssignmentID
   studentId: number;
   ojtSemesterId: number;
+  semester?: { id: number; code?: string; name?: string } | null;
   positionId: number;
   coordinationId: number;
   registrationId: number;
@@ -583,7 +586,7 @@ export const enterpriseService = {
   ): Promise<BulkEvaluationResponse> => {
     const response = await API.post<BulkEvaluationResponse>('/enterprise/internships/evaluations/bulk', {
       items, status, confirmed,
-      reason: status === 'DRAFT' ? 'Lưu nháp đánh giá OJT hàng loạt' : 'Xác nhận gửi điểm OJT hàng loạt đến QHDN',
+      reason: status === 'DRAFT' ? 'Lưu điểm đánh giá OJT' : 'Xác nhận gửi điểm OJT hàng loạt đến QHDN',
     });
     return response.data;
   },

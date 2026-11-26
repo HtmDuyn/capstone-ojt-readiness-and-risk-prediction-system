@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { EligibleOjtRoster } from '@/components/qhdn/EligibleOjtRoster';
 import { RecruitmentRounds } from '@/components/qhdn/RecruitmentRounds';
+import { RecruitmentSemesterNotice } from '@/components/qhdn/RecruitmentConfirmation';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
 import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
@@ -71,10 +72,9 @@ export default function QhdnRegistrationWindows() {
   const safePage = Math.min(page, Math.max(1, Math.ceil(windows.length / 10)));
 
   return <div className="space-y-5 pb-10">
-    <PageBanner variant="qhdn" title="Quản lý các đợt OJT" description="Thiết lập đợt OJT, quản lý lịch tuyển dụng, mở đợt con và chốt tổng hợp kết quả theo học kỳ." badge="Phòng QHDN" />
+    <PageBanner variant="qhdn" title="Quản lý các đợt OJT" description="Mỗi học kỳ đang diễn ra được tạo một đợt OJT, quản lý lịch tuyển dụng và chốt tổng hợp kết quả." badge="Phòng QHDN" />
     <section className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5">
       <AcademicPeriodFilter selection={semester} disabled={busy} />
-      <button type="button" className={workflowSecondary} disabled={semester.loading || loading || busy} onClick={() => { semester.reload(); refresh(); }}><RefreshCw size={16} />Tải lại các đợt</button>
     </section>
     {semester.error && <Notice>{semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}
@@ -108,6 +108,7 @@ export default function QhdnRegistrationWindows() {
     {task && <WorkflowModal title={task.kind === 'extend' ? 'Gia hạn đăng ký' : task.window.status === 'OPEN' ? 'Đóng đợt đăng ký' : 'Mở lại đợt đăng ký'} subtitle={task.window.name} busy={busy} onClose={() => setTask(null)}>
       <form onSubmit={submit} className="space-y-4">
         {taskError && <Notice>{taskError}</Notice>}
+        {task.kind==='toggle'&&task.window.status!=='OPEN'&&<RecruitmentSemesterNotice semesterName={semester.selectedPeriod?.name} />}
         {task.kind === 'extend' ? <Field label={'Hạn mới (sau ' + localDate(task.window.endsAt) + ')'}><input name="endsAt" type="datetime-local" className={workflowInput} required /></Field> :
           <Notice>{task.window.status === 'OPEN' ? 'Sinh viên sẽ ngừng nộp hồ sơ trong đợt này.' : 'Đợt cần còn hạn và có sinh viên đủ điều kiện trong phạm vi.'}</Notice>}
         <Field label="Lý do"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>

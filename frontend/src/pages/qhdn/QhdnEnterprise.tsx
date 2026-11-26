@@ -3,12 +3,11 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   Building2,
+  Eye,
   Filter,
   Mail,
-  MoreHorizontal,
   LockKeyhole,
   UnlockKeyhole,
-  RefreshCw,
   Search,
   FileSpreadsheet,
   UserPlus,
@@ -314,14 +313,6 @@ export default function QhdnEnterpriseManagement() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 xl:shrink-0">
-                <button
-                  className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"}
-                  disabled={loading || positionsLoading}
-                  onClick={() => setRevision((v) => v + 1)}
-                >
-                  <RefreshCw size={16} />
-                  Làm mới
-                </button>
                 <button type="button" className={workflowSecondary + " h-11 flex-1 whitespace-nowrap sm:flex-none"} onClick={() => setImporting('file')}>
                   <FileSpreadsheet size={17} />Import danh sách doanh nghiệp
                 </button>
@@ -399,13 +390,7 @@ export default function QhdnEnterpriseManagement() {
             </div>
             {positionsError && (
               <Notice>
-                Không tải được chỉ tiêu: {positionsError}{" "}
-                <button
-                  className="ml-2 font-bold underline"
-                  onClick={() => setRevision((v) => v + 1)}
-                >
-                  Thử lại
-                </button>
+                Không tải được chỉ tiêu: {positionsError}
               </Notice>
             )}
           </div>
@@ -452,25 +437,20 @@ export default function QhdnEnterpriseManagement() {
                         >
                           <td className={cell + " text-center tabular-nums text-slate-500"}>{(currentPage - 1) * 10 + index + 1}</td>
                           <td className={cell}>
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-100 bg-orange-50 text-orange-600">
-                                <Building2 size={21} />
-                              </span>
-                              <div className="min-w-0">
-                                <button
-                                  className="block max-w-full truncate text-left font-bold text-slate-800 hover:text-orange-600"
-                                  title={c.name}
-                                  disabled={positionsLoading}
-                                  onClick={() =>
-                                    setSelected({ company: c, tab: "overview" })
-                                  }
-                                >
-                                  {c.name}
-                                </button>
-                                <p className="mt-1 truncate text-xs text-slate-500" title={`${c.code} · ${c.industry || "Chưa có lĩnh vực"}`}>
-                                  {c.code} · {c.industry || "Chưa có lĩnh vực"}
-                                </p>
-                              </div>
+                            <div className="min-w-0">
+                              <button
+                                className="block max-w-full truncate text-left font-bold text-slate-800 hover:text-orange-600"
+                                title={c.name}
+                                disabled={positionsLoading}
+                                onClick={() =>
+                                  setSelected({ company: c, tab: "overview" })
+                                }
+                              >
+                                {c.name}
+                              </button>
+                              <p className="mt-1 truncate text-xs text-slate-500" title={`${c.code} · ${c.industry || "Chưa có lĩnh vực"}`}>
+                                {c.code} · {c.industry || "Chưa có lĩnh vực"}
+                              </p>
                             </div>
                           </td>
                           <td className={cell}>
@@ -547,14 +527,14 @@ export default function QhdnEnterpriseManagement() {
                               className={
                                 workflowSecondary + " !h-9 !w-9 !rounded-lg !p-0"
                               }
-                              aria-label={"Quản lý doanh nghiệp " + c.name}
-                              title="Quản lý doanh nghiệp"
+                              aria-label={"Xem chi tiết doanh nghiệp " + c.name}
+                              title="Xem chi tiết doanh nghiệp"
                               disabled={positionsLoading}
                               onClick={() =>
                                 setSelected({ company: c, tab: "overview" })
                               }
                             >
-                              <MoreHorizontal size={17} />
+                              <Eye size={17} />
                             </button>
                             <button
                               type="button"

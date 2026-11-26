@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Building2, Sparkles, Users, Handshake, Award, ArrowRight } from 'lucide-react';
+import { Building2, Sparkles, Users, Handshake, Award, ArrowRight, BookOpen, ClipboardCheck } from 'lucide-react';
 import type { StudentProfile } from '@/types/student/studentDashboardTypes';
 import { getStudentMenuItemById, getStudentMenuItemByPath } from '@/config/menus/studentMenu';
 
@@ -34,8 +34,8 @@ export interface PageBannerProps {
   children?: React.ReactNode;
   /** Class CSS bổ sung cho banner. */
   className?: string;
-  /** Kiểu banner dành riêng cho giao diện doanh nghiệp. */
-  variant?: 'default' | 'enterprise' | 'qhdn';
+  /** Kiểu banner theo vai trò. */
+  variant?: 'default' | 'enterprise' | 'qhdn' | 'education';
 
   // Props cũ được giữ lại để tương thích với các màn hình hiện tại.
   onRegisterOjt?: () => void;
@@ -62,8 +62,10 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   const navigate = useNavigate();
   const isEnterprise = variant === 'enterprise';
   const isQhdn = variant === 'qhdn';
-  const renderedBreadcrumb = breadcrumb ?? (isQhdn ? (
-    <span className="qhdn-hero-eyebrow"><Sparkles size={13} /> TRUNG TÂM ĐIỀU PHỐI OJT</span>
+  const isEducation = variant === 'education';
+  const isDepartment = isQhdn || isEducation;
+  const renderedBreadcrumb = breadcrumb ?? (isDepartment ? (
+    <span className="qhdn-hero-eyebrow"><Sparkles size={13} /> {isEducation ? 'TRUNG TÂM QUẢN LÝ ĐÀO TẠO' : 'TRUNG TÂM ĐIỀU PHỐI OJT'}</span>
   ) : null);
 
   // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
@@ -132,14 +134,14 @@ export const PageBanner: React.FC<PageBannerProps> = ({
 
   const bannerClassName = isEnterprise
     ? 'enterprise-hero relative overflow-hidden text-white'
-    : isQhdn ? 'qhdn-hero relative overflow-hidden text-white'
+    : isDepartment ? 'qhdn-hero relative overflow-hidden text-white'
     : 'relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1c1917] via-[#2e1065] to-[#1c1917] p-6 sm:p-8 text-white shadow-xl shadow-purple-950/20 border border-white/15 backdrop-blur-md transition-all duration-300';
 
   return (
     <div
       className={`${bannerClassName} ${className}`}
     >
-      {!isEnterprise && !isQhdn && (
+      {!isEnterprise && !isDepartment && (
         <>
           <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-orange-500/25 blur-3xl pointer-events-none" />
           <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-purple-500/30 blur-3xl pointer-events-none" />
@@ -161,11 +163,11 @@ export const PageBanner: React.FC<PageBannerProps> = ({
 
           {/* Tiêu đề và badge. */}
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className={`flex items-center gap-2 tracking-tight text-white ${isEnterprise || isQhdn ? 'font-extrabold' : 'text-xl sm:text-2xl lg:text-[26px] font-extrabold'}`}>
+            <h1 className={`flex items-center gap-2 tracking-tight text-white ${isEnterprise || isDepartment ? 'font-extrabold' : 'text-xl sm:text-2xl lg:text-[26px] font-extrabold'}`}>
               {renderedTitle}
             </h1>
-            {isQhdn && badge !== null ? (
-              <span className="qhdn-hero-badge"><span />{renderedBadge || 'Phòng QHDN'}</span>
+            {isDepartment && badge !== null ? (
+              <span className="qhdn-hero-badge"><span />{renderedBadge || (isEducation ? 'Phòng Đào tạo' : 'Phòng QHDN')}</span>
             ) : isEnterprise && renderedBadge ? (
               <span className="qhdn-hero-badge"><span />{renderedBadge}</span>
             ) : renderedBadge}
@@ -206,6 +208,13 @@ export const PageBanner: React.FC<PageBannerProps> = ({
           )}
 
           {children}
+          {isEducation && (
+            <div className="qhdn-hero-flow" aria-label="Luồng quản lý đào tạo và OJT">
+              <span><BookOpen size={14} /> Quản lý học vụ</span><ArrowRight size={12} aria-hidden="true" />
+              <span><ClipboardCheck size={14} /> Xét điều kiện OJT</span><ArrowRight size={12} aria-hidden="true" />
+              <span><Users size={14} /> Bàn giao sinh viên</span>
+            </div>
+          )}
           {isQhdn && (
             <div className="qhdn-hero-flow" aria-label="Luồng điều phối OJT">
               <span><Users size={14} /> Bàn giao sinh viên</span><ArrowRight size={12} aria-hidden="true" />

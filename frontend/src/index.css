@@ -4,6 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --chart-1: #6366f1;
+    --chart-2: #14b8a6;
+    --chart-3: #f59e0b;
+    --chart-4: #f43f5e;
+    --chart-5: #8b5cf6;
+  }
+}
+
 /* ─── Reset & Base ─────────────────────────────────────────── */
 
 *,
@@ -550,7 +565,7 @@ body {
 }
 .qhdn-chart-card[data-visible='true']::before { animation: qhdn-chart-light 1.8s .2s ease-out both; }
 .qhdn-chart-card > .flex:first-child { min-height: 48px; gap: 12px; }
-.qhdn-chart-card canvas { cursor: crosshair; }
+.qhdn-chart-card .recharts-surface { cursor: crosshair; }
 .qhdn-chart-card h2 { letter-spacing: -.025em; }
 .qhdn-chart-card .bg-slate-100 { background-color: rgb(224 231 255 / .45); }
 .qhdn-chart-card .bg-white { background-color: rgb(255 255 255 / .8); }
@@ -645,4 +660,135 @@ body {
   .qhdn-page-transition { animation: none; }
   .qhdn-workspace :is(button, a, input, select) { transition: none; }
   .qhdn-workspace button:not(:disabled):is(:hover, :active) { transform: none; }
+}
+
+/* Shared page background */
+.app-background,
+.login-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  background:
+    radial-gradient(ellipse at 4% 18%, #fed7aa 0%, transparent 52%),
+    radial-gradient(ellipse at 96% 8%, #bfdbfe 0%, transparent 52%),
+    radial-gradient(ellipse at 88% 94%, #bfdbfe 0%, transparent 56%),
+    radial-gradient(ellipse at 8% 98%, #ffedd5 0%, transparent 48%),
+    #f7f9ff;
+}
+
+.login-bubble {
+  position: absolute;
+  width: var(--bubble-size);
+  aspect-ratio: 1;
+  left: var(--bubble-left, auto);
+  right: var(--bubble-right, auto);
+  top: var(--bubble-top, auto);
+  bottom: var(--bubble-bottom, auto);
+  border: 1px solid rgb(255 255 255 / .58);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 24%, rgb(255 255 255 / .58) 0%, rgb(255 255 255 / .1) 9%, transparent 28%),
+    radial-gradient(circle at 72% 78%, var(--bubble-tint) 0%, transparent 62%),
+    rgb(255 255 255 / .025);
+  box-shadow:
+    inset 1px 1px 3px rgb(255 255 255 / .65),
+    inset -2px -3px 9px var(--bubble-shadow),
+    0 5px 18px var(--bubble-shadow);
+  opacity: .48;
+  animation: login-bubble-float 10s ease-in-out infinite;
+}
+
+.login-bubble::before {
+  position: absolute;
+  top: 17%;
+  left: 21%;
+  width: 26%;
+  height: 9%;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .72);
+  content: "";
+  filter: blur(1.5px);
+  transform: rotate(-35deg);
+}
+
+.login-bubble::after {
+  position: absolute;
+  inset: 7%;
+  border: 1px solid transparent;
+  border-right-color: rgb(255 255 255 / .45);
+  border-bottom-color: rgb(186 230 253 / .28);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(12deg);
+}
+
+.login-bubble--one {
+  --bubble-size: clamp(64px, 8vw, 132px);
+  --bubble-left: 7%;
+  --bubble-top: 6%;
+  --bubble-tint: rgb(147 197 253 / .06);
+  --bubble-shadow: rgb(59 130 246 / .025);
+}
+
+.login-bubble--two {
+  --bubble-size: clamp(48px, 5.5vw, 90px);
+  --bubble-right: 10%;
+  --bubble-top: 12%;
+  --bubble-tint: rgb(253 186 116 / .05);
+  --bubble-shadow: rgb(249 115 22 / .025);
+  animation-delay: -3s;
+}
+
+.login-bubble--three {
+  --bubble-size: clamp(84px, 11vw, 180px);
+  --bubble-right: 4%;
+  --bubble-bottom: 4%;
+  --bubble-tint: rgb(147 197 253 / .06);
+  --bubble-shadow: rgb(59 130 246 / .03);
+  animation-delay: -6s;
+}
+
+.login-bubble--four {
+  --bubble-size: clamp(60px, 7vw, 114px);
+  --bubble-left: 2%;
+  --bubble-top: 48%;
+  --bubble-tint: rgb(125 211 252 / .05);
+  --bubble-shadow: rgb(14 165 233 / .025);
+  animation-delay: -8s;
+}
+
+.login-bubble--five {
+  --bubble-size: clamp(78px, 10vw, 156px);
+  --bubble-left: 18%;
+  --bubble-bottom: 2%;
+  --bubble-tint: rgb(253 186 116 / .04);
+  --bubble-shadow: rgb(249 115 22 / .025);
+  animation-delay: -5s;
+}
+
+.login-bubble--six {
+  --bubble-size: clamp(44px, 4.5vw, 72px);
+  --bubble-right: 25%;
+  --bubble-top: 56%;
+  --bubble-tint: rgb(147 197 253 / .05);
+  --bubble-shadow: rgb(59 130 246 / .025);
+  animation-delay: -1s;
+}
+
+@keyframes login-bubble-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(10px, -24px, 0) scale(1.04); }
+}
+
+@media (max-width: 640px) {
+  .login-bubble { opacity: .34; }
+  .login-bubble--four,
+  .login-bubble--six { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-bubble { animation: none; }
 }

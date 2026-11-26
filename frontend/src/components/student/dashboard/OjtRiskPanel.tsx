@@ -27,7 +27,7 @@ function EmptyAssessment() {
       <div><h3 className="text-base font-semibold text-slate-900">Tín chỉ tích lũy</h3><p className="mt-3 text-3xl font-bold text-slate-900">—</p><p className="mt-2 text-sm text-slate-500">Chưa có dữ liệu tín chỉ trong đánh giá.</p></div>
       <div className="grid gap-5 border-t border-slate-200 pt-5 lg:grid-cols-2">
         <section aria-label="Phân tích nguyên nhân rủi ro"><h3 className="text-base font-semibold text-slate-900">Phân tích nguyên nhân rủi ro</h3><p className="mt-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-500">Chưa có thông tin phân tích. Các yếu tố ảnh hưởng sẽ được cập nhật sau khi hệ thống đánh giá dữ liệu học tập.</p></section>
-        <section aria-label="Lộ trình học tập đề xuất"><h3 className="text-base font-semibold text-slate-900">Lộ trình học tập đề xuất</h3><p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-500">Chưa có môn học đề xuất. Bạn vẫn có thể xem bảng điểm và chương trình đào tạo của mình.</p></section>
+        <section aria-label="Lộ trình học tập đề xuất"><h3 className="text-base font-semibold text-slate-900">Lộ trình học tập đề xuất</h3><p className="mt-3 text-sm leading-6 text-slate-500">Chưa có môn học đề xuất. Bạn vẫn có thể xem bảng điểm và chương trình đào tạo của mình.</p></section>
       </div>
     </section>
     <section className={`${cardClass} p-5 sm:p-6`} aria-label="Hướng hành động tiếp theo"><h3 className="text-base font-semibold text-slate-900">Bạn nên làm gì tiếp theo?</h3><p className="mt-3 text-sm leading-6 text-slate-500">Theo dõi tiến độ học tập và kiểm tra dữ liệu các môn đã hoàn thành để chuẩn bị cho kỳ OJT.</p><Link to="/student/academic-profile" className={`mt-3 inline-block rounded text-sm font-medium text-orange-600 hover:underline ${focusClass}`}>Xem hồ sơ học tập</Link></section>
@@ -47,11 +47,13 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
       <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
       <section className={`${cardClass} min-w-0 p-5 sm:p-6`} aria-label="Tiến độ và phân tích OJT">
         <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress} embedded />
-        <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 lg:grid-cols-2 lg:gap-0">
-          <div className="min-w-0 lg:pr-6"><RiskInsights data={data} embedded /></div>
-          <div className="min-w-0 border-t border-slate-200 pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"><LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} embedded /></div>
+        <div className="mt-5 border-t border-slate-200 pt-5">
+          <RiskInsights data={data} embedded />
         </div>
-        <RoadmapNotes roadmap={data.roadmap} />
+        <div className="mt-5 border-t border-slate-200 pt-5">
+          <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} embedded />
+          <RoadmapNotes roadmap={data.roadmap} />
+        </div>
       </section>
       <section className={`${cardClass} min-w-0 p-5 sm:p-6`}><RecommendationSummary data={data} embedded /></section>
     </>:data?<>
