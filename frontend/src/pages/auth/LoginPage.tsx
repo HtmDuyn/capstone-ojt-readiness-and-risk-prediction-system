@@ -77,14 +77,13 @@ const LoginPage: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loginWithCredentials = async (email: string, password: string) => {
     setIsLoading(true);
     setErrorMessage("");
 
     try {
       const loginResponse = await authService.login({
-        email: account.trim(),
+        email: email.trim(),
         password,
       });
       const profile = loginResponse.user ?? (await authService.getCurrentUser(loginResponse.token)).user;
@@ -116,6 +115,11 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await loginWithCredentials(account, password);
+  };
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-slate-950 overflow-y-auto">
       <LoginBackground />
@@ -138,6 +142,7 @@ const LoginPage: React.FC = () => {
           isLoading={isLoading}
           errorMessage={errorMessage}
           onSubmit={handleLogin}
+          onQuickLogin={loginWithCredentials}
         />
       </div>
     </div>

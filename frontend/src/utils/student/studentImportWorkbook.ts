@@ -15,10 +15,10 @@ const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> =
 
 export const STUDENT_IMPORT_COLUMNS = [
   'Họ và tên', 'Mã sinh viên', 'Email', 'Số điện thoại',
-  'Mã chương trình đào tạo', 'Chuyên ngành', 'Trạng thái học vụ', 'Khóa', 'Nhóm', 'Học kỳ hiện tại',
+  'Mã chương trình đào tạo', 'Trạng thái học vụ', 'Khóa', 'Nhóm',
 ];
 export const COURSE_RESULT_COLUMNS = [
-  'Mã sinh viên', 'Mã môn', 'Tên môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
+  'Mã sinh viên', 'Mã môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
 ];
 
 const text = (value: unknown): string =>
@@ -63,11 +63,14 @@ const resolveOption = (
   }
 
   const id = positiveId(input);
+  // Period values copied from the UI may contain both code and display name,
+  // for example "FALL2023 — Fall 2023". Treat each displayed part as an alias.
+  const inputAliases = input.split(/[—–|·]/).map(normalize).filter(Boolean);
 
   const matches = options.filter(
     (item) =>
       (id !== undefined && item.id === id) ||
-      item.aliases.some((alias) => normalize(alias) === normalize(input)),
+      item.aliases.some((alias) => inputAliases.includes(normalize(alias))),
   );
 
   if (matches.length === 0) {
@@ -119,7 +122,7 @@ const readRows = (
     Object.values(row).some((v) => text(v) !== ""),
   );
   const aliases = sheetName === 'Danh sách sinh viên'
-    ? [...STUDENT_IMPORT_COLUMNS, 'Mã chuyên ngành', 'majorCode', 'Mã khung chương trình', 'Chương trình đào tạo', 'Lớp', 'Trạng thái sinh viên', 'Học kỳ bắt đầu chuyên ngành', 'Kỳ hiện tại', 'Kỳ bắt đầu chuyên ngành', 'MSSV', 'code', 'Họ tên', 'fullName', 'phone', 'className', 'programId', 'programName', 'status', 'studentStatus', 'cohortId', 'cohortCode', 'groupCode', 'Kỳ nhập học chuyên ngành', 'Kỳ nhập học', 'entryAcademicPeriodId', 'currentAcademicPeriodId']
+    ? [...STUDENT_IMPORT_COLUMNS, 'Mã chuyên ngành', 'majorCode', 'Mã khung chương trình', 'Chương trình đào tạo', 'Lớp', 'Trạng thái sinh viên', 'Học kỳ bắt đầu chuyên ngành', 'Kỳ bắt đầu chuyên ngành', 'MSSV', 'code', 'Họ tên', 'fullName', 'phone', 'className', 'programId', 'programName', 'status', 'studentStatus', 'cohortId', 'cohortCode', 'groupCode', 'Kỳ nhập học chuyên ngành', 'Kỳ nhập học', 'entryAcademicPeriodId']
     : [...COURSE_RESULT_COLUMNS, 'Học kỳ ghi nhận', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu', 'MSSV', 'code', 'courseCode', 'academicPeriodId', 'attemptNumber', 'status', 'score', 'gradePoints', 'grade', 'sourceReference'];
   const supported = new Set(aliases.map(normalize));
   const unknown = [...new Set(data.flatMap(row => Object.keys(row).filter(key => !supported.has(normalize(key)) && text(row[key]) !== '')))];
@@ -138,8 +141,8 @@ const readRows = (
 export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   const book = XLSX.utils.book_new();
   const sheets: [string, string[], number[], number[]][] = [
-    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 23, 20, 12, 24], [1, 3, 4, 5, 7, 8, 9]],
-    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 38, 20, 14, 19, 15], [0, 1, 3, 5]],
+    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 20, 12], [1, 3, 4, 6, 7]],
+    ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 20, 14, 19, 15], [0, 1, 2, 4]],
   ];
   for (const [name, headers, widths, textColumns] of sheets) {
     const sheet = XLSX.utils.aoa_to_sheet([headers]);
@@ -270,13 +273,6 @@ export const parseStudentImportWorkbook = async (
       number,
     );
 
-    const currentAcademicPeriodId = resolveOption(
-      getCell(row, ['Học kỳ hiện tại', "Kỳ hiện tại", "currentAcademicPeriodId"]),
-      catalogs.periods,
-      "kỳ hiện tại",
-      number,
-    );
-
     const group = getCell(row, ["Nhóm", "groupCode"]).toUpperCase();
 
     if (!["A", "B", "C", "D"].includes(group)) {
@@ -305,7 +301,6 @@ export const parseStudentImportWorkbook = async (
         placement: {
           cohortId,
           groupCode: group as StudentPlacement["groupCode"],
-          currentAcademicPeriodId,
           ...(entryAcademicPeriodId !== undefined ? { entryAcademicPeriodId } : {}),
         },
         courseResults: [],
@@ -387,9 +382,7 @@ const parseCourseResultImportWorkbook = (
 
     const code = getCell(row, ["Mã sinh viên", "MSSV", "code"]);
 
-    const courseCode = getCell(row, ["Mã môn", "courseCode"]);
-    // Tên môn is for the person filling the sheet; the existing import contract resolves the course by code.
-
+    const courseCode = getCell(row, ["Mã môn", "courseCode"]).trim().toUpperCase();
     const period = getCell(row, ['Học kỳ ghi nhận', "Kỳ học", "academicPeriodId"]);
 
     if (!code || !courseCode || !period) {
@@ -416,12 +409,11 @@ const parseCourseResultImportWorkbook = (
     const key = [
       code.trim().toUpperCase(),
       courseCode.trim().toUpperCase(),
-      academicPeriodId,
       attemptNumber,
     ].join("|");
 
     if (seen.has(key)) {
-      throw new Error(`Dòng ${number}: Trùng môn, kỳ và lần học.`);
+      throw new Error(`Dòng ${number}: Trùng môn và lần học.`);
     }
 
     seen.add(key);

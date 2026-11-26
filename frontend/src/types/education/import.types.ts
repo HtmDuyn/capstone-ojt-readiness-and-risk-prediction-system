@@ -17,7 +17,7 @@ export interface StudentCourseResult {
 export interface StudentPlacement {
   cohortId: number;
   groupCode: "A" | "B" | "C" | "D";
-  currentAcademicPeriodId: number;
+  currentAcademicPeriodId?: number;
   entryAcademicPeriodId?: number;
 }
 

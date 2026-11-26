@@ -4,7 +4,7 @@ import { query } from '../../config/database';
 import { academicTransaction } from '../academic/academic.repository';
 import { loadAcademicProgress, progressFromData } from '../students/academic-progress';
 import { evaluateEligibility } from './eligibility.service';
-import { saveOjtEligibilityResults } from './frontend-results.service';
+import { latestOjt202PassedSql, saveOjtEligibilityResults } from './frontend-results.service';
 import { ojtAssessmentCondition } from './ojt-policy.service';
 
 type Milestone = 'BLOCK10' | 'BLOCK3' | 'SEMESTER';
@@ -97,8 +97,7 @@ export async function assessOjtStudents(
   const excludedPassedOjt202Count = Number((await client.query(`SELECT count(*)::int AS count
     FROM "Students" s JOIN "Users" u USING ("UserID")
     WHERE s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
-      AND EXISTS (SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-        WHERE grade."StudentID"=s."StudentID" AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED')`)).rows[0].count);
+      AND ${latestOjt202PassedSql('s')}`)).rows[0].count);
   const passedReason = 'Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT.';
   const rule = condition.IsDefault
     ? { version: 0, minCredits: 70, defaultRule: true }
@@ -121,21 +120,14 @@ export async function assessOjtStudents(
           ELSE COALESCE(saved."Result"->'reasons','[]'::jsonb) || jsonb_build_array($1::text) END,
         true
       )
-    FROM "Students" s WHERE s."StudentID"=saved."StudentID" AND EXISTS (
-      SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-      WHERE grade."StudentID"=saved."StudentID"
-        AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
-    )`, [passedReason, condition.ConditionID, actorId, JSON.stringify(rule)]);
+    FROM "Students" s WHERE s."StudentID"=saved."StudentID" AND ${latestOjt202PassedSql('s')}`,
+    [passedReason, condition.ConditionID, actorId, JSON.stringify(rule)]);
 
   const { rows: students } = await client.query(`
     SELECT s."StudentID",s."Status",u."Status" AS "AccountStatus"
     FROM "Students" s JOIN "Users" u USING ("UserID")
     WHERE s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
-      AND NOT EXISTS (
-        SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-        WHERE grade."StudentID"=s."StudentID"
-          AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
-      )
+      AND NOT ${latestOjt202PassedSql('s')}
     ORDER BY s."StudentID" FOR UPDATE OF s`);
 
   const summary: OjtAssessmentSummary = {

@@ -175,6 +175,13 @@ const EducationStudentImport: React.FC = () => {
       <div role="tabpanel" id="student-import-panel" aria-labelledby="student-import-tab" hidden={activeTab !== 'import'} className={activeTab !== 'import' ? 'hidden' : ''}>
       <section className="space-y-4 p-5 sm:p-7">
         <h2 className="text-xl font-bold text-slate-900">Nhập dữ liệu từ Excel</h2>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <p className="font-semibold">Lưu ý khi import</p>
+          <ul className="mt-1 list-inside list-disc space-y-1">
+            <li>Mã môn và mã kỳ phải tồn tại trong hệ thống.</li>
+            <li>Nếu email chưa có tài khoản, khi xác nhận import hệ thống tạo tài khoản và gửi thông tin đăng nhập lần đầu qua email.</li>
+          </ul>
+        </div>
         <div className="flex flex-col items-center gap-3 py-2 text-center">
           <div className="flex max-w-full flex-col items-center gap-1">
             <FileSpreadsheet size={24} className="text-green-700" aria-hidden="true" />
@@ -269,8 +276,6 @@ const EducationStudentImport: React.FC = () => {
                       "Trạng thái học vụ",
                       "Khóa",
                       "Nhóm",
-                      "Kỳ bắt đầu chuyên ngành",
-                      "Học kỳ hiện tại",
                       "Kết quả học tập",
                       "Trạng thái kiểm tra",
                       "Chi tiết lỗi",
@@ -306,10 +311,6 @@ const EducationStudentImport: React.FC = () => {
                         )?.label ?? row.academic.placement.cohortId}
                       </td>
                       <td className="px-4 py-3">{row.academic.placement.groupCode}</td>
-                      <td className="px-4 py-3">{row.academic.placement.entryAcademicPeriodId
-                        ? catalogs?.periods.find(p => p.id === row.academic.placement.entryAcademicPeriodId)?.label ?? row.academic.placement.entryAcademicPeriodId
-                        : 'Theo nhóm khi tạo mới/đổi nhóm; giữ nguyên khi cập nhật'}</td>
-                      <td className="whitespace-nowrap px-4 py-3">{catalogs?.periods.find(p => p.id === row.academic.placement.currentAcademicPeriodId)?.label ?? row.academic.placement.currentAcademicPeriodId}</td>
                       <td className="px-4 py-3">{row.academic.courseResults.length} kết quả</td>
                       <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${rowErrors(row).length ? 'bg-red-100 text-red-700' : previewSignature ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>{rowErrors(row).length ? 'Có lỗi' : previewSignature ? 'Hợp lệ' : 'Chờ kiểm tra'}</span></td>
                       <td className="max-w-64 px-4 py-3 text-red-700">{rowErrors(row).join('; ') || '—'}</td>

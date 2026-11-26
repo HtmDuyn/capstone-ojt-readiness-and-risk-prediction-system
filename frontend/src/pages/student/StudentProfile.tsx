@@ -61,7 +61,7 @@ export const StudentAcademicProfile = () => {
               </div>
               <div className="min-w-0 space-y-3">
                 <div><dt className="text-slate-500">Email</dt><dd className="break-all text-slate-800">{profile.email}</dd></div>
-                <div><dt className="text-slate-500">Học kỳ hiện tại</dt><dd className="break-words text-slate-800">{profile.currentAcademicPeriod?.name || profile.currentSemester || 'Chưa cập nhật'}</dd></div>
+                <div><dt className="text-slate-500">Học kỳ hiện tại</dt><dd className="break-words text-slate-800">{profile.systemCurrentAcademicPeriod?.name || 'Chưa có học kỳ hiện hành trên hệ thống'}</dd></div>
               </div>
             </dl>
             <p className="mt-4 text-xs leading-6 text-slate-500">{academicPeriodId === null && !academicPeriodsLoading
@@ -152,7 +152,7 @@ export const StudentAcademicProfile = () => {
                               {excludedFromOjt && <span className="mt-1 block text-xs font-semibold text-amber-800">Không tính vào tín chỉ xét OJT</span>}
                             </td>
                             <td className="px-3 whitespace-nowrap">{item.semesterTaken == null ? '—' : `Kỳ ${item.semesterTaken}`}</td>
-                            <td className="px-3 whitespace-nowrap">{(item.courseCode === 'OJT202' && (item.periodName || study.data?.period?.name)) || item.periodCode || 'Chưa cập nhật'}</td>
+                                <td className="px-3 whitespace-nowrap">{((item.courseCode === 'OJT202' && (item.periodCode || study.data?.period?.code)) || item.periodCode || item.periodName || study.data?.period?.name)?.toUpperCase() ?? 'Chưa cập nhật'}</td>
                             <td>{item.attemptNumber}</td>
                             <td className={item.score == null ? 'text-slate-600' : item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.score ?? '—'}</td>
                             <td className={item.status === 'PASSED' ? 'font-semibold text-emerald-600' : item.status === 'FAILED' ? 'font-semibold text-red-600' : 'text-slate-600'}>{item.status === 'IN_PROGRESS' ? 'Đang học' : statusText(item.status)}</td>

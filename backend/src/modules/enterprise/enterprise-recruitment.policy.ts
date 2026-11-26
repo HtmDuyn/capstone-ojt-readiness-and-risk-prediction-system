@@ -48,7 +48,7 @@ export function enterprisePostActions(post: Row, window?: ReturnType<typeof ente
   const posting = !!window?.accepting && !!window.canEdit;
   return {
     canEdit: editable,
-    canDelete: draft,
+    canDelete: post.Status === 'DRAFT',
     canPublish: editable && posting,
   };
 }

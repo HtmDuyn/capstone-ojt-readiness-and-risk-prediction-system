@@ -1,11 +1,9 @@
 import { Router,type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
-import { inputObject,positiveId } from '../students/student.validation';
-import { assessmentWindows,createAssessment,updateAssessment,updateRule,semesters,semesterDossier,createNotification,notifications } from './rest-resource.service';
-import { createImportRequest,commitImportRequest,importRequests,retryStudentImportEmail } from '../imports/import-request.service';
-import { saveGradeMapping } from './workflow-policy';
-import { handoffHistory } from '../ojt-registration/handoff.service';
+import { positiveId } from '../students/student.validation';
+import { assessmentWindows,createAssessment,updateAssessment,updateRule,semesters,semesterDossier } from './rest-resource.service';
+import { createImportRequest,commitImportRequest,importRequests } from '../imports/import-request.service';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';
 import { enumValue } from '../students/student.validation';
 import { retakeClassProposals } from '../academic-reporting/retake-class.service';
@@ -20,21 +18,12 @@ router.get('/ojt-semesters',...staff,handle(r=>semesters(r.query)));
 router.get('/ojt-grading-criteria',...staff,handle(r=>getGradingCriteria(r.query)));
 router.put('/ojt-grading-criteria',...staff,handle(r=>saveGradingCriteria(r.body,r.user),201));
 router.get('/ojt-semesters/:id',...staff,handle(r=>semesterDossier(positiveId(r.params.id),r.query,r.user)));
-router.put('/ojt-grade-mappings',...staff,handle(r=>{
-  const b=inputObject(r.body,['programId','ojtSemesterId','courseId','academicPeriodId','gradeBands','reason']),{programId,ojtSemesterId,...mapping}=b;
-  return saveGradeMapping(positiveId(programId,'programId'),positiveId(ojtSemesterId,'ojtSemesterId'),mapping,r.user.userId);
-}));
-router.get('/eligible-student-handoffs',...staff,handle(r=>{const {ojtSemesterId,...params}=r.query;return handoffHistory(ojtSemesterId===undefined?null:positiveId(ojtSemesterId,'ojtSemesterId'),params);}));
-router.get('/academic-notifications',...staff,handle(r=>notifications(r.query,r.user)));
-router.get('/academic-notifications/:id',...staff,handle(r=>notifications(r.query,r.user,String(r.params.id))));
-router.post('/academic-notifications',...staff,handle(r=>createNotification(r.body,r.user),202));
 for(const [path,kind]of [['student-imports','STUDENT'],['curriculum-imports','CURRICULUM']] as const){
   router.get('/'+path,...staff,handle(r=>importRequests(kind,r.query,r.user)));
   router.get('/'+path+'/:id',...staff,handle(r=>importRequests(kind,r.query,r.user,positiveId(r.params.id))));
   router.post('/'+path,...staff,handle(r=>createImportRequest(kind,r.body,r.user),201));
   router.patch('/'+path,...staff,handle(r=>commitImportRequest(kind,r.body,r.user)));
 }
-router.post('/student-imports/:id/email-retries',authenticate,authorizeRoles('ADMIN'),handle(r=>retryStudentImportEmail(positiveId(r.params.id),r.body,r.user),202));
 router.get('/academic-alerts',...staff,handle(r=>alerts(r.query)));
 router.get('/course-demands',...staff,handle(r=>courseDemand(r.query)));
 router.get('/retake-class-proposals',...staff,handle(r=>retakeClassProposals(r.query)));
