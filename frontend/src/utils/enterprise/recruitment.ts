@@ -43,14 +43,14 @@ export function postPublishLockReason(post: RecruitmentPost, windows: Recruitmen
   return '';
 }
 
-const unpublishedDraftRequired = 'Chỉ được xóa tin nháp chưa từng công bố.';
+const draftRequired = 'Chỉ được xóa tin đang ở trạng thái nháp.';
 
 export function canDeleteRecruitmentPost(post: RecruitmentPost) {
-  return post.status === 'DRAFT' && !post.publishedAt && post.canDelete !== false;
+  return post.status === 'DRAFT' && post.canDelete !== false;
 }
 
 export function postDeleteLockReason(post: RecruitmentPost) {
-  return canDeleteRecruitmentPost(post) ? '' : unpublishedDraftRequired;
+  return canDeleteRecruitmentPost(post) ? '' : draftRequired;
 }
 
 export function postEditLockReason(post: RecruitmentPost, windows: RecruitmentWindow[], _now = Date.now()) {

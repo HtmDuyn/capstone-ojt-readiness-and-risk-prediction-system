@@ -189,12 +189,19 @@ export async function deleteEnterprisePost(id: number, actor: Actor) {
   return academicTransaction(async c => {
     const own = await company(c,actor);
     const before = await ownPost(c,id,own,true);
-    if (!isUnpublishedEnterpriseDraft(before)) {
-      throw invalid('Chỉ được xóa tin nháp chưa từng công bố.',409,'RECRUITMENT_POST_DELETE_DENIED');
+    if (before.Status !== 'DRAFT') {
+      throw invalid('Chỉ được xóa tin đang ở trạng thái nháp.',409,'RECRUITMENT_POST_DELETE_DENIED');
     }
-    if ((await c.query('SELECT 1 FROM "JobApplications" WHERE "PostID"=$1 LIMIT 1',[id])).rowCount) {
-      throw invalid('Tin đã có hồ sơ ứng tuyển không được xóa.',409,'RECRUITMENT_POST_HAS_APPLICATIONS');
-    }
+    // A draft should not have applicants in the normal workflow. If stale data
+    // exists, remove only records owned by this draft before deleting its links.
+    await c.query(`DELETE FROM "InternshipAssignments" a
+      USING "StudentEnterpriseCoordination" co, "JobApplications" app
+      WHERE a."CoordinationID"=co."CoordinationID" AND co."ApplicationID"=app."ApplicationID" AND app."PostID"=$1`,[id]);
+    await c.query(`DELETE FROM "StudentEnterpriseCoordination" co
+      USING "JobApplications" app WHERE co."ApplicationID"=app."ApplicationID" AND app."PostID"=$1`,[id]);
+    await c.query(`DELETE FROM "ApplicationEvents" ev USING "JobApplications" app
+      WHERE ev."ApplicationID"=app."ApplicationID" AND app."PostID"=$1`,[id]);
+    await c.query('DELETE FROM "JobApplications" WHERE "PostID"=$1',[id]);
     const { rows: links } = await c.query<{ PositionID: number }>(
       'DELETE FROM "RecruitmentPostPositions" WHERE "PostID"=$1 RETURNING "PositionID"', [id]);
     try {
@@ -214,9 +221,7 @@ export async function deleteEnterprisePost(id: number, actor: Actor) {
           AND NOT EXISTS (SELECT 1 FROM "RecruitmentPostPositions" pp WHERE pp."PositionID"=pos."PositionID")
           AND NOT EXISTS (SELECT 1 FROM "StudentEnterpriseCoordination" co WHERE co."PositionID"=pos."PositionID")
           AND NOT EXISTS (SELECT 1 FROM "InternshipAssignments" a WHERE a."PositionID"=pos."PositionID")
-          AND NOT EXISTS (SELECT 1 FROM "OJTRegistrations" r WHERE r."PreferredPositionID"=pos."PositionID")
-          AND NOT EXISTS (SELECT 1 FROM "PositionSpecializations" s WHERE s."PositionID"=pos."PositionID")
-          AND NOT EXISTS (SELECT 1 FROM "OJTMatchingProfiles" m WHERE m."PositionID"=pos."PositionID")`, [positionIds]);
+          AND NOT EXISTS (SELECT 1 FROM "OJTRegistrations" r WHERE r."PreferredPositionID"=pos."PositionID")`, [positionIds]);
       await closeUnusedPositions(c,positionIds);
     }
     await audit(c,actor.userId,'RecruitmentPosts',id,'ENTERPRISE_DELETE',null,{

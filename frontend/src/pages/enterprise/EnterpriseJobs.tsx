@@ -84,8 +84,8 @@ export function EnterpriseJobs() {
     const lockReason = action === 'publish' ? postPublishLockReason(post, windows) : postDeleteLockReason(post);
     if (lockReason) { feedback.notify(lockReason, 'Không thể thực hiện'); return; }
     const confirmation = action === 'publish' ? 'Sinh viên sẽ thấy tin sau khi công bố. Sau đó, bạn không thể xóa tin.'
-      : `Tin “${post.title}” sẽ bị xóa vĩnh viễn.`;
-    if (!await feedback.confirm({ message: confirmation, title: action === 'publish' ? 'Công bố tin tuyển dụng?' : 'Xóa tin tuyển dụng?', confirmLabel: action === 'publish' ? 'Công bố tin' : 'Xóa vĩnh viễn', tone: action === 'delete' ? 'danger' : 'warning' })) return;
+      : `Tin nháp “${post.title}” và toàn bộ dữ liệu riêng liên quan sẽ bị xóa vĩnh viễn, không thể khôi phục. Vị trí còn được tin khác hoặc lịch sử OJT sử dụng sẽ được giữ lại.`;
+    if (!await feedback.confirm({ message: confirmation, title: action === 'publish' ? 'Công bố tin tuyển dụng?' : 'Xóa hoàn toàn tin nháp?', confirmLabel: action === 'publish' ? 'Công bố tin' : 'Xóa hoàn toàn', tone: action === 'delete' ? 'danger' : 'warning' })) return;
     setActionBusy(post.id);
     try {
       if (action === 'delete') {
@@ -94,7 +94,7 @@ export function EnterpriseJobs() {
         setPosts(current => current.filter(item => item.id !== post.id));
         setDetailPost(current => current?.id === post.id ? null : current);
         refresh();
-        feedback.notify(`Đã xóa vĩnh viễn tin “${post.title}”.`, 'Đã xóa tin', 'success');
+        feedback.notify(`Đã xóa hoàn toàn tin nháp “${post.title}” và dữ liệu riêng liên quan.`, 'Đã xóa hoàn toàn', 'success');
       } else {
         const response = await enterpriseService.publishRecruitmentPost(post.id);
         if (!response.success || !response.data) throw new Error('Chưa cập nhật được trạng thái tin.');

@@ -79,7 +79,6 @@ DECLARE table_name text;
     'OJTConditions',
     'OJTCreditThresholds',
     'OJTEligibilityResultBatches',
-    'OJTMatchingProfiles',
     'OJTRegistrationEvents',
     'OJTRegistrationExceptions',
     'OJTRegistrations',
@@ -90,7 +89,6 @@ DECLARE table_name text;
     'PasswordResetCodes',
     'PredictionJobs',
     'PredictionModels',
-    'PositionSpecializations',
     'ProgramCombos',
     'ProgramCourseEquivalences',
     'ProgramCourses',
@@ -662,17 +660,6 @@ CREATE TABLE public."InternshipPositions" (
   CONSTRAINT "UQ_Position_Semester" UNIQUE ("PositionID", "OJTSemesterID")
 );
 COMMENT ON COLUMN public."InternshipPositions"."RemainingSlots" IS 'Legacy mutable counter. Reserve slots in a backend transaction with a position row lock; do not decrement from client requests without locking.';
-CREATE TABLE public."PositionSpecializations" (
-  "PositionID" integer NOT NULL,
-  "SpecializationID" integer NOT NULL,
-  CONSTRAINT "PositionSpecializations_pkey" PRIMARY KEY ("PositionID", "SpecializationID")
-);
-CREATE TABLE public."OJTMatchingProfiles" (
-  "PositionID" integer NOT NULL,
-  "Profile" jsonb DEFAULT '{}'::jsonb NOT NULL,
-  "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "OJTMatchingProfiles_pkey" PRIMARY KEY ("PositionID")
-);
 CREATE TABLE public."InternshipTasks" (
   "TaskID" integer GENERATED ALWAYS AS IDENTITY (SEQUENCE NAME public."InternshipTasks_TaskID_seq" START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1) NOT NULL,
   "AssignmentID" integer NOT NULL,
@@ -5848,9 +5835,6 @@ ALTER TABLE public."InternshipEvaluations" ADD CONSTRAINT "InternshipEvaluations
 ALTER TABLE public."InternshipPositions" ADD CONSTRAINT "FK_InternshipPositions_Enterprise" FOREIGN KEY ("EnterpriseID") REFERENCES "Enterprises"("EnterpriseID") ON DELETE CASCADE;
 ALTER TABLE public."InternshipPositions" ADD CONSTRAINT "FK_InternshipPositions_Semester" FOREIGN KEY ("OJTSemesterID") REFERENCES "OJTSemesters"("OJTSemesterID");
 ALTER TABLE public."InternshipPositions" ADD CONSTRAINT "InternshipPositions_JobRoleID_fkey" FOREIGN KEY ("JobRoleID") REFERENCES "JobRoles"("JobRoleID");
-ALTER TABLE public."PositionSpecializations" ADD CONSTRAINT "PositionSpecializations_PositionID_fkey" FOREIGN KEY ("PositionID") REFERENCES "InternshipPositions"("PositionID") ON DELETE CASCADE;
-ALTER TABLE public."PositionSpecializations" ADD CONSTRAINT "PositionSpecializations_SpecializationID_fkey" FOREIGN KEY ("SpecializationID") REFERENCES "Specializations"("SpecializationID") ON DELETE CASCADE;
-ALTER TABLE public."OJTMatchingProfiles" ADD CONSTRAINT "OJTMatchingProfiles_PositionID_fkey" FOREIGN KEY ("PositionID") REFERENCES "InternshipPositions"("PositionID") ON DELETE CASCADE;
 ALTER TABLE public."InternshipTasks" ADD CONSTRAINT "FK_InternshipTasks_Assignment" FOREIGN KEY ("AssignmentID") REFERENCES "InternshipAssignments"("AssignmentID") ON DELETE CASCADE;
 ALTER TABLE public."JobApplications" ADD CONSTRAINT "FK_JobApplication_CV" FOREIGN KEY ("CVFileID", "StudentID") REFERENCES "StudentCVFiles"("CVFileID", "StudentID");
 ALTER TABLE public."JobApplications" ADD CONSTRAINT "JobApplications_CVID_fkey" FOREIGN KEY ("CVID") REFERENCES "StudentCVVersions"("CVID");
@@ -6079,8 +6063,6 @@ ALTER TABLE public."Enterprises" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipAssignments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipEvaluations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipPositions" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."PositionSpecializations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public."OJTMatchingProfiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."InternshipTasks" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."JobApplications" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."JobRoles" ENABLE ROW LEVEL SECURITY;
@@ -6176,8 +6158,6 @@ FOR item IN SELECT * FROM (VALUES
   ('InternshipAssignments','TABLE'),
   ('InternshipEvaluations','TABLE'),
   ('InternshipPositions','TABLE'),
-  ('PositionSpecializations','TABLE'),
-  ('OJTMatchingProfiles','TABLE'),
   ('InternshipTasks','TABLE'),
   ('JobApplications','TABLE'),
   ('JobRoles','TABLE'),
@@ -6363,8 +6343,6 @@ IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRA
 IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."InternshipEvaluations_EvaluationID_seq" TO "service_role"'; END IF;
 IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."InternshipPositions" TO "service_role"'; END IF;
 IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."InternshipPositions_PositionID_seq" TO "service_role"'; END IF;
-IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."PositionSpecializations" TO "service_role"'; END IF;
-IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."OJTMatchingProfiles" TO "service_role"'; END IF;
 IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."InternshipTasks" TO "service_role"'; END IF;
 IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT SELECT, USAGE ON SEQUENCE public."InternshipTasks_TaskID_seq" TO "service_role"'; END IF;
 IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN EXECUTE 'GRANT DELETE, INSERT, SELECT, UPDATE ON TABLE public."JobApplications" TO "service_role"'; END IF;
