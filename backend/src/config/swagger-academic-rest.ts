@@ -27,11 +27,6 @@ export function describeAcademicRest(spec: Spec): Spec {
   add('/ojt-rule-sets','patch','/ojt-rule-sets/{id}','patch','Cập nhật hoặc ban hành bộ quy tắc',{...object,required:['id'],properties:{id,status:{type:'string',enum:['PUBLISHED']}}});
   add('/ojt-semesters','get','/ojt-semesters/{id}/students','get','Danh sách kỳ OJT');
   add('/ojt-semesters/{id}','get','/ojt-semesters/{id}/students','get','Chi tiết kỳ OJT, sinh viên, bàn giao và kết quả');
-  add('/ojt-grade-mappings','put','/curricula/{id}/ojt-grade-mappings/{semesterId}','put','Thiết lập quy đổi điểm OJT',{...object,required:['programId','ojtSemesterId'],properties:{programId:id,ojtSemesterId:id}});
-  add('/eligible-student-handoffs','get','/ojt-semesters/{id}/eligible-student-handoffs','get','Lịch sử bàn giao sinh viên');
-  add('/academic-notifications','get','/academic/advisory-runs','get','Lịch sử thông báo học vụ');
-  add('/academic-notifications/{id}','get','/academic/advisory-runs/{id}','get','Chi tiết thông báo và trạng thái từng sinh viên');
-  add('/academic-notifications','post','/academic/academic-summary-notifications','post','Tạo thông báo học vụ theo loại',{...object,required:['type'],properties:{type:{type:'string',enum:['ALERT','SUMMARY','ELIGIBILITY']}}});
   for (const [path,from] of [['student-imports','imports'],['curriculum-imports','curriculum-imports']]) {
     add('/'+path,'get','/academic-imports','get','Danh sách yêu cầu nhập dữ liệu');
     add('/'+path+'/{id}','get','/academic-imports','get','Chi tiết yêu cầu, kết quả và lỗi nhập dữ liệu');
@@ -48,9 +43,6 @@ export function describeAcademicRest(spec: Spec): Spec {
     }
     add('/'+path,'patch','/'+from+'/commit','post','Xác nhận nhập dữ liệu đã kiểm tra',commit);
   }
-  add('/student-imports/{id}/email-retries','post','/imports/commit','post','Gửi lại email tài khoản sinh viên',{type:'object',required:['email'],properties:{email:{type:'string',format:'email'}},additionalProperties:false});
-  spec.paths['/api/student-imports/{id}/email-retries'].post.tags=['Admin'];
-  spec.paths['/api/student-imports/{id}/email-retries'].post['x-roles']=['ADMIN'];
   for (const [to,from] of [['/academic-alerts','/academic/alerts'],['/course-demands','/academic/course-demand'],['/course-demands/export','/academic/course-demand/export']]) add(to,'get',from,'get',source['/api'+from].get.summary);
   spec.paths['/api/retake-class-proposals']={get:{tags:['Phòng đào tạo'],'x-roles':['ADMIN','ACADEMIC'],security:[{bearerAuth:[]}],
     summary:'Đề xuất chuẩn bị lớp học lại trong Block 3, sĩ số 35 sinh viên',

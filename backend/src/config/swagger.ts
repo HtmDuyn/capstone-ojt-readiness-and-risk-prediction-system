@@ -396,3 +396,19 @@ describeHandoffWorkflow(describedSpec);
 describeAcademicContracts(describedSpec);
 addStudentTaskOperations(describedSpec);
 export const swaggerSpec = describeOjtCertificates(describeJobMatching(describeJobExtraction(describeCvExtraction(describeStudentTaskResponses(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec))))))))));
+
+// Keep retired endpoints out of the published OpenAPI document even when
+// legacy module annotations still describe their historical behavior.
+for (const path of [
+  '/api/recruitment/posts',
+  '/api/qhdn/registered-students',
+  '/api/ojt-semesters/{id}/eligible-student-handoffs',
+  '/api/ojt-semesters/{id}/students',
+  '/api/ojt-registration-windows/{id}/semester-exceptions',
+  '/api/ojt-registration-windows/{id}/semester-exceptions/{exceptionId}/revoke',
+  '/api/ojt-grade-mappings',
+  '/api/eligible-student-handoffs',
+  '/api/academic-notifications',
+  '/api/academic-notifications/{id}',
+  '/api/student-imports/{id}/email-retries',
+]) delete swaggerSpec.paths[path];

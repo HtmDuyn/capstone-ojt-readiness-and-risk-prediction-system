@@ -6,7 +6,6 @@ import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
 import { list } from './catalog.service';
 import { coordinate, decision } from './workflow.service';
-import { registeredStudents } from './registered-students.service';
 import { eligibleStudents } from './eligible-students.service';
 import { studentDossier } from './student-profile.service';
 import { setCompanyAccess } from './company-access.service';
@@ -17,7 +16,6 @@ const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async
 router.get('/qhdn/placements',...staff,handle(req=>placementBoard(req.query,req.user)));
 router.post('/qhdn/placements',...staff,handle(req=>supplementPlacement(req.body,req.user),201));
 router.post('/qhdn/placements/:id/receive',...staff,handle(req=>recordActualReceipt(positiveId(req.params.id),req.body,req.user)));
-router.get('/qhdn/registered-students',...staff,handle(req=>registeredStudents(req.query,req.user)));
 router.get('/qhdn/eligible-students',...staff,handle(req=>eligibleStudents(req.query,req.user)));
 router.get('/qhdn/students/:id',...staff,handle(req=>studentDossier(positiveId(req.params.id),req.query,req.user)));
 router.patch('/qhdn/companies/:id/access',...staff,handle(req=>setCompanyAccess(positiveId(req.params.id),req.body,req.user)));
