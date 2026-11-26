@@ -142,9 +142,6 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
       await client.query('INSERT INTO "AccountImportRows" ("BatchID","RowNumber","SourceCode","UserID","Action") VALUES ($1,$2,$3,$4,$5)', [batchId, i + 1, row.code, p.userId, p.action]);
     }
     let academicImportId:string|undefined;
-    // Deferred history/prerequisite triggers must run for previews as well as commits.
-    // All profiles and attempts are present now, so file row order does not matter.
-    if (input.kind === 'STUDENT') await client.query('SET CONSTRAINTS ALL IMMEDIATE');
     if (preview) {
       await client.query('ROLLBACK');
       return {...summary,preview:true,rows:plans.map((p,i)=>({rowNumber:i+1,code:p.row.code,action:p.action}))};

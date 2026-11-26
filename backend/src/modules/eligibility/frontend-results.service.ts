@@ -5,6 +5,18 @@ import { academicTransaction, audit } from '../academic/academic.repository';
 import { inputObject, invalid, positiveId, requiredText, enumValue, pagination, score } from '../students/student.validation';
 
 type Status = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'REVIEW_REQUIRED';
+// The grade history may contain retakes; only the latest OJT202 attempt decides
+// whether the student has already completed OJT and should leave eligibility review.
+export const latestOjt202PassedSql = (studentAlias = 's') => `COALESCE((
+  SELECT latest_grade."Status"='PASSED'
+  FROM "StudentCourseResults" latest_grade
+  JOIN "Courses" latest_course USING ("CourseID")
+  LEFT JOIN "AcademicPeriods" latest_period ON latest_period."AcademicPeriodID"=latest_grade."AcademicPeriodID"
+  WHERE latest_grade."StudentID"=${studentAlias}."StudentID"
+    AND upper(btrim(latest_course."CourseCode"))='OJT202'
+  ORDER BY latest_grade."AttemptNumber" DESC, latest_period."StartDate" DESC NULLS LAST, latest_grade."ResultID" DESC
+  LIMIT 1
+),false)`;
 export interface OjtEligibilityResult {
   studentId: number; status: Status; earnedCredits: number | null; unpassedCourseCount: number;
   reasons: string[]; academicIssues: string[]; checkedAt: string;
@@ -105,8 +117,7 @@ export async function saveOjtEligibilityResults(
       throw invalid('Điều kiện OJT đang áp dụng đã thay đổi. Vui lòng xét lại.', 409, 'OJT_POLICY_CHANGED');
     const ids = input.results.map(result => result.studentId);
     const students = (await client.query(`SELECT s."StudentID",s."ProgramID",s."Status",u."Status" AS "AccountStatus",
-      EXISTS (SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-        WHERE grade."StudentID"=s."StudentID" AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED') AS "HasPassedOjt202",
+      ${latestOjt202PassedSql('s')} AS "HasPassedOjt202",
       (SELECT max(COALESCE(h."UpdatedAt",h."CreatedAt")) FROM "StudentCourseResults" h WHERE h."StudentID"=s."StudentID") AS "HistoryUpdatedAt"
       FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID"
       WHERE s."StudentID"=ANY($1::int[]) AND s."DeletedAt" IS NULL ORDER BY s."StudentID" FOR UPDATE OF s FOR SHARE OF u`, [ids])).rows;
@@ -116,8 +127,7 @@ export async function saveOjtEligibilityResults(
     if (students.some(row => row.HistoryUpdatedAt && new Date(row.HistoryUpdatedAt).getTime() > inputTimes.get(row.StudentID)!)) throw invalid('Course history changed after calculation. Recalculate before saving.', 409, 'ELIGIBILITY_RESULT_STALE');
     const current = (await client.query(`SELECT saved."StudentID",saved."CheckedAt",saved."Status",
       ${calculatedEligibilitySql('s')} AS result,
-      EXISTS (SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-        WHERE grade."StudentID"=s."StudentID" AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED') AS "HasPassedOjt202"
+      ${latestOjt202PassedSql('s')} AS "HasPassedOjt202"
       FROM "StudentOJTCalculatedResults" saved JOIN "Students" s USING ("StudentID") WHERE saved."StudentID"=ANY($1::int[])`, [ids])).rows;
     const previous = new Map(current.map(row => [row.StudentID, new Date(row.CheckedAt).getTime()]));
     if (input.results.some(row => (previous.get(row.studentId) ?? 0) > new Date(row.checkedAt).getTime())) throw invalid('Newer results already exist. Recalculate before saving.', 409, 'ELIGIBILITY_RESULT_STALE');
@@ -171,10 +181,9 @@ export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result.
     OR EXISTS(SELECT 1 FROM "StudentAcademicPlacements" placement WHERE placement."StudentID"=${studentAlias}."StudentID" AND placement."UpdatedAt">result."CheckedAt")
     OR EXISTS(SELECT 1 FROM "StudentCourseResults" history WHERE history."StudentID"=${studentAlias}."StudentID" AND COALESCE(history."UpdatedAt",history."CreatedAt")>result."CheckedAt"
       AND (history."SourceReference" IS DISTINCT FROM 'AUTO_OJT_ENROLLMENT' OR history."Status" IS DISTINCT FROM 'IN_PROGRESS'))
-    OR EXISTS(SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-      WHERE grade."StudentID"=${studentAlias}."StudentID" AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
+    OR (${latestOjt202PassedSql(studentAlias)}
         AND NOT (result."Status"='NOT_ELIGIBLE' AND COALESCE(result."Result"->'reasons','[]'::jsonb)
-          @> '["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."]'::jsonb)))
+          @> '["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."]'::jsonb))
   FROM "StudentOJTCalculatedResults" result WHERE result."StudentID"=${studentAlias}."StudentID")`;
 
 export async function listOjtEligibilityResults(params: Record<string, unknown>) {

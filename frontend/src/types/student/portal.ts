@@ -120,6 +120,7 @@ export interface Profile {
   program:
     (Named & { majorName?: string; totalCredits?: number | null }) | null;
   currentAcademicPeriod: Named | null;
+  systemCurrentAcademicPeriod?: Named | null;
   cv: CV | null;
   academicProgress: AcademicProgress;
   ojtSemesterId: number | null;

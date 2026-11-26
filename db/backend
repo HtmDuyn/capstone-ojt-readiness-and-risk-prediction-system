@@ -7580,6 +7580,7 @@ CREATE TEMP TABLE qhdn_student_roster ON COMMIT DROP AS
 SELECT g.n AS "Number",
   lower(identity."StudentCode") AS "Username",
   g."EmailName"||lower(identity."StudentCode")||'@fpt.edu.vn' AS "Email",
+  g."Phone",
   g."FullName",
   identity."StudentCode",
   program."ProgramID",
@@ -7588,26 +7589,26 @@ SELECT g.n AS "Number",
   (g.n IN (1,2,5,6,9,10)) AS "CompletedOJT",
   NULL::text AS "RegistrationStatus"
 FROM (VALUES
-  (1,'Nguyễn Hoàng Minh','minhnh'),
-  (2,'Lê Thị Ngọc Anh','anhltn'),
-  (5,'Võ Minh Khang','khangvm'),
-  (6,'Đặng Tuấn Kiệt','kietdt'),
-  (9,'Nguyễn Thị Mai Chi','chintm'),
-  (10,'Hoàng Đức Anh','anhhd'),
-  (13,'Trương Hải Đăng','dangth'),
-  (14,'Lý Khánh Vy','vylk'),
-  (17,'Nguyễn Văn Hùng','hungnv'),
-  (18,'Trần Ngọc Linh','linhtn'),
-  (21,'Phạm Gia Bảo','baopg'),
-  (22,'Đỗ Minh Thư','thudm'),
-  (81,'Đinh Minh Hoàng','hoangdm'),
-  (82,'Hồ Khánh Ngọc','ngochk'),
-  (83,'Lý Quốc Cường','cuonglq'),
-  (84,'Trịnh Thanh Hà','hatt'),
-  (85,'Nguyễn Hữu Tài','tainh'),
-  (86,'Trần Bảo An','antb'),
-  (87,'Lê Đức Thiện','thienld'),
-  (88,'Phạm Ngọc Trinh','trinhpn')) AS g(n,"FullName","EmailName")
+  (1,'Nguyễn Hoàng Minh','minhnh','0902000001'),
+  (2,'Lê Thị Ngọc Anh','anhltn','0902000002'),
+  (5,'Võ Minh Khang','khangvm','0902000003'),
+  (6,'Đặng Tuấn Kiệt','kietdt','0902000004'),
+  (9,'Nguyễn Thị Mai Chi','chintm','0902000005'),
+  (10,'Hoàng Đức Anh','anhhd','0902000006'),
+  (13,'Trương Hải Đăng','dangth','0902000007'),
+  (14,'Lý Khánh Vy','vylk','0902000008'),
+  (17,'Nguyễn Văn Hùng','hungnv','0902000009'),
+  (18,'Trần Ngọc Linh','linhtn','0902000010'),
+  (21,'Phạm Gia Bảo','baopg','0902000011'),
+  (22,'Đỗ Minh Thư','thudm','0902000012'),
+  (81,'Đinh Minh Hoàng','hoangdm','0902000013'),
+  (82,'Hồ Khánh Ngọc','ngochk','0902000014'),
+  (83,'Lý Quốc Cường','cuonglq','0902000015'),
+  (84,'Trịnh Thanh Hà','hatt','0902000016'),
+  (85,'Nguyễn Hữu Tài','tainh','0902000017'),
+  (86,'Trần Bảo An','antb','0902000018'),
+  (87,'Lê Đức Thiện','thienld','0902000019'),
+  (88,'Phạm Ngọc Trinh','trinhpn','0902000020')) AS g(n,"FullName","EmailName","Phone")
 JOIN LATERAL (
   SELECT CASE ((g.n-1)/20)
     WHEN 0 THEN 'K18' WHEN 1 THEN 'K19' WHEN 2 THEN 'K20' WHEN 3 THEN 'K21' ELSE 'K22' END AS "CohortCode",
@@ -7777,12 +7778,17 @@ WHERE admin."Username"='admin01'
   AND NOT EXISTS (SELECT 1 FROM public."OJTRegistrationWindows" existing
     WHERE existing."OJTSemesterID"=w."OJTSemesterID");
 
-INSERT INTO public."Users" ("Username","PasswordHash","Email","FullName","RoleID","Status","MustChangePassword","AuthVersion")
-SELECT r."Username",'$2b$12$rE/nRYGqC0vJve/XqJLsFer/G/xm.dp064CTTmGEfro53Fa/NieCq',r."Email",r."FullName",student_role."RoleID",'ACTIVE',false,0
+INSERT INTO public."Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status","MustChangePassword","AuthVersion")
+SELECT r."Username",'$2b$12$rE/nRYGqC0vJve/XqJLsFer/G/xm.dp064CTTmGEfro53Fa/NieCq',r."Email",r."Phone",r."FullName",student_role."RoleID",'ACTIVE',false,0
 FROM qhdn_student_roster r CROSS JOIN public."Roles" student_role
 WHERE student_role."RoleCode"='STUDENT'
   AND NOT EXISTS (SELECT 1 FROM public."Users" u WHERE u."Username"=r."Username" OR u."Email"=r."Email")
 ON CONFLICT DO NOTHING;
+
+UPDATE public."Users" u SET "Phone"=r."Phone","UpdatedAt"=now()
+FROM qhdn_student_roster r
+WHERE u."Email"=r."Email" AND u."RoleID"=(SELECT "RoleID" FROM public."Roles" WHERE "RoleCode"='STUDENT')
+  AND u."Phone" IS DISTINCT FROM r."Phone";
 
 -- The schema section above switched all constraints to IMMEDIATE for migration checks.
 -- Student history validation needs the complete student + placement + transcript set first.

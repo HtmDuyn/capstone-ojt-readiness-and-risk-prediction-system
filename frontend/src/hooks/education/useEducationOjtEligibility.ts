@@ -46,7 +46,7 @@ export function useEducationOjtEligibility() {
     switch (key) {
       case 'students': {
         const students = value as ImportedStudent[];
-        setTargets(students.map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
+        setTargets(students.filter(student => student.hasPassedOjt202 !== true).map(student => ({ student, reason: student.status !== 'ACTIVE' || student.accountStatus !== 'ACTIVE' ? 'Tài khoản hoặc trạng thái học vụ không hoạt động.' : '' })));
         break;
       }
       case 'results': {
@@ -151,16 +151,15 @@ export function useEducationOjtEligibility() {
   const statusByStudent = React.useMemo(() => Object.fromEntries(targets.map(target =>
     [target.student.id, educationOjtDisplayStatus(savedResults[target.student.id], undefined, target.reason)],
   )) as Record<number, OjtDisplayStatus>, [targets, savedResults]);
-  const statusCounts = React.useMemo(() => targets.filter(target => target.student.hasPassedOjt202 !== true).reduce((counts, target) => {
+  const statusCounts = React.useMemo(() => targets.reduce((counts, target) => {
     counts[statusByStudent[target.student.id]]++;
     return counts;
   }, { ELIGIBLE: 0, NOT_ELIGIBLE: 0, REVIEW_REQUIRED: 0, PENDING: 0, ERROR: 0, STALE: 0, INACTIVE: 0 }), [targets, statusByStudent]);
   const visible = React.useMemo(() => {
     const term = normalize(search);
     return targets.filter(target => {
-      const passedOjt202 = target.student.hasPassedOjt202 === true;
-      const inSelectedGroup = filter === 'PASSED_OJT202' ? passedOjt202 : !passedOjt202 && (filter === 'ALL' || statusByStudent[target.student.id] === filter);
-      return inSelectedGroup && (!term || normalize(`${target.student.studentCode} ${target.student.fullName}`).includes(term));
+      return (filter === 'ALL' || statusByStudent[target.student.id] === filter)
+        && (!term || normalize(`${target.student.studentCode} ${target.student.fullName}`).includes(term));
     });
   }, [targets, search, filter, statusByStudent]);
   React.useEffect(() => setPage(1), [search, filter]);
