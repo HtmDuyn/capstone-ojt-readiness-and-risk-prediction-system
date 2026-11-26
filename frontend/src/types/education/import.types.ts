@@ -99,6 +99,7 @@ export interface ImportedStudent {
   phone: string | null;
   status: string;
   accountStatus: string;
+  hasPassedOjt202?: boolean;
   programId: number | null;
   cohortId: number | null;
   groupCode: string | null;
