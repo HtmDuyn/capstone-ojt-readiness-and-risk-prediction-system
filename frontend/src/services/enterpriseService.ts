@@ -586,7 +586,7 @@ export const enterpriseService = {
   ): Promise<BulkEvaluationResponse> => {
     const response = await API.post<BulkEvaluationResponse>('/enterprise/internships/evaluations/bulk', {
       items, status, confirmed,
-      reason: status === 'DRAFT' ? 'Lưu nháp đánh giá OJT hàng loạt' : 'Xác nhận gửi điểm OJT hàng loạt đến QHDN',
+      reason: status === 'DRAFT' ? 'Lưu điểm đánh giá OJT' : 'Xác nhận gửi điểm OJT hàng loạt đến QHDN',
     });
     return response.data;
   },

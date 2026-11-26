@@ -679,41 +679,116 @@ body {
     #f7f9ff;
 }
 
-.login-background-icon {
-  --icon-angle: -12deg;
+.login-bubble {
   position: absolute;
-  width: clamp(44px, 6.4vw, 104px);
+  width: var(--bubble-size);
   aspect-ratio: 1;
-  color: #e88438;
-  opacity: .38;
-  animation: login-icon-drift 7.5s ease-in-out infinite;
+  left: var(--bubble-left, auto);
+  right: var(--bubble-right, auto);
+  top: var(--bubble-top, auto);
+  bottom: var(--bubble-bottom, auto);
+  border: 1px solid rgb(255 255 255 / .58);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 24%, rgb(255 255 255 / .58) 0%, rgb(255 255 255 / .1) 9%, transparent 28%),
+    radial-gradient(circle at 72% 78%, var(--bubble-tint) 0%, transparent 62%),
+    rgb(255 255 255 / .025);
+  box-shadow:
+    inset 1px 1px 3px rgb(255 255 255 / .65),
+    inset -2px -3px 9px var(--bubble-shadow),
+    0 5px 18px var(--bubble-shadow);
+  opacity: .48;
+  animation: login-bubble-float 10s ease-in-out infinite;
 }
 
-.login-background-icon svg { width: 100%; height: 100%; }
-.login-background-icon--graduation { top: 5%; left: 4%; }
-.login-background-icon--briefcase { --icon-angle: 14deg; top: 7%; right: 5%; color: #488cd0; animation-delay: -4s; }
-.login-background-icon--book { --icon-angle: 12deg; bottom: 4%; right: 3%; color: #9470cf; animation-delay: -7s; }
-.login-background-icon--network { --icon-angle: -8deg; bottom: 5%; left: 5%; color: #7b80d5; animation-delay: -2s; }
-.login-background-icon--chart { --icon-angle: 8deg; top: 43%; left: 1%; width: clamp(40px, 4vw, 64px); color: #e89b58; animation-delay: -8s; }
-.login-background-icon--users { --icon-angle: -10deg; top: 43%; right: 1%; width: clamp(40px, 4vw, 64px); color: #5e9ed3; animation-delay: -5s; }
-.login-background-icon--award { --icon-angle: 10deg; bottom: -3%; left: 45%; width: clamp(48px, 4.5vw, 72px); color: #ab86d8; animation-delay: -9s; }
+.login-bubble::before {
+  position: absolute;
+  top: 17%;
+  left: 21%;
+  width: 26%;
+  height: 9%;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .72);
+  content: "";
+  filter: blur(1.5px);
+  transform: rotate(-35deg);
+}
 
-@keyframes login-icon-drift {
-  0%, 100% { transform: translateY(0) rotate(var(--icon-angle)); }
-  50% { transform: translate(14px, -36px) rotate(calc(var(--icon-angle) + 14deg)) scale(1.06); }
+.login-bubble::after {
+  position: absolute;
+  inset: 7%;
+  border: 1px solid transparent;
+  border-right-color: rgb(255 255 255 / .45);
+  border-bottom-color: rgb(186 230 253 / .28);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(12deg);
+}
+
+.login-bubble--one {
+  --bubble-size: clamp(64px, 8vw, 132px);
+  --bubble-left: 7%;
+  --bubble-top: 6%;
+  --bubble-tint: rgb(147 197 253 / .06);
+  --bubble-shadow: rgb(59 130 246 / .025);
+}
+
+.login-bubble--two {
+  --bubble-size: clamp(48px, 5.5vw, 90px);
+  --bubble-right: 10%;
+  --bubble-top: 12%;
+  --bubble-tint: rgb(253 186 116 / .05);
+  --bubble-shadow: rgb(249 115 22 / .025);
+  animation-delay: -3s;
+}
+
+.login-bubble--three {
+  --bubble-size: clamp(84px, 11vw, 180px);
+  --bubble-right: 4%;
+  --bubble-bottom: 4%;
+  --bubble-tint: rgb(196 181 253 / .06);
+  --bubble-shadow: rgb(139 92 246 / .03);
+  animation-delay: -6s;
+}
+
+.login-bubble--four {
+  --bubble-size: clamp(60px, 7vw, 114px);
+  --bubble-left: 2%;
+  --bubble-top: 48%;
+  --bubble-tint: rgb(125 211 252 / .05);
+  --bubble-shadow: rgb(14 165 233 / .025);
+  animation-delay: -8s;
+}
+
+.login-bubble--five {
+  --bubble-size: clamp(78px, 10vw, 156px);
+  --bubble-left: 18%;
+  --bubble-bottom: 2%;
+  --bubble-tint: rgb(253 186 116 / .04);
+  --bubble-shadow: rgb(249 115 22 / .025);
+  animation-delay: -5s;
+}
+
+.login-bubble--six {
+  --bubble-size: clamp(44px, 4.5vw, 72px);
+  --bubble-right: 25%;
+  --bubble-top: 56%;
+  --bubble-tint: rgb(165 180 252 / .05);
+  --bubble-shadow: rgb(99 102 241 / .025);
+  animation-delay: -1s;
+}
+
+@keyframes login-bubble-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(10px, -24px, 0) scale(1.04); }
 }
 
 @media (max-width: 640px) {
-  .login-background-icon { opacity: .3; }
-  .login-background-icon--graduation { top: 1%; left: -5%; }
-  .login-background-icon--briefcase { top: 4%; right: -5%; }
-  .login-background-icon--network { bottom: 2%; left: -5%; }
-  .login-background-icon--book { bottom: 1%; right: -5%; }
-  .login-background-icon--chart,
-  .login-background-icon--users,
-  .login-background-icon--award { display: none; }
+  .login-bubble { opacity: .34; }
+  .login-bubble--four,
+  .login-bubble--six { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-background-icon { animation: none; transform: rotate(var(--icon-angle)); }
+  .login-bubble { animation: none; }
 }

@@ -15,7 +15,7 @@ import {
   Calendar,
   Layers,
   Search,
-  BarChart3,
+  ChartArea,
   List,
   RefreshCw,
   Send,
@@ -388,6 +388,7 @@ export const QhdnDashboard: React.FC = () => {
       </div>
 
       {/* Filter Toolbar: Năm học & Kỳ OJT Selector */}
+      {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
       <div className="qhdn-filter card-glass border border-slate-200/80 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
@@ -421,7 +422,6 @@ export const QhdnDashboard: React.FC = () => {
       {catalog.error && <Notice>{catalog.error}</Notice>}
       {eligibleError && <Notice>Không tải được số sinh viên đủ điều kiện: {eligibleError}.</Notice>}
       {internshipError && <Notice>Không tải được số sinh viên đang thực tập và đã hoàn thành: {internshipError}.</Notice>}
-      {periodNotice && <p role="status" className="text-sm font-medium text-red-700">{periodNotice}</p>}
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -433,14 +433,14 @@ export const QhdnDashboard: React.FC = () => {
                 Tiến độ Toàn trình OJT ({selectedSemesterName})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Đủ điều kiện ⟶ Doanh nghiệp tiếp nhận ⟶ Thực tập ⟶ Có kết quả OJT
+                Từ chối · Đã chốt DN · Chờ duyệt · Đang thực tập · Hoàn thành
               </p>
             </div>
             <TrendingUp className="text-slate-400" size={18} />
           </div>
           <div className="relative w-full h-72">
             {visibleCharts.pipeline && !eligibleLoading ? <OjtPipelineChart stats={kpiStats} reducedMotion={reducedMotion} /> : <p role="status" className="flex h-full items-center justify-center text-sm text-slate-500">Đang tải tiến độ OJT…</p>}
-            {kpiStats.handedOff === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            {kpiStats.rejected === null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="rounded-xl bg-white/95 px-4 py-2 text-sm text-slate-500">Chưa có dữ liệu thống kê tổng hợp.</p>
             </div>}
           </div>
@@ -456,7 +456,7 @@ export const QhdnDashboard: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 {quotaViewMode === "chart"
-                  ? "Biểu đồ Top 8 đối tác có quy mô tiếp nhận lớn nhất"
+                  ? "Đường tổng quota của Top 8 doanh nghiệp có chỉ tiêu lớn nhất"
                   : "Bảng xếp hạng đầy đủ chỉ tiêu tất cả đối tác"}
               </p>
             </div>
@@ -473,7 +473,7 @@ export const QhdnDashboard: React.FC = () => {
                 }`}
                 title="Xem dạng biểu đồ Top 8"
               >
-                <BarChart3 size={13} />
+                <ChartArea size={13} />
                 Top 8
               </button>
               <button
@@ -560,9 +560,9 @@ export const QhdnDashboard: React.FC = () => {
                             </span>
                             <span>{fill}%</span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                          <div className="h-1.5 rounded-full bg-violet-100 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-orange-500"
+                              className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-400"
                               style={{ width: `${Math.min(100,fill)}%` }}
                             />
                           </div>

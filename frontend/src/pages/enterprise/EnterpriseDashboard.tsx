@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -13,7 +13,7 @@ import {
   Clock3,
   CalendarClock,
 } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 import { DonutChart } from '@/components/common/DonutChart';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useReducedMotion } from '@/hooks/shared/useReducedMotion';
@@ -59,7 +59,6 @@ const emptyDashboardStats: EnterpriseDashboardStats = {
 interface CandidateStage {
   label: string;
   value: number;
-  color: string;
 }
 
 
@@ -105,6 +104,7 @@ export const EnterpriseDashboard: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
+  const candidateGradientId = `enterprise-status-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const statsRequest = useRef<AbortController | null>(null);
 
   // Tải thống kê bằng hai request song song để dashboard xuất hiện nhanh hơn.
@@ -208,14 +208,13 @@ export const EnterpriseDashboard: React.FC = () => {
 
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
   const candidateStages = useMemo<CandidateStage[]>(() => [
-    { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates, color: '#f59e0b' },
+    { label: 'Chờ duyệt', value: dashboardStats.pendingCandidates },
     {
       label: 'Đã nhận',
       value: dashboardStats.activeInterns,
-      color: '#6366f1',
     },
-    { label: 'Đã hoàn thành', value: dashboardStats.completedInterns, color: '#10b981' },
-    { label: 'Đã từ chối', value: dashboardStats.rejectedCandidates, color: '#f43f5e' },
+    { label: 'Đã hoàn thành', value: dashboardStats.completedInterns },
+    { label: 'Đã từ chối', value: dashboardStats.rejectedCandidates },
   ], [dashboardStats]);
   const candidateChartLabel = useMemo(
     () => candidateStages.map(stage => `${stage.label}: ${stage.value}`).join(', '),
@@ -413,14 +412,20 @@ export const EnterpriseDashboard: React.FC = () => {
                     aria-label={`Biểu đồ cột trạng thái sinh viên: ${candidateChartLabel}`}
                     className="relative h-64"
                   >
-                    <ChartContainer config={{ value: { label: 'Sinh viên', color: 'var(--chart-1)' } }} className="h-full w-full aspect-auto">
+                    <ChartContainer config={{ value: { label: 'Sinh viên', color: '#38bdf8' } }} className="h-full w-full aspect-auto">
                       <BarChart accessibilityLayer data={candidateStages} margin={{ top: 24, right: 8, left: -24, bottom: 8 }}>
-                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <defs>
+                          <linearGradient id={candidateGradientId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#7dd3fc" />
+                            <stop offset="45%" stopColor="#e0f2fe" />
+                            <stop offset="100%" stopColor="#fed7aa" />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid vertical={false} stroke="#e0f2fe" strokeDasharray="3 3" />
                         <XAxis dataKey="label" axisLine={false} tickLine={false} tickMargin={10} interval={0} fontSize={10} />
                         <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48} isAnimationActive={!reducedMotion}>
-                          {candidateStages.map(stage => <Cell key={stage.label} fill={stage.color} />)}
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" color="#38bdf8" />} />
+                        <Bar dataKey="value" fill={`url(#${candidateGradientId})`} radius={[6, 6, 0, 0]} maxBarSize={48} isAnimationActive={!reducedMotion}>
                           <LabelList dataKey="value" position="top" className="fill-slate-600 text-xs font-semibold" />
                         </Bar>
                       </BarChart>

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ClipboardCheck, GraduationCap, UserRound } from 'lucide-react';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import type { EnterpriseInternshipItem } from '@/services/enterpriseService';
+import { parseEvaluationScore } from '@/utils/enterprise/enterpriseEvaluation';
 
 const text = (value?: string | number | null) => value === undefined || value === null || value === '' ? 'Chưa cập nhật' : String(value);
 const score = (value?: number | null) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(2);
@@ -24,23 +25,22 @@ function Fields({ items }: { items: [string, ReactNode][] }) {
   </div>)}</dl>;
 }
 
-export function InternshipEvaluationDetailsDialog({ internship, semesterLabel, companyName, hasUnsavedChanges, onClose }: {
+export function InternshipEvaluationDetailsDialog({ internship, semesterLabel, companyName, onClose }: {
   internship: EnterpriseInternshipItem;
   semesterLabel: string;
   companyName?: string;
-  hasUnsavedChanges: boolean;
   onClose: () => void;
 }) {
   const { student, evaluation, template, academicSupervisor } = internship;
   const templateMatches = !evaluation || evaluation.templateId === template?.id;
   // An older evaluation must keep its own issued criteria and weights.
   const criteria = evaluation?.criteria?.length ? evaluation.criteria : templateMatches ? template?.criteria ?? [] : [];
-  const status = evaluation?.status === 'SUBMITTED' ? 'Đã gửi QHDN' : evaluation ? 'Bản nháp' : 'Chưa có đánh giá';
+  const complete = criteria.length > 0 && criteria.every(field => parseEvaluationScore(String(evaluation?.scoreDetails?.[field.key] ?? '')) !== null);
+  const status = evaluation?.status === 'SUBMITTED' ? 'Đã gửi QHDN' : evaluation && complete ? 'Đã lưu' : 'Thiếu điểm';
   const templateName = templateMatches && template ? `${template.name} · Phiên bản ${template.version}` : 'Bộ tiêu chí theo đánh giá đã lưu';
 
   return <StudentDialog title={`Chi tiết sinh viên và đánh giá · ${student.fullName || student.studentCode}`} onClose={onClose}>
     <div className="space-y-6">
-      {hasUnsavedChanges && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-800">Có thay đổi chưa lưu trên bảng. Đánh giá bên dưới là bản đã lưu gần nhất.</p>}
       <section aria-labelledby="evaluation-student-heading" className="space-y-3">
         <h3 id="evaluation-student-heading" className="flex items-center gap-2 text-base font-semibold text-slate-900"><UserRound size={18} className="text-orange-600" />Thông tin sinh viên</h3>
         <Fields items={[
