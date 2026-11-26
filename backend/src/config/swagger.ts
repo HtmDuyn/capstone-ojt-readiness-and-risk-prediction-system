@@ -7,6 +7,7 @@ import { describeOjtEligibilityResults } from '../modules/eligibility/frontend-r
 import { describeHandoffWorkflow } from './swagger-handoff-workflow';
 import { describeAcademicContracts, describeAcademicOperationContracts } from './swagger-academic-contracts';
 import { describeOfficialResults } from '../modules/ojt-results/result.openapi';
+import { describeOjtCertificates } from '../modules/ojt-results/certificate.openapi';
 import { describeListBaseFields } from './swagger-list-base-fields';
 import {
   readdirSync,
@@ -394,4 +395,4 @@ describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
 describeAcademicContracts(describedSpec);
 addStudentTaskOperations(describedSpec);
-export const swaggerSpec = describeJobMatching(describeJobExtraction(describeCvExtraction(describeStudentTaskResponses(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec)))))))));
+export const swaggerSpec = describeOjtCertificates(describeJobMatching(describeJobExtraction(describeCvExtraction(describeStudentTaskResponses(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec))))))))));

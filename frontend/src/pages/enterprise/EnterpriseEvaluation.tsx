@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Eye, Loader2, LockKeyhole, Pencil, Save, Search, Send } from 'lucide-react';
+import { OjtCertificatePanel } from '@/components/common/OjtCertificateDialog';
 import { PageBanner } from '@/components/common/PageBanner';
 import { StudentDialog } from '@/components/student/StudentDialog';
 import { InternshipEvaluationDetailsDialog } from '@/components/enterprise/InternshipEvaluationDetailsDialog';
@@ -93,6 +94,7 @@ export function EnterpriseEvaluation() {
   const [confirmationError, setConfirmationError] = useState('');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [evaluationDetailId, setEvaluationDetailId] = useState<number | null>(null);
+  const [certificateBusy, setCertificateBusy] = useState(false);
   const [editor, setEditor] = useState<ScoreEditor | null>(null);
   const [editorError, setEditorError] = useState('');
   const requestRef = useRef<AbortController | null>(null);
@@ -222,7 +224,7 @@ export function EnterpriseEvaluation() {
     finally { savingRef.current = false; setBusy(false); }
   };
   const saveEditor = async () => {
-    if (!editor || !editingRow || editingRow.locked || savingRef.current) return;
+    if (!editor || !editingRow || editingRow.locked || certificateBusy || savingRef.current) return;
     if (editingRow.criteria.some(c => (editor.scoreDetails[c.key]??'').trim() !== '' && parseEvaluationScore(editor.scoreDetails[c.key]) === null)) {
       setEditorError('Điểm phải từ 0 đến 10, tối đa 2 chữ số thập phân.');
       return;
@@ -353,7 +355,7 @@ export function EnterpriseEvaluation() {
       </div>
     </section>
     {evaluationDetail && <InternshipEvaluationDetailsDialog internship={evaluationDetail.internship} semesterLabel={evaluationDetail.semester} companyName={profile?.name} onClose={() => setEvaluationDetailId(null)} />}
-    {editor && editingRow && <StudentDialog title={`${editingRow.criteria.some(field => (editingRow.scoreDetails[field.key] ?? '').trim() !== '') ? 'Chỉnh sửa điểm' : 'Chấm điểm'} · ${editingRow.fullName}`} busy={busy} onClose={() => setEditor(null)}>
+    {editor && editingRow && <StudentDialog title={`${editingRow.criteria.some(field => (editingRow.scoreDetails[field.key] ?? '').trim() !== '') ? 'Chỉnh sửa điểm' : 'Chấm điểm'} · ${editingRow.fullName}`} busy={busy||certificateBusy} onClose={() => setEditor(null)}>
       <form onSubmit={event => { event.preventDefault(); void saveEditor(); }} className="space-y-5">
         <p className="text-sm text-slate-500">{editingRow.studentCode} · {editingRow.position || 'Chưa có vị trí'} · Thang điểm 0–10</p>
         <p className="text-sm font-medium text-orange-700">{editingRow.templateName}</p>
@@ -366,9 +368,10 @@ export function EnterpriseEvaluation() {
         </div>
         <div className="flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3"><span className="text-sm font-medium text-slate-700">Điểm tổng có trọng số</span><output aria-label="Điểm tổng sau chỉnh sửa" className="text-xl font-bold tabular-nums text-orange-600">{evaluationAverage({ criteria: editingRow.criteria, scoreDetails: editor.scoreDetails })?.toFixed(2) ?? '—'}</output></div>
         <label className="block text-sm font-semibold text-slate-700">Nhận xét (không bắt buộc)<textarea className={inputClass + ' mt-2 w-full font-normal'} rows={3} maxLength={5000} disabled={busy} value={editor.comments} onChange={event => setEditor({ ...editor, comments: event.target.value })} placeholder="Ưu điểm và những điểm sinh viên cần cải thiện…" /></label>
+        <div className="border-t border-slate-200 pt-4"><OjtCertificatePanel key={editingRow.id} assignmentId={editingRow.id} disabled={busy} onBusyChange={setCertificateBusy}/></div>
         {editorError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{editorError}</p>}
         <p className="text-xs leading-relaxed text-slate-500">Bấm Lưu để lưu điểm và nhận xét. Bạn vẫn có thể chỉnh sửa trước khi xác nhận đánh giá gửi đến QHDN. Tiêu chí chưa nhập điểm sẽ được ghi nhận là thiếu điểm.</p>
-        <div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><button type="button" className={secondaryClass} disabled={busy} onClick={() => setEditor(null)}>Hủy</button><button type="submit" className={primaryClass} disabled={busy}>{busy ? <><Loader2 size={16} className="animate-spin" />Đang lưu…</> : 'Lưu'}</button></div>
+        <div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><button type="button" className={secondaryClass} disabled={busy||certificateBusy} onClick={() => setEditor(null)}>Hủy</button><button type="submit" className={primaryClass} disabled={busy||certificateBusy}>{busy ? <><Loader2 size={16} className="animate-spin" />Đang lưu…</> : 'Lưu'}</button></div>
       </form>
     </StudentDialog>}
     {confirming && <StudentDialog title="Xác nhận đánh giá" busy={busy} onClose={() => setConfirming(false)}>
