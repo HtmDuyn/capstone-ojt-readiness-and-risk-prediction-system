@@ -6,14 +6,10 @@ import { currentRoundPhase, roundActions, hasPhaseSchedule, phaseIsOpen } from '
 import { academicPeriodStatusSql } from '../academic/period-status';
 
 export { type Actor, type Row };
-export const previousRoundSelect=`EXISTS(SELECT 1 FROM "RecruitmentWindows" previous
- WHERE previous."OJTSemesterID"=w."OJTSemesterID" AND previous."WindowID"<>w."WindowID"
- AND previous."StartsAt"<w."StartsAt"
- AND (previous."EndsAt">clock_timestamp() OR previous."ResultsFinalizedAt" IS NULL)) AS "PreviousRoundPending"`;
 export async function windowRecord(c: PoolClient,id: number) {
  const w=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Kind",p."Status" AS "PeriodStatus",
  ${academicPeriodStatusSql('p')} AS "CalendarStatus",
- p."EndDate" AS "PeriodEndDate",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow",${previousRoundSelect}
+ p."EndDate" AS "PeriodEndDate",o."AcademicPeriodID" AS "LinkedPeriodID",clock_timestamp() AS "DatabaseNow"
  FROM "RecruitmentWindows" w JOIN "AcademicPeriods" p ON p."AcademicPeriodID"=w."AcademicPeriodID"
  JOIN "OJTSemesters" o ON o."OJTSemesterID"=w."OJTSemesterID" WHERE w."WindowID"=$1 FOR UPDATE OF w`,[id])).rows[0];
  if (!w) throw invalid('Recruitment window not found.',404,'RECRUITMENT_WINDOW_NOT_FOUND');

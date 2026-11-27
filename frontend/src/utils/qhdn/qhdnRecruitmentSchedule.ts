@@ -32,9 +32,23 @@ export function parseScheduleDate(value:string) {
  return Number.isFinite(+date)&&formatScheduleDate(date)===value?date:null;
 }
 
-export function newRecruitmentSchedule(now: number): ScheduleDraft {
- const nextMinute = formatScheduleDate(new Date((Math.floor(now / 60000) + 1) * 60000));
- return Object.fromEntries(scheduleFields.map(field => [field, nextMinute])) as ScheduleDraft;
+type ReservedRound = { id?:number; name?:string; startsAt:string; endsAt:string };
+type SemesterSchedule = { semesterStart?:string; semesterEnd?:string; rounds?:readonly ReservedRound[] };
+const semesterStartTime=(value?:string)=>value?Date.parse(`${value.slice(0,10)}T00:00:00+07:00`):-Infinity;
+const semesterEndTime=(value?:string)=>value?semesterStartTime(value)+86400000:Infinity;
+
+export function newRecruitmentSchedule(now: number, options:SemesterSchedule={}): ScheduleDraft {
+ const latestEnd=Math.max(-Infinity,...(options.rounds??[]).map(round=>Date.parse(round.endsAt)).filter(Number.isFinite));
+ const start=Math.ceil(Math.max((Math.floor(now/60000)+1)*60000,semesterStartTime(options.semesterStart),latestEnd)/60000)*60000;
+ const available=Math.floor((semesterEndTime(options.semesterEnd)-start)/60000)*60000;
+ // Two positive phases are required; response review can run alongside applications.
+ if(available<120000)return {...emptySchedule};
+ const postingDuration=Math.min(86400000,Math.floor(available/3/60000)*60000);
+ const postingEnd=start+Math.max(60000,postingDuration);
+ const applicationEnd=Math.min(postingEnd+7*86400000,semesterEndTime(options.semesterEnd));
+ const resultsEnd=Math.min(applicationEnd+86400000,semesterEndTime(options.semesterEnd));
+ const times={postingStartsAt:start,postingEndsAt:postingEnd,applicationStartsAt:postingEnd,applicationEndsAt:applicationEnd,resultsStartsAt:postingEnd,resultsEndsAt:resultsEnd};
+ return Object.fromEntries(scheduleFields.map(field=>[field,formatScheduleDate(new Date(times[field]))])) as ScheduleDraft;
 }
 
 export function formatScheduleTimeInput(value: string) {
@@ -42,10 +56,11 @@ export function formatScheduleTimeInput(value: string) {
 }
 
 export function validateRecruitmentSchedule(draft: ScheduleDraft, options: {
- now: number; semesterEnd?: string; original?: Partial<PhaseSchedule>; requireFutureStart?: boolean; changedField?: ScheduleField;
-}) {
+ now: number; original?: Partial<PhaseSchedule>; requireFutureStart?: boolean; changedField?: ScheduleField;
+} & SemesterSchedule) {
  const { now, semesterEnd, original, requireFutureStart, changedField } = options;
- const endOfSemester = semesterEnd ? Date.parse(`${semesterEnd.slice(0, 10)}T00:00:00+07:00`) + 86400000 : Infinity;
+ const endOfSemester = semesterEndTime(semesterEnd);
+ const startOfSemester = semesterStartTime(options.semesterStart);
  const errors: ScheduleErrors = {};
  const times = {} as Record<ScheduleField, number>;
  const schedule = {} as PhaseSchedule;
@@ -61,6 +76,8 @@ export function validateRecruitmentSchedule(draft: ScheduleDraft, options: {
   times[field] = Date.parse(schedule[field]);
   if ((!unchanged || (requireFutureStart && field === 'postingStartsAt')) && times[field] <= now) {
    errorAt(field, `Chọn mốc sau thời điểm hiện tại (${formatScheduleDate(new Date(now))}, giờ Việt Nam).`);
+  } else if (times[field] < startOfSemester) {
+   errorAt(field, 'Mốc này trước ngày bắt đầu học kỳ.');
   } else if (times[field] > endOfSemester) {
    errorAt(field, 'Mốc này vượt quá ngày kết thúc học kỳ.');
   }
@@ -82,6 +99,8 @@ export function validateRecruitmentSchedule(draft: ScheduleDraft, options: {
   `Hạn bắt đầu xét tuyển phải trước mốc kết thúc đang chọn (${draft.resultsEndsAt}).`);
  checkOrder('applicationEndsAt', 'resultsEndsAt', true,
   `Hạn 3 phải kết thúc bằng hoặc sau mốc kết thúc Hạn 2 (${draft.applicationEndsAt}).`, null);
+ const conflict=options.rounds?.find(round=>Date.parse(round.startsAt)<times.resultsEndsAt&&Date.parse(round.endsAt)>times.postingStartsAt);
+ if(conflict)errorAt(changedField??'postingStartsAt',`Lịch trùng với đợt “${conflict.name??'đã có'}”. Chọn khoảng thời gian khác trong học kỳ.`);
  return { errors, schedule };
 }
 
@@ -95,6 +114,10 @@ export function updateScheduleDraft(before:ScheduleDraft,key:ScheduleField,value
    const start=parseScheduleDate(next.applicationStartsAt)!;
    next.applicationEndsAt=formatScheduleDate(new Date(+start+7*86400000));
   }
+ }
+ if(['postingEndsAt','applicationStartsAt','applicationEndsAt'].includes(key)&&!manual.has('resultsEndsAt')) {
+  const end=parseScheduleDate(next.applicationEndsAt);
+  if(end)next.resultsEndsAt=formatScheduleDate(new Date(+end+86400000));
  }
  return next;
 }

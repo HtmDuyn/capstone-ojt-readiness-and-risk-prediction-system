@@ -59,7 +59,6 @@ export function roundActions(w: Row) {
  else if(w.Kind!=='SEMESTER'||w.LinkedPeriodID!==w.AcademicPeriodID)
   openBlockedReason='Học kỳ hoặc liên kết kỳ OJT không còn khả dụng.';
  else if(w.CalendarStatus!=='ACTIVE')openBlockedReason='Chỉ mở đợt tuyển dụng trong học kỳ đang diễn ra.';
- else if(w.PreviousRoundPending)openBlockedReason='Đợi đợt trước kết thúc và được chốt tổng hợp.';
  return {canOpen:openBlockedReason===null,openBlockedReason,
   canFinalize:!w.ResultsFinalizedAt&&now>=new Date(w.EndsAt).getTime()};
 }
