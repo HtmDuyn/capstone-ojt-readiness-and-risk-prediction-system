@@ -9,6 +9,8 @@ SET LOCAL lock_timeout='60s';
 SET LOCAL search_path=public,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 SELECT pg_advisory_xact_lock(hashtext('ojt_full_fresh_build_20261121'));
+-- Acquire the shared academic calendar lock before taking any table locks.
+SELECT pg_advisory_xact_lock(hashtext('academic-calendar'));
 
 DROP SCHEMA IF EXISTS ojt_history CASCADE;
 
@@ -7210,7 +7212,7 @@ INSERT INTO public."Users" ("UserID","Username","PasswordHash","Email","FullName
 ('1','admin01','$2b$12$LQR3NnTiMLm3pELI8m/M1.XQ.YdWPSqIBH9JwQHVKvim5Ita.AorC','admin@ojtrpa.edu.vn','System Administrator','1','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
 ('2','academic01','$2b$12$pFxlemy2lPqCnEuhONH4WOJrcuSqYR4BgQ6fGE0xyM2./B9MPMWF6','academic@ojtrpa.edu.vn','Academic Staff','2','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
 ('3','ojt.coord01','$2b$12$7ju31R8JRLro8U1ZA3WzoOvJvJD1yXSY1nuzw/Gan9OI84tVNwa62','ojt.coord@ojtrpa.edu.vn','OJT Coordinator','3','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0'),
-('4','enterprise01','$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii','hr@techviet.example','TechViet HR','5','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0');
+('4','enterprise01','$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii','hr@techviet.vn','TechViet HR','5','ACTIVE','2026-10-26 19:54:04.855','2026-10-26 19:54:04.855','false','0');
 
 -- Seed the explicit GPA policy required by the automatic transcript calculation.
 -- Sample course scores use the 10-point scale; failed or missing history is handled
@@ -7237,7 +7239,7 @@ ON CONFLICT ("ProgramID") DO UPDATE SET
 
 -- Restore Enterprises
 INSERT INTO public."Enterprises" ("EnterpriseID","EnterpriseCode","Name","Industry","ContactPersonName","ContactEmail","Status","CreatedAt") OVERRIDING SYSTEM VALUE VALUES
-('1','TECHVIET','TechViet','Information Technology','HR Department','hr@techviet.example','ACTIVE','2026-10-26 19:54:04.855');
+('1','TECHVIET','TechViet','Information Technology','HR Department','hr@techviet.vn','ACTIVE','2026-10-26 19:54:04.855');
 
 -- Restore EnterpriseUsers
 INSERT INTO public."EnterpriseUsers" ("EnterpriseUserID","UserID","EnterpriseID","PositionTitle") OVERRIDING SYSTEM VALUE VALUES
@@ -7251,9 +7253,15 @@ SELECT setval(pg_get_serial_sequence('public."EnterpriseUsers"','EnterpriseUserI
 
 -- Sample enterprise accounts and employers for the seeded recruitment calendar.
 INSERT INTO public."Enterprises" ("EnterpriseCode","Name","Address","Industry","ContactPersonName","ContactPhone","ContactEmail","Status") VALUES
-  ('DATAVIT','DataViet Solutions','Quận 1, TP. Hồ Chí Minh','Information Technology','Nguyễn Minh An','0901000002','hr@dataviet.example','ACTIVE'),
-  ('SAIGONSOFT','Saigon Software Lab','Quận 3, TP. Hồ Chí Minh','Software Development','Trần Thu Hà','0901000003','hr@saigonsoft.example','ACTIVE'),
-  ('FINNEXT','FinNext Technology','Quận 7, TP. Hồ Chí Minh','Financial Technology','Lê Quốc Bảo','0901000004','hr@finnext.example','ACTIVE')
+  ('DATAVIT','DataViet Solutions','Quận 1, TP. Hồ Chí Minh','Information Technology','Nguyễn Minh An','0901000002','hr@dataviet.vn','ACTIVE'),
+  ('SAIGONSOFT','Saigon Software Lab','Quận 3, TP. Hồ Chí Minh','Software Development','Trần Thu Hà','0901000003','hr@saigonsoft.vn','ACTIVE'),
+  ('FINNEXT','FinNext Technology','Quận 7, TP. Hồ Chí Minh','Financial Technology','Lê Quốc Bảo','0901000004','hr@finnext.vn','ACTIVE'),
+  ('NEXUSLAB','NexusLab Solutions','Quận 1, TP. Hồ Chí Minh','Software Development','Phạm Minh Khoa','0901000005','hr@nexuslab.vn','ACTIVE'),
+  ('BLUEOCEAN','BlueOcean Digital','Quận 3, TP. Hồ Chí Minh','Digital Transformation','Nguyễn Khánh Linh','0901000006','hr@blueoceandigital.vn','ACTIVE'),
+  ('GREENBYTE','GreenByte Technology','Quận 7, TP. Hồ Chí Minh','Artificial Intelligence and Data','Trần Quốc Huy','0901000007','hr@greenbyte.vn','ACTIVE'),
+  ('CLOUDNOVA','CloudNova Systems','Thành phố Thủ Đức, TP. Hồ Chí Minh','Cloud Computing','Lê Hoàng Anh','0901000008','hr@cloudnova.vn','ACTIVE'),
+  ('FINBRIDGE','FinBridge Digital','Quận Hai Bà Trưng, Hà Nội','Financial Technology','Vũ Thu Trang','0901000009','hr@finbridge.vn','ACTIVE'),
+  ('MEDTECHVN','MedTech Vietnam','Quận Hải Châu, Đà Nẵng','Healthcare Technology','Đặng Minh Phúc','0901000010','hr@medtechvietnam.vn','ACTIVE')
 ON CONFLICT ("EnterpriseCode") DO UPDATE SET
   "Name"=EXCLUDED."Name","Address"=EXCLUDED."Address","Industry"=EXCLUDED."Industry",
   "ContactPersonName"=EXCLUDED."ContactPersonName","ContactPhone"=EXCLUDED."ContactPhone",
@@ -7263,9 +7271,9 @@ INSERT INTO public."Users" ("Username","PasswordHash","Email","FullName","RoleID
 SELECT account."Username",'$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii',
   account."Email",account."FullName",enterprise_role."RoleID",'ACTIVE',false,0
 FROM (VALUES
-  ('enterprise02','hr@dataviet.example','DataViet HR'),
-  ('enterprise03','hr@saigonsoft.example','Saigon Software HR'),
-  ('enterprise04','hr@finnext.example','FinNext HR')
+  ('enterprise02','hr@dataviet.vn','DataViet HR'),
+  ('enterprise03','hr@saigonsoft.vn','Saigon Software HR'),
+  ('enterprise04','hr@finnext.vn','FinNext HR')
 ) account("Username","Email","FullName")
 CROSS JOIN public."Roles" enterprise_role
 WHERE enterprise_role."RoleCode"='ENTERPRISE'
@@ -7274,9 +7282,39 @@ ON CONFLICT DO NOTHING;
 INSERT INTO public."EnterpriseUsers" ("UserID","EnterpriseID","PositionTitle")
 SELECT account."UserID",enterprise."EnterpriseID",'HR Manager'
 FROM (VALUES
-  ('hr@dataviet.example','DATAVIT'),
-  ('hr@saigonsoft.example','SAIGONSOFT'),
-  ('hr@finnext.example','FINNEXT')
+  ('hr@dataviet.vn','DATAVIT'),
+  ('hr@saigonsoft.vn','SAIGONSOFT'),
+  ('hr@finnext.vn','FINNEXT')
+) link("Email","EnterpriseCode")
+JOIN public."Users" account ON account."Email"=link."Email"
+JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=link."EnterpriseCode"
+ON CONFLICT ("UserID") DO UPDATE SET "EnterpriseID"=EXCLUDED."EnterpriseID","PositionTitle"=EXCLUDED."PositionTitle";
+
+-- Give each additional seeded enterprise one HR portal account for its published vacancies.
+INSERT INTO public."Users" ("Username","PasswordHash","Email","FullName","RoleID","Status","MustChangePassword","AuthVersion")
+SELECT account."Username",'$2b$12$ZS/2L4FG.RqQuHakq1UA4eI/cA3z.Z0MLL.zvpLOIWhaLzYSgf9Ii',
+  account."Email",account."FullName",enterprise_role."RoleID",'ACTIVE',false,0
+FROM (VALUES
+  ('enterprise05','hr@nexuslab.vn','NexusLab HR'),
+  ('enterprise06','hr@blueoceandigital.vn','BlueOcean HR'),
+  ('enterprise07','hr@greenbyte.vn','GreenByte HR'),
+  ('enterprise08','hr@cloudnova.vn','CloudNova HR'),
+  ('enterprise09','hr@finbridge.vn','FinBridge HR'),
+  ('enterprise10','hr@medtechvietnam.vn','MedTech Vietnam HR')
+) account("Username","Email","FullName")
+CROSS JOIN public."Roles" enterprise_role
+WHERE enterprise_role."RoleCode"='ENTERPRISE'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."EnterpriseUsers" ("UserID","EnterpriseID","PositionTitle")
+SELECT account."UserID",enterprise."EnterpriseID",'HR Manager'
+FROM (VALUES
+  ('hr@nexuslab.vn','NEXUSLAB'),
+  ('hr@blueoceandigital.vn','BLUEOCEAN'),
+  ('hr@greenbyte.vn','GREENBYTE'),
+  ('hr@cloudnova.vn','CLOUDNOVA'),
+  ('hr@finbridge.vn','FINBRIDGE'),
+  ('hr@medtechvietnam.vn','MEDTECHVN')
 ) link("Email","EnterpriseCode")
 JOIN public."Users" account ON account."Email"=link."Email"
 JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=link."EnterpriseCode"
@@ -8202,6 +8240,55 @@ WHERE coordinator."Username"='ojt.coord01'
   AND NOT EXISTS (SELECT 1 FROM public."OJTRegistrationWindows" existing
     WHERE existing."RecruitmentRoundID"=round_row."WindowID");
 
+-- Open Fall 2026 OJT registration for the first recruitment round (Nov 1-Dec 20).
+DO $seed_fall2026_ojt_round$
+DECLARE
+  target_period_id integer;
+  target_semester_id integer;
+  coordinator_id integer;
+  campaign_id integer;
+  round_id integer;
+BEGIN
+  SELECT period."AcademicPeriodID",term."OJTSemesterID"
+    INTO target_period_id,target_semester_id
+  FROM public."AcademicPeriods" period
+  JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
+  WHERE period."PeriodCode"='FALL2026' AND period."Kind"='SEMESTER';
+  SELECT "UserID" INTO coordinator_id FROM public."Users" WHERE "Username"='ojt.coord01';
+  IF target_period_id IS NULL OR target_semester_id IS NULL OR coordinator_id IS NULL THEN
+    RAISE EXCEPTION 'Fall 2026 OJT period or coordinator seed is missing.';
+  END IF;
+
+  INSERT INTO public."RecruitmentCampaigns"
+    ("OJTSemesterID","Name","CreatedBy","StartsAt","EndsAt","ScheduleVersion")
+  VALUES (target_semester_id,'Tuyển dụng OJT - Fall 2026',coordinator_id,
+    TIMESTAMPTZ '2026-11-01 00:00:00+07',TIMESTAMPTZ '2026-12-28 23:59:59+07',3)
+  ON CONFLICT ("OJTSemesterID") DO NOTHING;
+  SELECT "CampaignID" INTO campaign_id FROM public."RecruitmentCampaigns"
+    WHERE "OJTSemesterID"=target_semester_id;
+
+  INSERT INTO public."RecruitmentWindows"
+    ("AcademicPeriodID","OJTSemesterID","Name","StartsAt","EndsAt","Status","CreatedBy",
+     "CampaignID","RoundNumber","PostingStartsAt","PostingEndsAt","ApplicationStartsAt",
+     "ApplicationEndsAt","ResultsStartsAt","ResultsEndsAt","OpenedAt")
+  VALUES (target_period_id,target_semester_id,'Đợt 1 - Fall 2026',
+    TIMESTAMPTZ '2026-11-01 00:00:00+07',TIMESTAMPTZ '2026-12-28 23:59:59+07','OPEN',coordinator_id,
+    campaign_id,1,TIMESTAMPTZ '2026-11-01 00:00:00+07',TIMESTAMPTZ '2026-12-16 23:59:00+07',
+    TIMESTAMPTZ '2026-11-27 09:00:00+07',TIMESTAMPTZ '2026-12-20 23:59:00+07',
+    TIMESTAMPTZ '2026-11-27 09:00:00+07',TIMESTAMPTZ '2026-12-28 23:59:59+07',clock_timestamp())
+  ON CONFLICT ("CampaignID","RoundNumber") DO NOTHING;
+  SELECT "WindowID" INTO round_id FROM public."RecruitmentWindows"
+    WHERE "CampaignID"=campaign_id AND "RoundNumber"=1;
+
+  INSERT INTO public."OJTRegistrationWindows"
+    ("OJTSemesterID","AcademicPeriodID","RecruitmentRoundID","Name","Scope","StartsAt","EndsAt",
+     "Status","CreatedBy","OpenedBy","OpenedAt","RequiredRelativeSemester")
+  VALUES (target_semester_id,target_period_id,round_id,'Đợt 1 - Fall 2026','{}'::jsonb,
+    TIMESTAMPTZ '2026-11-27 09:00:00+07',TIMESTAMPTZ '2026-12-20 23:59:00+07',
+    'OPEN',coordinator_id,coordinator_id,clock_timestamp(),6)
+  ON CONFLICT ("RecruitmentRoundID") DO NOTHING;
+END $seed_fall2026_ojt_round$;
+
 -- Link the completed students' registrations to the registration window for the actual recruitment round.
 UPDATE public."OJTRegistrations" registration
 SET "WindowID"=round_window."WindowID"
@@ -8238,7 +8325,7 @@ INSERT INTO public."RecruitmentPosts"
   ("EnterpriseID","OJTSemesterID","WindowID","Title","Content","Benefits","ApplicationInstructions","Status",
    "PublishedAt","DeadlineAt","CreatedBy","CreatedAt","UpdatedAt","SubmissionKey","EnterpriseManaged")
 SELECT enterprise."EnterpriseID",schedule."OJTSemesterID",round_row."WindowID",
-  job_position."Title"||' - '||schedule."PeriodName",
+  job_position."Title",
   'Cơ hội thực tập OJT có hướng dẫn tại doanh nghiệp. Sinh viên tham gia công việc chuyên môn, phối hợp với nhóm dự án và hoàn thành nhiệm vụ theo kế hoạch thực tập.',
   'Có người hướng dẫn, môi trường làm việc thực tế và xác nhận kết quả thực tập theo quy định của chương trình.',
   'Nộp hồ sơ OJT trên hệ thống và chuẩn bị CV cùng thông tin liên hệ cập nhật.',
@@ -8273,6 +8360,81 @@ JOIN public."InternshipPositions" job_position ON job_position."EnterpriseID"=po
     THEN 'QHDN-SEED-OJT-'||period."PeriodCode"
     ELSE 'SEED-JOB-'||period."PeriodCode"||'-'||enterprise."EnterpriseCode" END
 WHERE post."SubmissionKey"='SEED-RECRUITMENT-'||period."PeriodCode"||'-'||enterprise."EnterpriseCode"
+ON CONFLICT ("PostID","PositionID") DO NOTHING;
+
+-- Seed Fall 2026 published vacancies: one for every enterprise, plus three additional TechViet vacancies.
+WITH fall_positions AS (
+  SELECT * FROM (VALUES
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET','Thực tập sinh phát triển phần mềm','TP. Hồ Chí Minh'),
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET-02','Thực tập sinh phát triển Backend','TP. Hồ Chí Minh'),
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET-03','Thực tập sinh kiểm thử phần mềm','TP. Hồ Chí Minh'),
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET-04','Thực tập sinh phát triển Full-stack','TP. Hồ Chí Minh'),
+    ('DATAVIT','SEED-JOB-FALL2026-DATAVIT','Thực tập sinh phân tích dữ liệu','TP. Hồ Chí Minh'),
+    ('SAIGONSOFT','SEED-JOB-FALL2026-SAIGONSOFT','Thực tập sinh phát triển phần mềm','TP. Hồ Chí Minh'),
+    ('FINNEXT','SEED-JOB-FALL2026-FINNEXT','Thực tập sinh phát triển ứng dụng tài chính','TP. Hồ Chí Minh'),
+    ('NEXUSLAB','SEED-JOB-FALL2026-NEXUSLAB','Thực tập sinh kỹ thuật phần mềm','TP. Hồ Chí Minh'),
+    ('BLUEOCEAN','SEED-JOB-FALL2026-BLUEOCEAN','Thực tập sinh chuyển đổi số','TP. Hồ Chí Minh'),
+    ('GREENBYTE','SEED-JOB-FALL2026-GREENBYTE','Thực tập sinh AI và dữ liệu','TP. Hồ Chí Minh'),
+    ('CLOUDNOVA','SEED-JOB-FALL2026-CLOUDNOVA','Thực tập sinh điện toán đám mây','TP. Hồ Chí Minh'),
+    ('FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE','Thực tập sinh công nghệ tài chính','Hà Nội'),
+    ('MEDTECHVN','SEED-JOB-FALL2026-MEDTECHVN','Thực tập sinh phát triển phần mềm y tế','Đà Nẵng')
+  ) AS row("EnterpriseCode","RecruitmentCode","Title","Location")
+)
+INSERT INTO public."InternshipPositions"
+  ("EnterpriseID","OJTSemesterID","Title","Description","Requirements","Capacity","RemainingSlots","Status","Location","WorkMode","RecruitmentCode")
+SELECT enterprise."EnterpriseID",term."OJTSemesterID",planned."Title",
+  'Tham gia dự án thực tế, phối hợp với người hướng dẫn và hoàn thành nhiệm vụ thực tập theo kế hoạch OJT.',
+  'Đang theo học chương trình CNTT; có kiến thức nền tảng và tinh thần học hỏi.',4,4,'OPEN',planned."Location",'HYBRID',planned."RecruitmentCode"
+FROM fall_positions planned
+JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=planned."EnterpriseCode"
+JOIN public."AcademicPeriods" period ON period."PeriodCode"='FALL2026'
+JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
+ON CONFLICT DO NOTHING;
+
+WITH fall_posts AS (
+  SELECT * FROM (VALUES
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET','Fall 2026 | Tuyển thực tập sinh phát triển phần mềm'),
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET-02','Fall 2026 | Tuyển thực tập sinh Backend'),
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET-03','Fall 2026 | Tuyển thực tập sinh kiểm thử phần mềm'),
+    ('TECHVIET','SEED-JOB-FALL2026-TECHVIET-04','Fall 2026 | Tuyển thực tập sinh Full-stack'),
+    ('DATAVIT','SEED-JOB-FALL2026-DATAVIT','Fall 2026 | Tuyển thực tập sinh phân tích dữ liệu'),
+    ('SAIGONSOFT','SEED-JOB-FALL2026-SAIGONSOFT','Fall 2026 | Tuyển thực tập sinh phát triển phần mềm'),
+    ('FINNEXT','SEED-JOB-FALL2026-FINNEXT','Fall 2026 | Tuyển thực tập sinh công nghệ tài chính'),
+    ('NEXUSLAB','SEED-JOB-FALL2026-NEXUSLAB','Fall 2026 | Tuyển thực tập sinh kỹ thuật phần mềm'),
+    ('BLUEOCEAN','SEED-JOB-FALL2026-BLUEOCEAN','Fall 2026 | Tuyển thực tập sinh chuyển đổi số'),
+    ('GREENBYTE','SEED-JOB-FALL2026-GREENBYTE','Fall 2026 | Tuyển thực tập sinh AI và dữ liệu'),
+    ('CLOUDNOVA','SEED-JOB-FALL2026-CLOUDNOVA','Fall 2026 | Tuyển thực tập sinh điện toán đám mây'),
+    ('FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE','Fall 2026 | Tuyển thực tập sinh công nghệ tài chính'),
+    ('MEDTECHVN','SEED-JOB-FALL2026-MEDTECHVN','Fall 2026 | Tuyển thực tập sinh phát triển phần mềm y tế')
+  ) AS row("EnterpriseCode","RecruitmentCode","Title")
+)
+INSERT INTO public."RecruitmentPosts"
+  ("EnterpriseID","OJTSemesterID","WindowID","Title","Content","Benefits","ApplicationInstructions","Status",
+   "PublishedAt","DeadlineAt","CreatedBy","CreatedAt","UpdatedAt","SubmissionKey","EnterpriseManaged")
+SELECT enterprise."EnterpriseID",term."OJTSemesterID",round_row."WindowID",planned."Title",
+  'Cơ hội thực tập OJT có hướng dẫn tại doanh nghiệp. Thực tập sinh tham gia công việc chuyên môn, phối hợp với nhóm dự án và hoàn thành nhiệm vụ theo kế hoạch.',
+  'Có người hướng dẫn, môi trường làm việc thực tế và xác nhận kết quả thực tập theo quy định của chương trình.',
+  'Ứng tuyển trên hệ thống trước hạn đăng ký OJT; chuẩn bị CV và thông tin liên hệ cập nhật.',
+  'PUBLISHED',clock_timestamp(),round_row."ApplicationEndsAt",account."UserID",clock_timestamp(),clock_timestamp(),
+  'SEED-FALL2026-POST-'||planned."RecruitmentCode",true
+FROM fall_posts planned
+JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=planned."EnterpriseCode"
+JOIN public."EnterpriseUsers" membership ON membership."EnterpriseID"=enterprise."EnterpriseID"
+JOIN public."Users" account ON account."UserID"=membership."UserID"
+JOIN public."InternshipPositions" position ON position."EnterpriseID"=enterprise."EnterpriseID"
+  AND position."RecruitmentCode"=planned."RecruitmentCode"
+JOIN public."AcademicPeriods" period ON period."PeriodCode"='FALL2026'
+JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
+JOIN public."RecruitmentWindows" round_row ON round_row."OJTSemesterID"=term."OJTSemesterID" AND round_row."RoundNumber"=1
+ON CONFLICT ("SubmissionKey") DO UPDATE SET "Title"=EXCLUDED."Title";
+
+INSERT INTO public."RecruitmentPostPositions" ("PostID","PositionID","EnterpriseID","OJTSemesterID")
+SELECT post."PostID",position."PositionID",post."EnterpriseID",post."OJTSemesterID"
+FROM public."RecruitmentPosts" post
+JOIN public."InternshipPositions" position ON position."EnterpriseID"=post."EnterpriseID"
+  AND position."OJTSemesterID"=post."OJTSemesterID"
+  AND post."SubmissionKey"='SEED-FALL2026-POST-'||position."RecruitmentCode"
+WHERE position."RecruitmentCode" LIKE 'SEED-JOB-FALL2026-%'
 ON CONFLICT ("PostID","PositionID") DO NOTHING;
 
 -- Attach the completed K18 students to the TechViet recruitment application and position records.
