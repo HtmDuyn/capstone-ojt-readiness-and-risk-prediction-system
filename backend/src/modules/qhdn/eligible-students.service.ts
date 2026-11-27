@@ -8,7 +8,7 @@ export async function eligibleStudents(params: Row, actor: Actor) {
     throw invalid('Only QHDN staff can view the eligible roster.', 403, 'FORBIDDEN');
   const page = pagination(params, [
     'ojtSemesterId', 'studentId', 'handoffId', 'programId', 'cohortId',
-    'groupCode', 'search', 'registrationStatus', 'rosterStatus',
+    'groupCode', 'search', 'registrationStatus',
   ]);
   const args: unknown[] = [];
   const where: string[] = [
@@ -33,10 +33,6 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       AND history."StudentID"=s."StudentID" AND history."OJTSemesterID"=target."OJTSemesterID")`);
   }
   if (params.groupCode !== undefined) add('placement."GroupCode"', enumValue(params.groupCode, ['A','B','C','D'], 'groupCode'));
-  if (params.rosterStatus !== undefined) {
-    const status = enumValue(params.rosterStatus, ['ASSIGNED','WAITING'], 'rosterStatus');
-    where.push(status === 'ASSIGNED' ? 'round."WindowID" IS NOT NULL' : 'round."WindowID" IS NULL');
-  }
   const registrationStatus = `CASE WHEN r."Status"='HANDED_OFF' THEN 'LEGACY_REVIEW_REQUIRED'
     ELSE COALESCE(r."Status",'NOT_REGISTERED') END`;
   if (params.registrationStatus !== undefined) add(registrationStatus,
@@ -87,18 +83,6 @@ export async function eligibleStudents(params: Row, actor: Actor) {
          WHERE default_term."AcademicPeriodID"=public."DefaultOJTAcademicPeriod"(s."StudentID") LIMIT 1)
       )
       LEFT JOIN LATERAL (
-        SELECT w."WindowID",w."Name"
-        FROM "RecruitmentWindows" w
-        WHERE w."OJTSemesterID"=target."OJTSemesterID"
-          AND target."Status" NOT IN ('CLOSED','ARCHIVED')
-          AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
-          AND COALESCE(w."ApplicationStartsAt",w."StartsAt")<=statement_timestamp()
-          AND w."EndsAt">statement_timestamp()
-          AND COALESCE(w."ApplicationEndsAt",w."EndsAt")>statement_timestamp()
-        ORDER BY COALESCE(w."ApplicationStartsAt",w."StartsAt"),w."WindowID"
-        LIMIT 1
-      ) round ON true
-      LEFT JOIN LATERAL (
         SELECT registration.* FROM "OJTRegistrations" registration
         WHERE registration."StudentID"=s."StudentID" AND registration."OJTSemesterID"=target."OJTSemesterID"
         ORDER BY registration."RegistrationID" DESC LIMIT 1
@@ -110,15 +94,6 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       s."ProgramID" AS "programId",program."ProgramName" AS "programName",
       placement."CohortID" AS "cohortId",cohort."Name" AS "cohortName",placement."GroupCode" AS "groupCode",
       target."OJTSemesterID" AS "ojtSemesterId",target."Name" AS "semesterName",
-      round."WindowID" AS "roundId",round."Name" AS "roundName",saved."CheckedAt" AS "checkedAt",
-      CASE WHEN round."WindowID" IS NULL THEN 'WAITING' ELSE 'ASSIGNED' END AS "rosterStatus",
-      CASE WHEN EXISTS (
-        SELECT 1 FROM "StudentEnterpriseCoordination" completed_coordination
-        JOIN "InternshipAssignments" completed_assignment
-          ON completed_assignment."CoordinationID"=completed_coordination."CoordinationID"
-        WHERE completed_coordination."RegistrationID"=r."RegistrationID"
-          AND completed_assignment."Status"='COMPLETED'
-      ) THEN 'COMPLETED' WHEN round."WindowID" IS NOT NULL THEN 'ASSIGNED' ELSE 'WAITING' END AS "participationStatus",
       COALESCE((SELECT jsonb_agg(jsonb_build_object(
         'resultId',history."ResultID",'courseCode',course."CourseCode",'courseName',course."CourseName",
         'semesterTaken',history."SemesterTaken",'periodName',period."Name",'score',history."Score",
@@ -130,7 +105,7 @@ export async function eligibleStudents(params: Row, actor: Actor) {
         WHERE history."StudentID"=s."StudentID"
       ),'[]'::jsonb) AS "academicHistory",
       r."RegistrationID" AS "registrationId",${registrationStatus} AS "registrationStatus"
-      ${from} ORDER BY round."WindowID" NULLS LAST, s."StudentCode",s."StudentID"
+      ${from} ORDER BY s."StudentCode",s."StudentID"
       LIMIT $${args.length + 1} OFFSET $${args.length + 2}`, [...args,page.limit,page.offset])).rows;
     return { ojtSemesterId: params.ojtSemesterId === undefined ? null : Number(params.ojtSemesterId),
       items,total,page:page.page,limit:page.limit };

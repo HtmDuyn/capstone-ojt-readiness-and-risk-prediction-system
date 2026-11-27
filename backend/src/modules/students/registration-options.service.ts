@@ -101,8 +101,6 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       if(kind==='ojt')pathway={admissionSource:admission?.source??null};
       if(kind==='ojt'&&(!admission||admission.status!=='ELIGIBLE'||admission.isStale))reasons.push(
         admission?.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
-      if(kind==='ojt'&&admission?.source==='SAVED_ELIGIBILITY'
-        &&(admission.roundId===null||(w.RecruitmentRoundID&&admission.roundId!==w.RecruitmentRoundID)))reasons.push('OJT_ROUND_NOT_ASSIGNED');
       if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');
       items.push({id:w.WindowID,name:w.Name,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,
         period:w.period,semester:w.semester,startsAt:w.StartsAt,endsAt:w.EndsAt,effectiveEndsAt:end,status:w.Status,

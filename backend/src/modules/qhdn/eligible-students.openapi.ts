@@ -7,8 +7,8 @@
  *         "tags": [
  *           "QHDN core"
  *         ],
- *         "summary": "Danh sách sinh viên đủ điều kiện và chưa có bản ghi OJT202 đã đạt",
- *         "description": "Phòng QHDN xem sinh viên đã có kết quả xét đủ điều kiện. Sinh viên được xếp vào đợt mở theo học kỳ chính kế tiếp trên lịch đào tạo. Danh sách chờ gồm sinh viên chưa có đợt phù hợp.",
+ *         "summary": "Danh sách sinh viên đủ điều kiện OJT và chưa đạt OJT202 ở lần học mới nhất",
+ *         "description": "Phòng QHDN xem tất cả sinh viên có kết quả đủ điều kiện và chưa đạt OJT202 ở lần học mới nhất. Danh sách không phụ thuộc RoundID hoặc việc sinh viên đã được gán đợt tuyển dụng.",
  *         "security": [
  *           {
  *             "bearerAuth": []
@@ -23,17 +23,6 @@
  *               "type": "integer",
  *               "minimum": 1,
  *               "maximum": 2147483647
- *             }
- *           },
- *           {
- *             "name": "rosterStatus",
- *             "in": "query",
- *             "schema": {
- *               "type": "string",
- *               "enum": [
- *                 "ASSIGNED",
- *                 "WAITING"
- *               ]
  *             }
  *           },
  *           {
@@ -228,29 +217,10 @@
  *                                   "LEGACY_REVIEW_REQUIRED"
  *                                 ]
  *                               },
- *                               "roundName": {
- *                                 "type": "string",
- *                                 "nullable": true
- *                               },
  *                               "semesterName": {
- *                                 "description": "Tên kỳ của đợt được xếp. Giá trị null khi còn chờ mở đợt.",
+ *                                 "description": "Tên kỳ OJT mục tiêu.",
  *                                 "type": "string",
  *                                 "nullable": true
- *                               },
- *                               "roundId": {
- *                                 "type": "integer",
- *                                 "nullable": true
- *                               },
- *                               "rosterStatus": {
- *                                 "type": "string",
- *                                 "enum": [
- *                                   "ASSIGNED",
- *                                   "WAITING"
- *                                 ]
- *                               },
- *                               "checkedAt": {
- *                                 "type": "string",
- *                                 "format": "date-time"
  *                               },
  *                               "academicHistory": {
  *                                 "description": "Lịch sử môn học; các bản ghi OJT202 đã PASSED không được trả về.",

@@ -26,7 +26,6 @@ import { PageBanner } from "@/components/common/PageBanner";
 import { AcademicPeriodFilter } from "@/components/qhdn/StudentWorkflowUi";
 import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
 import { useNearViewport } from "@/hooks/shared/useNearViewport";
-import { subscribeVisibleRefresh } from "@/utils/shared/visibleRefresh";
 import { missingRecruitmentRounds } from "@/utils/shared/recruitmentSchedule";
 import {
   listCompanies,
@@ -48,7 +47,6 @@ export const QhdnDashboard: React.FC = () => {
   const catalog = useQhdnAcademicPeriods("", false, true);
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
-  const [revision, setRevision] = useState(0);
   const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats>; companies: DashboardPlacementBoard['companies'] } | null>(null);
   const [internshipStats, setInternshipStats] = useState<{ semesterId: number; data: QhdnDashboardSummary } | null>(null);
   const [internshipError, setInternshipError] = useState('');
@@ -130,11 +128,7 @@ export const QhdnDashboard: React.FC = () => {
       controller.abort();
       if (dashboardRequest.current === controller) dashboardRequest.current = null;
     };
-  }, [selectedSemesterId, revision]);
-
-  useEffect(() => {
-    return subscribeVisibleRefresh(() => setRevision(value => value + 1), { canRefresh: () => !dashboardRequest.current });
-  }, []);
+  }, [selectedSemesterId]);
 
   // The company catalog is independent of the selected OJT semester.
   useEffect(() => {
@@ -176,7 +170,7 @@ export const QhdnDashboard: React.FC = () => {
       if (!controller.signal.aborted) setCoordinationsLoading(false);
     });
     return () => controller.abort();
-  }, [selectedSemesterId, revision, loadCoordinations]);
+  }, [selectedSemesterId, loadCoordinations]);
 
   // Tính toán Quota của từng doanh nghiệp từ vị trí tuyển dụng
   const enterpriseQuotaList = useMemo(() => {

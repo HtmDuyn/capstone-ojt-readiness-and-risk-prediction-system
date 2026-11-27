@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/shared/useAuth';
-import { loadStudentAcademicCredits } from '@/services/educationService';
+import { loadStudentAcademicCreditsBatch } from '@/services/educationService';
 
 type Credits = Record<number, number | null>;
 const emptyCredits: Credits = {};
@@ -23,18 +23,23 @@ export function useEducationStudentCredits(studentIds: number[]) {
     setState({ token, credits: scope.credits, failures, loading: missing.length > 0 });
 
     async function load() {
-      for (let start = 0; start < missing.length && !controller.signal.aborted; start += 4) {
-        const batch = missing.slice(start, start + 4);
-        const results = await Promise.allSettled(batch.map(id => loadStudentAcademicCredits(id, controller.signal)));
-        if (controller.signal.aborted) return;
-        const credits = { ...scope.credits };
-        results.forEach((result, index) => {
-          const id = batch[index];
-          if (result.status === 'fulfilled') credits[id] = result.value;
-          else failures.push(id);
-        });
-        scope.credits = credits;
-        setState({ token, credits, failures: [...failures], loading: start + batch.length < missing.length });
+      for (let start = 0; start < missing.length && !controller.signal.aborted; start += 100) {
+        const batch = missing.slice(start, start + 100);
+        try {
+          const loaded = await loadStudentAcademicCreditsBatch(batch, controller.signal);
+          if (controller.signal.aborted) return;
+          const credits = { ...scope.credits };
+          for (const id of batch) {
+            if (loaded.has(id)) credits[id] = loaded.get(id) ?? null;
+            else failures.push(id);
+          }
+          scope.credits = credits;
+          setState({ token, credits, failures: [...failures], loading: start + batch.length < missing.length });
+        } catch {
+          if (controller.signal.aborted) return;
+          failures.push(...batch);
+          setState({ token, credits: scope.credits, failures: [...failures], loading: start + batch.length < missing.length });
+        }
       }
     }
 

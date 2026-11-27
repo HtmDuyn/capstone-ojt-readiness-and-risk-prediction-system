@@ -28,7 +28,6 @@ import {
 } from '@/services/enterpriseService';
 import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
-import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
@@ -159,12 +158,10 @@ export const EnterpriseInterns: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     queueMicrotask(() => { if (mounted) void fetchInternships(); });
-    const unsubscribe = subscribeVisibleRefresh(() => void fetchInternships(true), { interval: 60_000, canRefresh: () => !activeRequest.current });
     return () => {
       mounted = false;
       activeRequest.current?.abort();
       activeRequest.current = null;
-      unsubscribe();
     };
   }, [fetchInternships]);
 

@@ -1,6 +1,6 @@
 import { AcademicBlockDates } from './AcademicBlockDates';
 import { useState } from 'react';
-import { Save, X } from 'lucide-react';
+import { Save } from 'lucide-react';
 import type { AcademicCalendar, SemesterDates } from '@/types/education/academic.types';
 import { blockDateError, calendarErrors, semesterDraft, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
 
@@ -41,9 +41,9 @@ export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
     event.preventDefault();
     if (!busy && !errors.length && changed && await onSave(rows, complete(blocks), complete(block10))) onCancel();
   }}>
-    <div className="flex items-center justify-between gap-3"><h3 className="font-bold text-slate-900">Chỉnh sửa lịch 3 kỳ — {calendar.year.yearCode}</h3><button type="button" aria-label="Hủy chỉnh sửa" disabled={busy} onClick={onCancel}><X size={18} /></button></div>
-    <p className="text-sm text-slate-600">Ngày học kỳ, Block 10 và Block 3 được lưu cùng lúc. Chọn cả hai ngày để bổ sung lịch block còn thiếu.</p>
-    <div className="grid gap-4 lg:grid-cols-3">{rows.map((row, index) => <fieldset key={row.term} disabled={busy} className={`space-y-3 rounded-xl border p-4 ${TERM_COLOR[row.term]}`}>
+    <h3 className="font-bold text-slate-900">Lịch học kỳ — {calendar.year.yearCode}</h3>
+    <p className="text-sm text-slate-600">Chỉnh ngày của ba học kỳ, Block 10 và Block 3. Các thay đổi được lưu cùng lúc.</p>
+    <div className="grid gap-4 md:grid-cols-3">{rows.map((row, index) => <fieldset key={row.term} disabled={busy} className={`min-w-0 space-y-3 rounded-xl border p-4 ${TERM_COLOR[row.term]}`}>
       <legend className="px-1 font-bold">{index + 1}. {TERM_LABEL[row.term]} {year}</legend>
       <label className="block text-sm">Ngày bắt đầu<input required type="date" min={`${year}-01-01`} max={`${year}-12-31`} value={row.startDate} onChange={e => setRows(values => values.map((value, i) => i === index ? { ...value, startDate: e.target.value } : value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /></label>
       <label className="block text-sm">Ngày kết thúc<input required type="date" min={`${year}-01-01`} max={`${year}-12-31`} value={row.endDate} onChange={e => setRows(values => values.map((value, i) => i === index ? { ...value, endDate: e.target.value } : value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /></label>
