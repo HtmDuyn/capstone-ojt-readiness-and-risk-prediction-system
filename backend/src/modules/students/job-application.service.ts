@@ -14,6 +14,7 @@ import { invalid, inputObject, positiveId, optionalText, pagination, enumValue }
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { assertPostPhase } from '../recruitment/round-policy';
 import { requireLifecycleSchema } from '../recruitment/lifecycle.service';
+import { studentOpportunitySql } from './student-opportunity.repository';
 
 export async function ownStudent(c:PoolClient,actor:Actor) {
   if(actor.roleCode!=='STUDENT')throw invalid('Chức năng dành cho sinh viên.',403,'FORBIDDEN');
@@ -178,10 +179,19 @@ export async function listApplications(params:Row,actor:Actor,existingClient?:Po
 }
 
 export async function studentOpportunities(params:Row,actor:Actor,existingClient?:PoolClient) {
-  const p=pagination(params,['windowId']),windowId=positiveId(params.windowId,'windowId');
+  const p=pagination(params,['windowId']),windowId=params.windowId===undefined?null:positiveId(params.windowId,'windowId');
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async c=>{
     const s=await ownStudent(c,actor);
+    if(windowId===null){
+      const args=[null,s.StudentID,null];
+      const total=(await c.query(`SELECT count(*)::int AS n FROM (${studentOpportunitySql}) x`,args)).rows[0].n;
+      const rows=(await c.query(studentOpportunitySql+' ORDER BY post."PublishedAt" DESC NULLS LAST,post."PostID" DESC,p."PositionID" LIMIT $4 OFFSET $5',[...args,p.limit,p.offset])).rows;
+      const blockers=['REGISTRATION_WINDOW_REQUIRED'];
+      const items=rows.map(pos=>({...pos,remainingSlots:Number(pos.remainingSlots),canApply:false,blockers:[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])]}));
+      return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:null,windowId:null,ojtSemesterId:null,
+        officialEligibility:null,admissionEligibility:null,canApply:false,blockers};
+    }
     const w=(await c.query(`SELECT w.*,clock_timestamp() AS "Now" FROM "OJTRegistrationWindows" w WHERE w."WindowID"=$1`,[windowId])).rows[0];
     if(!w)throw invalid('Registration window not found.',404,'REGISTRATION_WINDOW_NOT_FOUND');
     const semesterId=w.OJTSemesterID;
@@ -207,7 +217,7 @@ export async function studentOpportunities(params:Row,actor:Actor,existingClient
     const hasAssignment=r&&(await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[r.RegistrationID])).rowCount;
     if(hasAssignment)blockers.push('ASSIGNMENT_EXISTS');
     if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED' LIMIT 1`,[s.StudentID,semesterId])).rowCount)blockers.push('STUDENT_ALREADY_CONFIRMED');
-    const sql=`SELECT p."PositionID" AS id,p."OJTSemesterID" AS "ojtSemesterId",post."PostID" AS "postId",p."RecruitmentCode" AS code,p."Title" AS title,p."Description" AS description,p."Requirements" AS requirements,p."Location" AS location,p."WorkMode" AS "workMode",p."Capacity" AS capacity,GREATEST(0,p."Capacity"-public."RecruitmentOccupiedSlots"(p."PositionID")) AS "remainingSlots",jsonb_build_object('id',e."EnterpriseID",'name',e."Name",'address',e."Address") AS company,jsonb_build_object('id',post."PostID",'title',post."Title",'deadlineAt',post."DeadlineAt",'content',post."Content",'benefits',post."Benefits") AS post,(SELECT app."ApplicationID" FROM "JobApplications" app JOIN "OJTRegistrations" reg ON reg."RegistrationID"=app."RegistrationID" WHERE reg."StudentID"=$2 AND app."PositionID"=p."PositionID" AND app."PostID"=post."PostID" ORDER BY app."ApplicationID" DESC LIMIT 1) AS "applicationId" FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID" JOIN "RecruitmentPostPositions" pp ON pp."PositionID"=p."PositionID" JOIN "RecruitmentPosts" post ON post."PostID"=pp."PostID" WHERE p."OJTSemesterID"=$1 AND ($3::int IS NULL OR post."WindowID"=$3) AND p."Status"='OPEN' AND e."Status"='ACTIVE' AND post."Status"='PUBLISHED' AND (post."DeadlineAt" IS NULL OR post."DeadlineAt">clock_timestamp()) AND NOT EXISTS(SELECT 1 FROM "RecruitmentWindows" rw WHERE rw."WindowID"=post."WindowID" AND rw."CampaignID" IS NOT NULL AND (rw."Status"<>'OPEN' OR clock_timestamp()<rw."StartsAt" OR clock_timestamp()>=rw."EndsAt"))`;
+    const sql=studentOpportunitySql;
     const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) x`,[semesterId,s.StudentID,w.RecruitmentRoundID??null])).rows[0].n;
     const rows=(await c.query(sql+' ORDER BY p."PositionID",post."PostID" LIMIT $4 OFFSET $5',[semesterId,s.StudentID,w.RecruitmentRoundID??null,p.limit,p.offset])).rows;
     const items=rows.map(pos=>{const reasons=[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])];return {...pos,remainingSlots:Number(pos.remainingSlots),canApply:!reasons.length,blockers:reasons};});
