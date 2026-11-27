@@ -1,9 +1,10 @@
 import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from '../academic/academic.repository';
-import { actualPeriod,periodBounds } from '../academic/workflow-policy';
+import { actualPeriod } from '../academic/workflow-policy';
 import { inputObject,invalid,requiredText } from '../students/student.validation';
 import { windowRecord,windowApi } from './recruitment.repository';
-import { editedSchedule,scheduleColumns,scheduleFieldError,schedulePermissions } from './schedule-policy';
+import { editedSchedule,scheduleColumns,schedulePermissions } from './schedule-policy';
+import { assertNoRoundOverlap, assertRoundWithinSemester, assertRecruitmentPeriodActive } from './round-schedule.policy';
 
 export async function requireScheduleEditingSchema(c:PoolClient) {
  if(!(await c.query(`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='RecruitmentWindows' AND column_name='OpenedAt') AS ready`)).rows[0].ready)
@@ -17,12 +18,9 @@ export async function editWindowSchedule(id:number,body:unknown,actor:number) {
   await requireScheduleEditingSchema(c);
   const before=await windowRecord(c,id),after=editedSchedule(before,b);
   const period=await actualPeriod(c,before.AcademicPeriodID);
-  if(new Date(after.EndsAt)>periodBounds(period).end)throw scheduleFieldError('resultsEndsAt','Lịch không được vượt ngày kết thúc học kỳ.');
-  if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2
-   AND (("StartsAt"<$4 AND "EndsAt">$3) OR ("CampaignID"=$5 AND
-   (("RoundNumber"<$6 AND "EndsAt">$3) OR ("RoundNumber">$6 AND "StartsAt"<$4))))`,
-   [before.OJTSemesterID,id,after.StartsAt,after.EndsAt,before.CampaignID,before.RoundNumber])).rowCount)
-   throw invalid('Lịch trùng hoặc sai thứ tự với đợt khác.',409,'RECRUITMENT_WINDOW_CONFLICT');
+  assertRecruitmentPeriodActive(period);
+  assertRoundWithinSemester(period,new Date(after.StartsAt),new Date(after.EndsAt));
+  await assertNoRoundOverlap(c,before.AcademicPeriodID,before.OJTSemesterID,new Date(after.StartsAt),new Date(after.EndsAt),id);
   await c.query(`SELECT set_config('app.qhdn_schedule_edit','on',true)`);
   await c.query(`UPDATE "RecruitmentCampaigns" SET "StartsAt"=LEAST("StartsAt",$2::timestamptz),"EndsAt"=GREATEST("EndsAt",$3::timestamptz) WHERE "CampaignID"=$1`,[before.CampaignID,after.StartsAt,after.EndsAt]);
   await c.query(`UPDATE "RecruitmentWindows" SET "Name"=$2,"StartsAt"=$3,"EndsAt"=$4,
@@ -38,8 +36,8 @@ export async function editWindowSchedule(id:number,body:unknown,actor:number) {
  });
 }
 
-export async function deleteDraftWindow(id:number,body:unknown,actor:number) {
- const reason=requiredText(inputObject(body,['reason']).reason,'reason',2000);
+export async function deleteDraftWindow(id:number,actor:number) {
+ const reason='Xóa đợt tuyển dụng chưa mở.';
  return academicTransaction(async c=>{
   await requireScheduleEditingSchema(c);
   const before=await windowRecord(c,id);

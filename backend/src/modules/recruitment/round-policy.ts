@@ -41,6 +41,8 @@ export function currentRoundPhase(w: Row): string {
  if(w.Status==='CLOSED')return 'CLOSED';
  if(w.Status!=='OPEN')return 'DRAFT';
  if(hasPhaseSchedule(w)){
+  if(phaseIsOpen(w,'POSTING')&&phaseIsOpen(w,'APPLICATION'))
+   return phaseIsOpen(w,'RESULTS')?'POSTING_AND_APPLICATION_AND_RESULTS':'POSTING_AND_APPLICATION';
   if(phaseIsOpen(w,'POSTING'))return 'POSTING';
   if(phaseIsOpen(w,'APPLICATION')&&phaseIsOpen(w,'RESULTS'))return 'APPLICATION_AND_RESULTS';
   if(phaseIsOpen(w,'APPLICATION'))return 'APPLICATION';
@@ -59,7 +61,6 @@ export function roundActions(w: Row) {
  else if(w.Kind!=='SEMESTER'||w.LinkedPeriodID!==w.AcademicPeriodID)
   openBlockedReason='Học kỳ hoặc liên kết kỳ OJT không còn khả dụng.';
  else if(w.CalendarStatus!=='ACTIVE')openBlockedReason='Chỉ mở đợt tuyển dụng trong học kỳ đang diễn ra.';
- else if(w.PreviousRoundPending)openBlockedReason='Đợi đợt trước kết thúc và được chốt tổng hợp.';
  return {canOpen:openBlockedReason===null,openBlockedReason,
   canFinalize:!w.ResultsFinalizedAt&&now>=new Date(w.EndsAt).getTime()};
 }

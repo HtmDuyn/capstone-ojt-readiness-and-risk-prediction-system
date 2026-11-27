@@ -7,7 +7,6 @@ import { Footer } from '@/components/common/Footer';
 import { StudentHeader } from '@/components/student/StudentHeader';
 import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
 import { FirstPasswordChangePage } from '@/pages/auth/FirstPasswordChangePage';
-import { AuthLoadingScreen } from '@/components/auth/AuthLoadingScreen';
 
 function StudentShell() {
   const { user, logout } = useAuth();
@@ -15,7 +14,7 @@ function StudentShell() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   if (portal.mustChangePassword) return <FirstPasswordChangePage />;
-  if (portal.loading && !portal.profile) return <AuthLoadingScreen />;
+  if (portal.loading && !portal.profile) return null;
   const profile = portal.profile;
   const handleLogout = () => { logout(); navigate('/login'); };
   return <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#f7f9ff] text-slate-800 antialiased selection:bg-orange-500 selection:text-white">

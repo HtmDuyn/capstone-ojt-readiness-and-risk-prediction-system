@@ -1,6 +1,6 @@
 export const recruitmentPhases = [
-  { key: 'posting', label: '1. Doanh nghiệp đăng tin', description: 'Doanh nghiệp tạo, chỉnh sửa và tự công bố tin. Sinh viên xem trước, chưa ứng tuyển.' },
-  { key: 'application', label: '2. Sinh viên ứng tuyển', description: 'Sinh viên đủ điều kiện nộp hồ sơ; nội dung và chỉ tiêu tuyển dụng được khóa.' },
+  { key: 'posting', label: '1. Doanh nghiệp đăng tin', description: 'Doanh nghiệp tạo, chỉnh sửa tin nháp và tự công bố tin trong hạn đăng tin.' },
+  { key: 'application', label: '2. Sinh viên ứng tuyển', description: 'Sinh viên đủ điều kiện nộp hồ sơ, kể cả khi hạn đăng tin chưa kết thúc. Bắt đầu Hạn 2 phải sau bắt đầu Hạn 1; kết thúc Hạn 2 phải sau kết thúc Hạn 1.' },
   { key: 'results', label: '3. Doanh nghiệp xét tuyển, phản hồi', description: 'Giờ bắt đầu được gợi ý theo hạn ứng tuyển và có thể chỉnh tay. Doanh nghiệp xem hồ sơ, liên hệ, phỏng vấn và nhận hoặc từ chối trong hạn này.' },
 ] as const;
 

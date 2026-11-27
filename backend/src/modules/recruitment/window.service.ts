@@ -1,20 +1,21 @@
 import { academicTransaction, audit } from '../academic/academic.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { ensureOjtSemesterForPeriod } from '../academic/ojt-semester-link';
-import { actualPeriod, periodBounds } from '../academic/workflow-policy';
+import { actualPeriod } from '../academic/workflow-policy';
 import { inputObject, invalid, positiveId, requiredText, enumValue } from '../students/student.validation';
-import { windowRecord, windowApi, previousRoundSelect, type Row } from './recruitment.repository';
+import { windowRecord, windowApi, type Row } from './recruitment.repository';
 import { extendWindow, requireLifecycleSchema } from './lifecycle.service';
 import { requireRecruitmentSchema, requireThreePhaseSchema, expireRecruitmentResponses } from './round-policy';
 import { futureScheduleMessage, scheduleColumns, scheduleDate, scheduleFieldError, schedulePermissions, validatePhaseOrder } from './schedule-policy';
 import { requireScheduleEditingSchema } from './schedule.service';
 import { notifyRecruitmentCreated } from './notification.service';
 import { academicPeriodStatusSql } from '../academic/period-status';
+import { assertNoRoundOverlap, assertRoundWithinSemester, requireMultiRoundSchema } from './round-schedule.policy';
 
 export function validateCampaignSchedule(body:Row) {
  const start=scheduleDate(body.startsAt,'postingStartsAt'),end=scheduleDate(body.endsAt,'resultsEndsAt');
  if(end<=start)throw scheduleFieldError('resultsEndsAt','Ngày kết thúc đợt OJT phải sau ngày bắt đầu.');
- if(!Array.isArray(body.rounds)||body.rounds.length!==1)throw invalid('Mỗi học kỳ chỉ được tạo đúng một đợt tuyển dụng.',400,'RECRUITMENT_SINGLE_ROUND_REQUIRED');
+ if(!Array.isArray(body.rounds)||body.rounds.length!==1)throw invalid('Mỗi lần tạo một đợt tuyển dụng với đầy đủ ba hạn.',400,'RECRUITMENT_SINGLE_ROUND_REQUIRED');
  const rounds=body.rounds.map((value:unknown)=>{
   const keys=Object.keys(scheduleColumns) as (keyof typeof scheduleColumns)[];
   const r=inputObject(value,['name',...keys]);
@@ -36,7 +37,7 @@ export async function listWindows(params: Row) {
   await requireRecruitmentSchema(c);
   const rows=(await c.query(`SELECT w.*,p."PeriodCode",p."Name" AS "PeriodName",p."Status" AS "PeriodStatus",
    ${academicPeriodStatusSql('p')} AS "CalendarStatus",
-   p."Kind",o."AcademicPeriodID" AS "LinkedPeriodID",${previousRoundSelect},
+   p."Kind",o."AcademicPeriodID" AS "LinkedPeriodID",
    clock_timestamp() AS "DatabaseNow",campaign."Name" AS "CampaignName",
    (SELECT count(*)::int FROM "JobApplications" a JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID"
     WHERE post."WindowID"=w."WindowID" AND a."Status" NOT IN ('ACCEPTED','REJECTED','WITHDRAWN')) AS "PendingCount"
@@ -61,21 +62,23 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
    if(old.ResultsFinalizedAt)throw invalid('Đợt đã chốt tổng hợp không thể thay đổi.',409);
    const status=b.status===undefined?old.Status:enumValue(b.status,['OPEN','CLOSED'],'status');
    if(status==='OPEN'){
+    await requireMultiRoundSchema(c);
     if(old.Kind!=='SEMESTER'||old.LinkedPeriodID!==old.AcademicPeriodID)
      throw invalid('Học kỳ hoặc liên kết kỳ OJT không còn khả dụng.',409,'RECRUITMENT_PERIOD_UNAVAILABLE');
     if(old.CalendarStatus!=='ACTIVE')
      throw invalid('Chỉ mở đợt tuyển dụng trong học kỳ đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
+    const period=await actualPeriod(c,old.AcademicPeriodID);
+    assertRoundWithinSemester(period,new Date(old.StartsAt),new Date(old.EndsAt));
+    await assertNoRoundOverlap(c,old.AcademicPeriodID,old.OJTSemesterID,new Date(old.StartsAt),new Date(old.EndsAt),id);
    }
    if(status==='OPEN'&&old.Status!=='OPEN'){
     if(old.Status==='CLOSED'||new Date(old.EndsAt)<=old.DatabaseNow)throw invalid('Đợt đã đóng hoặc đã hết thời hạn.',409);
-    if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2
-      AND "StartsAt"<$3 AND ("EndsAt">clock_timestamp() OR "ResultsFinalizedAt" IS NULL)`,[old.OJTSemesterID,id,old.StartsAt])).rowCount)
-     throw invalid('Đợt trước phải kết thúc và được QHDN chốt tổng hợp kết quả.',409,'PREVIOUS_ROUND_NOT_FINALIZED');
-    await c.query(`UPDATE "RecruitmentWindows" SET "Status"='CLOSED' WHERE "OJTSemesterID"=$1 AND "WindowID"<>$2 AND "Status"='OPEN' AND "EndsAt"<=clock_timestamp() AND "ResultsFinalizedAt" IS NULL`,[old.OJTSemesterID,id]);
    }
-   await c.query(`UPDATE "RecruitmentWindows" SET "Name"=$2,"Status"=$3,"UpdatedBy"=$4,"UpdatedAt"=now() WHERE "WindowID"=$1`,[id,b.name===undefined?old.Name:requiredText(b.name,'name',150),status,actor]);
+   await c.query(`UPDATE "RecruitmentWindows" SET "Name"=$2,"Status"=$3::text,
+    "OpenedAt"=CASE WHEN $3::text='OPEN' THEN COALESCE("OpenedAt",clock_timestamp()) ELSE "OpenedAt" END,
+    "UpdatedBy"=$4,"UpdatedAt"=now() WHERE "WindowID"=$1`,[id,b.name===undefined?old.Name:requiredText(b.name,'name',150),status,actor]);
    await c.query(`UPDATE "OJTRegistrationWindows" SET "Status"=CASE WHEN $2::text='OPEN' AND "EndsAt"<=clock_timestamp() THEN 'CLOSED' ELSE $2::text END,"UpdatedAt"=now() WHERE "RecruitmentRoundID"=$1`,[id,status]);
-   if(status==='OPEN'&&old.Status!=='OPEN'&&old.PostingStartsAt){
+   if(status==='OPEN'&&old.Status!=='OPEN'&&old.PostingStartsAt&&new Date(old.PostingStartsAt)<=old.DatabaseNow){
     await requireLifecycleSchema(c);
     await c.query('SELECT public."CarryForwardRecruitmentPosts"($1)',[id]);
    }
@@ -85,39 +88,41 @@ export async function saveWindow(body:unknown,actor:number,id?:number) {
   const periodId=positiveId(b.academicPeriodId,'academicPeriodId'),period=await actualPeriod(c,periodId);
   if(period.Kind!=='SEMESTER'||period.CalendarStatus!=='ACTIVE')throw invalid('Chỉ tạo đợt tuyển dụng trong học kỳ chính đang diễn ra.',409,'RECRUITMENT_PERIOD_NOT_ACTIVE');
   const semesterId=await ensureOjtSemesterForPeriod(c,periodId);
-  // academicTransaction holds the shared calendar lock before this check,
-  // so simultaneous create requests cannot both create the first intake.
-  const existing=(await c.query(`SELECT EXISTS(SELECT 1 FROM "RecruitmentWindows"
-   WHERE "AcademicPeriodID"=$1 OR "OJTSemesterID"=$2)
-   OR EXISTS(SELECT 1 FROM "RecruitmentCampaigns" WHERE "OJTSemesterID"=$2) AS "hasRecruitment"`,[periodId,semesterId])).rows[0].hasRecruitment;
-  if(existing)throw invalid('Học kỳ này đã có đợt tuyển dụng. Mỗi học kỳ chỉ được tạo một đợt duy nhất.',409,'RECRUITMENT_CAMPAIGN_EXISTS');
+  const campaignName=requiredText(b.name,'name',150);
   if(b.supplemental!==undefined&&typeof b.supplemental!=='boolean')throw invalid('supplemental must be boolean.');
-  if(b.supplemental)throw invalid('Không tạo đợt bổ sung. Mỗi học kỳ chỉ được tạo một đợt tuyển dụng.',409,'RECRUITMENT_SUPPLEMENTAL_NOT_ALLOWED');
+  await requireMultiRoundSchema(c);
   await requireThreePhaseSchema(c);
   await requireLifecycleSchema(c);
   const schedule=validateCampaignSchedule(b);
   if(schedule.rounds.some(r=>+r.applicationEndsAt===+r.resultsEndsAt||+r.resultsStartsAt!==+r.applicationStartsAt))await requireScheduleEditingSchema(c);
-  if(schedule.end>periodBounds(period).end)throw scheduleFieldError('resultsEndsAt','Thời hạn không được vượt quá ngày kết thúc học kỳ.');
+  assertRoundWithinSemester(period,schedule.start,schedule.end);
   const databaseNow=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
   if(schedule.start<=databaseNow)throw scheduleFieldError('postingStartsAt',futureScheduleMessage(databaseNow));
-  const campaign=(await c.query(`INSERT INTO "RecruitmentCampaigns" ("OJTSemesterID","Name","CreatedBy","StartsAt","EndsAt","ScheduleVersion")
-    VALUES ($1,$2,$3,$4,$5,3) RETURNING *`,[semesterId,requiredText(b.name,'name',150),actor,schedule.start,schedule.end])).rows[0];
-  if((await c.query(`SELECT 1 FROM "RecruitmentWindows" WHERE "OJTSemesterID"=$1 AND "StartsAt"<$3 AND "EndsAt">$2`,[semesterId,schedule.start,schedule.end])).rowCount)
-   throw invalid('Lịch tuyển dụng trùng với đợt đã có.',409,'RECRUITMENT_WINDOW_CONFLICT');
+  await assertNoRoundOverlap(c,periodId,semesterId,schedule.start,schedule.end);
+  // Reuse the semester's campaign. The calendar lock serializes bounds updates
+  // and round numbering so simultaneous requests cannot reserve the same slot.
+  let campaign=(await c.query('SELECT * FROM "RecruitmentCampaigns" WHERE "OJTSemesterID"=$1 FOR UPDATE',[semesterId])).rows[0];
+  if(campaign){
+   await c.query(`SELECT set_config('app.qhdn_schedule_edit','on',true)`);
+   campaign=(await c.query(`UPDATE "RecruitmentCampaigns" SET "StartsAt"=LEAST("StartsAt",$2::timestamptz),"EndsAt"=GREATEST("EndsAt",$3::timestamptz)
+    WHERE "CampaignID"=$1 RETURNING *`,[campaign.CampaignID,schedule.start,schedule.end])).rows[0];
+  }else campaign=(await c.query(`INSERT INTO "RecruitmentCampaigns" ("OJTSemesterID","Name","CreatedBy","StartsAt","EndsAt","ScheduleVersion")
+    VALUES ($1,$2,$3,$4,$5,3) RETURNING *`,[semesterId,campaignName,actor,schedule.start,schedule.end])).rows[0];
+  const roundNumber=Number((await c.query('SELECT COALESCE(max("RoundNumber"),0)+1 AS "nextRound" FROM "RecruitmentWindows" WHERE "CampaignID"=$1',[campaign.CampaignID])).rows[0].nextRound);
   const createdByQhdn=(await c.query(`SELECT 1 FROM "Users" u JOIN "Roles" r USING("RoleID")
    WHERE u."UserID"=$1 AND u."Status"='ACTIVE' AND r."RoleCode"='OJT_COORD'`,[actor])).rowCount;
   const children=[];
   for(const r of schedule.rounds){
    const row=(await c.query(`INSERT INTO "RecruitmentWindows" ("AcademicPeriodID","OJTSemesterID","Name","StartsAt","EndsAt","CreatedBy","CampaignID","RoundNumber","PostingStartsAt","PostingEndsAt","ApplicationStartsAt","ApplicationEndsAt","ResultsStartsAt","ResultsEndsAt")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING "WindowID"`,[periodId,semesterId,r.name,r.start,r.end,actor,campaign.CampaignID,1,r.postingStartsAt,r.postingEndsAt,r.applicationStartsAt,r.applicationEndsAt,r.resultsStartsAt,r.resultsEndsAt])).rows[0];
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING "WindowID"`,[periodId,semesterId,r.name,r.start,r.end,actor,campaign.CampaignID,roundNumber,r.postingStartsAt,r.postingEndsAt,r.applicationStartsAt,r.applicationEndsAt,r.resultsStartsAt,r.resultsEndsAt])).rows[0];
    await c.query(`INSERT INTO "OJTRegistrationWindows" ("OJTSemesterID","AcademicPeriodID","Name","Scope","StartsAt","EndsAt","CreatedBy","RecruitmentRoundID")
     VALUES ($1,$2,$3,'{}'::jsonb,$4,$5,$6,$7)`,[semesterId,periodId,r.name,r.applicationStartsAt,r.applicationEndsAt,actor,row.WindowID]);
    const after=await windowRecord(c,row.WindowID);children.push(windowApi(after));
    if(createdByQhdn)await notifyRecruitmentCreated(c,after);
    await audit(c,actor,'RecruitmentWindows',row.WindowID,'CREATE',null,after,reason);
   }
-  await audit(c,actor,'RecruitmentCampaigns',campaign.CampaignID,'CREATE',null,{...campaign,rounds:children},reason);
-  return {id:campaign.CampaignID,name:b.name,startsAt:schedule.start,endsAt:schedule.end,rounds:children};
+  await audit(c,actor,'RecruitmentCampaigns',campaign.CampaignID,roundNumber>1?'ADD_ROUND':'CREATE',null,{...campaign,rounds:children},reason);
+  return {id:campaign.CampaignID,name:campaign.Name,startsAt:campaign.StartsAt,endsAt:campaign.EndsAt,rounds:children};
  });
 }
 export async function finalizeWindow(id:number,body:unknown,actor:number){

@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
+    "test:recruitment-schedule": "node --test tests/recruitment-schedule.test.cjs",
+    "test:recruitment-rounds": "node tests/recruitment-rounds-flow.cjs",
     "test:auth-first-password": "node tests/first-password-flow.cjs",
     "test:student-recruitment": "node tests/student-recruitment-flow.cjs"
   },
