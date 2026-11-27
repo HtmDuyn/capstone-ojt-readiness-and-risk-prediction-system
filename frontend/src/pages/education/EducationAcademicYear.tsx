@@ -44,6 +44,13 @@ const EducationAcademicYear: React.FC = () => {
   const validYear = /^\d{4}$/.test(startYear) && year >= 1900 && year < 2200;
   const yearCode = validYear ? `${year}-${year + 1}` : '';
   const exists = model.years.some(item => item.yearCode === yearCode);
+  const editableYears = model.years.filter(item => {
+    const year = Number(item.yearCode.slice(0, 4));
+    const codes = new Set(model.periods
+      .filter(period => period.kind === 'SEMESTER' && period.academicYearId === item.id)
+      .map(period => period.periodCode));
+    return CALENDAR_TERMS.every(term => codes.has(`${term}${year}`));
+  });
   const defaults = validYear ? defaultSemesters(year) : [];
   const blockErrors = defaults.map((semester, index) => {
     const main = createBlock10[index], block = createBlocks[index];
@@ -56,7 +63,6 @@ const EducationAcademicYear: React.FC = () => {
   const selectedCalendar = exists && model.calendar?.year.yearCode === yearCode ? model.calendar : null;
   const draft = selectedCalendar ? semesterDraft(selectedCalendar) : null;
   const today = currentCalendarDate();
-  useEffect(() => { setEditing(false); }, [model.selectedId]);
   useEffect(() => {
     if (!model.loading && !initializedYear.current) {
       initializedYear.current = true;
@@ -121,7 +127,12 @@ const EducationAcademicYear: React.FC = () => {
         <h2 className="flex items-center gap-2 text-left text-lg font-bold text-slate-900"><History size={20} className="text-orange-600" />Danh sách học kỳ đã khởi tạo</h2>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" disabled={model.busy || model.loading || creating || editing || Boolean(model.catalogError)} onClick={beginCreate} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:opacity-50"><Plus size={17} />Tạo mới</button>
-          {validYear && exists && <button type="button" disabled={model.busy || model.calendarLoading || !draft} onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-lg border border-orange-200 px-4 py-2.5 text-sm font-semibold text-orange-700 disabled:opacity-50"><Pencil size={16} />Chỉnh sửa lịch học kỳ</button>}
+          {editableYears.length > 0 && <button type="button" disabled={model.busy || model.calendarLoading || model.loading} onClick={() => {
+            const selected = editableYears.find(item => String(item.id) === model.selectedId) ?? editableYears[0];
+            setStartYear(selected.yearCode.slice(0, 4));
+            model.setSelectedId(String(selected.id));
+            setEditing(true);
+          }} className="inline-flex items-center gap-2 rounded-lg border border-orange-200 px-4 py-2.5 text-sm font-semibold text-orange-700 disabled:opacity-50"><Pencil size={16} />Chỉnh sửa lịch học kỳ</button>}
           <button type="button" aria-label="Tải lại lịch năm học" disabled={model.busy || creating || editing} onClick={model.reload} className="rounded-lg border border-slate-200 p-2.5 disabled:opacity-50"><RefreshCw size={17} /></button>
         </div>
       </div>
@@ -183,9 +194,24 @@ const EducationAcademicYear: React.FC = () => {
         </form>
       </div>
     </div>}
-    {editing && selectedCalendar && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label={`Chỉnh sửa lịch học kỳ ${yearCode}`} className="w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl md:p-6">
-        <AcademicCalendarEditor key={`${selectedCalendar.year.id}:${selectedCalendar.revision}`} calendar={selectedCalendar} busy={model.busy} onSave={model.save} onCancel={() => setEditing(false)} />
+    {editing && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+      <div role="dialog" aria-modal="true" aria-label="Chỉnh sửa lịch học kỳ" className="w-full max-w-6xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl md:p-6">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div><h2 className="text-lg font-bold text-slate-900">Chỉnh sửa lịch học kỳ</h2><p className="mt-1 text-sm text-slate-600">Chọn năm học đã có để xem và sửa ba học kỳ.</p></div>
+          <button type="button" aria-label="Đóng popup" disabled={model.busy} onClick={() => setEditing(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Đóng</button>
+        </div>
+        <label className="mb-5 block max-w-xs text-sm font-medium text-slate-700">Năm học
+          <select value={model.selectedId} disabled={model.busy} onChange={event => {
+            const selected = model.years.find(item => String(item.id) === event.target.value);
+            if (selected) { setStartYear(selected.yearCode.slice(0, 4)); model.setSelectedId(String(selected.id)); }
+          }} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-800 focus:border-orange-500 focus:outline-none">
+            {editableYears.map(item => <option key={item.id} value={String(item.id)}>{item.yearCode}</option>)}
+          </select>
+        </label>
+        {model.calendarLoading && <p role="status" className="mb-4 text-sm text-slate-500">Đang tải lịch học kỳ...</p>}
+        {model.calendarError && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{model.calendarError}</p>}
+        {selectedCalendar && draft && <AcademicCalendarEditor key={`${selectedCalendar.year.id}:${selectedCalendar.revision}`} calendar={selectedCalendar} busy={model.busy} onSave={model.save} onCancel={() => setEditing(false)} />}
+        {selectedCalendar && !draft && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Năm học này chưa có đủ ba học kỳ theo mẫu để chỉnh sửa lịch.</p>}
         {model.error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{model.error}</p>}
       </div>
     </div>}
