@@ -9499,5 +9499,24 @@ JOIN public."Students" s ON s."UserID"=account."UserID"
 JOIN public."TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
 ORDER BY s."StudentCode";
 
+-- BEGIN TASK SUBMISSION ATTACHMENTS
+ALTER TABLE public."TaskProgressUpdates"
+  ADD COLUMN IF NOT EXISTS "AttachmentName" varchar(255),
+  ADD COLUMN IF NOT EXISTS "AttachmentMimeType" varchar(150),
+  ADD COLUMN IF NOT EXISTS "AttachmentContent" bytea,
+  ADD COLUMN IF NOT EXISTS "AttachmentSha256" varchar(64);
+DO $task_attachment_constraint$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public."TaskProgressUpdates"'::regclass AND conname='CHK_TaskProgressUpdates_Attachment') THEN
+    ALTER TABLE public."TaskProgressUpdates" ADD CONSTRAINT "CHK_TaskProgressUpdates_Attachment" CHECK (
+      ("AttachmentName" IS NULL AND "AttachmentMimeType" IS NULL AND "AttachmentContent" IS NULL AND "AttachmentSha256" IS NULL)
+      OR ("AttachmentName" IS NOT NULL AND "AttachmentMimeType" IS NOT NULL AND "AttachmentContent" IS NOT NULL
+        AND "AttachmentSha256" IS NOT NULL AND octet_length("AttachmentContent") BETWEEN 1 AND 10485760)
+    );
+  END IF;
+END
+$task_attachment_constraint$;
+-- END TASK SUBMISSION ATTACHMENTS
+
 COMMIT;
 -- END OJT202 ELIGIBILITY GATE V1
