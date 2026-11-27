@@ -13,6 +13,7 @@ import type {
 import { authService } from "../services/authService";
 import { expireSession, SESSION_EXPIRED_EVENT, tokenExpiry } from '../utils/shared/authSession';
 import { clearSharedReads } from '../utils/shared/sharedRead';
+import { toAuthUser } from '../utils/shared/authUser';
 
 export type { UserRole, AuthUser, AuthContextValue };
 
@@ -40,24 +41,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Khôi phục trạng thái xác thực từ localStorage khi khởi chạy
   useEffect(() => {
-    try {
-      const storedToken = localStorage.getItem(TOKEN_KEY);
-      const storedUser = localStorage.getItem(USER_KEY);
-
-      if (storedToken && storedUser && tokenExpiry(storedToken) > Date.now()) {
+    const controller = new AbortController();
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    async function restoreSession() {
+      try {
+        if (!storedToken || tokenExpiry(storedToken) <= Date.now()) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          return;
+        }
+        // Read the current password gate before mounting any authenticated layout.
+        // Old cached users may not contain mustChangePassword, or may be stale.
+        const response = await authService.getCurrentUser(storedToken, controller.signal);
+        if (controller.signal.aborted || localStorage.getItem(TOKEN_KEY) !== storedToken) return;
+        const restoredUser = toAuthUser(response.user);
+        localStorage.setItem(USER_KEY, JSON.stringify(restoredUser));
         setToken(storedToken);
-        setUser(JSON.parse(storedUser) as AuthUser);
-      } else {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        setUser(restoredUser);
+      } catch {
+        if (!controller.signal.aborted && localStorage.getItem(TOKEN_KEY) === storedToken) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
       }
-    } catch {
-      // Dữ liệu lưu trữ bị lỗi — xóa nó
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-    } finally {
-      setIsLoading(false);
     }
+    void restoreSession();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {

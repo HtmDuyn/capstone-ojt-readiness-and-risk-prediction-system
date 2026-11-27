@@ -57,7 +57,9 @@ API.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const incorrectCurrentPassword = error.config?.url === '/auth/change-password'
+      && (error.response?.data as { errorCode?: string } | undefined)?.errorCode === 'INVALID_CREDENTIALS';
+    if (error.response?.status === 401 && !incorrectCurrentPassword) {
       const authorization = error.config?.headers?.get?.('Authorization')
         ?? error.config?.headers?.Authorization;
       expireBearerSession(authorization);

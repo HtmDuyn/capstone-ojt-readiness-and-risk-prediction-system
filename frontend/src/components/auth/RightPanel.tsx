@@ -12,6 +12,7 @@ interface RightPanelProps {
   onTogglePassword: () => void;
   isLoading: boolean;
   errorMessage: string;
+  statusMessage?: string;
   onSubmit: (e: React.FormEvent) => void;
   onQuickLogin: (email: string, password: string) => void;
 }
@@ -84,6 +85,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   onTogglePassword,
   isLoading,
   errorMessage,
+  statusMessage,
   onSubmit,
   onQuickLogin,
 }) => {
@@ -95,7 +97,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
     if (linkToken) window.history.replaceState(null, '', window.location.pathname);
   }, [linkToken]);
   const [resetOpen, setResetOpen] = useState(Boolean(linkEmail && linkToken));
-  const [resetMessage, setResetMessage] = useState("");
+  const [resetMessage, setResetMessage] = useState(statusMessage ?? '');
+  useEffect(() => { if (statusMessage) setResetMessage(statusMessage); }, [statusMessage]);
   const [quickLoginOpen, setQuickLoginOpen] = useState(false);
   const fadeStyle = (delay = 0) => ({
     opacity: animateIn ? 1 : 0,

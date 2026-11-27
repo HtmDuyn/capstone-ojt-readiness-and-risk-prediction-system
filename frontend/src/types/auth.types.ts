@@ -12,6 +12,7 @@ export interface AuthUser {
   email: string;
   role: UserRole;
   roleCode?: string;
+  mustChangePassword?: boolean;
   avatar?: string;
 }
 
