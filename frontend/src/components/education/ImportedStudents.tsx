@@ -40,7 +40,7 @@ export function ImportedStudents({ revision, catalogs }: { revision: number; cat
     const params = new URLSearchParams(window.location.search);
     const key = params.get('sort');
     const direction = params.get('direction');
-    return columns.some(column => column.key === key && column.key !== 'entry') && (direction === 'asc' || direction === 'desc')
+    return columns.some(column => column.key === key) && (direction === 'asc' || direction === 'desc')
       ? { key: key as SortKey, direction } : null;
   });
   const model = useEducationImportedStudents(revision, sort !== null);
