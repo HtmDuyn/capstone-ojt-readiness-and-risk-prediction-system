@@ -143,7 +143,6 @@ export default function QhdnOjtCoordination() {
     <PageBanner variant="qhdn" title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên bị doanh nghiệp từ chối hoặc chưa ứng tuyển khi đã hết hạn đăng ký, kể cả doanh nghiệp đã đủ chỉ tiêu." badge="Phòng QHDN" />
     {(error || semester.error) && <Notice>{error || semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}
-    {data && data.context.unfinished > 0 && <Notice>Sinh viên bị doanh nghiệp từ chối được điều phối ngay. Sinh viên chưa ứng tuyển được điều phối khi hết hạn đăng ký, không cần chờ chốt tổng hợp. Hồ sơ đang chờ doanh nghiệp phản hồi được giữ nguyên.</Notice>}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
       {placementStatuses.map(status => <button key={status} disabled={busy} aria-pressed={filter === status}
         className={'rounded-2xl border p-4 text-left transition ' + (filter === status ? placementStatusColors[status] : 'border-slate-200 bg-white hover:border-slate-300')}
