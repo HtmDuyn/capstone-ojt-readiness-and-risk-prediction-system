@@ -111,7 +111,7 @@ export function recruitmentError(error: unknown) {
     const messages: Record<string, string> = {
       RECRUITMENT_WINDOW_CLOSED: 'Đã hết hạn đăng tin. Bạn vẫn có thể chỉnh sửa và lưu bản nháp, nhưng không thể công bố.',
       RECRUITMENT_POST_LOCKED: 'Chỉ tin nháp được chỉnh sửa.',
-      RECRUITMENT_POST_DELETE_DENIED: unpublishedDraftRequired,
+      RECRUITMENT_POST_DELETE_DENIED: draftRequired,
       RECRUITMENT_PHASE_CLOSED: 'Hạn 1 chưa mở hoặc đã kết thúc; sinh viên có thể đang xét tuyển. Bạn vẫn có thể chỉnh sửa và lưu tin nháp, nhưng không thể công bố.',
       CAPACITY_BELOW_ACCEPTED: 'Chỉ tiêu không được thấp hơn số sinh viên đã được nhận.',
       RECRUITMENT_PERIOD_UNAVAILABLE: 'Học kỳ của đợt đăng tin không còn khả dụng.',

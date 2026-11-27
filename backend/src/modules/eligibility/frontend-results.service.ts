@@ -183,7 +183,7 @@ export const calculatedEligibilitySql = (studentAlias = 's') => `(SELECT result.
       AND (history."SourceReference" IS DISTINCT FROM 'AUTO_OJT_ENROLLMENT' OR history."Status" IS DISTINCT FROM 'IN_PROGRESS'))
     OR (${latestOjt202PassedSql(studentAlias)}
         AND NOT (result."Status"='NOT_ELIGIBLE' AND COALESCE(result."Result"->'reasons','[]'::jsonb)
-          @> '["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."]'::jsonb))
+          @> '["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."]'::jsonb)))
   FROM "StudentOJTCalculatedResults" result WHERE result."StudentID"=${studentAlias}."StudentID")`;
 
 export async function listOjtEligibilityResults(params: Record<string, unknown>) {

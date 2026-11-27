@@ -22,13 +22,31 @@ export function addStudentTaskOperations(spec: Spec) {
   ], page(ref('StudentTask'))) };
   spec.paths['/api/students/me/tasks/{id}/submissions'] = {
     get: operation('Lịch sử nộp bài của mình', [taskId, ...query], page(ref('StudentTaskSubmission'))),
-    post: { ...operation('Nộp nội dung hoặc đường dẫn bài làm', [taskId], {
+    post: { ...operation('Nộp nội dung, đường dẫn hoặc file bài làm', [taskId], {
       allOf: [ref('StudentTaskSubmission'), { type: 'object', properties: { replayed: { type: 'boolean' } } }],
-    }, '201'), description: 'Student submission atomically saves content, sets task DONE and PercentComplete to 100. Latest identical content replays without duplicate records or progress. Late submissions are flagged while the internship remains active. No enterprise approval is required.',
+    }, '201'), description: 'Submit content, one attachment, or both. Multipart accepts one PDF, Office document, ZIP, PNG, JPG or UTF-8 TXT file up to 10 MB. Saves content and file atomically with task DONE and PercentComplete 100. Latest identical content and file replay without duplicates. Late submissions are flagged while the internship remains active.',
       requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', additionalProperties: false,
-        required: ['content'], properties: { content: { type: 'string', minLength: 1, maxLength: 10000 } } } } } },
+        required: ['content'], properties: { content: { type: 'string', minLength: 1, maxLength: 10000 } } } },
+        'multipart/form-data': { schema: { type: 'object', additionalProperties: false, properties: {
+          content: { type: 'string', maxLength: 10000 }, attachment: { type: 'string', format: 'binary' },
+        }, anyOf: [{ required: ['content'] }, { required: ['attachment'] }] } },
+      } },
     },
   };
+  spec.paths['/api/students/me/tasks/{id}/submissions'].post.responses[413] = { description: 'Attachment exceeds 10 MB.' };
+  spec.paths['/api/internship-tasks/{id}/submissions'] = { get: {
+    ...operation('Lịch sử bài nộp theo quyền sinh viên/doanh nghiệp/QHDN', [taskId, ...query], page(ref('StudentTaskSubmission'))),
+    tags: ['Thực tập'], description: 'Students read their own task. Enterprises read only tasks assigned to their enterprise; OJT_COORD and ADMIN may also read.',
+  } };
+  spec.paths['/api/task-submissions/{id}/file'] = { get: {
+    summary: 'Tải file bài nộp theo quyền sinh viên/doanh nghiệp/QHDN', tags: ['Thực tập'], security: [{ bearerAuth: [] }], parameters: [taskId],
+    responses: {
+      200: { description: 'Private attachment download.', headers: { 'Content-Disposition': { schema: { type: 'string' } } },
+        content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } },
+      401: { description: 'Authentication required.' }, 403: { description: 'Submission outside permitted scope.' },
+      404: { description: 'Submission or attachment not found.' },
+    },
+  } };
 }
 
 // Called after the existing REST schema composition, without modifying staff/enterprise task schemas.
@@ -37,6 +55,10 @@ export function describeStudentTaskResponses(spec: Spec): Spec {
   schemas.StudentTaskSubmission = { type: 'object', required: ['id','taskId','studentId','content','submittedAt','isLate'], properties: {
     id, taskId: id, studentId: id, content: { type: 'string' }, percentComplete: { type: 'integer', minimum: 0, maximum: 100, nullable: true },
     submittedAt: { type: 'string', format: 'date-time', nullable: true }, isLate: { type: 'boolean' },
+    attachment: { type: 'object', nullable: true, properties: {
+      fileName: { type: 'string' }, mimeType: { type: 'string' }, size: { type: 'integer', minimum: 1, maximum: 10485760 },
+      sha256: { type: 'string', minLength: 64, maxLength: 64 },
+    } },
   } };
   const tasks = schemas.StudentInternships.properties.tasks;
   const base = structuredClone(tasks.properties.items.items);
