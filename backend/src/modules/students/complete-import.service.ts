@@ -13,8 +13,10 @@ export async function importAcademicProfile(c: PoolClient, studentId: number, ra
   const student = (await c.query('SELECT * FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL FOR UPDATE', [studentId])).rows[0];
   if (!student) throw invalid('Student not found or deleted.', 409);
   const placementForAssignment: Record<string, unknown> = { ...placement, programId, reason:'Complete student import' };
-  const existingPlacement = Boolean((await c.query('SELECT 1 FROM "StudentAcademicPlacements" WHERE "StudentID"=$1', [studentId])).rowCount);
-  if (!existingPlacement) {
+  const existingPlacement = (await c.query('SELECT "CurrentAcademicPeriodID" FROM "StudentAcademicPlacements" WHERE "StudentID"=$1', [studentId])).rows[0];
+  if (placementForAssignment.currentAcademicPeriodId == null && existingPlacement?.CurrentAcademicPeriodID != null)
+    placementForAssignment.currentAcademicPeriodId = existingPlacement.CurrentAcademicPeriodID;
+  if (placementForAssignment.currentAcademicPeriodId == null) {
     const currentPeriod = (await c.query(`SELECT "AcademicPeriodID" FROM "AcademicPeriods"
       WHERE "Kind"='SEMESTER' AND "Status" NOT IN ('CLOSED','ARCHIVED')
         AND "StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
