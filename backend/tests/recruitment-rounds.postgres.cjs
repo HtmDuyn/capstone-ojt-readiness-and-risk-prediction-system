@@ -68,7 +68,7 @@ async function main(){
    assert.ok(openedAt instanceof Date);
    await saveWindow({name:'Renamed supplemental',reason:'Rollback rename'},actor,opened.id);
    assert.equal(+(await c.query('SELECT "OpenedAt" FROM "RecruitmentWindows" WHERE "WindowID"=$1',[opened.id])).rows[0].OpenedAt,+openedAt);
-   await assert.rejects(()=>deleteDraftWindow(opened.id,{reason:'Cannot delete opened'},actor),{errorCode:'RECRUITMENT_DELETE_LOCKED'});
+   await assert.rejects(()=>deleteDraftWindow(opened.id,actor),{errorCode:'RECRUITMENT_DELETE_LOCKED'});
    await assert.rejects(()=>saveWindow(input,actor),{errorCode:'RECRUITMENT_WINDOW_CONFLICT'});
    for(const patch of [{applicationStartsAt:iso(10)},{applicationEndsAt:iso(12)}]){
     await assert.rejects(()=>saveWindow({...input,rounds:[{...schedule,name:input.name,...patch}]},actor),{errorCode:'RECRUITMENT_PHASE_SCHEDULE_INVALID'});
@@ -88,6 +88,9 @@ async function main(){
    await extendWindow(id+1,{postingEndsAt:iso(2)},actor);
    await assert.rejects(()=>extendWindow(id+1,{postingEndsAt:iso(5)},actor),{field:'postingEndsAt'});
    await c.query('ROLLBACK TO SAVEPOINT overlapping_current_round');
+   await deleteDraftWindow(corrected.rounds[0].id,actor);
+   assert.equal((await c.query('SELECT count(*)::int AS n FROM "RecruitmentWindows" WHERE "WindowID"=$1',[corrected.rounds[0].id])).rows[0].n,0);
+   assert.equal((await c.query('SELECT count(*)::int AS n FROM "OJTRegistrationWindows" WHERE "RecruitmentRoundID"=$1',[corrected.rounds[0].id])).rows[0].n,0);
    console.log('PASS PostgreSQL without round trigger: backend controls adjacent multiple rounds, first opening date, immutable opening date, linked application windows, create/edit/extension collisions, period bounds and phase ordering.');
   }finally{pool.connect=connect;}
  }finally{await c.query('ROLLBACK');c.release();}

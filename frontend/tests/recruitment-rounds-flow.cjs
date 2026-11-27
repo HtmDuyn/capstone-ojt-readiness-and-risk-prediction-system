@@ -31,11 +31,12 @@ const timer=setTimeout(()=>{server.kill();browser.kill();process.exit(1)},55000)
      const input=JSON.parse(p.request.postData);writes.push(input);
      const r=input.rounds[0];assert.equal(Date.parse(r.postingStartsAt),Date.parse(first.endsAt));assert.ok(Date.parse(r.resultsEndsAt)<=Date.parse(end+'T00:00:00+07:00')+day);
      assert.ok(Date.parse(r.applicationStartsAt)>Date.parse(r.postingStartsAt));assert.ok(Date.parse(r.applicationStartsAt)<Date.parse(r.postingEndsAt));
+     assert.equal(Date.parse(r.applicationStartsAt)-Date.parse(r.postingStartsAt),30*60000);
      assert.ok(Date.parse(r.applicationEndsAt)>Date.parse(r.postingEndsAt));assert.equal(r.resultsStartsAt,r.applicationStartsAt);
-     rounds=[first,{...r,id:2,campaignId:1,roundNumber:2,startsAt:r.postingStartsAt,endsAt:r.resultsEndsAt,status:'DRAFT',currentPhase:'DRAFT',canOpen:true,pendingCount:0}];
+     rounds=[first,{...r,id:2,campaignId:1,roundNumber:2,startsAt:r.postingStartsAt,endsAt:r.resultsEndsAt,status:'DRAFT',currentPhase:'DRAFT',canOpen:true,canDelete:true,pendingCount:0}];
      body={success:true,data:{id:1,name:'Học kỳ thử nghiệm',rounds:[rounds[1]]}};
     }else if(p.request.method==='PATCH'){
-     assert.equal(url.pathname,'/api/recruitment/windows/2');rounds[1]={...rounds[1],status:'OPEN',currentPhase:'SCHEDULED',canOpen:false};body={success:true,data:rounds[1]};writes.push({open:2});
+     assert.equal(url.pathname,'/api/recruitment/windows/2');rounds[1]={...rounds[1],status:'OPEN',currentPhase:'SCHEDULED',canOpen:false,canDelete:false};body={success:true,data:rounds[1]};writes.push({open:2});
     }else throw Error('Unexpected method '+p.request.method);
    }
    await send('Fetch.fulfillRequest',{requestId:p.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'application/json'},{name:'Access-Control-Allow-Origin',value:'*'},{name:'Access-Control-Allow-Headers',value:'authorization,content-type,cache-control,pragma'},{name:'Access-Control-Allow-Methods',value:'GET,POST,PATCH,OPTIONS'}],body:Buffer.from(JSON.stringify(body)).toString('base64')});
@@ -54,12 +55,15 @@ const timer=setTimeout(()=>{server.kill();browser.kill();process.exit(1)},55000)
  const initial=await ev('({date:document.getElementById("postingStartsAt-date").value,time:document.getElementById("postingStartsAt-time").value})');
  const expected=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(first.endsAt));
  assert.equal(initial.date,expected.slice(0,10).split('-').reverse().join('/'));assert.equal(initial.time,expected.slice(11));
+ const applicationExpected=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(Date.parse(first.endsAt)+30*60000));
+ assert.equal(await ev('document.getElementById("applicationStartsAt-date").value'),applicationExpected.slice(0,10).split('-').reverse().join('/'));
+ assert.equal(await ev('document.getElementById("applicationStartsAt-time").value'),applicationExpected.slice(11));
  await fill('input[name="name"]','Đợt bổ sung thử nghiệm');
  const overlap=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(Date.parse(first.endsAt)-3600000));
  await fill('#postingStartsAt-date',overlap.slice(0,10).split('-').reverse().join('/'));await fill('#postingStartsAt-time',overlap.slice(11));
  await click('Tạo đợt tuyển dụng');await wait('document.body.innerText.includes("Lịch trùng")');assert.equal(writes.length,0);
  await fill('#postingStartsAt-date',initial.date);await fill('#postingStartsAt-time',initial.time);
- const applicationStart=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(Date.parse(first.endsAt)+6*3600000));
+ const applicationStart=applicationExpected;
  await fill('#applicationStartsAt-date',applicationStart.slice(0,10).split('-').reverse().join('/'));await fill('#applicationStartsAt-time',applicationStart.slice(11));
  await wait('!document.querySelector("[aria-invalid=\\\"true\\\"]")');
  fs.writeFileSync(path.join(out,'supplemental-desktop.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
@@ -68,6 +72,10 @@ const timer=setTimeout(()=>{server.kill();browser.kill();process.exit(1)},55000)
  fs.writeFileSync(path.join(out,'supplemental-mobile.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await click('Tạo đợt tuyển dụng');await wait('document.body.innerText.includes("Xác nhận tạo đợt OJT")');await click('Xác nhận tạo đợt');
  await wait('document.querySelectorAll("article").length===2');assert.equal(writes[0].supplemental,true);
+ await click('Xóa đợt');await wait('document.body.innerText.includes("Xóa đợt chưa mở")');
+ assert.equal(await ev('!!document.querySelector("[role=dialog] textarea[name=reason]")'),false);
+ assert.equal(await ev('document.querySelector("[role=dialog] form").checkValidity()'),true);
+ await ev(`document.querySelector('[role="dialog"] button[aria-label="Đóng cửa sổ"]').click()`);
  await click('Mở đợt');await wait('document.body.innerText.includes("Xác nhận mở đợt OJT")');await click('Xác nhận mở đợt');
  await wait('document.body.innerText.includes("Chờ bắt đầu")');assert.equal(rounds[0].status,'OPEN');assert.equal(rounds[1].status,'OPEN');assert.equal(writes.length,2);
  assert.deepEqual(errors,[]);console.log('PASS browser: supplemental enabled during ongoing round, exact adjacent suggestions, overlap blocked before API, both rounds retained, future round opens as scheduled, desktop/mobile fit. All API writes mocked.');

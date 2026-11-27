@@ -36,18 +36,21 @@ type ReservedRound = { id?:number; name?:string; startsAt:string; endsAt:string 
 type SemesterSchedule = { semesterStart?:string; semesterEnd?:string; rounds?:readonly ReservedRound[] };
 const semesterStartTime=(value?:string)=>value?Date.parse(`${value.slice(0,10)}T00:00:00+07:00`):-Infinity;
 const semesterEndTime=(value?:string)=>value?semesterStartTime(value)+86400000:Infinity;
+const minute=60000;
+const applicationStartDelay=30*minute;
 
 export function newRecruitmentSchedule(now: number, options:SemesterSchedule={}): ScheduleDraft {
  const latestEnd=Math.max(-Infinity,...(options.rounds??[]).map(round=>Date.parse(round.endsAt)).filter(Number.isFinite));
- const start=Math.ceil(Math.max((Math.floor(now/60000)+1)*60000,semesterStartTime(options.semesterStart),latestEnd)/60000)*60000;
+ const start=Math.ceil(Math.max(now+3*minute,semesterStartTime(options.semesterStart),latestEnd)/minute)*minute;
  const available=Math.floor((semesterEndTime(options.semesterEnd)-start)/60000)*60000;
- // Two positive phases are required; response review can run alongside applications.
- if(available<120000)return {...emptySchedule};
+ // Leave at least one minute for applications after their suggested start.
+ if(available<applicationStartDelay+minute)return {...emptySchedule};
  const postingDuration=Math.min(86400000,Math.floor(available/3/60000)*60000);
  const postingEnd=start+Math.max(60000,postingDuration);
- const applicationEnd=Math.min(postingEnd+7*86400000,semesterEndTime(options.semesterEnd));
+ const applicationStart=start+applicationStartDelay;
+ const applicationEnd=Math.min(applicationStart+7*86400000,semesterEndTime(options.semesterEnd));
  const resultsEnd=Math.min(applicationEnd+86400000,semesterEndTime(options.semesterEnd));
- const times={postingStartsAt:start,postingEndsAt:postingEnd,applicationStartsAt:postingEnd,applicationEndsAt:applicationEnd,resultsStartsAt:postingEnd,resultsEndsAt:resultsEnd};
+ const times={postingStartsAt:start,postingEndsAt:postingEnd,applicationStartsAt:applicationStart,applicationEndsAt:applicationEnd,resultsStartsAt:applicationStart,resultsEndsAt:resultsEnd};
  return Object.fromEntries(scheduleFields.map(field=>[field,formatScheduleDate(new Date(times[field]))])) as ScheduleDraft;
 }
 
@@ -108,7 +111,18 @@ export function validateRecruitmentSchedule(draft: ScheduleDraft, options: {
 // Preserve manually entered deadlines when updating the suggested dates.
 export function updateScheduleDraft(before:ScheduleDraft,key:ScheduleField,value:string,manual:ReadonlySet<ScheduleField>) {
  const next={...before,[key]:value};
- if((key==='postingEndsAt'||key==='applicationStartsAt')&&parseScheduleDate(next.applicationStartsAt)) {
+ if(key==='postingStartsAt') {
+  const start=parseScheduleDate(value);
+  if(start){
+   if(!manual.has('postingEndsAt')){
+    const previousStart=parseScheduleDate(before.postingStartsAt),previousEnd=parseScheduleDate(before.postingEndsAt);
+    const duration=previousStart&&previousEnd&&+previousEnd>+previousStart?+previousEnd-+previousStart:86400000;
+    next.postingEndsAt=formatScheduleDate(new Date(+start+duration));
+   }
+   if(!manual.has('applicationStartsAt'))next.applicationStartsAt=formatScheduleDate(new Date(+start+applicationStartDelay));
+  }
+ }
+ if(['postingStartsAt','postingEndsAt','applicationStartsAt'].includes(key)&&parseScheduleDate(next.applicationStartsAt)) {
   if(!manual.has('resultsStartsAt'))next.resultsStartsAt=next.applicationStartsAt;
   if(!manual.has('applicationEndsAt')) {
    const start=parseScheduleDate(next.applicationStartsAt)!;
@@ -116,7 +130,7 @@ export function updateScheduleDraft(before:ScheduleDraft,key:ScheduleField,value
    next.applicationEndsAt=formatScheduleDate(new Date(Math.max(+start+7*86400000,postingEnd?+postingEnd+60000:-Infinity)));
   }
  }
- if(['postingEndsAt','applicationStartsAt','applicationEndsAt'].includes(key)&&!manual.has('resultsEndsAt')) {
+ if(['postingStartsAt','postingEndsAt','applicationStartsAt','applicationEndsAt'].includes(key)&&!manual.has('resultsEndsAt')) {
   const end=parseScheduleDate(next.applicationEndsAt);
   if(end)next.resultsEndsAt=formatScheduleDate(new Date(+end+86400000));
  }

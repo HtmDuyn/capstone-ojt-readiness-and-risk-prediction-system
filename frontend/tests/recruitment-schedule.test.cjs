@@ -21,11 +21,16 @@ describe('recruitment round scheduling',()=>{
   const draft=newRecruitmentSchedule(now,semester);
   assert.deepEqual(validateRecruitmentSchedule(draft,{now,...semester}).errors,{});
   assert.ok(+parseScheduleDate(draft.postingStartsAt)>now);
+  const start=+parseScheduleDate(draft.postingStartsAt);
+  assert.ok(start-now>=3*60000&&start-now<4*60000);
+  assert.equal(+parseScheduleDate(draft.applicationStartsAt)-start,30*60000);
+  assert.equal(draft.resultsStartsAt,draft.applicationStartsAt);
  });
  it('starts supplemental Hạn 1 exactly when the last round ends',()=>{
   const options={...semester,rounds:[prior]};
   const draft=newRecruitmentSchedule(now,options);
   assert.equal(+parseScheduleDate(draft.postingStartsAt),Date.parse(prior.endsAt));
+  assert.equal(+parseScheduleDate(draft.applicationStartsAt)-Date.parse(prior.endsAt),30*60000);
   assert.deepEqual(validateRecruitmentSchedule(draft,{now,...options}).errors,{});
  });
  it('uses the latest end across rounds regardless of list order or status',()=>{
@@ -41,6 +46,17 @@ describe('recruitment round scheduling',()=>{
  it('leaves fields empty when there is no time for another round',()=>{
   const draft=newRecruitmentSchedule(now,{...semester,rounds:[{...prior,endsAt:'2027-01-01T00:00:00+07:00'}]});
   assert.equal(draft.postingStartsAt,'');
+  assert.equal(newRecruitmentSchedule(now,{...semester,rounds:[{...prior,endsAt:'2026-12-31T23:30:00+07:00'}]}).postingStartsAt,'');
+ });
+ it('keeps the 30-minute offset when only 31 minutes remain in the semester',()=>{
+  const options={...semester,rounds:[{...prior,endsAt:'2026-12-31T23:29:00+07:00'}]};
+  const draft=newRecruitmentSchedule(now,options);
+  assert.equal(draft.applicationStartsAt,'31/12/2026 23:59');
+  assert.deepEqual(validateRecruitmentSchedule(draft,{now,...options}).errors,{});
+ });
+ it('uses current time plus three minutes if previous rounds already ended',()=>{
+  const draft=newRecruitmentSchedule(now,{...semester,rounds:[{...prior,endsAt:'2026-11-26T09:00:00+07:00'}]});
+  assert.equal(draft.postingStartsAt,newRecruitmentSchedule(now,semester).postingStartsAt);
  });
  it('rejects partial overlaps and reservations containing other rounds',()=>{
   const draft=newRecruitmentSchedule(now,semester);
@@ -75,5 +91,14 @@ describe('recruitment round scheduling',()=>{
   const manual=updateScheduleDraft(draft,'postingEndsAt','12/12/2026 09:00',new Set(['applicationStartsAt','applicationEndsAt','resultsEndsAt']));
   assert.equal(manual.applicationEndsAt,draft.applicationEndsAt);assert.equal(manual.resultsEndsAt,draft.resultsEndsAt);
   assert.ok(validateRecruitmentSchedule(manual,{now,...semester}).errors.applicationEndsAt);
+ });
+ it('moves untouched dates with Hạn 1 start but preserves manually entered Hạn 2 dates',()=>{
+  const draft=newRecruitmentSchedule(now,semester);
+  const changed=updateScheduleDraft(draft,'postingStartsAt','28/11/2026 23:50',new Set(['postingStartsAt']));
+  assert.equal(changed.applicationStartsAt,'29/11/2026 00:20');
+  assert.equal(changed.resultsStartsAt,changed.applicationStartsAt);
+  assert.deepEqual(validateRecruitmentSchedule(changed,{now,...semester}).errors,{});
+  const manual=updateScheduleDraft(draft,'postingStartsAt','28/11/2026 23:50',new Set(['postingEndsAt','applicationStartsAt','applicationEndsAt','resultsStartsAt','resultsEndsAt']));
+  for(const key of ['postingEndsAt','applicationStartsAt','applicationEndsAt','resultsStartsAt','resultsEndsAt'])assert.equal(manual[key],draft[key]);
  });
 });

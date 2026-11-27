@@ -36,8 +36,8 @@ export async function editWindowSchedule(id:number,body:unknown,actor:number) {
  });
 }
 
-export async function deleteDraftWindow(id:number,body:unknown,actor:number) {
- const reason=requiredText(inputObject(body,['reason']).reason,'reason',2000);
+export async function deleteDraftWindow(id:number,actor:number) {
+ const reason='Xóa đợt tuyển dụng chưa mở.';
  return academicTransaction(async c=>{
   await requireScheduleEditingSchema(c);
   const before=await windowRecord(c,id);
