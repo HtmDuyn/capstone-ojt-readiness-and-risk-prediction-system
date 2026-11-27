@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import LeftPanel from "@/components/auth/LeftPanel";
 import RightPanel from "@/components/auth/RightPanel";
-import { LoginBackground } from "@/components/auth/LoginBackground";
-import type { UserRole } from "@/types/auth.types";
+import { AuthPageLayout } from "@/components/auth/AuthPageLayout";
 import { useAuth } from "@/hooks/shared/useAuth";
-import { useRoleRedirect } from "@/hooks/shared/useRoleRedirect";
+import { getDashboardByRole } from "@/hooks/shared/useRoleRedirect";
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authService } from "@/services/authService";
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
-
-const roleByCode: Record<string, UserRole> = {
-  ADMIN: "admin",
-  ACADEMIC: "education",
-  OJT_COORD: "qhdn",
-  STUDENT: "student",
-  ENTERPRISE: "enterprise",
-};
+import { toAuthUser } from '@/utils/shared/authUser';
 
 const getApiErrorMessage = (error: unknown): string | undefined => {
   if (
@@ -52,7 +45,11 @@ const getApiErrorMessage = (error: unknown): string | undefined => {
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
-  const { redirectToDashboard } = useRoleRedirect();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [passwordChangedNotice] = useState(() => sessionStorage.getItem('ojt_password_changed_notice') ?? '');
+  const statusMessage = typeof location.state?.message === 'string' ? location.state.message : passwordChangedNotice;
+  useEffect(() => { sessionStorage.removeItem('ojt_password_changed_notice'); }, []);
 
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
@@ -87,22 +84,11 @@ const LoginPage: React.FC = () => {
         password,
       });
       const profile = loginResponse.user ?? (await authService.getCurrentUser(loginResponse.token)).user;
-      const role = profile.roleCode
-        ? roleByCode[profile.roleCode.toUpperCase()]
-        : undefined;
-
-      if (!role) {
-        throw new Error("Vai trò tài khoản không được hỗ trợ.");
-      }
-
-      login(loginResponse.token, {
-        id: String(profile.id),
-        name: profile.fullName || profile.username,
-        email: profile.email,
-        role,
-        roleCode: profile.roleCode?.toUpperCase() ?? undefined,
+      const accountUser = toAuthUser({
+        ...profile, mustChangePassword: loginResponse.mustChangePassword ?? profile.mustChangePassword,
       });
-      redirectToDashboard(role);
+      login(loginResponse.token, accountUser);
+      navigate(accountUser.mustChangePassword ? '/change-password' : getDashboardByRole(accountUser.role), { replace: true });
     } catch (error) {
       const apiErrorMessage = getApiErrorMessage(error);
       if (apiErrorMessage) {
@@ -121,11 +107,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-slate-950 overflow-y-auto">
-      <LoginBackground />
-
-      {/* Main Glassmorphic Container */}
-      <div className="relative w-full max-w-5xl rounded-[28px] sm:rounded-[36px] overflow-hidden glass-card flex flex-col lg:flex-row shadow-2xl border border-white/50 z-10 transition-all duration-500 my-auto bg-white/35 backdrop-blur-2xl">
+    <AuthPageLayout>
         <LeftPanel
           statsRef={statsRef}
           statsVisible={statsVisible}
@@ -141,11 +123,11 @@ const LoginPage: React.FC = () => {
           onTogglePassword={() => setShowPassword((v) => !v)}
           isLoading={isLoading}
           errorMessage={errorMessage}
+          statusMessage={statusMessage}
           onSubmit={handleLogin}
           onQuickLogin={loginWithCredentials}
         />
-      </div>
-    </div>
+    </AuthPageLayout>
   );
 };
 

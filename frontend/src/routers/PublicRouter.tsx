@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from "react-router-do
 import { GuestRoute, PrivateRoute } from "./PrivateRouter";
 import { getMenuByRole } from "@/config";
 import LoginPage from "@/pages/auth/LoginPage";
+import { FirstPasswordChangePage } from '@/pages/auth/FirstPasswordChangePage';
 import type { UserRole } from "@/types/auth.types";
 
 const BaseLayout = lazy(() => import('@/layouts/BaseLayout').then(({ BaseLayout }) => ({ default: BaseLayout })));
@@ -223,6 +224,10 @@ const educationRoutes: RouteObject = {
 };
 
 export const router = createBrowserRouter([
+  {
+    element: <PrivateRoute />,
+    children: [{ path: '/change-password', element: <FirstPasswordChangePage /> }],
+  },
   // Route công khai: người đã đăng nhập sẽ được chuyển về dashboard theo role.
   {
     element: <GuestRoute />,

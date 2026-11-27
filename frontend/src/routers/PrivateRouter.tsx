@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/shared/useAuth";
 import { getDashboardByRole } from "@/hooks/shared/useRoleRedirect";
 import type { UserRole } from "@/types/auth.types";
+import { AuthLoadingScreen } from '@/components/auth/AuthLoadingScreen';
 
 interface PrivateRouteProps {
   /** Danh sách các vai trò được phép truy cập route này (tùy chọn). */
@@ -13,25 +14,14 @@ interface PrivateRouteProps {
   unauthorizedRedirectTo?: string;
 }
 
-const AuthLoadingScreen: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-950 font-outfit">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-12 h-12 rounded-full border-4 border-orange-500/30 border-t-orange-500 animate-spin" />
-      <p className="text-white/60 text-sm font-medium tracking-wide">
-        Đang xác thực tài khoản...
-      </p>
-    </div>
-  </div>
-);
-
 /** Chuyển hướng người dùng đã xác thực khỏi các route chỉ dành cho khách. */
 export const GuestRoute: React.FC = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  if (isLoading) return null;
+  if (isLoading) return <AuthLoadingScreen />;
 
   return isAuthenticated ? (
-    <Navigate to={getDashboardByRole(user?.role)} replace />
+    <Navigate to={user?.mustChangePassword ? '/change-password' : getDashboardByRole(user?.role)} replace />
   ) : (
     <Outlet />
   );
@@ -50,6 +40,10 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
 
   if (!isAuthenticated || !user) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
+  }
+
+  if (user.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
