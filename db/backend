@@ -8544,7 +8544,7 @@ JOIN public."InternshipPositions" job_position ON job_position."EnterpriseID"=en
     AND schedule."PeriodCode" IN ('SPRING2024','SPRING2025','SPRING2026')
     THEN 'QHDN-SEED-OJT-'||schedule."PeriodCode"
     ELSE 'SEED-JOB-'||schedule."PeriodCode"||'-'||enterprise."EnterpriseCode" END
-WHERE enterprise."EnterpriseCode" IN ('TECHVIET','DATAVIT','SAIGONSOFT','FINNEXT')
+WHERE enterprise."EnterpriseCode"='TECHVIET'
   AND NOT EXISTS (SELECT 1 FROM public."RecruitmentPosts" existing
     WHERE existing."SubmissionKey"='SEED-RECRUITMENT-'||schedule."PeriodCode"||'-'||enterprise."EnterpriseCode");
 
