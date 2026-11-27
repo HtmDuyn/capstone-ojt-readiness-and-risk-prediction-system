@@ -922,6 +922,18 @@ export const loadStudentAcademicCredits = async (studentId: number, signal?: Abo
   const earned = profile.academicProgress?.credits?.earned;
   return typeof earned === 'number' && Number.isFinite(earned) ? earned : null;
 };
+export const loadStudentAcademicCreditsBatch = async (studentIds: number[], signal?: AbortSignal): Promise<Map<number, number | null>> => {
+  const ids = [...new Set(studentIds)].filter(id => Number.isSafeInteger(id) && id > 0);
+  const summaries = new Map<number, number | null>();
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const batch = ids.slice(offset, offset + 100);
+    const response = apiData<{ items?: { studentId: number; earnedCredits: number | null }[] }>(
+      await getJson('/students/gpa-summaries', { ids: batch.join(',') }, signal),
+    );
+    for (const item of response.items ?? []) summaries.set(Number(item.studentId), item.earnedCredits);
+  }
+  return summaries;
+};
 export type CurrentOjtRule = { id: number; version: number; minCredits: number; issuingDocument: string; effectiveFrom: string; isEffective: boolean; createdAt?: string | null; createdByName?: string | null };
 export const loadOjtConditions = async (signal?: AbortSignal): Promise<CurrentOjtRule[]> =>
   apiData<CurrentOjtRule[]>(await getJson('/ojt-conditions', {}, signal));

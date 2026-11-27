@@ -7570,9 +7570,10 @@ JOIN public."Users" account ON account."Email"=link."Email"
 JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=link."EnterpriseCode"
 ON CONFLICT ("UserID") DO UPDATE SET "EnterpriseID"=EXCLUDED."EnterpriseID","PositionTitle"=EXCLUDED."PositionTitle";
 
--- Seed 20 students with transcript history; only completed-OJT students receive the ELIGIBLE label.
--- Among the 14 students without OJT history, numbers 13,14,17,18,21,22,81-84
--- have study history capped at semester 5; 85-88 retain only current-semester history.
+-- Seed 20 students: six completed OJT, ten ineligible samples, and four K20
+-- IS/SE students with a prerequisite-valid transcript exceeding 70 OJT credits by semester 5.
+-- Numbers 13,14,17,18,21,22,81-84 retain their existing ineligible transcripts.
+-- Only completed-OJT students receive the persisted ELIGIBLE label in the seed roster.
 -- K22 IS placements use the available SE curriculum because no K22 IS curriculum exists in the source data.
 -- Resolve curricula by code and reuse existing course, slot, and prerequisite mappings.
 -- Synthetic instrument choices exercise the TMI_ELE mappings without creating new courses.
@@ -7605,14 +7606,15 @@ FROM (VALUES
   (82,'Hồ Khánh Ngọc','ngochk','0902000014'),
   (83,'Lý Quốc Cường','cuonglq','0902000015'),
   (84,'Trịnh Thanh Hà','hatt','0902000016'),
-  (85,'Nguyễn Hữu Tài','tainh','0902000017'),
-  (86,'Trần Bảo An','antb','0902000018'),
-  (87,'Lê Đức Thiện','thienld','0902000019'),
-  (88,'Phạm Ngọc Trinh','trinhpn','0902000020')) AS g(n,"FullName","EmailName","Phone")
+  (41,'Phan Quốc Bảo','baopq','0902000021'),
+  (42,'Lê Gia Hân','hanlg','0902000022'),
+  (43,'Nguyễn Tấn Phát','phatnt','0902000023'),
+  (44,'Đỗ Thùy Linh','linhdt','0902000024')) AS g(n,"FullName","EmailName","Phone")
 JOIN LATERAL (
   SELECT CASE ((g.n-1)/20)
     WHEN 0 THEN 'K18' WHEN 1 THEN 'K19' WHEN 2 THEN 'K20' WHEN 3 THEN 'K21' ELSE 'K22' END AS "CohortCode",
-    CASE ((g.n-1)%4) WHEN 0 THEN 'IS' WHEN 1 THEN 'SE' WHEN 2 THEN 'AI' ELSE 'IA' END AS "MajorCode"
+    CASE WHEN g.n IN (41,44) THEN 'IS' WHEN g.n IN (42,43) THEN 'SE'
+      ELSE CASE ((g.n-1)%4) WHEN 0 THEN 'IS' WHEN 1 THEN 'SE' WHEN 2 THEN 'AI' ELSE 'IA' END END AS "MajorCode"
 ) assignment ON true
 JOIN public."TrainingPrograms" program ON program."Status"='PUBLISHED' AND program."ProgramCode"=CASE assignment."MajorCode"
   WHEN 'AI' THEN CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_AI_K18D-19A' WHEN 'K19' THEN 'BIT_AI_K19D-20A'
@@ -7861,7 +7863,7 @@ WITH targets AS (
     WITH ORDINALITY AS clause(value,ordinality)
 ), alternatives AS (
   SELECT c."ProgramID",c."ProgramCourseID",c."RecommendedSemester",c."ClauseNumber",
-    upper(btrim(alternative.value)) AS "CourseCode"
+    regexp_replace(upper(btrim(alternative.value)), '^PASS[[:space:]]+', '') AS "CourseCode"
   FROM clauses c CROSS JOIN LATERAL regexp_split_to_table(c."ClauseText",'[[:space:]]+OR[[:space:]]+')
     AS alternative(value)
 ), resolved AS (
@@ -7944,6 +7946,7 @@ BEGIN
     SELECT s."StudentID",s."ProgramID",
       CASE WHEN roster."CompletedOJT" THEN s."CurrentSemester"
            WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 5
+           WHEN roster."Number" IN (41,42,43,44) THEN 5
            ELSE LEAST(s."CurrentSemester",2) END AS "CurrentSemester"
     FROM qhdn_student_roster roster
     JOIN public."Users" account ON account."Email"=roster."Email"
@@ -7989,10 +7992,8 @@ BEGIN
   END LOOP;
 END $schedule_study_history$;
 
-
-
--- Record one currently failed course for each of the 10 higher-credit non-OJT
--- students and two currently failed courses for each of the four lower-credit students.
+-- Preserve one failed course for each of the ten existing ineligible students;
+-- Each remaining non-completed sample retains one failed course.
 CREATE TEMP TABLE qhdn_student_course_failures ON COMMIT DROP AS
 WITH ranked_courses AS (
 SELECT schedule."StudentID",schedule."ProgramID",schedule."ProgramCourseID",
@@ -8003,14 +8004,14 @@ FROM qhdn_student_study_schedule schedule
 JOIN public."Students" student ON student."StudentID"=schedule."StudentID"
 JOIN public."Users" account ON account."UserID"=student."UserID"
 JOIN qhdn_student_roster roster ON roster."Email"=account."Email" AND roster."ProgramID"=schedule."ProgramID"
-WHERE NOT roster."CompletedOJT" AND schedule."SemesterTaken">0
+WHERE roster."Number" IN (13,14,17,18,21,22,81,82,83,84) AND schedule."SemesterTaken">0
   AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing
     WHERE existing."StudentID"=schedule."StudentID" AND existing."CourseID"=schedule."CourseID"
       AND existing."Status" IN ('PASSED','RECOGNIZED'))
 )
 SELECT "StudentID","ProgramID","ProgramCourseID","CourseID","SemesterTaken"
 FROM ranked_courses
-WHERE "FailureNumber"<=CASE WHEN "Number" IN (85,86,87,88) THEN 2 ELSE 1 END;
+WHERE "FailureNumber"<=1;
 
 DO $seed_study_history$
 DECLARE stage integer;
@@ -9485,13 +9486,14 @@ CREATE TABLE public."OjtCompletionCertificates" (
   "UploadedAt" timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
--- READ ONLY: list the original 20 QHDN seed students without exposing passwords.
+-- READ ONLY: list the 20 QHDN seed students without exposing passwords.
 SELECT s."StudentCode", roster."FullName", roster."Email", roster."CohortCode",
        program."ProgramCode", roster."SeedScenario",
        CASE
          WHEN roster."CompletedOJT" THEN 'COMPLETED_OJT_AND_ELIGIBLE_TRANSCRIPT'
-         WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 'TRANSCRIPT_OVER_70_NO_OJT_HISTORY'
-         ELSE 'TRANSCRIPT_UNDER_70_NO_OJT_HISTORY'
+         WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 'EXISTING_NOT_ELIGIBLE_NO_OJT'
+         WHEN roster."Number" IN (41,42,43,44) THEN 'NEW_ELIGIBLE_NO_OJT_CANDIDATE'
+         ELSE 'NOT_ELIGIBLE_NO_OJT'
        END AS "TranscriptScenario"
 FROM qhdn_student_roster roster
 JOIN public."Users" account ON account."Email"=roster."Email"

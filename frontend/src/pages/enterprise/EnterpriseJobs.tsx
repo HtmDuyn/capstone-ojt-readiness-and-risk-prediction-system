@@ -53,7 +53,7 @@ export function EnterpriseJobs() {
     const deadlines = posts.flatMap(post => post.status === 'PUBLISHED' && post.deadlineAt ? [Date.parse(post.deadlineAt)] : []);
     const next = windows.flatMap(w => [Date.parse(w.postingStartsAt ?? w.startsAt), Date.parse(w.postingDeadlineAt ?? w.endsAt), Date.parse(w.applicationEndsAt ?? w.endsAt), Date.parse(w.resultsEndsAt ?? w.endsAt)]).concat(deadlines).filter(time => time > now);
     const delay = next.length ? Math.min(30000, Math.min(...next) - now + 20) : 30000;
-    const timer = setTimeout(() => { setNow(Date.now()); if (next.some(time => time <= Date.now())) setRevision(v => v + 1); }, delay);
+    const timer = setTimeout(() => setNow(Date.now()), delay);
     return () => clearTimeout(timer);
   }, [windows, posts, now]);
   const selectedWindow = windows.find(w => w.id === selectedWindowId);

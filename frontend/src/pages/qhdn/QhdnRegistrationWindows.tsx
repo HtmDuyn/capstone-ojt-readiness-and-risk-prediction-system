@@ -79,7 +79,7 @@ export default function QhdnRegistrationWindows() {
     {semester.error && <Notice>{semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}
     <RecruitmentRounds key={semester.periodId} selection={semester} refreshKey={revision} onChanged={refresh} />
-    <EligibleOjtRoster semesterId={semester.semesterId} refreshKey={revision} />
+    <EligibleOjtRoster refreshKey={revision} />
     <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <summary className="cursor-pointer p-5 font-semibold text-slate-700">Các đợt đăng ký cũ <span className="ml-2 rounded-md bg-slate-100 px-2 py-1 text-xs tabular-nums text-slate-500">{windows.length}</span></summary>
       <div className="space-y-4 border-t border-slate-100 p-5">

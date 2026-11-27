@@ -112,8 +112,6 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       throw invalid('Đơn đăng ký đang được doanh nghiệp xử lý hoặc đã được tiếp nhận.',409,'APPLICATION_ALREADY_IN_PROCESS');
     }
     const admission = await requireStudentAdmission(c,s.StudentID,semesterId);
-    if (['SAVED_ELIGIBILITY','CALCULATED_ELIGIBILITY'].includes(admission.source) && (admission.roundId===null || admission.roundId!==p.PostWindowID))
-      throw invalid('Sinh viên chưa được xếp vào đợt OJT này.',409,'OJT_ROUND_NOT_ASSIGNED');
     const cv=await currentCV(c,s.StudentID);
     if(!cv)throw invalid('Upload a PDF CV before applying.',409,'CV_REQUIRED');
     const pathway={...await assertOjtPathway(c,s.StudentID,semesterId),admissionSource:admission.source};
@@ -204,8 +202,6 @@ export async function studentOpportunities(params:Row,actor:Actor,existingClient
       WHERE s."StudentID"=$1`,[s.StudentID])).rows[0];
     const blockers:string[]=[];
     if(!admission)blockers.push('ELIGIBLE_HANDOFF_REQUIRED');
-    if(admission?.source && ['SAVED_ELIGIBILITY','CALCULATED_ELIGIBILITY'].includes(admission.source) && (admission.roundId===null || (w.RecruitmentRoundID && admission.roundId!==w.RecruitmentRoundID)))
-      blockers.push('OJT_ROUND_NOT_ASSIGNED');
     if(admission&&(admission.status!=='ELIGIBLE'||admission.isStale))blockers.push(admission.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
     if(r&&r.ProgramID!==s.ProgramID)blockers.push('REGISTRATION_PROGRAM_CHANGED');
     if(w.Status!=='OPEN'||w.Now<new Date(w.StartsAt)||w.Now>=new Date(w.EndsAt))blockers.push('OJT_REGISTRATION_WINDOW_UNAVAILABLE');

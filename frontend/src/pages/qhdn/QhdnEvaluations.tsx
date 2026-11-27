@@ -5,7 +5,6 @@ import { OjtCertificateDialog } from '@/components/common/OjtCertificateDialog';
 import { listOjtResults, exportQhdnReport, exportOjtResults, publishOjtResults } from '@/services/qhdnService';
 import { downloadFile } from '@/utils/shared/downloadFile';
 import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
-import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { errorMessage, Field, Notice, Pager, Table, usePaged } from '@/components/qhdn/QhdnUi';
 import type { ReportType } from '@/types/qhdn/workflowTypes';
@@ -34,10 +33,6 @@ export default function QhdnEnterpriseEvaluations(){
  const [publishBusy,setPublishBusy]=useState(false);
  const [limit,setLimit]=useState(10);
  const results=usePaged((page,signal)=>listOjtResults({ojtSemesterId:Number(semesterId),page,limit},signal).then(r=>r.data),`${semesterId}:${limit}`,!!semesterId&&tab==='results');
- useEffect(()=>{
-  if(tab!=='results'||!semesterId||results.busy||publishBusy||certificateTarget)return;
-  return subscribeVisibleRefresh(results.reload, { interval: 30_000 });
- },[tab,semesterId,results.busy,results.reload,publishBusy,certificateTarget]);
  useEffect(()=>{setMessage('');setError('');},[catalog.periodId,type,tab]);
  const run=async(work:()=>Promise<unknown>,success:string)=>{
   if(busy||publishBusy||!semesterId)return;

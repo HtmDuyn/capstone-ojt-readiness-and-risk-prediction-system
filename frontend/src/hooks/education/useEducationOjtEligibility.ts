@@ -9,6 +9,7 @@ import {
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/education/educationOjtReason';
 import { ojtSourceEndpoints, partitionOjtLoad, type OjtLoadIssue, type OjtSourceKey } from '@/utils/education/ojtEligibilityLoad';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+import { sharedRead } from '@/utils/shared/sharedRead';
 
 type Target = { student: ImportedStudent; reason: string };
 export const OJT_ELIGIBILITY_PAGE_SIZE = 20;
@@ -35,10 +36,12 @@ export function useEducationOjtEligibility() {
   const sourceKeys = React.useMemo(() => Object.keys(ojtSourceEndpoints) as OjtSourceKey[], []);
 
   const loadSource = React.useCallback((key: OjtSourceKey, signal: AbortSignal) => {
+    // React StrictMode replays mount effects in development. Share the in-flight
+    // read so the replayed consumer does not dispatch a duplicate API request.
     switch (key) {
-      case 'students': return getAllItems<ImportedStudent>('/students', {}, signal);
-      case 'results': return loadSavedOjtEligibilityResults(signal);
-      case 'policy': return loadOjtConditions(signal);
+      case 'students': return sharedRead('education:ojt-eligibility:students', () => getAllItems<ImportedStudent>('/students'), signal);
+      case 'results': return sharedRead('education:ojt-eligibility:results', () => loadSavedOjtEligibilityResults(), signal);
+      case 'policy': return sharedRead('education:ojt-eligibility:policy', () => loadOjtConditions(), signal);
     }
   }, []);
 
@@ -75,29 +78,6 @@ export function useEducationOjtEligibility() {
     return () => controller.abort();
   }, [applySource, loadSource, sourceKeys]);
 
-  React.useEffect(() => {
-    if (loading || retrying || busy) return;
-    const controller = new AbortController();
-    let refreshing = false;
-    const refresh = async () => {
-      if (refreshing || document.hidden || running.current) return;
-      refreshing = true;
-      try {
-        const keys = ['policy', 'results'] as const;
-        const data = await Promise.allSettled(keys.map(key => loadSource(key, controller.signal)));
-        if (controller.signal.aborted || running.current) return;
-        data.forEach((item, index) => { if (item.status === 'fulfilled') applySource(keys[index], item.value); });
-      } finally { refreshing = false; }
-    };
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {
-      controller.abort();
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
-  }, [applySource, loadSource, loading, retrying, busy]);
-
   async function retryFailedSources() {
     const keys = sourceKeys.filter(key => sourceErrors[key]);
     if (!keys.length || retrying || busy) return;
@@ -126,7 +106,7 @@ export function useEducationOjtEligibility() {
     running.current = true; setBusy(true); setError(''); setNotice('');
     try {
       const result = await runOjtEligibilityAssessment();
-      const summary = `Đã xét ${result.checkedCount} sinh viên; lưu ${result.savedCount} kết quả. QHDN có ${result.eligibleCount} sinh viên đủ điều kiện (${result.assignedCount} đã vào đợt đang mở, ${result.waitingCount} chờ đợt). Loại ${result.excludedPassedOjt202Count} sinh viên đã đạt OJT202.`;
+      const summary = `Đã xét ${result.checkedCount} sinh viên; lưu ${result.savedCount} kết quả. QHDN có ${result.eligibleCount} sinh viên đủ điều kiện. `;
       setNotice(summary);
       const keys = ['results', 'policy'] as const;
       const refreshed = await Promise.allSettled([loadSavedOjtEligibilityResults(), loadOjtConditions()]);

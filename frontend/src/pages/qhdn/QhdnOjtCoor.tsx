@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { useSearchParams } from 'react-router-dom';
 import { UserPlus, Eye } from 'lucide-react';
 import API from '@/services/apiService';
@@ -85,11 +84,6 @@ export default function QhdnOjtCoordination() {
       });
     return () => controller.abort();
   }, [semester.semesterId, revision]);
-
-  useEffect(() => {
-    if (!semester.semesterId || busy || task || detail) return;
-    return subscribeVisibleRefresh(() => setRevision(v => v + 1), { interval: 30_000, canRefresh: () => !request.current });
-  }, [semester.semesterId, busy, task, detail]);
 
   const refresh = () => setRevision(v => v + 1);
   const submit = async (e: FormEvent<HTMLFormElement>) => {

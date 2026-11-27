@@ -97,7 +97,6 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
  };
  useEffect(()=>{if(createRequest)startCreate();},[createRequest]);
  useEffect(()=>{if(!creating&&!extending)return;const timer=window.setInterval(()=>setNow(Date.now()),15000);return()=>window.clearInterval(timer);},[creating,extending]);
- useEffect(()=>{if(migrationRequired)return;const timer=window.setInterval(()=>setRevision(v=>v+1),60000);return()=>window.clearInterval(timer);},[migrationRequired]);
  useEffect(()=>{
   
   if(!catalog.selectedPeriod)return;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -71,23 +71,6 @@ function ProgressContent() {
     signal => getAssignedTasks(semesterId!, page, signal),
   );
   const taskPage = tasks.data ?? { items: [], total: 0 };
-  const reload = useRef(tasks.reload);
-  reload.current = tasks.reload;
-
-  useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === 'visible' && !selectedTask) reload.current();
-    };
-    const timer = window.setInterval(refresh, 30000);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
-  }, [selectedTask]);
-
   const visibleTasks = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     return taskPage.items.filter(task => {

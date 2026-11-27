@@ -7,7 +7,6 @@ import { InternshipEvaluationDetailsDialog } from '@/components/enterprise/Inter
 import { enterpriseService, type EnterpriseInternshipItem, type EnterpriseInternshipTask } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { loadAllPages } from '@/utils/enterprise/recruitment';
-import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { applyEvaluationScore, evaluationAverage, parseEvaluationScore, taskScoreSuggestion,
   type EvaluationScores } from '@/utils/enterprise/enterpriseEvaluation';
@@ -144,11 +143,6 @@ export function EnterpriseEvaluation() {
     queueMicrotask(() => { if (mounted) void fetchRows(); });
     return () => { mounted = false; requestRef.current?.abort(); };
   }, [fetchRows]);
-  useEffect(() => {
-    if (editor || confirming || evaluationDetailId !== null || busy || loading) return;
-    return subscribeVisibleRefresh(() => void fetchRows(true), { interval: 60_000, canRefresh: () => !requestRef.current });
-  }, [fetchRows, editor, confirming, evaluationDetailId, busy, loading]);
-
   const filtered = useMemo(() => rows.filter(row => {
     const query = search.trim().toLocaleLowerCase('vi');
     return (!query || `${row.fullName} ${row.studentCode} ${row.position}`.toLocaleLowerCase('vi').includes(query))

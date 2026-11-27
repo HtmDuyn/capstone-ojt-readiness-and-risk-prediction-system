@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -27,7 +27,6 @@ import {
 } from '@/services/enterpriseService';
 import { describeApiError } from '@/services/apiService';
 import { loadRecruitmentOverview, recruitmentTotals } from '@/utils/enterprise/recruitment';
-import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsChart';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
@@ -90,9 +89,8 @@ const TaskCompletionDonut: React.FC<{
 
 export const EnterpriseDashboard: React.FC = () => {
   // Context supplies the company scope; dashboard figures are fetched on each visit.
-  const { profile, companyId, loading, error: profileError, reload } = useEnterprise();
+  const { profile, companyId, loading, error: profileError } = useEnterprise();
   const summary = profile?.summary;
-  const [revision, setRevision] = useState(0);
   const [taskSummary, setTaskSummary] = useState<DashboardTaskSummary>({
     total: 0, completed: 0, inProgress: 0, todo: 0, overdue: 0, dueSoon: 0, attention: [],
   });
@@ -173,16 +171,6 @@ export const EnterpriseDashboard: React.FC = () => {
     };
   }, [companyId, loading, profileError, summary]);
 
-  const refreshDashboard = useCallback(() => {
-    reload();
-    setRevision(value => value + 1);
-  }, [reload]);
-
-  useEffect(() => {
-    if (loading) return;
-    return subscribeVisibleRefresh(refreshDashboard, { canRefresh: () => !statsRequest.current });
-  }, [refreshDashboard, loading]);
-
   useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
     if (!companyId) return;
@@ -204,7 +192,7 @@ export const EnterpriseDashboard: React.FC = () => {
 
     void loadTaskProgress();
     return () => controller.abort();
-  }, [companyId, revision]);
+  }, [companyId]);
 
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
   const candidateStages = useMemo<CandidateStage[]>(() => [

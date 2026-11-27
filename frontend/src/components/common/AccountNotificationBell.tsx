@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import API from '@/services/apiService';
+import { sharedRead } from '@/utils/shared/sharedRead';
 type Notification={id:number;title:string;content:string;isRead:boolean;sentAt:string};
 export function AccountNotificationBell(){
  const [open,setOpen]=useState(false),[items,setItems]=useState<Notification[]>([]),[unread,setUnread]=useState(0);
@@ -11,24 +12,20 @@ export function AccountNotificationBell(){
   catch{setError('Không tải được thông báo. Vui lòng thử lại.');}
  },[]);
  useEffect(() => {
-  if (open) return;
   const controller = new AbortController();
   const refreshBadge = async () => {
-   if (document.visibilityState === 'hidden') return;
    try {
-    const response = await API.get('/accounts/me/notifications', {
+    const response = await sharedRead('account:notification-badge', () => API.get('/accounts/me/notifications', {
      params: { page: 1, limit: 1 },
-     signal: controller.signal,
-    });
+    }), controller.signal);
     if (!controller.signal.aborted) setUnread(response.data.data.unreadCount);
    } catch {
     // Opening the bell still reports load errors and offers a retry.
    }
   };
   void refreshBadge();
-  const timer = window.setInterval(() => void refreshBadge(), 60000);
-  return () => { controller.abort(); window.clearInterval(timer); };
- }, [open]);
+  return () => { controller.abort(); };
+ }, []);
  useEffect(()=>{if(!open)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setOpen(false);};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[open]);
  const read=async(item:Notification)=>{
   if(item.isRead||reading.current.has(item.id))return;
