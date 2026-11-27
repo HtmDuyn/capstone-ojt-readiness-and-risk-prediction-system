@@ -5,6 +5,7 @@ import { combos } from '../curriculum/curriculum.repository';
 import { purpose } from '../combo-registration/combo.validation';
 import { activeChoice } from '../combo-registration/combo.repository';
 import { studentAdmission } from '../student-portal/admission.service';
+import { calculatedEligibilitySql, latestOjt202PassedSql } from '../eligibility/frontend-results.service';
 import { assertRosterContext } from '../combo-registration/selection.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
 
@@ -51,7 +52,16 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     }else{
       from='FROM "OJTRegistrationWindows" w';
       // Bind the authenticated student, never a studentId supplied by the caller.
-      where.push('(EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID")) OR EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID"))');
+      where.push(`(EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID"))
+        OR EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID")
+        OR EXISTS (SELECT 1 FROM "Students" eligible_student
+          JOIN "Users" eligible_user ON eligible_user."UserID"=eligible_student."UserID"
+          JOIN "StudentOJTCalculatedResults" eligible_saved USING ("StudentID")
+          WHERE eligible_student."StudentID"=$1 AND eligible_student."DeletedAt" IS NULL
+            AND eligible_student."Status"='ACTIVE' AND eligible_user."Status"='ACTIVE'
+            AND eligible_saved."Status"='ELIGIBLE'
+            AND COALESCE(((${calculatedEligibilitySql('eligible_student')}) ->> 'isStale')::boolean,true)=false
+            AND NOT ${latestOjt202PassedSql('eligible_student')}))`);
       for(const [key,value,type]of [['programIds',s.ProgramID,'int'],['cohortIds',s.CohortID,'int'],['majorIds',s.SpecializationID,'int'],['studentIds',s.StudentID,'int'],['groupCodes',s.GroupCode,'text']] as const){
         args.push(value??null);where.push(`(NOT (w."Scope" ? '${key}') OR w."Scope"->'${key}' @> jsonb_build_array($${args.length}::${type}))`);
       }
@@ -91,6 +101,8 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       if(kind==='ojt')pathway={admissionSource:admission?.source??null};
       if(kind==='ojt'&&(!admission||admission.status!=='ELIGIBLE'||admission.isStale))reasons.push(
         admission?.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
+      if(kind==='ojt'&&admission?.source==='SAVED_ELIGIBILITY'
+        &&(admission.roundId===null||(w.RecruitmentRoundID&&admission.roundId!==w.RecruitmentRoundID)))reasons.push('OJT_ROUND_NOT_ASSIGNED');
       if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');
       items.push({id:w.WindowID,name:w.Name,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,
         period:w.period,semester:w.semester,startsAt:w.StartsAt,endsAt:w.EndsAt,effectiveEndsAt:end,status:w.Status,

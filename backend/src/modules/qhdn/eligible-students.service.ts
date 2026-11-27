@@ -1,6 +1,7 @@
 import { readTransaction } from './read.repository';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
+import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
 
 export async function eligibleStudents(params: Row, actor: Actor) {
   if (!['ADMIN', 'OJT_COORD'].includes(actor.roleCode))
@@ -10,24 +11,31 @@ export async function eligibleStudents(params: Row, actor: Actor) {
     'groupCode', 'search', 'registrationStatus', 'rosterStatus',
   ]);
   const args: unknown[] = [];
-  const where: string[] = [];
+  const where: string[] = [
+    `s."DeletedAt" IS NULL`,
+    `s."Status"='ACTIVE'`,
+    `u."Status"='ACTIVE'`,
+    `saved."Status"='ELIGIBLE'`,
+    `latest_ojt202."Status" IS DISTINCT FROM 'PASSED'`,
+    `COALESCE((((${calculatedEligibilitySql('s')}) ->> 'isStale')::boolean),true)=false`,
+  ];
   const add = (column: string, value: unknown) => {
     args.push(value);
     where.push(`${column}=$${args.length}`);
   };
   for (const [key, column] of Object.entries({
-    ojtSemesterId: 'roster."OJTSemesterID"', studentId: 's."StudentID"',
+    ojtSemesterId: 'target."OJTSemesterID"', studentId: 's."StudentID"',
     programId: 's."ProgramID"', cohortId: 'placement."CohortID"',
   })) if (params[key] !== undefined) add(column, positiveId(params[key], key));
   if (params.handoffId !== undefined) {
     args.push(positiveId(params.handoffId, 'handoffId'));
     where.push(`EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" history WHERE history."HandoffID"=$${args.length}
-      AND history."StudentID"=s."StudentID" AND history."OJTSemesterID"=roster."OJTSemesterID")`);
+      AND history."StudentID"=s."StudentID" AND history."OJTSemesterID"=target."OJTSemesterID")`);
   }
   if (params.groupCode !== undefined) add('placement."GroupCode"', enumValue(params.groupCode, ['A','B','C','D'], 'groupCode'));
   if (params.rosterStatus !== undefined) {
     const status = enumValue(params.rosterStatus, ['ASSIGNED','WAITING'], 'rosterStatus');
-    where.push(status === 'ASSIGNED' ? 'roster."RoundID" IS NOT NULL' : 'roster."RoundID" IS NULL');
+    where.push(status === 'ASSIGNED' ? 'round."WindowID" IS NOT NULL' : 'round."WindowID" IS NULL');
   }
   const registrationStatus = `CASE WHEN r."Status"='HANDED_OFF' THEN 'LEGACY_REVIEW_REQUIRED'
     ELSE COALESCE(r."Status",'NOT_REGISTERED') END`;
@@ -38,30 +46,79 @@ export async function eligibleStudents(params: Row, actor: Actor) {
     where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length} OR u."Email" ILIKE $${args.length})`);
   }
   return readTransaction(async client => {
-    const from = `FROM "OJTRecruitmentRoster" roster
-      JOIN "Students" s USING ("StudentID") JOIN "Users" u ON u."UserID"=s."UserID"
+    const from = `FROM "Students" s
+      JOIN "Users" u ON u."UserID"=s."UserID"
+      JOIN "StudentOJTCalculatedResults" saved ON saved."StudentID"=s."StudentID"
+      LEFT JOIN LATERAL (
+        SELECT history."Status"
+        FROM "StudentCourseResults" history
+        JOIN "Courses" course USING ("CourseID")
+        LEFT JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=history."AcademicPeriodID"
+        WHERE history."StudentID"=s."StudentID" AND upper(btrim(course."CourseCode"))='OJT202'
+        ORDER BY history."AttemptNumber" DESC,period."StartDate" DESC NULLS LAST,history."ResultID" DESC
+        LIMIT 1
+      ) latest_ojt202 ON true
       LEFT JOIN "TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
       LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
       LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=placement."CohortID"
-      LEFT JOIN "RecruitmentWindows" round ON round."WindowID"=roster."RoundID"
-      LEFT JOIN "OJTSemesters" term ON term."OJTSemesterID"=round."OJTSemesterID"
-      LEFT JOIN "OJTRegistrations" r ON r."StudentID"=s."StudentID" AND r."OJTSemesterID"=roster."OJTSemesterID"
+      LEFT JOIN LATERAL (
+        SELECT o."OJTSemesterID"
+        FROM "RecruitmentWindows" open_window
+        JOIN "OJTSemesters" o ON o."OJTSemesterID"=open_window."OJTSemesterID"
+        WHERE o."Status" NOT IN ('CLOSED','ARCHIVED')
+          AND open_window."Status"='OPEN' AND open_window."ResultsFinalizedAt" IS NULL
+          AND COALESCE(open_window."ApplicationStartsAt",open_window."StartsAt")<=statement_timestamp()
+          AND open_window."EndsAt">statement_timestamp()
+          AND COALESCE(open_window."ApplicationEndsAt",open_window."EndsAt")>statement_timestamp()
+          AND EXISTS (
+            SELECT 1 FROM "ProgramCourses" pc
+            JOIN "Courses" course USING ("CourseID")
+            JOIN "TrainingPrograms" curriculum USING ("ProgramID")
+            WHERE pc."ProgramID"=s."ProgramID" AND curriculum."Status"='PUBLISHED'
+              AND upper(btrim(course."CourseCode"))='OJT202'
+              AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6
+          )
+        ORDER BY COALESCE(open_window."ApplicationStartsAt",open_window."StartsAt"),open_window."WindowID"
+        LIMIT 1
+      ) open_target ON true
+      LEFT JOIN "OJTSemesters" target ON target."OJTSemesterID"=COALESCE(
+        open_target."OJTSemesterID",
+        (SELECT default_term."OJTSemesterID" FROM "OJTSemesters" default_term
+         WHERE default_term."AcademicPeriodID"=public."DefaultOJTAcademicPeriod"(s."StudentID") LIMIT 1)
+      )
+      LEFT JOIN LATERAL (
+        SELECT w."WindowID",w."Name"
+        FROM "RecruitmentWindows" w
+        WHERE w."OJTSemesterID"=target."OJTSemesterID"
+          AND target."Status" NOT IN ('CLOSED','ARCHIVED')
+          AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
+          AND COALESCE(w."ApplicationStartsAt",w."StartsAt")<=statement_timestamp()
+          AND w."EndsAt">statement_timestamp()
+          AND COALESCE(w."ApplicationEndsAt",w."EndsAt")>statement_timestamp()
+        ORDER BY COALESCE(w."ApplicationStartsAt",w."StartsAt"),w."WindowID"
+        LIMIT 1
+      ) round ON true
+      LEFT JOIN LATERAL (
+        SELECT registration.* FROM "OJTRegistrations" registration
+        WHERE registration."StudentID"=s."StudentID" AND registration."OJTSemesterID"=target."OJTSemesterID"
+        ORDER BY registration."RegistrationID" DESC LIMIT 1
+      ) r ON true
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}`;
     const total = (await client.query(`SELECT count(*)::int AS total ${from}`, args)).rows[0].total;
     const items = (await client.query(`SELECT s."StudentID" AS id,s."StudentID" AS "studentId",
       s."StudentCode" AS "studentCode",u."FullName" AS "fullName",u."Email" AS email,
       s."ProgramID" AS "programId",program."ProgramName" AS "programName",
       placement."CohortID" AS "cohortId",cohort."Name" AS "cohortName",placement."GroupCode" AS "groupCode",
-      roster."OJTSemesterID" AS "ojtSemesterId",term."Name" AS "semesterName",
-      roster."RoundID" AS "roundId",roster."RoundName" AS "roundName",roster."CheckedAt" AS "checkedAt",
-      CASE WHEN roster."RoundID" IS NULL THEN 'WAITING' ELSE 'ASSIGNED' END AS "rosterStatus",
+      target."OJTSemesterID" AS "ojtSemesterId",target."Name" AS "semesterName",
+      round."WindowID" AS "roundId",round."Name" AS "roundName",saved."CheckedAt" AS "checkedAt",
+      CASE WHEN round."WindowID" IS NULL THEN 'WAITING' ELSE 'ASSIGNED' END AS "rosterStatus",
       CASE WHEN EXISTS (
         SELECT 1 FROM "StudentEnterpriseCoordination" completed_coordination
         JOIN "InternshipAssignments" completed_assignment
           ON completed_assignment."CoordinationID"=completed_coordination."CoordinationID"
         WHERE completed_coordination."RegistrationID"=r."RegistrationID"
           AND completed_assignment."Status"='COMPLETED'
-      ) THEN 'COMPLETED' WHEN roster."RoundID" IS NOT NULL THEN 'ASSIGNED' ELSE 'WAITING' END AS "participationStatus",
+      ) THEN 'COMPLETED' WHEN round."WindowID" IS NOT NULL THEN 'ASSIGNED' ELSE 'WAITING' END AS "participationStatus",
       COALESCE((SELECT jsonb_agg(jsonb_build_object(
         'resultId',history."ResultID",'courseCode',course."CourseCode",'courseName',course."CourseName",
         'semesterTaken',history."SemesterTaken",'periodName',period."Name",'score',history."Score",
@@ -71,10 +128,9 @@ export async function eligibleStudents(params: Row, actor: Actor) {
         JOIN "Courses" course USING ("CourseID")
         LEFT JOIN "AcademicPeriods" period USING ("AcademicPeriodID")
         WHERE history."StudentID"=s."StudentID"
-          AND NOT (upper(btrim(course."CourseCode"))='OJT202' AND history."Status"='PASSED')
       ),'[]'::jsonb) AS "academicHistory",
       r."RegistrationID" AS "registrationId",${registrationStatus} AS "registrationStatus"
-      ${from} ORDER BY roster."RoundID" NULLS LAST, s."StudentCode",s."StudentID"
+      ${from} ORDER BY round."WindowID" NULLS LAST, s."StudentCode",s."StudentID"
       LIMIT $${args.length + 1} OFFSET $${args.length + 2}`, [...args,page.limit,page.offset])).rows;
     return { ojtSemesterId: params.ojtSemesterId === undefined ? null : Number(params.ojtSemesterId),
       items,total,page:page.page,limit:page.limit };
