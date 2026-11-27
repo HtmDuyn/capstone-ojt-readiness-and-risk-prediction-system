@@ -6,6 +6,7 @@ import { initializeStudentSnapshots, studentSnapshots } from '../utils/student/s
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 
 import { downloadFile } from '@/utils/shared/downloadFile';
+import { validateTaskAttachment } from './taskSubmissionService';
 import type { StudentCurrentUserResponse } from '@/types/student/portal';
 import type {
   AcademicSummary,
@@ -355,8 +356,14 @@ export const getAssignedTasks = (semester: number, page: number, signal?: AbortS
   getTasks(semester, page, signal);
 export const getTaskSubmissions = (taskId: number, page: number, signal?: AbortSignal) =>
   studentGet<Page<TaskSubmission>>(`/students/me/tasks/${taskId}/submissions` + studentQuery({ page, limit: 20 }), signal);
-export const submitAssignedTask = (taskId: number, content: string) =>
-  studentPost<TaskSubmission & { replayed: boolean }>(`/students/me/tasks/${taskId}/submissions`, { content });
+export const submitAssignedTask = (taskId: number, content: string, attachment?: File) => {
+  if (!attachment) return studentPost<TaskSubmission & { replayed: boolean }>(`/students/me/tasks/${taskId}/submissions`, { content });
+  validateTaskAttachment(attachment);
+  const data = new FormData();
+  data.append('content', content);
+  data.append('attachment', attachment);
+  return studentPost<TaskSubmission & { replayed: boolean }>(`/students/me/tasks/${taskId}/submissions`, data);
+};
 export const getOjtResults = (
   semester: number,
   page: number,
