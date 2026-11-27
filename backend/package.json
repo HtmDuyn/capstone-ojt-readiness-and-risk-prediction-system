@@ -14,6 +14,8 @@
     "test:task-attachments": "node --test tests/task-attachments.test.cjs",
     "test:enterprise-grading": "node --test tests/enterprise-grading.test.cjs",
     "test:recruitment": "node --test tests/recruitment-single-intake.test.cjs",
+    "test:student-recruitment": "node --test tests/student-recruitment.test.cjs",
+    "test:student-recruitment:postgres": "node tests/student-recruitment.postgres.cjs",
     "pretest:study-periods": "npm run build",
     "test:study-periods": "node --test tests/study-periods.test.cjs",
     "ojt:assess-due": "node dist/jobs/run-due-ojt-assessments.js",

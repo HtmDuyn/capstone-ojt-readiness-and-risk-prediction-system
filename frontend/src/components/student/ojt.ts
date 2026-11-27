@@ -12,6 +12,7 @@ export type Opportunity = {
   post: { title: string; deadlineAt?: string | null; content?: string | null; benefits?: string | null; applicationInstructions?: string | null };
 };
 const blockers: Record<string, string> = {
+  REGISTRATION_WINDOW_REQUIRED: 'Chọn đợt đăng ký OJT của bạn để kiểm tra điều kiện ứng tuyển.',
   OJT_ROUND_NOT_ASSIGNED: 'Chưa được xếp vào đợt OJT này.',
   ELIGIBLE_HANDOFF_REQUIRED: 'Chưa có kết quả đủ điều kiện OJT.',
   CONFIRMED_ELIGIBILITY_REQUIRED: 'Chưa có kết quả đủ điều kiện OJT hiện hành. Liên hệ Phòng Đào tạo để kiểm tra.',
