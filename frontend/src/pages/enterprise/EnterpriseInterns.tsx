@@ -31,6 +31,9 @@ import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
+import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
+import { getEnterpriseTaskSubmissions } from '@/services/taskSubmissionService';
+import { EnterpriseTaskSubmissionDetails } from '@/components/enterprise/EnterpriseTaskSubmissionDetails';
 
 // Adapter: map API data to existing UI's expected format
 const mapApiToIntern = (item: EnterpriseInternshipItem, total: number, completed: number): EnterpriseIntern => ({
@@ -173,6 +176,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Selected intern for task detail modal
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [submissionTask, setSubmissionTask] = useState<InternTask | null>(null);
   const viewingIntern = interns.find(intern => intern.id === viewingId);
   const [taskTab,setTaskTab] = useState<'students'|'assigned'>('students');
   const taskView = useAssignedTasks(tasks,taskTab === 'assigned');
@@ -564,7 +568,7 @@ export const EnterpriseInterns: React.FC = () => {
       {!apiLoading && !apiError && (
       <>
 
-      {taskTab === 'assigned' ? <AssignedTasks view={taskView} onDelete={handleDeleteTask}/> : <>
+      {taskTab === 'assigned' ? <AssignedTasks view={taskView} onDelete={handleDeleteTask} onSubmissions={setSubmissionTask}/> : <>
       {/* 2. Main Action Toolbar (Buttons moved down from banner + Dropdown filters) */}
       <div className="border-b border-slate-100 p-4 space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -1308,6 +1312,7 @@ export const EnterpriseInterns: React.FC = () => {
 
                           {/* Quick Actions */}
                           <div className="flex items-center space-x-1.5 flex-shrink-0">
+                            <button type="button" onClick={() => setSubmissionTask(task)} title="Xem chi tiết bài làm và file đính kèm" aria-label={`Xem bài nộp nhiệm vụ ${task.title}`} className="inline-flex items-center gap-1 rounded-lg p-1 text-orange-600 hover:bg-orange-50"><Eye className="w-3.5 h-3.5" /><span>Xem bài làm</span></button>
                             <button disabled={!task.canDelete}
                               onClick={() => void handleDeleteTask(task)}
                               className="p-1 rounded-lg text-slate-400 enabled:hover:text-rose-600 disabled:opacity-30"
@@ -1329,6 +1334,7 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
                           {task.createdAt && <span>Ngày giao: {displayTaskTime(task.createdAt)}</span>}
                         </div>
+                        <EnterpriseTaskSubmissionDetails taskId={Number(task.id)} initiallyOpen={task.id === viewedInternTasks.find(item => item.status === 'DONE')?.id} />
                       </div>
                     ))}
                   </div>
@@ -1352,6 +1358,10 @@ export const EnterpriseInterns: React.FC = () => {
       </>
       )}
       </section>
+      {submissionTask && <TaskSubmissionsDialog key={submissionTask.id} taskId={Number(submissionTask.id)}
+        name={`${submissionTask.title} · ${submissionTask.internName}`}
+        load={(page, signal) => getEnterpriseTaskSubmissions(Number(submissionTask.id), page, signal)}
+        onClose={() => setSubmissionTask(null)} />}
     </div>
   );
 };
