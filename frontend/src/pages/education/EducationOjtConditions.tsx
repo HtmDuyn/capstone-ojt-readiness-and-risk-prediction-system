@@ -60,7 +60,7 @@ const EducationOjtConditions: React.FC = () => {
         <Link to="/education/ojt-policy" className="px-2 py-2 text-sm font-medium text-orange-700 underline">Quản lý điều kiện</Link>
       </div>
       {rule?.issuingDocument && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Văn bản ban hành: {rule.issuingDocument}</p>}
-      <p className="text-sm text-slate-600">Tín chỉ xét lấy theo khung chương trình, loại trừ Giáo dục thể chất, Quốc phòng – An ninh và học phần nhạc cụ. Hệ thống tự xét theo ngày kết thúc đã lưu của Block 10, Block 3 và học kỳ. Có thể dùng nút xét để chạy thủ công khi cần.</p>
+      <p className="text-sm text-slate-600">Tín chỉ xét lấy theo khung chương trình, loại trừ Giáo dục thể chất, Quốc phòng – An ninh và học phần nhạc cụ. Có thể dùng nút xét để chạy thủ công khi cần.</p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void runAll()} disabled={loading || busy || selectionLocked}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
@@ -107,29 +107,37 @@ const EducationOjtConditions: React.FC = () => {
       <div className="flex items-center justify-between gap-3 border-t p-4 text-sm text-slate-500"><span>{sourceLoaded.students ? `${visible.length} sinh viên · Trang ${currentPage}/${pages}` : 'Chưa tải được danh sách sinh viên'}</span><div className="flex gap-2"><button disabled={!sourceLoaded.students || currentPage === 1} onClick={() => setPage(currentPage - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trước</button><button disabled={!sourceLoaded.students || currentPage === pages} onClick={() => setPage(currentPage + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Sau</button></div></div>
     </section>
     <p className="text-sm text-slate-500">Tra cứu tiếp tại <Link to="/education/student-status" className="text-orange-700 underline">Trạng thái sinh viên</Link>.</p>
-    {detailTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3" onMouseDown={event => { if (event.target === event.currentTarget) setDetailStudentId(null); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="ojt-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6">
-        <div className="mb-4 flex items-start justify-between gap-3"><h2 id="ojt-detail-title" className="text-lg font-bold text-slate-900">Chi tiết xét điều kiện OJT</h2><button type="button" aria-label="Đóng chi tiết" onClick={() => setDetailStudentId(null)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"><X size={20} /></button></div>
-        <div className="space-y-5 text-sm">
-          <section><h3 className="mb-2 font-semibold text-slate-900">Thông tin sinh viên</h3><dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-            <div><dt className="text-slate-500">Mã sinh viên</dt><dd>{detailTarget.student.studentCode}</dd></div><div><dt className="text-slate-500">Họ và tên</dt><dd>{detailTarget.student.fullName}</dd></div>
-            <div><dt className="text-slate-500">Khóa / Nhóm</dt><dd>{detailTarget.student.cohort?.code ?? 'Chưa có dữ liệu xác nhận'} / {detailTarget.student.groupCode ?? 'Chưa có dữ liệu xác nhận'}</dd></div>
-            <div><dt className="text-slate-500">Mã khung chương trình</dt><dd>{detailTarget.student.program?.code ?? '—'}</dd></div>
-            <div><dt className="text-slate-500">Kỳ chương trình hiện tại</dt><dd>{detailTarget.student.currentSemester == null ? 'Chưa có dữ liệu xác nhận' : `Kỳ ${detailTarget.student.currentSemester}`}</dd></div>
-          </dl></section>
-          <section><h3 className="mb-2 font-semibold text-slate-900">Thông tin học tập</h3><dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-            <div><dt className="text-slate-500">Tín chỉ dùng để xét (đã loại trừ nhóm không tính)</dt><dd>{detailResult?.earnedCredits ?? academicCredits[detailTarget.student.id] ?? 'Chưa có dữ liệu xác nhận'}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-slate-500">Điều kiện đã áp dụng</dt><dd>{detailResult?.rule ? `${detailResult.rule.minCredits} tín chỉ · ${detailResult.rule.issuingDocument ?? `Phiên bản ${detailResult.rule.version ?? '—'}`}` : 'Chưa có dữ liệu xác nhận'}</dd></div>
-            <div><dt className="text-slate-500">Ngưỡng tín chỉ đã dùng</dt><dd>{detailResult?.rule?.minCredits ?? '—'}</dd></div>
-          </dl></section>
-          <section><h3 className="mb-2 font-semibold text-slate-900">Kết quả xét hiện hành</h3><dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-            <div><dt className="text-slate-500">Kết quả đã lưu</dt><dd>{!sourceLoaded.results ? 'Chưa tải được kết quả xét' : detailSaved ? ojtDisplayStatusLabels[detailSaved.isStale ? 'STALE' : detailSaved.status] : 'Chưa xét'}</dd></div>
-            <div><dt className="text-slate-500">Kết quả đang hiển thị</dt><dd>{!sourceLoaded.results ? 'Chưa tải được kết quả xét' : ojtDisplayStatusLabels[statusByStudent[detailTarget.student.id]]}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-slate-500">Lý do chi tiết</dt><dd>{educationOjtReason(detailResult, failures[detailTarget.student.id], detailTarget.reason)}</dd></div>
-            <div><dt className="text-slate-500">Thời gian xét</dt><dd>{detailResult?.checkedAt ? new Date(detailResult.checkedAt).toLocaleString('vi-VN') : 'Chưa có dữ liệu xác nhận'}</dd></div>
-            <div><dt className="text-slate-500">Tình trạng lưu</dt><dd>{detailSaved ? 'Đã lưu kết quả' : 'Chưa có kết quả đã lưu'}</dd></div>
-          </dl></section>
+    {detailTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px] sm:p-6" onMouseDown={event => { if (event.target === event.currentTarget) setDetailStudentId(null); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="ojt-detail-title" className="flex max-h-[min(88vh,760px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-slate-50 shadow-2xl shadow-slate-950/25">
+        <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-7 sm:py-5">
+          <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-600">Phòng Đào tạo · Xét OJT</p><h2 id="ojt-detail-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Chi tiết sinh viên</h2><p className="mt-1 truncate text-sm text-slate-500">{detailTarget.student.studentCode} · {detailTarget.student.fullName}</p></div>
+          <button type="button" aria-label="Đóng chi tiết" onClick={() => setDetailStudentId(null)} className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"><X size={19} /></button>
+        </header>
+        <div className="space-y-4 overflow-y-auto p-4 sm:p-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <h3 className="text-sm font-bold text-slate-900">Thông tin sinh viên</h3>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[["Mã sinh viên", detailTarget.student.studentCode], ["Họ và tên", detailTarget.student.fullName], ["Khóa / Nhóm", `${detailTarget.student.cohort?.code ?? 'Chưa xác nhận'} / ${detailTarget.student.groupCode ?? '—'}`], ["Mã chương trình", detailTarget.student.program?.code ?? '—'], ["Kỳ chương trình hiện tại", detailTarget.student.currentSemester == null ? 'Chưa xác nhận' : `Kỳ ${detailTarget.student.currentSemester}`]].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-slate-50 px-3 py-2.5"><dt className="text-xs font-medium text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-semibold text-slate-800">{value}</dd></div>)}
+            </dl>
+          </section>
+          <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <h3 className="text-sm font-bold text-slate-900">Thông tin học tập</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-orange-100 bg-orange-50/70 p-3"><p className="text-xs font-medium leading-5 text-slate-600">Tín chỉ dùng để xét</p><p className="mt-1 text-2xl font-bold tabular-nums text-orange-700">{detailResult?.earnedCredits ?? academicCredits[detailTarget.student.id] ?? '—'} <span className="text-sm font-semibold">tín chỉ</span></p><p className="mt-1 text-xs text-slate-500">Đã loại trừ nhóm không tính</p></div>
+              <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-medium text-slate-500">Ngưỡng áp dụng</p><p className="mt-1 text-2xl font-bold tabular-nums text-slate-800">{detailResult?.rule?.minCredits ?? '—'} <span className="text-sm font-semibold">tín chỉ</span></p><p className="mt-1 break-words text-xs text-slate-500">{detailResult?.rule ? detailResult.rule.issuingDocument ?? `Phiên bản ${detailResult.rule.version ?? '—'}` : 'Chưa có dữ liệu điều kiện'}</p></div>
+            </div>
+          </section>
+          <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-bold text-slate-900">Kết quả xét hiện hành</h3><span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusByStudent[detailTarget.student.id] === 'ELIGIBLE' ? 'bg-emerald-100 text-emerald-800' : statusByStudent[detailTarget.student.id] === 'NOT_ELIGIBLE' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>{!sourceLoaded.results ? 'Chưa tải kết quả' : ojtDisplayStatusLabels[statusByStudent[detailTarget.student.id]]}</span></div>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5"><dt className="text-xs font-medium text-slate-500">Kết quả đã lưu</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{!sourceLoaded.results ? 'Chưa tải được kết quả' : detailSaved ? ojtDisplayStatusLabels[detailSaved.isStale ? 'STALE' : detailSaved.status] : 'Chưa xét'}</dd></div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5"><dt className="text-xs font-medium text-slate-500">Tình trạng lưu</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{detailSaved ? 'Đã lưu kết quả' : 'Chưa có kết quả đã lưu'}</dd></div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5 sm:col-span-2"><dt className="text-xs font-medium text-slate-500">Lý do chi tiết</dt><dd className="mt-1 text-sm leading-6 text-slate-800">{educationOjtReason(detailResult, failures[detailTarget.student.id], detailTarget.reason)}</dd></div>
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5 sm:col-span-2"><dt className="text-xs font-medium text-slate-500">Thời gian xét</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{detailResult?.checkedAt ? new Date(detailResult.checkedAt).toLocaleString('vi-VN') : 'Chưa có dữ liệu xác nhận'}</dd></div>
+            </dl>
+          </section>
         </div>
+        <footer className="flex justify-end border-t border-slate-200 bg-white px-5 py-3 sm:px-7"><button type="button" onClick={() => setDetailStudentId(null)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">Đóng</button></footer>
       </div>
     </div>}
   </div>;

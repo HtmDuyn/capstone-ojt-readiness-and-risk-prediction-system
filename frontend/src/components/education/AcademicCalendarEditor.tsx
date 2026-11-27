@@ -20,6 +20,9 @@ export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
   const [block10, setBlock10] = useState(initialBlock10);
   const [rows, setRows] = useState(initialRows);
   const [blocks, setBlocks] = useState(initialBlocks);
+  const [selectedTerm, setSelectedTerm] = useState<string>(initialRows[0]?.term ?? '');
+  const selectedIndex = rows.findIndex(row => row.term === selectedTerm);
+  const selectedRow = rows[selectedIndex];
   const year = Number(calendar.year.yearCode.slice(0, 4));
   const errors = calendarErrors(year, rows);
   for (const [index, parent] of rows.entries()) {
@@ -41,17 +44,22 @@ export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
     event.preventDefault();
     if (!busy && !errors.length && changed && await onSave(rows, complete(blocks), complete(block10))) onCancel();
   }}>
-    <div className="flex items-center justify-between gap-3"><h3 className="font-bold text-slate-900">Chỉnh sửa lịch 3 kỳ — {calendar.year.yearCode}</h3><button type="button" aria-label="Hủy chỉnh sửa" disabled={busy} onClick={onCancel}><X size={18} /></button></div>
-    <p className="text-sm text-slate-600">Ngày học kỳ, Block 10 và Block 3 được lưu cùng lúc. Chọn cả hai ngày để bổ sung lịch block còn thiếu.</p>
-    <div className="grid gap-4 lg:grid-cols-3">{rows.map((row, index) => <fieldset key={row.term} disabled={busy} className={`space-y-3 rounded-xl border p-4 ${TERM_COLOR[row.term]}`}>
-      <legend className="px-1 font-bold">{index + 1}. {TERM_LABEL[row.term]} {year}</legend>
-      <label className="block text-sm">Ngày bắt đầu<input required type="date" min={`${year}-01-01`} max={`${year}-12-31`} value={row.startDate} onChange={e => setRows(values => values.map((value, i) => i === index ? { ...value, startDate: e.target.value } : value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /></label>
-      <label className="block text-sm">Ngày kết thúc<input required type="date" min={`${year}-01-01`} max={`${year}-12-31`} value={row.endDate} onChange={e => setRows(values => values.map((value, i) => i === index ? { ...value, endDate: e.target.value } : value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /></label>
-      <AcademicBlockDates label="Block 10" semester={row} block={block10[index]} onChange={(field, value) =>
-        setBlock10(dates => dates.map(block => block.term === row.term ? { ...block, [field]: value } : block))} />
-      <AcademicBlockDates label="Block 3" semester={row} block={blocks[index]} onChange={(field, value) =>
-        setBlocks(dates => dates.map(block => block.term === row.term ? { ...block, [field]: value } : block))} />
-    </fieldset>)}</div>
+    <div className="flex items-center justify-between gap-3"><h3 className="font-bold text-slate-900">Chỉnh sửa lịch học kỳ — {calendar.year.yearCode}</h3><button type="button" aria-label="Hủy chỉnh sửa" disabled={busy} onClick={onCancel}><X size={18} /></button></div>
+    <p className="text-sm text-slate-600">Chọn học kỳ cần chỉnh sửa. Ngày học kỳ, Block 10 và Block 3 sẽ được lưu cùng lúc.</p>
+    <label className="block max-w-sm text-sm font-medium text-slate-700">Học kỳ
+      <select value={selectedTerm} disabled={busy} onChange={event => setSelectedTerm(event.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-800 focus:border-orange-500 focus:outline-none">
+        {rows.map((row, index) => <option key={row.term} value={row.term}>Học kỳ {index + 1} · {TERM_LABEL[row.term]} {year}</option>)}
+      </select>
+    </label>
+    {selectedRow && <fieldset key={selectedRow.term} disabled={busy} className={`space-y-3 rounded-xl border p-4 ${TERM_COLOR[selectedRow.term]}`}>
+      <legend className="px-1 font-bold">{TERM_LABEL[selectedRow.term]} {year}</legend>
+      <label className="block text-sm">Ngày bắt đầu<input required type="date" min={`${year}-01-01`} max={`${year}-12-31`} value={selectedRow.startDate} onChange={e => setRows(values => values.map((value, i) => i === selectedIndex ? { ...value, startDate: e.target.value } : value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /></label>
+      <label className="block text-sm">Ngày kết thúc<input required type="date" min={`${year}-01-01`} max={`${year}-12-31`} value={selectedRow.endDate} onChange={e => setRows(values => values.map((value, i) => i === selectedIndex ? { ...value, endDate: e.target.value } : value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-slate-800" /></label>
+      <AcademicBlockDates label="Block 10" semester={selectedRow} block={block10[selectedIndex]} onChange={(field, value) =>
+        setBlock10(dates => dates.map(block => block.term === selectedRow.term ? { ...block, [field]: value } : block))} />
+      <AcademicBlockDates label="Block 3" semester={selectedRow} block={blocks[selectedIndex]} onChange={(field, value) =>
+        setBlocks(dates => dates.map(block => block.term === selectedRow.term ? { ...block, [field]: value } : block))} />
+    </fieldset>}
     {errors.length > 0 && <ul role="alert" className="list-inside list-disc rounded-lg bg-red-50 p-3 text-sm text-red-700">{errors.map(error => <li key={error}>{error}</li>)}</ul>}
     <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">Ngày kết thúc được tính trong học kỳ. Kỳ tiếp theo phải bắt đầu từ ngày sau đó trở đi.</p><div className="flex gap-2"><button type="button" disabled={busy} onClick={onCancel} className="rounded-lg border bg-white px-4 py-2">Hủy</button><button disabled={busy || !changed || errors.length > 0} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white disabled:opacity-50"><Save size={16} />{busy ? 'Đang lưu...' : 'Lưu'}</button></div></div>
   </form>;

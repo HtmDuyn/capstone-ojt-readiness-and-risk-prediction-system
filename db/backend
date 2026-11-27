@@ -8049,6 +8049,91 @@ BEGIN
   END LOOP;
 END $seed_study_history$;
 
+-- Complete one K20 IS transcript using its exact curriculum path through semester 5.
+-- Every listed prerequisite clause must match a passed course from an earlier semester.
+DO $seed_k20_eligible_transcript$
+DECLARE stage integer;
+BEGIN
+  FOR stage IN 1..5 LOOP
+    INSERT INTO public."StudentCourseResults"
+      ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status",
+       "AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
+    SELECT student."StudentID",target_course."CourseID",stage,period."AcademicYearID",
+      8.00,'B','PASSED',period."AcademicPeriodID",1,3.00,
+      'QHDN_HANDOFF_2026_K20_PREREQUISITE_GRADE',academic."UserID"
+    FROM qhdn_student_roster roster
+    JOIN public."Users" account ON account."Email"=roster."Email"
+    JOIN public."Students" student ON student."UserID"=account."UserID" AND student."ProgramID"=roster."ProgramID"
+    JOIN public."TrainingPrograms" program ON program."ProgramID"=student."ProgramID"
+    JOIN (VALUES
+      ('BIT_IS_K20D-21A','CSD201',3,'PRO192'::text,NULL::text,NULL::text),
+      ('BIT_IS_K20D-21A','JPD123',3,'JPD113',NULL,NULL),
+      ('BIT_IS_K20D-21A','LAB211',3,'PRO192',NULL,NULL),
+      ('BIT_IS_K20D-21A','MAS291',4,'MAE101|MAC101',NULL,NULL),
+      ('BIT_IS_K20D-21A','PRJ302',4,'DBI202','PRO192',NULL),
+      ('BIT_IS_K20D-21A','SWE201c',4,'PRO192',NULL,NULL),
+      ('BIT_IS_K20D-21A','ISP392',5,'PRJ302','SWE201c','LAB211'),
+      ('BIT_IS_K20D-21A','ITA301',5,'ITA203c','DBI202',NULL),
+      ('BIT_SE_K20D_K21A','LAB211',3,'PRO192',NULL,NULL),
+      ('BIT_SE_K20D_K21A','MAS291',3,'MAE101|MAC101',NULL,NULL),
+      ('BIT_SE_K20D_K21A','SWE202c',3,'PRO192',NULL,NULL),
+      ('BIT_SE_K20D_K21A','CSD201',4,'PRO192',NULL,NULL),
+      ('BIT_SE_K20D_K21A','JPD123',4,'JPD113',NULL,NULL),
+      ('BIT_SE_K20D_K21A','PRJ301',4,'DBI202','PRO192',NULL),
+      ('BIT_SE_K20D_K21A','SWR302',4,'SWE202c',NULL,NULL),
+      ('BIT_SE_K20D_K21A','SWP391',5,'PRJ301','SWE202c','LAB211'),
+      ('BIT_SE_K20D_K21A','SWT301',5,'SWE202c',NULL,NULL)
+    ) AS planned("ProgramCode","CourseCode","SemesterTaken","PrerequisiteClause1","PrerequisiteClause2","PrerequisiteClause3")
+      ON planned."SemesterTaken"=stage
+    JOIN public."Courses" target_course ON upper(target_course."CourseCode")=upper(planned."CourseCode")
+    JOIN public."ProgramCourses" target_mapping ON target_mapping."ProgramID"=student."ProgramID"
+      AND target_mapping."CourseID"=target_course."CourseID" AND target_mapping."EntryKind"='COURSE'
+      AND target_mapping."IsRequired"=true AND target_mapping."Credits">0
+      AND target_mapping."RecommendedSemester"=planned."SemesterTaken"
+    JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=student."StudentID"
+    JOIN public."CohortCurriculumPeriods" curriculum_period ON curriculum_period."CohortID"=placement."CohortID"
+      AND curriculum_period."GroupCode"=placement."GroupCode" AND curriculum_period."CurriculumSemester"=stage
+    JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
+    JOIN public."Users" academic ON academic."Username"='academic01'
+    WHERE roster."Number" IN (41,42,43,44) AND program."ProgramCode"=planned."ProgramCode"
+      AND (planned."PrerequisiteClause1" IS NULL OR EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" prior
+        JOIN public."Courses" prerequisite ON prerequisite."CourseID"=prior."CourseID"
+        JOIN public."ProgramCourses" prior_mapping ON prior_mapping."ProgramID"=student."ProgramID"
+          AND prior_mapping."CourseID"=prior."CourseID" AND prior_mapping."EntryKind"='COURSE'
+          AND prior_mapping."RecommendedSemester"<stage
+        WHERE prior."StudentID"=student."StudentID" AND prior."Status" IN ('PASSED','RECOGNIZED')
+          AND prior."SemesterTaken"<stage
+          AND upper(prerequisite."CourseCode")=ANY(string_to_array(upper(planned."PrerequisiteClause1"),'|'))
+      ))
+      AND (planned."PrerequisiteClause2" IS NULL OR EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" prior
+        JOIN public."Courses" prerequisite ON prerequisite."CourseID"=prior."CourseID"
+        JOIN public."ProgramCourses" prior_mapping ON prior_mapping."ProgramID"=student."ProgramID"
+          AND prior_mapping."CourseID"=prior."CourseID" AND prior_mapping."EntryKind"='COURSE'
+          AND prior_mapping."RecommendedSemester"<stage
+        WHERE prior."StudentID"=student."StudentID" AND prior."Status" IN ('PASSED','RECOGNIZED')
+          AND prior."SemesterTaken"<stage
+          AND upper(prerequisite."CourseCode")=ANY(string_to_array(upper(planned."PrerequisiteClause2"),'|'))
+      ))
+      AND (planned."PrerequisiteClause3" IS NULL OR EXISTS (
+        SELECT 1 FROM public."StudentCourseResults" prior
+        JOIN public."Courses" prerequisite ON prerequisite."CourseID"=prior."CourseID"
+        JOIN public."ProgramCourses" prior_mapping ON prior_mapping."ProgramID"=student."ProgramID"
+          AND prior_mapping."CourseID"=prior."CourseID" AND prior_mapping."EntryKind"='COURSE'
+          AND prior_mapping."RecommendedSemester"<stage
+        WHERE prior."StudentID"=student."StudentID" AND prior."Status" IN ('PASSED','RECOGNIZED')
+          AND prior."SemesterTaken"<stage
+          AND upper(prerequisite."CourseCode")=ANY(string_to_array(upper(planned."PrerequisiteClause3"),'|'))
+      ))
+      AND NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing
+        WHERE existing."StudentID"=student."StudentID" AND existing."CourseID"=target_course."CourseID"
+          AND existing."Status" IN ('PASSED','RECOGNIZED'))
+    ON CONFLICT ("StudentID","CourseID","AcademicPeriodID","AttemptNumber")
+      WHERE "AcademicPeriodID" IS NOT NULL DO NOTHING;
+  END LOOP;
+END $seed_k20_eligible_transcript$;
+
 -- Add the missing transcript grades for the six completed-OJT students.
 -- PrerequisiteText was reviewed manually: each comma-separated requirement
 -- below must have a prior passing course; alternatives separated by | are OR.
