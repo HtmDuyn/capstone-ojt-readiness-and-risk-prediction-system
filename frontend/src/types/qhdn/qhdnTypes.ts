@@ -63,7 +63,6 @@ export interface QhdnStudentDossier {
   phone: string | null;
   status: string;
   enrollmentYear: number | null;
-  currentSemester: number | null;
   programCode: string | null;
   programName: string | null;
   majorCode: string | null;

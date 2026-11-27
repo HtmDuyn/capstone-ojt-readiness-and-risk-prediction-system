@@ -10,7 +10,7 @@ export async function recruitmentSchemaReady(c: PoolClient): Promise<boolean> {
   return result.rows[0].ready===true;
 }
 export async function requireRecruitmentSchema(c: PoolClient) {
-  if(!await recruitmentSchemaReady(c))throw invalid('Database chưa đồng bộ schema đợt tuyển dụng. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
+  if(!await recruitmentSchemaReady(c))throw invalid('Database chưa đồng bộ schema đợt tuyển dụng. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
 }
 
 export function hasPhaseSchedule(w: Row): boolean {
@@ -26,7 +26,7 @@ export function phaseIsOpen(w: Row, action:'POSTING'|'APPLICATION'|'RESULTS'): b
 }
 export async function requireThreePhaseSchema(c: PoolClient) {
  if(!(await c.query(`SELECT to_regprocedure('public."ExpireRecruitmentResponses"()') IS NOT NULL AS ready`)).rows[0].ready)
-  throw invalid('Database chưa đồng bộ schema đợt tuyển dụng ba giai đoạn. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
+  throw invalid('Database chưa đồng bộ schema đợt tuyển dụng ba giai đoạn. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
 }
 export async function expireRecruitmentResponses(c: PoolClient) {
  const ready=(await c.query(`SELECT to_regprocedure('public."ExpireRecruitmentResponses"()') IS NOT NULL AS ready`)).rows[0].ready;

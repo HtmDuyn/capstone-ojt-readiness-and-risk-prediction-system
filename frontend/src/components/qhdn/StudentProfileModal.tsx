@@ -92,7 +92,7 @@ export function StudentProfileModal({ studentId, ojtSemesterId, fullName, onClos
       <section className="space-y-2"><h3 className="flex items-center gap-2 border-b border-slate-100 pb-2 font-semibold text-slate-800"><GraduationCap size={17} className="text-orange-600" />Ngành học và chương trình đào tạo</h3>
         <ProfileFields fields={[
           ['Ngành / chuyên ngành', profile.majorName], ['Mã ngành', profile.majorCode], ['Chương trình đào tạo', profile.programName], ['Mã chương trình', profile.programCode],
-          ['Khóa', profile.cohortName], ['Nhóm', profile.groupCode], ['Năm nhập học', profile.enrollmentYear], ['Kỳ chuyên ngành thứ', profile.currentSemester],
+          ['Khóa', profile.cohortName], ['Nhóm', profile.groupCode], ['Năm nhập học', profile.enrollmentYear],
           ['Học kỳ hiện tại', profile.currentPeriodName], ['Kỳ OJT đang xem', profile.semesterName],
         ]} />
       </section>

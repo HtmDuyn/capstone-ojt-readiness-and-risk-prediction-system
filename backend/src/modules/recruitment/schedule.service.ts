@@ -8,7 +8,7 @@ import { assertNoRoundOverlap, assertRoundWithinSemester, assertRecruitmentPerio
 
 export async function requireScheduleEditingSchema(c:PoolClient) {
  if(!(await c.query(`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='RecruitmentWindows' AND column_name='OpenedAt') AS ready`)).rows[0].ready)
-  throw invalid('Database chưa đồng bộ schema lịch QHDN. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
+  throw invalid('Database chưa đồng bộ schema lịch QHDN. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'RECRUITMENT_MIGRATION_REQUIRED');
 }
 
 export async function editWindowSchedule(id:number,body:unknown,actor:number) {

@@ -162,7 +162,7 @@ async function performAccountImport(body: unknown, actorId: number, preview = fa
     if ((error as { code?: string }).code === '23514') {
       if ((body as any)?.kind === 'ENTERPRISE') {
         if ((error as { constraint?: string }).constraint === 'AccountImportBatches_check')
-          throw fail('Database chưa đồng bộ schema import tài khoản doanh nghiệp. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
+          throw fail('Database chưa đồng bộ schema import tài khoản doanh nghiệp. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'ENTERPRISE_ACCOUNT_MIGRATION_REQUIRED');
         throw fail('Thông tin tài khoản doanh nghiệp không đáp ứng ràng buộc dữ liệu.',422,'INVALID_ENTERPRISE_ACCOUNT');
       }
       throw fail((error as Error).message, 422, 'INVALID_STUDY_HISTORY');

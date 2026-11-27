@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "check:db": "node scripts/check-db.cjs",
+    "db:backend:reset": "node scripts/run-db-backend.cjs",
     "db:migrate:recruitment-rounds": "node scripts/migrate-recruitment-rounds.cjs",
     "db:migrate:task-attachments": "node scripts/migrate-task-attachments.cjs",
     "test:task-attachments": "node --test tests/task-attachments.test.cjs",
