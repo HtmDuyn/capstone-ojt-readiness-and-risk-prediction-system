@@ -13,7 +13,7 @@ export async function importAcademicProfile(c: PoolClient, studentId: number, ra
   const student = (await c.query('SELECT * FROM "Students" WHERE "StudentID"=$1 AND "DeletedAt" IS NULL FOR UPDATE', [studentId])).rows[0];
   if (!student) throw invalid('Student not found or deleted.', 409);
   const placementForAssignment: Record<string, unknown> = { ...placement, programId, reason:'Complete student import' };
-  const existingPlacement = (await c.query('SELECT 1 FROM "StudentAcademicPlacements" WHERE "StudentID"=$1', [studentId])).rowCount > 0;
+  const existingPlacement = Boolean((await c.query('SELECT 1 FROM "StudentAcademicPlacements" WHERE "StudentID"=$1', [studentId])).rowCount);
   if (!existingPlacement) {
     const currentPeriod = (await c.query(`SELECT "AcademicPeriodID" FROM "AcademicPeriods"
       WHERE "Kind"='SEMESTER' AND "Status" NOT IN ('CLOSED','ARCHIVED')

@@ -24,7 +24,7 @@ export async function submit(body:unknown,actor:Actor) {const b=inputObject(body
  if(s.Status!=='ACTIVE'||s.AccountStatus!=='ACTIVE'||(s.ProgramStatus!=null&&s.ProgramStatus!=='PUBLISHED'))throw invalid('Registration requires an active student/account and a published curriculum.',409,'REGISTRATION_STUDENT_INACTIVE');
  const w=await windowRecord(c,windowId),now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;if(w.Status!=='OPEN'||now<new Date(w.StartsAt)||now>=new Date(w.EndsAt))throw invalid('Registration window is closed or outside its deadline.',409,'OJT_REGISTRATION_WINDOW_UNAVAILABLE');
  const admission = await requireStudentAdmission(c,studentId,w.OJTSemesterID);
- if(admission.source==='SAVED_ELIGIBILITY' && (admission.roundId===null || (w.RecruitmentRoundID && admission.roundId!==w.RecruitmentRoundID)))
+ if(['SAVED_ELIGIBILITY','CALCULATED_ELIGIBILITY'].includes(admission.source) && (admission.roundId===null || (w.RecruitmentRoundID && admission.roundId!==w.RecruitmentRoundID)))
   throw invalid('Sinh viên chưa được xếp vào đợt OJT này.',409,'OJT_ROUND_NOT_ASSIGNED');
  const scope=w.Scope;for(const [key,value] of [['programIds',s.ProgramID],['majorIds',s.SpecializationID],['cohortIds',s.CohortID],['groupCodes',s.GroupCode],['studentIds',studentId]] as const)if(scope[key]&&!scope[key].includes(value))throw invalid('Student is outside the registration window scope.',403,'REGISTRATION_OUT_OF_SCOPE');
  const pathway={...await assertOjtPathway(c,studentId,w.OJTSemesterID),admissionSource:admission.source};

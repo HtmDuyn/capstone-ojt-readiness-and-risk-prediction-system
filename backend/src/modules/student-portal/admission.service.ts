@@ -1,32 +1,65 @@
 import type { PoolClient } from 'pg';
-import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
+import { calculatedEligibilitySql, latestOjt202PassedSql } from '../eligibility/frontend-results.service';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
 import { invalid } from '../students/student.validation';
 import type { Row } from './shared';
 
+async function currentOpenRound(client: PoolClient, semesterId: number) {
+  return (await client.query(`SELECT w."WindowID"
+    FROM "RecruitmentWindows" w JOIN "OJTSemesters" term USING ("OJTSemesterID")
+    WHERE w."OJTSemesterID"=$1 AND term."Status" NOT IN ('CLOSED','ARCHIVED')
+      AND w."Status"='OPEN' AND w."ResultsFinalizedAt" IS NULL
+      AND COALESCE(w."ApplicationStartsAt",w."StartsAt")<=clock_timestamp()
+      AND w."EndsAt">clock_timestamp()
+      AND COALESCE(w."ApplicationEndsAt",w."EndsAt")>clock_timestamp()
+    ORDER BY COALESCE(w."ApplicationStartsAt",w."StartsAt"),w."WindowID" LIMIT 1`, [semesterId])).rows[0]?.WindowID as number | undefined;
+}
+
 // Use the live recruitment roster first, then check historical eligibility records.
 export async function studentAdmission(client: PoolClient, studentId: number, semesterId: number,
   options: { lockSource?: boolean; official?: Row | null } = {}) {
-  const direct = (await client.query(`SELECT saved."Result" AS result, roster."BatchID", roster."RoundID"
-    FROM "OJTRecruitmentRoster" roster JOIN "StudentOJTCalculatedResults" saved USING ("StudentID")
+  // Match QHDN's roster rule: only the latest OJT202 attempt determines whether
+  // a student has already passed, regardless of older attempts.
+  if ((await client.query(`SELECT ${latestOjt202PassedSql('s')} AS passed
+    FROM "Students" s WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL`, [studentId])).rows[0]?.passed) return null;
+
+  const direct = (await client.query(`SELECT ${calculatedEligibilitySql('s')} AS result, roster."BatchID", roster."RoundID"
+    FROM "OJTRecruitmentRoster" roster JOIN "Students" s USING ("StudentID")
     WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=$2`, [studentId, semesterId])).rows[0];
   if (direct) {
     const { result } = direct;
+    if (result?.status !== 'ELIGIBLE' || result?.isStale) return null;
+    const roundId = direct.RoundID ?? await currentOpenRound(client, semesterId) ?? null;
     return {
       studentId, status: 'ELIGIBLE', isStale: false,
       earnedCredits: result.earnedCredits ?? null, missingCredits: 0,
       unpassedCourseCount: result.unpassedCourseCount ?? null,
       reasons: result.reasons ?? [], academicIssues: result.academicIssues ?? [],
       source: 'SAVED_ELIGIBILITY', handoffId: null, batchId: direct.BatchID,
-      roundId: direct.RoundID as number | null, checkId: null,
+      roundId, checkId: null,
       appliedCondition: result.rule?.conditionId ? { id: result.rule.conditionId, version: result.rule.version, minCredits: result.rule.minCredits, issuingDocument: result.rule.issuingDocument ?? '' } : null,
     };
   }
-  const passedOjt202 = (await client.query(`SELECT EXISTS (
-    SELECT 1 FROM "StudentCourseResults" grade JOIN "Courses" course USING ("CourseID")
-    WHERE grade."StudentID"=$1 AND upper(btrim(course."CourseCode"))='OJT202' AND grade."Status"='PASSED'
-  ) AS passed`, [studentId])).rows[0]?.passed;
-  if (passedOjt202) return null;
+
+  // Students with a current calculated ELIGIBLE result must be able to see an
+  // open campaign even before QHDN has created a roster/handoff for them.
+  const calculated = (await client.query(`SELECT ${calculatedEligibilitySql('s')} AS result
+    FROM "Students" s JOIN "Users" u ON u."UserID"=s."UserID"
+    WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL
+      AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'`, [studentId])).rows[0]?.result;
+  if (calculated?.status === 'ELIGIBLE' && calculated?.isStale === false) {
+    const roundId = await currentOpenRound(client, semesterId) ?? null;
+    return {
+      studentId, status: 'ELIGIBLE', isStale: false,
+      earnedCredits: calculated.earnedCredits ?? null, missingCredits: calculated.missingCredits ?? 0,
+      unpassedCourseCount: calculated.unpassedCourseCount ?? null,
+      reasons: calculated.reasons ?? [], academicIssues: calculated.academicIssues ?? [],
+      source: roundId ? 'SAVED_ELIGIBILITY' : 'CALCULATED_ELIGIBILITY',
+      handoffId: null, batchId: calculated.batchId,
+      roundId, checkId: null,
+      appliedCondition: calculated.rule?.conditionId ? { id: calculated.rule.conditionId, version: calculated.rule.version, minCredits: calculated.rule.minCredits, issuingDocument: calculated.rule.issuingDocument ?? '' } : null,
+    };
+  }
   const handoff = (await client.query(`SELECT i."HandoffID",i."CheckID",i."CalculatedBatchID",i."Snapshot",h."CreatedAt"
     FROM ojt_history."StudentEligibilityItems" i JOIN ojt_history."EligibilityBatches" h ON h."HandoffID"=i."HandoffID"
     WHERE i."StudentID"=$1 AND i."OJTSemesterID"=$2 ORDER BY i."HandoffID" DESC LIMIT 1`, [studentId, semesterId])).rows[0];
