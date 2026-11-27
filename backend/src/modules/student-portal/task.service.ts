@@ -3,9 +3,7 @@ import { pool } from '../../config/database';
 import { audit } from '../academic/academic.repository';
 import { readTransaction } from '../qhdn/read.repository';
 import { inputObject, invalid, pagination, positiveId, requiredText } from '../students/student.validation';
-import { type Actor, type Row } from './shared';
-import { createHash } from 'node:crypto';
-import { taskAttachmentMetadata, taskSubmissionScope, validateTaskAttachment } from './task-attachment.service';
+import { ownStudent, type Actor, type Row } from './shared';
 
 // Student submission, completion and audit are committed atomically; no enterprise approval step.
 const localDay = `(clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`;
@@ -16,7 +14,7 @@ const canSubmitSql = `COALESCE(UPPER(t."Status") IN ('TODO','PENDING','IN_PROGRE
   AND (a."EndDate" IS NULL OR a."EndDate">=${localDay}),false)`;
 const submissionSelect = `SELECT u."UpdateID" AS id,u."TaskID" AS "taskId",u."UpdatedByStudentID" AS "studentId",
   COALESCE(u."ProgressDescription",'') AS content,
-  u."PercentComplete" AS "percentComplete",${taskAttachmentMetadata('u')} AS attachment,
+  u."PercentComplete" AS "percentComplete",
   u."UpdateDate" AT TIME ZONE 'Asia/Ho_Chi_Minh' AS "submittedAt",
   COALESCE(u."UpdateDate">(to_jsonb(submitted_task)->>'DueAt')::timestamp,u."UpdateDate">=(submitted_task."DueDate"+1)::timestamp,false) AS "isLate"
   FROM "TaskProgressUpdates" u JOIN "InternshipTasks" submitted_task ON submitted_task."TaskID"=u."TaskID"`;
@@ -65,8 +63,9 @@ export async function taskSubmissions(taskId: number, params: Row, actor: Actor)
   const p = pagination(params, []);
   if (p.offset > 2147483647) throw invalid('Pagination exceeds allowed range.');
   return readTransaction(async client => {
-    const studentId = await taskSubmissionScope(client, taskId, actor);
-    const args = [taskId, studentId];
+    const student = await ownStudent(client, actor);
+    await taskRecord(client, taskId, student.StudentID);
+    const args = [taskId, student.StudentID];
     const total = (await client.query(`SELECT count(*)::int AS total FROM "TaskProgressUpdates"
       WHERE "TaskID"=$1 AND "UpdatedByStudentID"=$2`, args)).rows[0].total;
     const items = (await client.query(`${submissionSelect}
@@ -76,15 +75,10 @@ export async function taskSubmissions(taskId: number, params: Row, actor: Actor)
   });
 }
 
-export async function submitTask(taskId: number, body: unknown, actor: Actor, attachment?: Express.Multer.File) {
+export async function submitTask(taskId: number, body: unknown, actor: Actor) {
   if (actor.roleCode !== 'STUDENT') throw invalid('Student access required.', 403, 'FORBIDDEN');
-  const input = inputObject(attachment && body && typeof body === 'object' && !Array.isArray(body)
-    ? { content: '', ...body } : body, ['content']);
-  if (attachment) validateTaskAttachment(attachment);
-  const content = (typeof input.content === 'string' && !input.content.trim()) || input.content === undefined
-    ? '' : requiredText(input.content, 'content', 10000);
-  if (!content && !attachment) throw invalid('Nhập nội dung hoặc chọn file bài làm.');
-  const attachmentHash = attachment ? createHash('sha256').update(attachment.buffer).digest('hex') : null;
+  const input = inputObject(body, ['content']);
+  const content = requiredText(input.content, 'content', 10000);
   if (!pool) throw invalid('Database is not configured.', 503, 'DATABASE_UNAVAILABLE');
   const client = await pool.connect();
   try {
@@ -98,22 +92,18 @@ export async function submitTask(taskId: number, body: unknown, actor: Actor, at
     const previous = (await client.query(`${submissionSelect}
       WHERE u."TaskID"=$1 AND u."UpdatedByStudentID"=$2 ORDER BY u."UpdateID" DESC LIMIT 1`, [taskId, student.StudentID])).rows[0];
     // Retry the latest identical content without creating a duplicate, even if the task closed meanwhile.
-    const sameAttachment = attachment
-      ? previous?.attachment?.sha256 === attachmentHash && previous.attachment.fileName === attachment.originalname
-      : !previous?.attachment;
-    if (previous?.content === content && sameAttachment && (!task.canSubmit || previous.percentComplete === 100)) {
+    if (previous?.content === content && (!task.canSubmit || previous.percentComplete === 100)) {
       await client.query('COMMIT');
       return { ...previous, replayed: true };
     }
     if (!task.canSubmit) throw invalid('This task no longer accepts submissions.', 409, 'TASK_SUBMISSION_CLOSED');
     const inserted = (await client.query(`INSERT INTO "TaskProgressUpdates"
-      ("TaskID","UpdatedByStudentID","UpdateDate","ProgressDescription","PercentComplete","AttachmentName","AttachmentMimeType","AttachmentContent","AttachmentSha256")
-      VALUES ($1,$2,clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',$3,100,$4,$5,$6,$7) RETURNING "UpdateID"`,
-      [taskId, student.StudentID, content, attachment?.originalname ?? null, attachment?.mimetype ?? null, attachment?.buffer ?? null, attachmentHash])).rows[0];
+      ("TaskID","UpdatedByStudentID","UpdateDate","ProgressDescription","PercentComplete")
+      VALUES ($1,$2,clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',$3,100) RETURNING "UpdateID"`, [taskId, student.StudentID, content])).rows[0];
     await client.query('UPDATE "InternshipTasks" SET "Status"=\'DONE\' WHERE "TaskID"=$1', [taskId]);
     const result = (await client.query(`${submissionSelect} WHERE u."UpdateID"=$1`, [inserted.UpdateID])).rows[0];
     await audit(client, actor.userId, 'TaskProgressUpdates', result.id, 'SUBMIT_TASK', null,
-      { taskId, studentId: student.StudentID, isLate: result.isLate, taskStatus: 'DONE', percentComplete: 100, attachment: result.attachment });
+      { taskId, studentId: student.StudentID, isLate: result.isLate, taskStatus: 'DONE', percentComplete: 100 });
     await client.query('COMMIT');
     return { ...result, replayed: false };
   } catch (error) {

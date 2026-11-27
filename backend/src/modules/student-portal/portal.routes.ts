@@ -9,7 +9,6 @@ import { notifications, readNotification } from './academic.service';
 import { analyzeCurrentCv, matchingProfile, updateMatchingProfile } from './cv-extraction.service';
 import { matchStudentJobs } from './job-matching.service';
 import { taskSubmissions, submitTask } from './task.service';
-import { receiveTaskSubmission } from './task-attachment.service';
 import { studyPeriods, studyOverview } from './study-period.service';
 
 const router = Router();
@@ -57,9 +56,9 @@ router.get('/students/me/tasks', ...read, handle(async r => {
     tasksPage: query.page, tasksLimit: query.limit, include: 'tasks' }, r.user)).tasks;
 }));
 router.get('/students/me/tasks/:id/submissions', ...read, handle(r => taskSubmissions(positiveId(r.params.id, 'taskId'), r.query, r.user)));
-router.post('/students/me/tasks/:id/submissions', ...own, receiveTaskSubmission, handle(r => {
+router.post('/students/me/tasks/:id/submissions', ...own, requireJsonBody, handle(r => {
   if (Object.keys(r.query).length) throw invalid('Send submission fields in the JSON body.');
-  return submitTask(positiveId(r.params.id, 'taskId'), r.body, r.user, r.file);
+  return submitTask(positiveId(r.params.id, 'taskId'), r.body, r.user);
 }, 201));
 router.get('/students/me/opportunities', ...read, handle(r => studentOpportunities(r.query, r.user)));
 router.get('/students/me/dashboard', ...read, handle(r => dashboard(r.query,r.user)));

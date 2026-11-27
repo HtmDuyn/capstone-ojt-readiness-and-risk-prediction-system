@@ -10,8 +10,6 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "check:db": "node scripts/check-db.cjs",
-    "db:migrate:task-attachments": "node scripts/migrate-task-attachments.cjs",
-    "test:task-attachments": "node --test tests/task-attachments.test.cjs",
     "test:enterprise-grading": "node --test tests/enterprise-grading.test.cjs",
     "test:recruitment": "node --test tests/recruitment-single-intake.test.cjs",
     "pretest:study-periods": "npm run build",

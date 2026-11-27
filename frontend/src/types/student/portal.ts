@@ -304,7 +304,6 @@ export interface TaskSubmission {
   content: string;
   submittedAt: string;
   isLate: boolean;
-  attachment?: { fileName: string; mimeType: string; size: number } | null;
 }
 export interface OjtResult {
   id: number;

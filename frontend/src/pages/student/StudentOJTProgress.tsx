@@ -265,7 +265,7 @@ function ProgressContent() {
                           Đã nộp · {dateText(activeTask.latestSubmission.submittedAt)}
                           {activeTask.latestSubmission.isLate && <span className="ml-2 text-amber-700">Nộp sau hạn</span>}
                         </p>
-                        <p className="mt-1 line-clamp-2 break-all text-slate-600">{activeTask.latestSubmission.content || activeTask.latestSubmission.attachment?.fileName}</p>
+                        <p className="mt-1 line-clamp-2 break-all text-slate-600">{activeTask.latestSubmission.content}</p>
                       </>
                     ) : (
                       <p className="text-slate-600">Chưa nộp bài</p>
@@ -313,7 +313,7 @@ function ProgressContent() {
           name={selectedTask.name}
           initialContent={selectedTask.latestSubmission?.content}
           load={(historyPage, signal) => getTaskSubmissions(selectedTask.id, historyPage, signal)}
-          submit={selectedTask.canSubmit ? (content, attachment) => submitAssignedTask(selectedTask.id, content, attachment) : undefined}
+          submit={selectedTask.canSubmit ? content => submitAssignedTask(selectedTask.id, content) : undefined}
           onClose={() => setSelectedTask(null)}
           onSubmitted={() => { setSelectedTask(null); setMessage('Đã gửi bài nộp cho doanh nghiệp.'); tasks.reload(); }}
         />
