@@ -57,4 +57,23 @@ describe('recruitment round scheduling',()=>{
   assert.equal(changed.resultsEndsAt,'13/12/2026 09:00');
   assert.equal(updateScheduleDraft(draft,'applicationEndsAt','12/12/2026 09:00',new Set(['resultsEndsAt'])).resultsEndsAt,draft.resultsEndsAt);
  });
+ it('allows Hạn 2 to overlap Hạn 1 and rejects equal or earlier starts and deadlines',()=>{
+  const draft={...newRecruitmentSchedule(now,semester),postingStartsAt:'28/11/2026 08:00',postingEndsAt:'02/12/2026 08:00',applicationStartsAt:'29/11/2026 08:00',applicationEndsAt:'06/12/2026 08:00',resultsStartsAt:'29/11/2026 08:00',resultsEndsAt:'07/12/2026 08:00'};
+  assert.deepEqual(validateRecruitmentSchedule(draft,{now,...semester}).errors,{});
+  for(const [key,value] of [['applicationStartsAt','28/11/2026 08:00'],['applicationStartsAt','28/11/2026 07:00'],['applicationEndsAt','02/12/2026 08:00'],['applicationEndsAt','02/12/2026 07:00']]){
+   assert.ok(validateRecruitmentSchedule({...draft,[key]:value},{now,...semester}).errors[key]);
+  }
+  assert.ok(validateRecruitmentSchedule({...draft,resultsStartsAt:'29/11/2026 07:00'},{now,...semester}).errors.resultsStartsAt);
+  assert.ok(validateRecruitmentSchedule({...draft,resultsEndsAt:'06/12/2026 07:00'},{now,...semester}).errors.resultsEndsAt);
+ });
+ it('changing Hạn 1 end preserves Hạn 2 start and maintains valid suggested ends',()=>{
+  const draft=newRecruitmentSchedule(now,semester);
+  const changed=updateScheduleDraft(draft,'postingEndsAt','12/12/2026 09:00',new Set());
+  assert.equal(changed.applicationStartsAt,draft.applicationStartsAt);
+  assert.ok(+parseScheduleDate(changed.applicationEndsAt)>+parseScheduleDate(changed.postingEndsAt));
+  assert.deepEqual(validateRecruitmentSchedule(changed,{now,...semester}).errors,{});
+  const manual=updateScheduleDraft(draft,'postingEndsAt','12/12/2026 09:00',new Set(['applicationStartsAt','applicationEndsAt','resultsEndsAt']));
+  assert.equal(manual.applicationEndsAt,draft.applicationEndsAt);assert.equal(manual.resultsEndsAt,draft.resultsEndsAt);
+  assert.ok(validateRecruitmentSchedule(manual,{now,...semester}).errors.applicationEndsAt);
+ });
 });

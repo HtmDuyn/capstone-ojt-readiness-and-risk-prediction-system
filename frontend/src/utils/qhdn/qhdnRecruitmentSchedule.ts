@@ -90,7 +90,8 @@ export function validateRecruitmentSchedule(draft: ScheduleDraft, options: {
   }
  };
  checkOrder('postingStartsAt', 'postingEndsAt', false, 'Hạn đăng tin phải kết thúc sau khi bắt đầu.');
- checkOrder('postingEndsAt', 'applicationStartsAt', true, 'Hạn ứng tuyển phải bắt đầu từ khi hạn đăng tin kết thúc.');
+ checkOrder('postingStartsAt', 'applicationStartsAt', false, 'Hạn 2 phải bắt đầu sau thời điểm bắt đầu Hạn 1.');
+ checkOrder('postingEndsAt', 'applicationEndsAt', false, 'Hạn 2 phải kết thúc sau thời điểm kết thúc Hạn 1.');
  checkOrder('applicationStartsAt', 'applicationEndsAt', false,
   `Hạn 2 phải kết thúc sau mốc bắt đầu ứng tuyển (${draft.applicationStartsAt}).`, null);
  checkOrder('applicationStartsAt', 'resultsStartsAt', true, 'Hạn xét tuyển phải bắt đầu từ khi mở ứng tuyển.');
@@ -107,12 +108,12 @@ export function validateRecruitmentSchedule(draft: ScheduleDraft, options: {
 // Preserve manually entered deadlines when updating the suggested dates.
 export function updateScheduleDraft(before:ScheduleDraft,key:ScheduleField,value:string,manual:ReadonlySet<ScheduleField>) {
  const next={...before,[key]:value};
- if(key==='postingEndsAt'&&parseScheduleDate(value)&&!manual.has('applicationStartsAt'))next.applicationStartsAt=value;
  if((key==='postingEndsAt'||key==='applicationStartsAt')&&parseScheduleDate(next.applicationStartsAt)) {
   if(!manual.has('resultsStartsAt'))next.resultsStartsAt=next.applicationStartsAt;
   if(!manual.has('applicationEndsAt')) {
    const start=parseScheduleDate(next.applicationStartsAt)!;
-   next.applicationEndsAt=formatScheduleDate(new Date(+start+7*86400000));
+   const postingEnd=parseScheduleDate(next.postingEndsAt);
+   next.applicationEndsAt=formatScheduleDate(new Date(Math.max(+start+7*86400000,postingEnd?+postingEnd+60000:-Infinity)));
   }
  }
  if(['postingEndsAt','applicationStartsAt','applicationEndsAt'].includes(key)&&!manual.has('resultsEndsAt')) {

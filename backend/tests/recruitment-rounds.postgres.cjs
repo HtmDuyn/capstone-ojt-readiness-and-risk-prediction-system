@@ -54,19 +54,25 @@ async function main(){
    const {editWindowSchedule,deleteDraftWindow}=require('../dist/modules/recruitment/schedule.service');
    const {extendWindow}=require('../dist/modules/recruitment/lifecycle.service');
    const iso=h=>new Date(base+h*hour).toISOString();
-   const schedule={postingStartsAt:iso(10),postingEndsAt:iso(12),applicationStartsAt:iso(12),applicationEndsAt:iso(17),resultsStartsAt:iso(12),resultsEndsAt:iso(18)};
+   const schedule={postingStartsAt:iso(10),postingEndsAt:iso(12),applicationStartsAt:iso(11),applicationEndsAt:iso(17),resultsStartsAt:iso(11),resultsEndsAt:iso(18)};
    const input={academicPeriodId:id,name:'Supplemental rollback fixture',supplemental:true,startsAt:iso(10),endsAt:iso(18),rounds:[{name:'Supplemental rollback fixture',...schedule}]};
    const saved=await saveWindow(input,actor);
    assert.equal(saved.id,id);assert.equal(saved.rounds[0].roundNumber,3);
    assert.equal((await c.query('SELECT count(*)::int AS n FROM "OJTRegistrationWindows" WHERE "RecruitmentRoundID"=$1',[saved.rounds[0].id])).rows[0].n,1);
    const opened=await saveWindow({status:'OPEN',reason:'Rollback opening check'},actor,saved.rounds[0].id);
    assert.equal(opened.status,'OPEN');assert.equal(opened.currentPhase,'SCHEDULED');assert.equal(opened.canPost,false);
+   await editWindowSchedule(opened.id,{...schedule,postingEndsAt:iso(13),name:input.name,reason:'Posting overlaps applications'},actor);
+   const linked=(await c.query('SELECT "StartsAt","EndsAt" FROM "OJTRegistrationWindows" WHERE "RecruitmentRoundID"=$1',[opened.id])).rows[0];
+   assert.equal(+linked.StartsAt,Date.parse(schedule.applicationStartsAt));assert.equal(+linked.EndsAt,Date.parse(schedule.applicationEndsAt));
    const openedAt=(await c.query('SELECT "OpenedAt" FROM "RecruitmentWindows" WHERE "WindowID"=$1',[opened.id])).rows[0].OpenedAt;
    assert.ok(openedAt instanceof Date);
    await saveWindow({name:'Renamed supplemental',reason:'Rollback rename'},actor,opened.id);
    assert.equal(+(await c.query('SELECT "OpenedAt" FROM "RecruitmentWindows" WHERE "WindowID"=$1',[opened.id])).rows[0].OpenedAt,+openedAt);
    await assert.rejects(()=>deleteDraftWindow(opened.id,{reason:'Cannot delete opened'},actor),{errorCode:'RECRUITMENT_DELETE_LOCKED'});
    await assert.rejects(()=>saveWindow(input,actor),{errorCode:'RECRUITMENT_WINDOW_CONFLICT'});
+   for(const patch of [{applicationStartsAt:iso(10)},{applicationEndsAt:iso(12)}]){
+    await assert.rejects(()=>saveWindow({...input,rounds:[{...schedule,name:input.name,...patch}]},actor),{errorCode:'RECRUITMENT_PHASE_SCHEDULE_INVALID'});
+   }
    await assert.rejects(()=>editWindowSchedule(saved.rounds[0].id,{...schedule,name:input.name,reason:'Rollback collision check',postingStartsAt:iso(9)},actor),{errorCode:'RECRUITMENT_WINDOW_CONFLICT'});
    await assert.rejects(()=>editWindowSchedule(saved.rounds[0].id,{...schedule,name:input.name,reason:'Rollback period bounds check',resultsEndsAt:iso(92*24)},actor),{field:'resultsEndsAt'});
    await assert.rejects(()=>extendWindow(id+1,{applicationEndsAt:iso(6),resultsEndsAt:iso(6)},actor),{errorCode:'RECRUITMENT_WINDOW_CONFLICT'});
@@ -77,9 +83,14 @@ async function main(){
    const correction={...input.rounds[0],postingStartsAt:iso(19),postingEndsAt:iso(20),applicationStartsAt:iso(20),applicationEndsAt:iso(22),resultsStartsAt:iso(20),resultsEndsAt:iso(24)};
    const corrected=await saveWindow({...input,startsAt:iso(19),endsAt:iso(24),rounds:[correction]},actor);
    assert.equal(corrected.rounds[0].roundNumber,4);
+   await c.query('SAVEPOINT overlapping_current_round');
+   await c.query(`UPDATE "RecruitmentWindows" SET "PostingEndsAt"=$2 WHERE "WindowID"=$1`,[id+1,iso(1)]);
+   await extendWindow(id+1,{postingEndsAt:iso(2)},actor);
+   await assert.rejects(()=>extendWindow(id+1,{postingEndsAt:iso(5)},actor),{field:'postingEndsAt'});
+   await c.query('ROLLBACK TO SAVEPOINT overlapping_current_round');
    console.log('PASS PostgreSQL without round trigger: backend controls adjacent multiple rounds, first opening date, immutable opening date, linked application windows, create/edit/extension collisions, period bounds and phase ordering.');
   }finally{pool.connect=connect;}
  }finally{await c.query('ROLLBACK');c.release();}
  console.log('All recruitment fixtures rolled back.');
 }
-main().catch(e=>{console.error('Recruitment PostgreSQL check failed:',e.code||e.message);process.exitCode=1;}).finally(()=>pool.end());
+main().catch(e=>{console.error('Recruitment PostgreSQL check failed:',e.code==='ERR_ASSERTION'?e.stack:e.code||e.message);process.exitCode=1;}).finally(()=>pool.end());

@@ -30,6 +30,8 @@ const timer=setTimeout(()=>{server.kill();browser.kill();process.exit(1)},55000)
     else if(p.request.method==='POST'){
      const input=JSON.parse(p.request.postData);writes.push(input);
      const r=input.rounds[0];assert.equal(Date.parse(r.postingStartsAt),Date.parse(first.endsAt));assert.ok(Date.parse(r.resultsEndsAt)<=Date.parse(end+'T00:00:00+07:00')+day);
+     assert.ok(Date.parse(r.applicationStartsAt)>Date.parse(r.postingStartsAt));assert.ok(Date.parse(r.applicationStartsAt)<Date.parse(r.postingEndsAt));
+     assert.ok(Date.parse(r.applicationEndsAt)>Date.parse(r.postingEndsAt));assert.equal(r.resultsStartsAt,r.applicationStartsAt);
      rounds=[first,{...r,id:2,campaignId:1,roundNumber:2,startsAt:r.postingStartsAt,endsAt:r.resultsEndsAt,status:'DRAFT',currentPhase:'DRAFT',canOpen:true,pendingCount:0}];
      body={success:true,data:{id:1,name:'Học kỳ thử nghiệm',rounds:[rounds[1]]}};
     }else if(p.request.method==='PATCH'){
@@ -57,6 +59,9 @@ const timer=setTimeout(()=>{server.kill();browser.kill();process.exit(1)},55000)
  await fill('#postingStartsAt-date',overlap.slice(0,10).split('-').reverse().join('/'));await fill('#postingStartsAt-time',overlap.slice(11));
  await click('Tạo đợt tuyển dụng');await wait('document.body.innerText.includes("Lịch trùng")');assert.equal(writes.length,0);
  await fill('#postingStartsAt-date',initial.date);await fill('#postingStartsAt-time',initial.time);
+ const applicationStart=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(Date.parse(first.endsAt)+6*3600000));
+ await fill('#applicationStartsAt-date',applicationStart.slice(0,10).split('-').reverse().join('/'));await fill('#applicationStartsAt-time',applicationStart.slice(11));
+ await wait('!document.querySelector("[aria-invalid=\\\"true\\\"]")');
  fs.writeFileSync(path.join(out,'supplemental-desktop.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await pause(150);
  assert.ok(await ev('document.documentElement.scrollWidth<=innerWidth'));

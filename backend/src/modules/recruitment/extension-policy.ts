@@ -17,8 +17,8 @@ export function extendedSchedule(before:Row, input:Row) {
   after[column]=value;changed=true;
  }
  if(!changed)throw invalid('Chọn ít nhất một thời hạn mới dài hơn hiện tại.');
- if(new Date(after.PostingEndsAt)>new Date(after.ApplicationStartsAt))
-  throw scheduleFieldError('postingEndsAt','Hạn đăng tin phải kết thúc trước hoặc đúng lúc bắt đầu ứng tuyển.');
+ if(new Date(after.PostingEndsAt)>=new Date(after.ApplicationEndsAt))
+  throw scheduleFieldError('postingEndsAt','Hạn 1 phải kết thúc trước thời điểm kết thúc Hạn 2.');
  if(new Date(after.ApplicationEndsAt)>new Date(after.ResultsEndsAt))
   throw scheduleFieldError('applicationEndsAt','Hạn ứng tuyển phải kết thúc trước hoặc đúng lúc hết hạn xét tuyển. Có thể gia hạn đồng thời hai hạn khi cả hai đang mở.');
  after.EndsAt=after.ResultsEndsAt;

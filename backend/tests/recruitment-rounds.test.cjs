@@ -234,3 +234,58 @@ test('backend protects finalized schedules and already elapsed phase boundaries'
  assert.throws(()=>policy.editedSchedule(row,{...r,postingStartsAt:new Date(+new Date(row.DatabaseNow)+3600000).toISOString()}),{errorCode:'RECRUITMENT_SCHEDULE_LOCKED'});
 });
 
+test('create accepts application intake during posting and enforces strict start/end ordering',async()=>{
+ const b=payload();b.rounds[0].applicationStartsAt='2026-11-27T12:00:00Z';
+ await fixture().service.saveWindow(b,7);
+ for(const [key,value] of [
+  ['applicationStartsAt',b.rounds[0].postingStartsAt],
+  ['applicationStartsAt','2026-11-27T01:00:00Z'],
+  ['applicationEndsAt',b.rounds[0].postingEndsAt],
+  ['applicationEndsAt','2026-11-28T01:00:00Z'],
+ ]){
+  const invalid={...b,rounds:[{...b.rounds[0],[key]:value}]};
+  await assert.rejects(()=>fixture().service.saveWindow(invalid,7),{field:key,errorCode:'RECRUITMENT_PHASE_SCHEDULE_INVALID'});
+ }
+});
+
+function activePhaseRow(schedule,clock='2026-11-28T12:00:00Z'){
+ const row={CampaignID:1,AcademicPeriodID:1,LinkedPeriodID:1,Kind:'SEMESTER',PeriodStatus:'ACTIVE',Status:'OPEN',OpenedAt:now,DatabaseNow:new Date(clock),StartsAt:schedule.postingStartsAt,EndsAt:schedule.resultsEndsAt};
+ const columns=fixture().load('backend/src/modules/recruitment/schedule-policy.ts').scheduleColumns;
+ for(const [key,column] of Object.entries(columns))row[column]=schedule[key];
+ return row;
+}
+test('posting and applications have independent open/close boundaries, with unchanged review rules',()=>{
+ const policy=fixture().load('backend/src/modules/recruitment/round-policy.ts');
+ const schedule={...payload().rounds[0],postingEndsAt:'2026-11-30T02:00:00Z'};
+ const row=activePhaseRow(schedule);
+ assert.equal(policy.phaseIsOpen(row,'POSTING'),true);assert.equal(policy.phaseIsOpen(row,'APPLICATION'),true);
+ assert.equal(policy.phaseIsOpen(row,'RESULTS'),true);assert.equal(policy.currentRoundPhase(row),'POSTING_AND_APPLICATION_AND_RESULTS');
+ assert.equal(policy.currentRoundPhase({...row,ResultsStartsAt:'2026-12-01T00:00:00Z'}),'POSTING_AND_APPLICATION');
+ const postingEnded={...row,DatabaseNow:new Date(row.PostingEndsAt)};
+ assert.equal(policy.phaseIsOpen(postingEnded,'POSTING'),false);assert.equal(policy.phaseIsOpen(postingEnded,'APPLICATION'),true);
+ assert.equal(policy.currentRoundPhase(postingEnded),'APPLICATION_AND_RESULTS');
+ const applicationsEnded={...row,DatabaseNow:new Date(row.ApplicationEndsAt)};
+ assert.equal(policy.phaseIsOpen(applicationsEnded,'APPLICATION'),false);assert.equal(policy.phaseIsOpen(applicationsEnded,'RESULTS'),true);
+});
+test('schedule editing and extension accept overlap, but Hạn 1 must still end strictly before Hạn 2',()=>{
+ const f=fixture(),schedulePolicy=f.load('backend/src/modules/recruitment/schedule-policy.ts'),extension=f.load('backend/src/modules/recruitment/extension-policy.ts');
+ const schedule={...payload().rounds[0],postingEndsAt:'2026-11-30T02:00:00Z'};
+ const before=activePhaseRow(schedule);
+ assert.doesNotThrow(()=>schedulePolicy.editedSchedule(before,{...schedule,postingEndsAt:'2026-12-01T02:00:00Z'}));
+ assert.equal(+extension.extendedSchedule(before,{postingEndsAt:'2026-12-01T02:00:00Z'}).PostingEndsAt,Date.parse('2026-12-01T02:00:00Z'));
+ for(const postingEndsAt of [schedule.applicationEndsAt,'2026-12-05T11:00:00Z']){
+  assert.throws(()=>extension.extendedSchedule(before,{postingEndsAt}),{field:'postingEndsAt'});
+  assert.throws(()=>schedulePolicy.editedSchedule(before,{...schedule,postingEndsAt}),{field:'applicationEndsAt'});
+ }
+ assert.throws(()=>extension.extendedSchedule(before,{applicationEndsAt:'2026-12-07T10:00:00Z'}),{field:'applicationEndsAt'});
+ assert.doesNotThrow(()=>extension.extendedSchedule(before,{applicationEndsAt:'2026-12-07T10:00:00Z',resultsEndsAt:'2026-12-08T10:00:00Z'}));
+});
+test('Hạn 3 can start with applications and must continue through their deadline',()=>{
+ const f=fixture(),b=payload();
+ assert.doesNotThrow(()=>f.service.validateCampaignSchedule(b));
+ for(const patch of [{resultsStartsAt:'2026-11-28T01:00:00Z'},{resultsEndsAt:'2026-12-05T09:00:00Z'}]){
+  assert.throws(()=>f.service.validateCampaignSchedule({...b,rounds:[{...b.rounds[0],...patch}]}),{errorCode:'RECRUITMENT_PHASE_SCHEDULE_INVALID'});
+ }
+ assert.doesNotThrow(()=>f.service.validateCampaignSchedule({...b,rounds:[{...b.rounds[0],resultsEndsAt:b.rounds[0].applicationEndsAt}]}));
+});
+

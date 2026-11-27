@@ -29,7 +29,8 @@ export function scheduleDate(value: unknown, field: ScheduleField) {
 export function validatePhaseOrder(dates: Record<ScheduleField, Date>) {
  const rules = [
   ['postingStartsAt','postingEndsAt',false,'Hạn đăng tin phải kết thúc sau khi bắt đầu.'],
-  ['postingEndsAt','applicationStartsAt',true,'Hạn ứng tuyển phải bắt đầu từ khi hạn đăng tin kết thúc.'],
+  ['postingStartsAt','applicationStartsAt',false,'Hạn 2 phải bắt đầu sau thời điểm bắt đầu Hạn 1.'],
+  ['postingEndsAt','applicationEndsAt',false,'Hạn 2 phải kết thúc sau thời điểm kết thúc Hạn 1.'],
   ['applicationStartsAt','applicationEndsAt',false,`Hạn 2 phải kết thúc sau mốc bắt đầu ứng tuyển (${scheduleClock.format(dates.applicationStartsAt)}).`],
   ['applicationStartsAt','resultsStartsAt',true,'Hạn xét tuyển phải bắt đầu từ khi mở ứng tuyển.'],
   ['resultsStartsAt','resultsEndsAt',false,`Hạn kết thúc xét tuyển phải sau mốc bắt đầu đang chọn (${scheduleClock.format(dates.resultsStartsAt)}).`],

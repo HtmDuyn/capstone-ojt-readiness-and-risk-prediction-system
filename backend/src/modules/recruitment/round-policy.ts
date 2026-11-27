@@ -41,6 +41,8 @@ export function currentRoundPhase(w: Row): string {
  if(w.Status==='CLOSED')return 'CLOSED';
  if(w.Status!=='OPEN')return 'DRAFT';
  if(hasPhaseSchedule(w)){
+  if(phaseIsOpen(w,'POSTING')&&phaseIsOpen(w,'APPLICATION'))
+   return phaseIsOpen(w,'RESULTS')?'POSTING_AND_APPLICATION_AND_RESULTS':'POSTING_AND_APPLICATION';
   if(phaseIsOpen(w,'POSTING'))return 'POSTING';
   if(phaseIsOpen(w,'APPLICATION')&&phaseIsOpen(w,'RESULTS'))return 'APPLICATION_AND_RESULTS';
   if(phaseIsOpen(w,'APPLICATION'))return 'APPLICATION';
