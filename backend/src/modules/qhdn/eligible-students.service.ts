@@ -95,7 +95,7 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       s."StudentCode" AS "studentCode",u."FullName" AS "fullName",u."Email" AS email,
       s."ProgramID" AS "programId",program."ProgramName" AS "programName",
       placement."CohortID" AS "cohortId",cohort."Name" AS "cohortName",placement."GroupCode" AS "groupCode",
-      target."OJTSemesterID" AS "ojtSemesterId",target."Name" AS "semesterName",
+      target."OJTSemesterID" AS "ojtSemesterId",target."Name" AS "semesterName",target."Status" AS "semesterStatus",
       COALESCE((SELECT jsonb_agg(jsonb_build_object(
         'resultId',history."ResultID",'courseCode',course."CourseCode",'courseName',course."CourseName",
         'semesterTaken',history."SemesterTaken",'periodName',period."Name",'score',history."Score",
