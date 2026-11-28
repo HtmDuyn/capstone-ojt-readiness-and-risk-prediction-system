@@ -42,8 +42,9 @@ export async function getPage<T>(
   path: string,
   params: Query = {},
   signal?: AbortSignal,
+  timeout = 30000,
 ): Promise<Page<T>> {
-  const result = apiData<Page<T>>(await getJson(path, params, signal));
+  const result = apiData<Page<T>>(await getJson(path, params, signal, timeout));
   if (!Array.isArray(result?.items))
     throw new Error("Chưa thể tải danh sách lúc này. Vui lòng thử lại.");
   return result;
@@ -52,6 +53,7 @@ export async function getAllItems<T>(
   path: string,
   params: Query = {},
   signal?: AbortSignal,
+  timeout = 30000,
 ): Promise<T[]> {
   const items: T[] = [];
   for (let page = 1; page <= 1000; page++) {
@@ -59,6 +61,7 @@ export async function getAllItems<T>(
       path,
       { ...params, page, limit: 100 },
       signal,
+      timeout,
     );
     items.push(...data.items);
     if (items.length >= data.total || data.items.length === 0) return items;
@@ -411,10 +414,10 @@ export const academicReportingService = {
     getPage<CourseDemand>('/course-demands', {
       ...scope, page, limit: 20, includeInProgress: String(includeInProgress),
     }, signal) as Promise<DemandReport>,
-  exportCourseDemand: async (scope: ReportScope, includeInProgress = false) => {
+  exportCourseDemand: async (scope: ReportScope, includeInProgress = false, excludeNonOjtCreditCourses = false) => {
     try {
       const response = await API.get<Blob>('/course-demands/export', {
-        params: cleanQuery({ ...scope, includeInProgress: String(includeInProgress), format: 'csv' }),
+        params: cleanQuery({ ...scope, includeInProgress: String(includeInProgress), excludeNonOjtCreditCourses: String(excludeNonOjtCreditCourses), format: 'csv' }),
         responseType: 'blob',
       });
       return response.data;
@@ -746,14 +749,18 @@ export const educationOverviewService = {
         id: number;
         accountStatus: string;
         cohortId: number | null;
+        currentAcademicPeriodId?: number | null;
         cohort?: { id: number; name: string; code: string } | null;
         calculatedEligibility?: SavedOjtEligibility | null;
       };
       const students = (await getAllItems<OverviewStudent>('/students', {
         status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
       }, signal)).filter(student => student.accountStatus === 'ACTIVE');
+      const scopedStudents = scope.academicPeriodId
+        ? students.filter(student => String(student.currentAcademicPeriodId) === String(scope.academicPeriodId))
+        : students;
       signal?.throwIfAborted();
-      const rows = students.map(student => {
+      const rows = scopedStudents.map(student => {
         const saved = student.calculatedEligibility;
         const status = saved && !saved.isStale ? saved.status : undefined;
         const category = !saved || saved.isStale ? 'AWAITING_CONFIRMATION' : status === 'REVIEW_REQUIRED' ? 'INSUFFICIENT_DATA' : status;
@@ -762,9 +769,9 @@ export const educationOverviewService = {
       });
       const data = dashboardSummary([{
         rows,
-        cohorts: students.flatMap(student => student.cohort ? [{ CohortID: student.cohort.id, Name: student.cohort.name, CohortCode: student.cohort.code }] : []),
+        cohorts: scopedStudents.flatMap(student => student.cohort ? [{ CohortID: student.cohort.id, Name: student.cohort.name, CohortCode: student.cohort.code }] : []),
       }]);
-      const staleCount = students.filter(student => student.calculatedEligibility?.isStale).length;
+      const staleCount = scopedStudents.filter(student => student.calculatedEligibility?.isStale).length;
       return { ...data, unavailableProfiles: 0,
         warning: staleCount ? `${staleCount} kết quả đã cũ do dữ liệu học vụ thay đổi. Cần xét lại trước khi sử dụng.` : '',
       };
@@ -1232,7 +1239,7 @@ async function loadStudent(
       : decision === "NOT_ELIGIBLE"
         ? "Chưa đủ điều kiện"
         : decision === "REVIEW_REQUIRED"
-          ? "Cần đối soát"
+          ? "Chưa đủ dữ liệu"
         : "Chưa có kết quả";
   return {
     id: String(profile.id),
@@ -1242,8 +1249,8 @@ async function loadStudent(
     curriculumCode: progressText(program.code),
     currentCurriculumSemester: number(profile.currentSemester),
     courseSemesterTag: number(profile.courseSemesterTag),
-    currentTerm: progressText(profile.currentAcademicPeriod?.name),
-    currentTermStartDate: profile.currentAcademicPeriod?.startDate ?? null,
+    currentTerm: progressText(profile.systemCurrentAcademicPeriod?.name),
+    currentTermStartDate: profile.systemCurrentAcademicPeriod?.startDate ?? null,
     gpa: number(progress.gpa),
     gpaScale: number(progress.gpaScale),
     gpaLoaded: true,
@@ -1270,7 +1277,7 @@ async function loadStudent(
       [
         curriculumWarning,
         progress.issues?.length
-          ? "Dữ liệu học vụ cần đối soát: " + progress.issues.join(", ")
+          ? "Dữ liệu học vụ chưa đầy đủ: " + progress.issues.join(", ")
           : "",
       ]
         .filter(Boolean)
@@ -1299,8 +1306,8 @@ function progressSummary(row: Row): StudentProgress {
     curriculumCode: progressText(row.program?.code),
     currentCurriculumSemester: number(row.currentSemester),
     courseSemesterTag: number(row.courseSemesterTag),
-    currentTerm: progressText(row.currentAcademicPeriod?.name),
-    currentTermStartDate: row.currentAcademicPeriod?.startDate ?? null,
+    currentTerm: progressText(row.systemCurrentAcademicPeriod?.name),
+    currentTermStartDate: row.systemCurrentAcademicPeriod?.startDate ?? null,
     gpa: gpaLoaded ? number(row.cachedGpa) : null,
     gpaScale: gpaLoaded ? number(row.cachedGpaScale) : null,
     gpaLoaded,

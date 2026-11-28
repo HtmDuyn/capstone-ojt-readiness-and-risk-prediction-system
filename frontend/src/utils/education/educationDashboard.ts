@@ -149,6 +149,12 @@ export const parseAcademicYears = (value: unknown): AcademicYear[] => {
 
 export const parseAcademicPeriods = (value: unknown): AcademicPeriod[] => {
   return readList(value)
+    // The dashboard filter is by main semester only; Block 3 is a child
+    // academic period used by workflow/reporting APIs, not a semester choice.
+    .filter((item) => {
+      const kind = (readString(item, ["kind"]) ?? "").toUpperCase();
+      return !kind || kind === "SEMESTER";
+    })
     .map((item) => {
       const id = readString(item, ["id"]);
 

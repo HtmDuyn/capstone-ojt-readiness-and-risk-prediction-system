@@ -13,6 +13,7 @@ import {
   Activity,
   ClipboardCheck,
   SlidersHorizontal,
+  Bell,
 } from 'lucide-react';
 
 import type { NavItem } from '@/types/common.types';
@@ -174,6 +175,17 @@ export const EDUCATION_NAV_ITEMS: NavItem[] = [
       title: 'Nhu cầu lớp hỗ trợ',
       description:
         'Xem nhu cầu học phần từ hồ sơ học tập và điều kiện OJT để cân nhắc mở lớp hỗ trợ.',
+      badge: 'Phòng Đào tạo',
+    },
+  },
+  {
+    id: 'notifications',
+    label: 'Thông báo',
+    path: '/education/notifications',
+    icon: <Bell size={20} />,
+    banner: {
+      title: 'Thông báo',
+      description: 'Theo dõi thông báo được gửi đến tài khoản Phòng Đào tạo.',
       badge: 'Phòng Đào tạo',
     },
   },

@@ -5,6 +5,9 @@ import { resultSelect } from './student.service';
 type Row=Record<string,any>;
 const excludedOjtCredit = /(?:\bGDTC\b|\bGDQP\b|\bQPAN\b|\bPE\b|PHE[_ -]?COM|\bphysical\s+education\b|\bmilitary\b|quoc\s+phong|giao\s+duc\s+the\s+chat|the\s+duc|nhac\s+cu|musical\s+instrument)/i;
 const normalizedCourseText=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d');
+export function isExcludedFromOjtCredits(value:string) {
+  return excludedOjtCredit.test(normalizedCourseText(value)) || /(?:^|[\s._-])PE\s*\d+\b/i.test(value);
+}
 // Pure calculation: no guessed passing threshold, conversion scale, or legacy global course credits.
 export function calculateProgress(program:Row|undefined,courses:Row[],attempts:Row[],aliases:Row[],options:Row[],policy:Row|undefined,configurationIssues:string[]=[],curriculumGradeWeights:Row[]=[],requireConfirmedSlotChoices=true) {
   const issues=[...configurationIssues];
@@ -16,6 +19,9 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
     while (mapping.has(id)) {if (seen.has(id)) {issues.push('COURSE_EQUIVALENCE_CYCLE');return -1;}seen.add(id);id=mapping.get(id)!;}
     return id;
   };
+  const physicalEducationCourses=new Set<number>(curriculumGradeWeights
+    .filter(r=>/^PHE_COM/i.test(String(r.ComboCode??'')))
+    .map(r=>canonical(Number(r.CourseID))).filter(id=>id>0));
   const requirements:Row[]=[],normal=new Map<number,Row>();
   for (const c of courses) {
     if (c.EntryKind==='COURSE') {
@@ -72,7 +78,9 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
     r.completed=key!==undefined;r.matchedCourseId=key??null;
     const selected=key===undefined?null:[...courses,...options].find(course=>Number(course.CourseID)===key);
     const courseDescription=`${selected?.CourseCatalogName??''} ${selected?.ChosenCourseName??''} ${selected?.CourseName??r.name??''} ${selected?.CourseCode??r.courseCode??''}`;
-    r.excludedFromOjtCredits=excludedOjtCredit.test(normalizedCourseText(courseDescription))||/(?:^|[\s._-])PE\s*\d+\b/i.test(courseDescription);
+    const requirementChoices=(r.choices as number[]|undefined)??(r.courseId===null?[]:[r.courseId as number]);
+    r.excludedFromOjtCredits=isExcludedFromOjtCredits(courseDescription)
+      || requirementChoices.some(id=>physicalEducationCourses.has(canonical(Number(id))));
     if (key!==undefined && r.credits!==null) {earned+=r.credits;if(!r.excludedFromOjtCredits)ojtEarned+=r.credits;weights.set(key,r.credits);}
     if (r.kind==='COURSE' && r.credits!==null) weights.set(r.courseId,r.credits);
   }
@@ -89,15 +97,12 @@ export function calculateProgress(program:Row|undefined,courses:Row[],attempts:R
   }
   // OJT credits come from passed course history, including combo courses whose
   // curriculum slot option was never mapped. Unknown course weights are omitted.
-  const physicalEducationCourses=new Set<number>(curriculumGradeWeights
-    .filter(r=>/^PHE_COM/i.test(String(r.ComboCode??'')))
-    .map(r=>canonical(Number(r.CourseID))).filter(id=>id>0));
   let historyOjtEarned=0;
   for (const key of achieved) {
     const credit=weights.get(key);
     if (credit===undefined) continue;
     const description=(groups.get(key)??[]).map(r=>`${r.courseName??''} ${r.courseCode??''}`).join(' ');
-    if (physicalEducationCourses.has(key) || excludedOjtCredit.test(normalizedCourseText(description)) || /(?:^|[\s._-])PE\s*\d+\b/i.test(description)) continue;
+    if (physicalEducationCourses.has(key) || isExcludedFromOjtCredits(description)) continue;
     historyOjtEarned+=credit;
   }
   const gpaIssues:string[]=[];

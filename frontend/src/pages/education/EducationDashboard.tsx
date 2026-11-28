@@ -6,21 +6,21 @@ import { courseDemandOverview } from '@/utils/education/courseDemandOverview';
 import { useEducationDashboard } from '@/hooks/education/useEducationDashboard';
 import { useNearViewport } from '@/hooks/shared/useNearViewport';
 import { formatDate, formatNumber, formatPercent } from '@/utils/education/educationDashboard';
-import { AlertTriangle, BarChart3, BellRing, BookOpen, CalendarDays, CheckCircle2, FileDown, Info, PieChart, Users } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, CalendarDays, CheckCircle2, FileDown, Info, PieChart, Users } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
 
 export const EducationDashboard: React.FC = () => {
   const { ref: demandSection, reached: loadCourseDemand } = useNearViewport<HTMLElement>();
 
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
-  const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible + period.reviewRequired > 0);
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, filtersError, dashboardError, courseDemandError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
+  const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible > 0);
   const ojtGroups = [
     { label: 'Đủ điều kiện', count: eligibleStudents ?? 0, color: '#22c55e', dotClass: 'bg-green-500' },
     { label: 'Chưa đủ điều kiện', count: ineligibleStudents ?? 0, color: '#f87171', dotClass: 'bg-red-400' },
-    { label: 'Cần đối soát', count: reviewRequiredStudents ?? 0, color: '#fb923c', dotClass: 'bg-orange-400' },
   ];
   const demandOverview = courseDemandOverview(courseDemands);
+  const hasCourseDemandScope = Boolean(selectedPeriod && selectedOjtSemesterId);
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6">
       <PageBanner
@@ -101,7 +101,6 @@ export const EducationDashboard: React.FC = () => {
                 {filteredPeriods.map((period) => (
                   <option key={period.id} value={period.id}>
                     {period.name}
-                    {period.code ? ` (${period.code})` : ""}
                   </option>
                 ))}
               </select>
@@ -139,10 +138,8 @@ export const EducationDashboard: React.FC = () => {
             <Info size={15} className="mt-0.5 shrink-0" />
 
             <span>
-              {selectedOjtSemesterId
-                  ? "Báo cáo học vụ theo kỳ đã chọn; kết quả xét điều kiện OJT được tổng hợp riêng, không phụ thuộc kỳ học và chưa phải quyết định chính thức."
-                  : selectedPeriod
-                    ? "Đang xem học vụ theo kỳ học đã chọn; kết quả xét điều kiện OJT theo kỳ ghi nhận trong hồ sơ và chưa phải quyết định chính thức."
+              {selectedPeriod
+                  ? "Số liệu được lọc theo kỳ học hiện tại trong hồ sơ sinh viên; kết quả xét OJT là kết quả đã lưu gần nhất của các sinh viên trong phạm vi này."
                     : selectedYear
                     ? "Năm học chỉ lọc danh sách kỳ học; số liệu bên dưới vẫn tổng hợp toàn hệ thống. Kết quả xét điều kiện OJT phục vụ theo dõi, chưa phải quyết định chính thức."
                     : "Dữ liệu tổng hợp theo phạm vi đã chọn, mỗi sinh viên được tính một lần. Kết quả xét điều kiện OJT phục vụ công tác theo dõi và chuẩn bị thực tập, chưa phải quyết định chính thức."}
@@ -166,7 +163,7 @@ export const EducationDashboard: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">
+          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-3">
             <div className="border-slate-200 sm:border-r sm:border-b xl:border-b-0">
               <MetricCard
                 label="Tổng sinh viên"
@@ -200,14 +197,6 @@ export const EducationDashboard: React.FC = () => {
               />
             </div>
 
-            <MetricCard
-              label="Cảnh báo học vụ"
-              value={alertCount}
-              description="Cảnh báo được hệ thống ghi nhận"
-              icon={<BellRing size={18} />}
-              iconClass="bg-orange-50 text-orange-600"
-              loading={alertsLoading}
-            />
           </div>
         </section>
 
@@ -272,7 +261,6 @@ export const EducationDashboard: React.FC = () => {
                       <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
                       Chưa đủ điều kiện
                     </span>
-                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />Cần đối soát</span>
                   </div>
                   <CohortResultsChart results={cohortResults} />
                   <p className="text-center text-xs text-slate-500">Khóa sinh viên · Số lượng sinh viên</p>
@@ -294,8 +282,8 @@ export const EducationDashboard: React.FC = () => {
 
           <div className="grid gap-3 sm:grid-cols-3">
             {([
-              ['Học phần có nhu cầu', demandOverview.courseCount, 'Học phần duy nhất từ nhu cầu học, không riêng học lại'],
-              ['Lượt nhu cầu học', demandOverview.demandCount, 'Cặp sinh viên – học phần duy nhất trong phạm vi đang xem'],
+              ['Học phần có nhu cầu', hasCourseDemandScope ? demandOverview.courseCount : null, 'Học phần duy nhất từ nhu cầu học, không riêng học lại'],
+              ['Lượt nhu cầu học', hasCourseDemandScope ? demandOverview.demandCount : null, 'Cặp sinh viên – học phần duy nhất trong phạm vi đang xem'],
               ['Lớp hỗ trợ đề xuất', null, 'Cần chọn kỳ học/Block 3 tại trang nhu cầu lớp hỗ trợ'],
             ] as const).map(([label, value, description], index) => <div key={label} className="flex min-h-32 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <span className={`mb-3 h-1 w-10 rounded-full ${['bg-orange-400', 'bg-blue-400', 'bg-emerald-400'][index]}`} aria-hidden="true" />
@@ -317,8 +305,12 @@ export const EducationDashboard: React.FC = () => {
               {courseDemands.length === 0 ? (
                 <EmptyState
                   loading={courseDemandLoading}
-                  title="Chưa có thống kê nhu cầu học phần"
-                  description="Chưa có dữ liệu học phần phù hợp để hiển thị."
+                  title={hasCourseDemandScope ? 'Chưa có thống kê nhu cầu học phần' : 'Chọn kỳ học để xem nhu cầu học phần'}
+                  description={hasCourseDemandScope
+                    ? 'Chưa có dữ liệu học phần phù hợp để hiển thị.'
+                    : selectedPeriod
+                      ? 'Kỳ học đã chọn chưa được liên kết với kỳ OJT. Hãy chọn kỳ học có kỳ OJT tương ứng.'
+                      : 'Báo cáo nhu cầu cần một kỳ học cụ thể. Chọn kỳ ở bộ lọc phía trên để tải dữ liệu.'}
                 />
               ) : (
                 <div className="mt-3 max-w-full overflow-x-auto rounded-lg border border-slate-200">
@@ -344,49 +336,6 @@ export const EducationDashboard: React.FC = () => {
                   </table>
                 </div>
               )}
-          </div>
-        </section>
-
-        {/* =============================================
-            ACADEMIC ALERTS
-            ============================================= */}
-
-        <section className="px-5 py-5 md:px-7">
-          <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <SectionTitle
-              icon={<BellRing size={18} />}
-              title="Tổng quan cảnh báo học vụ"
-              description="Số liệu theo phạm vi thống kê đang chọn."
-              iconClass="bg-orange-50 text-orange-600"
-            />
-            <Link to="/education/student-progress" className="text-sm font-semibold text-orange-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">Xem danh sách sinh viên</Link>
-          </div>
-
-          <div className="bg-white">
-            {alertsError && (
-              <div className="mb-4">
-                <ErrorNotice message={alertsError} />
-              </div>
-            )}
-
-            {!alertOverview || alertOverview.total === 0 ? (
-              <EmptyState
-                loading={alertsLoading}
-                title="Chưa có cảnh báo học vụ"
-                description="Chưa có cảnh báo trong phạm vi đang xem."
-              />
-            ) : (
-              <div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4"><p className="text-sm text-slate-600">Tổng số cảnh báo</p><p className="mt-1 text-2xl font-bold text-orange-700">{formatNumber(alertOverview.total)}</p></div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm text-slate-600">Sinh viên có cảnh báo</p><p className="mt-1 text-2xl font-bold text-slate-900">{formatNumber(alertOverview.studentCount)}</p></div>
-                </div>
-                <h3 className="mt-5 text-sm font-bold text-slate-800">Theo loại cảnh báo</h3>
-                <div className={`mt-3 grid gap-3 ${alertOverview.groups.length === 1 ? 'grid-cols-1' : alertOverview.groups.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-                  {alertOverview.groups.map(group => <div key={group.type} className="flex min-h-20 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-orange-50/60"><span className="min-w-0 break-words text-sm text-slate-700">{group.label}</span><strong className="shrink-0 text-lg tabular-nums text-orange-700">{formatNumber(group.count)}</strong></div>)}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 

@@ -7,6 +7,7 @@ type Row = Record<string, any>;
 // QHDN publishes enterprise evaluations directly. Student reads require the publication record.
 const resultSelect = `SELECT ev.*,a."AssignmentID",a."StudentID",a."EnterpriseID",a."PositionID",
   co."OJTSemesterID",s."ProgramID",s."StudentCode",u."FullName",e."Name" AS "EnterpriseName",t."SemesterCode",
+  ap."PeriodCode" AS "AcademicPeriodCode",ap."Name" AS "AcademicPeriodName",ay."YearCode" AS "AcademicYearCode",
   publication."SentAt" AS "PublishedAt",publication."NotificationID" IS NOT NULL AS "PublishedToStudent",
   CASE WHEN publication."NotificationID" IS NOT NULL THEN 'PUBLISHED' ELSE 'SUBMITTED' END AS "Status",
   CASE WHEN template."TemplateID" IS NULL THEN NULL ELSE jsonb_build_object('id',template."TemplateID",'code',template."Code",'name',template."Name",'version',template."Version",'criteria',template."Criteria") END AS "EvaluationTemplate"
@@ -14,6 +15,8 @@ const resultSelect = `SELECT ev.*,a."AssignmentID",a."StudentID",a."EnterpriseID
   JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
   JOIN "Students" s ON s."StudentID"=a."StudentID" JOIN "Users" u ON u."UserID"=s."UserID"
   JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "OJTSemesters" t ON t."OJTSemesterID"=co."OJTSemesterID"
+  LEFT JOIN "AcademicPeriods" ap ON ap."AcademicPeriodID"=t."AcademicPeriodID"
+  LEFT JOIN "AcademicYears" ay ON ay."AcademicYearID"=ap."AcademicYearID"
   LEFT JOIN LATERAL (SELECT n."NotificationID",n."SentAt" FROM "Notifications" n
     WHERE n."UserID"=u."UserID" AND n."RelatedEntityType"='OJT_RESULT_PUBLISHED'
       AND n."RelatedEntityID"=ev."EvaluationID" ORDER BY n."NotificationID" LIMIT 1) publication ON true
@@ -21,7 +24,8 @@ const resultSelect = `SELECT ev.*,a."AssignmentID",a."StudentID",a."EnterpriseID
 export function resultApi(r: Row) {
   return {id:r.EvaluationID,resultId:null,evaluationId:r.EvaluationID,assignmentId:r.AssignmentID,studentId:r.StudentID,
     companyId:r.EnterpriseID,positionId:r.PositionID,programId:r.ProgramID,studentCode:r.StudentCode,fullName:r.FullName,
-    enterpriseName:r.EnterpriseName,ojtSemesterId:r.OJTSemesterID,semesterCode:r.SemesterCode,status:r.Status,
+    enterpriseName:r.EnterpriseName,ojtSemesterId:r.OJTSemesterID,semesterCode:r.SemesterCode,
+    academicPeriodCode:r.AcademicPeriodCode??null,academicPeriodName:r.AcademicPeriodName??null,academicYearCode:r.AcademicYearCode??null,status:r.Status,
     publishedToStudent:Boolean(r.PublishedToStudent),publishedAt:r.PublishedAt??null,
     officialScore:r.PublishedToStudent&&r.OverallScore!=null?Number(r.OverallScore):null,completionScore:r.CompletionScore==null?null:Number(r.CompletionScore),
     attitudeScore:r.AttitudeScore==null?null:Number(r.AttitudeScore),skillScore:r.SkillScore==null?null:Number(r.SkillScore),

@@ -16,9 +16,9 @@ export interface SavedOjtEligibility {
   rule?: OjtAppliedCondition;
 }
 
-export function savedOjtLabel(result: SavedOjtEligibility): 'Đủ điều kiện' | 'Chưa đủ điều kiện' | 'Cần đối soát' | 'Cần xét lại' {
+export function savedOjtLabel(result: SavedOjtEligibility): 'Đủ điều kiện' | 'Chưa đủ điều kiện' | 'Chưa đủ dữ liệu' | 'Cần xét lại' {
   if (result.isStale) return 'Cần xét lại';
-  return { ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Chưa đủ điều kiện', REVIEW_REQUIRED: 'Cần đối soát' }[result.status] as 'Đủ điều kiện' | 'Chưa đủ điều kiện' | 'Cần đối soát';
+  return { ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Chưa đủ điều kiện', REVIEW_REQUIRED: 'Chưa đủ dữ liệu' }[result.status] as 'Đủ điều kiện' | 'Chưa đủ điều kiện' | 'Chưa đủ dữ liệu';
 }
 
 export function savedOjtProgressLabel(result?: SavedOjtEligibility): ReturnType<typeof savedOjtLabel> | 'Chưa có kết quả' {

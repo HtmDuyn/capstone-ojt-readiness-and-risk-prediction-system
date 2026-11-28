@@ -35,7 +35,7 @@ export async function getGradingCriteria(params: Row) {
     if (semesterId && !(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1', [semesterId])).rowCount) throw invalid('OJT semester not found.',404);
   const rows = (await c.query(`SELECT t.* FROM "AssessmentTemplates" t WHERE t."OJTSemesterID" IS NOT NULL AND ($1::int IS NULL OR t."OJTSemesterID"=$1) ORDER BY t."OJTSemesterID",t."EffectiveFrom" DESC,t."Version" DESC`, [semesterId])).rows;
     const semesters = (await c.query(`SELECT o."OJTSemesterID" AS id,o."SemesterCode" AS code,o."Name" AS name,o."StartDate" AS "startDate",o."EndDate" AS "endDate",o."Status" AS status FROM "OJTSemesters" o ORDER BY o."StartDate",o."OJTSemesterID"`)).rows;
-    const current = (await c.query(`SELECT o."OJTSemesterID" FROM "OJTSemesters" o WHERE o."StartDate"<=CURRENT_DATE AND (o."EndDate" IS NULL OR o."EndDate">=CURRENT_DATE) ORDER BY o."StartDate" DESC LIMIT 1`)).rows[0]?.OJTSemesterID ?? null;
+    const current = (await c.query(`SELECT o."OJTSemesterID" FROM "OJTSemesters" o WHERE o."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Saigon')::date AND (o."EndDate" IS NULL OR o."EndDate">=(statement_timestamp() AT TIME ZONE 'Asia/Saigon')::date) ORDER BY o."StartDate" DESC LIMIT 1`)).rows[0]?.OJTSemesterID ?? null;
     return { items: rows.map(api), semesters, currentOjtSemesterId: current };
   });
 }
@@ -55,7 +55,12 @@ export function gradingCriteriaSelection(semesterSql: string) {
   return `SELECT t.* FROM "AssessmentTemplates" t
     JOIN "OJTSemesters" source ON source."OJTSemesterID"=t."OJTSemesterID"
     JOIN "OJTSemesters" target ON target."OJTSemesterID"=${semesterSql}
-    WHERE t."Status"='PUBLISHED' AND COALESCE(t."EffectiveFrom",source."StartDate")<=target."StartDate"
+    WHERE t."Status"='PUBLISHED' AND COALESCE(t."EffectiveFrom",source."StartDate")<=CASE
+      WHEN target."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Saigon')::date
+        AND (target."EndDate" IS NULL OR target."EndDate">=(statement_timestamp() AT TIME ZONE 'Asia/Saigon')::date)
+      THEN (statement_timestamp() AT TIME ZONE 'Asia/Saigon')::date
+      ELSE target."StartDate"
+    END
     ORDER BY COALESCE(t."EffectiveFrom",source."StartDate") DESC,t."Version" DESC,t."TemplateID" DESC LIMIT 1`;
 }
 export async function activeCriteria(c: PoolClient, semesterId: number) {
@@ -73,10 +78,12 @@ export async function saveGradingCriteria(body: unknown, actor: {userId:number;r
     const today=(await c.query("SELECT (now() AT TIME ZONE 'Asia/Saigon')::date AS today")).rows[0].today;
     const start=semester.StartDate instanceof Date?semester.StartDate.toISOString().slice(0,10):String(semester.StartDate).slice(0,10);
     const todayText=today instanceof Date?today.toISOString().slice(0,10):String(today).slice(0,10);
-    if(start<=todayText)throw invalid('Không thể áp dụng hoặc sửa tiêu chí cho kỳ OJT đang diễn ra hoặc đã bắt đầu.',409,'OJT_GRADING_SEMESTER_STARTED');
+    const end=semester.EndDate==null?null:semester.EndDate instanceof Date?semester.EndDate.toISOString().slice(0,10):String(semester.EndDate).slice(0,10);
+    if(start<=todayText && end!==null && end<todayText)throw invalid('Không thể áp dụng tiêu chí cho kỳ OJT đã kết thúc.',409,'OJT_GRADING_SEMESTER_ENDED');
     const latest=(await c.query(`SELECT * FROM "AssessmentTemplates" WHERE "OJTSemesterID"=$1 ORDER BY "Version" DESC LIMIT 1`,[semesterId])).rows[0];
     const version=(latest?.Version ?? 0)+1;
-    const row=(await c.query(`INSERT INTO "AssessmentTemplates" ("Code","Version","Name","Criteria","Status","CreatedBy","PublishedAt","OJTSemesterID","EffectiveFrom","Reason") VALUES ($1,$2,$3,$4,'PUBLISHED',$5,now(),$6,$7,$8) RETURNING *`,[`OJT-${semesterId}`,version,name,JSON.stringify(criteria),actor.userId,semesterId,semester.StartDate,reason])).rows[0];
+    const effectiveFrom=start<=todayText?todayText:semester.StartDate;
+    const row=(await c.query(`INSERT INTO "AssessmentTemplates" ("Code","Version","Name","Criteria","Status","CreatedBy","PublishedAt","OJTSemesterID","EffectiveFrom","Reason") VALUES ($1,$2,$3,$4,'PUBLISHED',$5,now(),$6,$7,$8) RETURNING *`,[`OJT-${semesterId}`,version,name,JSON.stringify(criteria),actor.userId,semesterId,effectiveFrom,reason])).rows[0];
     await c.query(`INSERT INTO "AuditLogs" ("UserID","Action","EntityType","EntityID","Detail") VALUES ($1,'SET_OJT_GRADING_CRITERIA','AssessmentTemplates',$2,$3)`,[actor.userId,row.TemplateID,reason]);
     return api(row);
   });

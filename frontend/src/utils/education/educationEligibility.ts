@@ -7,7 +7,7 @@ export function filterEligibilityResults(items: EligibilityCheck[], status: Elig
 }
 
 export const eligibilityStatusLabel = (status: string) => ({
-  ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Không đủ điều kiện', REVIEW_REQUIRED: 'Cần đối soát',
+  ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Không đủ điều kiện', REVIEW_REQUIRED: 'Chưa đủ dữ liệu',
 }[status] ?? status);
 
 export const eligibilityReasonLabel = (reason: string) => ({

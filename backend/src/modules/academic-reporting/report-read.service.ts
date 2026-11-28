@@ -24,15 +24,18 @@ export async function alerts(params:Row) {
 }
 
 export async function courseDemand(params:Row,exporting=false) {
-  const p=pagination(params,[...scopeKeys,'includeInProgress','courseId','format']);
+  const p=pagination(params,[...scopeKeys,'includeInProgress','excludeNonOjtCreditCourses','courseId','format']);
   const courseId=params.courseId===undefined?null:positiveId(params.courseId,'courseId');
   if(params.includeInProgress!==undefined&&!['true','false'].includes(params.includeInProgress))throw invalid('includeInProgress must be true or false.');
+  if(params.excludeNonOjtCreditCourses!==undefined&&!['true','false'].includes(params.excludeNonOjtCreditCourses))throw invalid('excludeNonOjtCreditCourses must be true or false.');
   const withProgress=params.includeInProgress==='true';
+  const excludeNonOjtCreditCourses=params.excludeNonOjtCreditCourses==='true';
   if(!exporting&&params.format!==undefined)throw invalid('format is only supported for export.');
   return readTransaction(async c=>{
     const {requested,scopes,data}=await readReports(c,params,['includeInProgress','courseId','format'],false);
     if(courseId&&!(await c.query('SELECT 1 FROM "Courses" WHERE "CourseID"=$1',[courseId])).rowCount)throw invalid('Course not found.',404);
-    const details=data.flatMap(d=>d.period?demandRows(d,withProgress):[]).filter(r=>!courseId||r.courseId===courseId);
+    const details=data.flatMap(d=>d.period?demandRows(d,withProgress):[])
+      .filter(r=>(!courseId||r.courseId===courseId)&&(!excludeNonOjtCreditCourses||r.excludedFromOjtCredits!==true));
     const byCourse=new Map<string,Row>();
     for(const r of details){
       const key=`${r.ojtSemesterId}:${r.academicPeriodId}:${r.courseId}`;

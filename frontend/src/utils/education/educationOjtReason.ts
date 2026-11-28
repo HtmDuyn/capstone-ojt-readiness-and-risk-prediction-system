@@ -33,7 +33,7 @@ export function educationOjtReason(result?: ReasonResult, failure?: string, inac
       : [...(result.reasons ?? []), ...(result.academicIssues ?? [])].filter(Boolean);
     if (details.length) message = details.join(' ');
     else if (result.status === 'ELIGIBLE') message = 'Đáp ứng yêu cầu xét OJT.';
-    else if (result.status === 'REVIEW_REQUIRED') message = 'Cần đối soát dữ liệu học tập trước khi kết luận.';
+    else if (result.status === 'REVIEW_REQUIRED') message = 'Dữ liệu học tập chưa đầy đủ để kết luận điều kiện OJT.';
     else message = 'Chưa đủ điều kiện OJT; kết quả xét chưa có lý do chi tiết.';
   }
 
