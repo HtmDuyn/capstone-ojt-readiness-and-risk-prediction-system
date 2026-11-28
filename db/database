@@ -7319,10 +7319,10 @@ JOIN public."Users" account ON account."Email"=link."Email"
 JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=link."EnterpriseCode"
 ON CONFLICT ("UserID") DO UPDATE SET "EnterpriseID"=EXCLUDED."EnterpriseID","PositionTitle"=EXCLUDED."PositionTitle";
 
--- Seed 20 students: six completed OJT, ten ineligible samples, and four K20
+-- Seed 20 students: six accepted into OJT without final scores, ten ineligible samples, and four K20
 -- IS/SE students with a prerequisite-valid transcript exceeding 70 OJT credits by semester 5.
 -- Numbers 13,14,17,18,21,22,81-84 retain their existing ineligible transcripts.
--- Only completed-OJT students receive the persisted ELIGIBLE label in the seed roster.
+-- Only the six accepted OJT students receive the persisted ELIGIBLE label in the seed roster.
 -- K22 IS placements use the available SE curriculum because no K22 IS curriculum exists in the source data.
 -- Resolve curricula by code and reuse existing course, slot, and prerequisite mappings.
 -- Synthetic instrument choices exercise the TMI_ELE mappings without creating new courses.
@@ -7336,7 +7336,7 @@ SELECT g.n AS "Number",
   program."ProgramID",
   cohort."CohortCode",
   CASE WHEN g.n IN (1,2,5,6,9,10) THEN 'ELIGIBLE' END AS "SeedScenario",
-  (g.n IN (1,2,5,6,9,10)) AS "CompletedOJT",
+  (g.n IN (1,2,5,6,9,10)) AS "HasOJTPlacement",
   NULL::text AS "RegistrationStatus"
 FROM (VALUES
   (1,'Nguyễn Hoàng Minh','minhnh','0902000001'),
@@ -7693,7 +7693,7 @@ DECLARE student record; stage integer; candidate record; assigned_count integer;
 BEGIN
   FOR student IN
     SELECT s."StudentID",s."ProgramID",
-      CASE WHEN roster."CompletedOJT" THEN s."CurrentSemester"
+      CASE WHEN roster."HasOJTPlacement" THEN s."CurrentSemester"
            WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 5
            WHEN roster."Number" IN (41,42,43,44) THEN 5
            ELSE LEAST(s."CurrentSemester",2) END AS "CurrentSemester"
@@ -7956,7 +7956,7 @@ BEGIN
       JOIN public."CohortCurriculumPeriods" curriculum_period ON curriculum_period."CohortID"=placement."CohortID"
         AND curriculum_period."GroupCode"=placement."GroupCode" AND curriculum_period."CurriculumSemester"=stage
       JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=curriculum_period."AcademicPeriodID"
-      WHERE roster."CompletedOJT"
+      WHERE roster."HasOJTPlacement"
     )
     SELECT target."StudentID",target."CourseID",stage,
       CASE WHEN pass_period."AcademicPeriodID"=target."AcademicPeriodID"
@@ -8038,7 +8038,7 @@ JOIN LATERAL (
   JOIN public."Courses" instrument ON instrument."CourseID"=cc."CourseID"
   WHERE slot."ProgramID"=s."ProgramID" AND slot."EntryKind"='ELECTIVE_SLOT'
     AND placeholder."CourseCode"='TMI_ELE' AND cc."Semester"=slot."RecommendedSemester"
-    AND slot."RecommendedSemester"<=CASE WHEN roster."CompletedOJT" THEN s."CurrentSemester"
+    AND slot."RecommendedSemester"<=CASE WHEN roster."HasOJTPlacement" THEN s."CurrentSemester"
       WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 5 ELSE 2 END
   ORDER BY instrument."CourseCode",cc."ComboCourseID"
   OFFSET ((roster."Number"-1)%7) LIMIT 1
@@ -8047,7 +8047,7 @@ JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."St
 JOIN public."CohortCurriculumPeriods" mapping ON mapping."CohortID"=placement."CohortID"
   AND mapping."GroupCode"=placement."GroupCode" AND mapping."CurriculumSemester"=choice."RecommendedSemester"
 JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=mapping."AcademicPeriodID"
-WHERE roster."CompletedOJT";
+WHERE roster."HasOJTPlacement";
 
 INSERT INTO public."StudentComboSelections" ("StudentID","ProgramID","ProgramComboID","SelectedAt","SelectionSource","ConfirmedAt","ConfirmedBy")
 SELECT instrument."StudentID",instrument."ProgramID",instrument."ProgramComboID",NULL,'SYNTHETIC',instrument."EndDate"::timestamp,academic."UserID"
@@ -8095,13 +8095,13 @@ ON CONFLICT ("StudentID","OJTSemesterID") DO UPDATE SET
   "ProgramID"=EXCLUDED."ProgramID","Application"=EXCLUDED."Application","SubmittedBy"=EXCLUDED."SubmittedBy",
   "ReviewCheckID"=NULL,"ReviewedBy"=EXCLUDED."ReviewedBy","ReviewedAt"=EXCLUDED."ReviewedAt","ReviewReason"=EXCLUDED."ReviewReason";
 
--- Six IS/SE students with completed OJT; their official OJT202 grade is synchronized below.
+-- Six IS/SE students accepted into OJT; OJT202 remains in progress without enterprise scores.
 INSERT INTO public."EligibilityChecks"
   ("StudentID","OJTSemesterID","Source","Status","SourceHash","InputSnapshot","Result","CheckedBy","CheckedAt")
 SELECT s."StudentID",term."OJTSemesterID",'MANUAL','ELIGIBLE',
   md5('QHDN-HANDOFF:'||s."StudentCode"||':'||term."OJTSemesterID"),
   jsonb_build_object('source','QHDN_HANDOFF','studentCode',s."StudentCode",'programId',s."ProgramID"),
-  jsonb_build_object('eligible',true,'reason','Seeded completed OJT history'),coordinator."UserID",
+  jsonb_build_object('eligible',true,'reason','Seeded accepted OJT placement'),coordinator."UserID",
   CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMPTZ '2023-10-25 09:00:00+07'
     WHEN 'K19' THEN TIMESTAMPTZ '2024-10-25 09:00:00+07' ELSE TIMESTAMPTZ '2025-10-25 09:00:00+07' END
 FROM qhdn_student_roster r
@@ -8111,7 +8111,7 @@ JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=(
   SELECT "AcademicPeriodID" FROM public."AcademicPeriods"
   WHERE "PeriodCode"=CASE s."CohortCode" WHEN 'K18' THEN 'SPRING2024' WHEN 'K19' THEN 'SPRING2025' ELSE 'SPRING2026' END)
 CROSS JOIN public."Users" coordinator
-WHERE r."CompletedOJT" AND coordinator."Username"='ojt.coord01'
+WHERE r."HasOJTPlacement" AND coordinator."Username"='ojt.coord01'
   AND NOT EXISTS (SELECT 1 FROM public."EligibilityChecks" existing
     WHERE existing."StudentID"=s."StudentID" AND existing."OJTSemesterID"=term."OJTSemesterID"
       AND existing."SourceHash"=md5('QHDN-HANDOFF:'||s."StudentCode"||':'||term."OJTSemesterID"));
@@ -8126,7 +8126,7 @@ SELECT s."StudentID",term."OJTSemesterID",
   (CASE s."CohortCode" WHEN 'K18' THEN TIMESTAMP '2023-11-15 09:00:00'
     WHEN 'K19' THEN TIMESTAMP '2024-11-15 09:00:00' ELSE TIMESTAMP '2025-11-15 09:00:00' END)
     +(r."Number"-CASE s."CohortCode" WHEN 'K18' THEN 1 WHEN 'K19' THEN 21 ELSE 41 END)*INTERVAL '1 day',
-  'Hồ sơ OJT mẫu đã được duyệt để ghi nhận thực tập hoàn thành.'
+  'Hồ sơ OJT mẫu đã được duyệt và doanh nghiệp đã tiếp nhận, chưa hoàn thành thực tập.'
 FROM qhdn_student_roster r
 JOIN public."Users" u ON u."Email"=r."Email"
 JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
@@ -8139,11 +8139,11 @@ JOIN public."EligibilityChecks" eligibility ON eligibility."StudentID"=s."Studen
   AND eligibility."OJTSemesterID"=term."OJTSemesterID" AND eligibility."SourceHash"=
     md5('QHDN-HANDOFF:'||s."StudentCode"||':'||term."OJTSemesterID") AND eligibility."Status"='ELIGIBLE'
 CROSS JOIN public."Users" coordinator
-WHERE r."CompletedOJT" AND coordinator."Username"='ojt.coord01'
+WHERE r."HasOJTPlacement" AND coordinator."Username"='ojt.coord01'
   AND NOT EXISTS (SELECT 1 FROM public."OJTRegistrations" existing
     WHERE existing."StudentID"=s."StudentID" AND existing."OJTSemesterID"=term."OJTSemesterID");
 
-CREATE TEMP TABLE qhdn_student_ojt_success ON COMMIT DROP AS
+CREATE TEMP TABLE qhdn_student_ojt_accepted ON COMMIT DROP AS
 SELECT s."StudentID",s."ProgramID",s."StudentCode",registration."RegistrationID",registration."OJTSemesterID",
   term."AcademicPeriodID",period."AcademicYearID",period."StartDate",period."EndDate",course."CourseID"
 FROM qhdn_student_roster roster
@@ -8155,14 +8155,14 @@ JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."Academic
 JOIN public."ProgramCourses" course_row ON course_row."ProgramID"=s."ProgramID"
   AND course_row."EntryKind"='COURSE' AND course_row."RecommendedSemester"=6
 JOIN public."Courses" course ON course."CourseID"=course_row."CourseID" AND upper(course."CourseCode")='OJT202'
-WHERE roster."CompletedOJT"
+WHERE roster."HasOJTPlacement"
   AND period."PeriodCode"=CASE s."CohortCode" WHEN 'K18' THEN 'SPRING2024' WHEN 'K19' THEN 'SPRING2025' ELSE 'SPRING2026' END;
 
 INSERT INTO public."OJTRegistrationEvents" ("RegistrationID","Action","IdempotencyKey","Snapshot","CreatedBy","CreatedAt","Reason")
 SELECT success."RegistrationID",'SUBMITTED','QHDN-'||success."StudentCode"||'-OJT-SUBMITTED',
   jsonb_build_object('source','QHDN_HANDOFF','studentCode',success."StudentCode",'status','SUBMITTED'),account."UserID",
   registration."RegisteredAt" AT TIME ZONE 'Asia/Ho_Chi_Minh',NULL
-FROM qhdn_student_ojt_success success
+FROM qhdn_student_ojt_accepted success
 JOIN public."OJTRegistrations" registration ON registration."RegistrationID"=success."RegistrationID"
 JOIN public."Students" student ON student."StudentID"=success."StudentID"
 JOIN public."Users" account ON account."UserID"=student."UserID"
@@ -8172,14 +8172,14 @@ INSERT INTO public."OJTRegistrationEvents" ("RegistrationID","Action","Idempoten
 SELECT success."RegistrationID",'APPROVED','QHDN-'||success."StudentCode"||'-OJT-APPROVED',
   jsonb_build_object('source','QHDN_HANDOFF','studentCode',success."StudentCode",'status','APPROVED'),coordinator."UserID",
   registration."ReviewedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh',registration."ReviewReason"
-FROM qhdn_student_ojt_success success
+FROM qhdn_student_ojt_accepted success
 JOIN public."OJTRegistrations" registration ON registration."RegistrationID"=success."RegistrationID"
 CROSS JOIN public."Users" coordinator
 WHERE coordinator."Username"='ojt.coord01'
 ON CONFLICT ("RegistrationID","IdempotencyKey") DO NOTHING;
 
 INSERT INTO public."InternshipPositions" ("EnterpriseID","OJTSemesterID","Title","Description","Requirements","Capacity","RemainingSlots","Status","Location","WorkMode","RecruitmentCode")
-SELECT 1,term."OJTSemesterID",'Thực tập phát triển phần mềm','Vị trí thực tập mẫu để ghi nhận sinh viên hoàn thành OJT.','Hoàn thành chương trình thực tập.',6,6,'ACTIVE','Hồ Chí Minh','HYBRID',
+SELECT 1,term."OJTSemesterID",'Thực tập phát triển phần mềm','Vị trí thực tập mẫu cho sinh viên đã được doanh nghiệp tiếp nhận.','Thực hiện chương trình thực tập.',6,6,'ACTIVE','Hồ Chí Minh','HYBRID',
   'QHDN-SEED-OJT-'||period."PeriodCode"
 FROM public."AcademicPeriods" period
 JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
@@ -8288,10 +8288,10 @@ BEGIN
   ON CONFLICT ("RecruitmentRoundID") DO NOTHING;
 END $seed_fall2026_ojt_round$;
 
--- Link the completed students' registrations to the registration window for the actual recruitment round.
+-- Link the accepted students' registrations to the registration window for the actual recruitment round.
 UPDATE public."OJTRegistrations" registration
 SET "WindowID"=round_window."WindowID"
-FROM qhdn_student_ojt_success success
+FROM qhdn_student_ojt_accepted success
 JOIN public."OJTRegistrationWindows" round_window
   ON round_window."OJTSemesterID"=success."OJTSemesterID"
  AND round_window."RecruitmentRoundID" IS NOT NULL
@@ -8301,7 +8301,7 @@ WHERE registration."RegistrationID"=success."RegistrationID"
   AND round_row."OJTSemesterID"=success."OJTSemesterID"
   AND registration."WindowID" IS DISTINCT FROM round_window."WindowID";
 
--- Give each seeded company a matching position for every OJT semester; reuse TechViet's completed-OJT positions.
+-- Give each seeded company a matching position for every OJT semester; reuse TechViet's accepted-OJT positions.
 INSERT INTO public."InternshipPositions"
   ("EnterpriseID","OJTSemesterID","Title","Description","Requirements","Capacity","RemainingSlots","Status","Location","WorkMode","RecruitmentCode")
 SELECT enterprise."EnterpriseID",schedule."OJTSemesterID",
@@ -8506,7 +8506,7 @@ SELECT success."RegistrationID",success."StudentID",success."OJTSemesterID",post
     'post',jsonb_build_object('id',post."PostID",'windowId',post."WindowID"),
     'coverLetter','Em mong muốn tham gia thực tập và hoàn thành các mục tiêu OJT tại doanh nghiệp.',
     'certificates','[]'::jsonb,'cvFileId',NULL)
-FROM qhdn_student_ojt_success success
+FROM qhdn_student_ojt_accepted success
 JOIN public."Students" student ON student."StudentID"=success."StudentID"
 JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
 JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=success."AcademicPeriodID"
@@ -8526,7 +8526,7 @@ INSERT INTO public."StudentEnterpriseCoordination" ("RegistrationID","Enterprise
 SELECT success."RegistrationID",ipos."EnterpriseID",ipos."PositionID",coordinator."UserID",
   success."StartDate"-INTERVAL '15 days','ACCEPTED',success."StartDate"-INTERVAL '10 days','QHDN_COORDINATION',
   'Điều phối mẫu đã được doanh nghiệp chấp thuận. ',success."OJTSemesterID",application."ApplicationID"
-FROM qhdn_student_ojt_success success
+FROM qhdn_student_ojt_accepted success
 JOIN public."AcademicPeriods" success_period ON success_period."AcademicPeriodID"=success."AcademicPeriodID"
 JOIN public."Enterprises" techvietnam ON techvietnam."EnterpriseCode"='TECHVIET'
 JOIN public."InternshipPositions" ipos ON ipos."OJTSemesterID"=success."OJTSemesterID"
@@ -8540,94 +8540,35 @@ WHERE NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" existing
 
 INSERT INTO public."InternshipAssignments" ("CoordinationID","StudentID","EnterpriseID","PositionID","EnterpriseSupervisorName","StartDate","EndDate","Status","AcademicSupervisorID")
 SELECT coordination."CoordinationID",success."StudentID",coordination."EnterpriseID",coordination."PositionID",
-  'TechViet HR',success."StartDate",success."EndDate",'COMPLETED',academic."UserID"
-FROM qhdn_student_ojt_success success
+  'TechViet HR',success."StartDate",success."EndDate",'ASSIGNED',academic."UserID"
+FROM qhdn_student_ojt_accepted success
 JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
 CROSS JOIN public."Users" academic
 WHERE academic."Username"='academic01'
   AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" existing WHERE existing."CoordinationID"=coordination."CoordinationID");
 
--- Complete the historical OJT record with student task submissions and enterprise evaluations.
--- These six students were accepted into the TechViet positions above; retain that same assignment mapping.
-INSERT INTO public."InternshipTasks"
-  ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status","AssignedAt","DueAt")
-SELECT assignment."AssignmentID",task."TaskName",task."Description",assignment."StartDate"+1,
-  assignment."StartDate"+task."DueOffset",'DONE',
-  (assignment."StartDate"+1)+TIME '09:00',
-  (assignment."StartDate"+task."DueOffset")+TIME '17:00'
-FROM qhdn_student_ojt_success success
-JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
-CROSS JOIN (VALUES
-  ('OJT mẫu: Báo cáo tổng kết','Tổng kết kết quả, kỹ năng đạt được và minh chứng hoàn thành OJT.',110)
-) AS task("TaskName","Description","DueOffset")
-WHERE NOT EXISTS (SELECT 1 FROM public."InternshipTasks" existing
-  WHERE existing."AssignmentID"=assignment."AssignmentID" AND existing."TaskName"=task."TaskName");
-
-INSERT INTO public."TaskProgressUpdates" ("TaskID","UpdatedByStudentID","UpdateDate","ProgressDescription","PercentComplete")
-SELECT task."TaskID",assignment."StudentID",task."DueAt"-INTERVAL '1 hour',
-  'Đã nộp minh chứng hoàn thành nhiệm vụ OJT.',100
-FROM qhdn_student_ojt_success success
-JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
-JOIN public."InternshipTasks" task ON task."AssignmentID"=assignment."AssignmentID" AND task."TaskName" LIKE 'OJT mẫu:%'
-WHERE NOT EXISTS (SELECT 1 FROM public."TaskProgressUpdates" existing
-  WHERE existing."TaskID"=task."TaskID" AND existing."UpdatedByStudentID"=assignment."StudentID");
-
+-- Accepted students start without completed tasks or enterprise evaluations.
 INSERT INTO public."AssessmentTemplates"
   ("Code","Version","Name","Criteria","Status","CreatedBy","PublishedAt","OJTSemesterID","EffectiveFrom","Reason")
-SELECT 'OJT-SEED-'||term."SemesterCode",1,'Đánh giá thực tập OJT (dữ liệu lịch sử)',
+SELECT 'OJT-SEED-'||term."SemesterCode",1,'Đánh giá thực tập OJT',
   jsonb_build_array(
     jsonb_build_object('key','completionScore','label','Hoàn thành công việc','weight',40),
     jsonb_build_object('key','skillScore','label','Năng lực chuyên môn','weight',35),
     jsonb_build_object('key','attitudeScore','label','Thái độ và kỷ luật','weight',25)),
   'PUBLISHED',academic."UserID",
   ((term."StartDate"+1)+TIME '09:00') AT TIME ZONE 'Asia/Ho_Chi_Minh',
-  term."OJTSemesterID",term."StartDate",'Bộ tiêu chí mẫu để ghi nhận đánh giá lịch sử đã hoàn thành.'
-FROM (SELECT DISTINCT success."OJTSemesterID" FROM qhdn_student_ojt_success success) historical
+  term."OJTSemesterID",term."StartDate",'Bộ tiêu chí mẫu cho sinh viên đã được doanh nghiệp tiếp nhận.'
+FROM (SELECT DISTINCT success."OJTSemesterID" FROM qhdn_student_ojt_accepted success) historical
 JOIN public."OJTSemesters" term ON term."OJTSemesterID"=historical."OJTSemesterID"
 CROSS JOIN public."Users" academic
 WHERE academic."Username"='academic01'
 ON CONFLICT ("Code","Version") DO NOTHING;
 
-INSERT INTO public."InternshipEvaluations"
-  ("AssignmentID","EvaluatedBy","EvaluatedAt","CompletionScore","AttitudeScore","SkillScore","OverallScore","Comments","Status","TemplateID","ScoreDetails")
-SELECT assignment."AssignmentID",enterprise_user."UserID",assignment."EndDate"+TIME '15:00',
-  8.50,8.50,8.50,8.50,'Hoàn thành nhiệm vụ OJT, có tinh thần hợp tác và đáp ứng yêu cầu vị trí.',
-  'SUBMITTED',template."TemplateID",
-  jsonb_build_object('completionScore',8.50,'skillScore',8.50,'attitudeScore',8.50)
-FROM qhdn_student_ojt_success success
-JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID" AND assignment."Status"='COMPLETED'
-JOIN public."OJTSemesters" term ON term."OJTSemesterID"=success."OJTSemesterID"
-JOIN public."AssessmentTemplates" template ON template."OJTSemesterID"=term."OJTSemesterID"
-  AND template."Code"='OJT-SEED-'||term."SemesterCode"
-JOIN public."EnterpriseUsers" membership ON membership."EnterpriseID"=assignment."EnterpriseID"
-JOIN public."Users" enterprise_user ON enterprise_user."UserID"=membership."UserID" AND enterprise_user."Username"='enterprise01'
-WHERE NOT EXISTS (SELECT 1 FROM public."InternshipEvaluations" existing
-  WHERE existing."AssignmentID"=assignment."AssignmentID");
-
--- Mark submitted evaluations as published in-app so student results and OJT reports use the normal publication relation.
-INSERT INTO public."Notifications" ("UserID","Title","Content","Channel","RelatedEntityType","RelatedEntityID","SentAt","EventKey")
-SELECT student_user."UserID",'Công bố kết quả đánh giá OJT - '||success."StudentCode",
-  'Doanh nghiệp TechViet đã công bố kết quả OJT. Điểm tổng kết: '||evaluation."OverallScore"||'.',
-  'IN_APP','OJT_RESULT_PUBLISHED',evaluation."EvaluationID",evaluation."EvaluatedAt"+INTERVAL '1 day',
-  'SEED-OJT-RESULT-PUBLISHED-'||evaluation."EvaluationID"
-FROM qhdn_student_ojt_success success
-JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
-JOIN public."InternshipEvaluations" evaluation ON evaluation."AssignmentID"=assignment."AssignmentID" AND evaluation."Status"='SUBMITTED'
-JOIN public."Students" student ON student."StudentID"=success."StudentID"
-JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
-WHERE NOT EXISTS (SELECT 1 FROM public."Notifications" existing
-  WHERE existing."UserID"=student_user."UserID" AND existing."RelatedEntityType"='OJT_RESULT_PUBLISHED'
-    AND existing."RelatedEntityID"=evaluation."EvaluationID");
-
 INSERT INTO public."OJTActualReceipts" ("StudentID","OJTSemesterID","CoordinationID","AssignmentID","ReceivedBy","Reason","OriginalCapacity","ExceededCapacity","ReceivedAt")
 SELECT success."StudentID",success."OJTSemesterID",coordination."CoordinationID",assignment."AssignmentID",
   coordinator."UserID",'Sinh viên đã bắt đầu thực tập tại doanh nghiệp trong kỳ OJT này.',job_position."Capacity",false,
   success."StartDate"+INTERVAL '1 day'
-FROM qhdn_student_ojt_success success
+FROM qhdn_student_ojt_accepted success
 JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
 JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
 JOIN public."InternshipPositions" job_position ON job_position."PositionID"=coordination."PositionID"
@@ -8671,55 +8612,16 @@ WHERE EXISTS (SELECT 1 FROM public."RecruitmentPostPositions" link
   JOIN public."RecruitmentPosts" post ON post."PostID"=link."PostID"
   WHERE link."PositionID"=job_position."PositionID" AND post."SubmissionKey" LIKE 'SEED-RECRUITMENT-%');
 
--- Store the successful score transferred by the enterprise; academic confirmation
--- remains pending, so it is not copied into the official StudentCourseResults transcript.
-INSERT INTO public."OJTResults" ("AssignmentID","StudentID","OJTSemesterID","Status","Version","Dossier","SourceSnapshot","SourceHash","OfficialScore","Outcome","AcademicNote","TransferredBy","TransferredAt")
-SELECT assignment."AssignmentID",success."StudentID",success."OJTSemesterID",'PENDING_ACADEMIC_CONFIRMATION',1,
-  jsonb_build_object('source','QHDN_HANDOFF_2026','completionStatus','COMPLETED','studentCode',success."StudentCode"),
-  jsonb_build_object('source','QHDN_HANDOFF_2026','assignmentId',assignment."AssignmentID",'semesterId',success."OJTSemesterID"),
-  md5(success."StudentCode"||':'||success."OJTSemesterID"),8.50,'PASSED',
-  'Hoàn thành kỳ thực tập; điểm tổng kết đạt.',enterprise."UserID",success."EndDate"+INTERVAL '1 day'
-FROM qhdn_student_ojt_success success
-JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID" AND assignment."Status"='COMPLETED'
-CROSS JOIN public."Users" enterprise
-WHERE enterprise."Username"='enterprise01'
-  AND NOT EXISTS (SELECT 1 FROM public."OJTResults" existing WHERE existing."AssignmentID"=assignment."AssignmentID");
-
--- Synchronize transferred passing OJT202 scores into the official transcript.
-INSERT INTO public."ProgramOJTGradeMappings"
-  ("ProgramID","OJTSemesterID","CourseID","AcademicPeriodID","GradeBands","Reason","ConfirmedBy")
-SELECT DISTINCT success."ProgramID",success."OJTSemesterID",success."CourseID",success."AcademicPeriodID",
-  jsonb_build_array(jsonb_build_object('minScore',0,'maxScore',10,'grade','B','gradePoints',3.00)),
-  'Seeded handoff grade mapping for completed OJT202.',academic."UserID"
-FROM qhdn_student_ojt_success success
-JOIN public."Users" academic ON academic."Username"='academic01'
-ON CONFLICT ("ProgramID","OJTSemesterID") DO NOTHING;
-
+-- Accepted OJT students have an enrollment, not a passing grade or transferred result.
 INSERT INTO public."StudentCourseResults"
-  ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy","OJTResultID")
-SELECT success."StudentID",success."CourseID",6,success."AcademicYearID",8.50,'B','PASSED',success."AcademicPeriodID",1,3.00,
-  'QHDN_HANDOFF_OJT202_CONFIRMED',academic."UserID",result."ResultID"
-FROM qhdn_student_ojt_success success
-JOIN public."OJTResults" result ON result."StudentID"=success."StudentID" AND result."OJTSemesterID"=success."OJTSemesterID"
-JOIN public."Users" academic ON academic."Username"='academic01'
-WHERE NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing WHERE existing."OJTResultID"=result."ResultID");
-
-UPDATE public."OJTResults" result
-SET "Status"='CONFIRMED',"Version"=result."Version"+1,"ConfirmedBy"=academic."UserID",
-    "ConfirmedAt"=clock_timestamp(),"ConfirmationReason"='Điểm OJT202 đã được xác nhận và đồng bộ vào bảng điểm.',
-    "CourseResultID"=grade."ResultID","GradeMappingID"=mapping."MappingID",
-    "GradeMappingSnapshot"=jsonb_build_object('mappingId',mapping."MappingID",'programId',mapping."ProgramID",
-      'courseId',mapping."CourseID",'academicPeriodId',mapping."AcademicPeriodID",'gradeBands',mapping."GradeBands")
-FROM qhdn_student_ojt_success success
-JOIN public."StudentCourseResults" grade ON grade."StudentID"=success."StudentID"
-  AND grade."AcademicPeriodID"=success."AcademicPeriodID" AND grade."CourseID"=success."CourseID"
-  AND grade."SourceReference"='QHDN_HANDOFF_OJT202_CONFIRMED'
-JOIN public."ProgramOJTGradeMappings" mapping ON mapping."ProgramID"=success."ProgramID"
-  AND mapping."OJTSemesterID"=success."OJTSemesterID"
-JOIN public."Users" academic ON academic."Username"='academic01'
-WHERE result."StudentID"=success."StudentID" AND result."OJTSemesterID"=success."OJTSemesterID"
-  AND result."Status"='PENDING_ACADEMIC_CONFIRMATION';
+  ("StudentID","CourseID","SemesterTaken","AcademicYearID","Status","AcademicPeriodID","AttemptNumber","SourceReference","RecordedBy")
+SELECT accepted."StudentID",accepted."CourseID",6,accepted."AcademicYearID",'IN_PROGRESS',accepted."AcademicPeriodID",1,
+  'AUTO_OJT_ENROLLMENT',coordinator."UserID"
+FROM qhdn_student_ojt_accepted accepted
+JOIN public."Users" coordinator ON coordinator."Username"='ojt.coord01'
+WHERE NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing
+  WHERE existing."StudentID"=accepted."StudentID" AND existing."CourseID"=accepted."CourseID"
+    AND existing."AcademicPeriodID"=accepted."AcademicPeriodID");
 
 INSERT INTO public."OJTRegistrationEvents" ("RegistrationID","Action","IdempotencyKey","Snapshot","CreatedBy","CreatedAt","Reason")
 SELECT reg."RegistrationID",'SUBMITTED','QHDN-'||s."StudentCode"||'-SUBMITTED',
@@ -8766,62 +8668,33 @@ BEGIN
       WHERE period."PeriodCode" IN ('SPRING2027','SPRING2028'))<>0 THEN
     RAISE EXCEPTION 'Expected no OJT registrations before the seeded eligibility assessment runs.';
   END IF;
-  IF (SELECT count(*) FROM qhdn_student_ojt_success)<>
-       (SELECT count(*) FROM qhdn_student_roster WHERE "CompletedOJT")
-    OR (SELECT count(*) FROM public."OJTResults" result JOIN qhdn_student_ojt_success success
-        ON success."StudentID"=result."StudentID" AND success."OJTSemesterID"=result."OJTSemesterID"
-        WHERE result."Status"='CONFIRMED' AND result."OfficialScore"=8.50 AND result."Outcome"='PASSED') <>
-       (SELECT count(*) FROM qhdn_student_ojt_success)
-    OR (SELECT count(*) FROM public."StudentCourseResults" grade JOIN qhdn_student_ojt_success success
-        ON success."StudentID"=grade."StudentID" AND success."AcademicPeriodID"=grade."AcademicPeriodID"
-        WHERE grade."CourseID"=success."CourseID" AND grade."SemesterTaken"=6 AND grade."Status"='PASSED'
-          AND grade."SourceReference"='QHDN_HANDOFF_OJT202_CONFIRMED') <>
-       (SELECT count(*) FROM qhdn_student_ojt_success)
-    OR (SELECT count(*) FROM public."OJTActualReceipts" receipt JOIN qhdn_student_ojt_success success
-        ON success."StudentID"=receipt."StudentID" AND success."OJTSemesterID"=receipt."OJTSemesterID") <>
-       (SELECT count(*) FROM qhdn_student_ojt_success) THEN
-    RAISE EXCEPTION 'Every roster student marked completed must have a joined assignment, confirmed passing score, and passed OJT202 transcript record.';
-  END IF;
-  IF (SELECT count(*) FROM qhdn_student_ojt_success success
-      JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-      JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
-      JOIN public."InternshipTasks" task ON task."AssignmentID"=assignment."AssignmentID" AND task."TaskName" LIKE 'OJT mẫu:%') <>
-      (SELECT count(*) FROM qhdn_student_ojt_success success
-       JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-       JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID")
-    OR (SELECT count(*) FROM qhdn_student_ojt_success success
-      JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-      JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
-      JOIN public."InternshipTasks" task ON task."AssignmentID"=assignment."AssignmentID" AND task."TaskName" LIKE 'OJT mẫu:%'
-      JOIN public."TaskProgressUpdates" progress ON progress."TaskID"=task."TaskID"
-        AND progress."UpdatedByStudentID"=success."StudentID" AND progress."PercentComplete"=100) <>
-      (SELECT count(*) FROM qhdn_student_ojt_success success
-       JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-       JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID")
-    OR (SELECT count(*) FROM qhdn_student_ojt_success success
-      JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-      JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID"
-      JOIN public."InternshipEvaluations" evaluation ON evaluation."AssignmentID"=assignment."AssignmentID"
-        AND evaluation."Status"='SUBMITTED' AND evaluation."OverallScore"=8.50) <>
-      (SELECT count(*) FROM qhdn_student_ojt_success success
-       JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-       JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID")
-    OR (SELECT count(*) FROM public."Notifications" publication
-      JOIN public."InternshipEvaluations" evaluation ON evaluation."EvaluationID"=publication."RelatedEntityID"
-      JOIN public."InternshipAssignments" assignment ON assignment."AssignmentID"=evaluation."AssignmentID"
-      JOIN public."StudentEnterpriseCoordination" coordination ON coordination."CoordinationID"=assignment."CoordinationID"
-      JOIN qhdn_student_ojt_success success ON success."RegistrationID"=coordination."RegistrationID"
-      WHERE publication."RelatedEntityType"='OJT_RESULT_PUBLISHED') <>
-      (SELECT count(*) FROM qhdn_student_ojt_success success
-       JOIN public."StudentEnterpriseCoordination" coordination ON coordination."RegistrationID"=success."RegistrationID" AND coordination."Decision"='ACCEPTED'
-       JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=coordination."CoordinationID") THEN
-    RAISE EXCEPTION 'Expected each completed OJT assignment to include one student-completed task and a published enterprise evaluation.';
+  IF (SELECT count(*) FROM qhdn_student_ojt_accepted)<>
+       (SELECT count(*) FROM qhdn_student_roster WHERE "HasOJTPlacement")
+    OR (SELECT count(*) FROM qhdn_student_ojt_accepted accepted
+        JOIN public."StudentEnterpriseCoordination" co ON co."RegistrationID"=accepted."RegistrationID" AND co."Decision"='ACCEPTED'
+        JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=co."CoordinationID"
+        WHERE assignment."Status"='ASSIGNED')<>(SELECT count(*) FROM qhdn_student_ojt_accepted)
+    OR (SELECT count(*) FROM public."StudentCourseResults" grade JOIN qhdn_student_ojt_accepted accepted
+        ON accepted."StudentID"=grade."StudentID" AND accepted."CourseID"=grade."CourseID"
+          AND accepted."AcademicPeriodID"=grade."AcademicPeriodID"
+        WHERE grade."Status"='IN_PROGRESS' AND grade."Score" IS NULL AND grade."Grade" IS NULL
+          AND grade."GradePoints" IS NULL AND grade."OJTResultID" IS NULL)<>(SELECT count(*) FROM qhdn_student_ojt_accepted)
+    OR EXISTS (SELECT 1 FROM qhdn_student_ojt_accepted accepted
+        JOIN public."StudentEnterpriseCoordination" co ON co."RegistrationID"=accepted."RegistrationID"
+        JOIN public."InternshipAssignments" assignment ON assignment."CoordinationID"=co."CoordinationID"
+        JOIN public."InternshipEvaluations" evaluation ON evaluation."AssignmentID"=assignment."AssignmentID")
+    OR EXISTS (SELECT 1 FROM public."OJTResults" result JOIN qhdn_student_ojt_accepted accepted
+        ON accepted."StudentID"=result."StudentID" AND accepted."OJTSemesterID"=result."OJTSemesterID")
+    OR (SELECT count(*) FROM public."OJTActualReceipts" receipt JOIN qhdn_student_ojt_accepted accepted
+        ON accepted."StudentID"=receipt."StudentID" AND accepted."OJTSemesterID"=receipt."OJTSemesterID")
+       <>(SELECT count(*) FROM qhdn_student_ojt_accepted) THEN
+    RAISE EXCEPTION 'Accepted OJT students must have an assigned internship and an in-progress OJT202 enrollment, without enterprise scores or transferred results.';
   END IF;
   IF (SELECT count(*) FROM qhdn_student_roster)<>20
     OR (SELECT count(*) FROM qhdn_student_roster WHERE "SeedScenario"='ELIGIBLE')<>6
     OR EXISTS (SELECT 1 FROM qhdn_student_roster
       WHERE "SeedScenario" IS NOT NULL AND "SeedScenario"<>'ELIGIBLE') THEN
-    RAISE EXCEPTION 'Expected 20 seeded students and an ELIGIBLE label only for the six students with completed OJT.';
+    RAISE EXCEPTION 'Expected 20 seeded students and an ELIGIBLE label only for the six accepted OJT students.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" grade
     WHERE grade."Status"='FAILED' AND grade."SourceReference" LIKE 'QHDN_HANDOFF_2026%') THEN
@@ -8844,7 +8717,7 @@ BEGIN
     JOIN public."Students" student ON student."UserID"=account."UserID"
     JOIN public."OJTRegistrations" registration ON registration."StudentID"=student."StudentID"
     WHERE roster."RegistrationStatus" IS NULL
-      AND NOT EXISTS (SELECT 1 FROM qhdn_student_ojt_success success WHERE success."StudentID"=student."StudentID")
+      AND NOT EXISTS (SELECT 1 FROM qhdn_student_ojt_accepted success WHERE success."StudentID"=student."StudentID")
   ) THEN RAISE EXCEPTION 'The seeded students without an OJT application must have no registration row.';
   END IF;
 END $verify_qhdn_seed_students$;
@@ -9980,7 +9853,7 @@ CREATE TABLE public."OjtCompletionCertificates" (
 SELECT s."StudentCode", roster."FullName", roster."Email", roster."CohortCode",
        program."ProgramCode", roster."SeedScenario",
        CASE
-         WHEN roster."CompletedOJT" THEN 'COMPLETED_OJT_AND_ELIGIBLE_TRANSCRIPT'
+         WHEN roster."HasOJTPlacement" THEN 'ACCEPTED_OJT_WITHOUT_ENTERPRISE_SCORES'
          WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 'EXISTING_NOT_ELIGIBLE_NO_OJT'
          WHEN roster."Number" IN (41,42,43,44) THEN 'NEW_ELIGIBLE_NO_OJT_CANDIDATE'
          ELSE 'NOT_ELIGIBLE_NO_OJT'
