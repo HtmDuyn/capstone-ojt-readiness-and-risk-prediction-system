@@ -374,8 +374,8 @@ const searchOjtSemesters = async (
 // ======================================================
 
 export const academicService = {
-  getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number;effectiveFrom:string;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
-  saveOjtGradingCriteria: async (payload:{ojtSemesterId:number;name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
+  getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number|null;effectiveFrom:string|null;effectiveAt:string|null;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
+  saveOjtGradingCriteria: async (payload:{name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
   getCalendar: async (id: number, signal?: AbortSignal) => apiData<AcademicCalendar>(await getJson(`/academic-years/${id}/calendar`, {}, signal)),
   updateCalendar: async (id: number, semesters: SemesterDates[], revision: string, blocks?: SemesterDates[], block10?: SemesterDates[]) =>
     apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision, blocks, block10 })).data),
