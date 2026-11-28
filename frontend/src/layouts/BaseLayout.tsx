@@ -33,7 +33,7 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const isQhdn = user?.role === 'qhdn';
   const isAdmin = user?.role === 'admin' || user?.roleCode === 'ADMIN';
   const hideHeaderTools = user?.role === 'enterprise' || user?.role === 'qhdn';
-  const showNotifications = !isEnterprise && user?.roleCode !== 'ADMIN' && user?.role !== 'admin';
+  const showNotifications = !isEnterprise && !isQhdn && user?.roleCode !== 'ADMIN' && user?.role !== 'admin';
   const RoleSidebar = isEducation ? EducationSidebar : Sidebar;
 
   const handleLogout = () => {

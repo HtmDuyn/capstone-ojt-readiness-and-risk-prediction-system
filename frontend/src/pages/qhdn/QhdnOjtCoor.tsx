@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { UserPlus, Eye } from 'lucide-react';
+import { UserPlus, Eye, CircleX, BadgeCheck, Send, Clock3, UserRound, Check, ArrowUpRight } from 'lucide-react';
 import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
@@ -40,6 +40,8 @@ type Board = { items: Student[]; semesterBoards: SemesterBoard[]; total: number;
 const cell = 'px-4 py-4 align-middle';
 const filterInput = workflowInput + ' h-11 min-w-0 truncate';
 const compactAction = 'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
+
+const statusIcons = { REJECTED: CircleX, ACCEPTED: BadgeCheck, APPLIED: Send, WAITING_RESPONSE: Clock3, NOT_APPLIED: UserRound };
 
 export default function QhdnOjtCoordination() {
   const [data, setData] = useState<Board | null>(null), [loading, setLoading] = useState(false);
@@ -161,16 +163,26 @@ export default function QhdnOjtCoordination() {
     <PageBanner variant="qhdn" title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên có kết quả xét OJT hợp lệ đến doanh nghiệp; theo dõi phản hồi tiếp nhận và số lượng thực nhận." badge="Phòng QHDN" />
     {error && <Notice>{error}</Notice>}
     {message && <Notice>{message}</Notice>}
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-      {placementStatuses.map(status => <button key={status} disabled={busy} aria-pressed={filter === status}
-        className={'rounded-2xl border p-4 text-left transition ' + (filter === status ? placementStatusColors[status] : 'border-slate-200 bg-white hover:border-slate-300')}
-        onClick={() => setFilter(filter === status ? 'ALL' : status)}>
-        <p className="flex items-center gap-2 text-sm font-medium text-slate-600">
-          <span className={'h-2.5 w-2.5 shrink-0 rounded-full border ' + placementStatusColors[status]} />
-          {placementStatusLabels[status]}
-        </p>
-        <p className="mt-2 text-2xl font-bold tabular-nums text-slate-800">{data?.items.filter(s => placementStatus(s) === status).length ?? 0}</p>
-      </button>)}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Thống kê trạng thái điều phối">
+      {placementStatuses.map(status => {
+        const Icon = statusIcons[status];
+        const active = filter === status;
+        const count = data?.items.filter(student => placementStatus(student) === status).length ?? 0;
+        return <button key={status} type="button" disabled={busy} aria-pressed={active}
+          className={'group flex min-w-0 flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ' + (active ? 'border-orange-400 ring-1 ring-orange-400' : 'border-slate-200')}
+          onClick={() => setFilter(active ? 'ALL' : status)}>
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className={'flex size-10 items-center justify-center rounded-xl border ' + placementStatusColors[status]}><Icon size={20} aria-hidden="true" /></span>
+            {active ? <Check size={17} className="text-orange-600" aria-hidden="true" /> : <ArrowUpRight size={17} className="text-slate-300 group-hover:text-slate-500" aria-hidden="true" />}
+          </div>
+          <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums text-slate-900">{loading ? '—' : count}</p>
+          <p className="mt-1 min-h-10 text-sm font-medium leading-5 text-slate-600">{placementStatusLabels[status]}</p>
+          <div className="mt-4 flex w-full items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
+            <span className="text-slate-400">Sinh viên</span>
+            <span className={active ? 'font-semibold text-orange-600' : 'text-slate-500'}>{active ? 'Đang lọc' : 'Xem danh sách'}</span>
+          </div>
+        </button>;
+      })}
     </div>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
