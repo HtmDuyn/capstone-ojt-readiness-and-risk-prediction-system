@@ -17,6 +17,7 @@ import type { AssessmentWindow, CreateOjtRuleSetPayload, EligibilityCheck, OjtRu
 import type { OjtEligibilityStatus, StudentProgress, StudentSubject, SubjectStatus } from '@/types/education/studentProgress.types';
 import { savedOjtProgressLabel } from '@/utils/education/savedOjtEligibility';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+import { educationRead, educationReadKey, invalidateEducationReadCache } from '@/utils/education/educationReadCache';
 
 export const cleanQuery = (params: Query = {}) =>
   Object.fromEntries(
@@ -30,7 +31,10 @@ export async function getJson<T>(
   signal?: AbortSignal,
   timeout = 30000,
 ): Promise<T> {
-  return (await API.get<T>(path, { params: cleanQuery(params), signal, timeout })).data;
+  const cleaned=cleanQuery(params);
+  const stableKey=educationReadKey(path,cleaned);
+  const catalog=/^\/(academic-years|academic-periods|majors|curricula|cohorts)(\/|$)/.test(path)?5*60_000:60_000;
+  return educationRead(stableKey,async requestSignal => (await API.get<T>(path,{params:cleaned,signal:requestSignal,timeout})).data,signal,catalog);
 }
 export function apiData<T>(response: unknown): T {
   const root = response as { success?: boolean; message?: string; data?: T };
@@ -248,6 +252,8 @@ const listAllAcademicPeriods = (): Promise<AcademicPeriod[]> => {
 const searchAcademicPeriods = async (
   payload: SearchAcademicPeriodsPayload,
 ): Promise<AcademicPeriod[]> => {
+  const cacheKey=educationReadKey('/academic-periods',payload);
+  return educationRead(cacheKey,async()=>{
   const params = new URLSearchParams();
 
   params.set("page", String(payload.page));
@@ -276,6 +282,7 @@ const searchAcademicPeriods = async (
   }
 
   return result.items;
+  },undefined,5*60_000);
 };
 
 // Tìm chính xác kỳ theo academicYearId và periodCode.
@@ -333,6 +340,7 @@ const createAcademicPeriod = async (
   >(response);
 
   checkResponse(response, result, "Không thể tạo kỳ học.");
+  invalidateEducationReadCache();
 
   // FE sẽ tải lại danh sách từ BE sau khi tạo.
   // Không bắt buộc response phải có data.
@@ -394,10 +402,13 @@ export const academicReportingService = {
   retakeClassProposals:async(periodId:number,scope:ReportScope,page:number,signal?:AbortSignal,mode:'CONFIGURED'|'CALCULATED'='CONFIGURED'):Promise<RetakeClassReport>=>{
     const {academicPeriodId,...filters}=scope;
     void academicPeriodId;
+    const params={...filters,...(mode==='CALCULATED'?{semesterPeriodId:periodId}:{blockPeriodId:periodId}),page,limit:20};
+    const cacheKey=educationReadKey('/retake-class-proposals',params);
+    return educationRead(cacheKey,async requestSignal=>{
     try{
-      return (await API.get('/retake-class-proposals',{params:{...filters,...(mode==='CALCULATED'?{semesterPeriodId:periodId}:{blockPeriodId:periodId}),page,limit:20},signal,timeout:60000})).data.data;
+      return (await API.get('/retake-class-proposals',{params,signal:requestSignal,timeout:60000})).data.data;
     }catch(error){
-      if(signal?.aborted)throw error;
+      if(requestSignal?.aborted)throw error;
       const code=(error as {code?:string}).code;
       if(code==='ECONNABORTED'||code==='ETIMEDOUT')throw new Error('Tổng hợp nhu cầu mở lớp mất quá thời gian chờ. Vui lòng thử lại hoặc chọn một khóa sinh viên để thu hẹp dữ liệu.');
       const body=(error as {response?:{data?:{errorCode?:string}}}).response?.data;
@@ -407,6 +418,7 @@ export const academicReportingService = {
       const messages:Record<string,string>={UPCOMING_SEMESTER_REQUIRED:'Vui lòng chọn học kỳ sắp tới.',BLOCK3_REQUIRED:'Vui lòng chọn kỳ học loại Block 3.',BLOCK_PERIOD_NOT_FOUND:'Không tìm thấy kỳ Block 3 đã chọn.',BLOCK_PARENT_INVALID:'Kỳ Block 3 chưa được gắn đúng với học kỳ chính. Vui lòng đối soát cấu hình.',BLOCK_NOT_OPEN_FOR_PLANNING:'Kỳ Block 3 này không còn ở trạng thái có thể lập kế hoạch.',BLOCK_ALREADY_ENDED:'Kỳ Block 3 đã kết thúc. Vui lòng chọn kỳ sắp tới hoặc đang diễn ra.',BLOCK_DATES_INVALID:'Ngày bắt đầu và kết thúc Block 3 chưa hợp lệ.'};
       throw new Error(messages[body?.errorCode??'']??'Không tải được đề xuất mở lớp. Vui lòng kiểm tra kết nối và thử lại.');
     }
+    },signal,30_000);
   },
   cohorts: (signal?: AbortSignal) => getAllItems<Cohort>('/cohorts', {}, signal),
   periods: (signal?: AbortSignal) => getAllItems<ReportPeriod>('/academic-periods', {}, signal),
@@ -856,6 +868,7 @@ const sendImportRequest = async <T>(
   }
 
   clearSharedReads();
+  invalidateEducationReadCache();
   return result as T;
 };
 
@@ -878,7 +891,7 @@ export const importService = {
   listStudentImportBatches: (signal?: AbortSignal) =>
     getAllItems<StudentImportBatch>('/academic-imports', { kind: 'STUDENT', status: 'COMPLETED' }, signal),
   getImportedStudent: async (id: number, signal?: AbortSignal) =>
-    apiData<ImportedStudentProfile>(await getJson(`/students/${id}`, { resultsLimit: 1, ojtLimit: 1 }, signal)),
+    apiData<ImportedStudentProfile>(await getJson(`/students/${id}`, { include: 'academicProgress' }, signal)),
   getStoredCourseResults: async (id: number, page: number, signal?: AbortSignal) =>
     apiData<{ courseResults: import('@/types/education/api.types').Page<StoredCourseResult> }>(
       await getJson(`/students/${id}`, { include: 'courseResults', resultsPage: page, resultsLimit: 20 }, signal),
@@ -926,6 +939,7 @@ export async function runOjtEligibilityAssessment(): Promise<OjtAssessmentSummar
   if (response.data.success !== true || !response.data.data)
     throw new Error(friendlyErrorMessage(response.data.message, 'Chưa nhận được kết quả xét OJT từ máy chủ.'));
   clearSharedReads();
+  invalidateEducationReadCache();
   return response.data.data;
 }
 export const loadStudentAcademicCredits = async (studentId: number, signal?: AbortSignal): Promise<number | null> => {
@@ -1037,6 +1051,8 @@ const requestJson = async <T>(
       errorBody?.data,
     );
   }
+
+  if(!['GET','HEAD'].includes((options.method??'GET').toUpperCase()))invalidateEducationReadCache();
 
   return responseData as T;
 };
@@ -1249,6 +1265,7 @@ async function loadStudent(
     cohort: progressText(profile.cohort?.code ?? profile.cohortCode),
     curriculumCode: progressText(program.code),
     currentCurriculumSemester: number(profile.currentSemester),
+    actualSemester: number(profile.actualSemester),
     courseSemesterTag: number(profile.courseSemesterTag),
     currentTerm: progressText(profile.systemCurrentAcademicPeriod?.name),
     currentTermStartDate: profile.systemCurrentAcademicPeriod?.startDate ?? null,
@@ -1306,6 +1323,7 @@ function progressSummary(row: Row): StudentProgress {
     cohort: progressText(row.cohort?.code ?? row.cohortCode),
     curriculumCode: progressText(row.program?.code),
     currentCurriculumSemester: number(row.currentSemester),
+    actualSemester: number(row.actualSemester),
     courseSemesterTag: number(row.courseSemesterTag),
     currentTerm: progressText(row.systemCurrentAcademicPeriod?.name),
     currentTermStartDate: row.systemCurrentAcademicPeriod?.startDate ?? null,
@@ -1329,7 +1347,7 @@ function progressSummary(row: Row): StudentProgress {
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
     const token = localStorage.getItem('ojt_auth_token');
-    const rows = await getAllItems<Row>('/students', {}, signal);
+    const rows = await getAllItems<Row>('/students/progress', {}, signal);
     progressSession = token;
     progressRows = new Map(rows.map(row => [Number(row.id), row]));
     progressSavedResults = new Map(rows.flatMap(row => row.calculatedEligibility

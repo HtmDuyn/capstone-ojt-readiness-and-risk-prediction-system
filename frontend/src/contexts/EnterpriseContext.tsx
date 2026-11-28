@@ -14,6 +14,7 @@ import { isAxiosError } from 'axios';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { EnterpriseFirstPassword } from '@/components/enterprise/EnterpriseFirstPassword';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+import { useEnterpriseCacheRefresh } from '@/hooks/enterprise/useEnterpriseCacheRefresh';
 
 // ─── Enterprise Context ────────────────────────────────────────────────────────
 // Lưu thông tin doanh nghiệp (bao gồm companyId) sau khi đăng nhập.
@@ -99,6 +100,7 @@ export function EnterpriseProvider({ children }: EnterpriseProviderProps) {
     setError(null);
   }, [token]);
   const reload = useCallback(() => { void loadProfile(); }, [loadProfile]);
+  useEnterpriseCacheRefresh(['/enterprise/profile:'],reload,300);
   const value = useMemo<EnterpriseContextValue>(() => ({
     profile,
     companyId: profile?.id ?? null,  // companyId lấy từ profile.id

@@ -30,24 +30,27 @@ import { missingRecruitmentRounds } from "@/utils/shared/recruitmentSchedule";
 import {
   listCompanies,
   listCoordinations,
-  getDashboardPlacementBoard,
+  getDashboardPlacementSummary,
   getQhdnDashboardSummary,
 } from "@/services/qhdnService";
-import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdn/qhdnDashboard';
+import type { QhdnDashboardSummary, DashboardPlacementSummary } from '@/utils/qhdn/qhdnDashboard';
 import { OjtPipelineChart, EnterpriseQuotaChart } from "@/components/qhdn/QhdnDashboardCharts";
 import type {
   CoordinationItem,
   CompanyListItem,
 } from "@/types/qhdn/qhdnTypes";
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 
 export const QhdnDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loadError, setLoadError] = useState("");
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useQhdnCacheRefresh(['/qhdn/placements/summary:','/qhdn/dashboard/summary:','/companies:','/ojt-coordinations:'],()=>setCacheRevision(value=>value+1),300);
 
   const catalog = useQhdnAcademicPeriods("", false, true);
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
-  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats>; companies: DashboardPlacementBoard['companies'] } | null>(null);
+  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: DashboardPlacementSummary['stats']; companies: DashboardPlacementSummary['companies'] } | null>(null);
   const [internshipStats, setInternshipStats] = useState<{ semesterId: number; data: QhdnDashboardSummary } | null>(null);
   const [internshipError, setInternshipError] = useState('');
   const [eligibleError, setEligibleError] = useState('');
@@ -113,8 +116,8 @@ export const QhdnDashboard: React.FC = () => {
     queueMicrotask(() => {
       if (signal.aborted) return;
       void Promise.allSettled([
-        getDashboardPlacementBoard(selectedSemesterId, signal)
-          .then(board => { if (!signal.aborted) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(board.items), companies: board.companies }); })
+        getDashboardPlacementSummary(selectedSemesterId, signal)
+          .then(summary => { if (!signal.aborted) setPlacementStats({ semesterId: selectedSemesterId, ...summary }); })
           .catch(error => { if (!signal.aborted) setEligibleError(errorMessage(error)); }),
         getQhdnDashboardSummary(selectedSemesterId, signal)
           .then(data => { if (!signal.aborted) setInternshipStats({ semesterId: selectedSemesterId, data }); })
@@ -128,7 +131,7 @@ export const QhdnDashboard: React.FC = () => {
       controller.abort();
       if (dashboardRequest.current === controller) dashboardRequest.current = null;
     };
-  }, [selectedSemesterId]);
+  }, [selectedSemesterId,cacheRevision]);
 
   // The company catalog is independent of the selected OJT semester.
   useEffect(() => {
@@ -142,7 +145,7 @@ export const QhdnDashboard: React.FC = () => {
         .finally(() => { if (!controller.signal.aborted) setCompaniesLoading(false); });
     });
     return () => controller.abort();
-  }, []);
+  }, [cacheRevision]);
 
   useEffect(() => {
     setRejectedCoordinations([]);
@@ -170,7 +173,7 @@ export const QhdnDashboard: React.FC = () => {
       if (!controller.signal.aborted) setCoordinationsLoading(false);
     });
     return () => controller.abort();
-  }, [selectedSemesterId, loadCoordinations]);
+  }, [selectedSemesterId, loadCoordinations,cacheRevision]);
 
   // Tính toán Quota của từng doanh nghiệp từ vị trí tuyển dụng
   const enterpriseQuotaList = useMemo(() => {

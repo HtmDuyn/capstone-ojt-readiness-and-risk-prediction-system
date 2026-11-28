@@ -32,7 +32,7 @@ export function StudentJobMatches({windowId,cvFileId,opportunities,onApply}:{
       <p className="mt-1 text-sm text-slate-600">Gợi ý trong đợt đăng ký đã chọn, dựa trên CV mới nhất đã được bạn xác nhận. Nếu ít hơn 5 vị trí hợp lệ, hệ thống hiển thị số thực có.</p></header>
     {!cvFileId && <p className="text-sm text-amber-800">Bạn cần tải CV, đọc và xác nhận hồ sơ CV trước khi tìm gợi ý.</p>}
     <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" className="mt-1 accent-orange-600" checked={consent} disabled={busy||!cvFileId} onChange={e=>setConsent(e.target.checked)}/>
-      <span>Tôi đồng ý gửi thông tin nghề nghiệp đã xác nhận (kỹ năng, công nghệ dự án, vai trò, ngoại ngữ và ngành/bằng cấp) đến Cohere để xếp hạng vị trí tuyển dụng. Không gửi file CV gốc.</span></label>
+      <span>Tôi đồng ý gửi thông tin nghề nghiệp đã xác nhận (kỹ năng, công nghệ dự án, vai trò, ngoại ngữ và ngành/bằng cấp) đến Cohere để xếp hạng vị trí tuyển dụng.</span></label>
     <button type="button" onClick={()=>void run()} disabled={busy||!consent||!cvFileId} className={buttonClass+' inline-flex items-center gap-2'}>
       {busy?<LoaderCircle size={17} className="animate-spin"/>:result?<RefreshCw size={17}/>:<Sparkles size={17}/>}{busy?'Đang tìm vị trí phù hợp…':result?'Cập nhật gợi ý':'Tìm vị trí phù hợp'}
     </button>

@@ -2,10 +2,12 @@ import { studentProgressService } from '@/services/educationService';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import React from 'react';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 export function useEducationStudentProgress() {
   const [revision, setRevision] = React.useState(0);
   const reload = React.useCallback(() => setRevision(value => value + 1), []);
+  useEducationCacheRefresh(['/students/progress:'],reload,350);
   const [students, setStudents] = React.useState<StudentProgress[]>([]);
 
   const [loading, setLoading] = React.useState(true);

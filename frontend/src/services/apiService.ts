@@ -2,6 +2,10 @@ import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestCo
 import { clearSharedReads } from '../utils/shared/sharedRead';
 import { expireBearerSession, expireSession } from '../utils/shared/authSession';
 import { friendlyErrorMessage } from '../utils/shared/friendlyError';
+import { invalidateEducationReadCache } from '../utils/education/educationReadCache';
+import { invalidateQhdnReadCache } from '../utils/qhdn/qhdnReadCache';
+import { invalidateEnterpriseReadCache } from '../utils/enterprise/enterpriseReadCache';
+import { invalidateStudentReadCache } from '../utils/student/studentReads';
 
 // Tất cả vai trò dùng chung backend; môi trường local đi qua proxy của Vite.
 export const API_BASE_URL = (
@@ -53,6 +57,10 @@ API.interceptors.response.use(
   (response: AxiosResponse) => {
     if (!['get', 'head'].includes(response.config.method?.toLowerCase() ?? 'get')) {
       clearSharedReads();
+      invalidateEducationReadCache();
+      invalidateQhdnReadCache();
+      invalidateEnterpriseReadCache();
+      invalidateStudentReadCache();
     }
     return response;
   },
@@ -97,7 +105,7 @@ export async function apiRequest<T>(
   if (!body) {
     throw new Error('Chưa thể xử lý phản hồi lúc này. Vui lòng thử lại sau.');
   }
-  if (!['GET', 'HEAD'].includes((options.method ?? 'GET').toUpperCase())) clearSharedReads();
+  if (!['GET', 'HEAD'].includes((options.method ?? 'GET').toUpperCase())) { clearSharedReads(); invalidateEducationReadCache(); invalidateQhdnReadCache(); invalidateEnterpriseReadCache(); invalidateStudentReadCache(); }
   return body as T;
 }
 

@@ -14,6 +14,19 @@ export function defaultSemesters(year: number): SemesterDates[] {
     { term: 'FALL', startDate: `${year}-09-01`, endDate: `${year}-12-31` },
   ];
 }
+export function suggestedBlockDates(semester: SemesterDates): { block10: SemesterDates; block3: SemesterDates } {
+  const addDays = (value: string, days: number) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+  const block10End = addDays(semester.startDate, 69);
+  const block3Start = addDays(semester.endDate, -20);
+  return {
+    block10: { term: semester.term, startDate: semester.startDate, endDate: block10End < semester.endDate ? block10End : addDays(semester.startDate, 59) },
+    block3: { term: semester.term, startDate: block3Start > semester.startDate ? block3Start : addDays(semester.startDate, 60), endDate: semester.endDate },
+  };
+}
 const validCalendarDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 type DateRange = Pick<SemesterDates, 'startDate' | 'endDate'>;
 export function blockDateError(block: DateRange | undefined, semester: DateRange, label = 'Block 3'): string {

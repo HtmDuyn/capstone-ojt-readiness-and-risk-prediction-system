@@ -417,7 +417,7 @@ export const EnterpriseProfile: React.FC = () => {
                   <div className="grid gap-3.5 sm:grid-cols-2">
                     <label className="block text-xs font-semibold text-slate-600 sm:col-span-2">
                       Họ và tên người đại diện <span className="text-rose-500">*</span>
-                      <input type="text" required placeholder="Ví dụ: Nguyen Van A" value={editFullName} onChange={event=>setEditFullName(event.target.value)}
+                      <input type="text" required placeholder="Họ và tên người đại diện" value={editFullName} onChange={event=>setEditFullName(event.target.value)}
                         className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" />
                     </label>
                     <label className="block min-w-0 text-xs font-semibold text-slate-600">
@@ -427,7 +427,7 @@ export const EnterpriseProfile: React.FC = () => {
                     </label>
                     <label className="block min-w-0 text-xs font-semibold text-slate-600">
                       Số điện thoại liên hệ
-                      <input type="tel" placeholder="Ví dụ: 0909123456" value={editPhone} onChange={event=>setEditPhone(event.target.value)}
+                      <input type="tel" placeholder="Số điện thoại liên hệ" value={editPhone} onChange={event=>setEditPhone(event.target.value)}
                         className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" />
                     </label>
                   </div>

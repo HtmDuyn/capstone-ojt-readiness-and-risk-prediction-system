@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { query } from '../../config/database';
 import { invalid } from '../students/student.validation';
-import { type Actor, requireStaff } from '../qhdn/qhdn.repository';
 import { JOB_SCHEMA_VERSION, type JobSource } from './job-extraction.schema';
 import { extractJob, jobProviderConfig, JobExtractionError } from './claude-job';
 
@@ -29,43 +28,6 @@ async function guarded<T>(work: () => Promise<T>) {
     if (error.code === '42P01' || error.code === '42703') throw invalid('Database chưa đồng bộ schema trích xuất tin tuyển dụng. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.', 503, 'JOB_EXTRACTION_MIGRATION_REQUIRED');
     throw error;
   }
-}
-function config() {
-  try { return jobProviderConfig(); }
-  catch (error) {
-    if (error instanceof JobExtractionError) throw invalid('Bật RECRUITMENT_CLAUDE_ENABLED=true và cấu hình ANTHROPIC_API_KEY, CLAUDE_RECRUITMENT_MODEL (hoặc CLAUDE_CV_MODEL).', 503, error.code);
-    throw error;
-  }
-}
-export async function getJobExtraction(postId: number, actor: Actor) {
-  requireStaff(actor);
-  return guarded(async () => {
-    const post = (await query('SELECT "PostID" FROM "RecruitmentPosts" WHERE "PostID"=$1', [postId])).rows[0];
-    if (!post) throw invalid('Không tìm thấy tin tuyển dụng.', 404, 'RECRUITMENT_POST_NOT_FOUND');
-    const model = (process.env.CLAUDE_RECRUITMENT_MODEL || process.env.CLAUDE_CV_MODEL)?.trim() || '';
-    const source = (await query(`${sourceCte} SELECT s.hash,x.* FROM current_sources s
-      LEFT JOIN "RecruitmentPostExtractions" x ON x."PostID"=s."PostID" AND x."SourceHash"=s.hash
-        AND x."SchemaVersion"=$2 AND x."Model"=$3 WHERE s."PostID"=$1`, [postId, JOB_SCHEMA_VERSION, model])).rows[0];
-    if (!source) return { postId, status: 'NOT_ELIGIBLE', usableForMatching: false, profile: null };
-    return { postId, id: source.ExtractionID ?? null, status: source.Status ?? 'NOT_ANALYZED',
-      sourceHash: source.hash, schemaVersion: JOB_SCHEMA_VERSION, model, attempts: source.Attempts ?? 0,
-      updatedAt: source.UpdatedAt ?? null, nextAttemptAt: source.NextAttemptAt ?? null,
-      errorCode: source.LastError ?? null, profile: source.Status === 'READY' ? source.Profile : null,
-      usableForMatching: source.Status === 'READY',
-      evidencePolicy: 'Quotes are checked against source text; AI interpretation is not independently verified.' };
-  });
-}
-export async function queueJobExtraction(postId: number, actor: Actor) {
-  requireStaff(actor); const provider = config();
-  return guarded(async () => {
-    const source = (await query(`${sourceCte} SELECT * FROM current_sources WHERE "PostID"=$1`, [postId])).rows[0];
-    if (!source) throw invalid('Chỉ đọc tin doanh nghiệp đã công bố, chưa hết hạn và còn vị trí đang tuyển.', 409, 'JOB_POST_NOT_ELIGIBLE');
-    await query(`INSERT INTO "RecruitmentPostExtractions" ("PostID","SourceHash","SchemaVersion","Model") VALUES ($1,$2,$3,$4)
-      ON CONFLICT ("PostID","SourceHash","SchemaVersion","Model") DO UPDATE SET "Status"='PENDING',"Profile"=NULL,
-        "Attempts"=0,"LastError"=NULL,"LeaseUntil"=NULL,"NextAttemptAt"=now(),"UpdatedAt"=now()
-      WHERE "RecruitmentPostExtractions"."Status" IN ('FAILED','STALE')`, [postId, source.hash, JOB_SCHEMA_VERSION, provider.model]);
-    return getJobExtraction(postId, actor);
-  });
 }
 
 export async function processJobExtraction() {

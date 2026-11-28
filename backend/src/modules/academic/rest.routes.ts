@@ -2,7 +2,7 @@ import { Router,type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorizeRoles } from '../../middleware/authorize';
 import { positiveId } from '../students/student.validation';
-import { assessmentWindows,createAssessment,updateAssessment,updateRule,semesters,semesterDossier } from './rest-resource.service';
+import { assessmentWindows,createAssessment,updateAssessment,updateRule,semesters } from './rest-resource.service';
 import { createImportRequest,commitImportRequest,importRequests } from '../imports/import-request.service';
 import { alerts,courseDemand,csvReport } from '../academic-reporting/report-read.service';
 import { enumValue } from '../students/student.validation';
@@ -17,7 +17,6 @@ router.patch('/ojt-rule-sets',...staff,handle(r=>updateRule(r.body,r.user)));
 router.get('/ojt-semesters',...staff,handle(r=>semesters(r.query)));
 router.get('/ojt-grading-criteria',...staff,handle(r=>getGradingCriteria(r.query)));
 router.put('/ojt-grading-criteria',...staff,handle(r=>saveGradingCriteria(r.body,r.user),201));
-router.get('/ojt-semesters/:id',...staff,handle(r=>semesterDossier(positiveId(r.params.id),r.query,r.user)));
 for(const [path,kind]of [['student-imports','STUDENT'],['curriculum-imports','CURRICULUM']] as const){
   router.get('/'+path,...staff,handle(r=>importRequests(kind,r.query,r.user)));
   router.get('/'+path+'/:id',...staff,handle(r=>importRequests(kind,r.query,r.user,positiveId(r.params.id))));

@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, Info, Layers3, RefreshCw, UsersRound } from 'lucide-react';
+import { BookOpen, Info, Layers3, RefreshCw, UsersRound } from 'lucide-react';
 import { academicReportingService as reports } from '@/services/educationService';
 import type { ReportPeriod, RetakeClassReport } from '@/types/education/reporting.types';
-import type { Major } from '@/types/education/curriculum.types';
+import { useEducationCacheRefresh } from '@/hooks/education/useEducationCacheRefresh';
 
-type Props = { periods: ReportPeriod[]; majors: Major[]; catalogLoading: boolean };
+type Props = { periods: ReportPeriod[]; catalogLoading: boolean };
 
 const dateLabel = (value: string) => new Date(value).toLocaleDateString('vi-VN', { timeZone: 'UTC' });
 
-export function RetakeClassProposals({ periods, majors, catalogLoading }: Props) {
-  const [chosenSemesterId, setChosenSemesterId] = useState<string | null>(null);
-  const [majorId, setMajorId] = useState('');
+export function RetakeClassProposals({ periods, catalogLoading }: Props) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<RetakeClassReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
+  useEducationCacheRefresh(['/retake-class-proposals:'],()=>setRetry(value=>value+1),300);
 
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
   const upcomingSemesters = periods
     .filter(period => period.kind === 'SEMESTER' && period.status === 'PLANNED' && period.startDate.slice(0, 10) > today)
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.id - b.id);
   const defaultSemester = upcomingSemesters[0];
-  const semesterId = chosenSemesterId ?? (defaultSemester ? String(defaultSemester.id) : '');
+  const semesterId = defaultSemester ? String(defaultSemester.id) : '';
   const semester = upcomingSemesters.find(period => String(period.id) === semesterId);
 
   useEffect(() => {
@@ -37,7 +36,7 @@ export function RetakeClassProposals({ periods, majors, catalogLoading }: Props)
     setLoading(true);
     reports.retakeClassProposals(
       Number(semesterId),
-      majorId ? { majorId: Number(majorId) } : {},
+      {},
       page,
       controller.signal,
       'CALCULATED',
@@ -48,7 +47,7 @@ export function RetakeClassProposals({ periods, majors, catalogLoading }: Props)
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [semesterId, majorId, page, retry]);
+  }, [semesterId, page, retry]);
 
   const metricCards = data ? [
     { label: 'Môn cần hỗ trợ', value: data.summary.courseCount, detail: 'Môn có sinh viên cần học', icon: BookOpen, tone: 'orange' },
@@ -58,37 +57,7 @@ export function RetakeClassProposals({ periods, majors, catalogLoading }: Props)
 
   return (
     <section id="retake-class-proposals" aria-label="Đề xuất lớp hỗ trợ" className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600"><CalendarDays size={16} aria-hidden="true" /></span>
-          <div>
-            <h3 className="text-sm font-bold text-slate-800">Phạm vi đề xuất</h3>
-            <p className="text-xs text-slate-500">Chọn học kỳ dự kiến và chuyên ngành cần xem.</p>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="min-w-0 text-xs font-semibold text-slate-600">
-            Học kỳ
-            <select value={semesterId} disabled={catalogLoading} onChange={event => { setChosenSemesterId(event.target.value); setPage(1); }} className="mt-1.5 block min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:opacity-60">
-              <option value="">Chọn học kỳ</option>
-              {upcomingSemesters.map(period => <option key={period.id} value={period.id}>{period.periodCode}</option>)}
-            </select>
-          </label>
-          <label className="min-w-0 text-xs font-semibold text-slate-600">
-            Chuyên ngành
-            <select value={majorId} disabled={catalogLoading} onChange={event => { setMajorId(event.target.value); setPage(1); }} className="mt-1.5 block min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-normal text-slate-800 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:opacity-60">
-              <option value="">Tất cả chuyên ngành</option>
-              {majors.map(major => <option key={major.id} value={major.id}>{major.name}</option>)}
-            </select>
-          </label>
-        </div>
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-3 text-sm leading-5 text-blue-900">
-          <Info size={17} className="mt-0.5 shrink-0 text-blue-600" aria-hidden="true" />
-          <p>Mỗi môn có nhu cầu từ <strong>1–35 sinh viên</strong> được đề xuất 1 lớp; trên 35 sinh viên được đề xuất 2 lớp. Số liệu chỉ để tham khảo, chưa phải quyết định mở lớp.</p>
-        </div>
-      </div>
-
-      {catalogLoading && <p role="status" className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Đang tải học kỳ và chuyên ngành…</p>}
+      {catalogLoading && <p role="status" className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Đang tải học kỳ…</p>}
       {!catalogLoading && upcomingSemesters.length === 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">Chưa có học kỳ sắp tới để lập đề xuất lớp hỗ trợ.</div>}
       {loading && <div role="status" className="grid gap-3 sm:grid-cols-3"><div className="h-24 animate-pulse rounded-xl bg-slate-100 sm:col-span-3" /><div className="h-16 animate-pulse rounded-xl bg-slate-100 sm:col-span-3" /></div>}
       {error && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 sm:flex-row sm:items-center sm:justify-between"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)} className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-rose-200 bg-white px-3 py-2 font-semibold hover:bg-rose-100 sm:self-auto"><RefreshCw size={15} /> Thử lại</button></div>}
@@ -116,7 +85,12 @@ export function RetakeClassProposals({ periods, majors, catalogLoading }: Props)
           })}
         </div>
 
-        {(data.excludedStudentCount > 0 || data.unresolvedAlternativeStudentCount > 0) && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{[data.excludedStudentCount > 0 ? `${data.excludedStudentCount} sinh viên thiếu dữ liệu học vụ` : null, data.unresolvedAlternativeStudentCount > 0 ? `${data.unresolvedAlternativeStudentCount} sinh viên có môn lựa chọn chưa xác định` : null].filter(Boolean).join(' · ')}. Số liệu có thể chưa đầy đủ.</div>}
+        <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-3 text-sm leading-5 text-blue-900">
+          <Info size={17} className="mt-0.5 shrink-0 text-blue-600" aria-hidden="true" />
+          <p>Mỗi môn có nhu cầu từ <strong>1–35 sinh viên</strong> được đề xuất 1 lớp; trên 35 sinh viên được đề xuất 2 lớp. Số liệu chỉ để tham khảo, chưa phải quyết định mở lớp.</p>
+        </div>
+
+        {data.excludedStudentCount > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{data.excludedStudentCount} sinh viên thiếu dữ liệu học vụ. Số liệu có thể chưa đầy đủ.</div>}
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-5">

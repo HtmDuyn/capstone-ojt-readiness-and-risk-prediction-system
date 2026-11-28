@@ -9,21 +9,26 @@ import { normalizeEnterpriseImportPreview } from "@/utils/qhdn/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
 import API from "./apiService";
-import type { DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
+import type { DashboardPlacementSummary, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
+import { qhdnRead, qhdnReadKey } from '@/utils/qhdn/qhdnReadCache';
 
-/** Use the same roster as the OJT coordination screen, including unregistered students. */
-export const getDashboardPlacementBoard = async (ojtSemesterId: number, signal?: AbortSignal): Promise<DashboardPlacementBoard> => {
-  const response = await API.get<{ success: boolean; data: DashboardPlacementBoard }>('/qhdn/placements', { params: { ojtSemesterId }, signal });
-  if (!response.data.success) throw new Error('Không tải được danh sách điều phối OJT.');
-  return response.data.data;
+/** Dashboard projection: counts only, without loading student rows, placement history, or positions. */
+export const getDashboardPlacementSummary = async (ojtSemesterId: number, signal?: AbortSignal): Promise<DashboardPlacementSummary> => {
+  return qhdnRead(qhdnReadKey('/qhdn/placements/summary',{ojtSemesterId}),async requestSignal=>{
+    const response = await API.get<{ success: boolean; data: DashboardPlacementSummary }>('/qhdn/placements/summary', { params: { ojtSemesterId }, signal:requestSignal });
+    if (!response.data.success) throw new Error('Không tải được thống kê điều phối OJT.');
+    return response.data.data;
+  },signal);
 };
 
 export const getQhdnDashboardSummary = async (ojtSemesterId: number, signal?: AbortSignal): Promise<QhdnDashboardSummary> => {
-  const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard/summary', { params: { ojtSemesterId }, signal });
-  if (!response.data.success) throw new Error('Không tải được thống kê thực tập OJT.');
-  const progress=response.data.data?.progress;
-  if(!progress||![progress.completed,progress.inProgress,progress.evaluated].every(count=>Number.isSafeInteger(count)&&count>=0))throw new Error('Chưa tải được đầy đủ thống kê kết quả OJT. Vui lòng thử lại.');
-  return response.data.data;
+  return qhdnRead(qhdnReadKey('/qhdn/dashboard/summary',{ojtSemesterId}),async requestSignal=>{
+    const response = await API.get<{ success: boolean; data: QhdnDashboardSummary }>('/qhdn/dashboard/summary', { params: { ojtSemesterId }, signal:requestSignal });
+    if (!response.data.success) throw new Error('Không tải được thống kê thực tập OJT.');
+    const progress=response.data.data?.progress;
+    if(!progress||![progress.completed,progress.inProgress,progress.evaluated].every(count=>Number.isSafeInteger(count)&&count>=0))throw new Error('Chưa tải được đầy đủ thống kê kết quả OJT. Vui lòng thử lại.');
+    return response.data.data;
+  },signal);
 };
 
 import type {
@@ -61,8 +66,7 @@ export const listCompanies = async (
   } = { page: 1, limit: 100 },
   signal?: AbortSignal,
 ): Promise<CompanyListResponse> => {
-  const response = await API.get<CompanyListResponse>("/companies", { params, signal });
-  return response.data;
+  return qhdnRead(qhdnReadKey('/companies',params),async requestSignal=>(await API.get<CompanyListResponse>("/companies", { params, signal:requestSignal })).data,signal);
 };
 
 export const setCompanyAccess = async (id: number, status: 'ACTIVE' | 'INACTIVE') => {
@@ -88,10 +92,7 @@ export const listPositions = async (
   } = { page: 1, limit: 100 },
   signal?: AbortSignal,
 ): Promise<PositionListResponse> => {
-  const response = await API.get<PositionListResponse>("/positions", {
-    params, signal,
-  });
-  return response.data;
+  return qhdnRead(qhdnReadKey('/positions',params),async requestSignal=>(await API.get<PositionListResponse>("/positions", { params, signal:requestSignal })).data,signal);
 };
 
 /**
@@ -105,15 +106,14 @@ export const getAcademicPeriods = async (
     search?: string;
     status?: string;
   } = {},
+  signal?:AbortSignal,
 ): Promise<AcademicPeriodListResponse> => {
-  const { data } = await API.get<AcademicPeriodListResponse>("/academic-periods", {
-    params: { page: 1, limit: 100, ...params },
-  });
-  if (data.success !== true) {
-    throw new Error(data.message || "Không tải được danh sách kỳ học.");
-  }
-  // The API returns { success, items, page, limit, total }, without a data wrapper.
-  return data;
+  const query={page:1,limit:100,...params};
+  return qhdnRead(qhdnReadKey('/academic-periods',query),async requestSignal=>{
+    const { data } = await API.get<AcademicPeriodListResponse>("/academic-periods", { params:query,signal:requestSignal });
+    if (data.success !== true) throw new Error(data.message || "Không tải được danh sách kỳ học.");
+    return data;
+  },signal,5*60_000);
 };
 
 /**
@@ -129,11 +129,7 @@ export const listRegistrationWindows = async (
   } = { page: 1, limit: 50 },
   signal?: AbortSignal,
 ): Promise<ListRegistrationWindowsResponse> => {
-  const response = await API.get<ListRegistrationWindowsResponse>(
-    "/ojt-registration-windows",
-    { params, signal },
-  );
-  return response.data;
+  return qhdnRead(qhdnReadKey('/ojt-registration-windows',params),async requestSignal=>(await API.get<ListRegistrationWindowsResponse>("/ojt-registration-windows",{params,signal:requestSignal})).data,signal);
 };
 
 /**
@@ -204,11 +200,7 @@ export const listCoordinations = async (
   } = { page: 1, limit: 100 },
   signal?: AbortSignal,
 ): Promise<CoordinationListResponse> => {
-  const response = await API.get<CoordinationListResponse>(
-    "/ojt-coordinations",
-    { params, signal },
-  );
-  return response.data;
+  return qhdnRead(qhdnReadKey('/ojt-coordinations',params),async requestSignal=>(await API.get<CoordinationListResponse>("/ojt-coordinations",{params,signal:requestSignal})).data,signal);
 };
 
 // =========================================================================
@@ -228,12 +220,9 @@ export const listInternshipEvaluations = async (
     status?: string;
     search?: string;
   } = { page: 1, limit: 100 },
+  signal?:AbortSignal,
 ): Promise<InternshipEvaluationListResponse> => {
-  const response = await API.get<InternshipEvaluationListResponse>(
-    "/internship-evaluations",
-    { params },
-  );
-  return response.data;
+  return qhdnRead(qhdnReadKey('/internship-evaluations',params),async requestSignal=>(await API.get<InternshipEvaluationListResponse>("/internship-evaluations",{params,signal:requestSignal})).data,signal);
 };
 
 export const listOjtResults = async (
@@ -247,11 +236,12 @@ export const listOjtResults = async (
   } = { page: 1, limit: 100 },
   signal?: AbortSignal,
 ): Promise<OjtResultListResponse> => {
-  const response = await API.get<OjtResultListResponse>("/ojt-results", {
-    params, signal,
-  });
-  return response.data;
+  return qhdnRead(qhdnReadKey('/ojt-results',params),async requestSignal=>(await API.get<OjtResultListResponse>("/ojt-results",{params,signal:requestSignal})).data,signal);
 };
+
+export const getEligibleStudentsPage = async <T>(params:{page:number;limit:number},signal?:AbortSignal):Promise<T> =>
+  qhdnRead(qhdnReadKey('/qhdn/eligible-students',params),async requestSignal=>
+    (await API.get<{data:T}>('/qhdn/eligible-students',{params,signal:requestSignal})).data.data,signal);
 
 export const publishOjtResults = async (
   payload: PublishOjtResultsRequest,
@@ -274,11 +264,11 @@ export const updateCompany = async (
   > & { reason: string },
 ) => (await API.patch(`/companies/${id}`, payload)).data;
 export const getQhdnStudentDossier = async (studentId: number, ojtSemesterId: number, signal?: AbortSignal): Promise<QhdnStudentDossier> => {
-  const { data } = await API.get<{ success: boolean; data: QhdnStudentDossier; message?: string }>(`/qhdn/students/${studentId}`, {
-    params: { ojtSemesterId }, signal,
-  });
-  if (!data.success) throw new Error(data.message || 'Không tải được hồ sơ sinh viên.');
-  return data.data;
+  return qhdnRead(qhdnReadKey(`/qhdn/students/${studentId}`,{ojtSemesterId}),async requestSignal=>{
+    const { data } = await API.get<{ success: boolean; data: QhdnStudentDossier; message?: string }>(`/qhdn/students/${studentId}`, { params:{ojtSemesterId},signal:requestSignal });
+    if (!data.success) throw new Error(data.message || 'Không tải được hồ sơ sinh viên.');
+    return data.data;
+  },signal);
 };
 
 // API trả Blob; utils/shared/downloadFile phụ trách lưu file trên trình duyệt.

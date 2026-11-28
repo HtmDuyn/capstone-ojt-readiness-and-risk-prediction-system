@@ -30,6 +30,7 @@ import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { EnterpriseTaskSubmissionDetails } from '@/components/enterprise/EnterpriseTaskSubmissionDetails';
+import { useEnterpriseCacheRefresh } from '@/hooks/enterprise/useEnterpriseCacheRefresh';
 
 // Adapter: map API data to existing UI's expected format
 const mapApiToIntern = (item: EnterpriseInternshipItem, total: number, completed: number): EnterpriseIntern => ({
@@ -100,6 +101,8 @@ export const EnterpriseInterns: React.FC = () => {
   const [tasks, setTasks] = useState<InternTask[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useEnterpriseCacheRefresh(['/enterprise/internships:', '/internship-tasks:'],()=>setCacheRevision(value=>value+1),300);
 
   const interns = useMemo(() => {
     const counts = new Map<string, {total: number; completed: number; overdue: number}>();
@@ -160,7 +163,7 @@ export const EnterpriseInterns: React.FC = () => {
         setApiLoading(false);
       }
     }
-  }, [companyId, profileLoading]);
+  }, [companyId, profileLoading,cacheRevision]);
 
   useEffect(() => {
     let mounted = true;
@@ -211,7 +214,7 @@ export const EnterpriseInterns: React.FC = () => {
   // Filter & Search states for the main table (Using dropdowns instead of tabs)
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOjtSemesterId, setSelectedOjtSemesterId] = useState('');
-  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('');
+  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('ACTIVE');
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('ALL');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('ALL');
 
@@ -337,6 +340,18 @@ export const EnterpriseInterns: React.FC = () => {
         : assignableInterns.map((intern) => intern.id);
     const selectedIds = requestedIds.filter((id) => assignableIds.has(id));
     setModalSelectedInternIds(selectedIds);
+    const selectedInterns = assignableInterns.filter(intern => selectedIds.includes(intern.id));
+    const endDates = selectedInterns.map(intern => intern.assignmentEndDate?.slice(0, 10));
+    let suggestedDeadline = '';
+    if (endDates.length && endDates.every((date): date is string => !!date)) {
+      const today = vietnamTaskMinute().slice(0, 10);
+      const latestAllowed = endDates.reduce((earliest, date) => date < earliest ? date : earliest);
+      const target = new Date(`${today}T00:00:00`);
+      target.setDate(target.getDate() + 3);
+      const suggestedDate = localDateString(target) > latestAllowed ? latestAllowed : localDateString(target);
+      suggestedDeadline = `${suggestedDate}T23:59`;
+    }
+    setNewTask(current => ({ ...current, deadline: suggestedDeadline }));
     setTaskSubmitError(
       selectedIds.length
         ? null

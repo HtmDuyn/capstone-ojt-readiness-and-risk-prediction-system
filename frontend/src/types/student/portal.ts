@@ -116,6 +116,7 @@ export interface Profile {
   email: string;
   phone: string | null;
   currentSemester: number | null;
+  actualSemester: number | null;
   programId: number | null;
   program:
     (Named & { majorName?: string; totalCredits?: number | null }) | null;

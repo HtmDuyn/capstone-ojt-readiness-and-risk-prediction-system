@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { importService } from '@/services/educationService';
 import type { Page } from '@/types/education/api.types';
 import type { ImportedStudent, ImportedStudentFilters, ImportedStudentProfile, StoredCourseResult } from '@/types/education/import.types';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 const emptyFilters = (): ImportedStudentFilters => ({ search: '', programId: '', cohortId: '', status: '', importBatchId: '' });
 const message = (e: unknown) => e instanceof Error ? e.message : 'Không tải được dữ liệu đã lưu.';
@@ -23,6 +24,7 @@ export function useEducationImportedStudents(revision: number, sortActive = fals
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  useEducationCacheRefresh(['/students:'],()=>setRefresh(value=>value+1),300);
   const allKey = JSON.stringify([filters, revision, refresh]);
   useEffect(() => { if (previousRevision.current !== revision) { previousRevision.current = revision; setFilters(emptyFilters()); setPage(1); } }, [revision]);
   useEffect(() => {
@@ -83,6 +85,7 @@ export function useImportedStudentDetail(id: number, revision: number) {
   const [error, setError] = useState('');
   const [resultsError, setResultsError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  useEducationCacheRefresh([`/students/${id}:`],()=>setRefresh(value=>value+1),300);
   useEffect(() => {
     const c = new AbortController(); setProfileLoading(true); setError(''); setProfile(null);
     importService.getImportedStudent(id, c.signal)

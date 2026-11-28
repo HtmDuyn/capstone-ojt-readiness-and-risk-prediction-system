@@ -167,7 +167,7 @@ export async function dashboardCandidates(actor: Actor) {
 
 export async function enterpriseCandidates(params: Row, actor: Actor) {
   const hasPagination = params.page !== undefined || params.limit !== undefined;
-  const page = pagination(params,['studentId','candidateId','academicYearId','ojtSemesterId','positionId','decision','search']);
+  const page = pagination(params,['studentId','candidateId','academicYearId','ojtSemesterId','ojtSemesterIds','positionId','decision','search','roundId']);
   if(page.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const id=params.candidateId===undefined?undefined:positiveId(params.candidateId,'candidateId');
   return readTransaction(async c => {
@@ -180,14 +180,29 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
     if(params.studentId!==undefined)add('r."StudentID"=?',positiveId(params.studentId,'studentId'));
     if(!id)where.push(`NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."EnterpriseID"=co."EnterpriseID" AND newer."CoordinationID">co."CoordinationID")`);
     if(params.academicYearId!==undefined)add('EXISTS(SELECT 1 FROM "OJTSemesters" o WHERE o."OJTSemesterID"=r."OJTSemesterID" AND o."AcademicYearID"=?)',positiveId(params.academicYearId,'academicYearId'));
+    if(params.ojtSemesterIds!==undefined){
+      if(typeof params.ojtSemesterIds!=='string')throw invalid('ojtSemesterIds must be a comma-separated list.');
+      const semesterIds=params.ojtSemesterIds.split(',').map((value:string)=>positiveId(value,'ojtSemesterIds'));
+      if(!semesterIds.length||semesterIds.length>100)throw invalid('ojtSemesterIds must contain 1–100 IDs.');
+      add('r."OJTSemesterID"=ANY(?::int[])',semesterIds);
+    }
     for (const [key,col] of [['ojtSemesterId','r."OJTSemesterID"'],['positionId','co."PositionID"']]) if (params[key]!==undefined) add(col+'=?',positiveId(params[key],key));
       if (params.decision!==undefined) add(`COALESCE(co."Decision",'PENDING')=?`,enumValue(params.decision,['PENDING','ACCEPTED','REJECTED'],'decision'));
       if (params.search!==undefined) { args.push('%'+requiredText(params.search,'search',100)+'%'); where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length})`); }
+    const baseWhere=[...where],baseArgs=[...args];
+    if(params.roundId!==undefined){
+      if(params.roundId==='unlinked')where.push('review_round."WindowID" IS NULL');
+      else add('review_round."WindowID"=?',positiveId(params.roundId,'roundId'));
+    }
     const sql = `SELECT ${candidateFields},COALESCE((SELECT ja."ApplicationSnapshot"->'application' FROM "JobApplications" ja WHERE ja."ApplicationID"=co."ApplicationID"),r."Application")-'cvUrl' AS application,${applicationDetails} AS "jobApplication",
       COALESCE((SELECT jsonb_agg(jsonb_build_object('name',skill."SkillName",'level',ss."Level") ORDER BY skill."SkillName")
         FROM "StudentMatchingSkills" ss JOIN "MatchingSkills" skill ON skill."SkillID"=ss."SkillID" WHERE ss."StudentID"=r."StudentID"),'[]'::jsonb) AS skills
       ${candidateFrom} WHERE ${where.join(' AND ')}`;
-    const total = (await c.query(`SELECT count(*)::int AS n FROM (${sql}) candidates`,args)).rows[0].n;
+    // Count from the filtered candidate relation only. Running the projection query
+    // for COUNT also evaluates CV/application/skill JSON subqueries for every row.
+    const total = (await c.query(`SELECT count(*)::int AS n ${candidateFrom} WHERE ${where.join(' AND ')}`,args)).rows[0].n;
+    const roundOptions=(await c.query(`SELECT DISTINCT review_round."WindowID" AS id,review_round."Name" AS name
+      ${candidateFrom} WHERE ${baseWhere.join(' AND ')} ORDER BY review_round."Name" NULLS LAST`,baseArgs)).rows;
     const items = (await c.query(
       hasPagination
         ? `${sql} ORDER BY co."CoordinationID" DESC LIMIT $${args.length+1} OFFSET $${args.length+2}`
@@ -204,6 +219,7 @@ export async function enterpriseCandidates(params: Row, actor: Actor) {
       total,
       page:hasPagination?page.page:1,
       limit:hasPagination?page.limit:Math.max(total,1),
+      rounds:roundOptions.map(round=>({id:round.id===null?'unlinked':String(round.id),name:round.name??'Chưa liên kết đợt OJT'})),
     };
   });
 }

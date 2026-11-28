@@ -14,14 +14,17 @@ import { studentRecruitmentAssignment } from './recruitment-assignment.service';
 type Row = Record<string, any>;
 export async function studentProfile(id:number,params:Row,actor:Actor,existingClient?:PoolClient,assessment?:AssessmentReadContext) {
   const section=enumValue(params.section??'all',['all','academicProgress'],'section');
-  const sections=['academicProgress','courseResults','comboSelections','ojtRegistrations','eligibility','eligibilityChecks','comboHistory','academic','curriculum'];
+  const sections=['academicProgress','courseResults','comboSelections','ojtRegistrations','eligibility','eligibilityChecks','comboHistory','academic','curriculum','recruitmentAssignment'];
   const allowed=['section','include','resultsPage','resultsLimit','courseId','academicPeriodId','courseStatus','ojtPage','ojtLimit','ojtSemesterId','checksPage','checksLimit','comboPage','comboLimit'];
   if(params.include!==undefined&&(typeof params.include!=='string'||!params.include.length))throw invalid('include must be a comma-separated list.');
   if(params.include!==undefined&&params.section!==undefined)throw invalid('Use include or section, not both.');
-  const selectedSections=params.include===undefined?(section==='academicProgress'?['academicProgress']:sections):params.include.split(',');
+  // A bare profile read returns identity/summary fields only. Detail sections are
+  // opt-in so list and profile screens do not pay for academic history by default.
+  const selectedSections=params.include===undefined?(section==='academicProgress'?['academicProgress']:[]):params.include.split(',');
   if(selectedSections.some((key:string)=>!sections.includes(key))||new Set(selectedSections).size!==selectedSections.length)throw invalid('Unknown or duplicate profile include section.');
   const includes=new Set<string>(selectedSections);
-  const needsProgress=['academicProgress','academic','eligibility'].some(key=>includes.has(key));
+  const needsEligibility=includes.has('academic')||includes.has('eligibility');
+  const needsProgress=includes.has('academicProgress')||needsEligibility;
   const checksPage=pagination({page:params.checksPage,limit:params.checksLimit},[]);
   const comboPage=pagination({page:params.comboPage,limit:params.comboLimit},[]);
   for(const key of Object.keys(params))if(!allowed.includes(key))throw invalid('Unknown profile parameter: '+key);
@@ -29,8 +32,11 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
   const ojtPage=pagination({page:params.ojtPage,limit:params.ojtLimit},[]);
   if([resultsPage,ojtPage,checksPage,comboPage].some(p=>p.offset>2147483647))throw invalid('Pagination exceeds allowed range.');
   const selected=params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId');
+  const onlyCourseResults=includes.size===1&&includes.has('courseResults');
   return readTransaction(async c=>{
-    const profile=(await c.query(studentSelect+' WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL',[id])).rows[0];
+    const profile=(await c.query(onlyCourseResults
+      ? 'SELECT s."StudentID" AS id,s."UserID" AS "userId" FROM "Students" s WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL'
+      : studentSelect+' WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL',[id])).rows[0];
     if(!profile)throw invalid('Student not found.',404,'STUDENT_NOT_FOUND');
     if(!['ADMIN','ACADEMIC'].includes(actor.roleCode)&&(actor.roleCode!=='STUDENT'||profile.userId!==actor.userId))throw invalid('You cannot access this student.',403,'FORBIDDEN');
     if(selected&&!(await c.query('SELECT 1 FROM "OJTSemesters" WHERE "OJTSemesterID"=$1',[selected])).rowCount)throw invalid('OJT semester not found.',404,'OJT_SEMESTER_NOT_FOUND');
@@ -81,16 +87,18 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
     if (!selected && ojtPage.offset===0) registrationSemester=registrations[0]?.ojtSemesterId ?? null;
     output.ojtRegistrations={items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit};
     }
-    const recruitmentAssignment=await studentRecruitmentAssignment(c,id);
-    output.recruitmentAssignment=recruitmentAssignment;
-    // Prefer the QHDN assignment; an explicit historical filter still takes precedence.
-    const semesterId=selected??recruitmentAssignment?.ojtSemesterId??(registrationSemester !== undefined ? registrationSemester : (await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID)??
+    const recruitmentAssignment=includes.has('recruitmentAssignment')?await studentRecruitmentAssignment(c,id):null;
+    if(includes.has('recruitmentAssignment'))output.recruitmentAssignment=recruitmentAssignment;
+    // Assignment lookup and fallback semester discovery are only needed for
+    // sections that calculate semester-scoped academic/eligibility data.
+    const semesterId=selected??recruitmentAssignment?.ojtSemesterId??registrationSemester??(needsEligibility?
+      (await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID??
       (await c.query(`SELECT "OJTSemesterID" FROM "OJTSemesters"
-       WHERE "AcademicPeriodID"="DefaultOJTAcademicPeriod"($1) LIMIT 1`,[id])).rows[0]?.OJTSemesterID??null;
+       WHERE "AcademicPeriodID"="DefaultOJTAcademicPeriod"($1) LIMIT 1`,[id])).rows[0]?.OJTSemesterID??null:null);
     output.ojtSemesterId=semesterId;
     const decision=semesterId&&(includes.has('eligibility')||includes.has('academic'))?await eligibility(id,{ojtSemesterId:semesterId},c,academicProgress,source):null;
-    const official=decision?decision.official:(semesterId&&needsProgress?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null);
-    if(needsProgress){output.officialEligibility=official;output.officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;}
+    const official=decision?decision.official:(semesterId&&needsEligibility?await officialEligibilityWithClient(c,id,semesterId,{lockSource:false,progress:academicProgress}):null);
+    if(needsEligibility){output.officialEligibility=official;output.officialDecision=!official||official.isStale?'REVIEW_REQUIRED':official.status;}
     if(includes.has('eligibility'))output.eligibility=decision;
     if(includes.has('eligibilityChecks'))output.eligibilityChecks=await history(id,{...(selected?{ojtSemesterId:selected}:{}),page:params.checksPage,limit:params.checksLimit},c);
     if(includes.has('academic')){

@@ -1275,6 +1275,7 @@ CREATE TABLE public."StudentAcademicPlacements" (
   "GroupCode" character(1) NOT NULL,
   "EntryAcademicPeriodID" integer NOT NULL,
   "CurrentAcademicPeriodID" integer NOT NULL,
+  "ActualSemester" integer NOT NULL DEFAULT 0,
   "UpdatedBy" integer NOT NULL,
   "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "StudentAcademicPlacements_pkey" PRIMARY KEY ("StudentID")
@@ -5711,7 +5712,7 @@ INSERT INTO public."TrainingPrograms" ("ProgramID","ProgramCode","ProgramName","
 ('27','BIT_IS_K20B','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('28','BIT_IS_K20C','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('29','BIT_IS_K20D','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
-('30','BIT_IS_K20D-21A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
+('30','BIT_IS_K20D-21A_K22A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('31','BIT_SE_K18D_19A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('32','BIT_SE_K19B','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('33','BIT_SE_K19C','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
@@ -7308,8 +7309,8 @@ ON CONFLICT ("ProgramID") DO UPDATE SET
   "ConfirmedBy"=EXCLUDED."ConfirmedBy","ConfirmedAt"=now();
 
 -- Restore Enterprises
-INSERT INTO public."Enterprises" ("EnterpriseID","EnterpriseCode","Name","Industry","ContactPersonName","ContactEmail","Status","CreatedAt") OVERRIDING SYSTEM VALUE VALUES
-('1','TECHVIET','TechViet','Information Technology','HR Department','hr@techviet.vn','ACTIVE','2026-10-26 19:54:04.855');
+INSERT INTO public."Enterprises" ("EnterpriseID","EnterpriseCode","Name","Address","Industry","ContactPersonName","ContactPhone","ContactEmail","Status","CreatedAt") OVERRIDING SYSTEM VALUE VALUES
+('1','TECHVIET','TechViet','Quận 1, TP. Hồ Chí Minh','Information Technology','HR Department','0903 482 716','hr@techviet.vn','ACTIVE','2026-10-26 19:54:04.855');
 
 -- Restore EnterpriseUsers
 INSERT INTO public."EnterpriseUsers" ("EnterpriseUserID","UserID","EnterpriseID","PositionTitle") OVERRIDING SYSTEM VALUE VALUES
@@ -7323,15 +7324,15 @@ SELECT setval(pg_get_serial_sequence('public."EnterpriseUsers"','EnterpriseUserI
 
 -- Sample enterprise accounts and employers for the seeded recruitment calendar.
 INSERT INTO public."Enterprises" ("EnterpriseCode","Name","Address","Industry","ContactPersonName","ContactPhone","ContactEmail","Status") VALUES
-  ('DATAVIT','DataViet Solutions','Quận 1, TP. Hồ Chí Minh','Information Technology','Nguyễn Minh An','0901000002','hr@dataviet.vn','ACTIVE'),
-  ('SAIGONSOFT','Saigon Software Lab','Quận 3, TP. Hồ Chí Minh','Software Development','Trần Thu Hà','0901000003','hr@saigonsoft.vn','ACTIVE'),
-  ('FINNEXT','FinNext Technology','Quận 7, TP. Hồ Chí Minh','Financial Technology','Lê Quốc Bảo','0901000004','hr@finnext.vn','ACTIVE'),
-  ('NEXUSLAB','NexusLab Solutions','Quận 1, TP. Hồ Chí Minh','Software Development','Phạm Minh Khoa','0901000005','hr@nexuslab.vn','ACTIVE'),
-  ('BLUEOCEAN','BlueOcean Digital','Quận 3, TP. Hồ Chí Minh','Digital Transformation','Nguyễn Khánh Linh','0901000006','hr@blueoceandigital.vn','ACTIVE'),
-  ('GREENBYTE','GreenByte Technology','Quận 7, TP. Hồ Chí Minh','Artificial Intelligence and Data','Trần Quốc Huy','0901000007','hr@greenbyte.vn','ACTIVE'),
-  ('CLOUDNOVA','CloudNova Systems','Thành phố Thủ Đức, TP. Hồ Chí Minh','Cloud Computing','Lê Hoàng Anh','0901000008','hr@cloudnova.vn','ACTIVE'),
-  ('FINBRIDGE','FinBridge Digital','Quận Hai Bà Trưng, Hà Nội','Financial Technology','Vũ Thu Trang','0901000009','hr@finbridge.vn','ACTIVE'),
-  ('MEDTECHVN','MedTech Vietnam','Quận Hải Châu, Đà Nẵng','Healthcare Technology','Đặng Minh Phúc','0901000010','hr@medtechvietnam.vn','ACTIVE')
+  ('DATAVIT','DataViet Solutions','Quận 1, TP. Hồ Chí Minh','Information Technology','Nguyễn Minh An','0938 215 604','hr@dataviet.vn','ACTIVE'),
+  ('SAIGONSOFT','Saigon Software Lab','Quận 3, TP. Hồ Chí Minh','Software Development','Trần Thu Hà','0917 603 842','hr@saigonsoft.vn','ACTIVE'),
+  ('FINNEXT','FinNext Technology','Quận 7, TP. Hồ Chí Minh','Financial Technology','Lê Quốc Bảo','0982 431 705','hr@finnext.vn','ACTIVE'),
+  ('NEXUSLAB','NexusLab Solutions','Quận 1, TP. Hồ Chí Minh','Software Development','Phạm Minh Khoa','0908 764 219','hr@nexuslab.vn','ACTIVE'),
+  ('BLUEOCEAN','BlueOcean Digital','Quận 3, TP. Hồ Chí Minh','Digital Transformation','Nguyễn Khánh Linh','0934 582 630','hr@blueoceandigital.vn','ACTIVE'),
+  ('GREENBYTE','GreenByte Technology','Quận 7, TP. Hồ Chí Minh','Artificial Intelligence and Data','Trần Quốc Huy','0976 240 851','hr@greenbyte.vn','ACTIVE'),
+  ('CLOUDNOVA','CloudNova Systems','Thành phố Thủ Đức, TP. Hồ Chí Minh','Cloud Computing','Lê Hoàng Anh','0912 875 364','hr@cloudnova.vn','ACTIVE'),
+  ('FINBRIDGE','FinBridge Digital','Quận Hai Bà Trưng, Hà Nội','Financial Technology','Vũ Thu Trang','0987 316 420','hr@finbridge.vn','ACTIVE'),
+  ('MEDTECHVN','MedTech Vietnam','Quận Hải Châu, Đà Nẵng','Healthcare Technology','Đặng Minh Phúc','0905 628 147','hr@medtechvietnam.vn','ACTIVE')
 ON CONFLICT ("EnterpriseCode") DO UPDATE SET
   "Name"=EXCLUDED."Name","Address"=EXCLUDED."Address","Industry"=EXCLUDED."Industry",
   "ContactPersonName"=EXCLUDED."ContactPersonName","ContactPhone"=EXCLUDED."ContactPhone",
@@ -7442,7 +7443,7 @@ JOIN public."TrainingPrograms" program ON program."Status"='PUBLISHED' AND progr
   WHEN 'IA' THEN CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_IA_K18D-19A' WHEN 'K19' THEN 'BIT_IA_K19D-20A'
     WHEN 'K20' THEN 'BIT_IA_K20D-21A' ELSE 'BIT_IA_K21D-22A' END
   WHEN 'IS' THEN CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_IS_K18D_19A' WHEN 'K19' THEN 'BIT_IS_K19D_K20A'
-    WHEN 'K20' THEN 'BIT_IS_K20D-21A' WHEN 'K21' THEN 'BIT_IS_K20D-21A' ELSE 'BIT_SE-2026_K21D_K22A' END
+    WHEN 'K20' THEN 'BIT_IS_K20D-21A_K22A' WHEN 'K21' THEN 'BIT_IS_K20D-21A_K22A' ELSE 'BIT_SE-2026_K21D_K22A' END
   ELSE CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_SE_K18D_19A' WHEN 'K19' THEN 'BIT_SE_K19D_K20A'
     WHEN 'K20' THEN 'BIT_SE_K20D_K21A' ELSE 'BIT_SE-2026_K21D_K22A' END
 END
@@ -7477,7 +7478,7 @@ FROM (VALUES
 ) AS sample("Number","MajorCode","FullName","Phone","RecruitmentScenario")
 JOIN public."TrainingPrograms" program ON program."Status"='PUBLISHED'
   AND program."ProgramCode"=CASE sample."MajorCode"
-    WHEN 'IS' THEN 'BIT_IS_K20D-21A' ELSE 'BIT_SE_K20D_K21A' END
+  WHEN 'IS' THEN 'BIT_IS_K20D-21A_K22A' ELSE 'BIT_SE_K20D_K21A' END
 CROSS JOIN LATERAL (SELECT sample."MajorCode"||'20'||(1600+sample."Number")::text AS "StudentCode") identity
 WHERE NOT EXISTS (SELECT 1 FROM qhdn_student_roster existing WHERE existing."StudentCode"=identity."StudentCode");
 
@@ -7660,25 +7661,67 @@ JOIN LATERAL (
 WHERE NOT EXISTS (SELECT 1 FROM public."Students" s WHERE s."UserID"=u."UserID" OR s."StudentCode"=r."StudentCode")
 ON CONFLICT DO NOTHING;
 
-INSERT INTO public."StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
-SELECT s."StudentID",c."CohortID",'A',entry."AcademicPeriodID",current_period."AcademicPeriodID",academic."UserID"
+INSERT INTO public."StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","ActualSemester","UpdatedBy")
+SELECT s."StudentID",c."CohortID",'A',entry."AcademicPeriodID",current_period."AcademicPeriodID",
+  (SELECT count(*)::integer FROM public."AcademicPeriods" actual_period
+   WHERE actual_period."Kind"='SEMESTER' AND actual_period."StartDate">entry."StartDate"
+     AND actual_period."StartDate"<=current_period_row."StartDate"),academic."UserID"
 FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
 JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
 JOIN public."Cohorts" c ON c."CohortCode"=r."CohortCode"
 JOIN public."CohortGroups" cohort_group ON cohort_group."CohortID"=c."CohortID" AND cohort_group."GroupCode"='A'
 JOIN public."AcademicPeriods" entry ON entry."AcademicPeriodID"=cohort_group."EntryAcademicPeriodID"
 JOIN LATERAL (
-  SELECT mapping."AcademicPeriodID"
+  SELECT mapping."AcademicPeriodID",mapped_period."StartDate"
   FROM public."CohortCurriculumPeriods" mapping
   JOIN public."AcademicPeriods" mapped_period ON mapped_period."AcademicPeriodID"=mapping."AcademicPeriodID"
   WHERE mapping."CohortID"=c."CohortID" AND mapping."GroupCode"=cohort_group."GroupCode"
     AND mapped_period."StartDate"<=(SELECT "StartDate" FROM public."AcademicPeriods" WHERE "PeriodCode"='FALL2026')
   ORDER BY mapped_period."StartDate" DESC LIMIT 1
-) current_period ON true
+) current_period_row ON true
+JOIN public."AcademicPeriods" current_period ON current_period."AcademicPeriodID"=current_period_row."AcademicPeriodID"
 JOIN public."Users" academic ON academic."Username"='academic01'
 ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCode"=EXCLUDED."GroupCode",
   "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
+  "ActualSemester"=EXCLUDED."ActualSemester",
   "UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
+
+-- Three K22 Information Systems students. K22 follows the existing calendar:
+-- stage 0 / entry = Spring 2026, stage 1 = Summer 2026, stage 2 = Fall 2026.
+-- The closest available IS curriculum (K20D-21A) is extended to K22 above.
+INSERT INTO public."Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status","MustChangePassword","AuthVersion")
+SELECT lower(seed."StudentCode"),'$2b$12$/kDukioJZ/1pVcQI1F/QZ.FHl1qSrmv9s.W.6ouvsA4VuwtMsg2Ti',
+  lower(seed."StudentCode")||'@fpt.edu.vn',seed."Phone",seed."FullName",role."RoleID",'ACTIVE',false,0
+FROM (VALUES
+  ('IS221621','Nguyễn Minh Khôi','0902000621'),
+  ('IS221622','Trần Gia Bảo','0902000622'),
+  ('IS221623','Lê Hoàng Yến','0902000623')
+) AS seed("StudentCode","FullName","Phone")
+CROSS JOIN public."Roles" role
+WHERE role."RoleCode"='STUDENT'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","Status","CohortCode")
+SELECT account."UserID",seed."StudentCode",program."ProgramID",2026,2,'ACTIVE','K22'
+FROM (VALUES ('IS221621'),('IS221622'),('IS221623')) AS seed("StudentCode")
+JOIN public."Users" account ON account."Username"=lower(seed."StudentCode")
+JOIN public."TrainingPrograms" program ON program."ProgramCode"='BIT_IS_K20D-21A_K22A'
+WHERE NOT EXISTS (SELECT 1 FROM public."Students" existing WHERE existing."StudentCode"=seed."StudentCode")
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."StudentAcademicPlacements"
+  ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","ActualSemester","UpdatedBy")
+SELECT student."StudentID",cohort."CohortID",'B',entry."AcademicPeriodID",current_period."AcademicPeriodID",2,academic."UserID"
+FROM (VALUES ('IS221621'),('IS221622'),('IS221623')) AS seed("StudentCode")
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Cohorts" cohort ON cohort."CohortCode"='K22'
+JOIN public."AcademicPeriods" entry ON entry."PeriodCode"='SPRING2026'
+JOIN public."AcademicPeriods" current_period ON current_period."PeriodCode"='FALL2026'
+CROSS JOIN public."Users" academic
+WHERE academic."Username"='academic01'
+ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCode"=EXCLUDED."GroupCode",
+  "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
+  "ActualSemester"=EXCLUDED."ActualSemester","UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
 
 -- Convert source prerequisite prose when it is a list of exact course codes:
 -- commas mean every clause is required; OR means one course in that clause.
@@ -8510,6 +8553,57 @@ INSERT INTO public."StudentCourseResults" ("ResultID","StudentID","CourseID","Se
   (701,4,263,0,1,8.00,'B','PASSED',1,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
   (702,5,259,0,1,8.00,'B','PASSED',1,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
   (703,6,260,0,1,8.00,'B','PASSED',1,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL);
+SELECT setval(pg_get_serial_sequence('public."StudentCourseResults"','ResultID'),GREATEST(COALESCE((SELECT max("ResultID") FROM public."StudentCourseResults"),1),1),true);
+
+-- K22 IS history: five curriculum stage-1 courses in Summer 2026 and five
+-- stage-2 courses in Fall 2026 for each student. Fall courses are in progress.
+INSERT INTO public."StudentCourseResults"
+  ("ResultID","StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy","OJTResultID")
+OVERRIDING SYSTEM VALUE
+SELECT seed."ResultID",student."StudentID",course."CourseID",seed."SemesterTaken",period."AcademicYearID",
+  seed."Score",seed."Grade",seed."Status",period."AcademicPeriodID",1,seed."GradePoints",
+  'K22_IS_TRANSCRIPT_2026',academic."UserID",NULL
+FROM (VALUES
+  (704,'IS221621',1,'CEA201','PASSED',8.00,'B',3.00),
+  (705,'IS221621',1,'CSI106','PASSED',8.00,'B',3.00),
+  (706,'IS221621',1,'MAE101','PASSED',8.00,'B',3.00),
+  (707,'IS221621',1,'PRF192','PASSED',8.00,'B',3.00),
+  (708,'IS221621',1,'SSA101','PASSED',8.00,'B',3.00),
+  (709,'IS221621',2,'JPD113','IN_PROGRESS',NULL,NULL,NULL),
+  (710,'IS221621',2,'MAD101','IN_PROGRESS',NULL,NULL,NULL),
+  (711,'IS221621',2,'NWC204','IN_PROGRESS',NULL,NULL,NULL),
+  (712,'IS221621',2,'OSG202','IN_PROGRESS',NULL,NULL,NULL),
+  (713,'IS221621',2,'PRO192','IN_PROGRESS',NULL,NULL,NULL),
+  (714,'IS221622',1,'CEA201','PASSED',8.00,'B',3.00),
+  (715,'IS221622',1,'CSI106','PASSED',8.00,'B',3.00),
+  (716,'IS221622',1,'MAE101','PASSED',8.00,'B',3.00),
+  (717,'IS221622',1,'PRF192','PASSED',8.00,'B',3.00),
+  (718,'IS221622',1,'SSA101','PASSED',8.00,'B',3.00),
+  (719,'IS221622',2,'JPD113','IN_PROGRESS',NULL,NULL,NULL),
+  (720,'IS221622',2,'MAD101','IN_PROGRESS',NULL,NULL,NULL),
+  (721,'IS221622',2,'NWC204','IN_PROGRESS',NULL,NULL,NULL),
+  (722,'IS221622',2,'OSG202','IN_PROGRESS',NULL,NULL,NULL),
+  (723,'IS221622',2,'PRO192','IN_PROGRESS',NULL,NULL,NULL),
+  (724,'IS221623',1,'CEA201','PASSED',8.00,'B',3.00),
+  (725,'IS221623',1,'CSI106','PASSED',8.00,'B',3.00),
+  (726,'IS221623',1,'MAE101','PASSED',8.00,'B',3.00),
+  (727,'IS221623',1,'PRF192','PASSED',8.00,'B',3.00),
+  (728,'IS221623',1,'SSA101','PASSED',8.00,'B',3.00),
+  (729,'IS221623',2,'JPD113','IN_PROGRESS',NULL,NULL,NULL),
+  (730,'IS221623',2,'MAD101','IN_PROGRESS',NULL,NULL,NULL),
+  (731,'IS221623',2,'NWC204','IN_PROGRESS',NULL,NULL,NULL),
+  (732,'IS221623',2,'OSG202','IN_PROGRESS',NULL,NULL,NULL),
+  (733,'IS221623',2,'PRO192','IN_PROGRESS',NULL,NULL,NULL)
+) AS seed("ResultID","StudentCode","SemesterTaken","CourseCode","Status","Score","Grade","GradePoints")
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Courses" course ON course."CourseCode"=seed."CourseCode"
+JOIN public."ProgramCourses" program_course ON program_course."ProgramID"=student."ProgramID"
+  AND program_course."CourseID"=course."CourseID" AND program_course."RecommendedSemester"=seed."SemesterTaken"
+  AND program_course."EntryKind"='COURSE'
+JOIN public."AcademicPeriods" period ON period."PeriodCode"=CASE seed."SemesterTaken" WHEN 1 THEN 'SUMMER2026' ELSE 'FALL2026' END
+CROSS JOIN public."Users" academic
+WHERE academic."Username"='academic01'
+ON CONFLICT ("ResultID") DO NOTHING;
 SELECT setval(pg_get_serial_sequence('public."StudentCourseResults"','ResultID'),GREATEST(COALESCE((SELECT max("ResultID") FROM public."StudentCourseResults"),1),1),true);
 
 -- Only the six completed-OJT samples receive historic approved registrations; no future application is fabricated.
@@ -10347,6 +10441,19 @@ INSERT INTO public."StudentCourseResults" ("ResultID","StudentID","CourseID","Se
   (728,30,142,1,3,4.00,'F','FAILED',8,1,0.00,'QHDN_HANDOFF_2026_NEW_ELIGIBLE_FAILED_COURSE',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL);
 SELECT setval(pg_get_serial_sequence('public."StudentCourseResults"','ResultID'),GREATEST(COALESCE((SELECT max("ResultID") FROM public."StudentCourseResults"),1),1),true);
 
+-- IS181613 (BIT_IS_K18D_19A): coursework is limited to mapped semesters 1-5, with 69 OJT-eligible credits earned.
+-- ERP remains the single failed course; the student is 1 credit below the 70-credit rule.
+INSERT INTO public."StudentCourseResults" ("ResultID","StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy","CreatedAt","UpdatedAt","OJTResultID") OVERRIDING SYSTEM VALUE VALUES
+  (729,7,62,3,2,8.00,'B','PASSED',4,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (730,7,64,3,2,8.00,'B','PASSED',4,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (731,7,25,4,2,8.00,'B','PASSED',5,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (732,7,21,4,2,8.00,'B','PASSED',5,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (733,7,90,4,2,8.00,'B','PASSED',5,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (734,7,26,4,2,8.00,'B','PASSED',5,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (735,7,93,5,2,8.00,'B','PASSED',6,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
+  (736,7,94,5,2,8.00,'B','PASSED',6,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL);
+SELECT setval(pg_get_serial_sequence('public."StudentCourseResults"','ResultID'),GREATEST(COALESCE((SELECT max("ResultID") FROM public."StudentCourseResults"),1),1),true);
+
 DO $verify_new_eligible_failed_courses$
 BEGIN
   IF (SELECT count(DISTINCT student."StudentID") FROM public."Students" student
@@ -10358,29 +10465,45 @@ BEGIN
   END IF;
 END $verify_new_eligible_failed_courses$;
 
--- Determine each student's curriculum stage from their coursework rather than
--- the calendar-period mapping: use the highest stage with at least two distinct
--- recorded courses. OJT202 and duplicate attempts do not increase the course count.
-CREATE TEMP TABLE qhdn_transcript_curriculum_stage ON COMMIT DROP AS
+-- Use the highest curriculum stage with more than two distinct courses actively in progress.
+-- If no stage meets that definition, preserve the stage from CurrentAcademicPeriodID.
+CREATE TEMP TABLE qhdn_current_course_stage ON COMMIT DROP AS
 SELECT roster."StudentCode",student."StudentID",student."CurrentSemester" AS "PreviousCurrentSemester",
-  max(stage_count."SemesterTaken") FILTER (WHERE stage_count."CourseCount">=2) AS "CurriculumSemester"
+  COALESCE(active_stage."CurriculumSemester",
+    public."StudentCurriculumSemester"(student."StudentID",placement."CurrentAcademicPeriodID"),
+    student."CurrentSemester") AS "CurriculumSemester"
 FROM qhdn_student_roster roster
 JOIN public."Users" account ON account."Email"=roster."Email"
 JOIN public."Students" student ON student."UserID"=account."UserID"
+LEFT JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=student."StudentID"
 LEFT JOIN LATERAL (
-  SELECT result."SemesterTaken",count(DISTINCT result."CourseID") AS "CourseCount"
-  FROM public."StudentCourseResults" result
-  JOIN public."Courses" course ON course."CourseID"=result."CourseID"
-  WHERE result."StudentID"=student."StudentID" AND result."SemesterTaken" BETWEEN 1 AND 9
-    AND result."Status" IN ('PASSED','RECOGNIZED','FAILED','IN_PROGRESS','WITHDRAWN')
-    AND upper(btrim(course."CourseCode"))<>'OJT202'
-  GROUP BY result."SemesterTaken"
-) stage_count ON true
-GROUP BY roster."StudentCode",student."StudentID",student."CurrentSemester";
+  SELECT max(stage_count."CurriculumSemester") FILTER (WHERE stage_count."CourseCount">2) AS "CurriculumSemester"
+  FROM (
+    SELECT active_course."CurriculumSemester",count(DISTINCT active_course."CourseID") AS "CourseCount"
+    FROM (
+      SELECT pc."RecommendedSemester" AS "CurriculumSemester",result."CourseID"
+      FROM public."StudentCourseResults" result
+      JOIN public."ProgramCourses" pc ON pc."ProgramID"=student."ProgramID" AND pc."CourseID"=result."CourseID" AND pc."EntryKind"='COURSE'
+      WHERE result."StudentID"=student."StudentID" AND result."Status"='IN_PROGRESS'
+      UNION
+      SELECT combo_course."Semester" AS "CurriculumSemester",result."CourseID"
+      FROM public."StudentCourseResults" result
+      JOIN public."StudentComboSelections" selection ON selection."StudentID"=student."StudentID"
+        AND selection."ProgramID"=student."ProgramID" AND selection."ConfirmedAt" IS NOT NULL
+      JOIN public."StudentComboCourseSelections" choice ON choice."SelectionID"=selection."SelectionID"
+      JOIN public."ComboCourses" combo_course ON combo_course."ComboCourseID"=choice."ComboCourseID"
+        AND combo_course."CourseID"=result."CourseID"
+      WHERE result."StudentID"=student."StudentID" AND result."Status"='IN_PROGRESS'
+    ) active_course
+    WHERE active_course."CurriculumSemester" BETWEEN 0 AND 9
+    GROUP BY active_course."CurriculumSemester"
+  ) stage_count
+) active_stage ON true
+;
 
 UPDATE public."Students" student
 SET "CurrentSemester"=stage."CurriculumSemester"
-FROM qhdn_transcript_curriculum_stage stage
+FROM qhdn_current_course_stage stage
 WHERE stage."StudentID"=student."StudentID"
   AND student."CurrentSemester" IS DISTINCT FROM stage."CurriculumSemester";
 
@@ -10498,8 +10621,8 @@ INSERT INTO public."AuditLogs" ("UserID","Action","EntityType","EntityID","Detai
 SELECT academic."UserID",'SEED_UPDATE_CURRICULUM_STAGE','Students',student."StudentID",
   jsonb_build_object('seedKey','CURRICULUM_STAGE:'||student."StudentCode",'studentCode',student."StudentCode",
     'before',stage."PreviousCurrentSemester",'after',stage."CurriculumSemester",
-    'rule','highest curriculum stage containing at least two distinct recorded courses')::text
-FROM qhdn_transcript_curriculum_stage stage
+    'rule','highest curriculum stage with more than two distinct IN_PROGRESS courses; otherwise mapped current period')::text
+FROM qhdn_current_course_stage stage
 JOIN public."Students" student ON student."StudentID"=stage."StudentID"
 JOIN public."Users" academic ON academic."Username"='academic01'
 WHERE stage."PreviousCurrentSemester" IS DISTINCT FROM stage."CurriculumSemester"
@@ -10511,7 +10634,7 @@ SELECT s."StudentCode", roster."FullName", roster."Email", roster."CohortCode",
        program."ProgramCode", roster."SeedScenario",roster."RecruitmentScenario",
        CASE WHEN roster."RecruitmentScenario" IS NOT NULL THEN 'FALL2026 / ROUND 1' END AS "AssignedOJTRound",
        placement_period."PeriodCode" AS "CurrentCalendarPeriod",
-       transcript."CurriculumSemester" AS "CurrentCurriculumSemester",
+       current_stage."CurriculumSemester" AS "CurrentCurriculumSemester",
        CASE
          WHEN roster."HasOJTPlacement" THEN 'COMPLETED_OJT_AND_ELIGIBLE_TRANSCRIPT'
          WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 'EXISTING_NOT_ELIGIBLE_NO_OJT'
@@ -10525,7 +10648,7 @@ JOIN public."Students" s ON s."UserID"=account."UserID"
 JOIN public."TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
 LEFT JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
 LEFT JOIN public."AcademicPeriods" placement_period ON placement_period."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
-LEFT JOIN qhdn_transcript_curriculum_stage transcript ON transcript."StudentID"=s."StudentID"
+LEFT JOIN qhdn_current_course_stage current_stage ON current_stage."StudentID"=s."StudentID"
 ORDER BY s."StudentCode";
 
 -- BEGIN TASK SUBMISSION ATTACHMENTS
@@ -10563,7 +10686,7 @@ LANGUAGE sql IMMUTABLE AS $$ SELECT 2 $$;
 -- 70 credits. This page does not enforce the separate max-unpassed-courses policy.
 -- Materialized 1 rows for public.OJTEligibilityResultBatches.
 INSERT INTO public."OJTEligibilityResultBatches" ("BatchID","IdempotencyKey","RequestHash","SavedBy","SavedAt","SavedCount","Results") OVERRIDING SYSTEM VALUE VALUES
-  (1,'qhdn-seed-ojt-eligibility-30-v1','fb971645105ef377a641b2e5b2a5464ffb971645105ef377a641b2e5b2a5464f',2,'2026-11-28T09:31:58.239Z'::timestamptz,30,'[{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":1,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":2,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":3,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":4,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":5,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":6,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 25.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":7,"earnedCredits":45,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 28.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":8,"earnedCredits":42,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 25.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":9,"earnedCredits":45,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 28.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":10,"earnedCredits":42,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":11,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":12,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 10.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":13,"earnedCredits":60,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 10.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":14,"earnedCredits":60,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 34.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":15,"earnedCredits":36,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 31.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":16,"earnedCredits":39,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":17,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":18,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":19,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":20,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":21,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":22,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":23,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":24,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":25,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":26,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":27,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":28,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":29,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":30,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1}]'::jsonb);
+  (1,'qhdn-seed-ojt-eligibility-30-v1','fb971645105ef377a641b2e5b2a5464ffb971645105ef377a641b2e5b2a5464f',2,'2026-11-28T09:31:58.239Z'::timestamptz,30,'[{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":1,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":2,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":3,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":4,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":5,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":6,"earnedCredits":99,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 1.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":7,"earnedCredits":69,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 28.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":8,"earnedCredits":42,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 25.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":9,"earnedCredits":45,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 28.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":10,"earnedCredits":42,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":11,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":12,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 10.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":13,"earnedCredits":60,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 10.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":14,"earnedCredits":60,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 34.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":15,"earnedCredits":36,"academicIssues":[],"unpassedCourseCount":1},{"status":"NOT_ELIGIBLE","reasons":["Còn thiếu 31.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":16,"earnedCredits":39,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":17,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":18,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":19,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":20,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":21,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":22,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":23,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":24,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":25,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":26,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":27,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":28,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":29,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":0},{"status":"ELIGIBLE","reasons":[],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":30,"earnedCredits":72,"academicIssues":[],"unpassedCourseCount":1}]'::jsonb);
 SELECT setval(pg_get_serial_sequence('public."OJTEligibilityResultBatches"','BatchID'),GREATEST(COALESCE((SELECT max("BatchID") FROM public."OJTEligibilityResultBatches"),1),1),true);
 
 -- Materialized 30 rows for public.StudentOJTCalculatedResults.
@@ -10574,7 +10697,7 @@ INSERT INTO public."StudentOJTCalculatedResults" ("StudentID","BatchID","Program
   (4,1,31,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":4,"earnedCredits":99,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":0}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
   (5,1,23,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":5,"earnedCredits":99,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":0}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
   (6,1,31,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Đã đạt môn OJT202 nên không còn thuộc danh sách xét đợt OJT."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":6,"earnedCredits":99,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":0}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
-  (7,1,23,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Còn thiếu 25.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":7,"earnedCredits":45,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":1}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
+  (7,1,23,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Còn thiếu 1.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":7,"earnedCredits":69,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":1}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
   (8,1,31,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Còn thiếu 28.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":8,"earnedCredits":42,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":1}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
   (9,1,23,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Còn thiếu 25.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":9,"earnedCredits":45,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":1}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),
   (10,1,31,'NOT_ELIGIBLE','{"rule":{"id":1,"version":1,"minCredits":70,"conditionId":1,"issuingDocument":"Văn bản sửa đổi điều kiện xét duyệt sinh viên OJT – QĐ/OJT03/20/11/2024"},"source":"BACKEND","status":"NOT_ELIGIBLE","reasons":["Còn thiếu 28.00 tín chỉ so với mức 70.00."],"checkedAt":"2026-11-28T09:31:51.455Z","studentId":10,"earnedCredits":42,"policyVersion":1,"academicIssues":[],"unpassedCourseCount":1}'::jsonb,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:58.239Z'::timestamptz,2,1),

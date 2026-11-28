@@ -16,7 +16,7 @@ export default function EducationGradingCriteria() {
     { key: 'criterion_2', label: 'Kỹ năng mềm', weight: 30 },
     { key: 'criterion_3', label: 'Thái độ', weight: 30 },
   ]);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('Cập nhật tỷ trọng đánh giá để phản ánh đầy đủ năng lực chuyên môn, kỹ năng phối hợp và thái độ làm việc trong kỳ thực tập.');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -40,7 +40,7 @@ export default function EducationGradingCriteria() {
     try {
       await academicService.saveOjtGradingCriteria({ name, criteria, reason });
       setNotice('Đã tạo phiên bản tiêu chí mới và áp dụng cho toàn hệ thống từ thời điểm lưu.');
-      setReason('');
+      setReason('Cập nhật tỷ trọng đánh giá để phản ánh đầy đủ năng lực chuyên môn, kỹ năng phối hợp và thái độ làm việc trong kỳ thực tập.');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không lưu được.');

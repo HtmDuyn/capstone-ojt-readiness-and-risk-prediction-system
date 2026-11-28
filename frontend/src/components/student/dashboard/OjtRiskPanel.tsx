@@ -1,12 +1,13 @@
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CircleAlert,GraduationCap,RefreshCw } from 'lucide-react';
+import { Activity,CircleAlert,GraduationCap,RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { useStudentRisk, type StudentRiskResource } from '@/hooks/student/useStudentRisk';
 import { type RiskAssessment } from '@/services/studentService';
 import { RiskOverview } from '../ojt-risk/RiskOverview';
 import { AcademicMetrics } from '../ojt-risk/AcademicMetrics';
 import { RiskInsights } from '../ojt-risk/RiskInsights';
+import { RiskSummaryGauge } from '../ojt-risk/RiskInsights';
 import { LearningRoadmap } from '../ojt-risk/LearningRoadmap';
 import { RoadmapNotes } from '../ojt-risk/LearningRoadmap';
 import { RecommendationSummary } from '../ojt-risk/RecommendationSummary';
@@ -44,18 +45,21 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
     {error&&<div role="alert" className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-4"><div className="flex items-start gap-3"><CircleAlert size={20} className="mt-0.5 shrink-0 text-rose-600" aria-hidden="true"/><div><p className="text-sm font-semibold text-rose-900">{data?'Chưa thể cập nhật đánh giá':'Không tải được đánh giá OJT'}</p><p className="mt-1 max-w-xl text-sm leading-relaxed text-rose-700">{error}</p>{data&&<p className="mt-1 text-xs text-rose-700">Đang hiển thị kết quả đã tải trước đó.</p>}</div></div><div className="flex flex-wrap items-end gap-3"><button type="button" disabled={loading} onClick={refresh} className={`inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 disabled:opacity-50 ${focusClass}`}><RefreshCw size={14} aria-hidden="true"/>Thử lại</button></div></div>}
     {renderDashboard&&resource.refreshing&&<p role="status" className="text-xs text-slate-500">Đang cập nhật đánh giá rủi ro và lộ trình…</p>}
     {renderDashboard?renderDashboard(data):loading&&!data?<AssessmentSkeleton/>:data&&compactLayout?<>
-      <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
-      <section className={`${cardClass} min-w-0 p-5 sm:p-6`} aria-label="Tiến độ và phân tích OJT">
-        <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress} embedded />
-        <div className="mt-5 border-t border-slate-200 pt-5">
-          <RiskInsights data={data} embedded />
-        </div>
-        <div className="mt-5 border-t border-slate-200 pt-5">
-          <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} academicProgress={currentAcademic?.academicProgress} embedded />
-          <RoadmapNotes roadmap={data.roadmap} />
+      <section id="risk-progress" className={`${cardClass} min-w-0 scroll-mt-24 p-2.5 sm:p-3`} aria-label="Tiến độ học tập">
+        <div className="mb-2 flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-blue-50 text-blue-700"><Activity size={17} aria-hidden="true"/></span><h2 className="text-base font-bold tracking-tight text-slate-900">Tiến độ học tập</h2></div>
+        <div className="grid min-w-0 gap-3 xl:grid-cols-3 xl:items-stretch">
+          <div className="min-w-0 xl:col-span-2"><AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress} profileStyle /></div>
+          <RiskSummaryGauge data={data}/>
         </div>
       </section>
-      <section className={`${cardClass} min-w-0 p-5 sm:p-6`}><RecommendationSummary data={data} embedded /></section>
+      <section id="risk-insights" className={`${cardClass} min-w-0 scroll-mt-24 p-5 sm:p-6`} aria-label="Nguyên nhân rủi ro"><RiskInsights data={data} embedded profileStyle /></section>
+      <section id="risk-roadmap" className={`${cardClass} min-w-0 scroll-mt-24 p-5 sm:p-6`} aria-label="Lộ trình học tập đề xuất">
+        <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} academicProgress={currentAcademic?.academicProgress} embedded />
+        <RoadmapNotes roadmap={data.roadmap} />
+      </section>
+      <section id="risk-actions" className="relative isolate min-w-0 scroll-mt-24 overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100/80 p-5 sm:p-6" aria-label="Hướng hành động tiếp theo">
+        <span aria-hidden="true" className="absolute -right-8 -top-10 -z-10 size-40 rounded-full bg-orange-200/40"/><RecommendationSummary data={data} embedded />
+      </section>
     </>:data?<>
       <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
       <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress}/>

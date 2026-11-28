@@ -105,6 +105,7 @@ export interface ImportedStudent {
   groupCode: string | null;
   entryAcademicPeriodId: number | null;
   currentAcademicPeriodId: number | null;
+  actualSemester: number | null;
   enrollmentYear: number | null;
   currentSemester: number | null;
   courseSemesterTag: number | null;

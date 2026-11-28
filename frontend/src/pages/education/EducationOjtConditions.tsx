@@ -92,16 +92,19 @@ const EducationOjtConditions: React.FC = () => {
         ['Mã số sinh viên', 'studentCode'], ['Họ và tên', 'fullName'], ['Khóa', 'cohort'], ['Nhóm', 'group'], ['Chương trình', 'program'], ['Tín chỉ xét', 'credits'], ['Kết quả', 'status'], ['Lý do', 'reason'],
       ] as const).map(([label, key]) => <th key={key} scope="col" aria-sort={sortKey === key ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'} className={`px-3 py-2.5 text-xs font-semibold ${key === 'group' ? 'w-14' : key === 'cohort' || key === 'studentCode' ? 'w-36' : key === 'fullName' ? 'min-w-40' : ''}`}><button type="button" onClick={() => sortBy(key)} className="inline-flex items-center gap-1 text-left hover:text-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">{label}{sortKey === key ? sortDirection === 'asc' ? <ArrowUp size={13} aria-hidden="true" /> : <ArrowDown size={13} aria-hidden="true" /> : <ArrowUpDown size={13} className="text-slate-400" aria-hidden="true" />}</button></th>)}<th scope="col" className="px-3 py-2.5">Chi tiết</th></tr></thead><tbody className="divide-y divide-[#E2E8F0]">{sortedVisible.slice(pageStart, pageEnd).map((t, index) => {
         const r = results[t.student.id];
+        const currentCredits = r?.earnedCredits ?? academicCredits[t.student.id];
+        const requiredCredits = r?.rule?.minCredits ?? rule?.minCredits ?? 70;
+        const nearCreditThreshold = currentCredits != null && requiredCredits - currentCredits >= 1 && requiredCredits - currentCredits <= 3;
         const displayStatus = statusByStudent[t.student.id];
         const statusLabel = ojtDisplayStatusLabels[displayStatus];
-        return <tr key={t.student.id} className="bg-white align-top transition-colors duration-150 hover:bg-[#EAF2FF]">
+        return <tr key={t.student.id} className={`${nearCreditThreshold ? 'bg-amber-50' : 'bg-white'} align-top transition-colors duration-150 hover:bg-[#EAF2FF]`}>
           <td className="px-3 py-2.5 tabular-nums">{pageStart + index + 1}</td>
           <td className="whitespace-nowrap px-3 py-2.5 font-medium text-orange-700">{t.student.studentCode}</td>
           <td className="min-w-40 break-words px-3 py-2.5">{t.student.fullName}</td>
           <td className="w-36 break-words px-3 py-2.5">{t.student.cohort?.code ?? '—'}</td>
           <td className="w-14 px-3 py-2.5">{t.student.groupCode ?? '—'}</td>
           <td className="px-3 py-2.5 text-xs">{t.student.program?.code ?? '—'}</td>
-          <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{r?.earnedCredits ?? academicCredits[t.student.id] ?? '—'}{r?.rule && <span className="block text-xs text-slate-500">Ngưỡng {r.rule.minCredits}</span>}</td>
+          <td className={`whitespace-nowrap px-3 py-2.5 tabular-nums ${nearCreditThreshold ? 'font-semibold text-amber-800' : ''}`} title={nearCreditThreshold ? 'Còn thiếu từ 1 đến 3 tín chỉ so với ngưỡng' : undefined}>{currentCredits ?? '—'}{(r?.rule || rule) && <span className={`block text-xs ${nearCreditThreshold ? 'font-medium text-amber-700' : 'text-slate-500'}`}>Ngưỡng {requiredCredits}</span>}</td>
           <td className="px-3 py-2.5"><span className={`inline-block whitespace-nowrap rounded-full px-2 py-1 text-xs ${sourceLoaded.results && displayStatus === 'ELIGIBLE' ? 'bg-green-50 text-green-700' : sourceLoaded.results && displayStatus === 'NOT_ELIGIBLE' ? 'bg-red-50 text-red-700' : sourceLoaded.results && displayStatus === 'ERROR' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{sourceLoaded.results ? statusLabel : 'Chưa tải được kết quả'}</span></td>
           <td className="min-w-48 max-w-sm whitespace-normal break-words px-3 py-2.5 text-xs leading-5 text-slate-600">{sourceLoaded.results ? educationOjtReason(r, failures[t.student.id], t.reason) : 'Chưa tải được kết quả xét.'}{savedResults[t.student.id] && <span className="mt-1 block text-emerald-700">Đã lưu kết quả</span>}</td>
 
@@ -127,7 +130,7 @@ const EducationOjtConditions: React.FC = () => {
           <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
             <h3 className="text-sm font-bold text-slate-900">Thông tin học tập</h3>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-orange-100 bg-orange-50/70 p-3"><p className="text-xs font-medium leading-5 text-slate-600">Tín chỉ dùng để xét</p><p className="mt-1 text-2xl font-bold tabular-nums text-orange-700">{detailResult?.earnedCredits ?? academicCredits[detailTarget.student.id] ?? '—'} <span className="text-sm font-semibold">tín chỉ</span></p><p className="mt-1 text-xs text-slate-500">Đã loại trừ nhóm không tính</p></div>
+              {(() => { const current = detailResult?.earnedCredits ?? academicCredits[detailTarget.student.id]; const required = detailResult?.rule?.minCredits ?? rule?.minCredits; const gap = current != null && required != null ? required - current : null; const near = gap != null && gap >= 1 && gap <= 3; return <div className={`rounded-lg border p-3 ${near ? 'border-amber-200 bg-amber-50' : 'border-orange-100 bg-orange-50/70'}`}><p className="text-xs font-medium leading-5 text-slate-600">Tín chỉ dùng để xét</p><p className={`mt-1 text-2xl font-bold tabular-nums ${near ? 'text-amber-800' : 'text-orange-700'}`}>{current ?? '—'} <span className="text-sm font-semibold">tín chỉ</span></p><p className={`mt-1 text-xs ${near ? 'text-amber-700' : 'text-slate-500'}`}>{near ? `Còn thiếu ${gap} tín chỉ` : 'Đã loại trừ nhóm không tính'}</p></div>; })()}
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-medium text-slate-500">Ngưỡng áp dụng</p><p className="mt-1 text-2xl font-bold tabular-nums text-slate-800">{detailResult?.rule?.minCredits ?? '—'} <span className="text-sm font-semibold">tín chỉ</span></p><p className="mt-1 break-words text-xs text-slate-500">{detailResult?.rule ? detailResult.rule.issuingDocument ?? `Phiên bản ${detailResult.rule.version ?? '—'}` : 'Chưa có dữ liệu điều kiện'}</p></div>
             </div>
           </section>

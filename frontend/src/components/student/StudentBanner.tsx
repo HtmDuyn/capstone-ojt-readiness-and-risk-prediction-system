@@ -24,6 +24,10 @@ export interface PageBannerProps {
   breadcrumb?: React.ReactNode;
   /** Badge hiển thị cạnh tiêu đề. */
   badge?: React.ReactNode;
+  /** Class tùy chỉnh cho badge cạnh tiêu đề. */
+  badgeClassName?: string;
+  /** Class tùy chỉnh cho vùng chứa nội dung trong banner. */
+  contentClassName?: string;
   /** Nút hành động chính. */
   primaryAction?: BannerAction;
   /** Nút hành động phụ. */
@@ -47,6 +51,8 @@ export const StudentBanner: React.FC<PageBannerProps> = ({
   description,
   breadcrumb,
   badge,
+  badgeClassName,
+  contentClassName,
   primaryAction,
   secondaryAction,
   extra,
@@ -111,7 +117,7 @@ export const StudentBanner: React.FC<PageBannerProps> = ({
       <div
         className={`qhdn-hero relative overflow-hidden text-white ${className}`}
       >
-        <div className="relative z-10 max-w-3xl space-y-3">
+        <div className={`relative z-10 ${contentClassName || 'max-w-3xl'} space-y-3`}>
           <div className="mb-2">
             {breadcrumb ?? <span className="qhdn-hero-eyebrow"><GraduationCap size={13} /> CỔNG SINH VIÊN · OJT</span>}
           </div>
@@ -120,7 +126,7 @@ export const StudentBanner: React.FC<PageBannerProps> = ({
             <h1 className="font-extrabold tracking-tight text-white flex items-center gap-2">
               {renderedTitle}
             </h1>
-            {renderedBadge && <span className="qhdn-hero-badge"><span />{renderedBadge}</span>}
+            {renderedBadge && <span className={badgeClassName || 'qhdn-hero-badge'}>{!badgeClassName && <span />}{renderedBadge}</span>}
           </div>
 
           {renderedDescription && (

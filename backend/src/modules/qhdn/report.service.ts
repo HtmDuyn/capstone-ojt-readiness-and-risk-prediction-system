@@ -1,4 +1,3 @@
-import { recruitmentAccessSql } from '../eligibility/recruitment-roster.repository';
 import { enrichListRows } from '../../shared/list-context';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import type { PoolClient } from 'pg';
@@ -10,13 +9,13 @@ import { staff } from './catalog.service';
 export type ReportType='acceptance'|'internships'|'enterprise-feedback';
 export type Filters={ojtSemesterId:number|null;companyId:number|null};
 const reportTypes:ReportType[]=['acceptance','internships','enterprise-feedback'];
-export function reportQuery(params:Row,kind:'dashboard'|'report'|'export'){
-  const allowed=['ojtSemesterId','companyId',...(kind==='export'?['type','format']:kind==='report'?['type']:[])];
+export function reportQuery(params:Row,kind:'report'|'export'){
+  const allowed=['ojtSemesterId','companyId',...(kind==='export'?['type','format']:['type'])];
   const p=pagination(params,allowed);
-  if(kind!=='report'&&(params.page!==undefined||params.limit!==undefined))throw invalid('Dashboard and export do not support pagination.');
+  if(kind==='export'&&(params.page!==undefined||params.limit!==undefined))throw invalid('Export does not support pagination.');
   if(p.offset>2147483647)throw invalid('Pagination exceeds allowed range.');
   const filters:Filters={ojtSemesterId:params.ojtSemesterId===undefined?null:positiveId(params.ojtSemesterId,'ojtSemesterId'),companyId:params.companyId===undefined?null:positiveId(params.companyId,'companyId')};
-  const type=kind!=='dashboard'?enumValue(params.type,reportTypes,'type') as ReportType:undefined;
+  const type=enumValue(params.type,reportTypes,'type') as ReportType;
   const format=kind==='export'?enumValue(params.format??'csv',['csv','json'],'format'):undefined;
   return {filters,...p,type,format};
 }
@@ -153,51 +152,6 @@ export async function dashboardSummary(semesterId:number,actor:Actor) {
   });
 }
 
-export async function dashboard(params:Row,actor:Actor){
- staff(actor);const {filters:f}=reportQuery(params,'dashboard');
- return readTransaction(async c=>{
-  await validateScope(c,f);const args=[f.ojtSemesterId,f.companyId];
-  const partners=(await c.query(`SELECT count(*)::int AS total,count(*) FILTER (WHERE e."Status"='ACTIVE')::int AS active,count(*) FILTER (WHERE e."Status"='INACTIVE')::int AS inactive FROM "Enterprises" e WHERE ($2::int IS NULL OR e."EnterpriseID"=$2) AND ($1::int IS NULL OR EXISTS (SELECT 1 FROM "InternshipPositions" p WHERE p."EnterpriseID"=e."EnterpriseID" AND p."OJTSemesterID"=$1))`,args)).rows[0];
-  const positions=(await c.query(`WITH scoped_positions AS (
-   SELECT p.*,e."Status" AS company_status
-   FROM "InternshipPositions" p JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"
-   WHERE ($1::int IS NULL OR p."OJTSemesterID"=$1) AND ($2::int IS NULL OR p."EnterpriseID"=$2)
-  ), occupancy AS (
-   SELECT a."PositionID",count(*)::int AS used FROM "InternshipAssignments" a
-   JOIN scoped_positions p ON p."PositionID"=a."PositionID"
-   WHERE COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') GROUP BY a."PositionID"
-  ), positions AS (
-   SELECT p.*,COALESCE(o.used,0) AS used FROM scoped_positions p LEFT JOIN occupancy o ON o."PositionID"=p."PositionID"
-  ) SELECT count(*)::int AS total,count(*) FILTER (WHERE "Status"='OPEN' AND company_status='ACTIVE')::int AS open,
-   COALESCE(sum(COALESCE("Capacity",0)),0)::float8 AS "totalCapacity",COALESCE(sum(used),0)::float8 AS "occupiedSlots",
-   COALESCE(sum(GREATEST(0,COALESCE("Capacity",0)-used)),0)::float8 AS "remainingSlots",
-   COALESCE(sum(GREATEST(0,COALESCE("Capacity",0)-used)) FILTER (WHERE "Status"='OPEN' AND company_status='ACTIVE'),0)::float8 AS "openRemainingSlots" FROM positions`,args)).rows[0];
-  const students=(await c.query(`${coordinationCte}, latest_assignment AS (
-   SELECT DISTINCT ON (co."RegistrationID") co."RegistrationID",a."AssignmentID",a."EnterpriseID"
-   FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
-   WHERE ($1::int IS NULL OR co."OJTSemesterID"=$1) AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
-   ORDER BY co."RegistrationID",a."AssignmentID" DESC
-  ), handed_off AS (
-   SELECT r."RegistrationID",lc."CoordinationID",lc."Decision",a."AssignmentID",
-    CASE WHEN UPPER(lc."Decision") IN ('ACCEPTED','ACCEPT','APPROVED') THEN 'ACCEPTED' WHEN UPPER(lc."Decision") IN ('REJECTED','REJECT') THEN 'REJECTED' ELSE 'PENDING' END AS decision
-   FROM (${recruitmentAccessSql}) h LEFT JOIN "OJTRegistrations" r ON r."StudentID"=h."StudentID" AND r."OJTSemesterID"=h."OJTSemesterID"
-   LEFT JOIN latest_coordination lc ON lc."RegistrationID"=r."RegistrationID"
-   LEFT JOIN latest_assignment a ON a."RegistrationID"=r."RegistrationID"
-   WHERE ($1::int IS NULL OR h."OJTSemesterID"=$1) AND ($2::int IS NULL OR COALESCE(a."EnterpriseID",lc."EnterpriseID")=$2)
-  ) SELECT count(*)::int AS "handedOff",count(*) FILTER (WHERE "AssignmentID" IS NULL)::int AS unallocated,
-   count(*) FILTER (WHERE "CoordinationID" IS NULL AND "AssignmentID" IS NULL)::int AS "notCoordinated",
-   count(*) FILTER (WHERE "CoordinationID" IS NOT NULL AND decision='PENDING' AND "AssignmentID" IS NULL)::int AS "waitingForEnterprise",
-   count(*) FILTER (WHERE decision='REJECTED' AND "AssignmentID" IS NULL)::int AS "enterpriseRejected",
-   count(*) FILTER (WHERE "CoordinationID" IS NOT NULL AND decision='ACCEPTED' AND "AssignmentID" IS NULL)::int AS "acceptedAwaitingAssignment",
-   count(*) FILTER (WHERE "AssignmentID" IS NOT NULL)::int AS assigned FROM handed_off`,args)).rows[0];
-  const totals=(await c.query(`SELECT COALESCE(sum("totalAssignments"),0)::int AS total,COALESCE(sum(assigned),0)::int AS assigned,COALESCE(sum(active),0)::int AS active,COALESCE(sum(completed),0)::int AS completed,COALESCE(sum(failed),0)::int AS failed,COALESCE(sum(cancelled),0)::int AS cancelled,COALESCE(sum("totalResults"),0)::int AS "totalResults",COALESCE(sum("publishedResults"),0)::int AS "publishedResults",COALESCE(sum("unpublishedResults"),0)::int AS "unpublishedResults" FROM (${internshipSql}) report`,args)).rows[0];
-  const {totalResults,publishedResults,unpublishedResults,...assignments}=totals;
-  // A submitted company evaluation is visible immediately, without a transfer or
-  // assignment-status update. Aggregate once per student and OJT semester.
-  const progress=(await c.query(progressSql,args)).rows[0];
-  return {filters:f,partners,positions,students,assignments,progress,results:{total:totalResults,published:publishedResults,unpublished:unpublishedResults}};
- });
-}
 export const reportColumns:Record<ReportType,string[]>={
  acceptance:['ojtSemesterId','semesterCode','companyId','companyName','currentStudents','pending','accepted','rejected','acceptanceRate','coordinationAttempts','pendingAttempts','acceptedAttempts','rejectedAttempts'],
  internships:['ojtSemesterId','semesterCode','companyId','companyName','totalAssignments','assigned','active','completed','failed','cancelled','assignedStudents','totalResults','publishedResults','unpublishedResults','averageOverallScore'],

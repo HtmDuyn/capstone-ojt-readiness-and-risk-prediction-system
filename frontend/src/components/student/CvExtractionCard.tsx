@@ -28,6 +28,7 @@ export function CvExtractionCard({cvFileId}:{cvFileId:number}) {
    .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
   return ()=>{controller.abort();pending.current?.abort();};
  },[cvFileId,reload,token,user?.id]);
+ useEffect(()=>{const onUpdate=(event:Event)=>{const key=(event as CustomEvent<{key?:string}>).detail?.key;if(key?.startsWith('/students/me/matching-profile'))setReload(value=>value+1);};window.addEventListener('student:read-cache-updated',onUpdate);return()=>window.removeEventListener('student:read-cache-updated',onUpdate);},[]);
  const run=async(work:(signal:AbortSignal)=>Promise<void>)=>{
   if(pending.current)return;const controller=new AbortController();pending.current=controller;setBusy(true);setError('');setNotice('');
   try{await work(controller.signal);}catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Không xử lý được hồ sơ CV.');}

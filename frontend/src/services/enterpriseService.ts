@@ -1,5 +1,6 @@
 import API from './apiService';
 import type { EnterpriseProfileData, EnterpriseProfileResponse } from '@/types/enterprise/enterpriseTypes';
+import { enterpriseRead, enterpriseReadKey } from '@/utils/enterprise/enterpriseReadCache';
 
 export interface EnterpriseProfileUpdateResponse {
   success: boolean;
@@ -63,6 +64,7 @@ export interface PaginatedResponse<T> {
     total: number;
     page: number;
     limit: number;
+    rounds?: Array<{ id: string; name: string }>;
   };
 }
 
@@ -464,8 +466,7 @@ export const enterpriseService = {
   // ── Profile ──────────────────────────────────────────────────────────────
   // Gọi GET /api/enterprise/profile — không cần companyId vì backend lấy từ JWT
   getProfile: async (signal?: AbortSignal): Promise<EnterpriseProfileResponse> => {
-    const response = await API.get<EnterpriseProfileResponse>('/enterprise/profile', { signal });
-    return response.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/profile'),async requestSignal=>(await API.get<EnterpriseProfileResponse>('/enterprise/profile',{signal:requestSignal})).data,signal,5*60_000);
   },
 
   updateEnterpriseProfile: async (
@@ -478,14 +479,12 @@ export const enterpriseService = {
   // ── Recruitment Windows ──────────────────────────────────────
   // API doanh nghiệp lấy quyền từ JWT, GET dùng query parameters.
   listRecruitmentWindows: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<RecruitmentWindow>> => {
-    const response = await API.get<PaginatedResponse<RecruitmentWindow>>('/enterprise/recruitment/windows', { params, signal });
-    return response.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/recruitment/windows',params),async requestSignal=>(await API.get<PaginatedResponse<RecruitmentWindow>>('/enterprise/recruitment/windows',{params,signal:requestSignal})).data,signal);
   },
 
   // ── Recruitment Posts ─────────────────────────────────────────────────────
   listRecruitmentPosts: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<RecruitmentPost>> => {
-    const response = await API.get<PaginatedResponse<RecruitmentPost>>('/enterprise/recruitment/posts', { params, signal });
-    return response.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/recruitment/posts',params),async requestSignal=>(await API.get<PaginatedResponse<RecruitmentPost>>('/enterprise/recruitment/posts',{params,signal:requestSignal})).data,signal);
   },
 
   createRecruitmentPost: async (data: EnterpriseRecruitmentPostCreateInput): Promise<EnterpriseRecruitmentPostResponse> => {
@@ -513,58 +512,41 @@ export const enterpriseService = {
 
   // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
   listCandidatePeriods: async (signal?: AbortSignal): Promise<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }> => {
-    const response = await API.get<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }>('/enterprise/candidate-periods', {signal});
-    return response.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/candidate-periods'),async requestSignal=>(await API.get<{ success: boolean; data: { items: EnterpriseCandidatePeriod[] } }>('/enterprise/candidate-periods',{signal:requestSignal})).data,signal,5*60_000);
   },
 
   dashboardTasks: async (signal: AbortSignal) => {
-    const response = await API.get<{success: boolean; data: DashboardTaskSummary}>('/enterprise/dashboard/tasks', {signal});
-    return response.data.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/dashboard/tasks'),async requestSignal=>(await API.get<{success:boolean;data:DashboardTaskSummary}>('/enterprise/dashboard/tasks',{signal:requestSignal})).data.data,signal);
   },
 
   dashboardCandidates: async (signal: AbortSignal) => {
-    const response = await API.get<{success: boolean; data: {items: DashboardCandidate[]; rejectedCount: number}}>(
-      '/enterprise/dashboard/candidates', {signal},
-    );
-    return response.data.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/dashboard/candidates'),async requestSignal=>(await API.get<{success:boolean;data:{items:DashboardCandidate[];rejectedCount:number}}>('/enterprise/dashboard/candidates',{signal:requestSignal})).data.data,signal);
   },
 
   listCandidates: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseCandidateItem>> => {
-    const response = await API.get<PaginatedResponse<EnterpriseCandidateItem>>('/enterprise/candidates', {
-      params,
-      signal,
-    });
-    return response.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/candidates',params),async requestSignal=>(await API.get<PaginatedResponse<EnterpriseCandidateItem>>('/enterprise/candidates',{params,signal:requestSignal})).data,signal);
   },
 
   // ── Enterprise Internships ────────────────────────────────────────────────
   // GET tự giới hạn theo doanh nghiệp trong token; bỏ page/limit để lấy toàn bộ danh sách.
   listInternships: async (params: PaginatedRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseInternshipItem>> => {
-    const response = await API.get<PaginatedResponse<EnterpriseInternshipItem>>('/enterprise/internships', {
-      params,
-      signal,
-    });
-    return response.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/internships',params),async requestSignal=>(await API.get<PaginatedResponse<EnterpriseInternshipItem>>('/enterprise/internships',{params,signal:requestSignal})).data,signal);
   },
   getOjtGradingCriteria: async (assignmentId:number, signal?:AbortSignal) => {
-    const response=await API.get<{success:boolean;data:{id:number|null;criteria:Array<{key:string;label:string;weight:number}>;name:string;version?:number}}>(`/enterprise/internships/grading-criteria`,{params:{assignmentId},signal});
-    return response.data.data;
+    return enterpriseRead(enterpriseReadKey('/enterprise/internships/grading-criteria',{assignmentId}),async requestSignal=>(await API.get<{success:boolean;data:{id:number|null;criteria:Array<{key:string;label:string;weight:number}>;name:string;version?:number}}>('/enterprise/internships/grading-criteria',{params:{assignmentId},signal:requestSignal})).data.data,signal,5*60_000);
   },
 
   // ── Internship Tasks ──────────────────────────────────────────────────────
   // Gọi GET /api/internship-tasks
   // companyId BẮT BUỘC với vai trò ENTERPRISE — backend dùng để kiểm tra scope
   listInternshipTasks: async (companyId: number, params: InternshipTaskListRequest = {}, signal?: AbortSignal): Promise<PaginatedResponse<EnterpriseInternshipTask>> => {
-    const response = await API.get<PaginatedResponse<EnterpriseInternshipTask>>('/internship-tasks', {
-      params: {
+    const query={
         page: params.page ?? 1,
         limit: params.limit ?? 100,
         companyId,
         ...(params.assignmentId !== undefined ? { assignmentId: params.assignmentId } : {}),
-      },
-      signal,
-    });
-    return response.data;
+      };
+    return enterpriseRead(enterpriseReadKey('/internship-tasks',query),async requestSignal=>(await API.get<PaginatedResponse<EnterpriseInternshipTask>>('/internship-tasks',{params:query,signal:requestSignal})).data,signal);
   },
 
   // Chỉ xóa task chưa phát sinh hoạt động; id được truyền nguyên vẹn theo route backend.

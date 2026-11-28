@@ -41,6 +41,7 @@ import type {
 } from "@/types/qhdn/qhdnTypes";
 import { useQhdnAcademicPeriods } from "@/hooks/qhdn/useQhdnAcademicPeriods";
 import { linkedOjtSemesterId } from "@/utils/qhdn/qhdnAcademicPeriods";
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 
 const cell = "px-5 py-4 align-middle sm:px-6";
 const filterInput = workflowInput + " h-11 min-w-0 truncate";
@@ -101,6 +102,7 @@ export default function QhdnEnterpriseManagement() {
     [positionsError, setPositionsError] = useState(""),
     [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
+  useQhdnCacheRefresh(['/companies:','/positions:'],()=>setRevision(value=>value+1),300);
   const [search, setSearch] = useState(""),
     [status, setStatus] = useState(""),
     [recruiting, setRecruiting] = useState(""),

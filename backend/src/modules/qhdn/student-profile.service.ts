@@ -18,7 +18,7 @@ export async function studentDossier(studentId: number, params: Row, actor: Acto
       s."Status" AS status,s."EnrollmentYear" AS "enrollmentYear",
       program."ProgramCode" AS "programCode",program."ProgramName" AS "programName",
       major."SpecializationCode" AS "majorCode",major."SpecializationName" AS "majorName",
-      cohort."Name" AS "cohortName",placement."GroupCode" AS "groupCode",period."Name" AS "currentPeriodName",
+      cohort."Name" AS "cohortName",placement."GroupCode" AS "groupCode",placement."ActualSemester" AS "actualSemester",period."Name" AS "currentPeriodName",
       term."OJTSemesterID" AS "ojtSemesterId",term."Name" AS "semesterName",
       ${currentCVSql('s."StudentID"')} AS cv,
       CASE WHEN submitted_cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('submitted_cv')} END AS "submittedCv",

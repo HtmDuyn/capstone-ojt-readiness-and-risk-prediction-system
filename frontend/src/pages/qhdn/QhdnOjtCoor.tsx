@@ -10,6 +10,8 @@ import { canSelectForCoordination, coordinateBatch } from '@/utils/qhdn/qhdnCoor
 import { summarizePlacementCompanies } from '@/utils/qhdn/qhdnCompanySummary';
 import { paginateItems, selectPage } from '@/utils/qhdn/qhdnPagination';
 import { loadAllPages } from '@/utils/shared/loadAllPages';
+import { getEligibleStudentsPage } from '@/services/qhdnService';
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 
 type Student = {
   id: number;
@@ -48,6 +50,7 @@ const statusIcons = { REJECTED: CircleX, ACCEPTED: BadgeCheck, APPLIED: Send, WA
 export default function QhdnOjtCoordination() {
   const [data, setData] = useState<Board | null>(null), [loading, setLoading] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [revision, setRevision] = useState(0);
+  useQhdnCacheRefresh(['/qhdn/eligible-students:'],()=>setRevision(value=>value+1),300);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState<PlacementStatus | 'ALL'>('ALL'), [busy, setBusy] = useState(false);
   const [semesterFilter, setSemesterFilter] = useState('ALL');
   const [semesterStatusFilter, setSemesterStatusFilter] = useState('ALL');
@@ -91,10 +94,7 @@ export default function QhdnOjtCoordination() {
       let firstPage: Board | null = null;
       const semesterBoards = new Map<number, SemesterBoard>();
       return loadAllPages(async page => {
-        const response = await API.get<{ data: Board & { total: number; limit: number } }>('/qhdn/eligible-students', {
-          params: { page, limit: 100 }, signal: controller.signal,
-        });
-        const result = response.data.data;
+        const result = await getEligibleStudentsPage<Board & { total:number;limit:number }>({page,limit:100},controller.signal);
         if (page === 1) firstPage = result;
         for (const board of result.semesterBoards ?? []) semesterBoards.set(board.ojtSemesterId, board);
         return result;
@@ -303,15 +303,15 @@ export default function QhdnOjtCoordination() {
           {task.bulk?<>
             <p className="text-sm text-slate-500">Doanh nghiệp và lý do được áp dụng cho tất cả sinh viên đã chọn. Có thể điều phối vượt chỉ tiêu; số thực nhận cập nhật khi doanh nghiệp đồng ý nhận.</p>
             <input type="hidden" name="source" value="QHDN_COORDINATION"/>
-            <Field label={'Danh sách tiếp nhận hồ sơ · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="companyId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp tiếp nhận</option>{taskCompanies.map(company=><option key={company.key} value={company.id??''} disabled={!company.id}>{company.name} · Còn {company.availableSlots} slot</option>)}</select></Field>
+            <Field label={'Danh sách tiếp nhận hồ sơ · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="companyId" className={workflowInput} required defaultValue={String(taskCompanies.find(company=>company.id)?.id??'')}><option value="" disabled>Chọn doanh nghiệp tiếp nhận</option>{taskCompanies.map(company=><option key={company.key} value={company.id??''} disabled={!company.id}>{company.name} · Còn {company.availableSlots} slot</option>)}</select></Field>
             {!taskCompanies.length&&<p className="text-sm text-amber-700">Chưa có doanh nghiệp tiếp nhận cho kỳ OJT này.</p>}
             {taskCompanies.length>0&&!taskCompanies.some(company=>company.id)&&<p className="text-sm text-amber-700">Chưa thể xác định doanh nghiệp tiếp nhận. Vui lòng liên hệ quản trị viên.</p>}
           </>:<>
             <input type="hidden" name="source" value="QHDN_COORDINATION"/>
-            <Field label={'Doanh nghiệp và vị trí · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{taskBoard?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>
+            <Field label={'Doanh nghiệp và vị trí · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="positionId" className={workflowInput} required defaultValue={String(taskBoard?.positions[0]?.id??'')}><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{taskBoard?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>
           </>}
         </>
-        <Field label="Lý do điều phối"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>
+        <Field label="Lý do điều phối"><textarea name="reason" defaultValue="Điều phối sinh viên theo nguyện vọng đăng ký và vị trí phù hợp với chuyên ngành đào tạo." className={workflowInput} required maxLength={2000} rows={3} /></Field>
         </fieldset>
         <div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={() => setTask(null)}>Đóng</button><button className={workflowPrimary} disabled={busy}>{busy ? `Đang điều phối ${completed}/${task.students.length}…` : `Xác nhận điều phối (${task.students.length})`}</button></div>
       </form>

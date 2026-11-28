@@ -68,6 +68,16 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  useEffect(()=>{
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const onUpdate=(event:Event)=>{
+      const key=(event as CustomEvent<{key?:string}>).detail?.key;
+      if(!key||!(key.startsWith('/ojt-registration-windows')||key.startsWith('/ojt-registrations')||!!profile&&key.startsWith(`/students/${profile.id}?include=academicProgress,ojtRegistrations,recruitmentAssignment`)))return;
+      if(timer)clearTimeout(timer);timer=setTimeout(refresh,220);
+    };
+    window.addEventListener('student:read-cache-updated',onUpdate);
+    return()=>{if(timer)clearTimeout(timer);window.removeEventListener('student:read-cache-updated',onUpdate);};
+  },[profile?.id,refresh]);
   const assignedRecruitment = useStudentResource<StudentIdentityProfile['recruitmentAssignment']>(
     profile ? `student-recruitment-assignment:${profile.id}:${revision}` : null,
     signal => studentGet('/students/me/recruitment-assignment', signal), { snapshot: true },

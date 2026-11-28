@@ -7,8 +7,14 @@ import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from
 import type { AcademicPeriodItem, EnterpriseImportRow, EnterpriseImportPayload, ImportPreviewResponse, ImportCommitResponse } from '@/types/qhdn/qhdnTypes';
 import type { RecruitmentWindow } from '@/types/qhdn/workflowTypes';
 import { emailDeliveryMessage } from '@/utils/shared/emailDelivery';
-const sampleRow = (): EnterpriseImportRow => ({ name: 'Công ty TNHH Giải pháp Phần mềm Minh Phát', fullName: 'Nguyễn Anh Tuấn', email: 'anh.tuan@minhphat.vn' });
-const emptyRow = (): EnterpriseImportRow => ({ name: '', fullName: '', email: '' });
+const sampleRow = (index = 0): EnterpriseImportRow => {
+ const samples: EnterpriseImportRow[] = [
+  { name: 'Công ty TNHH Giải pháp Phần mềm Minh Phát', fullName: 'Nguyễn Anh Tuấn', email: 'anh.tuan@minhphat.vn' },
+  { name: 'Công ty Cổ phần Công nghệ An Bình', fullName: 'Lê Hoàng Nam', email: 'nam.le@anbinhtech.vn' },
+  { name: 'Công ty TNHH Dịch vụ Số Phương Nam', fullName: 'Trần Ngọc Hà', email: 'ha.tran@phuongnamdigital.vn' },
+ ];
+ return samples[index] ?? { name: `Công ty TNHH Công nghệ Minh Phát ${index + 1}`, fullName: 'Nguyễn Anh Tuấn', email: `anh.tuan.${index + 1}@minhphat.vn` };
+};
 export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 'manual' }: {
  isOpen:boolean;onClose:()=>void;onImported:(result:ImportCommitResponse)=>void;mode?:'manual'|'file';periods?:AcademicPeriodItem[];periodsLoading?:boolean;initialAcademicPeriodId?:number;initialWindow?:RecruitmentWindow|null;
 }) {
@@ -62,7 +68,7 @@ export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 
      <label className="space-y-2 text-sm font-medium">Tên người phụ trách <span className="text-orange-600">*</span><input required maxLength={150} className={workflowInput} value={row.fullName} onChange={e=>change(index,'fullName',e.target.value)} placeholder="Người nhận thông tin tài khoản"/></label>
      <label className="space-y-2 text-sm font-medium">Email đăng nhập <span className="text-orange-600">*</span><input required type="email" maxLength={100} className={workflowInput} value={row.email} onChange={e=>change(index,'email',e.target.value)} placeholder="Email của người phụ trách"/><span className="block text-xs font-normal text-slate-500">Thông tin đăng nhập sẽ được gửi đến email này.</span></label>
     </div>
-   </section>)}<button type="button" disabled={rows.length>=500} className={workflowSecondary} onClick={()=>{setRows(current=>[...current,emptyRow()]);invalidate();}}><Plus size={16}/>Thêm doanh nghiệp</button></fieldset></>}
+   </section>)}<button type="button" disabled={rows.length>=500} className={workflowSecondary} onClick={()=>{setRows(current=>[...current,sampleRow(current.length)]);invalidate();}}><Plus size={16}/>Thêm doanh nghiệp</button></fieldset></>}
    <footer className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4"><button type="button" disabled={busy} className={workflowSecondary} onClick={onClose}>Để sau</button><button type="submit" disabled={busy||!rows.length} className={workflowPrimary}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<CheckCircle2 size={17}/>}Kiểm tra thông tin<ArrowRight size={16}/></button></footer>
   </form>:<div className="space-y-5">
    <p className="text-sm text-slate-600">Kiểm tra {payload?.rows.length} tài khoản trước khi tạo. Tài khoản hoặc email đã tồn tại sẽ không bị ghi đè.</p>

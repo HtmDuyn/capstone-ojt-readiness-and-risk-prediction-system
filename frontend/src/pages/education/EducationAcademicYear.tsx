@@ -4,7 +4,7 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { AcademicBlockDates } from '@/components/education/AcademicBlockDates';
 import { AcademicCalendarEditor } from '@/components/education/AcademicCalendarEditor';
 import { useEducationAcademicCalendar } from '@/hooks/education/useEducationAcademicCalendar';
-import { CALENDAR_TERMS, blockDateError, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
+import { CALENDAR_TERMS, blockDateError, currentCalendarDate, defaultSemesters, formatCalendarDate, semesterDraft, semesterState, suggestedBlockDates, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
 import type { AcademicPeriod, SemesterDates } from '@/types/education/academic.types';
 
 const stateLabel = { UPCOMING: 'Sắp diễn ra', NOT_STARTED: 'Chưa diễn ra', CURRENT: 'Đang diễn ra', PAST: 'Đã kết thúc' };
@@ -76,8 +76,8 @@ const EducationAcademicYear: React.FC = () => {
     while (model.years.some(item => item.yearCode === `${nextYear}-${nextYear + 1}`)) nextYear++;
     const semesters = defaultSemesters(nextYear);
     setStartYear(String(nextYear));
-    setCreateBlocks(semesters.map(({ term }) => ({ term, startDate: '', endDate: '' })));
-    setCreateBlock10(semesters.map(({ term }) => ({ term, startDate: '', endDate: '' })));
+    setCreateBlocks(semesters.map(semester => suggestedBlockDates(semester).block3));
+    setCreateBlock10(semesters.map(semester => suggestedBlockDates(semester).block10));
     setCreating(true);
   };
   useEffect(() => {
@@ -173,8 +173,8 @@ const EducationAcademicYear: React.FC = () => {
             setStartYear(value);
             if (/^\d{4}$/.test(value) && Number(value) >= 1900 && Number(value) < 2200) {
               const semesters = defaultSemesters(Number(value));
-              setCreateBlocks(semesters.map(({ term }) => ({ term, startDate: '', endDate: '' })));
-              setCreateBlock10(semesters.map(({ term }) => ({ term, startDate: '', endDate: '' })));
+              setCreateBlocks(semesters.map(semester => suggestedBlockDates(semester).block3));
+              setCreateBlock10(semesters.map(semester => suggestedBlockDates(semester).block10));
             } else { setCreateBlocks([]); setCreateBlock10([]); }
           }} aria-invalid={!validYear || exists} className="mt-2 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-800 focus:border-orange-500 focus:outline-none" /></label>
           {!validYear && <p role="alert" className="text-sm text-red-700">Nhập năm bắt đầu từ 1900 đến 2199.</p>}

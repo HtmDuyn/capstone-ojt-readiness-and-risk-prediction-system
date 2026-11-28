@@ -24,6 +24,7 @@ const quickAccounts = [
   { role: "Doanh nghiệp", email: "hr@techviet.vn", password: "Enterprise@123" },
   { role: "Sinh viên - Chưa apply", email: "linhdtis201644@fpt.edu.vn", password: "Student@123" },
   { role: "Sinh viên Anh", email: "anhltnse181602@fpt.edu.vn", password: "Student@123" },
+  { role: "Sinh viên - Thiếu 1 môn", email: "dangthis181613@fpt.edu.vn", password: "Student@123" },
 ];
 
 interface InputFieldProps {
