@@ -13,7 +13,7 @@ import { Link } from 'react-router-dom';
 export const EducationDashboard: React.FC = () => {
   const { ref: demandSection, reached: loadCourseDemand } = useNearViewport<HTMLElement>();
 
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertOverview, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
   const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible + period.reviewRequired > 0);
   const ojtGroups = [
     { label: 'Đủ điều kiện', count: eligibleStudents ?? 0, color: '#22c55e', dotClass: 'bg-green-500' },
@@ -166,7 +166,7 @@ export const EducationDashboard: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">
+          <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-3">
             <div className="border-slate-200 sm:border-r sm:border-b xl:border-b-0">
               <MetricCard
                 label="Tổng sinh viên"
@@ -200,14 +200,6 @@ export const EducationDashboard: React.FC = () => {
               />
             </div>
 
-            <MetricCard
-              label="Cảnh báo học vụ"
-              value={alertCount}
-              description="Cảnh báo được hệ thống ghi nhận"
-              icon={<BellRing size={18} />}
-              iconClass="bg-orange-50 text-orange-600"
-              loading={alertsLoading}
-            />
           </div>
         </section>
 

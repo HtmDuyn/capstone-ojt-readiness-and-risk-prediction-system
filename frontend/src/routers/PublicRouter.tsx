@@ -155,6 +155,10 @@ const educationRoutes: RouteObject = {
           path: "/education/dashboard",
           lazy: async () => ({ Component: (await import("@/pages/education/EducationDashboard")).default }),
         },
+        {
+          path: "/education/notifications",
+          lazy: async () => ({ Component: (await import("@/pages/education/EducationNotifications")).default }),
+        },
 
         /* =========================
            QUẢN LÝ DỮ LIỆU

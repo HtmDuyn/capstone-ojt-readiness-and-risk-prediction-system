@@ -282,7 +282,6 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
   const reviewRequiredStudents = readNumber(dashboardData, ["summary.insufficientData", "summary.currentEvaluation.reviewRequired"]);
 
   const alertOverview = useMemo(() => alertsData ? academicAlertOverview(alertsData) : null, [alertsData]);
-  const alertCount = alertOverview?.total ?? null;
 
   const assessedStudents =
     eligibleStudents !== null && ineligibleStudents !== null && reviewRequiredStudents !== null
@@ -356,5 +355,5 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
     } catch (error) { setExportError(getErrorMessage(error)); }
     finally { setExporting(false); }
   };
-  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertCount, alertOverview, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
+  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, alertsLoading, filtersError, dashboardError, courseDemandError, alertsError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, alertOverview, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
 }
