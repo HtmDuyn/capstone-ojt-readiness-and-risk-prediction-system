@@ -47,6 +47,7 @@ export default function QhdnOjtCoordination() {
   const [search, setSearch] = useState(''), [filter, setFilter] = useState<PlacementStatus | 'ALL'>('ALL'), [busy, setBusy] = useState(false);
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [page, setPage] = useState(1), [limit, setLimit] = useState(10);
+  const [companyPage, setCompanyPage] = useState(1), [companyLimit, setCompanyLimit] = useState(10);
   const [task, setTask] = useState<{ students: Student[];bulk:boolean } | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -145,6 +146,7 @@ export default function QhdnOjtCoordination() {
   const selectable = students.filter(canSelectForCoordination);
   const selected = selectable.filter(student => selectedIds.has(student.id));
   const paged = paginateItems(students, page, limit);
+  const pagedCompanies = paginateItems(companies, companyPage, companyLimit);
   const selectedSemesterId = selected[0]?.ojtSemesterId ?? null;
   const pageCandidateStudents = paged.items.filter(canSelectForCoordination);
   const pageSemesterId = selectedSemesterId ?? pageCandidateStudents[0]?.ojtSemesterId ?? null;
@@ -152,6 +154,7 @@ export default function QhdnOjtCoordination() {
   const pageSelectedCount = pageSelectable.filter(student => selectedIds.has(student.id)).length;
   const allSelected = pageSelectable.length > 0 && pageSelectedCount === pageSelectable.length;
   useEffect(() => { setPage(current => Math.min(current, paged.pages)); }, [paged.pages]);
+  useEffect(() => { setCompanyPage(current => Math.min(current, pagedCompanies.pages)); }, [pagedCompanies.pages]);
   const openCoordination = (students: Student[],bulk=false) => {
     setError(''); setBatchErrors([]); setCompleted(0);
     setTask({ students,bulk });
@@ -250,8 +253,8 @@ export default function QhdnOjtCoordination() {
       <div className="p-5"><h2 className="font-bold text-slate-800">Chỉ tiêu và số lượng thực nhận</h2><p className="mt-1 text-sm text-slate-500">Số thực nhận tính sinh viên doanh nghiệp đã nhận hoặc đã có phân công, mỗi sinh viên một lần. Số này có thể thấp hơn, bằng hoặc vượt chỉ tiêu; chỉ tiêu ban đầu được giữ nguyên.</p></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">
         <thead className="bg-slate-50 text-xs text-slate-500"><tr>{['STT', 'Doanh nghiệp', 'Chỉ tiêu', 'Sinh viên thực nhận', 'Vượt chỉ tiêu'].map((label, index) => <th scope="col" key={label} className={'px-4 py-3 font-semibold ' + (index === 0 ? 'w-16 text-center' : index > 1 ? 'text-right' : '')}>{label}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-100">{companies.map((company, index) => <tr key={company.key}>
-          <td className={cell + ' text-center tabular-nums text-slate-500'}>{index + 1}</td>
+        <tbody className="divide-y divide-slate-100">{pagedCompanies.items.map((company, index) => <tr key={company.key}>
+          <td className={cell + ' text-center tabular-nums text-slate-500'}>{pagedCompanies.offset + index + 1}</td>
           <td className={cell + ' font-medium text-slate-700'}>{company.name}</td>
           <td className={cell + ' text-right tabular-nums'}>{company.capacity}</td>
           <td className={cell + ' text-right tabular-nums'}>{company.actualCount}</td>
@@ -259,6 +262,9 @@ export default function QhdnOjtCoordination() {
         </tr>)}</tbody>
       </table></div>
       {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu.':'Chưa có doanh nghiệp tiếp nhận trong các kỳ OJT này.'}</p>}
+      <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+        <Pager page={pagedCompanies.page} total={companies.length} limit={companyLimit} busy={loading} onChange={setCompanyPage} onLimitChange={setCompanyLimit} />
+      </div>
     </section>
     {detail?.ojtSemesterId && <StudentProfileModal key={detail.id + ':' + detail.ojtSemesterId} studentId={detail.id} ojtSemesterId={detail.ojtSemesterId} fullName={detail.fullName} onClose={() => setDetail(null)} />}
     {task && <WorkflowModal wide title={task.bulk ? `Điều phối hàng loạt ${task.students.length} sinh viên` : 'Điều phối sinh viên đến doanh nghiệp'} busy={busy} onClose={() => setTask(null)}>

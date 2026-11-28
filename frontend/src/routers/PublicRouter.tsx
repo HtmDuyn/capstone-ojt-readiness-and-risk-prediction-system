@@ -300,6 +300,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "/qhdn", element: <Navigate to="/qhdn/dashboard" replace /> },
           { path: "/qhdn/dashboard", element: <QhdnDashboard /> },
+          { path: "/qhdn/profile", element: <AdminSettings variant="qhdn" /> },
           { path: "/qhdn/registration-windows", element: <QhdnRegistrationWindows /> },
           { path: "/qhdn/eligible-students", element: <Navigate to="/qhdn/registration-windows" replace /> },
           { path: "/qhdn/handoff", element: <Navigate to="/qhdn/registration-windows" replace /> },
