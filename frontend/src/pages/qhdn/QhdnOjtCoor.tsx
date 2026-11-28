@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { UserPlus, Eye, CircleX, BadgeCheck, Send, Clock3, UserRound, Check, ArrowUpRight } from 'lucide-react';
+import { Users, UserPlus, Eye, CircleX, BadgeCheck, Send, Clock3, UserRound } from 'lucide-react';
 import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
@@ -17,6 +17,7 @@ type Student = {
   fullName: string;
   ojtSemesterId: number | null;
   semesterName: string | null;
+  semesterStatus: string | null;
   coordinationId?: number;
   registrationId?: number | null;
   registrationStatus?: string | null;
@@ -41,12 +42,15 @@ const cell = 'px-4 py-4 align-middle';
 const filterInput = workflowInput + ' h-11 min-w-0 truncate';
 const compactAction = 'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
 
+const semesterStatusLabels: Record<string, string> = { PLANNED: 'Sắp diễn ra', ACTIVE: 'Đang diễn ra', OPEN: 'Đang mở', CLOSED: 'Đã đóng', ARCHIVED: 'Đã lưu trữ', DRAFT: 'Bản nháp' };
 const statusIcons = { REJECTED: CircleX, ACCEPTED: BadgeCheck, APPLIED: Send, WAITING_RESPONSE: Clock3, NOT_APPLIED: UserRound };
 
 export default function QhdnOjtCoordination() {
   const [data, setData] = useState<Board | null>(null), [loading, setLoading] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [revision, setRevision] = useState(0);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState<PlacementStatus | 'ALL'>('ALL'), [busy, setBusy] = useState(false);
+  const [semesterFilter, setSemesterFilter] = useState('ALL');
+  const [semesterStatusFilter, setSemesterStatusFilter] = useState('ALL');
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [page, setPage] = useState(1), [limit, setLimit] = useState(10);
   const [task, setTask] = useState<{ students: Student[];bulk:boolean } | null>(null);
@@ -63,8 +67,8 @@ export default function QhdnOjtCoordination() {
   const taskBoard = data?.semesterBoards.find(board => board.ojtSemesterId === taskSemesterId);
   const taskCompanies = taskBoard ? summarizePlacementCompanies(taskBoard) : [];
 
-  useEffect(() => { setSelectedIds(new Set()); }, [search, filter, followUpOnly]);
-  useEffect(() => { setPage(1); }, [search, filter, followUpOnly, limit]);
+  useEffect(() => { setSelectedIds(new Set()); }, [search, filter, followUpOnly, semesterFilter, semesterStatusFilter]);
+  useEffect(() => { setPage(1); }, [search, filter, followUpOnly, semesterFilter, semesterStatusFilter, limit]);
   useEffect(() => {
     const selectable = new Set(data?.items.filter(canSelectForCoordination).map(student => student.id));
     setSelectedIds(previous => new Set([...previous].filter(id => selectable.has(id))));
@@ -140,7 +144,12 @@ export default function QhdnOjtCoordination() {
     } catch (e) { setError(errorMessage(e)); }
     finally { setBusy(false); }
   };
-  const students = (data?.items ?? []).filter(s => (!followUpOnly || s.needsFollowUp) &&
+  const semesters = [...new Map((data?.items ?? []).filter(student => student.ojtSemesterId !== null).map(student => [String(student.ojtSemesterId), { id: String(student.ojtSemesterId), name: student.semesterName ?? 'Kỳ OJT #' + student.ojtSemesterId, status: student.semesterStatus }])).values()];
+  const availableSemesters = semesters.filter(semester => semesterStatusFilter === 'ALL' || semester.status === semesterStatusFilter);
+  const semesterStudents = (data?.items ?? []).filter(student =>
+    (semesterFilter === 'ALL' || String(student.ojtSemesterId) === semesterFilter) &&
+    (semesterStatusFilter === 'ALL' || student.semesterStatus === semesterStatusFilter));
+  const students = semesterStudents.filter(s => (!followUpOnly || s.needsFollowUp) &&
     (filter === 'ALL' || placementStatus(s) === filter) &&
     `${s.studentCode} ${s.fullName}`.toLowerCase().includes(search.toLowerCase()),
   );
@@ -163,43 +172,47 @@ export default function QhdnOjtCoordination() {
     <PageBanner variant="qhdn" title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên có kết quả xét OJT hợp lệ đến doanh nghiệp; theo dõi phản hồi tiếp nhận và số lượng thực nhận." badge="Phòng QHDN" />
     {error && <Notice>{error}</Notice>}
     {message && <Notice>{message}</Notice>}
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Thống kê trạng thái điều phối">
-      {placementStatuses.map(status => {
-        const Icon = statusIcons[status];
-        const active = filter === status;
-        const count = data?.items.filter(student => placementStatus(student) === status).length ?? 0;
-        return <button key={status} type="button" disabled={busy} aria-pressed={active}
-          className={'group flex min-w-0 flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ' + (active ? 'border-orange-400 ring-1 ring-orange-400' : 'border-slate-200')}
-          onClick={() => setFilter(active ? 'ALL' : status)}>
+    <div className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] gap-3 overflow-x-auto pb-2" aria-label="Thống kê trạng thái điều phối">
+      {(['ALL', ...placementStatuses] as const).map(status => {
+        const Icon = status === 'ALL' ? Users : statusIcons[status];
+        const count = status === 'ALL' ? semesterStudents.length : semesterStudents.filter(student => placementStatus(student) === status).length;
+        return <div key={status} className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
           <div className="flex w-full items-center justify-between gap-2">
-            <span className={'flex size-10 items-center justify-center rounded-xl border ' + placementStatusColors[status]}><Icon size={20} aria-hidden="true" /></span>
-            {active ? <Check size={17} className="text-orange-600" aria-hidden="true" /> : <ArrowUpRight size={17} className="text-slate-300 group-hover:text-slate-500" aria-hidden="true" />}
+            <span className={'flex size-10 items-center justify-center rounded-xl border ' + (status === 'ALL' ? 'border-orange-200 bg-orange-50 text-orange-700' : placementStatusColors[status])}><Icon size={20} aria-hidden="true" /></span>
           </div>
           <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums text-slate-900">{loading ? '—' : count}</p>
-          <p className="mt-1 min-h-10 text-sm font-medium leading-5 text-slate-600">{placementStatusLabels[status]}</p>
-          <div className="mt-4 flex w-full items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
-            <span className="text-slate-400">Sinh viên</span>
-            <span className={active ? 'font-semibold text-orange-600' : 'text-slate-500'}>{active ? 'Đang lọc' : 'Xem danh sách'}</span>
-          </div>
-        </button>;
+          <p className="mt-1 min-h-10 text-sm font-medium leading-5 text-slate-600">{status === 'ALL' ? 'Tổng số sinh viên' : placementStatusLabels[status]}</p>
+        </div>;
       })}
     </div>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4">
         <div className="min-w-0">
-          <Field label="Tìm sinh viên">
+          <div className="min-w-0">
             <input className={filterInput} placeholder="Tìm mã hoặc tên sinh viên…" aria-label="Tìm sinh viên" value={search} onChange={e => setSearch(e.target.value)} />
-          </Field>
+          </div>
         </div>
-        <Field label="Trạng thái">
+        <div className="min-w-0">
+          <select className={filterInput} aria-label="Lọc trạng thái kỳ" value={semesterStatusFilter} onChange={e => { setSemesterStatusFilter(e.target.value); setSemesterFilter('ALL'); }}>
+            <option value="ALL">Tất cả trạng thái kỳ</option>
+            {[...new Set(semesters.map(semester => semester.status).filter((status): status is string => !!status))].map(status => <option key={status} value={status}>{semesterStatusLabels[status] ?? status}</option>)}
+          </select>
+        </div>
+        <div className="min-w-0">
+          <select className={filterInput} aria-label="Lọc kỳ OJT" value={semesterFilter} onChange={e => setSemesterFilter(e.target.value)}>
+            <option value="ALL">Tất cả kỳ OJT</option>
+            {availableSemesters.map(semester => <option key={semester.id} value={semester.id}>{semester.name}</option>)}
+          </select>
+        </div>
+        <div className="min-w-0">
           <select className={filterInput} aria-label="Lọc trạng thái" value={filter} onChange={e => setFilter(e.target.value as PlacementStatus | 'ALL')}>
             <option value="ALL">Tất cả trạng thái</option>
             {placementStatuses.map(status => <option key={status} value={status}>{placementStatusLabels[status]}</option>)}
           </select>
-        </Field>
+        </div>
       </fieldset>
-      <p className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Danh sách gồm sinh viên đủ điều kiện ở tất cả kỳ OJT. Chọn sinh viên cùng kỳ OJT để điều phối hàng loạt.</p>
-      <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" disabled={busy} checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({data?.items.filter(s => s.needsFollowUp).length ?? 0})</label>
+      <p className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Danh sách và số liệu thống kê hiển thị theo kỳ OJT và trạng thái kỳ đã chọn. Chọn sinh viên cùng kỳ OJT để điều phối hàng loạt.</p>
+      <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" disabled={busy} checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({semesterStudents.filter(s => s.needsFollowUp).length})</label>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-orange-50/50 px-5 py-3">
         <p className="text-sm text-slate-600" aria-live="polite">Đã chọn <strong className="text-orange-700">{selected.length}</strong> sinh viên <span className="text-slate-500">· {selectable.length} hồ sơ có thể điều phối trong danh sách</span></p>
         <div className="flex flex-wrap gap-2">
