@@ -8841,8 +8841,122 @@ BEGIN
   END IF;
 END $verify_qhdn_seed_students$;
 
--- Fall 2026 TechViet student applications. Resolve every relationship by its
--- business key so these records remain valid if identity IDs differ by database.
+-- Ten additional K20 demo students (five IS, five SE) with five application
+-- outcomes represented twice each. Their transcript rows are copied only from
+-- the same K20 program and only for curriculum semesters 1-5; rows mapped to
+-- curriculum semester 6 or later are explicitly excluded.
+CREATE TEMP TABLE qhdn_fall2026_new_students ON COMMIT DROP AS
+SELECT * FROM (VALUES
+  ('IS201651','is201651','khanhpgis201651@fpt.edu.vn','Phạm Gia Khánh','0902000101','BIT_IS_K20D-21A','GREENBYTE','SEED-JOB-FALL2026-GREENBYTE','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.'),
+  ('IS201652','is201652','thaonmis201652@fpt.edu.vn','Nguyễn Minh Thảo','0902000102','BIT_IS_K20D-21A','FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE-01','ACCEPTED','ACCEPTED',NULL),
+  ('IS201653','is201653','huytqis201653@fpt.edu.vn','Trần Quốc Huy','0902000103','BIT_IS_K20D-21A','FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE-03','SUBMITTED','PENDING',NULL),
+  ('IS201654','is201654','yenlhis201654@fpt.edu.vn','Lê Hoàng Yến','0902000104','BIT_IS_K20D-21A','FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE-05','REVIEWING','PENDING',NULL),
+  ('IS201655','is201655','anhvdis201655@fpt.edu.vn','Võ Đức Anh','0902000105','BIT_IS_K20D-21A',NULL,NULL,'NOT_APPLIED',NULL,NULL),
+  ('SE201656','se201656','linhdotse201656@fpt.edu.vn','Đỗ Khánh Linh','0902000106','BIT_SE_K20D_K21A','MEDTECHVN','SEED-JOB-FALL2026-MEDTECHVN-02','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.'),
+  ('SE201657','se201657','datntse201657@fpt.edu.vn','Nguyễn Thành Đạt','0902000107','BIT_SE_K20D_K21A','FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE-02','ACCEPTED','ACCEPTED',NULL),
+  ('SE201658','se201658','maipnse201658@fpt.edu.vn','Phan Ngọc Mai','0902000108','BIT_SE_K20D_K21A','FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE-04','SUBMITTED','PENDING',NULL),
+  ('SE201659','se201659','baobqse201659@fpt.edu.vn','Bùi Quốc Bảo','0902000109','BIT_SE_K20D_K21A','FINBRIDGE','SEED-JOB-FALL2026-FINBRIDGE-06','REVIEWING','PENDING',NULL),
+  ('SE201660','se201660','giangthse201660@fpt.edu.vn','Trần Hương Giang','0902000110','BIT_SE_K20D_K21A',NULL,NULL,'NOT_APPLIED',NULL,NULL)
+) AS s("StudentCode","Username","Email","FullName","Phone","ProgramCode","EnterpriseCode","RecruitmentCode","Scenario","Decision","Reason");
+
+INSERT INTO public."Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status","MustChangePassword","AuthVersion")
+SELECT seed."Username",'$2b$12$rE/nRYGqC0vJve/XqJLsFer/G/xm.dp064CTTmGEfro53Fa/NieCq',seed."Email",seed."Phone",seed."FullName",role_row."RoleID",'ACTIVE',false,0
+FROM qhdn_fall2026_new_students seed CROSS JOIN public."Roles" role_row
+WHERE role_row."RoleCode"='STUDENT'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","Status","CohortCode")
+SELECT account."UserID",seed."StudentCode",program."ProgramID",cohort."EnrollmentYear",current_mapping."CurriculumSemester",'ACTIVE','K20'
+FROM qhdn_fall2026_new_students seed
+JOIN public."Users" account ON account."Email"=seed."Email"
+JOIN public."TrainingPrograms" program ON program."ProgramCode"=seed."ProgramCode"
+JOIN public."Cohorts" cohort ON cohort."CohortCode"='K20'
+JOIN public."CohortGroups" cohort_group ON cohort_group."CohortID"=cohort."CohortID" AND cohort_group."GroupCode"='A'
+JOIN LATERAL (
+  SELECT mapping."CurriculumSemester"
+  FROM public."CohortCurriculumPeriods" mapping
+  JOIN public."AcademicPeriods" mapped_period ON mapped_period."AcademicPeriodID"=mapping."AcademicPeriodID"
+  WHERE mapping."CohortID"=cohort."CohortID" AND mapping."GroupCode"=cohort_group."GroupCode"
+    AND mapped_period."StartDate"<=(SELECT "StartDate" FROM public."AcademicPeriods" WHERE "PeriodCode"='FALL2026')
+  ORDER BY mapped_period."StartDate" DESC LIMIT 1
+) current_mapping ON true
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
+SELECT student."StudentID",cohort."CohortID",cohort_group."GroupCode",cohort_group."EntryAcademicPeriodID",current_mapping."AcademicPeriodID",academic."UserID"
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Cohorts" cohort ON cohort."CohortCode"='K20'
+JOIN public."CohortGroups" cohort_group ON cohort_group."CohortID"=cohort."CohortID" AND cohort_group."GroupCode"='A'
+JOIN LATERAL (
+  SELECT mapping."AcademicPeriodID"
+  FROM public."CohortCurriculumPeriods" mapping
+  JOIN public."AcademicPeriods" mapped_period ON mapped_period."AcademicPeriodID"=mapping."AcademicPeriodID"
+  WHERE mapping."CohortID"=cohort."CohortID" AND mapping."GroupCode"=cohort_group."GroupCode"
+    AND mapped_period."StartDate"<=(SELECT "StartDate" FROM public."AcademicPeriods" WHERE "PeriodCode"='FALL2026')
+  ORDER BY mapped_period."StartDate" DESC LIMIT 1
+) current_mapping ON true
+JOIN public."Users" academic ON academic."Username"='academic01'
+ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCode"=EXCLUDED."GroupCode",
+  "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
+  "UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
+
+-- Copy same-program transcript rows to the target cohort's calendar. Infer the
+-- student's established curriculum level from distinct recorded courses: a
+-- level needs at least two different courses. Attempts do not count twice.
+DELETE FROM public."StudentCourseResults" old
+USING public."Students" target_student,qhdn_fall2026_new_students target
+WHERE old."StudentID"=target_student."StudentID"
+  AND target_student."StudentCode"=target."StudentCode"
+  AND old."SourceReference"='SEED_K20_FALL2026_'||target."StudentCode";
+
+WITH copied AS (
+  SELECT target_student."StudentID" AS "TargetStudentID",target."StudentCode",target_user."UserID" AS "TargetUserID",
+    source_result."CourseID",source_result."SemesterTaken" AS "SourceSemesterTaken",
+    source_result."AttemptNumber",source_result."Score",source_result."Grade",source_result."GradePoints",source_result."Status",
+    target_period."AcademicPeriodID",target_academic_period."AcademicYearID"
+  FROM qhdn_fall2026_new_students target
+  JOIN public."Students" target_student ON target_student."StudentCode"=target."StudentCode"
+  JOIN public."Users" target_user ON target_user."UserID"=target_student."UserID"
+  JOIN public."StudentAcademicPlacements" target_placement ON target_placement."StudentID"=target_student."StudentID"
+  JOIN public."Students" source_student ON source_student."StudentCode"=CASE WHEN target."ProgramCode"='BIT_IS_K20D-21A' THEN 'IS201641' ELSE 'SE201642' END
+  JOIN public."StudentCourseResults" source_result ON source_result."StudentID"=source_student."StudentID"
+  JOIN public."ProgramCourses" program_course ON program_course."ProgramID"=target_student."ProgramID" AND program_course."CourseID"=source_result."CourseID"
+  JOIN public."CohortCurriculumPeriods" target_period ON target_period."CohortID"=target_placement."CohortID"
+    AND target_period."GroupCode"=target_placement."GroupCode"
+    AND target_period."CurriculumSemester"=source_result."SemesterTaken"
+  JOIN public."AcademicPeriods" target_academic_period ON target_academic_period."AcademicPeriodID"=target_period."AcademicPeriodID"
+  WHERE source_result."SemesterTaken" BETWEEN 1 AND 5
+    AND program_course."RecommendedSemester" BETWEEN 1 AND 5
+    AND source_result."OJTResultID" IS NULL
+    AND upper(btrim((SELECT course."CourseCode" FROM public."Courses" course WHERE course."CourseID"=source_result."CourseID")))<>'OJT202'
+), stage_counts AS (
+  SELECT "TargetStudentID","SourceSemesterTaken",count(DISTINCT "CourseID") AS "CourseCount"
+  FROM copied
+  WHERE "Status" IN ('IN_PROGRESS','PASSED','FAILED','RECOGNIZED')
+  GROUP BY "TargetStudentID","SourceSemesterTaken"
+), inferred AS (
+  SELECT "TargetStudentID",max("SourceSemesterTaken") FILTER (WHERE "CourseCount">=2) AS "EstablishedSemester"
+  FROM stage_counts
+  GROUP BY "TargetStudentID"
+)
+INSERT INTO public."StudentCourseResults"
+  ("StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy")
+SELECT copied."TargetStudentID",copied."CourseID",
+  CASE WHEN inferred."EstablishedSemester" IS NULL THEN NULL
+    WHEN copied."SourceSemesterTaken">inferred."EstablishedSemester" THEN inferred."EstablishedSemester"
+    ELSE copied."SourceSemesterTaken" END,
+  copied."AcademicYearID",copied."Score",copied."Grade",copied."Status",copied."AcademicPeriodID",copied."AttemptNumber",
+  copied."GradePoints",'SEED_K20_FALL2026_'||copied."StudentCode",copied."TargetUserID"
+FROM copied
+JOIN inferred USING ("TargetStudentID")
+WHERE NOT EXISTS (SELECT 1 FROM public."StudentCourseResults" existing
+  WHERE existing."StudentID"=copied."TargetStudentID" AND existing."CourseID"=copied."CourseID"
+    AND existing."AcademicPeriodID"=copied."AcademicPeriodID"
+    AND existing."AttemptNumber"=copied."AttemptNumber");
+
+-- Fall 2026 applications for the original four K19/K20 examples.
+-- Resolve every relationship by business key so identity IDs may vary.
 WITH fall_applicants("StudentCode","ApplicationStatus","Decision","Reason") AS (
   VALUES
     ('IS191621','SUBMITTED','PENDING',NULL::text),
@@ -8944,6 +9058,145 @@ JOIN public."RecruitmentPosts" post ON post."PostID"=application."PostID"
 WHERE NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" existing
   WHERE existing."ApplicationID"=application."ApplicationID");
 
+-- Submit OJT registrations for the eight students with an application.
+INSERT INTO public."OJTRegistrations"
+  ("StudentID","OJTSemesterID","RegisteredAt","Status","WindowID","ProgramID","Application","SubmittedBy","PathwaySnapshot")
+SELECT student."StudentID",term."OJTSemesterID",TIMESTAMPTZ '2026-11-27 10:00:00+07','SUBMITTED',registration_window."WindowID",
+  student."ProgramID",jsonb_build_object('contactPhone',student_user."Phone",'contactEmail',student_user."Email",
+    'note','Đăng ký OJT Fall 2026 và ứng tuyển vị trí thực tập.'),student_user."UserID",
+  jsonb_build_object('source','SEEDED_APPLICATION','studentCode',seed."StudentCode",
+    'academicPeriodId',period."AcademicPeriodID",'requiredRelativeSemester',registration_window."RequiredRelativeSemester")
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
+JOIN public."AcademicPeriods" period ON period."PeriodCode"='FALL2026'
+JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID"
+JOIN public."RecruitmentWindows" recruitment_window ON recruitment_window."OJTSemesterID"=term."OJTSemesterID" AND recruitment_window."RoundNumber"=1
+JOIN public."OJTRegistrationWindows" registration_window ON registration_window."OJTSemesterID"=term."OJTSemesterID"
+  AND registration_window."RecruitmentRoundID"=recruitment_window."WindowID"
+WHERE seed."Scenario"<>'NOT_APPLIED'
+ON CONFLICT ("StudentID","OJTSemesterID") DO UPDATE SET
+  "RegisteredAt"=EXCLUDED."RegisteredAt","Status"='SUBMITTED',"WindowID"=EXCLUDED."WindowID",
+  "ProgramID"=EXCLUDED."ProgramID","Application"=EXCLUDED."Application","SubmittedBy"=EXCLUDED."SubmittedBy",
+  "ReviewCheckID"=NULL,"ReviewedBy"=NULL,"ReviewedAt"=NULL,"ReviewReason"=NULL,"PathwaySnapshot"=EXCLUDED."PathwaySnapshot";
+
+-- Connect each application to its Fall 2026 published post and matching position.
+INSERT INTO public."JobApplications"
+  ("RegistrationID","StudentID","OJTSemesterID","PostID","PositionID","EnterpriseID","Status","AppliedAt","UpdatedAt",
+   "ReviewedBy","ReviewNote","PositionSnapshot","ApplicationSnapshot")
+SELECT registration."RegistrationID",student."StudentID",term."OJTSemesterID",post."PostID",position."PositionID",
+  enterprise."EnterpriseID",seed."Scenario",TIMESTAMPTZ '2026-11-27 10:05:00+07',TIMESTAMPTZ '2026-11-28 10:10:00+07',
+  CASE WHEN seed."Scenario" IN ('ACCEPTED','REJECTED') THEN enterprise_user."UserID" END,
+  seed."Reason",
+  jsonb_build_object('id',position."PositionID",'enterpriseId',enterprise."EnterpriseID",'ojtSemesterId',term."OJTSemesterID",
+    'title',position."Title",'description',position."Description",'requirements',position."Requirements",
+    'capacity',position."Capacity",'location',position."Location",'workMode',position."WorkMode",
+    'postId',post."PostID",'deadlineAt',post."DeadlineAt"),
+  jsonb_build_object('application',registration."Application",
+    'position',to_jsonb(position)||jsonb_build_object('PostEnterpriseID',enterprise."EnterpriseID",
+      'PostStatus',post."Status",'PostWindowID',post."WindowID",'DeadlineAt',post."DeadlineAt",'CompanyStatus',enterprise."Status"),
+    'post',jsonb_build_object('id',post."PostID",'windowId',post."WindowID"),
+    'coverLetter','Em mong muốn tham gia thực tập và hoàn thành các mục tiêu OJT tại doanh nghiệp.',
+    'certificates','[]'::jsonb,'cvFileId',NULL)
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
+JOIN public."OJTRegistrations" registration ON registration."StudentID"=student."StudentID"
+JOIN public."AcademicPeriods" period ON period."PeriodCode"='FALL2026'
+JOIN public."OJTSemesters" term ON term."AcademicPeriodID"=period."AcademicPeriodID" AND term."OJTSemesterID"=registration."OJTSemesterID"
+JOIN public."Enterprises" enterprise ON enterprise."EnterpriseCode"=seed."EnterpriseCode"
+JOIN public."EnterpriseUsers" membership ON membership."EnterpriseID"=enterprise."EnterpriseID"
+JOIN public."Users" enterprise_user ON enterprise_user."UserID"=membership."UserID"
+JOIN public."InternshipPositions" position ON position."EnterpriseID"=enterprise."EnterpriseID"
+  AND position."OJTSemesterID"=term."OJTSemesterID" AND position."RecruitmentCode"=seed."RecruitmentCode"
+JOIN public."RecruitmentPosts" post ON post."EnterpriseID"=enterprise."EnterpriseID"
+  AND post."OJTSemesterID"=term."OJTSemesterID" AND post."SubmissionKey"='SEED-FALL2026-POST-'||seed."RecruitmentCode"
+JOIN public."RecruitmentPostPositions" post_position ON post_position."PostID"=post."PostID"
+  AND post_position."PositionID"=position."PositionID" AND post_position."OJTSemesterID"=term."OJTSemesterID"
+WHERE seed."Scenario"<>'NOT_APPLIED'
+ON CONFLICT ("RegistrationID","PostID","PositionID") DO UPDATE SET
+  "Status"=EXCLUDED."Status","UpdatedAt"=EXCLUDED."UpdatedAt","ReviewedBy"=EXCLUDED."ReviewedBy",
+  "ReviewNote"=EXCLUDED."ReviewNote","PositionSnapshot"=EXCLUDED."PositionSnapshot","ApplicationSnapshot"=EXCLUDED."ApplicationSnapshot";
+
+INSERT INTO public."StudentEnterpriseCoordination"
+  ("RegistrationID","EnterpriseID","PositionID","CoordinatedBy","CoordinatedAt","Decision","DecisionAt",
+   "RejectReason","ApplicationID","OJTSemesterID","Source","CoordinationReason")
+SELECT application."RegistrationID",application."EnterpriseID",application."PositionID",
+  CASE WHEN seed."Decision" IN ('ACCEPTED','REJECTED') THEN enterprise_user."UserID" ELSE student_user."UserID" END,
+  TIMESTAMP '2026-11-28 10:10:00',seed."Decision",
+  CASE WHEN seed."Decision" IN ('ACCEPTED','REJECTED') THEN TIMESTAMP '2026-11-28 10:10:00' END,
+  seed."Reason",application."ApplicationID",application."OJTSemesterID",'STUDENT_APPLICATION',NULL
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
+JOIN public."JobApplications" application ON application."StudentID"=student."StudentID"
+  AND application."Status"=seed."Scenario"
+JOIN public."Enterprises" enterprise ON enterprise."EnterpriseID"=application."EnterpriseID"
+JOIN public."EnterpriseUsers" membership ON membership."EnterpriseID"=enterprise."EnterpriseID"
+JOIN public."Users" enterprise_user ON enterprise_user."UserID"=membership."UserID"
+WHERE seed."Scenario"<>'NOT_APPLIED'
+  AND NOT EXISTS (SELECT 1 FROM public."StudentEnterpriseCoordination" existing
+    WHERE existing."ApplicationID"=application."ApplicationID");
+
+-- Accepted candidates receive an active internship assignment; other states do not.
+INSERT INTO public."InternshipAssignments"
+  ("CoordinationID","StudentID","EnterpriseID","PositionID","EnterpriseSupervisorName","StartDate","EndDate","Status","AcademicSupervisorID")
+SELECT coordination."CoordinationID",student."StudentID",coordination."EnterpriseID",coordination."PositionID",
+  enterprise."ContactPersonName",period."StartDate",period."EndDate",'ASSIGNED',academic."UserID"
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."StudentEnterpriseCoordination" coordination ON coordination."ApplicationID"=(
+  SELECT application."ApplicationID" FROM public."JobApplications" application WHERE application."StudentID"=student."StudentID" ORDER BY application."ApplicationID" DESC LIMIT 1)
+  AND coordination."Decision"='ACCEPTED'
+JOIN public."Enterprises" enterprise ON enterprise."EnterpriseID"=coordination."EnterpriseID"
+JOIN public."AcademicPeriods" period ON period."PeriodCode"='FALL2026'
+JOIN public."Users" academic ON academic."Username"='academic01'
+WHERE seed."Scenario"='ACCEPTED'
+  AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" existing WHERE existing."CoordinationID"=coordination."CoordinationID");
+
+-- Keep registration and application history for audit screens.
+INSERT INTO public."OJTRegistrationEvents"
+  ("RegistrationID","Action","IdempotencyKey","RequestHash","Snapshot","CreatedBy","CreatedAt")
+SELECT registration."RegistrationID",'SUBMITTED','FALL2026-'||seed."StudentCode"||'-SUBMITTED',md5(seed."StudentCode"||':FALL2026:REGISTRATION'),
+  jsonb_build_object('source','SEEDED_APPLICATION','studentCode',seed."StudentCode",'status','SUBMITTED','periodCode','FALL2026'),
+  student_user."UserID",TIMESTAMPTZ '2026-11-27 10:00:00+07'
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
+JOIN public."OJTRegistrations" registration ON registration."StudentID"=student."StudentID"
+JOIN public."OJTSemesters" term ON term."OJTSemesterID"=registration."OJTSemesterID"
+JOIN public."AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID" AND period."PeriodCode"='FALL2026'
+WHERE seed."Scenario"<>'NOT_APPLIED'
+ON CONFLICT ("RegistrationID","IdempotencyKey") DO NOTHING;
+
+INSERT INTO public."ApplicationEvents" ("ApplicationID","Action","ActorID","Reason","Snapshot","CreatedAt")
+SELECT application."ApplicationID",'STUDENT_SUBMITTED',student_user."UserID",NULL,
+  jsonb_build_object('studentCode',seed."StudentCode",'statusAtSubmission','SUBMITTED','periodCode','FALL2026'),TIMESTAMPTZ '2026-11-27 10:05:00+07'
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Users" student_user ON student_user."UserID"=student."UserID"
+JOIN public."JobApplications" application ON application."StudentID"=student."StudentID"
+WHERE seed."Scenario"<>'NOT_APPLIED'
+  AND NOT EXISTS (SELECT 1 FROM public."ApplicationEvents" existing
+    WHERE existing."ApplicationID"=application."ApplicationID" AND existing."Action"='STUDENT_SUBMITTED');
+
+INSERT INTO public."ApplicationEvents" ("ApplicationID","Action","ActorID","Reason","Snapshot","CreatedAt")
+SELECT application."ApplicationID",CASE seed."Scenario" WHEN 'ACCEPTED' THEN 'EMPLOYER_ACCEPTED'
+    WHEN 'REJECTED' THEN 'EMPLOYER_REJECTED' ELSE 'EMPLOYER_REVIEWING' END,
+  enterprise_user."UserID",seed."Reason",
+  jsonb_build_object('studentCode',seed."StudentCode",'applicationStatus',seed."Scenario",'decision',seed."Decision",
+    'enterpriseCode',seed."EnterpriseCode"),TIMESTAMPTZ '2026-11-28 10:10:00+07'
+FROM qhdn_fall2026_new_students seed
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."JobApplications" application ON application."StudentID"=student."StudentID"
+JOIN public."EnterpriseUsers" membership ON membership."EnterpriseID"=application."EnterpriseID"
+JOIN public."Users" enterprise_user ON enterprise_user."UserID"=membership."UserID"
+WHERE seed."Scenario" IN ('ACCEPTED','REJECTED','REVIEWING')
+  AND NOT EXISTS (SELECT 1 FROM public."ApplicationEvents" existing
+    WHERE existing."ApplicationID"=application."ApplicationID"
+      AND existing."Action"=CASE seed."Scenario" WHEN 'ACCEPTED' THEN 'EMPLOYER_ACCEPTED'
+        WHEN 'REJECTED' THEN 'EMPLOYER_REJECTED' ELSE 'EMPLOYER_REVIEWING' END);
+
 INSERT INTO public."OJTRegistrationEvents"
   ("RegistrationID","Action","IdempotencyKey","RequestHash","Snapshot","CreatedBy","CreatedAt")
 SELECT registration."RegistrationID",'SUBMITTED','FALL2026-TECHVIET-'||student."StudentCode"||'-SUBMITTED',
@@ -9002,6 +9255,41 @@ WHERE student."StudentID"=application."StudentID" AND student."StudentCode" IN (
   ) AS seed("StudentCode","Sha256") WHERE seed."StudentCode"=student."StudentCode")
   AND application."PostID"=(SELECT post."PostID" FROM public."RecruitmentPosts" post
     WHERE post."SubmissionKey"='SEED-FALL2026-POST-SEED-JOB-FALL2026-TECHVIET');
+
+-- Ten distinct one-page demo CV PDFs encoded as Base64 for repeatable seeding.
+WITH cv_seed("StudentCode","FileName","Sha256","ContentBase64") AS (
+  VALUES
+    ('IS201651','IS201651-CV.pdf','b270b98ebadb7e01f7be920d50a89dc383b1f29bea82d893e572b0486cba0d23','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODc3ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKFBoYW0gR2lhIEtoYW5oKSBUaiBFVApCVCAvRjEgMTAgVGYgNDIgNzg3IFRkIChJUzIwMTY1MSAgfCAgSW5mb3JtYXRpb24gU3lzdGVtcykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDcyNSBUZCAoUFJPRklMRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDcwNSBUZCAoSzIwIHN0dWRlbnQgcHJlcGFyaW5nIGZvciBhIHN1cGVydmlzZWQgT0pUIHBsYWNlbWVudC4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2NzcgVGQgKFBST0pFQ1RTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjU3IFRkIChCdXNpbmVzcyBwcm9jZXNzIGRhc2hib2FyZCBhbmQgU1FMIHJlcG9ydGluZykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDYyOSBUZCAoVEVDSE5JQ0FMIFNLSUxMUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDYwOSBUZCAoU1FMLCBQb3N0Z3JlU1FMLCByZXF1aXJlbWVudHMgYW5hbHlzaXMsIFBvd2VyIEJJKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTgxIFRkIChMQU5HVUFHRVMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1NjEgVGQgKFZpZXRuYW1lc2UgXChuYXRpdmVcKSwgRW5nbGlzaCBcKHdvcmtpbmcgcHJvZmljaWVuY3lcKS4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1MzMgVGQgKEVYUEVSSUVOQ0UpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1MTMgVGQgKEFjYWRlbWljIHRlYW13b3JrIGFuZCBjb3Vyc2UgcHJvamVjdHM7IG5vIGV4dGVybmFsIGVtcGxveW1lbnQgY2xhaW1lZC4pIFRqIEVUCkJUIC9GMSA5IFRmIDQyIDU0IFRkIChEZW1vIHJlc3VtZSAtIGZpY3Rpb25hbCBzYW1wbGUgcHJvZmlsZSBmb3Igc3lzdGVtIHRlc3RpbmcpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQxIDAwMDAwIG4gCjAwMDAwMDAzMTEgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoxMjM5CiUlRU9GCg=='),
+    ('IS201652','IS201652-CV.pdf','cb52959e78a367a7b61b5b6824198a91f1c6d5d816be8cec5ccc2aa1388daab9','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODY5ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKE5ndXllbiBNaW5oIFRoYW8pIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKElTMjAxNjUyICB8ICBJbmZvcm1hdGlvbiBTeXN0ZW1zKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNzI1IFRkIChQUk9GSUxFKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNzA1IFRkIChLMjAgc3R1ZGVudCBwcmVwYXJpbmcgZm9yIGEgc3VwZXJ2aXNlZCBPSlQgcGxhY2VtZW50LikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDY3NyBUZCAoUFJPSkVDVFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2NTcgVGQgKEludmVudG9yeSB3b3JrZmxvdyBhbmQgUkVTVCBBUEkgc3BlY2lmaWNhdGlvbikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDYyOSBUZCAoVEVDSE5JQ0FMIFNLSUxMUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDYwOSBUZCAoU1FMLCBCUE1OLCBBUEkgdGVzdGluZywgZG9jdW1lbnRhdGlvbikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDU4MSBUZCAoTEFOR1VBR0VTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNTYxIFRkIChWaWV0bmFtZXNlIFwobmF0aXZlXCksIEVuZ2xpc2ggXCh3b3JraW5nIHByb2ZpY2llbmN5XCkuKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTMzIFRkIChFWFBFUklFTkNFKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNTEzIFRkIChBY2FkZW1pYyB0ZWFtd29yayBhbmQgY291cnNlIHByb2plY3RzOyBubyBleHRlcm5hbCBlbXBsb3ltZW50IGNsYWltZWQuKSBUaiBFVApCVCAvRjEgOSBUZiA0MiA1NCBUZCAoRGVtbyByZXN1bWUgLSBmaWN0aW9uYWwgc2FtcGxlIHByb2ZpbGUgZm9yIHN5c3RlbSB0ZXN0aW5nKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzExIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKMTIzMQolJUVPRgo='),
+    ('IS201653','IS201653-CV.pdf','9412ac58372b8908b286df533f507f9ead923d28d751ba3eb2568074df471404','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODYzID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKFRyYW4gUXVvYyBIdXkpIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKElTMjAxNjUzICB8ICBJbmZvcm1hdGlvbiBTeXN0ZW1zKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNzI1IFRkIChQUk9GSUxFKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNzA1IFRkIChLMjAgc3R1ZGVudCBwcmVwYXJpbmcgZm9yIGEgc3VwZXJ2aXNlZCBPSlQgcGxhY2VtZW50LikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDY3NyBUZCAoUFJPSkVDVFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2NTcgVGQgKEhlbHBkZXNrIHRpY2tldCBhbmFseXNpcyBhbmQgc2VydmljZSBtZXRyaWNzKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNjI5IFRkIChURUNITklDQUwgU0tJTExTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjA5IFRkIChTUUwsIEV4Y2VsLCBkYXRhIG1vZGVsaW5nLCB0ZWFtd29yaykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDU4MSBUZCAoTEFOR1VBR0VTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNTYxIFRkIChWaWV0bmFtZXNlIFwobmF0aXZlXCksIEVuZ2xpc2ggXCh3b3JraW5nIHByb2ZpY2llbmN5XCkuKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTMzIFRkIChFWFBFUklFTkNFKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNTEzIFRkIChBY2FkZW1pYyB0ZWFtd29yayBhbmQgY291cnNlIHByb2plY3RzOyBubyBleHRlcm5hbCBlbXBsb3ltZW50IGNsYWltZWQuKSBUaiBFVApCVCAvRjEgOSBUZiA0MiA1NCBUZCAoRGVtbyByZXN1bWUgLSBmaWN0aW9uYWwgc2FtcGxlIHByb2ZpbGUgZm9yIHN5c3RlbSB0ZXN0aW5nKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzExIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKMTIyNQolJUVPRgo='),
+    ('IS201654','IS201654-CV.pdf','d5b3804067b6da57a9d48ee0ac6e14288750e45fbc7547e54c38baf3dad7b8da','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODU5ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKExlIEhvYW5nIFllbikgVGogRVQKQlQgL0YxIDEwIFRmIDQyIDc4NyBUZCAoSVMyMDE2NTQgIHwgIEluZm9ybWF0aW9uIFN5c3RlbXMpIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA3MjUgVGQgKFBST0ZJTEUpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA3MDUgVGQgKEsyMCBzdHVkZW50IHByZXBhcmluZyBmb3IgYSBzdXBlcnZpc2VkIE9KVCBwbGFjZW1lbnQuKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNjc3IFRkIChQUk9KRUNUUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDY1NyBUZCAoQ3VzdG9tZXIgZmVlZGJhY2sgcG9ydGFsIGFuZCBwcm9jZXNzIG1hcHBpbmcpIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2MjkgVGQgKFRFQ0hOSUNBTCBTS0lMTFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2MDkgVGQgKFVNTCwgU1FMLCB1c2VyIHJlc2VhcmNoLCB0ZXN0aW5nKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTgxIFRkIChMQU5HVUFHRVMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1NjEgVGQgKFZpZXRuYW1lc2UgXChuYXRpdmVcKSwgRW5nbGlzaCBcKHdvcmtpbmcgcHJvZmljaWVuY3lcKS4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1MzMgVGQgKEVYUEVSSUVOQ0UpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1MTMgVGQgKEFjYWRlbWljIHRlYW13b3JrIGFuZCBjb3Vyc2UgcHJvamVjdHM7IG5vIGV4dGVybmFsIGVtcGxveW1lbnQgY2xhaW1lZC4pIFRqIEVUCkJUIC9GMSA5IFRmIDQyIDU0IFRkIChEZW1vIHJlc3VtZSAtIGZpY3Rpb25hbCBzYW1wbGUgcHJvZmlsZSBmb3Igc3lzdGVtIHRlc3RpbmcpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQxIDAwMDAwIG4gCjAwMDAwMDAzMTEgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoxMjIxCiUlRU9GCg=='),
+    ('IS201655','IS201655-CV.pdf','fefc441bc555d58183d77389347988a4ea4424be990b2ce33511c0a0aef7d524','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODY0ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKFZvIER1YyBBbmgpIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKElTMjAxNjU1ICB8ICBJbmZvcm1hdGlvbiBTeXN0ZW1zKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNzI1IFRkIChQUk9GSUxFKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNzA1IFRkIChLMjAgc3R1ZGVudCBwcmVwYXJpbmcgZm9yIGEgc3VwZXJ2aXNlZCBPSlQgcGxhY2VtZW50LikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDY3NyBUZCAoUFJPSkVDVFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2NTcgVGQgKFNhbGVzIHJlcG9ydGluZyBwcm90b3R5cGUgYW5kIGRhdGEgZGljdGlvbmFyeSkgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDYyOSBUZCAoVEVDSE5JQ0FMIFNLSUxMUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDYwOSBUZCAoUG9zdGdyZVNRTCwgUG93ZXIgQkksIHByb2Nlc3MgYW5hbHlzaXMpIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1ODEgVGQgKExBTkdVQUdFUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDU2MSBUZCAoVmlldG5hbWVzZSBcKG5hdGl2ZVwpLCBFbmdsaXNoIFwod29ya2luZyBwcm9maWNpZW5jeVwpLikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDUzMyBUZCAoRVhQRVJJRU5DRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDUxMyBUZCAoQWNhZGVtaWMgdGVhbXdvcmsgYW5kIGNvdXJzZSBwcm9qZWN0czsgbm8gZXh0ZXJuYWwgZW1wbG95bWVudCBjbGFpbWVkLikgVGogRVQKQlQgL0YxIDkgVGYgNDIgNTQgVGQgKERlbW8gcmVzdW1lIC0gZmljdGlvbmFsIHNhbXBsZSBwcm9maWxlIGZvciBzeXN0ZW0gdGVzdGluZykgVGogRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNDEgMDAwMDAgbiAKMDAwMDAwMDMxMSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDYgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjEyMjYKJSVFT0YK'),
+    ('SE201656','SE201656-CV.pdf','c5efadf03a51e6e0fe9fb7cb3b10aabc340516991517be40d7efeca77e9e242a','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODU5ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKERvIEtoYW5oIExpbmgpIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKFNFMjAxNjU2ICB8ICBTb2Z0d2FyZSBFbmdpbmVlcmluZykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDcyNSBUZCAoUFJPRklMRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDcwNSBUZCAoSzIwIHN0dWRlbnQgcHJlcGFyaW5nIGZvciBhIHN1cGVydmlzZWQgT0pUIHBsYWNlbWVudC4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2NzcgVGQgKFBST0pFQ1RTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjU3IFRkIChSZXNwb25zaXZlIGNvdXJzZSByZWdpc3RyYXRpb24gd2ViIGFwcGxpY2F0aW9uKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNjI5IFRkIChURUNITklDQUwgU0tJTExTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjA5IFRkIChKYXZhLCBTcHJpbmcgQm9vdCwgUkVTVCwgR2l0KSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTgxIFRkIChMQU5HVUFHRVMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1NjEgVGQgKFZpZXRuYW1lc2UgXChuYXRpdmVcKSwgRW5nbGlzaCBcKHdvcmtpbmcgcHJvZmljaWVuY3lcKS4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1MzMgVGQgKEVYUEVSSUVOQ0UpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1MTMgVGQgKEFjYWRlbWljIHRlYW13b3JrIGFuZCBjb3Vyc2UgcHJvamVjdHM7IG5vIGV4dGVybmFsIGVtcGxveW1lbnQgY2xhaW1lZC4pIFRqIEVUCkJUIC9GMSA5IFRmIDQyIDU0IFRkIChEZW1vIHJlc3VtZSAtIGZpY3Rpb25hbCBzYW1wbGUgcHJvZmlsZSBmb3Igc3lzdGVtIHRlc3RpbmcpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQxIDAwMDAwIG4gCjAwMDAwMDAzMTEgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoxMjIxCiUlRU9GCg=='),
+    ('SE201657','SE201657-CV.pdf','0f7feac4a2145d86e600131a412b0a645651c98eae888ece7d662bbd1908db82','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODc0ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKE5ndXllbiBUaGFuaCBEYXQpIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKFNFMjAxNjU3ICB8ICBTb2Z0d2FyZSBFbmdpbmVlcmluZykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDcyNSBUZCAoUFJPRklMRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDcwNSBUZCAoSzIwIHN0dWRlbnQgcHJlcGFyaW5nIGZvciBhIHN1cGVydmlzZWQgT0pUIHBsYWNlbWVudC4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2NzcgVGQgKFBST0pFQ1RTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjU3IFRkIChBcHBvaW50bWVudCBib29raW5nIHNlcnZpY2Ugd2l0aCByb2xlLWJhc2VkIGFjY2VzcykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDYyOSBUZCAoVEVDSE5JQ0FMIFNLSUxMUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDYwOSBUZCAoVHlwZVNjcmlwdCwgTm9kZS5qcywgUG9zdGdyZVNRTCwgR2l0KSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTgxIFRkIChMQU5HVUFHRVMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1NjEgVGQgKFZpZXRuYW1lc2UgXChuYXRpdmVcKSwgRW5nbGlzaCBcKHdvcmtpbmcgcHJvZmljaWVuY3lcKS4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1MzMgVGQgKEVYUEVSSUVOQ0UpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1MTMgVGQgKEFjYWRlbWljIHRlYW13b3JrIGFuZCBjb3Vyc2UgcHJvamVjdHM7IG5vIGV4dGVybmFsIGVtcGxveW1lbnQgY2xhaW1lZC4pIFRqIEVUCkJUIC9GMSA5IFRmIDQyIDU0IFRkIChEZW1vIHJlc3VtZSAtIGZpY3Rpb25hbCBzYW1wbGUgcHJvZmlsZSBmb3Igc3lzdGVtIHRlc3RpbmcpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQxIDAwMDAwIG4gCjAwMDAwMDAzMTEgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoxMjM2CiUlRU9GCg=='),
+    ('SE201658','SE201658-CV.pdf','2850ddbebe7ca7683992f218082989054a1e7ff8aad8038d45751edaeffe7cab','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODY0ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKFBoYW4gTmdvYyBNYWkpIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKFNFMjAxNjU4ICB8ICBTb2Z0d2FyZSBFbmdpbmVlcmluZykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDcyNSBUZCAoUFJPRklMRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDcwNSBUZCAoSzIwIHN0dWRlbnQgcHJlcGFyaW5nIGZvciBhIHN1cGVydmlzZWQgT0pUIHBsYWNlbWVudC4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2NzcgVGQgKFBST0pFQ1RTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjU3IFRkIChNb2JpbGUgZXhwZW5zZSB0cmFja2VyIGFuZCBBUEkgaW50ZWdyYXRpb24pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2MjkgVGQgKFRFQ0hOSUNBTCBTS0lMTFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2MDkgVGQgKEphdmEsIFJlYWN0IE5hdGl2ZSwgUkVTVCBBUEksIHRlc3RpbmcpIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1ODEgVGQgKExBTkdVQUdFUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDU2MSBUZCAoVmlldG5hbWVzZSBcKG5hdGl2ZVwpLCBFbmdsaXNoIFwod29ya2luZyBwcm9maWNpZW5jeVwpLikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDUzMyBUZCAoRVhQRVJJRU5DRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDUxMyBUZCAoQWNhZGVtaWMgdGVhbXdvcmsgYW5kIGNvdXJzZSBwcm9qZWN0czsgbm8gZXh0ZXJuYWwgZW1wbG95bWVudCBjbGFpbWVkLikgVGogRVQKQlQgL0YxIDkgVGYgNDIgNTQgVGQgKERlbW8gcmVzdW1lIC0gZmljdGlvbmFsIHNhbXBsZSBwcm9maWxlIGZvciBzeXN0ZW0gdGVzdGluZykgVGogRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNDEgMDAwMDAgbiAKMDAwMDAwMDMxMSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDYgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjEyMjYKJSVFT0YK'),
+    ('SE201659','SE201659-CV.pdf','b8233d27bcbca58671fc159f01b4a25b0a933cea832d89fe412ec611a2be6dfe','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODU5ID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKEJ1aSBRdW9jIEJhbykgVGogRVQKQlQgL0YxIDEwIFRmIDQyIDc4NyBUZCAoU0UyMDE2NTkgIHwgIFNvZnR3YXJlIEVuZ2luZWVyaW5nKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNzI1IFRkIChQUk9GSUxFKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNzA1IFRkIChLMjAgc3R1ZGVudCBwcmVwYXJpbmcgZm9yIGEgc3VwZXJ2aXNlZCBPSlQgcGxhY2VtZW50LikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDY3NyBUZCAoUFJPSkVDVFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2NTcgVGQgKEF1dG9tYXRlZCB0ZXN0IHN1aXRlIGZvciBhbiBlLWNvbW1lcmNlIGRlbW8pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2MjkgVGQgKFRFQ0hOSUNBTCBTS0lMTFMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA2MDkgVGQgKEphdmEsIFNlbGVuaXVtLCBTUUwsIHRlc3QgZGVzaWduKSBUaiBFVApCVCAvRjEgMTIgVGYgNDIgNTgxIFRkIChMQU5HVUFHRVMpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1NjEgVGQgKFZpZXRuYW1lc2UgXChuYXRpdmVcKSwgRW5nbGlzaCBcKHdvcmtpbmcgcHJvZmljaWVuY3lcKS4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1MzMgVGQgKEVYUEVSSUVOQ0UpIFRqIEVUCkJUIC9GMSAxMCBUZiA1MiA1MTMgVGQgKEFjYWRlbWljIHRlYW13b3JrIGFuZCBjb3Vyc2UgcHJvamVjdHM7IG5vIGV4dGVybmFsIGVtcGxveW1lbnQgY2xhaW1lZC4pIFRqIEVUCkJUIC9GMSA5IFRmIDQyIDU0IFRkIChEZW1vIHJlc3VtZSAtIGZpY3Rpb25hbCBzYW1wbGUgcHJvZmlsZSBmb3Igc3lzdGVtIHRlc3RpbmcpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjQxIDAwMDAwIG4gCjAwMDAwMDAzMTEgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgoxMjIxCiUlRU9GCg=='),
+    ('SE201660','SE201660-CV.pdf','f4098ba3fa3b958d2a29e097fee2f3752572c44ce93dcbefa02b4c94346f0d56','JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggODczID4+CnN0cmVhbQpxIDAuMDM1IDAuMTYgMC4yOSByZyAwIDc2NSA1OTUgNzcgcmUgZiBRCkJUIC9GMSAyMiBUZiA0MiA4MDcgVGQgKFRyYW4gSHVvbmcgR2lhbmcpIFRqIEVUCkJUIC9GMSAxMCBUZiA0MiA3ODcgVGQgKFNFMjAxNjYwICB8ICBTb2Z0d2FyZSBFbmdpbmVlcmluZykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDcyNSBUZCAoUFJPRklMRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDcwNSBUZCAoSzIwIHN0dWRlbnQgcHJlcGFyaW5nIGZvciBhIHN1cGVydmlzZWQgT0pUIHBsYWNlbWVudC4pIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA2NzcgVGQgKFBST0pFQ1RTKSBUaiBFVApCVCAvRjEgMTAgVGYgNTIgNjU3IFRkIChUZWFtIHRhc2sgYm9hcmQgd2l0aCBhdXRoZW50aWNhdGlvbiBhbmQgcmVwb3J0cykgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDYyOSBUZCAoVEVDSE5JQ0FMIFNLSUxMUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDYwOSBUZCAoUmVhY3QsIE5vZGUuanMsIFBvc3RncmVTUUwsIFVJIHRlc3RpbmcpIFRqIEVUCkJUIC9GMSAxMiBUZiA0MiA1ODEgVGQgKExBTkdVQUdFUykgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDU2MSBUZCAoVmlldG5hbWVzZSBcKG5hdGl2ZVwpLCBFbmdsaXNoIFwod29ya2luZyBwcm9maWNpZW5jeVwpLikgVGogRVQKQlQgL0YxIDEyIFRmIDQyIDUzMyBUZCAoRVhQRVJJRU5DRSkgVGogRVQKQlQgL0YxIDEwIFRmIDUyIDUxMyBUZCAoQWNhZGVtaWMgdGVhbXdvcmsgYW5kIGNvdXJzZSBwcm9qZWN0czsgbm8gZXh0ZXJuYWwgZW1wbG95bWVudCBjbGFpbWVkLikgVGogRVQKQlQgL0YxIDkgVGYgNDIgNTQgVGQgKERlbW8gcmVzdW1lIC0gZmljdGlvbmFsIHNhbXBsZSBwcm9maWxlIGZvciBzeXN0ZW0gdGVzdGluZykgVGogRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyNDEgMDAwMDAgbiAKMDAwMDAwMDMxMSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDYgL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjEyMzUKJSVFT0YK')
+)
+INSERT INTO public."StudentCVFiles" ("StudentID","FileName","MimeType","Content","Sha256","UploadedBy")
+SELECT student."StudentID",seed."FileName",'application/pdf',decode(seed."ContentBase64",'base64'),seed."Sha256",student."UserID"
+FROM cv_seed seed JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+WHERE NOT EXISTS (SELECT 1 FROM public."StudentCVFiles" existing WHERE existing."StudentID"=student."StudentID" AND existing."Sha256"=seed."Sha256");
+
+UPDATE public."JobApplications" application
+SET "CVFileID"=cv."CVFileID"
+FROM public."Students" student,public."StudentCVFiles" cv
+WHERE student."StudentID"=application."StudentID" AND student."StudentCode" IN ('IS201651','IS201652','IS201653','IS201654','SE201656','SE201657','SE201658','SE201659')
+  AND cv."StudentID"=student."StudentID"
+  AND cv."Sha256"=(SELECT seed."Sha256" FROM (VALUES
+    ('IS201651','b270b98ebadb7e01f7be920d50a89dc383b1f29bea82d893e572b0486cba0d23'),
+    ('IS201652','cb52959e78a367a7b61b5b6824198a91f1c6d5d816be8cec5ccc2aa1388daab9'),
+    ('IS201653','9412ac58372b8908b286df533f507f9ead923d28d751ba3eb2568074df471404'),
+    ('IS201654','d5b3804067b6da57a9d48ee0ac6e14288750e45fbc7547e54c38baf3dad7b8da'),
+    ('SE201656','c5efadf03a51e6e0fe9fb7cb3b10aabc340516991517be40d7efeca77e9e242a'),
+    ('SE201657','0f7feac4a2145d86e600131a412b0a645651c98eae888ece7d662bbd1908db82'),
+    ('SE201658','2850ddbebe7ca7683992f218082989054a1e7ff8aad8038d45751edaeffe7cab'),
+    ('SE201659','b8233d27bcbca58671fc159f01b4a25b0a933cea832d89fe412ec611a2be6dfe')
+  ) AS seed("StudentCode","Sha256") WHERE seed."StudentCode"=student."StudentCode");
 
 -- READ ONLY: verify created identities without exposing password hashes.
 SELECT u."Username", u."Email", r."RoleCode", u."Status",
