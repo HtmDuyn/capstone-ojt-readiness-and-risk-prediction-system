@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Building2, GraduationCap, UserRoundPlus, Users } from 'lucide-react';
 import { DonutChart } from "@/components/common/DonutChart";
 import { PageBanner } from '@/components/common/PageBanner';
-import { getAccounts, getSummary, type AccountCount, type Summary } from '@/services/adminService';
+import { ADMIN_SUMMARY_CACHE_KEY, getAccountRoles, getSummary, type AccountCount, type Summary } from '@/services/adminService';
+import { readAdminCache, subscribeAdminCache } from '@/utils/admin/adminReadCache';
 
 const roles = [
   { code: 'STUDENT', label: 'Sinh viên', color: '#6366f1' },
@@ -61,29 +62,25 @@ function AccountStatus({ counts, total }: { counts: AccountCount[]; total: numbe
 export default function AdminDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [counts, setCounts] = useState<AccountCount[] | null>(null);
-  const [newAccounts30, setNewAccounts30] = useState<number | null>(null);
   const [error, setError] = useState('');
-  const [accountsError, setAccountsError] = useState('');
   const [loading, setLoading] = useState(true);
+  const applySummary = useCallback((next: Summary) => {
+    setSummary(next);
+    setCounts(Array.isArray(next.accountBreakdown) ? next.accountBreakdown : null);
+  }, []);
   const load = useCallback(async () => {
-    setLoading(true); setError(''); setAccountsError(''); setNewAccounts30(null);
+    const cached=readAdminCache<{data:{summary:Summary}}>(ADMIN_SUMMARY_CACHE_KEY);
+    if(cached?.data?.summary)applySummary(cached.data.summary);
+    setLoading(!cached); setError('');
     try {
       const { data: { summary: next } } = await getSummary();
-      setSummary(next);
-      setCounts(Array.isArray(next.accountBreakdown) ? next.accountBreakdown : null);
-      try {
-        const accounts = await getAccounts();
-        if (!Array.isArray(next.accountBreakdown) && accounts.data.length === accounts.total)
-          setCounts(accounts.data.map(account => ({ roleCode: account.role_code, status: account.status, count: 1 })));
-        if (accounts.total === next.accounts && accounts.data.length === accounts.total && accounts.data.every(account => account.created_at && Number.isFinite(Date.parse(account.created_at)))) {
-          const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-          setNewAccounts30(accounts.data.filter(account => Date.parse(account.created_at!) >= cutoff).length);
-        } else setAccountsError('Chưa đủ dữ liệu để tính tài khoản mới trong 30 ngày.');
-      } catch { setAccountsError('Không tải được số tài khoản mới trong 30 ngày.'); }
-    } catch { setSummary(null); setCounts(null); setError('Không tải được tổng quan tài khoản.'); }
+      applySummary(next);
+    } catch { if(!cached){setSummary(null);setCounts(null);setError('Không tải được tổng quan tài khoản.');} }
     finally { setLoading(false); }
-  }, []);
+  }, [applySummary]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(()=>subscribeAdminCache<{data:{summary:Summary}}>(ADMIN_SUMMARY_CACHE_KEY,result=>{if(result?.data?.summary){applySummary(result.data.summary);setError('');}}),[applySummary]);
+  useEffect(()=>{const timer=window.setTimeout(()=>{void getAccountRoles().catch(()=>undefined);},1200);return()=>window.clearTimeout(timer);},[]);
   const total = summary?.accounts ?? 0;
   const studentCount = counts ? countBy(counts, 'roleCode', 'STUDENT') : null;
   const enterpriseCount = counts ? countBy(counts, 'roleCode', 'ENTERPRISE') : null;
@@ -91,7 +88,7 @@ export default function AdminDashboard() {
     { title: 'Tài khoản hệ thống', value: summary?.accounts ?? null, description: 'Tổng số tài khoản trong hệ thống', icon: Users },
     { title: 'Sinh viên', value: studentCount, description: studentCount === null ? 'Chưa có dữ liệu' : `${percentText(studentCount, total)} tổng số tài khoản`, icon: GraduationCap },
     { title: 'Doanh nghiệp', value: enterpriseCount, description: enterpriseCount === null ? 'Chưa có dữ liệu' : `${percentText(enterpriseCount, total)} tổng số tài khoản`, icon: Building2 },
-    { title: 'Tài khoản mới trong 30 ngày', value: newAccounts30, description: 'Được tạo trong 30 ngày gần nhất', icon: UserRoundPlus },
+    { title: 'Tài khoản mới trong 30 ngày', value: summary?.newAccounts30 ?? null, description: 'Được tạo trong 30 ngày gần nhất', icon: UserRoundPlus },
   ];
   return <div className="mx-auto max-w-[1440px] space-y-5">
     <PageBanner title="Trung tâm Quản trị Hệ thống" badge={<span className="rounded-full border border-white/25 bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">Quản trị viên</span>}
@@ -103,7 +100,6 @@ export default function AdminDashboard() {
         <p className="mt-3 text-3xl font-extrabold tabular-nums text-slate-900">{loading ? '…' : value === null ? '—' : number(value)}</p>
         <p className="mt-1 text-xs text-slate-500">{description}</p>
       </div>)}</section>
-    {accountsError && <p role="status" className="text-sm text-slate-600">{accountsError}</p>}
     <section aria-label="Thống kê tài khoản" className="grid gap-4 lg:grid-cols-2">
       <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Tài khoản theo vai trò</h2><p className="mt-1 text-sm text-slate-500">Phân bố tài khoản theo 5 vai trò</p>{loading ? <p role="status" className="py-20 text-center text-sm text-slate-500">Đang tải thống kê…</p> : counts ? <RoleDistribution counts={counts} total={total} /> : <p className="py-20 text-center text-sm text-slate-500">Chưa có dữ liệu theo vai trò.</p>}</div>
       <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Trạng thái tài khoản</h2><p className="mt-1 text-sm text-slate-500">Tình trạng hoạt động của toàn bộ tài khoản</p>{loading ? <p role="status" className="py-20 text-center text-sm text-slate-500">Đang tải thống kê…</p> : counts ? <AccountStatus counts={counts} total={total} /> : <p className="py-20 text-center text-sm text-slate-500">Chưa có dữ liệu trạng thái.</p>}</div>

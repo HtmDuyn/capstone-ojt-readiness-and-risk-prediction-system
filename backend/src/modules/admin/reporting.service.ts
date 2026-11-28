@@ -14,6 +14,7 @@ export async function systemDashboard(params:Record<string,unknown>) {
     SELECT COALESCE(sum(count), 0)::int AS accounts,
            COALESCE(sum(count) FILTER (WHERE status = 'ACTIVE'), 0)::int AS "activeAccounts",
            COALESCE(jsonb_agg(to_jsonb(account_counts)), '[]'::jsonb) AS "accountBreakdown",
+           (SELECT count(*)::int FROM "Users" WHERE "CreatedAt">=clock_timestamp()-interval '30 days') AS "newAccounts30",
            (SELECT count(*)::int FROM "Students" WHERE "DeletedAt" IS NULL) AS students,
            (SELECT count(*)::int FROM "Enterprises" WHERE "DeletedAt" IS NULL) AS companies,
            (SELECT count(*)::int FROM "OJTSemesters") AS "ojtSemesters"
