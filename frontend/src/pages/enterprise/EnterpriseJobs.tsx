@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BriefcaseBusiness, ChevronLeft, ChevronRight, Clock3, FileText, LayoutGrid, Loader2, LockKeyhole, Plus, Search, UserCheck, Users } from 'lucide-react';
+import { AlertCircle, BriefcaseBusiness, ChevronLeft, ChevronRight, FileText, LayoutGrid, Loader2, LockKeyhole, Plus, Search, UserCheck, Users } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { PageBanner } from '@/components/common/PageBanner';
 import { RecruitmentPostDialog } from '@/components/enterprise/RecruitmentPostDialog';
 import { RecruitmentPostDetailsDialog } from '@/components/enterprise/RecruitmentPostDetailsDialog';
 import { useRecruitmentFeedback } from '@/components/enterprise/RecruitmentNoticeDialog';
 import { RecruitmentPostCard } from '@/components/enterprise/RecruitmentPostCard';
-import { enterprisePeriodLabels, formatRecruitmentDate, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts, windowAllowsPostCreation } from '@/utils/enterprise/recruitment';
+import { enterprisePeriodLabels, formatRecruitmentDateTime, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts, windowAllowsPostCreation } from '@/utils/enterprise/recruitment';
 import { enterpriseService, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -66,6 +66,8 @@ export function EnterpriseJobs() {
     [periodFilteredWindows],
   );
   const selectedWindow = windows.find(w => w.id === selectedWindowId);
+  const postingStartsAt = selectedWindow?.postingStartsAt ?? selectedWindow?.startsAt;
+  const postingDeadlineAt = selectedWindow?.postingEndsAt ?? selectedWindow?.postingDeadlineAt ?? selectedWindow?.endsAt;
   const creationWindows = windows.filter(windowAllowsPostCreation);
   const canCreate = creationWindows.length > 0
     && (selectedWindow ? windowAllowsPostCreation(selectedWindow) : periodStatusFilter !== 'CLOSED');
@@ -147,14 +149,23 @@ export function EnterpriseJobs() {
                 onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
                 <option value="0">Tất cả đợt đăng tin</option>
-                {periodFilteredWindows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''} · {enterprisePeriodLabels[w.periodStatus]}</option>)}
+                {periodFilteredWindows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''}</option>)}
               </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
             </div>
           </div>
-          {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / công bố tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
-              <p className="mt-1 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)} · QHDN quản lý thời hạn</p>
-            </div>
+          {selectedWindow && <div className="min-w-0 space-y-2 text-sm">
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="font-medium text-slate-600">Bắt đầu đăng tin:</span>
+              <time dateTime={postingStartsAt} className="font-bold tabular-nums text-blue-700">
+                {formatRecruitmentDateTime(postingStartsAt)}
+              </time>
+            </p>
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="font-semibold text-slate-800">Hạn kết thúc đăng tin và công bố tin:</span>
+              <time dateTime={postingDeadlineAt} className="font-bold tabular-nums text-orange-700">
+                {formatRecruitmentDateTime(postingDeadlineAt)}
+              </time>
+            </p>
           </div>}
         </div>
         {!creationWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt đăng tin khả dụng trong học kỳ đang diễn ra.</p>}

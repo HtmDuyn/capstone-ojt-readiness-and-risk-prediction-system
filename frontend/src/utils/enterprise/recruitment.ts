@@ -13,9 +13,20 @@ export function windowAllowsPostCreation(window?: RecruitmentWindow) {
   return window?.periodStatus === 'ACTIVE' && window.canCreate === true;
 }
 
-const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
+const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' });
 export const formatRecruitmentDate = (value?: string | null) => value && Number.isFinite(Date.parse(value))
   ? dateFormatter.format(new Date(value)) : 'Chưa có thời hạn';
+const recruitmentDateOnlyFormatter = new Intl.DateTimeFormat('vi-VN', {
+  day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh',
+});
+const recruitmentTimeOnlyFormatter = new Intl.DateTimeFormat('vi-VN', {
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Ho_Chi_Minh',
+});
+export const formatRecruitmentDateTime = (value?: string | null) => {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Chưa có thời hạn';
+  const date = new Date(value);
+  return `${recruitmentDateOnlyFormatter.format(date)} · ${recruitmentTimeOnlyFormatter.format(date)}`;
+};
 
 export function windowAcceptsPosts(window?: RecruitmentWindow, now = Date.now()) {
   return !!window && windowAllowsPostCreation(window) && window.accepting && window.canEdit !== false && window.status === 'OPEN'

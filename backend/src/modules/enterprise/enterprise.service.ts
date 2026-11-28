@@ -119,7 +119,13 @@ const candidateFrom = `FROM "StudentEnterpriseCoordination" co
   JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
   JOIN "Students" s ON s."StudentID"=r."StudentID"
   JOIN "Users" u ON u."UserID"=s."UserID"
-  JOIN "InternshipPositions" p ON p."PositionID"=co."PositionID"`;
+  JOIN "InternshipPositions" p ON p."PositionID"=co."PositionID"
+  LEFT JOIN "JobApplications" review_application ON review_application."ApplicationID"=co."ApplicationID"
+  LEFT JOIN "RecruitmentPosts" review_post ON review_post."PostID"=review_application."PostID"
+  LEFT JOIN "OJTRegistrationWindows" review_intake ON review_intake."WindowID"=r."WindowID"
+  LEFT JOIN "RecruitmentWindows" review_round
+    ON review_round."WindowID"=COALESCE(review_post."WindowID",review_intake."RecruitmentRoundID")
+    AND review_round."OJTSemesterID"=r."OJTSemesterID"`;
 const candidateFields = `CASE WHEN co."Decision"<>'PENDING' THEN false ELSE NOT EXISTS(
  SELECT 1 FROM "JobApplications" ja JOIN "RecruitmentPosts" post ON post."PostID"=ja."PostID"
  JOIN "RecruitmentWindows" rw ON rw."WindowID"=post."WindowID"
@@ -129,6 +135,9 @@ const candidateFields = `CASE WHEN co."Decision"<>'PENDING' THEN false ELSE NOT 
  ) END AS "canRespond",co."CoordinationID" AS id,co."Source" AS source,(SELECT receipt."ReceivedAt" FROM "OJTActualReceipts" receipt WHERE receipt."CoordinationID"=co."CoordinationID") AS "receivedAt",co."EnterpriseID" AS "companyId",co."CoordinatedBy" AS "coordinatedBy",jsonb_build_object('id',r."RegistrationID",'status',r."Status",'registeredAt',r."RegisteredAt") AS registration,r."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",co."PositionID" AS "positionId",co."ApplicationID" AS "applicationId",r."RegistrationID" AS "registrationId",${student} AS student,${position} AS position,
   COALESCE(co."Decision",'PENDING') AS decision,co."CoordinatedAt" AS "introducedAt",
   co."DecisionAt" AS "decisionAt",co."RejectReason" AS "rejectReason",
+  CASE WHEN review_round."WindowID" IS NULL THEN NULL ELSE jsonb_build_object(
+    'id',review_round."WindowID",'name',review_round."Name",
+    'resultsStartsAt',review_round."ResultsStartsAt",'resultsEndsAt',review_round."ResultsEndsAt") END AS "recruitmentRound",
   NOT EXISTS(SELECT 1 FROM "StudentEnterpriseCoordination" newer WHERE newer."RegistrationID"=co."RegistrationID" AND newer."CoordinationID">co."CoordinationID") AS "isLatestCoordination"`;
 
 export async function dashboardCandidates(actor: Actor) {
@@ -240,6 +249,14 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
     const sql = `SELECT a."AssignmentID" AS id,a."EnterpriseID" AS "companyId",a."StudentID" AS "studentId",r."OJTSemesterID" AS "ojtSemesterId",a."PositionID" AS "positionId",co."ApplicationID" AS "applicationId",r."RegistrationID" AS "registrationId",${student} AS student,${position} AS position,
       a."CoordinationID" AS "coordinationId",a."EnterpriseSupervisorName" AS "enterpriseSupervisorName",
       a."StartDate" AS "startDate",a."EndDate" AS "endDate",a."Status" AS status,
+      (${enterpriseSemesterStatusSql('period','term')}) AS "periodStatus",
+      CASE WHEN recruitment_round."WindowID" IS NULL THEN NULL ELSE jsonb_build_object(
+        'id',recruitment_round."WindowID",'name',recruitment_round."Name",'status',recruitment_round."Status",
+        'periodStatus',CASE
+          WHEN recruitment_round."Status"='CLOSED' OR recruitment_round."ResultsFinalizedAt" IS NOT NULL
+            OR recruitment_round."EndsAt"<=statement_timestamp() OR (${enterpriseSemesterStatusSql('period','term')}) IN ('CLOSED','ARCHIVED') THEN 'CLOSED'
+          WHEN recruitment_round."Status"='OPEN' AND recruitment_round."StartsAt"<=statement_timestamp() THEN 'ACTIVE'
+          ELSE NULL END) END AS "recruitmentRound",
       COALESCE((SELECT ja."ApplicationSnapshot"->'application' FROM "JobApplications" ja WHERE ja."ApplicationID"=co."ApplicationID"),r."Application")-'cvUrl' AS application,${applicationDetails} AS "jobApplication",
       CASE WHEN supervisor."UserID" IS NULL THEN NULL ELSE jsonb_build_object('id',supervisor."UserID",'fullName',supervisor."FullName",'email',supervisor."Email",'phone',supervisor."Phone") END AS "academicSupervisor",
       CASE WHEN v."EvaluationID" IS NULL THEN NULL ELSE jsonb_build_object(
@@ -251,6 +268,14 @@ export async function enterpriseInternships(params: Row, actor: Actor) {
       FROM "InternshipAssignments" a
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
       JOIN "OJTRegistrations" r ON r."RegistrationID"=co."RegistrationID"
+      JOIN "OJTSemesters" term ON term."OJTSemesterID"=r."OJTSemesterID"
+      LEFT JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID"
+      LEFT JOIN "JobApplications" accepted_application ON accepted_application."ApplicationID"=co."ApplicationID"
+      LEFT JOIN "RecruitmentPosts" accepted_post ON accepted_post."PostID"=accepted_application."PostID"
+      LEFT JOIN "OJTRegistrationWindows" intake_window ON intake_window."WindowID"=r."WindowID"
+      LEFT JOIN "RecruitmentWindows" recruitment_round
+        ON recruitment_round."WindowID"=COALESCE(accepted_post."WindowID",intake_window."RecruitmentRoundID")
+        AND recruitment_round."OJTSemesterID"=r."OJTSemesterID"
       JOIN "Students" s ON s."StudentID"=a."StudentID"
       JOIN "Users" u ON u."UserID"=s."UserID"
       JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID"

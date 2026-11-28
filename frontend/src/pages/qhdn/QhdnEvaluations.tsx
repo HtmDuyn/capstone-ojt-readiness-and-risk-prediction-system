@@ -8,6 +8,7 @@ import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { errorMessage, Field, Notice, Pager, Table, usePaged } from '@/components/qhdn/QhdnUi';
 import type { ReportType } from '@/types/qhdn/workflowTypes';
+import { linkedOjtSemesterId, preferredAcademicPeriod } from '@/utils/qhdn/qhdnAcademicPeriods';
 
 const reports:Record<ReportType,{label:string;description:string}>={
  acceptance:{label:'Tiếp nhận sinh viên',description:'Tổng hợp tình hình tiếp nhận và quyết định của doanh nghiệp trong kỳ OJT.'},
@@ -27,13 +28,18 @@ export default function QhdnEnterpriseEvaluations(){
  const [publishTarget,setPublishTarget]=useState<{evaluationIds?:number[];studentName?:string}|null>(null);
  const [tab,setTab]=useState<'results'|'reports'>('results');
  const catalog=useQhdnAcademicPeriods('',false,true);
- const {semesterId}=catalog;
+ const [periodStatusFilter,setPeriodStatusFilter]=useState<'ALL'|'ACTIVE'|'CLOSED'>('ALL');
+ const filteredPeriods=catalog.filteredPeriods.filter(period=>periodStatusFilter==='ALL'||period.status===periodStatusFilter);
+ const selectedPeriod=filteredPeriods.find(period=>String(period.id)===catalog.periodId)||preferredAcademicPeriod(filteredPeriods);
+ const linkedSemesterId=linkedOjtSemesterId(selectedPeriod);
+ const periodSelection={...catalog,filteredPeriods,selectedPeriod,periodId:selectedPeriod?String(selectedPeriod.id):'',semesterId:linkedSemesterId===null?'':String(linkedSemesterId)};
+ const {semesterId}=periodSelection;
  const [type,setType]=useState<ReportType>('acceptance');
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const [publishBusy,setPublishBusy]=useState(false);
  const [limit,setLimit]=useState(10);
  const results=usePaged((page,signal)=>listOjtResults({ojtSemesterId:Number(semesterId),page,limit},signal).then(r=>r.data),`${semesterId}:${limit}`,!!semesterId&&tab==='results');
- useEffect(()=>{setMessage('');setError('');},[catalog.periodId,type,tab]);
+ useEffect(()=>{setMessage('');setError('');},[periodSelection.periodId,type,tab,periodStatusFilter]);
  const run=async(work:()=>Promise<unknown>,success:string)=>{
   if(busy||publishBusy||!semesterId)return;
   setBusy(true);setMessage('');setError('');
@@ -63,7 +69,14 @@ export default function QhdnEnterpriseEvaluations(){
     {([['results','Kết quả đánh giá'],['reports','Xuất báo cáo']] as const).map(([id,label])=><button key={id} id={`report-tab-${id}`} role="tab" aria-selected={tab===id} aria-controls={`report-panel-${id}`} type="button" disabled={busy||publishBusy} onClick={()=>setTab(id)} className={'border-b-2 px-0.5 py-4 text-sm font-semibold transition focus-visible:outline-orange-500 '+(tab===id?'border-orange-600 text-orange-700':'border-transparent text-slate-500 hover:text-slate-800')}>{label}</button>)}
    </div>
    <div className="flex flex-wrap items-end gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-4">
-    <AcademicPeriodFilter selection={catalog} disabled={busy||publishBusy}/>
+    <AcademicPeriodFilter selection={periodSelection} showPeriodStatus={false} disabled={busy||publishBusy||!!publishTarget}/>
+    <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">Trạng thái kỳ OJT
+     <select aria-label="Lọc trạng thái kỳ OJT" className={workflowInput+' w-auto min-w-44'} value={periodStatusFilter} disabled={busy||publishBusy||catalog.loading||!!publishTarget} onChange={event=>setPeriodStatusFilter(event.target.value as 'ALL'|'ACTIVE'|'CLOSED')}>
+      <option value="ALL">Tất cả trạng thái</option>
+      <option value="ACTIVE">Đang diễn ra</option>
+      <option value="CLOSED">Đã đóng</option>
+     </select>
+    </label>
    </div>
    <div className="space-y-3 px-5 empty:hidden">{(catalog.error||error)&&<div className="pt-4"><Notice>{catalog.error||error}</Notice></div>}{message&&<p role="status" className="pt-4 text-sm font-medium text-emerald-700">{message}</p>}</div>
    <div id={`report-panel-${tab}`} role="tabpanel" aria-labelledby={`report-tab-${tab}`}>
@@ -92,7 +105,7 @@ export default function QhdnEnterpriseEvaluations(){
      </div>
     </div>
     <dl className="divide-y divide-slate-100 border-y border-slate-200 text-sm">
-     <div className="grid gap-1 py-3 sm:grid-cols-[100px_1fr] sm:gap-4"><dt className="text-slate-500">Học kỳ</dt><dd className="break-words font-medium text-slate-900">{catalog.selectedPeriod?.name||'Học kỳ đang chọn'}</dd></div>
+     <div className="grid gap-1 py-3 sm:grid-cols-[100px_1fr] sm:gap-4"><dt className="text-slate-500">Học kỳ</dt><dd className="break-words font-medium text-slate-900">{periodSelection.selectedPeriod?.name||'Học kỳ đang chọn'}</dd></div>
      <div className="grid gap-1 py-3 sm:grid-cols-[100px_1fr] sm:gap-4"><dt className="text-slate-500">Phạm vi</dt><dd className="break-words font-medium text-slate-900">{publishTarget.evaluationIds?publishTarget.studentName||'Sinh viên đã chọn':'Toàn bộ kết quả đủ điều kiện trong kỳ OJT'}</dd></div>
     </dl>
     <div>

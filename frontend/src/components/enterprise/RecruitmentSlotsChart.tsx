@@ -67,15 +67,12 @@ export function RecruitmentSlotsChart({ posts, loading, error }: {
               </DonutChart>
             </div>
             {total > 0 ? (
-              <ul className="mt-4 divide-y divide-slate-100">
+              <ul className="mt-3 grid gap-x-3 gap-y-1 sm:grid-cols-2">
                 {segments.map((segment, index) => (
-                  <li key={segment.id} className="flex min-w-0 items-center gap-3 py-3" title={`${segment.title}: ${segment.remaining} slot`}>
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: palette[index].to }} />
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 break-words text-xs font-medium leading-relaxed text-slate-600">{segment.title}</p>
-                      <p className="mt-0.5 text-[10px] tabular-nums text-slate-400">{segment.remaining} slot</p>
-                    </div>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{Math.round(segment.remaining / total * 100)}%</span>
+                  <li key={segment.id} className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-50" title={`${segment.title}: ${segment.remaining} slot`}>
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: palette[index].to }} />
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{segment.title}</span>
+                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-slate-500">{segment.remaining} slot</span>
                   </li>
                 ))}
               </ul>

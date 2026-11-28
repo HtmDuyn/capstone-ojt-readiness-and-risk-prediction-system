@@ -134,11 +134,13 @@ export function AcademicPeriodFilter({
   disabled,
   controlClassName = workflowInput,
   layout = "inline",
+  showPeriodStatus = true,
 }: {
   selection: ReturnType<typeof useQhdnAcademicPeriods>;
   disabled?: boolean;
   controlClassName?: string;
   layout?: "inline" | "grid";
+  showPeriodStatus?: boolean;
 }) {
   return (
     <div className={layout === "grid" ? "contents" : "flex min-w-0 max-w-full flex-wrap items-end gap-3"}>
@@ -157,10 +159,11 @@ export function AcademicPeriodFilter({
           onChange={(e) => selection.selectPeriod(e.target.value)}>
           {selection.allowAll && <option value="ALL">{selection.semestersOnly ? 'Tất cả học kỳ chính' : 'Tất cả học kỳ / Block 3'}</option>}
           {!selection.filteredPeriods.length && <option value="">{selection.loading ? "Đang tải…" : selection.semestersOnly ? 'Không có học kỳ chính' : "Không có học kỳ / Block 3"}</option>}
-          {selection.years.filter((year) => !selection.yearId || String(year.id) === selection.yearId).map((year) => (
+          {selection.years.filter((year) => (!selection.yearId || String(year.id) === selection.yearId)
+            && selection.filteredPeriods.some(period => period.academicYearId === year.id)).map((year) => (
             <optgroup key={year.id} label={year.code}>
               {selection.filteredPeriods.filter((p) => p.academicYearId === year.id).map((period) => (
-                <option key={period.id} value={period.id}>{academicPeriodLabel(period)}</option>
+                <option key={period.id} value={period.id}>{academicPeriodLabel(period, showPeriodStatus)}</option>
               ))}
             </optgroup>
           ))}
