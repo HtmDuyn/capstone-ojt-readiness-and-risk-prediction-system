@@ -17,8 +17,10 @@ interface EvaluationRow extends EvaluationScores {
   fullName: string;
   studentCode: string;
   position: string;
-  semesterId: number;
   semester: string;
+  roundId: number | null;
+  roundName: string;
+  roundStatus: 'ACTIVE' | 'CLOSED' | null;
   comments: string;
   status: 'NEW' | 'DRAFT' | 'SUBMITTED';
   locked: boolean;
@@ -48,8 +50,11 @@ function makeRow(item: EnterpriseInternshipItem, tasks: EnterpriseInternshipTask
   const suggestion = tasksAvailable ? taskScoreSuggestion(completed, tasks.length) : null;
   return {
     id: item.id, internship: item, fullName: item.student?.fullName || '', studentCode: item.student?.studentCode || '',
-    position: item.position?.title || '', semesterId: item.ojtSemesterId,
-    semester: tasks[0]?.semesterCode || `Kỳ OJT #${item.ojtSemesterId}`,
+    position: item.position?.title || '',
+    semester: item.semester?.name || item.semester?.code || tasks[0]?.semesterCode || 'Chưa cập nhật kỳ OJT',
+    roundId: item.recruitmentRound?.id ?? null,
+    roundName: item.recruitmentRound?.name || 'Chưa liên kết đợt OJT',
+    roundStatus: item.recruitmentRound?.periodStatus ?? null,
     comments: ev?.comments || '', status: ev?.status === 'SUBMITTED' ? 'SUBMITTED' : ev ? 'DRAFT' : 'NEW',
     locked: item.evaluationLocked === true || submitted || !templateId || !criteria.length
       || !['ASSIGNED','ACTIVE', 'IN_PROGRESS', 'COMPLETED'].includes(item.status?.toUpperCase()),
@@ -85,7 +90,8 @@ export function EnterpriseEvaluation() {
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
-  const [semester, setSemester] = useState('all');
+  const [round, setRound] = useState('all');
+  const [roundStatus, setRoundStatus] = useState<'all' | 'ACTIVE' | 'CLOSED'>('all');
   const [column, setColumn] = useState('');
   const [bulkScore, setBulkScore] = useState('8');
   const [page, setPage] = useState(1);
@@ -146,14 +152,15 @@ export function EnterpriseEvaluation() {
   const filtered = useMemo(() => rows.filter(row => {
     const query = search.trim().toLocaleLowerCase('vi');
     return (!query || `${row.fullName} ${row.studentCode} ${row.position}`.toLocaleLowerCase('vi').includes(query))
-      && (semester === 'all' || String(row.semesterId) === semester)
+      && (round === 'all' || (row.roundId === null ? 'unlinked' : String(row.roundId)) === round)
+      && (roundStatus === 'all' || row.roundStatus === roundStatus)
       && (status === 'all' || evaluationState(row) === status);
-  }), [rows, search, semester, status]);
+  }), [rows, search, round, roundStatus, status]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
   const visible = filtered.slice((page - 1) * limit, page * limit);
   const editableVisible = visible.filter(row => !row.locked);
   const checked = editableVisible.length > 0 && editableVisible.every(row => selected.has(row.id));
-  const selectedRows = rows.filter(row => selected.has(row.id) && !row.locked);
+  const selectedRows = filtered.filter(row => selected.has(row.id) && !row.locked);
   // Keep columns separate across issued templates, even when their keys are identical.
   const tableColumns = Array.from(new Map(filtered.flatMap(row => row.criteria.map(field => ({
     ...field, templateId: row.templateId, templateName: row.templateName, columnId: `${row.templateId}:${field.key}`,
@@ -164,8 +171,9 @@ export function EnterpriseEvaluation() {
   const detail = rows.find(row => row.id === detailId);
   const evaluationDetail = rows.find(row => row.id === evaluationDetailId);
   const editingRow = rows.find(row => row.id === editor?.id);
-  const semesters = Array.from(new Map(rows.map(row => [row.semesterId, row.semester])).entries());
-  useEffect(() => { setPage(1); }, [search, status, semester]);
+  const rounds = Array.from(new Map(rows.filter(row => roundStatus === 'all' || row.roundStatus === roundStatus)
+    .map(row => [row.roundId === null ? 'unlinked' : String(row.roundId), row.roundName])).entries());
+  useEffect(() => { setPage(1); setSelected(new Set()); }, [search, status, round, roundStatus]);
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
   useEffect(() => { if (column && !bulkColumns.some(field => field.key === column)) setColumn(''); }, [column, bulkColumns]);
   useEffect(() => {
@@ -258,7 +266,7 @@ export function EnterpriseEvaluation() {
   };
 
   return <div className="space-y-5 pb-10">
-    <PageBanner variant="enterprise" title="Đánh giá OJT hàng loạt" badge="Chấm điểm OJT"
+    <PageBanner variant="enterprise" title="Đánh giá kết quả OJT" badge="Chấm điểm OJT"
       description="Chấm điểm, lưu và chỉnh sửa đánh giá; xác nhận khi hoàn tất để gửi kết quả đến Phòng QHDN." />
     {message && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 size={18} />{message}</div>}
     {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><AlertCircle size={18} />{error}</div>}
@@ -273,8 +281,9 @@ export function EnterpriseEvaluation() {
       <div className="space-y-4 border-b border-slate-100 bg-slate-50/60 p-5">
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-52 flex-1 text-xs font-semibold text-slate-600">Tìm sinh viên<div className="relative mt-1.5"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={inputClass + ' w-full pl-9'} placeholder="Họ tên, mã sinh viên, vị trí…" value={search} disabled={busy || loading} onChange={e => setSearch(e.target.value)} /></div></label>
-          <label className="text-xs font-semibold text-slate-600">Đợt OJT<select className={inputClass + ' mt-1.5 block'} value={semester} disabled={busy || loading} onChange={e => setSemester(e.target.value)}><option value="all">Tất cả đợt OJT</option>{semesters.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-          <label className="text-xs font-semibold text-slate-600">Trạng thái<select className={inputClass + ' mt-1.5 block'} value={status} disabled={busy || loading} onChange={e => setStatus(e.target.value)}><option value="all">Tất cả trạng thái</option><option value="saved">Đã lưu</option><option value="submitted">Đã chốt điểm</option><option value="missing">Thiếu điểm</option></select></label>
+          <label className="text-xs font-semibold text-slate-600">Trạng thái đợt<select aria-label="Lọc trạng thái đợt OJT" className={inputClass + ' mt-1.5 block max-w-full'} value={roundStatus} disabled={busy || loading} onChange={e => { const value = e.target.value; setRoundStatus(value === 'ACTIVE' || value === 'CLOSED' ? value : 'all'); setRound('all'); }}><option value="all">Tất cả trạng thái đợt</option><option value="ACTIVE">Đang diễn ra</option><option value="CLOSED">Đã đóng</option></select></label>
+          <label className="min-w-0 max-w-full text-xs font-semibold text-slate-600">Đợt OJT<select aria-label="Lọc đợt OJT" className={inputClass + ' mt-1.5 block max-w-full'} value={round} disabled={busy || loading} onChange={e => setRound(e.target.value)}><option value="all">Tất cả đợt OJT</option>{rounds.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+          <label className="text-xs font-semibold text-slate-600">Trạng thái điểm<select aria-label="Lọc trạng thái điểm" className={inputClass + ' mt-1.5 block max-w-full'} value={status} disabled={busy || loading} onChange={e => setStatus(e.target.value)}><option value="all">Tất cả trạng thái điểm</option><option value="saved">Đã lưu</option><option value="submitted">Đã chốt điểm</option><option value="missing">Thiếu điểm</option></select></label>
         </div>
         <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <label className="text-xs font-semibold text-slate-600">Nhập điểm<input type="number" min={0} max={10} step="0.01" inputMode="decimal" placeholder="0–10" className={inputClass + ' mt-1.5 block w-32'} value={bulkScore} disabled={busy || loading} aria-invalid={bulkScore !== '' && parseEvaluationScore(bulkScore) === null} onChange={e => setBulkScore(e.target.value)} /></label>
@@ -307,7 +316,7 @@ export function EnterpriseEvaluation() {
                 return <tr key={row.id} className={selected.has(row.id) ? 'bg-orange-50/40' : 'hover:bg-slate-50/50'}>
                   <td className="px-4 py-5 align-top"><input type="checkbox" aria-label={`Chọn ${row.fullName} (${row.studentCode})`} className="mt-1 h-4 w-4 accent-orange-500" checked={selected.has(row.id)} disabled={busy || row.locked} onChange={() => toggle(row.id)} /></td>
                   <td className="px-3 py-4 text-center tabular-nums text-slate-500">{(page - 1) * limit + index + 1}</td>
-                  <td className="px-3 py-4"><p className="font-semibold text-slate-900">{row.fullName}</p><p className="mt-0.5 text-xs text-slate-500">{row.studentCode} · {row.semester}</p><p className="mt-1 text-xs text-slate-500">{row.position || 'Chưa có vị trí'}</p></td>
+                  <td className="px-3 py-4"><p className="font-semibold text-slate-900">{row.fullName}</p><p className="mt-0.5 text-xs text-slate-500">{row.studentCode} · {row.roundName}</p><p className="mt-1 text-xs text-slate-500">{row.position || 'Chưa có vị trí'}</p></td>
                   <td className="px-3 py-4">
                     <p className="text-sm font-semibold tabular-nums text-slate-700">{taskError ? '—' : `${completed}/${row.tasks.length}`}</p>
                     {!taskError && row.tasks.length > 0 && <div className="mt-1.5 h-1.5 w-20 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Tiến độ task của ${row.fullName}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(completed / row.tasks.length * 100)}><div className={'h-full rounded-full ' + (completed / row.tasks.length >= 0.8 ? 'bg-emerald-500' : 'bg-amber-400')} style={{ width: `${completed / row.tasks.length * 100}%` }} /></div>}

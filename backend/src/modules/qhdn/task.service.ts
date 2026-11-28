@@ -7,7 +7,7 @@ import { inputObject, requiredText, optionalText, positiveId, invalid, paginatio
 import { dateInput } from '../academic/academic.schema';
 import { fingerprint } from '../eligibility/eligibility.service';
 import type { Actor } from '../ojt-registration/window.service';
-import { visibleEnterpriseSemester } from '../enterprise/enterprise-periods';
+import { enterpriseSemesterStatusSql, visibleEnterpriseSemester } from '../enterprise/enterprise-periods';
 
 export async function assignTasks(body: unknown, actor: Actor) {
   if (actor.roleCode !== 'ENTERPRISE') throw invalid('Enterprise role required.',403);
@@ -136,9 +136,12 @@ export async function listTasks(params:Record<string,unknown>, actor:Actor,exist
       ${actor.roleCode==='ENTERPRISE' ? `${enterpriseTaskStatus} AS "enterpriseStatus",
         NOT ${hasTaskHistory} AS "canDelete",` : ''}
       a."StudentID" AS "studentId",a."EnterpriseID" AS "companyId",a."PositionID" AS "positionId",co."OJTSemesterID" AS "ojtSemesterId",
+      (${enterpriseSemesterStatusSql('period','term')}) AS "periodStatus",
       jsonb_build_object('id',a."AssignmentID",'status',a."Status",'startDate',a."StartDate",'endDate',a."EndDate") AS assignment
       FROM "InternshipTasks" t JOIN "InternshipAssignments" a ON a."AssignmentID"=t."AssignmentID" JOIN "Students" s ON s."StudentID"=a."StudentID"
       JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID"
+      JOIN "OJTSemesters" term ON term."OJTSemesterID"=co."OJTSemesterID"
+      LEFT JOIN "AcademicPeriods" period ON period."AcademicPeriodID"=term."AcademicPeriodID"
       WHERE ($1::int IS NULL OR a."AssignmentID"=$1) AND ($2::int IS NULL OR a."EnterpriseID"=$2) AND ($3::int IS NULL OR a."StudentID"=$3) AND ($4::int IS NULL OR a."PositionID"=$4) AND ($7::int IS NULL OR co."OJTSemesterID"=$7)
       ${actor.roleCode==='ENTERPRISE' ? `AND ${visibleEnterpriseSemester('co."OJTSemesterID"')}` : ''}
       ), paged AS (SELECT * FROM filtered ORDER BY id DESC LIMIT $5 OFFSET $6)

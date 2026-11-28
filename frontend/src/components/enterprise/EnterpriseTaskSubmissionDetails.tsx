@@ -10,6 +10,6 @@ export function EnterpriseTaskSubmissionDetails({ taskId, initiallyOpen = false 
       <span className="flex items-center gap-2"><FileText size={17} className="shrink-0" />Bài làm và file đính kèm</span>
       <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
     </summary>
-    {open && <div className="min-w-0 border-t border-orange-100 p-3 sm:p-4"><TaskSubmissionHistory taskId={taskId} load={(page, signal) => getEnterpriseTaskSubmissions(taskId, page, signal)} /></div>}
+    {open && <div className="min-w-0 border-t border-orange-100 p-3 sm:p-4"><TaskSubmissionHistory taskId={taskId} emptyAttachmentMessage="Bài tập này chưa có file nộp" load={(page, signal) => getEnterpriseTaskSubmissions(taskId, page, signal)} /></div>}
   </details>;
 }

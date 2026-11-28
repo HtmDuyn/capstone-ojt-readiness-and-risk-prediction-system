@@ -19,8 +19,13 @@ export interface EnterpriseIntern {
 
 export interface InternTask {
   id: string;
+  ojtSemesterId?: number;
+  ojtSemesterName?: string;
+  ojtPeriodStatus?: 'ACTIVE' | 'CLOSED';
   internId: string;
   internName: string;
+  internStudentCode?: string;
+  positionTitle?: string;
   title: string;
   description: string;
   deadline: string;

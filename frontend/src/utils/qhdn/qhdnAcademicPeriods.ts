@@ -22,5 +22,5 @@ export function preferredAcademicPeriod(periods: AcademicPeriodItem[], initialOj
     ?? periods[0];
 }
 
-export const academicPeriodLabel = (period: AcademicPeriodItem) =>
-  `${period.name} (${period.periodCode}) · ${period.kind === "BLOCK3" ? "Block 3" : "Học kỳ"} · ${academicPeriodStatus(period.status)}`;
+export const academicPeriodLabel = (period: AcademicPeriodItem, showStatus = true) =>
+  `${period.name} (${period.periodCode}) · ${period.kind === "BLOCK3" ? "Block 3" : "Học kỳ"}${showStatus ? ` · ${academicPeriodStatus(period.status)}` : ''}`;

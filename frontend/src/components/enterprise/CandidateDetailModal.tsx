@@ -101,13 +101,11 @@ export function CandidateDetailModal({ candidate, busy, decisionLabel, onClose, 
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1" data-candidate-content>
         <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="min-w-0"><p className="text-[11px] font-medium text-slate-500">Vị trí ứng tuyển</p><p className="mt-1 truncate text-sm font-bold text-slate-900" title={candidate.position.title}>{candidate.position.title}</p></div>
+          <div className="min-w-0"><p className="text-[11px] font-medium text-slate-500">Vị trí ứng tuyển</p><p className="mt-1 break-words text-sm font-bold text-slate-900">{text(candidate.position.title)}</p></div>
           <div><p className="text-[11px] font-medium text-slate-500">Trạng thái</p><p className={`mt-1 text-sm font-bold ${candidate.decision === 'ACCEPTED' ? 'text-emerald-700' : candidate.decision === 'REJECTED' ? 'text-rose-700' : 'text-amber-700'}`}>{decisionLabel}</p></div>
           <div><p className="text-[11px] font-medium text-slate-500">Ngày nộp đơn</p><p className="mt-1 text-sm font-semibold text-slate-800">{dateText(submitted?.appliedAt)}</p></div>
           <div><p className="text-[11px] font-medium text-slate-500">Ngày nhận hồ sơ</p><p className="mt-1 text-sm font-semibold text-slate-800">{dateText(candidate.introducedAt)}</p></div>
         </div>
-
-        <SubmittedCv candidate={candidate} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
           <div className="min-w-0 space-y-4">
@@ -127,7 +125,7 @@ export function CandidateDetailModal({ candidate, busy, decisionLabel, onClose, 
             <section className="text-sm">
               <h3 className="font-bold text-slate-900">Thông tin vị trí ứng tuyển</h3>
               <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-4 text-slate-600 [overflow-wrap:anywhere]">
-                <p>Mã vị trí: {candidate.position.code || 'Chưa cập nhật'}</p>
+                <p>Tên vị trí: <span className="font-medium text-slate-800">{text(candidate.position.title)}</span></p>
                 <div><h4 className="font-medium text-slate-800">Mô tả</h4><p className="mt-1 whitespace-pre-wrap leading-relaxed">{text(candidate.position.description)}</p></div>
                 <div><h4 className="font-medium text-slate-800">Yêu cầu</h4><p className="mt-1 whitespace-pre-wrap leading-relaxed">{text(candidate.position.requirements)}</p></div>
               </div>
@@ -153,6 +151,7 @@ export function CandidateDetailModal({ candidate, busy, decisionLabel, onClose, 
 
         {candidate.rejectReason && <p className="whitespace-pre-wrap break-words rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">Lý do từ chối: {candidate.rejectReason}</p>}
         {candidate.decision === 'PENDING' && candidate.canRespond === false && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Hiện ngoài hạn xét tuyển. Quyết định chỉ được cập nhật trong thời hạn phản hồi.</p>}
+        <SubmittedCv candidate={candidate} />
       </div>
       <footer className="mt-4 flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
         {canRespond ? <>

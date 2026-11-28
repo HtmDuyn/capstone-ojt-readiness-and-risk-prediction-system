@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Users,
-  Filter,
   Trash2,
   Check,
   Briefcase,
@@ -30,8 +29,6 @@ import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes
 import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
-import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
-import { getEnterpriseTaskSubmissions } from '@/services/taskSubmissionService';
 import { EnterpriseTaskSubmissionDetails } from '@/components/enterprise/EnterpriseTaskSubmissionDetails';
 
 // Adapter: map API data to existing UI's expected format
@@ -57,8 +54,13 @@ const mapApiToIntern = (item: EnterpriseInternshipItem, total: number, completed
 const mapApiToTask = (item: EnterpriseInternshipTask): InternTask => {
   return {
     id: String(item.id),
+    ojtSemesterId: item.ojtSemesterId,
+    ojtSemesterName: item.semester?.name || item.semester?.code || item.semesterCode,
+    ojtPeriodStatus: item.periodStatus,
     internId: String(item.assignmentId),
     internName: item.student?.fullName || item.fullName || 'Sinh viên',
+    internStudentCode: item.student?.studentCode || item.student?.code || item.studentCode,
+    positionTitle: item.position?.title || item.positionTitle,
     title: item.name,
     description: item.description || '',
     deadline: item.dueAt || item.dueDate?.slice(0, 10) || '',
@@ -178,10 +180,8 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Selected intern for task detail modal
   const [viewingId, setViewingId] = useState<string | null>(null);
-  const [submissionTask, setSubmissionTask] = useState<InternTask | null>(null);
   const viewingIntern = interns.find(intern => intern.id === viewingId);
   const [taskTab,setTaskTab] = useState<'students'|'assigned'>('students');
-  const taskView = useAssignedTasks(tasks,taskTab === 'assigned');
 
   // Table selection checkboxes (bulk action on main table)
   const [tableSelectedIds, setTableSelectedIds] = useState<string[]>([]);
@@ -210,6 +210,8 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Filter & Search states for the main table (Using dropdowns instead of tabs)
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedOjtSemesterId, setSelectedOjtSemesterId] = useState('');
+  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('');
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('ALL');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('ALL');
 
@@ -224,18 +226,74 @@ export const EnterpriseInterns: React.FC = () => {
   } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
+  const ojtSemesterOptions = useMemo(() => {
+    const semesters = new Map<number, string>();
+    for (const task of tasks) {
+      if (task.ojtSemesterId && (!selectedPeriodStatus || task.ojtPeriodStatus === selectedPeriodStatus)) {
+        semesters.set(task.ojtSemesterId, task.ojtSemesterName || 'Đợt OJT chưa cập nhật tên');
+      }
+    }
+    for (const item of roster) {
+      if (!selectedPeriodStatus || item.periodStatus === selectedPeriodStatus) {
+        semesters.set(item.ojtSemesterId, item.semester?.name || item.semester?.code || 'Đợt OJT chưa cập nhật tên');
+      }
+    }
+    return [...semesters].sort(([first], [second]) => second - first);
+  }, [roster, tasks, selectedPeriodStatus]);
+
+  const periodInterns = useMemo(() => {
+    const assignmentIds = new Set(roster
+      .filter(item => (!selectedOjtSemesterId || String(item.ojtSemesterId) === selectedOjtSemesterId)
+        && (!selectedPeriodStatus || item.periodStatus === selectedPeriodStatus))
+      .map(item => String(item.id)));
+    return interns.filter(intern => assignmentIds.has(intern.id));
+  }, [interns, roster, selectedOjtSemesterId, selectedPeriodStatus]);
+
+  const resetTaskSelection = () => {
+    setCurrentPage(1);
+    setTableSelectedIds([]);
+    setModalSelectedInternIds([]);
+    setTaskSubmitError(null);
+  };
+
+  const handleOjtSemesterChange = (value: string) => {
+    setSelectedOjtSemesterId(value);
+    resetTaskSelection();
+  };
+
+  const matchingTaskInternIds = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase('vi');
+    return new Set(tasks.filter(task => task.title.toLocaleLowerCase('vi').includes(term)).map(task => task.internId));
+  }, [tasks, searchTerm]);
+
   // Filtered interns list for main table
   const filteredInterns = useMemo(() => {
-    return interns.filter((intern) => {
+    return periodInterns.filter((intern) => {
+      const term = searchTerm.trim().toLocaleLowerCase('vi');
       const matchSearch =
-        intern.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        intern.studentCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        intern.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        intern.mentorName.toLowerCase().includes(searchTerm.toLowerCase());
+        intern.fullName.toLocaleLowerCase('vi').includes(term) ||
+        intern.studentCode.toLocaleLowerCase('vi').includes(term) ||
+        intern.position.toLocaleLowerCase('vi').includes(term) ||
+        intern.mentorName.toLocaleLowerCase('vi').includes(term) ||
+        matchingTaskInternIds.has(intern.id);
       const matchStatus = statusFilter === 'ALL' || intern.taskStatus === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [interns, searchTerm, statusFilter]);
+  }, [periodInterns, searchTerm, statusFilter, matchingTaskInternIds]);
+
+  const filteredTasks = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase('vi');
+    const matchingInternIds = new Set(interns.filter(intern =>
+      [intern.fullName, intern.studentCode, intern.position, intern.mentorName]
+        .some(value => value.toLocaleLowerCase('vi').includes(term))).map(intern => intern.id));
+    return tasks.filter(task =>
+      (!selectedOjtSemesterId || String(task.ojtSemesterId) === selectedOjtSemesterId)
+      && (!selectedPeriodStatus || task.ojtPeriodStatus === selectedPeriodStatus)
+      && (statusFilter === 'ALL' || task.status === statusFilter)
+      && (matchingInternIds.has(task.internId) || [task.title, task.internName, task.internStudentCode, task.positionTitle]
+        .some(value => value?.toLocaleLowerCase('vi').includes(term))));
+  }, [tasks, interns, searchTerm, selectedOjtSemesterId, selectedPeriodStatus, statusFilter]);
+  const taskView = useAssignedTasks(filteredTasks);
 
   // Paginated interns
   const totalPages = Math.ceil(filteredInterns.length / pageSize) || 1;
@@ -270,7 +328,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Open task assignment modal
   const handleOpenAssignModal = (initialIds?: string[]) => {
-    const assignableInterns = interns.filter(isTaskAssignable);
+    const assignableInterns = filteredInterns.filter(isTaskAssignable);
     const assignableIds = new Set(assignableInterns.map((intern) => intern.id));
     const requestedIds = initialIds?.length
       ? initialIds
@@ -290,8 +348,8 @@ export const EnterpriseInterns: React.FC = () => {
   };
 
   const selectedTaskInterns = useMemo(
-    () => interns.filter((intern) => modalSelectedInternIds.includes(intern.id)),
-    [interns, modalSelectedInternIds]
+    () => periodInterns.filter((intern) => modalSelectedInternIds.includes(intern.id)),
+    [periodInterns, modalSelectedInternIds]
   );
 
   const taskDeadlineRange = useMemo(() => {
@@ -339,7 +397,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Filtered interns for modal checkbox list
   const filteredModalInterns = useMemo(() => {
-    return interns.filter((intern) => {
+    return periodInterns.filter((intern) => {
       if (!isTaskAssignable(intern)) return false;
       const matchSearch =
         intern.fullName.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
@@ -348,7 +406,7 @@ export const EnterpriseInterns: React.FC = () => {
       const matchStatus = modalStatusFilter === 'ALL' || intern.status === modalStatusFilter;
       return matchSearch && matchStatus;
     });
-  }, [interns, modalSearchTerm, modalStatusFilter]);
+  }, [periodInterns, modalSearchTerm, modalStatusFilter]);
 
   const allFilteredModalSelected =
     filteredModalInterns.length > 0 &&
@@ -384,7 +442,7 @@ export const EnterpriseInterns: React.FC = () => {
       return;
     }
 
-    const assignedStudents = interns.filter((i) => modalSelectedInternIds.includes(i.id));
+    const assignedStudents = periodInterns.filter((i) => modalSelectedInternIds.includes(i.id));
     const assignmentIds = assignedStudents.map((student) => Number(student.id));
     if (assignedStudents.length !== modalSelectedInternIds.length || assignmentIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
       setTaskSubmitError('Danh sách thực tập sinh không hợp lệ. Vui lòng tải lại trang và thử lại.');
@@ -443,10 +501,16 @@ export const EnterpriseInterns: React.FC = () => {
         if (!student) {
           throw new Error('Kết quả giao nhiệm vụ chưa khớp với danh sách đã chọn. Vui lòng tải lại danh sách để kiểm tra.');
         }
+        const internship = roster.find(item => String(item.id) === student.id);
         return {
           id: String(task.id),
           internId: student.id,
           internName: student.fullName,
+          internStudentCode: student.studentCode,
+          positionTitle: student.position,
+          ojtSemesterId: internship?.ojtSemesterId,
+          ojtSemesterName: internship?.semester?.name || internship?.semester?.code,
+          ojtPeriodStatus: internship?.periodStatus,
           title: newTask.title.trim(),
           description: newTask.description.trim(),
           deadline: newTask.deadline,
@@ -508,7 +572,7 @@ export const EnterpriseInterns: React.FC = () => {
   }, [tasks, viewingIntern, taskStatusFilter]);
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="min-w-0 space-y-6 pb-16">
       {/* 1. Page Banner without buttons (as requested) */}
       <PageBanner
         variant="enterprise"
@@ -518,28 +582,30 @@ export const EnterpriseInterns: React.FC = () => {
       />
 
       <TaskSummary groups={taskView.groups} ready={!apiLoading && !apiError}/>
-      <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <nav aria-label="Quản lý nhiệm vụ" className="flex gap-6 border-b border-slate-200 px-5">
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <nav aria-label="Quản lý nhiệm vụ" className="flex gap-5 border-b border-slate-200 px-4 sm:px-5">
         {(['students','assigned'] as const).map(tab => <button type="button" key={tab} aria-current={taskTab===tab?'page':undefined}
-          onClick={()=>setTaskTab(tab)} className={`border-b-2 py-3 text-sm font-semibold ${taskTab===tab?'border-orange-600 text-orange-700':'border-transparent text-slate-600'}`}>
+          onClick={()=>setTaskTab(tab)} className={`whitespace-nowrap border-b-2 py-3 text-sm font-semibold ${taskTab===tab?'border-orange-600 text-orange-700':'border-transparent text-slate-600'}`}>
           {tab==='students'?'Thực tập sinh':'Nhiệm vụ đã giao'}
         </button>)}
       </nav>
       {/* Toast Alert */}
       {toast && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-sm font-medium flex items-start justify-between animate-fadeIn shadow-sm">
-          <div className="flex items-start space-x-3">
+        <div role="status" className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 animate-fadeIn sm:mx-5">
+          <div className="flex min-w-0 items-start gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
-            <div>
+            <div className="min-w-0 break-words">
               <p className="font-bold text-emerald-800 text-sm">{toast.title}</p>
               <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">{toast.message}</p>
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Đóng thông báo giao nhiệm vụ"
             onClick={() => setToast(null)}
-            className="text-emerald-500 hover:text-emerald-700 p-1 font-bold text-base"
+            className="shrink-0 rounded-md p-1 text-base font-bold text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800"
           >
             ✕
           </button>
@@ -573,75 +639,98 @@ export const EnterpriseInterns: React.FC = () => {
       {!apiLoading && !apiError && (
       <>
 
-      {taskTab === 'assigned' ? <AssignedTasks view={taskView} onDelete={handleDeleteTask} onSubmissions={setSubmissionTask}/> : <>
-      {/* 2. Main Action Toolbar (Buttons moved down from banner + Dropdown filters) */}
-      <div className="border-b border-slate-100 p-4 space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Left filters: Search + Select Dropdowns (No tabs) */}
-          <div className="flex flex-wrap items-center gap-2.5 flex-1">
-            {/* Search */}
-            <div className="relative min-w-[260px] flex-1">
+      <div className="border-b border-slate-100 p-4 sm:p-5">
+          <div role="search" aria-label="Bộ lọc thực tập sinh và nhiệm vụ" className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(16rem,1fr)_repeat(3,minmax(10rem,auto))_auto]">
+            <label className="min-w-0 space-y-1.5 sm:col-span-2 xl:col-span-4 2xl:col-span-1">
+              <span className="block text-xs font-semibold text-slate-600">Tìm kiếm</span>
+              <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
-                type="text"
-                placeholder="Tìm tên sinh viên, MSSV, vị trí, mentor..."
+                type="search"
+                aria-label="Tìm sinh viên hoặc nhiệm vụ"
+                placeholder="Tìm sinh viên, MSSV, vị trí hoặc nhiệm vụ..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
+                  resetTaskSelection();
                 }}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all font-medium"
+                className="h-10 w-full pl-9 pr-3 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all font-medium"
               />
-            </div>
+              </div>
+            </label>
 
-            {/* Dropdown filter: Trạng thái tiến độ */}
-            <div className="flex items-center space-x-1.5">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <label className="min-w-0 space-y-1.5">
+              <span className="block text-xs font-semibold text-slate-600">Trạng thái đợt</span>
+            <select
+              aria-label="Lọc trạng thái đợt OJT"
+              value={selectedPeriodStatus}
+              onChange={e => {
+                const value = e.target.value;
+                setSelectedPeriodStatus(value === 'ACTIVE' || value === 'CLOSED' ? value : '');
+                handleOjtSemesterChange('');
+              }}
+              className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">Tất cả trạng thái đợt</option>
+              <option value="ACTIVE">Đang diễn ra</option>
+              <option value="CLOSED">Đã đóng</option>
+            </select>
+            </label>
+            <label className="min-w-0 space-y-1.5">
+              <span className="block text-xs font-semibold text-slate-600">Đợt OJT</span>
+            <select
+              aria-label="Lọc đợt OJT"
+              value={selectedOjtSemesterId}
+              onChange={e => handleOjtSemesterChange(e.target.value)}
+              className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">Tất cả đợt OJT</option>
+              {ojtSemesterOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+            </label>
+
+            <label className="min-w-0 space-y-1.5">
+              <span className="block text-xs font-semibold text-slate-600">Trạng thái nhiệm vụ</span>
               <select
+                aria-label="Lọc trạng thái nhiệm vụ"
                 value={statusFilter}
                 onChange={(e) => {
                   const value = e.target.value;
                   if (isTaskStatusFilter(value)) setStatusFilter(value);
-                  setCurrentPage(1);
+                  resetTaskSelection();
                 }}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
-                <option value="ALL">Tất cả trạng thái ({interns.length})</option>
+                <option value="ALL">Tất cả trạng thái nhiệm vụ</option>
                 {Object.entries(taskStatusLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label} ({interns.filter(i => i.taskStatus === value).length})</option>
+                  <option key={value} value={value}>{label}</option>
                 ))}
               </select>
-            </div>
+            </label>
 
-          </div>
-
-          {/* Right: 2 Action Buttons moved down from banner */}
-          <div className="flex items-center space-x-2.5 flex-shrink-0">
-            {tableSelectedIds.length > 0 && (
-              <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2.5 py-1.5 rounded-xl border border-orange-200">
-                Đã chọn: <strong>{tableSelectedIds.length}</strong> sinh viên
-              </span>
+            {taskTab === 'students' && (
+              <button
+                type="button"
+                onClick={() => handleOpenAssignModal()}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
+              >
+                <Users className="h-4 w-4" />
+                <span>
+                  {tableSelectedIds.length > 0
+                    ? `Giao task cho ${tableSelectedIds.length} SV đã chọn`
+                    : 'Giao task hàng loạt'}
+                </span>
+              </button>
             )}
-
-            <button
-              onClick={() => handleOpenAssignModal()}
-              className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold flex items-center space-x-2 shadow-sm transition-all"
-            >
-              <Users className="w-4 h-4" />
-              <span>
-                {tableSelectedIds.length > 0
-                  ? `Giao task cho ${tableSelectedIds.length} SV đã chọn`
-                  : '+ Giao task hàng loạt cho SV'}
-              </span>
-            </button>
           </div>
-        </div>
+
       </div>
 
+      {taskTab === 'assigned' ? <AssignedTasks view={taskView} onDelete={handleDeleteTask}/> : <>
       {/* 3. Main Student List: Clean, high-density Table View (No circular avatars, easily manages 200+ students) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+      <div className="min-w-0 bg-white">
+        <div role="region" aria-label="Danh sách thực tập sinh" tabIndex={0} className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-orange-500">
+          <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4 w-12 text-center">
@@ -655,8 +744,7 @@ export const EnterpriseInterns: React.FC = () => {
                 </th>
                 <th className="py-3 px-3 w-12 text-center">STT</th>
                 <th className="py-3 px-4 min-w-[180px]">Sinh viên</th>
-                <th className="py-3 px-4 min-w-[160px]">Vị trí OJT & Ngành</th>
-                <th className="py-3 px-4 min-w-[150px]">Mentor phụ trách</th>
+                <th className="py-3 px-4 min-w-[240px]">Vị trí OJT & Ngành</th>
                 <th className="py-3 px-4 w-44">Tiến độ OJT</th>
                 <th className="py-3 px-4 w-28 text-center">Nhiệm vụ</th>
                 <th className="py-3 px-4 w-32 text-center">Trạng thái</th>
@@ -666,7 +754,7 @@ export const EnterpriseInterns: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {paginatedInterns.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
                     Không tìm thấy sinh viên nào phù hợp với điều kiện tìm kiếm.
                   </td>
                 </tr>
@@ -712,15 +800,7 @@ export const EnterpriseInterns: React.FC = () => {
                         <div className="font-semibold text-slate-800 text-xs">
                           {intern.position}
                         </div>
-                        <div className="text-[11px] text-slate-400">{intern.major}</div>
-                      </td>
-
-                      {/* Mentor */}
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-slate-800 text-xs">
-                          {intern.mentorName}
-                        </div>
-                        <div className="text-[10px] text-slate-400">{intern.mentorEmail}</div>
+                        <div className="mt-1 max-w-md break-words text-xs leading-relaxed text-slate-500">{intern.major}</div>
                       </td>
 
                       {/* Progress */}
@@ -756,7 +836,7 @@ export const EnterpriseInterns: React.FC = () => {
                       {/* Status */}
                       <td className="py-3 px-4 text-center">
                         <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          className={`inline-block whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-bold ${
                             intern.taskStatus === 'OVERDUE'
                               ? 'bg-rose-100 text-rose-700 border border-rose-200'
                               : intern.taskStatus === 'DONE'
@@ -789,14 +869,14 @@ export const EnterpriseInterns: React.FC = () => {
 
         {/* Table Pagination & Total Count Footer */}
         <div className="px-4 py-3 bg-slate-50/60 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-          <div className="flex items-center space-x-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
             <span>
               Hiển thị <strong>{filteredInterns.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> -{' '}
               <strong>{Math.min(currentPage * pageSize, filteredInterns.length)}</strong> trên tổng số{' '}
               <strong>{filteredInterns.length}</strong> sinh viên
             </span>
-            <span className="text-slate-300">|</span>
-            <div className="flex items-center space-x-1">
+            <span aria-hidden="true" className="hidden text-slate-300 sm:inline">|</span>
+            <div className="flex items-center gap-1">
               <span>Hiển thị mỗi trang:</span>
               <select
                 value={pageSize}
@@ -997,7 +1077,7 @@ export const EnterpriseInterns: React.FC = () => {
                       2. Danh sách sinh viên nhận nhiệm vụ
                     </h4>
                     <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">
-                      Đã chọn: {modalSelectedInternIds.length} / {interns.length}
+                      Đã chọn: {modalSelectedInternIds.length} / {periodInterns.length}
                     </span>
                   </div>
 
@@ -1026,8 +1106,8 @@ export const EnterpriseInterns: React.FC = () => {
                 </p>
 
                 {/* Search & dropdown filter (No tabs) */}
-                <div className="flex items-center space-x-2">
-                  <div className="relative flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[180px] flex-1">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
@@ -1037,6 +1117,15 @@ export const EnterpriseInterns: React.FC = () => {
                       className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all font-medium"
                     />
                   </div>
+                  <select
+                    aria-label="Lọc đợt OJT trong giao nhiệm vụ"
+                    value={selectedOjtSemesterId}
+                    onChange={e => handleOjtSemesterChange(e.target.value)}
+                    className="min-w-0 max-w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="">Tất cả đợt OJT</option>
+                    {ojtSemesterOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  </select>
                   <select
                     value={modalStatusFilter}
                     onChange={(e) => {
@@ -1317,7 +1406,6 @@ export const EnterpriseInterns: React.FC = () => {
 
                           {/* Quick Actions */}
                           <div className="flex items-center space-x-1.5 flex-shrink-0">
-                            <button type="button" onClick={() => setSubmissionTask(task)} title="Xem chi tiết bài làm và file đính kèm" aria-label={`Xem bài nộp nhiệm vụ ${task.title}`} className="inline-flex items-center gap-1 rounded-lg p-1 text-orange-600 hover:bg-orange-50"><Eye className="w-3.5 h-3.5" /><span>Xem bài làm</span></button>
                             <button disabled={!task.canDelete}
                               onClick={() => void handleDeleteTask(task)}
                               className="p-1 rounded-lg text-slate-400 enabled:hover:text-rose-600 disabled:opacity-30"
@@ -1328,8 +1416,8 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+                          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                             <span>
                               Hạn chót: <strong className="text-slate-700">{displayTaskTime(task.deadline)}</strong>
                             </span>
@@ -1339,7 +1427,7 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
                           {task.createdAt && <span>Ngày giao: {displayTaskTime(task.createdAt)}</span>}
                         </div>
-                        <EnterpriseTaskSubmissionDetails taskId={Number(task.id)} initiallyOpen={task.id === viewedInternTasks.find(item => item.status === 'DONE')?.id} />
+                        <EnterpriseTaskSubmissionDetails taskId={Number(task.id)} />
                       </div>
                     ))}
                   </div>
@@ -1363,10 +1451,6 @@ export const EnterpriseInterns: React.FC = () => {
       </>
       )}
       </section>
-      {submissionTask && <TaskSubmissionsDialog key={submissionTask.id} taskId={Number(submissionTask.id)}
-        name={`${submissionTask.title} · ${submissionTask.internName}`}
-        load={(page, signal) => getEnterpriseTaskSubmissions(Number(submissionTask.id), page, signal)}
-        onClose={() => setSubmissionTask(null)} />}
     </div>
   );
 };

@@ -232,6 +232,12 @@ export interface EnterpriseCandidateItem {
   rejectReason?: string | null;
   isLatestCoordination: boolean;
   canRespond?: boolean;
+  recruitmentRound?: {
+    id: number;
+    name: string;
+    resultsStartsAt: string | null;
+    resultsEndsAt: string | null;
+  } | null;
   application?: Record<string, unknown> | null;
   skills?: { name: string; level?: number | null }[];
   jobApplication?: {
@@ -264,6 +270,13 @@ export interface EnterpriseInternshipItem {
   id: number; // AssignmentID
   studentId: number;
   ojtSemesterId: number;
+  periodStatus?: 'ACTIVE' | 'CLOSED';
+  recruitmentRound?: {
+    id: number;
+    name: string;
+    status: 'DRAFT' | 'OPEN' | 'CLOSED';
+    periodStatus: 'ACTIVE' | 'CLOSED' | null;
+  } | null;
   semester?: { id: number; code?: string; name?: string } | null;
   positionId: number;
   coordinationId: number;
@@ -341,6 +354,7 @@ export interface EnterpriseInternshipTask {
   companyName?: string;
   positionTitle?: string;
   semesterCode?: string;
+  periodStatus?: 'ACTIVE' | 'CLOSED';
   assignment?: {
     id: number;
     status: string;

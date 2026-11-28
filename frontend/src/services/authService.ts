@@ -15,6 +15,10 @@ export interface CurrentUserResponse {
     id: number;
     username: string;
     email: string;
+    phone?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    lastLoginAt?: string | null;
     fullName: string;
     status: string;
     roleCode: string | null;

@@ -1,11 +1,9 @@
 import { displayTaskTime } from '@/utils/shared/taskTime';
-import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ClipboardList, Eye, Search, Trash2, Users } from 'lucide-react';
+import { useMemo } from 'react';
+import { CheckCircle2, ChevronDown, ClipboardList, Trash2, Users } from 'lucide-react';
 import type { InternTask } from '@/types/enterprise/enterpriseTypes';
 
 export const taskStatusLabels = { TODO: 'Chưa làm', DONE: 'Đã xong', OVERDUE: 'Quá hạn' };
-const dateKey = (date: Date) => date.toISOString().slice(0,10);
-const today = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date());
 
 const tones = {
   TODO: 'bg-amber-100 text-amber-800',
@@ -14,7 +12,7 @@ const tones = {
 };
 const chip = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium';
 
-function TaskCard({items,onDelete,onSubmissions}:{items:InternTask[];onDelete:(task:InternTask)=>void;onSubmissions:(task:InternTask)=>void}) {
+function TaskCard({items,onDelete}:{items:InternTask[];onDelete:(task:InternTask)=>void}) {
   const task = items[0];
   const completed = items.filter(item => item.status === 'DONE').length;
   const overdue = items.filter(item => item.status === 'OVERDUE').length;
@@ -27,6 +25,7 @@ function TaskCard({items,onDelete,onSubmissions}:{items:InternTask[];onDelete:(t
         <ChevronDown size={17} className="shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
       </span>
       <span className="mt-1 block text-sm text-slate-500">Giao: {displayTaskTime(task.createdAt)} · Hạn nộp: {displayTaskTime(task.deadline)}</span>
+      {task.ojtSemesterName && <span className="mt-1 block text-sm text-slate-600">Đợt OJT: <span className="font-medium">{task.ojtSemesterName}</span></span>}
       <span className="mt-3 flex flex-wrap gap-2">
         <span className={chip+' bg-slate-100 text-slate-700'}><Users size={14}/>{students} sinh viên</span>
         <span className={chip+' '+tones.DONE}>{completed} hoàn thành</span>
@@ -44,41 +43,24 @@ function TaskCard({items,onDelete,onSubmissions}:{items:InternTask[];onDelete:(t
         <tbody>{items.map(item => <tr key={item.id} className="border-t border-slate-100">
           <td className="py-2 pr-2">{item.internName}</td>
           <td><span className={chip+' whitespace-nowrap '+tones[item.status]}>{taskStatusLabels[item.status]}</span></td>
-          <td className="text-right"><button aria-label={`Xem bài nộp của ${item.internName}`} title="Xem chi tiết bài làm và file đính kèm" onClick={()=>onSubmissions(item)} className="inline-flex items-center gap-1 rounded p-2 font-medium text-orange-600 hover:bg-orange-50"><Eye size={15}/><span>Xem bài làm</span></button>{item.canDelete && <button aria-label={`Xóa nhiệm vụ của ${item.internName}`} title="Xóa nhiệm vụ" onClick={()=>onDelete(item)} className="rounded p-2 text-slate-500 hover:text-rose-700"><Trash2 size={15}/></button>}</td>
+          <td className="text-right">{item.canDelete && <button aria-label={`Xóa nhiệm vụ của ${item.internName}`} title="Xóa nhiệm vụ" onClick={()=>onDelete(item)} className="rounded p-2 text-slate-500 hover:text-rose-700"><Trash2 size={15}/></button>}</td>
         </tr>)}</tbody>
       </table>
     </div>
   </details>;
 }
 
-export function useAssignedTasks(tasks:InternTask[], filterByDate:boolean) {
-  const [period,setPeriod] = useState('all');
-  const [anchor,setAnchor] = useState(today);
-  const [from,setFrom] = useState(today);
-  const [to,setTo] = useState(today);
-  let start = '', end = '';
-  if (period==='custom') { start=from; end=to; }
-  if (anchor && (period==='week' || period==='month')) {
-    const first=new Date(anchor+'T00:00:00Z');
-    if(period==='week') first.setUTCDate(first.getUTCDate()-(first.getUTCDay()+6)%7);
-    else first.setUTCDate(1);
-    const last=new Date(first);
-    if(period==='week') last.setUTCDate(first.getUTCDate()+6);
-    else last.setUTCMonth(last.getUTCMonth()+1,0);
-    start=dateKey(first); end=dateKey(last);
-  }
+export function useAssignedTasks(tasks:InternTask[]) {
   const groups = useMemo(() => {
     const result = new Map<string,InternTask[]>();
     for (const t of tasks) {
-      const day = t.createdAt?.slice(0,10);
-      if (filterByDate && period !== 'all' && !(day && start && end && day >= start && day <= end)) continue;
-      const key = JSON.stringify([t.title,t.description,t.createdAt,t.deadline]);
+      const key = JSON.stringify([t.ojtSemesterId,t.title,t.description,t.createdAt,t.deadline]);
       const group = result.get(key);
       if (group) group.push(t); else result.set(key,[t]);
     }
     return [...result.entries()];
-  },[tasks,period,start,end,filterByDate]);
-  return {groups,period,setPeriod,anchor,setAnchor,from,setFrom,to,setTo,start,end};
+  },[tasks]);
+  return {groups};
 }
 
 export function TaskSummary({groups,ready}:{groups:ReturnType<typeof useAssignedTasks>['groups'];ready:boolean}) {
@@ -94,30 +76,10 @@ export function TaskSummary({groups,ready}:{groups:ReturnType<typeof useAssigned
     </div>)}</dl>;
 }
 
-export function AssignedTasks({view,onDelete,onSubmissions}:{view:ReturnType<typeof useAssignedTasks>;onDelete:(task:InternTask)=>void;onSubmissions:(task:InternTask)=>void}) {
-  const {groups,period,setPeriod,anchor,setAnchor,from,setFrom,to,setTo,start,end}=view;
-  const [query,setQuery] = useState('');
-  const [status,setStatus] = useState('');
-  const term = query.trim().toLocaleLowerCase('vi');
-  const visible = groups.filter(([,items]) => items[0].title.toLocaleLowerCase('vi').includes(term) && (!status || items.some(t => t.status === status)));
-  const input='h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus-visible:outline-orange-500';
+export function AssignedTasks({view,onDelete}:{view:ReturnType<typeof useAssignedTasks>;onDelete:(task:InternTask)=>void}) {
+  const {groups}=view;
   return <section aria-label="Nhiệm vụ đã giao" className="space-y-4 p-3 text-slate-900 sm:p-5">
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto]">
-      <div className="relative col-span-2 sm:col-span-1"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-        <input type="search" aria-label="Tìm kiếm nhiệm vụ" placeholder="Tìm theo tên nhiệm vụ…" value={query} onChange={e=>setQuery(e.target.value)} className={input+' w-full !pl-9'}/></div>
-      <select aria-label="Lọc trạng thái nhiệm vụ" className={input} value={status} onChange={e=>setStatus(e.target.value)}>
-        <option value="">Tất cả trạng thái</option>{Object.entries(taskStatusLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}
-      </select>
-      <select aria-label="Lọc theo ngày giao" className={input} value={period} onChange={e=>setPeriod(e.target.value)}>
-        <option value="all">Mọi ngày giao</option><option value="week">Theo tuần</option><option value="month">Theo tháng</option><option value="custom">Tùy chỉnh</option>
-      </select>
-    </div>
-    {period!=='all' && <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-600">
-      {(period==='week'||period==='month') && <label>Ngày trong {period==='week'?'tuần':'tháng'} <input className={input} type="date" value={anchor} onChange={e=>setAnchor(e.target.value)}/></label>}
-      {period==='custom' && <><label>Từ ngày <input className={input} type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></label>
-        <label>Đến ngày <input className={input} type="date" value={to} min={from} onChange={e=>setTo(e.target.value)}/></label></>}
-    </div>}
-    <div className="space-y-2.5">{visible.map(([key,items])=><TaskCard key={key} items={items} onDelete={onDelete} onSubmissions={onSubmissions}/>)}</div>
-    {!visible.length && <p className="py-8 text-center text-sm text-slate-500">{start>end && end ? 'Ngày kết thúc phải từ ngày bắt đầu trở đi.' : 'Không tìm thấy nhiệm vụ phù hợp.'}</p>}
+    <div className="space-y-2.5">{groups.map(([key,items])=><TaskCard key={key} items={items} onDelete={onDelete}/>)}</div>
+    {!groups.length && <p className="py-8 text-center text-sm text-slate-500">Không tìm thấy nhiệm vụ phù hợp.</p>}
   </section>;
 }
