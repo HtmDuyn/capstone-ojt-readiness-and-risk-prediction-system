@@ -716,26 +716,28 @@ export const CurriculumImportActions:
                         </div>
 
                         <div className="max-h-[320px] overflow-auto">
-                          <table className="w-full min-w-[720px] text-left text-sm">
+                          <table className="w-full min-w-[880px] table-fixed text-left text-sm">
+                            <caption className="sr-only">Xem trước môn học trong khung chương trình</caption>
+                            <colgroup><col className="w-[16%]" /><col className="w-[42%]" /><col className="w-[14%]" /><col className="w-[10%]" /><col className="w-[18%]" /></colgroup>
                             <thead className="sticky top-0 border-b border-[#CBD5E1] bg-[#EFF6FF] text-[#334155]">
                               <tr>
-                                <th className="px-4 py-3 font-semibold text-slate-600">
+                                <th scope="col" className="px-4 py-3 text-left align-middle font-semibold leading-5 text-slate-600">
                                   Mã môn
                                 </th>
 
-                                <th className="px-4 py-3 font-semibold text-slate-600">
+                                <th scope="col" className="px-4 py-3 text-left align-middle font-semibold leading-5 text-slate-600">
                                   Tên môn
                                 </th>
 
-                                <th className="px-4 py-3 text-center font-semibold text-slate-600">
+                                <th scope="col" className="px-4 py-3 text-center align-middle font-semibold leading-5 text-slate-600">
                                   Kỳ
                                 </th>
 
-                                <th className="px-4 py-3 text-center font-semibold text-slate-600">
+                                <th scope="col" className="px-4 py-3 text-center align-middle font-semibold leading-5 text-slate-600">
                                   Tín chỉ
                                 </th>
 
-                                <th className="px-4 py-3 font-semibold text-slate-600">
+                                <th scope="col" className="px-4 py-3 text-left align-middle font-semibold leading-5 text-slate-600">
                                   Loại
                                 </th>
                               </tr>
@@ -757,28 +759,28 @@ export const CurriculumImportActions:
                                       key={`${course.courseCode}-${index}`}
                                       className="bg-white transition-colors duration-150 hover:bg-[#EAF2FF]"
                                     >
-                                      <td className="px-4 py-3 font-semibold text-orange-600">
+                                      <td className="break-words px-4 py-3 align-top font-semibold leading-6 text-orange-600">
                                         {
                                           course.courseCode
                                         }
                                       </td>
 
-                                      <td className="px-4 py-3 text-slate-700">
+                                      <td className="break-words px-4 py-3 align-top leading-6 text-slate-700">
                                         {normalized?.name ??
                                           "—"}
                                       </td>
 
-                                      <td className="px-4 py-3 text-center text-slate-600">
+                                      <td className="px-4 py-3 text-center align-top leading-6 tabular-nums text-slate-600">
                                         {course.semester === 0 ? "Chuẩn bị" : `Kỳ ${course.semester}`}
                                       </td>
 
-                                      <td className="px-4 py-3 text-center text-slate-600">
+                                      <td className="px-4 py-3 text-center align-top leading-6 tabular-nums text-slate-600">
                                         {
                                           course.credits
                                         }
                                       </td>
 
-                                      <td className="px-4 py-3 text-slate-600">
+                                      <td className="break-words px-4 py-3 align-top text-xs leading-6 text-slate-600">
                                         {
                                           course.entryKind
                                         }

@@ -8,6 +8,7 @@ export function RetakeClassProposals({periods,cohorts,catalogLoading}:{periods:R
   const [mode,setMode]=useState<'CALCULATED'|'CONFIGURED'>('CALCULATED');
   const [data,setData]=useState<RetakeClassReport|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState('');
   const [cohortId, setCohortId] = useState('');
+  const [retry, setRetry] = useState(0);
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
   const upcomingSemesters = periods.filter(period =>
     period.kind === 'SEMESTER' && period.status === 'PLANNED' && period.startDate.slice(0, 10) > today
@@ -27,7 +28,7 @@ export function RetakeClassProposals({periods,cohorts,catalogLoading}:{periods:R
       .catch(e=>{if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Không tải được đề xuất mở lớp.');})
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return ()=>controller.abort();
-  },[blockId,mode,cohortId,page]);
+  },[blockId,mode,cohortId,page,retry]);
   const selectedPeriod = blocks.find(period => String(period.id) === blockId);
   const semester = mode === 'CALCULATED'
     ? selectedPeriod
@@ -37,14 +38,14 @@ export function RetakeClassProposals({periods,cohorts,catalogLoading}:{periods:R
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1.5fr_1fr]">
       <label className="min-w-0 text-xs font-semibold text-slate-600">Chế độ lịch<select value={mode} onChange={e=>{setMode(e.target.value as 'CALCULATED'|'CONFIGURED');setChosenBlockId(null);setPage(1);setData(null);}} className="mt-1.5 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"><option value="CALCULATED">Tính lịch trong học kỳ</option><option value="CONFIGURED">Dùng Block 3 đã cấu hình</option></select></label>
       <label className="min-w-0 text-xs font-semibold text-slate-600">{mode==='CALCULATED'?'Học kỳ':'Block 3'}<select value={blockId} disabled={catalogLoading} onChange={e=>{setChosenBlockId(e.target.value);setPage(1);}} className="mt-1.5 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"><option value="">Chọn kỳ học</option>{blocks.map(p=><option key={p.id} value={p.id}>{p.periodCode} — {p.name}</option>)}</select></label>
-      <label className="min-w-0 text-xs font-semibold text-slate-600">Khóa sinh viên<select value={cohortId} disabled={catalogLoading} onChange={event => { setCohortId(event.target.value); setPage(1); }} className="mt-1.5 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"><option value="">Tất cả khóa</option>{cohorts.map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.cohortCode} — {cohort.name}</option>)}</select></label>
+      <label className="min-w-0 text-xs font-semibold text-slate-600">Khóa sinh viên<select value={cohortId} disabled={catalogLoading} onChange={event => { setCohortId(event.target.value); setPage(1); }} className="mt-1.5 block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"><option value="">Tất cả khóa</option>{cohorts.map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.cohortCode || cohort.name}</option>)}</select></label>
     </div>
     <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2.5 text-sm leading-5 text-blue-900"><Info size={17} className="mt-0.5 shrink-0" aria-hidden="true"/><p>Từ <strong>18–22 sinh viên</strong>, bắt đầu đề xuất chuẩn bị mở lớp. Mỗi lớp tối đa <strong>35 sinh viên</strong>. Nếu phần dư đủ 18 sinh viên, hệ thống đề xuất thêm một lớp. Đây chưa phải quyết định mở lớp.</p></div>
     {catalogLoading&&<p role="status" className="text-sm text-slate-500">Đang tải kỳ học…</p>}
     {!catalogLoading&&blocks.length===0&&<p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Chưa có học kỳ sắp tới phù hợp với chế độ lịch đã chọn.</p>}
     {!blockId&&blocks.length>0&&<p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">Chọn kỳ học để xem lịch Block 3 và đề xuất lớp học lại.</p>}
     {loading&&<p role="status" className="text-sm text-slate-500">Đang tổng hợp nhu cầu học lại…</p>}
-    {error&&<p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
+    {error&&<div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800"><p>{error}</p><button type="button" onClick={()=>setRetry(value=>value+1)} className="mt-2 rounded font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">Thử lại</button></div>}
     {data&&<>
       <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
         <div>

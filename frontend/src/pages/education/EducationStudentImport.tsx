@@ -8,7 +8,9 @@ import { STUDENT_STATUS_LABELS } from '@/utils/student/studentAcademicStatus';
 import React from "react";
 import { Link } from 'react-router-dom';
 import { FileSpreadsheet, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useRecruitmentFeedback } from '@/components/enterprise/RecruitmentNoticeDialog';
 const EducationStudentImport: React.FC = () => {
+  const feedback = useRecruitmentFeedback();
   const [activeTab, setActiveTab] = React.useState<'import' | 'students'>(() =>
     new URLSearchParams(window.location.search).get('tab') === 'students' ? 'students' : 'import');
   const [savedRevision, setSavedRevision] = React.useState(0);
@@ -123,9 +125,12 @@ const EducationStudentImport: React.FC = () => {
   async function commit() {
     if (!keptRows.length || result || busy) return;
     if (
-      !window.confirm(
-        `Nhập ${keptRows.length} sinh viên và ${gradeCount} kết quả học tập vào hệ thống?`,
-      )
+      !await feedback.confirm({
+        title: 'Xác nhận nhập dữ liệu',
+        message: `Nhập ${keptRows.length} sinh viên và ${gradeCount} kết quả học tập vào hệ thống?`,
+        confirmLabel: 'Xác nhận nhập',
+        tone: 'info',
+      })
     )
       return;
     setBusy("commit");
@@ -161,6 +166,7 @@ const EducationStudentImport: React.FC = () => {
   };
   return (
     <div className="space-y-6 pb-8">
+      {feedback.dialog}
       <PageBanner
         variant="education"
         title="Import sinh viên và bảng điểm"

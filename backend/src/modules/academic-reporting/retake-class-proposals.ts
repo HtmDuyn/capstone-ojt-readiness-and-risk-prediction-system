@@ -18,7 +18,10 @@ export function planRetakeClasses(count:number){
 export function collectRetakeDemand(reports:Row[]){
   const groups=new Map<number,Row>(),excluded=new Set<number>();
   for(const report of reports)for(const student of report.rows){
-    if(student.dataIssues.length||student.category==='INSUFFICIENT_DATA'){excluded.add(student.studentId);continue;}
+    // Retake demand needs valid course/pathway data, not an OJT eligibility
+    // rule or official eligibility confirmation. Those may be absent even
+    // when the student's failed courses are fully reconciled.
+    if(student.dataIssues.length){excluded.add(student.studentId);continue;}
     for(const course of student.missingRequiredCourses){
       // New/unattempted courses and ongoing retakes are not demand for another class.
       if(course.reason!=='RETAKE'||!course.needsEnrollment)continue;
