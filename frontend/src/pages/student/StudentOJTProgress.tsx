@@ -3,20 +3,20 @@ import {
   AlertTriangle,
   CalendarDays,
   Check,
+  CheckCircle2,
   ClipboardList,
   Clock3,
   FileText,
-  MessageCircle,
-  RefreshCw,
   Search,
   Send,
   Upload,
 } from 'lucide-react';
 import { useStudentPortal } from '@/contexts/StudentPortalContext';
 import { useStudentResource } from '@/hooks/student/useStudentResource';
-import { getAssignedTasks, getTaskSubmissions, submitAssignedTask } from '@/services/studentService';
+import { getAssignedTasks, submitAssignedTask } from '@/services/studentService';
 import type { Task } from '@/types/student/portal';
 import { StudentBanner } from '@/components/student/StudentBanner';
+import { StudentDialog } from '@/components/student/StudentDialog';
 import { TaskSubmissionsDialog } from '@/components/student/TaskSubmissionsDialog';
 import { displayTaskTime } from '@/utils/shared/taskTime';
 import { buttonClass, dateText, Empty, Pagination, ResourceState, statusText } from '@/components/student/PortalUI';
@@ -58,14 +58,13 @@ function deadlineNotice(task: Task) {
   return null;
 }
 
-function ProgressContent() {
+function ProgressContent({ onMessage }: { onMessage: (message: string) => void }) {
   const { profile, semesterId, revision } = useStudentPortal();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<TaskFilter>('ALL');
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [message, setMessage] = useState('');
   const tasks = useStudentResource(
     semesterId ? `assigned-tasks:${profile!.id}:${semesterId}:${revision}:${page}` : null,
     signal => getAssignedTasks(semesterId!, page, signal),
@@ -97,8 +96,6 @@ function ProgressContent() {
 
   return (
     <>
-      {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p>}
-
       <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(19rem,0.92fr)_minmax(0,1.08fr)]">
         <section className="flex min-h-[34rem] flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Danh sách nhiệm vụ">
           <div className="relative">
@@ -184,18 +181,7 @@ function ProgressContent() {
           )}
 
           <div className="mt-auto pt-3">
-            <div className="flex items-center justify-between gap-3">
-              <Pagination page={page} total={taskPage.total} onChange={setPage} disabled={tasks.loading || !semesterId} />
-              <button
-                type="button"
-                disabled={tasks.loading || !semesterId}
-                title={!semesterId ? 'Cần có đợt OJT để cập nhật nhiệm vụ' : undefined}
-                onClick={tasks.reload}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw size={15} /> Cập nhật
-              </button>
-            </div>
+            <Pagination page={page} total={taskPage.total} onChange={setPage} disabled={tasks.loading || !semesterId} />
             <p className="mt-2 text-xs leading-relaxed text-slate-500">Danh sách tự cập nhật khi bạn quay lại trang.</p>
           </div>
         </section>
@@ -236,7 +222,7 @@ function ProgressContent() {
                 </p>
               </section>
 
-              <section className="border-b border-slate-200 py-5">
+              <section className="pt-5">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
                   <Upload size={20} /> Bài nộp của bạn
                 </h3>
@@ -257,7 +243,7 @@ function ProgressContent() {
                   <button
                     type="button"
                     className={buttonClass + ' inline-flex shrink-0 items-center gap-2 rounded-lg'}
-                    onClick={() => { setMessage(''); setSelectedTask(activeTask); }}
+                    onClick={() => { onMessage(''); setSelectedTask(activeTask); }}
                   >
                     <Send size={16} />
                     {activeTask.canSubmit ? activeTask.latestSubmission ? 'Nộp lại' : 'Nộp bài' : 'Xem bài nộp'}
@@ -265,18 +251,6 @@ function ProgressContent() {
                 </div>
               </section>
 
-              <section className="pt-5">
-                <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
-                  <MessageCircle size={20} /> Phản hồi từ doanh nghiệp
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  {taskStatus(activeTask) === 'DONE'
-                    ? 'Doanh nghiệp đã xác nhận hoàn thành nhiệm vụ.'
-                    : activeTask.latestSubmission
-                      ? 'Chưa có phản hồi mới từ doanh nghiệp.'
-                      : 'Nộp bài để doanh nghiệp xem và cập nhật trạng thái nhiệm vụ.'}
-                </p>
-              </section>
             </>
           ) : (
             <div className="flex min-h-[30rem] flex-col items-center justify-center px-6 text-center">
@@ -292,13 +266,13 @@ function ProgressContent() {
 
       {selectedTask && (
         <TaskSubmissionsDialog
-          taskId={selectedTask.id}
+          key={selectedTask.id}
           name={selectedTask.name}
           initialContent={selectedTask.latestSubmission?.content}
-          load={(historyPage, signal) => getTaskSubmissions(selectedTask.id, historyPage, signal)}
+          latestSubmission={selectedTask.latestSubmission}
           submit={selectedTask.canSubmit ? (content, attachment) => submitAssignedTask(selectedTask.id, content, attachment) : undefined}
           onClose={() => setSelectedTask(null)}
-          onSubmitted={() => { setSelectedTask(null); setMessage('Đã gửi bài nộp cho doanh nghiệp.'); tasks.reload(); }}
+          onSubmitted={() => { setSelectedTask(null); onMessage('Đã gửi bài nộp cho doanh nghiệp.'); tasks.reload(); }}
         />
       )}
     </>
@@ -307,6 +281,7 @@ function ProgressContent() {
 
 export default function StudentOJTProgress() {
   const portal = useStudentPortal();
+  const [message, setMessage] = useState('');
   const currentRegistration = portal.profile?.ojtRegistrations.items.find(item => item.ojtSemesterId === portal.semesterId);
   const semesterName = currentRegistration?.semester?.name
     ?? currentRegistration?.semester?.code
@@ -337,8 +312,15 @@ export default function StudentOJTProgress() {
         </div>
       ))}
       {!portal.loading && !portal.error && portal.profile && (
-        <ProgressContent />
+        <ProgressContent onMessage={setMessage} />
       )}
+      {message && <StudentDialog title="Nộp bài thành công" onClose={() => setMessage('')} compact>
+        <div className="flex flex-col items-center gap-4 pb-2 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><CheckCircle2 size={36} aria-hidden="true" /></span>
+          <p className="text-sm font-medium text-emerald-700">{message}</p>
+          <button type="button" className={buttonClass + ' mt-2'} onClick={() => setMessage('')}>Đóng</button>
+        </div>
+      </StudentDialog>}
     </div>
   );
 }

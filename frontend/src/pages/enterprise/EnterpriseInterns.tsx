@@ -7,7 +7,6 @@ import {
   CheckSquare,
   Square,
   Search,
-  CheckCircle2,
   AlertTriangle,
   Users,
   Trash2,
@@ -573,6 +572,7 @@ export const EnterpriseInterns: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-6 pb-16">
+      {toast && <p role="status" className="break-words text-sm font-medium text-emerald-700">{toast.title} {toast.message}</p>}
       {/* 1. Page Banner without buttons (as requested) */}
       <PageBanner
         variant="enterprise"
@@ -589,29 +589,6 @@ export const EnterpriseInterns: React.FC = () => {
           {tab==='students'?'Thực tập sinh':'Nhiệm vụ đã giao'}
         </button>)}
       </nav>
-      {/* Toast Alert */}
-      {toast && (
-        <div role="status" className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-900 animate-fadeIn sm:mx-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div className="min-w-0 break-words">
-              <p className="font-bold text-emerald-800 text-sm">{toast.title}</p>
-              <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">{toast.message}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label="Đóng thông báo giao nhiệm vụ"
-            onClick={() => setToast(null)}
-            className="shrink-0 rounded-md p-1 text-base font-bold text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* API Loading State */}
       {apiLoading && (
         <div className="flex items-center justify-center py-16">
