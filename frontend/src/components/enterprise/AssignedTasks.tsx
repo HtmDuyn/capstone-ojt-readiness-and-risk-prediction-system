@@ -1,6 +1,6 @@
 import { displayTaskTime } from '@/utils/shared/taskTime';
 import { useMemo } from 'react';
-import { CheckCircle2, ChevronDown, ClipboardList, Eye, Trash2, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ClipboardList, Trash2, Users } from 'lucide-react';
 import type { InternTask } from '@/types/enterprise/enterpriseTypes';
 
 export const taskStatusLabels = { TODO: 'Chưa làm', DONE: 'Đã xong', OVERDUE: 'Quá hạn' };
@@ -12,7 +12,7 @@ const tones = {
 };
 const chip = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium';
 
-function TaskCard({items,onDelete,onSubmissions}:{items:InternTask[];onDelete:(task:InternTask)=>void;onSubmissions:(task:InternTask)=>void}) {
+function TaskCard({items,onDelete}:{items:InternTask[];onDelete:(task:InternTask)=>void}) {
   const task = items[0];
   const completed = items.filter(item => item.status === 'DONE').length;
   const overdue = items.filter(item => item.status === 'OVERDUE').length;
@@ -43,7 +43,7 @@ function TaskCard({items,onDelete,onSubmissions}:{items:InternTask[];onDelete:(t
         <tbody>{items.map(item => <tr key={item.id} className="border-t border-slate-100">
           <td className="py-2 pr-2">{item.internName}</td>
           <td><span className={chip+' whitespace-nowrap '+tones[item.status]}>{taskStatusLabels[item.status]}</span></td>
-          <td className="text-right"><button aria-label={`Xem bài nộp của ${item.internName}`} title="Xem chi tiết bài làm và file đính kèm" onClick={()=>onSubmissions(item)} className="inline-flex items-center gap-1 rounded p-2 font-medium text-orange-600 hover:bg-orange-50"><Eye size={15}/><span>Xem bài làm</span></button>{item.canDelete && <button aria-label={`Xóa nhiệm vụ của ${item.internName}`} title="Xóa nhiệm vụ" onClick={()=>onDelete(item)} className="rounded p-2 text-slate-500 hover:text-rose-700"><Trash2 size={15}/></button>}</td>
+          <td className="text-right">{item.canDelete && <button aria-label={`Xóa nhiệm vụ của ${item.internName}`} title="Xóa nhiệm vụ" onClick={()=>onDelete(item)} className="rounded p-2 text-slate-500 hover:text-rose-700"><Trash2 size={15}/></button>}</td>
         </tr>)}</tbody>
       </table>
     </div>
@@ -76,10 +76,10 @@ export function TaskSummary({groups,ready}:{groups:ReturnType<typeof useAssigned
     </div>)}</dl>;
 }
 
-export function AssignedTasks({view,onDelete,onSubmissions}:{view:ReturnType<typeof useAssignedTasks>;onDelete:(task:InternTask)=>void;onSubmissions:(task:InternTask)=>void}) {
+export function AssignedTasks({view,onDelete}:{view:ReturnType<typeof useAssignedTasks>;onDelete:(task:InternTask)=>void}) {
   const {groups}=view;
   return <section aria-label="Nhiệm vụ đã giao" className="space-y-4 p-3 text-slate-900 sm:p-5">
-    <div className="space-y-2.5">{groups.map(([key,items])=><TaskCard key={key} items={items} onDelete={onDelete} onSubmissions={onSubmissions}/>)}</div>
+    <div className="space-y-2.5">{groups.map(([key,items])=><TaskCard key={key} items={items} onDelete={onDelete}/>)}</div>
     {!groups.length && <p className="py-8 text-center text-sm text-slate-500">Không tìm thấy nhiệm vụ phù hợp.</p>}
   </section>;
 }

@@ -6,7 +6,6 @@ import {
   ChevronRight,
   BriefcaseBusiness,
   ClipboardCheck,
-  ListChecks,
   Loader2,
   AlertCircle,
   AlertTriangle,
@@ -14,7 +13,6 @@ import {
   CalendarClock,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
-import { DonutChart } from '@/components/common/DonutChart';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useReducedMotion } from '@/hooks/shared/useReducedMotion';
 import { displayTaskTime } from '@/utils/shared/taskTime';
@@ -28,6 +26,7 @@ import {
 import { describeApiError } from '@/services/apiService';
 import { loadRecruitmentOverview, recruitmentTotals } from '@/utils/enterprise/recruitment';
 import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsChart';
+import { EnterpriseTaskProgress } from '@/components/enterprise/EnterpriseTaskProgress';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
 
@@ -60,32 +59,6 @@ interface CandidateStage {
   value: number;
 }
 
-
-const TaskCompletionDonut: React.FC<{
-  completed: number;
-  total: number;
-}> = ({ completed, total }) => {
-  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-  return (
-    <div
-      role="img"
-      aria-label={`Biểu đồ tròn tiến độ task toàn sinh viên: ${percentage}% hoàn thành, ${completed}/${total} task`}
-      className="relative mx-auto h-56 w-56 shrink-0"
-    >
-      <DonutChart segments={total > 0 ? [
-        { label: 'Đã hoàn thành', value: completed, color: '#14b8a6' },
-        { label: 'Chưa hoàn thành', value: Math.max(0, total - completed), color: '#e2e8f0' },
-      ] : []} label={'Tiến độ task: ' + completed + '/' + total} unit="task" />
-      <div className="pointer-events-none absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
-        <span className="text-4xl font-black tracking-tight text-slate-900">{percentage}%</span>
-        <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-          task hoàn thành
-        </span>
-        <span className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">{completed}/{total} task</span>
-      </div>
-    </div>
-  );
-};
 
 export const EnterpriseDashboard: React.FC = () => {
   // Context supplies the company scope; dashboard figures are fetched on each visit.
@@ -305,64 +278,7 @@ export const EnterpriseDashboard: React.FC = () => {
       <section className="grid items-start gap-5 xl:grid-cols-[minmax(280px,0.82fr)_minmax(0,1.7fr)]">
         <div className="min-w-0 space-y-5">
           <RecruitmentSlotsChart posts={recruitmentPosts} loading={statsLoading} error={statsError} />
-          <article className="enterprise-reveal overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_16px_50px_-36px_rgba(30,41,59,0.45)]">
-            <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-600">Task completion</p>
-                  <h2 className="mt-1 flex items-center gap-2 text-base font-extrabold text-slate-900">
-                    <ListChecks className="h-4 w-4 text-teal-500" />
-                    Tiến độ hoàn thành Task
-                  </h2>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    Tỷ lệ task hoàn thành trên tổng số task được giao cho toàn bộ sinh viên.
-                  </p>
-                </div>
-                <Link
-                  to="/enterprise/interns"
-                  aria-label="Quản lý task thực tập"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-            <div className="p-5 sm:p-6">
-              {tasksLoading ? (
-                <div role="status" className="flex flex-col items-center gap-3 py-8">
-                  <Loader2 className="h-7 w-7 animate-spin text-teal-500" />
-                  <p className="text-xs font-medium text-slate-500">Đang tính tiến độ task...</p>
-                </div>
-              ) : tasksError ? (
-                <div role="alert" className="rounded-xl bg-rose-50 p-5 text-center">
-                  <AlertCircle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
-                  <p className="text-sm font-medium text-rose-700">{tasksError}</p>
-                </div>
-              ) : (
-                <>
-                  <TaskCompletionDonut
-                    completed={taskSummary.completed}
-                    total={taskSummary.total}
-                  />
-                  <div className="mt-5 grid grid-cols-3 gap-2">
-                    {[
-                      { label: 'Hoàn thành', value: taskSummary.completed, color: 'text-teal-700', tone: 'bg-teal-50' },
-                      { label: 'Đang làm', value: taskSummary.inProgress, color: 'text-indigo-700', tone: 'bg-indigo-50' },
-                      { label: 'Chưa bắt đầu', value: taskSummary.todo, color: 'text-slate-700', tone: 'bg-slate-50' },
-                    ].map(metric => (
-                      <div key={metric.label} className={`rounded-xl px-2.5 py-2.5 ${metric.tone}`}>
-                        <p className={`text-lg font-black tabular-nums ${metric.color}`}>{metric.value}</p>
-                        <p className="text-[9px] font-semibold text-slate-500">{metric.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-[10px] leading-relaxed text-slate-500">
-                    Phần trăm được tính từ tổng số task đã hoàn thành chia cho toàn bộ task của doanh nghiệp.
-                  </p>
-                </>
-              )}
-            </div>
-          </article>
+          <EnterpriseTaskProgress summary={taskSummary} loading={tasksLoading} error={tasksError} />
         </div>
         <div className="min-w-0 space-y-5">
           <article className="enterprise-reveal overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_16px_50px_-36px_rgba(30,41,59,0.45)]" style={{ animationDelay: '100ms' }}>
