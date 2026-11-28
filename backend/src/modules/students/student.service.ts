@@ -56,6 +56,50 @@ export async function listStudents(params: Record<string,unknown>, exporting=fal
   if(exporting&&row.total>10000)throw invalid('Narrow export to at most 10000 students.',422,'EXPORT_TOO_LARGE');
   return {total:row.total,items:await enrichListRows({query},row.items),page:p.page,limit:p.limit};
 }
+
+// Compact projection for the education progress table. Academic history and GPA
+// calculations are fetched by their dedicated, on-demand endpoints.
+export async function listStudentProgress(params: Record<string,unknown>) {
+  const p=pagination(params,[]);
+  const result=await query(`WITH progress_rows AS (
+    SELECT s."StudentID" AS id,s."StudentCode" AS "studentCode",u."FullName" AS "fullName",
+      c."CohortCode" AS "cohortCode",tp."ProgramCode" AS "curriculumCode",
+      s."CurrentSemester" AS "currentSemester","StudentCourseSemesterTag"(s."StudentID") AS "courseSemesterTag",
+      current_period."Name" AS "currentTerm",current_period."StartDate" AS "currentTermStartDate",
+      CASE WHEN cache."StudentID" IS NOT NULL AND NOT cache."IsDirty" AND cache."ProgramID" IS NOT DISTINCT FROM s."ProgramID" THEN cache."Gpa" END AS "cachedGpa",
+      CASE WHEN cache."StudentID" IS NOT NULL AND NOT cache."IsDirty" AND cache."ProgramID" IS NOT DISTINCT FROM s."ProgramID" THEN cache."GpaScale" END AS "cachedGpaScale",
+      CASE WHEN cache."StudentID" IS NOT NULL AND NOT cache."IsDirty" AND cache."ProgramID" IS NOT DISTINCT FROM s."ProgramID" THEN cache."EarnedCredits" END AS "cachedEarnedCredits",
+      CASE WHEN cache."StudentID" IS NOT NULL AND NOT cache."IsDirty" AND cache."ProgramID" IS NOT DISTINCT FROM s."ProgramID" THEN cache."TotalCredits" END AS "cachedTotalCredits",
+      (cache."StudentID" IS NOT NULL AND NOT cache."IsDirty" AND cache."ProgramID" IS NOT DISTINCT FROM s."ProgramID") AS "gpaLoaded",
+      tp."TotalCredits" AS "programTotalCredits",${calculatedEligibilitySql('s')} AS "calculatedEligibility"
+    FROM "Students" s
+    JOIN "Users" u ON u."UserID"=s."UserID"
+    LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
+    LEFT JOIN "Cohorts" c ON c."CohortID"=placement."CohortID"
+    LEFT JOIN "TrainingPrograms" tp ON tp."ProgramID"=s."ProgramID"
+    LEFT JOIN "StudentAcademicProgressCache" cache ON cache."StudentID"=s."StudentID"
+    LEFT JOIN LATERAL (
+      SELECT period."Name",period."StartDate" FROM "AcademicPeriods" period
+      WHERE period."Kind"='SEMESTER' AND period."Status" NOT IN ('CLOSED','ARCHIVED')
+        AND period."StartDate"<=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+        AND period."EndDate">=(statement_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+      ORDER BY period."StartDate" DESC,period."AcademicPeriodID" DESC LIMIT 1
+    ) current_period ON true
+    WHERE s."DeletedAt" IS NULL
+  ), paged AS (
+    SELECT * FROM progress_rows ORDER BY id LIMIT $1 OFFSET $2
+  )
+  SELECT (SELECT count(*)::int FROM progress_rows) AS total,
+    COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items
+  FROM paged`,[p.limit,p.offset]);
+  const row=result.rows[0];
+  const items=row.items.map((item:Record<string,any>)=>{
+    const {programTotalCredits,curriculumCode,...summary}=item;
+    return {...summary,program:curriculumCode===null?null:{code:curriculumCode,totalCredits:programTotalCredits}};
+  });
+  return {total:row.total,items,page:p.page,limit:p.limit};
+}
+
 export async function patchStudent(id: number, body: unknown, actorId: number) {
   const input=inputObject(body,['fullName','phone','status','programId','placement','reason']);
   const reason=requiredText(input.reason,'reason',2000);

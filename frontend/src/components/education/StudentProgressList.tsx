@@ -7,14 +7,13 @@ type Filters = typeof initialFilters;
 type FilterKey = keyof Filters;
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 const filterLabels: Record<FilterKey, string> = { search: 'Từ khóa', eligibility: 'Kết quả xét OJT' };
-type SortKey = 'name' | 'code' | 'curriculum' | 'semester' | 'gpa' | 'credits' | 'failed' | 'eligibility';
+type SortKey = 'name' | 'code' | 'curriculum' | 'gpa' | 'credits' | 'failed' | 'eligibility';
 type SortSelection = { key: SortKey; direction: 'asc' | 'desc' };
 const sortableColumns: { title: string; key?: SortKey }[] = [
   { title: 'STT' },
   { title: 'Sinh viên', key: 'name' },
   { title: 'Mã sinh viên', key: 'code' },
   { title: 'Mã khung chương trình', key: 'curriculum' },
-  { title: 'Học kỳ', key: 'semester' },
   { title: 'GPA', key: 'gpa' },
   { title: 'Tín chỉ tích lũy', key: 'credits' },
   { title: 'Môn chưa đạt', key: 'failed' },
@@ -59,7 +58,6 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
         case 'name': left = a.fullName; right = b.fullName; break;
         case 'code': left = a.studentCode; right = b.studentCode; break;
         case 'curriculum': left = a.curriculumCode; right = b.curriculumCode; break;
-        case 'semester': left = a.currentTermStartDate; right = b.currentTermStartDate; break;
         case 'gpa': left = a.gpa; right = b.gpa; break;
         case 'credits': left = a.completedCredits; right = b.completedCredits; break;
         case 'failed':
@@ -133,7 +131,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
       </div>
       </div>
       {warning && <p role="status" className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm text-amber-800">{warning}</p>}
-      <div className="overflow-x-auto border-t border-slate-100"><table className="w-full min-w-[1260px] text-left text-sm">
+      <div className="overflow-x-auto border-t border-slate-100"><table className="w-full min-w-[1120px] text-left text-sm">
         <thead className="border-b border-[#CBD5E1] bg-[#EFF6FF] text-xs font-semibold text-[#334155]"><tr>{sortableColumns.map(({ title, key }) => <th key={title} scope="col"
           aria-sort={key && sort?.key === key ? sort.direction === 'asc' ? 'ascending' : 'descending' : undefined}
           aria-label={key ? `Sắp xếp theo ${title}` : undefined}
@@ -145,7 +143,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
           ? sort.direction === 'asc' ? <ArrowUp size={14} aria-hidden="true" className="text-orange-600" /> : <ArrowDown size={14} aria-hidden="true" className="text-orange-600" />
           : <ArrowUpDown size={14} aria-hidden="true" className="text-slate-400" />)}</span></th>)}</tr></thead>
         <tbody className="divide-y divide-[#E2E8F0]">
-      {loading ? <tr><td colSpan={10} role="status" className="px-5 py-14 text-center text-slate-500">Đang tải danh sách sinh viên...</td></tr> : error ? <tr><td colSpan={10} role="alert" className="px-5 py-12 text-center text-red-700"><p>{error}</p><button onClick={onReload} className="mt-3 font-semibold underline">Thử tải lại</button></td></tr> : visible.length ? visible.map((student, index) => {
+      {loading ? <tr><td colSpan={9} role="status" className="px-5 py-14 text-center text-slate-500">Đang tải danh sách sinh viên...</td></tr> : error ? <tr><td colSpan={9} role="alert" className="px-5 py-12 text-center text-red-700"><p>{error}</p><button onClick={onReload} className="mt-3 font-semibold underline">Thử tải lại</button></td></tr> : visible.length ? visible.map((student, index) => {
             const complete = student.completedCredits;
             const total = student.totalCredits;
             const failed = student.subjects.filter(s => s.status === 'Not Passed').length;
@@ -155,14 +153,13 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
               <td className="min-w-44 px-4 py-4 align-middle"><button onClick={() => onSelect(student)} className="text-left font-semibold text-slate-800 hover:text-orange-700">{student.fullName}</button></td>
               <td className="w-[125px] px-4 py-4 align-middle text-sm text-slate-700">{student.studentCode}{student.dataWarning && <p className="mt-1 text-xs text-amber-700" title={student.dataWarning}>Hồ sơ cần kiểm tra</p>}</td>
               <td className="min-w-52 max-w-64 break-words px-4 py-4 text-xs font-medium text-slate-600">{student.curriculumCode}</td>
-              <td className="whitespace-nowrap px-4 py-4 align-middle text-sm font-medium text-slate-700">{student.currentTerm}</td>
               <td className="px-4 py-4 font-semibold text-slate-800">{student.gpaLoading ? <span role="status" aria-label="Đang tải GPA">…</span> : student.gpa === null ? '—' : `${student.gpa.toFixed(2)}${student.gpaScale ? ` / ${student.gpaScale}` : ''}`}</td>
               <td className="min-w-40 px-4 py-4 align-middle"><span className="font-semibold text-slate-800">{complete ?? '—'}</span><span className="text-sm text-slate-500"> / {total ?? '—'}</span></td>
               <td className="px-4 py-4">{student.detailsLoaded ? <span className={failed ? 'font-semibold text-rose-600' : 'text-slate-500'}>{failed} môn</span> : student.unpassedCourseCount !== null && student.unpassedCourseCount !== undefined ? <span className={student.unpassedCourseCount ? 'font-semibold text-rose-600' : 'text-slate-500'}>{student.unpassedCourseCount} môn*</span> : <span className="text-slate-400">—</span>}</td>
               <td className="px-4 py-4"><span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle}`}>{student.eligibilityStatus}</span></td>
               <td className="w-20 px-2 py-4 text-center"><button aria-label="Xem chi tiết" title="Xem chi tiết" onClick={() => onSelect(student)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"><Eye size={18} aria-hidden="true" /></button></td>
             </tr>;
-          }) : <tr><td colSpan={10} className="px-5 py-14 text-center"><Users size={30} className="mx-auto text-slate-300" /><p className="mt-3 font-medium text-slate-700">{students.length ? 'Không có sinh viên khớp bộ lọc' : 'Chưa có sinh viên trong hệ thống'}</p><p className="mt-1 text-sm text-slate-500">{students.length ? 'Thử đổi từ khóa hoặc mở rộng phạm vi tìm kiếm.' : 'Sinh viên sẽ xuất hiện sau khi được thêm hoặc import thành công.'}</p>{active.length > 0 && <button onClick={() => setFilters(initialFilters)} className="mt-3 text-sm font-semibold text-orange-700">Xóa tất cả bộ lọc</button>}</td></tr>}
+          }) : <tr><td colSpan={9} className="px-5 py-14 text-center"><Users size={30} className="mx-auto text-slate-300" /><p className="mt-3 font-medium text-slate-700">{students.length ? 'Không có sinh viên khớp bộ lọc' : 'Chưa có sinh viên trong hệ thống'}</p><p className="mt-1 text-sm text-slate-500">{students.length ? 'Thử đổi từ khóa hoặc mở rộng phạm vi tìm kiếm.' : 'Sinh viên sẽ xuất hiện sau khi được thêm hoặc import thành công.'}</p>{active.length > 0 && <button onClick={() => setFilters(initialFilters)} className="mt-3 text-sm font-semibold text-orange-700">Xóa tất cả bộ lọc</button>}</td></tr>}
         </tbody>
       </table></div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 text-xs text-slate-500">

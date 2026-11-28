@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { PageBanner } from '@/components/common/PageBanner';
 import { RetakeClassProposals } from '@/components/education/RetakeClassProposals';
-import { academicReportingService as reports, getAllItems } from '@/services/educationService';
+import { academicReportingService as reports } from '@/services/educationService';
 import type { ReportPeriod } from '@/types/education/reporting.types';
-import type { Major } from '@/types/education/curriculum.types';
 
 export default function EducationSupportClassDemand() {
   const [periods, setPeriods] = useState<ReportPeriod[]>([]);
-  const [majors, setMajors] = useState<Major[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -16,14 +14,13 @@ export default function EducationSupportClassDemand() {
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    Promise.all([reports.periods(controller.signal), getAllItems<Major>('/majors', {}, controller.signal)])
-      .then(([periods, majors]) => {
+    reports.periods(controller.signal)
+      .then(periods => {
         if (controller.signal.aborted) return;
         setPeriods(periods);
-        setMajors(majors);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError('Không tải được học kỳ và chuyên ngành.');
+        if (!controller.signal.aborted) setError('Không tải được danh sách học kỳ.');
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -40,7 +37,7 @@ export default function EducationSupportClassDemand() {
           <button type="button" className="font-semibold underline" onClick={() => setAttempt(value => value + 1)}>Thử lại</button>
         </div>
       ) : (
-        <RetakeClassProposals periods={periods} majors={majors} catalogLoading={loading} />
+        <RetakeClassProposals periods={periods} catalogLoading={loading} />
       )}
     </div>
   );

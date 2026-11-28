@@ -878,7 +878,7 @@ export const importService = {
   listStudentImportBatches: (signal?: AbortSignal) =>
     getAllItems<StudentImportBatch>('/academic-imports', { kind: 'STUDENT', status: 'COMPLETED' }, signal),
   getImportedStudent: async (id: number, signal?: AbortSignal) =>
-    apiData<ImportedStudentProfile>(await getJson(`/students/${id}`, { resultsLimit: 1, ojtLimit: 1 }, signal)),
+    apiData<ImportedStudentProfile>(await getJson(`/students/${id}`, { include: 'academicProgress' }, signal)),
   getStoredCourseResults: async (id: number, page: number, signal?: AbortSignal) =>
     apiData<{ courseResults: import('@/types/education/api.types').Page<StoredCourseResult> }>(
       await getJson(`/students/${id}`, { include: 'courseResults', resultsPage: page, resultsLimit: 20 }, signal),
@@ -1329,7 +1329,7 @@ function progressSummary(row: Row): StudentProgress {
 export const studentProgressService = {
   async loadAll(signal?: AbortSignal): Promise<StudentProgress[]> {
     const token = localStorage.getItem('ojt_auth_token');
-    const rows = await getAllItems<Row>('/students', {}, signal);
+    const rows = await getAllItems<Row>('/students/progress', {}, signal);
     progressSession = token;
     progressRows = new Map(rows.map(row => [Number(row.id), row]));
     progressSavedResults = new Map(rows.flatMap(row => row.calculatedEligibility

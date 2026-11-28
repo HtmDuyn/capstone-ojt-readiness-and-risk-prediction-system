@@ -9,12 +9,12 @@ import { normalizeEnterpriseImportPreview } from "@/utils/qhdn/qhdnEnterprise";
 import type { CompanyListItem } from "@/types/qhdn/qhdnTypes";
 import type { ReportType } from "@/types/qhdn/workflowTypes";
 import API from "./apiService";
-import type { DashboardPlacementBoard, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
+import type { DashboardPlacementSummary, QhdnDashboardSummary } from '@/utils/qhdn/qhdnDashboard';
 
-/** Use the same roster as the OJT coordination screen, including unregistered students. */
-export const getDashboardPlacementBoard = async (ojtSemesterId: number, signal?: AbortSignal): Promise<DashboardPlacementBoard> => {
-  const response = await API.get<{ success: boolean; data: DashboardPlacementBoard }>('/qhdn/placements', { params: { ojtSemesterId }, signal });
-  if (!response.data.success) throw new Error('Không tải được danh sách điều phối OJT.');
+/** Dashboard projection: counts only, without loading student rows, placement history, or positions. */
+export const getDashboardPlacementSummary = async (ojtSemesterId: number, signal?: AbortSignal): Promise<DashboardPlacementSummary> => {
+  const response = await API.get<{ success: boolean; data: DashboardPlacementSummary }>('/qhdn/placements/summary', { params: { ojtSemesterId }, signal });
+  if (!response.data.success) throw new Error('Không tải được thống kê điều phối OJT.');
   return response.data.data;
 };
 

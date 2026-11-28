@@ -58,6 +58,47 @@ export async function placementBoard(params:Row,actor:Actor){
   return {canCoordinate:students.some(student=>student.canCoordinate),summaryReady:context.roundCount>0&&context.unfinished===0,context,companies:coordinationCompanies(positions,confirmedCounts),positions,items:students};
  });
 }
+
+/** Dashboard projection: aggregate roster and company totals without loading the full placement board. */
+export async function placementDashboardSummary(params:Row,actor:Actor){
+ staff(actor);const semesterId=positiveId(params.ojtSemesterId,'ojtSemesterId');
+ return readTransaction(async c=>{
+  await requirePlacementSchema(c);
+  const [roster,companies]=await Promise.all([
+   c.query(`WITH roster AS MATERIALIZED (
+     SELECT DISTINCT ON (s."StudentID") s."StudentID" AS id,r."RegistrationID"
+     FROM "Students" s JOIN "Users" u USING("UserID")
+     LEFT JOIN "OJTRegistrations" r ON r."StudentID"=s."StudentID" AND r."OJTSemesterID"=$1
+     WHERE s."DeletedAt" IS NULL AND EXISTS(SELECT 1 FROM (${recruitmentAccessSql}) access WHERE access."StudentID"=s."StudentID" AND access."OJTSemesterID"=$1)
+     ORDER BY s."StudentID",r."RegistrationID" DESC NULLS LAST
+   ), student_status AS (
+     SELECT roster.id,
+       latest."Decision" AS decision,
+       EXISTS(SELECT 1 FROM "OJTActualReceipts" receipt WHERE receipt."StudentID"=roster.id AND receipt."OJTSemesterID"=$1) AS received,
+       EXISTS(SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID")
+         WHERE a."StudentID"=roster.id AND co."OJTSemesterID"=$1 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')) AS assigned
+     FROM roster
+     LEFT JOIN LATERAL (SELECT co."Decision" FROM "StudentEnterpriseCoordination" co
+       WHERE co."RegistrationID"=roster."RegistrationID" ORDER BY co."CoordinationID" DESC LIMIT 1) latest ON true
+   )
+   SELECT count(*)::int AS "handedOff",
+     count(*) FILTER(WHERE decision='ACCEPTED' OR received OR assigned)::int AS assigned,
+     count(*) FILTER(WHERE NOT (decision='ACCEPTED' OR received OR assigned) AND decision='PENDING')::int AS waiting,
+     count(*) FILTER(WHERE NOT (decision='ACCEPTED' OR received OR assigned) AND decision='REJECTED')::int AS rejected
+   FROM student_status`,[semesterId]),
+   c.query(`SELECT confirmed."EnterpriseID" AS id,e."Name" AS name,count(DISTINCT confirmed."StudentID")::int AS "actualCount"
+     FROM (
+       SELECT co."EnterpriseID",r."StudentID" FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."OJTSemesterID"=$1 AND co."Decision"='ACCEPTED'
+       UNION SELECT a."EnterpriseID",a."StudentID" FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE co."OJTSemesterID"=$1 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
+       UNION SELECT co."EnterpriseID",receipt."StudentID" FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE receipt."OJTSemesterID"=$1
+     ) confirmed JOIN "Enterprises" e USING("EnterpriseID") WHERE e."DeletedAt" IS NULL GROUP BY confirmed."EnterpriseID",e."Name"`,[semesterId]),
+  ]);
+  const counts=roster.rows[0]??{handedOff:0,assigned:0,waiting:0,rejected:0};
+  const handedOff=Number(counts.handedOff),assigned=Number(counts.assigned),waiting=Number(counts.waiting),rejected=Number(counts.rejected);
+  return {stats:{handedOff,assigned,waiting,rejected,acceptanceRate:handedOff?Math.round(assigned/handedOff*1000)/10:0},companies:companies.rows};
+ });
+}
+
 export async function supplementPlacement(body:unknown,actor:Actor){
  staff(actor);const b=inputObject(body,['studentId','ojtSemesterId','positionId','companyId','source','reason']);
  const studentId=positiveId(b.studentId,'studentId'),semesterId=positiveId(b.ojtSemesterId,'ojtSemesterId');

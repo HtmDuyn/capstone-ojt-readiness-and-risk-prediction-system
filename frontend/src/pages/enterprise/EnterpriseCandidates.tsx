@@ -15,6 +15,8 @@ const candidateFilterLabel = 'mb-1.5 block text-xs font-semibold text-slate-600'
 export const EnterpriseCandidates: React.FC = () => {
   const { error: profileError } = useEnterprise();
   const [candidates, setCandidates] = useState<EnterpriseCandidateItem[]>([]);
+  const [candidateTotal,setCandidateTotal]=useState(0);
+  const [candidateRounds,setCandidateRounds]=useState<Array<[string,string]>>([]);
   const [candidatePeriods, setCandidatePeriods] = useState<EnterpriseCandidatePeriod[]>([]);
   const [periodsLoading, setPeriodsLoading] = useState(true);
   const [periodsError, setPeriodsError] = useState<string | null>(null);
@@ -22,10 +24,11 @@ export const EnterpriseCandidates: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<EnterpriseCandidateItem | null>(null);
   const [selectedYearId, setSelectedYearId] = useState('');
-  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('');
+  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('ACTIVE');
   const [selectedRoundId, setSelectedRoundId] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm,setDebouncedSearchTerm]=useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -38,8 +41,8 @@ export const EnterpriseCandidates: React.FC = () => {
   const [acceptanceBusy,setAcceptanceBusy]=useState(false);
   const [acceptanceError,setAcceptanceError]=useState('');
   const eligible=(candidate:EnterpriseCandidateItem)=>candidate.decision==='PENDING'&&candidate.isLatestCoordination&&candidate.canRespond!==false;
-  useEffect(()=>{setSelectedIds(new Set());setPage(1);},[selectedYearId,selectedPeriodStatus,selectedRoundId,filterStatus,searchTerm]);
-  useEffect(()=>{setSelectedIds(previous=>new Set([...previous].filter(id=>candidates.some(candidate=>candidate.id===id&&eligible(candidate)))));},[candidates]);
+  useEffect(()=>{setSelectedIds(new Set());setPage(1);},[selectedYearId,selectedPeriodStatus,selectedRoundId,filterStatus]);
+  useEffect(()=>{const timer=window.setTimeout(()=>{setDebouncedSearchTerm(searchTerm);setPage(1);},250);return()=>window.clearTimeout(timer);},[searchTerm]);
   const previewAcceptance=async(ids:number[],mode:'single'|'bulk'='bulk')=>{
     if(bulkLoading||singleLoadingId!==null||acceptanceBusy||actionLoading!==null||!ids.length)return;
     if(mode==='bulk')setBulkLoading(true);else setSingleLoadingId(ids[0]);
@@ -86,16 +89,7 @@ export const EnterpriseCandidates: React.FC = () => {
     () => new Map(candidatePeriods.map(period => [period.ojtSemesterId, period.periodStatus])),
     [candidatePeriods]
   );
-  const availablePeriodIds = useMemo(() => new Set(availablePeriods.map(period => period.ojtSemesterId)), [availablePeriods]);
-  const availableRounds = useMemo(() => {
-    const rounds = new Map<string, string>();
-    for (const candidate of candidates) {
-      if (!availablePeriodIds.has(candidate.ojtSemesterId)) continue;
-      const round = candidate.recruitmentRound;
-      rounds.set(round ? String(round.id) : 'unlinked', round?.name || 'Chưa liên kết đợt OJT');
-    }
-    return [...rounds];
-  }, [candidates, availablePeriodIds]);
+  const availableRounds = candidateRounds;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -122,17 +116,26 @@ export const EnterpriseCandidates: React.FC = () => {
 
   const candidatesRequest = useRef<AbortController | null>(null);
   const fetchCandidates = useCallback(async () => {
+    if(periodsLoading)return;
     candidatesRequest.current?.abort();
+    if(!availablePeriods.length){setCandidates([]);setCandidateTotal(0);setCandidateRounds([]);setLoading(false);return;}
     const controller = new AbortController();
     candidatesRequest.current = controller;
     setLoading(true);
     setError(null);
     try {
       const res = await enterpriseService.listCandidates({
+        page,limit,
         ...(selectedYearId ? { academicYearId: Number(selectedYearId) } : {}),
+        ...(filterStatus!=='ALL'?{decision:filterStatus}:{}),
+        ...(debouncedSearchTerm.trim()?{search:debouncedSearchTerm.trim()}:{}),
+        ...(selectedRoundId?{roundId:selectedRoundId}:{}),
+        ojtSemesterIds:availablePeriods.map(period=>period.ojtSemesterId).join(','),
       }, controller.signal);
       if (!controller.signal.aborted && res?.success && res.data) {
         setCandidates(res.data.items || []);
+        setCandidateTotal(res.data.total||0);
+        setCandidateRounds((res.data.rounds||[]).map(round=>[round.id,round.name] as [string,string]));
       }
     } catch (err: unknown) {
       if (controller.signal.aborted) return;
@@ -142,7 +145,7 @@ export const EnterpriseCandidates: React.FC = () => {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [selectedYearId]);
+  }, [periodsLoading,availablePeriods,page,selectedYearId,filterStatus,debouncedSearchTerm,selectedRoundId]);
 
   useEffect(() => {
     let active = true;
@@ -150,19 +153,7 @@ export const EnterpriseCandidates: React.FC = () => {
     return () => { active = false; candidatesRequest.current?.abort(); };
   }, [fetchCandidates]);
 
-  const filteredCandidates = useMemo(() => {
-    const query = searchTerm.trim().toLocaleLowerCase();
-    return candidates.filter((candidate) => {
-      const matchesStatus = filterStatus === 'ALL' || candidate.decision === filterStatus;
-      const matchesPeriodStatus = !selectedPeriodStatus || candidatePeriodStatuses.get(candidate.ojtSemesterId) === selectedPeriodStatus;
-      const matchesYear = !selectedYearId || availablePeriodIds.has(candidate.ojtSemesterId);
-      const matchesRound = !selectedRoundId || (candidate.recruitmentRound ? String(candidate.recruitmentRound.id) : 'unlinked') === selectedRoundId;
-      const matchesSearch = !query ||
-        candidate.student.fullName.toLocaleLowerCase().includes(query) ||
-        candidate.student.studentCode.toLocaleLowerCase().includes(query);
-      return matchesStatus && matchesPeriodStatus && matchesYear && matchesRound && matchesSearch;
-    });
-  }, [candidates, filterStatus, searchTerm, selectedPeriodStatus, candidatePeriodStatuses, selectedRoundId, selectedYearId, availablePeriodIds]);
+  const filteredCandidates = candidates;
   const reviewSchedules = useMemo(() => {
     const schedules = new Map<number, NonNullable<EnterpriseCandidateItem['recruitmentRound']>>();
     for (const candidate of filteredCandidates) {
@@ -172,11 +163,8 @@ export const EnterpriseCandidates: React.FC = () => {
     }
     return [...schedules.values()];
   }, [filteredCandidates, candidatePeriodStatuses]);
-  const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / limit));
-  const visibleCandidates = useMemo(
-    () => filteredCandidates.slice((page - 1) * limit, page * limit),
-    [filteredCandidates, page]
-  );
+  const totalPages = Math.max(1, Math.ceil(candidateTotal / limit));
+  const visibleCandidates = filteredCandidates;
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
@@ -193,14 +181,17 @@ export const EnterpriseCandidates: React.FC = () => {
         decision,
         'Từ chối sinh viên'
       );
+      setCandidates(previous => previous.map(candidate => candidate.id === candidateId
+        ? { ...candidate, decision: 'REJECTED' }
+        : candidate));
       const statusText = 'từ chối';
       setToastMessage(`Đã ${statusText} ứng viên thành công!`);
       setTimeout(() => setToastMessage(null), 4000);
-      // Refresh the list
-      await fetchCandidates();
       if (selectedCandidate?.id === candidateId) {
         setSelectedCandidate(null);
       }
+      // Refresh in the background; the completed decision is already visible locally.
+      void fetchCandidates();
     } catch (err: any) {
       const errorCode = err?.response?.data?.errorCode;
       let displayMessage = friendlyErrorMessage(err, 'Không thể cập nhật quyết định. Vui lòng thử lại.');
@@ -265,9 +256,9 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       <section aria-label="Danh sách hồ sơ ứng tuyển" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-      {selectable.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 bg-orange-50/70 px-4 py-3">
-        <p className="text-sm text-slate-600">Đã chọn <strong>{selected.length}</strong> / {selectable.length} hồ sơ có thể tiếp nhận</p>
-        <button type="button" className={workflowPrimary} disabled={!selected.length||bulkLoading||singleLoadingId!==null||acceptanceBusy||actionLoading!==null||loading} onClick={()=>previewAcceptance(selected.map(candidate=>candidate.id))}><CheckCircle2 size={16}/>{bulkLoading?'Đang kiểm tra…':`Nhận sinh viên đã chọn (${selected.length})`}</button>
+      {(selectable.length>0||selectedIds.size>0)&&<div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100 bg-orange-50/70 px-4 py-3">
+        <p className="text-sm text-slate-600">Đã chọn <strong>{selectedIds.size}</strong> hồ sơ có thể tiếp nhận</p>
+        <button type="button" className={workflowPrimary} disabled={!selectedIds.size||bulkLoading||singleLoadingId!==null||acceptanceBusy||actionLoading!==null||loading} onClick={()=>previewAcceptance([...selectedIds])}><CheckCircle2 size={16}/>{bulkLoading?'Đang kiểm tra…':`Nhận sinh viên đã chọn (${selectedIds.size})`}</button>
       </div>}
       {/* Filter and Search Bar */}
       <div role="search" aria-label="Bộ lọc hồ sơ ứng tuyển" className="grid min-w-0 grid-cols-1 gap-3 border-b border-slate-100 bg-slate-50/60 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.2fr)]">
@@ -421,7 +412,7 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!loading && !error && filteredCandidates.length === 0 && (
+      {!loading && !error && candidateTotal === 0 && (
         <div className="p-12 text-center">
           <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-500">
@@ -439,7 +430,7 @@ export const EnterpriseCandidates: React.FC = () => {
             <table className="w-full min-w-[900px] table-fixed text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="w-10 px-2 py-3.5 text-center"><input type="checkbox" aria-label="Chọn tất cả hồ sơ có thể tiếp nhận" disabled={!selectable.length||bulkLoading||singleLoadingId!==null||acceptanceBusy||actionLoading!==null} checked={selectable.length>0&&selected.length===selectable.length} ref={node=>{if(node)node.indeterminate=selected.length>0&&selected.length<selectable.length;}} onChange={event=>setSelectedIds(new Set(event.target.checked?selectable.map(candidate=>candidate.id):[]))}/></th>
+                  <th className="w-10 px-2 py-3.5 text-center"><input type="checkbox" aria-label="Chọn tất cả hồ sơ có thể tiếp nhận" disabled={!selectable.length||bulkLoading||singleLoadingId!==null||acceptanceBusy||actionLoading!==null} checked={selectable.length>0&&selected.length===selectable.length} ref={node=>{if(node)node.indeterminate=selected.length>0&&selected.length<selectable.length;}} onChange={event=>setSelectedIds(previous=>{const next=new Set(previous);for(const candidate of selectable){if(event.target.checked)next.add(candidate.id);else next.delete(candidate.id);}return next;})}/></th>
                   <th className="w-16 px-3 py-3.5 text-center">STT</th>
                   <th className="w-[25%] px-4 py-3.5">Sinh viên</th>
                   <th className="w-[22%] px-4 py-3.5">Vị trí</th>
@@ -511,7 +502,7 @@ export const EnterpriseCandidates: React.FC = () => {
                               title="Từ chối"
                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              <X className="h-4 w-4" />
+                              {actionLoading === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                             </button>
                           </>
                         )}
@@ -525,10 +516,10 @@ export const EnterpriseCandidates: React.FC = () => {
       )}
 
       {/* Pagination */}
-      {filteredCandidates.length > 0 && (
+      {candidateTotal > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4">
           <span className="text-xs font-medium text-slate-500">
-            Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, filteredCandidates.length)} trong {filteredCandidates.length} hồ sơ
+            Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, candidateTotal)} trong {candidateTotal} hồ sơ
           </span>
           <div className="flex items-center justify-center space-x-3">
           <button

@@ -23,7 +23,7 @@ function fixture({assigned=assignment,historical=null}={}){
   const mod={exports:{}};cache.set(file,mod);const code=ts.transpileModule(fs.readFileSync(path.join(root,'src',file),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   vm.runInThisContext('(function(require,module,exports){'+code+'\n})',{filename:file})(name=>name.startsWith('.')?load(path.join(path.dirname(file),name+'.ts')):require(name),mod,mod.exports);return mod.exports;
  }
- return {queries,profile:params=>load('modules/students/student-profile.service.ts').studentProfile(10,{include:'ojtRegistrations',...params},{userId:11,studentId:10,roleCode:'STUDENT'})};
+ return {queries,profile:params=>load('modules/students/student-profile.service.ts').studentProfile(10,{include:'ojtRegistrations,recruitmentAssignment',...params},{userId:11,studentId:10,roleCode:'STUDENT'})};
 }
 test('a qualified student without any application uses the assigned QHDN semester instead of the next pathway semester',async()=>{
  const f=fixture();const profile=await f.profile();assert.equal(profile.ojtSemesterId,15);assert.deepEqual(profile.recruitmentAssignment,assignment);

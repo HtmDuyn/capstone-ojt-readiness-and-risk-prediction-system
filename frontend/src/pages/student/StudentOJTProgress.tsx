@@ -5,6 +5,7 @@ import {
   Check,
   ClipboardList,
   Clock3,
+  CheckCircle2,
   FileText,
   MessageCircle,
   RefreshCw,
@@ -99,8 +100,21 @@ function ProgressContent() {
     <>
       {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p>}
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(19rem,0.92fr)_minmax(0,1.08fr)]">
-        <section className="flex min-h-[34rem] flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Danh sách nhiệm vụ">
+      <section className="grid gap-3 sm:grid-cols-3" aria-label="Tổng quan nhiệm vụ">
+        {([
+          { label: 'Tổng nhiệm vụ', value: counts.ALL, icon: ClipboardList, tone: 'bg-blue-50 text-blue-700' },
+          { label: 'Đang thực hiện', value: counts.IN_PROGRESS, icon: Clock3, tone: 'bg-orange-50 text-orange-700' },
+          { label: 'Đã hoàn thành', value: counts.DONE, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-700' },
+        ] as const).map(item => <div key={item.label} className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:px-5">
+          <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${item.tone}`}><item.icon size={20} /></span>
+          <span className="min-w-0"><span className="block text-xs font-medium text-slate-500">{item.label}</span><span className="mt-0.5 block text-xl font-bold tabular-nums text-slate-900">{item.value}</span></span>
+        </div>)}
+      </section>
+
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(19rem,0.86fr)_minmax(0,1.14fr)]">
+        <section className="flex min-h-[34rem] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm" aria-label="Danh sách nhiệm vụ">
+          <div className="border-b border-slate-100 bg-gradient-to-r from-orange-50/70 to-white p-4 sm:p-5">
+          <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-slate-900"><ClipboardList size={19} className="text-orange-600" /> Nhiệm vụ được giao</h2>
           <div className="relative">
             <Search size={18} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -129,6 +143,7 @@ function ProgressContent() {
               </button>
             ))}
           </div>
+          </div>
 
           <ResourceState loading={tasks.loading} error={tasks.error} retry={tasks.reload} />
           {tasks.loading && !taskPage.items.length ? (
@@ -144,7 +159,7 @@ function ProgressContent() {
               </Empty>
             </div>
           ) : (
-            <div className="mt-4 flex-1 space-y-2 overflow-y-auto lg:max-h-[30rem] lg:pr-1" role="list" aria-label="Các nhiệm vụ">
+            <div className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-4 lg:max-h-[30rem]" role="list" aria-label="Các nhiệm vụ">
               {visibleTasks.map(task => {
                 const status = taskStatus(task);
                 const due = task.dueAt ?? task.dueDate;
@@ -157,7 +172,7 @@ function ProgressContent() {
                       onClick={() => setSelectedTaskId(task.id)}
                       className={`w-full rounded-xl border p-3.5 text-left transition ${
                         isSelected
-                          ? 'border-orange-500 bg-orange-50/60 shadow-sm'
+                          ? 'border-orange-300 bg-orange-50/70 shadow-sm ring-1 ring-orange-100'
                           : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/30'
                       }`}
                     >
@@ -183,7 +198,7 @@ function ProgressContent() {
             </div>
           )}
 
-          <div className="mt-auto pt-3">
+          <div className="mt-auto border-t border-slate-100 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <Pagination page={page} total={taskPage.total} onChange={setPage} disabled={tasks.loading || !semesterId} />
               <button
@@ -200,10 +215,10 @@ function ProgressContent() {
           </div>
         </section>
 
-        <section className="min-h-[34rem] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-label="Chi tiết nhiệm vụ">
+        <section className="min-h-[34rem] overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm" aria-label="Chi tiết nhiệm vụ">
           {activeTask ? (
             <>
-              <header className="border-b border-slate-200 pb-4">
+              <header className="border-b border-slate-100 bg-gradient-to-br from-slate-50 via-white to-orange-50/50 p-5 sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="text-xl font-bold leading-snug text-slate-900 sm:text-2xl">{activeTask.name}</h2>
@@ -227,7 +242,7 @@ function ProgressContent() {
                 </div>
               </header>
 
-              <section className="border-b border-slate-200 py-5">
+              <section className="border-b border-slate-100 px-5 py-5 sm:px-6">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
                   <FileText size={20} /> Yêu cầu nhiệm vụ
                 </h3>
@@ -236,7 +251,7 @@ function ProgressContent() {
                 </p>
               </section>
 
-              <section className="border-b border-slate-200 py-5">
+              <section className="border-b border-slate-100 px-5 py-5 sm:px-6">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
                   <Upload size={20} /> Bài nộp của bạn
                 </h3>
@@ -265,7 +280,7 @@ function ProgressContent() {
                 </div>
               </section>
 
-              <section className="pt-5">
+              <section className="px-5 py-5 sm:px-6">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900">
                   <MessageCircle size={20} /> Phản hồi từ doanh nghiệp
                 </h3>

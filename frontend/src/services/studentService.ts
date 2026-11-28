@@ -212,7 +212,7 @@ async function resolveOwnStudent<T extends Pick<Profile, 'id' | 'userId'>>(
 export const getStudentProfile = (id: number, signal?: AbortSignal) =>
   studentGet<Profile>(
     `/students/${id}` +
-      studentQuery({ include: 'academicProgress,ojtRegistrations', ojtLimit: 100 }),
+      studentQuery({ include: 'academicProgress,ojtRegistrations,recruitmentAssignment', ojtLimit: 100 }),
     signal,
   );
 export const getStudentAcademicProgress = (id: number, signal?: AbortSignal) =>

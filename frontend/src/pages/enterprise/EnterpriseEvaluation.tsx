@@ -91,7 +91,7 @@ export function EnterpriseEvaluation() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [round, setRound] = useState('all');
-  const [roundStatus, setRoundStatus] = useState<'all' | 'ACTIVE' | 'CLOSED'>('all');
+  const [roundStatus, setRoundStatus] = useState<'all' | 'ACTIVE' | 'CLOSED'>('ACTIVE');
   const [column, setColumn] = useState('');
   const [bulkScore, setBulkScore] = useState('8');
   const [page, setPage] = useState(1);

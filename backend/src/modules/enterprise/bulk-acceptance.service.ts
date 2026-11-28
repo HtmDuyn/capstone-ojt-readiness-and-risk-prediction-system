@@ -22,19 +22,19 @@ async function preview(c:PoolClient,candidateIds:number[],companyId:number,actor
   if(candidate.ApplicationID){const application=(await c.query('SELECT "PostID" FROM "JobApplications" WHERE "ApplicationID"=$1',[candidate.ApplicationID])).rows[0];if(application)await assertPostPhase(c,application.PostID,'RESULTS');}
  }
  const semesterIds=[...new Set(candidates.map(candidate=>candidate.OJTSemesterID))].sort((a,b)=>a-b);
- const semesters=[];
- for(const semesterId of semesterIds){
-  const row=(await c.query(`SELECT term."Name" AS name,
-   (SELECT COALESCE(sum(p."Capacity"),0)::int FROM "InternshipPositions" p WHERE p."EnterpriseID"=$1 AND p."OJTSemesterID"=$2 AND p."DeletedAt" IS NULL AND p."ArchivedAt" IS NULL) AS capacity,
+ const capacityRows=semesterIds.length?(await c.query(`SELECT term."OJTSemesterID" AS "semesterId",term."Name" AS name,
+   (SELECT COALESCE(sum(p."Capacity"),0)::int FROM "InternshipPositions" p WHERE p."EnterpriseID"=$1 AND p."OJTSemesterID"=term."OJTSemesterID" AND p."DeletedAt" IS NULL AND p."ArchivedAt" IS NULL) AS capacity,
    (SELECT count(DISTINCT placed.student)::int FROM (
-    SELECT r."StudentID" AS student FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."EnterpriseID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED'
-    UNION SELECT a."StudentID" FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."EnterpriseID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
-    UNION SELECT receipt."StudentID" FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE co."EnterpriseID"=$1 AND receipt."OJTSemesterID"=$2
-   ) placed) AS "currentCount" FROM "OJTSemesters" term WHERE term."OJTSemesterID"=$2`,[companyId,semesterId])).rows[0];
+    SELECT r."StudentID" AS student FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" r USING("RegistrationID") WHERE co."EnterpriseID"=$1 AND co."OJTSemesterID"=term."OJTSemesterID" AND co."Decision"='ACCEPTED'
+    UNION SELECT a."StudentID" FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."EnterpriseID"=$1 AND co."OJTSemesterID"=term."OJTSemesterID" AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
+    UNION SELECT receipt."StudentID" FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE co."EnterpriseID"=$1 AND receipt."OJTSemesterID"=term."OJTSemesterID"
+   ) placed) AS "currentCount" FROM "OJTSemesters" term WHERE term."OJTSemesterID"=ANY($2::int[]) ORDER BY term."OJTSemesterID"`,[companyId,semesterIds])).rows:[];
+ const semesters=capacityRows.map(row=>{
+  const semesterId=row.semesterId;
   const selectedCount=candidates.filter(candidate=>candidate.OJTSemesterID===semesterId).length;
   const afterCount=row.currentCount+selectedCount;
-  semesters.push({ojtSemesterId:semesterId,...row,selectedCount,afterCount,excessCount:Math.max(0,afterCount-row.capacity)});
- }
+  return {ojtSemesterId:semesterId,name:row.name,capacity:row.capacity,currentCount:row.currentCount,selectedCount,afterCount,excessCount:Math.max(0,afterCount-row.capacity)};
+ });
  const confirmationToken=createHash('sha256').update(JSON.stringify({actor:actor.userId,companyId,candidateIds,semesters})).digest('hex');
  return {candidateIds,semesters,totalSelected:candidateIds.length,overCapacity:semesters.some(item=>item.excessCount>0),confirmationToken};
 }

@@ -1,4 +1,4 @@
-import { placementBoard, supplementPlacement } from './placement.service';
+import { placementBoard, placementDashboardSummary, supplementPlacement } from './placement.service';
 import { dashboardSummary, report, reportQuery, reportCsv } from './report.service';
 import { Router, type RequestHandler } from 'express';
 import { authenticate } from '../../middleware/authenticate';
@@ -14,6 +14,7 @@ const staff=[authenticate,authorizeRoles('ADMIN','OJT_COORD')];
 const admin=[authenticate,authorizeRoles('ADMIN')];
 const handle=(work:(req:any)=>Promise<unknown>,status=200):RequestHandler=>async(req,res,next)=>{try{res.status(status).json({success:true,data:await work(req)});}catch(error){next(error);}};
 router.get('/qhdn/placements',...staff,handle(req=>placementBoard(req.query,req.user)));
+router.get('/qhdn/placements/summary',...staff,handle(req=>placementDashboardSummary(req.query,req.user)));
 router.post('/qhdn/placements',...staff,handle(req=>supplementPlacement(req.body,req.user),201));
 router.get('/qhdn/eligible-students',...staff,handle(req=>eligibleStudents(req.query,req.user)));
 router.get('/qhdn/students/:id',...staff,handle(req=>studentDossier(positiveId(req.params.id),req.query,req.user)));

@@ -30,10 +30,10 @@ import { missingRecruitmentRounds } from "@/utils/shared/recruitmentSchedule";
 import {
   listCompanies,
   listCoordinations,
-  getDashboardPlacementBoard,
+  getDashboardPlacementSummary,
   getQhdnDashboardSummary,
 } from "@/services/qhdnService";
-import { placementDashboardStats, type QhdnDashboardSummary, type DashboardPlacementBoard } from '@/utils/qhdn/qhdnDashboard';
+import type { QhdnDashboardSummary, DashboardPlacementSummary } from '@/utils/qhdn/qhdnDashboard';
 import { OjtPipelineChart, EnterpriseQuotaChart } from "@/components/qhdn/QhdnDashboardCharts";
 import type {
   CoordinationItem,
@@ -47,7 +47,7 @@ export const QhdnDashboard: React.FC = () => {
   const catalog = useQhdnAcademicPeriods("", false, true);
   const selectedSemesterId = catalog.ojtSemesterId;
   const selectedSemesterName = catalog.selectedPeriod?.name || "—";
-  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: ReturnType<typeof placementDashboardStats>; companies: DashboardPlacementBoard['companies'] } | null>(null);
+  const [placementStats, setPlacementStats] = useState<{ semesterId: number; stats: DashboardPlacementSummary['stats']; companies: DashboardPlacementSummary['companies'] } | null>(null);
   const [internshipStats, setInternshipStats] = useState<{ semesterId: number; data: QhdnDashboardSummary } | null>(null);
   const [internshipError, setInternshipError] = useState('');
   const [eligibleError, setEligibleError] = useState('');
@@ -113,8 +113,8 @@ export const QhdnDashboard: React.FC = () => {
     queueMicrotask(() => {
       if (signal.aborted) return;
       void Promise.allSettled([
-        getDashboardPlacementBoard(selectedSemesterId, signal)
-          .then(board => { if (!signal.aborted) setPlacementStats({ semesterId: selectedSemesterId, stats: placementDashboardStats(board.items), companies: board.companies }); })
+        getDashboardPlacementSummary(selectedSemesterId, signal)
+          .then(summary => { if (!signal.aborted) setPlacementStats({ semesterId: selectedSemesterId, ...summary }); })
           .catch(error => { if (!signal.aborted) setEligibleError(errorMessage(error)); }),
         getQhdnDashboardSummary(selectedSemesterId, signal)
           .then(data => { if (!signal.aborted) setInternshipStats({ semesterId: selectedSemesterId, data }); })

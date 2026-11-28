@@ -3,6 +3,7 @@ import { CurriculumImportActions } from "@/components/education/CurriculumImport
 import { curriculumService } from '@/services/educationService';
 import { getAllItems } from "@/services/educationService";
 import type { CurriculumDetail, CurriculumSummary, Major } from '@/types/education/curriculum.types';
+import { BookOpen, GraduationCap, Layers3, LibraryBig, ListChecks } from 'lucide-react';
 import React from "react";
 const EducationCurriculumPlan: React.FC = () => {
   const [majors, setMajors] = React.useState<Major[]>([]),
@@ -82,11 +83,15 @@ const EducationCurriculumPlan: React.FC = () => {
         description="Nhập và tra cứu khung chương trình, môn học và combo. Không sửa, xóa hoặc thay thế dữ liệu đã nhập."
         badge="Phòng Đào tạo"
       />
-      <section className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex flex-wrap items-center gap-3">
+      <section className="min-w-0 space-y-5">
+        <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50/80 via-white to-orange-50/40 px-5 py-5 sm:px-6">
+          <div className="mb-4 flex items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-700"><LibraryBig size={22}/></span><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Tra cứu học vụ</p><h2 className="mt-1 text-lg font-bold text-slate-900">Chọn khung chương trình</h2><p className="mt-1 text-sm text-slate-500">Lọc theo chuyên ngành để xem môn học, tín chỉ và các combo.</p></div></div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-0 flex-1 space-y-1.5 text-xs font-semibold text-slate-600 sm:min-w-44"><span>Chuyên ngành</span>
           <select
             aria-label="Chuyên ngành"
-            className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 sm:w-auto sm:min-w-44 sm:flex-1"
+            className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             value={majorId}
             onChange={(e) => {
               defaultsApplied.current = true;
@@ -101,9 +106,11 @@ const EducationCurriculumPlan: React.FC = () => {
               </option>
             ))}
           </select>
+          </label>
+          <label className="min-w-0 flex-[1.5] space-y-1.5 text-xs font-semibold text-slate-600 sm:min-w-60"><span>Khung chương trình</span>
           <select
             aria-label="Khung chương trình"
-            className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 sm:w-auto sm:min-w-60 sm:flex-[2]"
+            className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             value={programId}
             onChange={(e) => { defaultsApplied.current = true; setProgramId(e.target.value); }}
           >
@@ -116,12 +123,15 @@ const EducationCurriculumPlan: React.FC = () => {
                 </option>
               ))}
           </select>
+          </label>
           <CurriculumImportActions
             majors={majors}
             selectedMajorCode={selectedMajor?.code ?? null}
             curriculumDetail={detail}
             onCommitted={() => setRefresh((v) => v + 1)}
           />
+        </div>
+        </div>
         </div>
         {loading && <p role="status">Đang tải dữ liệu...</p>}
         {error && (
@@ -130,34 +140,33 @@ const EducationCurriculumPlan: React.FC = () => {
           </p>
         )}
         {!programId && (
-          <p>
+          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">
             Chọn khung đã nhập để xem; sử dụng chức năng import để thêm khung
             mới.
           </p>
         )}
         {detail && (
           <>
-            <div className="space-y-4 border-b border-slate-200 pb-5">
-              <h2 className="text-lg font-semibold text-slate-900">Thông tin khung chương trình</h2>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-500">Mã khung chương trình</p>
-                <p className="mt-1 break-words text-sm font-semibold text-orange-700">{detail.code}</p>
-                <p className="mt-3 text-xs font-medium text-slate-500">Tên khung chương trình</p>
-                <p className="mt-1 break-words text-base font-semibold text-slate-900">{detail.name}</p>
+            <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 via-white to-blue-50/50 p-5 sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">{detail.code}</p><h2 className="mt-1 break-words text-xl font-bold leading-snug text-slate-900 sm:text-2xl">{detail.name}</h2><p className="mt-1 text-sm text-slate-500">{detail.majorName}</p></div>
+                <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700"><GraduationCap size={15}/>Khung chương trình</span>
               </div>
-              <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ['Chuyên ngành', detail.majorName],
-                  ['Tổng số tín chỉ', detail.totalCredits],
-                  ['Phiên bản', detail.version ?? '—'],
-                  ['Năm áp dụng', detail.effectiveYear ?? '—'],
-                ].map(([label, value]) => (
-                  <div key={label} className="min-w-0 rounded-lg bg-slate-50 px-4 py-3">
-                    <dt className="text-xs font-medium text-slate-500">{label}</dt>
-                    <dd className="mt-1 break-words text-sm font-semibold text-slate-800">{value}</dd>
+              <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {([
+                  ['Tổng tín chỉ', detail.totalCredits, BookOpen],
+                  ['Môn học', detail.courses.length, ListChecks],
+                  ['Combo', detail.combos.length, Layers3],
+                ] as const).map(([label, value, Icon]) => (
+                  <div key={String(label)} className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-100 bg-white/90 px-4 py-3 shadow-sm">
+                    <Icon size={18} className="shrink-0 text-blue-600"/>
+                    <span className="min-w-0"><dt className="text-xs font-medium text-slate-500">{label}</dt><dd className="mt-0.5 break-words text-sm font-bold text-slate-900">{value}</dd></span>
                   </div>
                 ))}
               </dl>
+            </div>
+            <div className="space-y-5 p-5 sm:p-6">
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold text-slate-800">Mô tả khung chương trình</h3>
                 <p className={`mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700 ${hasLongDescription && !descriptionExpanded ? 'line-clamp-3' : ''}`}>
@@ -165,14 +174,13 @@ const EducationCurriculumPlan: React.FC = () => {
                 </p>
                 {hasLongDescription && <button type="button" onClick={() => setDescriptionExpanded(value => !value)} aria-expanded={descriptionExpanded} className="mt-2 text-sm font-medium text-orange-700 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500">{descriptionExpanded ? 'Thu gọn' : 'Xem thêm'}</button>}
               </div>
-            </div>
-            <h3 className="text-base font-semibold text-slate-900">Môn học trong khung</h3>
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-blue-700">Chi tiết đào tạo</p><h3 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={18} className="text-blue-700"/>Môn học trong khung</h3></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{detail.courses.length} môn</span></div>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
               <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
                 <caption className="sr-only">Danh sách môn học trong khung chương trình</caption>
                 <colgroup><col className="w-[12%]" /><col className="w-[34%]" /><col className="w-[11%]" /><col className="w-[8%]" /><col className="w-[13%]" /><col className="w-[22%]" /></colgroup>
-                <thead className="bg-[#EFF6FF] text-[#334155]">
-                  <tr className="border-b border-[#D6E4F0]">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr className="border-b border-slate-200">
                     {[
                       "Mã môn",
                       "Tên môn",
@@ -189,7 +197,7 @@ const EducationCurriculumPlan: React.FC = () => {
                 </thead>
                 <tbody>
                   {detail.courses.map((c) => (
-                    <tr key={c.id} className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]">
+                    <tr key={c.id} className="border-t border-slate-100 bg-white transition-colors hover:bg-blue-50/50">
                       <td className="break-words px-4 py-3 align-top font-medium leading-6 text-slate-800">{c.courseCode}</td>
                       <td className="break-words px-4 py-3 align-top leading-6 text-slate-700">{c.name}</td>
                       <td className="px-4 py-3 text-center align-top leading-6 tabular-nums text-slate-700">{c.semester}</td>
@@ -201,20 +209,20 @@ const EducationCurriculumPlan: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            <h3 className="text-base font-semibold text-slate-900">Combo</h3>
-            {!detail.combos.length && <p>Khung này chưa có combo.</p>}
+            <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-violet-700">Lựa chọn chuyên sâu</p><h3 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900"><Layers3 size={18} className="text-violet-700"/>Combo môn học</h3></div><span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">{detail.combos.length} combo</span></div>
+            {!detail.combos.length && <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">Khung này chưa có combo.</p>}
             {detail.combos.map((combo) => (
-              <section key={combo.id} className="min-w-0 space-y-3 rounded-xl border border-slate-200 p-4">
+              <section key={combo.id} className="min-w-0 space-y-3 rounded-2xl border border-violet-100 bg-violet-50/20 p-4 sm:p-5">
                 <h4 className="break-words text-sm font-semibold leading-6 text-slate-900">
                   {combo.code} — {combo.name}
                 </h4>
                 <p className="whitespace-pre-line break-words text-sm leading-6 text-slate-600">{combo.note}</p>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                   <table className="w-full min-w-[1040px] table-fixed text-left text-sm">
                     <caption className="sr-only">Danh sách môn học của combo {combo.code}</caption>
                     <colgroup><col className="w-[12%]" /><col className="w-[34%]" /><col className="w-[11%]" /><col className="w-[8%]" /><col className="w-[35%]" /></colgroup>
-                    <thead className="bg-[#EFF6FF] text-[#334155]">
-                      <tr className="border-b border-[#D6E4F0]">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr className="border-b border-slate-200">
                         {[
                           "Mã môn",
                           "Tên môn",
@@ -230,7 +238,7 @@ const EducationCurriculumPlan: React.FC = () => {
                     </thead>
                     <tbody>
                       {combo.courses.map((c) => (
-                        <tr className="border-t border-[#E2E8F0] bg-white transition-colors duration-150 hover:bg-[#EAF2FF]" key={c.id}>
+                        <tr className="border-t border-slate-100 bg-white transition-colors hover:bg-violet-50/40" key={c.id}>
                           <td className="break-words px-4 py-3 align-top font-medium leading-6 text-slate-800">{c.courseCode}</td>
                           <td className="break-words px-4 py-3 align-top leading-6 text-slate-700">{c.name}</td>
                           <td className="px-4 py-3 text-center align-top leading-6 tabular-nums text-slate-700">{c.semester}</td>
@@ -243,6 +251,8 @@ const EducationCurriculumPlan: React.FC = () => {
                 </div>
               </section>
             ))}
+            </div>
+            </div>
           </>
         )}
       </section>

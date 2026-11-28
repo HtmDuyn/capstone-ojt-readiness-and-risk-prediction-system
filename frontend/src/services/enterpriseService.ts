@@ -63,6 +63,7 @@ export interface PaginatedResponse<T> {
     total: number;
     page: number;
     limit: number;
+    rounds?: Array<{ id: string; name: string }>;
   };
 }
 

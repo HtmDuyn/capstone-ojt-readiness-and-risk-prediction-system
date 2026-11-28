@@ -211,7 +211,7 @@ export const EnterpriseInterns: React.FC = () => {
   // Filter & Search states for the main table (Using dropdowns instead of tabs)
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOjtSemesterId, setSelectedOjtSemesterId] = useState('');
-  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('');
+  const [selectedPeriodStatus, setSelectedPeriodStatus] = useState<'' | 'ACTIVE' | 'CLOSED'>('ACTIVE');
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('ALL');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('ALL');
 
