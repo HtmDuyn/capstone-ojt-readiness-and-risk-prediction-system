@@ -15,7 +15,7 @@ const STUDENT_STATUS_ALIASES: Partial<Record<StudentAcademicStatus, string[]>> =
 
 export const STUDENT_IMPORT_COLUMNS = [
   'Họ và tên', 'Mã sinh viên', 'Email', 'Số điện thoại',
-  'Mã chương trình đào tạo', 'Trạng thái học vụ', 'Khóa', 'Nhóm',
+  'Mã chương trình đào tạo', 'Khóa', 'Nhóm',
 ];
 export const COURSE_RESULT_COLUMNS = [
   'Mã sinh viên', 'Mã môn', 'Kỳ học', 'Lần học', 'Trạng thái', 'Điểm số',
@@ -124,6 +124,8 @@ const readRows = (
   const aliases = sheetName === 'Danh sách sinh viên'
     ? [...STUDENT_IMPORT_COLUMNS, 'Mã chuyên ngành', 'majorCode', 'Mã khung chương trình', 'Chương trình đào tạo', 'Lớp', 'Trạng thái sinh viên', 'Học kỳ bắt đầu chuyên ngành', 'Kỳ bắt đầu chuyên ngành', 'MSSV', 'code', 'Họ tên', 'fullName', 'phone', 'className', 'programId', 'programName', 'status', 'studentStatus', 'cohortId', 'cohortCode', 'groupCode', 'Kỳ nhập học chuyên ngành', 'Kỳ nhập học', 'entryAcademicPeriodId']
     : [...COURSE_RESULT_COLUMNS, 'Học kỳ ghi nhận', 'Điểm hệ 4', 'Điểm chữ', 'Nguồn dữ liệu', 'MSSV', 'code', 'courseCode', 'academicPeriodId', 'attemptNumber', 'status', 'score', 'gradePoints', 'grade', 'sourceReference'];
+  // Continue accepting older workbooks that include the optional status column.
+  if (sheetName === 'Danh sách sinh viên') aliases.push('Trạng thái học vụ');
   const supported = new Set(aliases.map(normalize));
   const unknown = [...new Set(data.flatMap(row => Object.keys(row).filter(key => !supported.has(normalize(key)) && text(row[key]) !== '')))];
   if (unknown.length) throw new Error(`Sheet ${sheetName}: tên cột chưa đúng hoặc chưa được hỗ trợ: ${unknown.join(', ')}. Hãy dùng mẫu chuẩn để tránh bỏ sót dữ liệu.`);
@@ -141,7 +143,7 @@ const readRows = (
 export const createStudentImportWorkbook = (): XLSX.WorkBook => {
   const book = XLSX.utils.book_new();
   const sheets: [string, string[], number[], number[]][] = [
-    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 23, 20, 12], [1, 3, 4, 6, 7]],
+    ['Danh sách sinh viên', STUDENT_IMPORT_COLUMNS, [30, 19, 36, 20, 24, 20, 12], [1, 3, 4, 5, 6]],
     ['Kết quả học tập', COURSE_RESULT_COLUMNS, [19, 17, 20, 14, 19, 15], [0, 1, 2, 4]],
   ];
   for (const [name, headers, widths, textColumns] of sheets) {
@@ -192,10 +194,6 @@ export const createStudentImportTemplateFile = (): Uint8Array => {
       const view = '<sheetView workbookViewId="0"/>';
       if (!xml.includes(view)) throw new Error('Không tạo được file Excel mẫu: thiếu cấu hình cố định hàng tiêu đề.');
       xml = xml.replace(view, '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>');
-      if (index === 1) {
-        const validation = '<dataValidations count="1"><dataValidation type="list" allowBlank="1" showInputMessage="1" promptTitle="Trạng thái học vụ" prompt="Chọn trạng thái bằng tiếng Việt" sqref="G2:G501"><formula1>"Đang học,Bảo lưu,Thôi học"</formula1></dataValidation></dataValidations>';
-        xml = xml.replace('</worksheet>', `${validation}</worksheet>`);
-      }
       return xml.replace(/<c r="([A-Z]+)1"([^>]*)>/g, (_cell, column: string, attributes: string) => `<c r="${column}1" s="${headerStyle}"${attributes}>`);
     });
   }
