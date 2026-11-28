@@ -31,10 +31,13 @@ export async function assignTasks(body: unknown, actor: Actor) {
     if(old){if(old.UserID!==actor.userId||old.data.hash!==hash)throw invalid('Idempotency key conflict.',409);return {...old.data.result,replayed:true};}
     const companyId=await enterpriseScope(c,actor);
     if(companyId===null)throw invalid('Enterprise role required.',403);
-    const assignments=await c.query(`SELECT "AssignmentID","EnterpriseID","Status" FROM "InternshipAssignments" WHERE "AssignmentID"=ANY($1::int[]) FOR UPDATE`,[ids]);
+    const assignments=await c.query(`SELECT a."AssignmentID",a."EnterpriseID",a."Status",
+      EXISTS(SELECT 1 FROM "InternshipEvaluations" ev WHERE ev."AssignmentID"=a."AssignmentID" AND ev."Status"='SUBMITTED') AS "EvaluationFinalized"
+      FROM "InternshipAssignments" a WHERE a."AssignmentID"=ANY($1::int[]) FOR UPDATE OF a`,[ids]);
     if(assignments.rows.length!==ids.length)throw invalid('Internship assignment not found.',404,'QHDN_RECORD_NOT_FOUND');
     for(const assignment of assignments.rows){
       if(assignment.EnterpriseID!==companyId)throw invalid('This internship belongs to another enterprise.',403,'FORBIDDEN');
+      if(assignment.EvaluationFinalized)throw invalid('Sinh viên đã chốt điểm, không thể giao thêm nhiệm vụ.',409,'OJT_SCORE_FINALIZED');
       if(!['ASSIGNED','ACTIVE','IN_PROGRESS'].includes(String(assignment.Status).toUpperCase()))throw invalid('Tasks require an accepted, ongoing internship.',409);
     }
     const deadlines=tasks.map(task=>task.dueDate.length===10 ? task.dueDate+'T23:59:59.999999' : task.dueDate);

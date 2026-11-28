@@ -38,7 +38,7 @@ export function InternshipEvaluationDetailsDialog({ internship, semesterLabel, c
   // An older evaluation must keep its own issued criteria and weights.
   const criteria = evaluation?.criteria?.length ? evaluation.criteria : templateMatches ? template?.criteria ?? [] : [];
   const complete = criteria.length > 0 && criteria.every(field => parseEvaluationScore(String(evaluation?.scoreDetails?.[field.key] ?? '')) !== null);
-  const status = evaluation?.status === 'SUBMITTED' ? 'Đã gửi QHDN' : evaluation && complete ? 'Đã lưu' : 'Thiếu điểm';
+  const status = evaluation?.status === 'SUBMITTED' ? 'Đã chốt điểm' : evaluation && complete ? 'Đã lưu' : 'Thiếu điểm';
   const templateName = templateMatches && template ? `${template.name} · Phiên bản ${template.version}` : 'Bộ tiêu chí theo đánh giá đã lưu';
 
   return <StudentDialog title={`Chi tiết sinh viên và đánh giá · ${student.fullName || student.studentCode}`} onClose={onClose} busy={certificateBusy}>

@@ -252,7 +252,7 @@ export function EnterpriseEvaluation() {
     setConfirmationError('');
     try {
       if (!await persistEvaluations(selectedRows, 'SUBMITTED')) return;
-      setMessage(`Đã gửi đánh giá của ${selectedRows.length} sinh viên đến Phòng QHDN. Điểm đã được khóa.`);
+      setMessage(`Đã chốt điểm cho ${selectedRows.length} sinh viên và gửi kết quả đến Phòng QHDN.`);
       setConfirming(false);
     } catch (e) { setConfirmationError(errorText(e)); }
   };
@@ -268,13 +268,13 @@ export function EnterpriseEvaluation() {
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-busy={loading || busy}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
         <div><h2 className="text-lg font-bold text-slate-900">Đánh giá thực tập sinh</h2><p className="mt-1 text-sm text-slate-500">Điểm tổng = tổng (điểm từng tiêu chí × tỷ lệ %) / 100. Các cột và tỷ lệ do Phòng Đào tạo ban hành, chấm theo thang 0–10.</p></div>
-        <span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700">Đã gửi {rows.filter(row => row.status === 'SUBMITTED').length} / {rows.length} sinh viên</span>
+        <span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700">Đã chốt điểm {rows.filter(row => row.status === 'SUBMITTED').length} / {rows.length} sinh viên</span>
       </div>
       <div className="space-y-4 border-b border-slate-100 bg-slate-50/60 p-5">
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-52 flex-1 text-xs font-semibold text-slate-600">Tìm sinh viên<div className="relative mt-1.5"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input className={inputClass + ' w-full pl-9'} placeholder="Họ tên, mã sinh viên, vị trí…" value={search} disabled={busy || loading} onChange={e => setSearch(e.target.value)} /></div></label>
           <label className="text-xs font-semibold text-slate-600">Đợt OJT<select className={inputClass + ' mt-1.5 block'} value={semester} disabled={busy || loading} onChange={e => setSemester(e.target.value)}><option value="all">Tất cả đợt OJT</option>{semesters.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-          <label className="text-xs font-semibold text-slate-600">Trạng thái<select className={inputClass + ' mt-1.5 block'} value={status} disabled={busy || loading} onChange={e => setStatus(e.target.value)}><option value="all">Tất cả trạng thái</option><option value="saved">Đã lưu</option><option value="submitted">Đã gửi QHDN</option><option value="missing">Thiếu điểm</option></select></label>
+          <label className="text-xs font-semibold text-slate-600">Trạng thái<select className={inputClass + ' mt-1.5 block'} value={status} disabled={busy || loading} onChange={e => setStatus(e.target.value)}><option value="all">Tất cả trạng thái</option><option value="saved">Đã lưu</option><option value="submitted">Đã chốt điểm</option><option value="missing">Thiếu điểm</option></select></label>
         </div>
         <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
           <label className="text-xs font-semibold text-slate-600">Nhập điểm<input type="number" min={0} max={10} step="0.01" inputMode="decimal" placeholder="0–10" className={inputClass + ' mt-1.5 block w-32'} value={bulkScore} disabled={busy || loading} aria-invalid={bulkScore !== '' && parseEvaluationScore(bulkScore) === null} onChange={e => setBulkScore(e.target.value)} /></label>
@@ -329,7 +329,7 @@ export function EnterpriseEvaluation() {
                       <span aria-hidden="true" className="mt-1 h-4" />
                     </div>
                   </td>
-                  <td className="px-4 py-4"><span className={'inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ' + (state === 'submitted' ? 'bg-emerald-50 text-emerald-700' : state === 'saved' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-600')}>{state === 'submitted' ? 'Đã gửi QHDN' : state === 'saved' ? 'Đã lưu' : 'Thiếu điểm'}</span>{!row.templateId && row.status !== 'SUBMITTED' ? <p className="mt-2 text-xs text-amber-700">Chờ Đào tạo ban hành tiêu chí</p> : row.gradingChanged && !row.locked && <p className="mt-2 text-xs text-amber-700">Cần chấm lại theo quy ước mới</p>}</td>
+                  <td className="px-4 py-4"><span className={'inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ' + (state === 'submitted' ? 'bg-emerald-50 text-emerald-700' : state === 'saved' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-600')}>{state === 'submitted' ? 'Đã chốt điểm' : state === 'saved' ? 'Đã lưu' : 'Thiếu điểm'}</span>{!row.templateId && row.status !== 'SUBMITTED' ? <p className="mt-2 text-xs text-amber-700">Chờ Đào tạo ban hành tiêu chí</p> : row.gradingChanged && !row.locked && <p className="mt-2 text-xs text-amber-700">Cần chấm lại theo quy ước mới</p>}</td>
                   <td className="px-4 py-4 text-right"><div className="flex items-center justify-end gap-2">
                     <button type="button" className={iconActionClass} disabled={busy} title="Xem thông tin sinh viên và đánh giá doanh nghiệp" aria-label={`Xem thông tin sinh viên và đánh giá của ${row.fullName} (${row.studentCode})`} onClick={() => setEvaluationDetailId(row.id)}><Eye size={16} aria-hidden="true" /></button>
                     <button type="button" className={iconActionClass} disabled={busy || row.locked} title={scoreAction} aria-label={`${scoreAction} của ${row.fullName} (${row.studentCode})`} onClick={() => openEditor(row)}>{row.locked ? <LockKeyhole size={16} aria-hidden="true" /> : hasScores ? <Pencil size={16} aria-hidden="true" /> : <ClipboardCheck size={16} aria-hidden="true" />}</button>
