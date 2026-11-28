@@ -114,6 +114,14 @@ async function syncStudentProgress(client: PoolClient) {
     JOIN "AcademicPeriods" current ON current."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
     LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=current."ParentPeriodID"
     WHERE student."StudentID"=placement."StudentID"`);
+  await client.query(`UPDATE "StudentAcademicPlacements" placement SET "ActualSemester"=(
+    SELECT count(*)::integer FROM "AcademicPeriods" semester
+    JOIN "AcademicPeriods" entry ON entry."AcademicPeriodID"=placement."EntryAcademicPeriodID"
+    JOIN "AcademicPeriods" current ON current."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
+    LEFT JOIN "AcademicPeriods" parent ON parent."AcademicPeriodID"=current."ParentPeriodID"
+    WHERE semester."Kind"='SEMESTER' AND semester."StartDate">entry."StartDate"
+      AND semester."StartDate"<=CASE WHEN current."Kind"='BLOCK3' THEN parent."StartDate" ELSE current."StartDate" END
+  )`);
 }
 
 export async function saveResource(resource: Resource, input: unknown, actorId: number, id?: number, existingClient?: PoolClient) {
@@ -196,7 +204,7 @@ export async function assignPlacementWithClient(client:PoolClient,studentId:numb
     await validateCalendar(client);
     await syncStudentProgress(client);
     const result = (await client.query(`SELECT p."StudentID" AS "studentId",p."CohortID" AS "cohortId",p."GroupCode" AS "groupCode",
-      p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId",
+      p."EntryAcademicPeriodID" AS "entryAcademicPeriodId",p."CurrentAcademicPeriodID" AS "currentAcademicPeriodId",p."ActualSemester" AS "actualSemester",
       s."CurrentSemester" AS "currentSemester",s."EnrollmentYear" AS "enrollmentYear",s."ProgramID" AS "programId",p."UpdatedAt" AS "updatedAt"
       FROM "StudentAcademicPlacements" p JOIN "Students" s ON s."StudentID"=p."StudentID" WHERE p."StudentID"=$1`, [studentId])).rows[0];
     await audit(client, actorId, 'StudentAcademicPlacements', studentId, 'UPDATE_ACADEMIC_PLACEMENT', { placement: previous ?? null, programId: student.ProgramID, currentSemester: student.CurrentSemester }, result, reason);

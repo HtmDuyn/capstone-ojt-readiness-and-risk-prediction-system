@@ -36,6 +36,7 @@ export interface StudentProgress {
   cohort: string;
   curriculumCode: string;
   currentCurriculumSemester: number | null;
+  actualSemester?: number | null;
   courseSemesterTag?: number | null;
   currentTerm: string;
   currentTermStartDate: string | null;

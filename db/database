@@ -1275,6 +1275,7 @@ CREATE TABLE public."StudentAcademicPlacements" (
   "GroupCode" character(1) NOT NULL,
   "EntryAcademicPeriodID" integer NOT NULL,
   "CurrentAcademicPeriodID" integer NOT NULL,
+  "ActualSemester" integer NOT NULL DEFAULT 0,
   "UpdatedBy" integer NOT NULL,
   "UpdatedAt" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "StudentAcademicPlacements_pkey" PRIMARY KEY ("StudentID")
@@ -7660,24 +7661,29 @@ JOIN LATERAL (
 WHERE NOT EXISTS (SELECT 1 FROM public."Students" s WHERE s."UserID"=u."UserID" OR s."StudentCode"=r."StudentCode")
 ON CONFLICT DO NOTHING;
 
-INSERT INTO public."StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","UpdatedBy")
-SELECT s."StudentID",c."CohortID",'A',entry."AcademicPeriodID",current_period."AcademicPeriodID",academic."UserID"
+INSERT INTO public."StudentAcademicPlacements" ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","ActualSemester","UpdatedBy")
+SELECT s."StudentID",c."CohortID",'A',entry."AcademicPeriodID",current_period."AcademicPeriodID",
+  (SELECT count(*)::integer FROM public."AcademicPeriods" actual_period
+   WHERE actual_period."Kind"='SEMESTER' AND actual_period."StartDate">entry."StartDate"
+     AND actual_period."StartDate"<=current_period_row."StartDate"),academic."UserID"
 FROM qhdn_student_roster r JOIN public."Users" u ON u."Email"=r."Email"
 JOIN public."Students" s ON s."UserID"=u."UserID" AND s."ProgramID"=r."ProgramID"
 JOIN public."Cohorts" c ON c."CohortCode"=r."CohortCode"
 JOIN public."CohortGroups" cohort_group ON cohort_group."CohortID"=c."CohortID" AND cohort_group."GroupCode"='A'
 JOIN public."AcademicPeriods" entry ON entry."AcademicPeriodID"=cohort_group."EntryAcademicPeriodID"
 JOIN LATERAL (
-  SELECT mapping."AcademicPeriodID"
+  SELECT mapping."AcademicPeriodID",mapped_period."StartDate"
   FROM public."CohortCurriculumPeriods" mapping
   JOIN public."AcademicPeriods" mapped_period ON mapped_period."AcademicPeriodID"=mapping."AcademicPeriodID"
   WHERE mapping."CohortID"=c."CohortID" AND mapping."GroupCode"=cohort_group."GroupCode"
     AND mapped_period."StartDate"<=(SELECT "StartDate" FROM public."AcademicPeriods" WHERE "PeriodCode"='FALL2026')
   ORDER BY mapped_period."StartDate" DESC LIMIT 1
-) current_period ON true
+) current_period_row ON true
+JOIN public."AcademicPeriods" current_period ON current_period."AcademicPeriodID"=current_period_row."AcademicPeriodID"
 JOIN public."Users" academic ON academic."Username"='academic01'
 ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCode"=EXCLUDED."GroupCode",
   "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
+  "ActualSemester"=EXCLUDED."ActualSemester",
   "UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
 
 -- Convert source prerequisite prose when it is a list of exact course codes:
@@ -10371,29 +10377,45 @@ BEGIN
   END IF;
 END $verify_new_eligible_failed_courses$;
 
--- Determine each student's curriculum stage from their coursework rather than
--- the calendar-period mapping: use the highest stage with at least two distinct
--- recorded courses. OJT202 and duplicate attempts do not increase the course count.
-CREATE TEMP TABLE qhdn_transcript_curriculum_stage ON COMMIT DROP AS
+-- Use the highest curriculum stage with more than two distinct courses actively in progress.
+-- If no stage meets that definition, preserve the stage from CurrentAcademicPeriodID.
+CREATE TEMP TABLE qhdn_current_course_stage ON COMMIT DROP AS
 SELECT roster."StudentCode",student."StudentID",student."CurrentSemester" AS "PreviousCurrentSemester",
-  max(stage_count."SemesterTaken") FILTER (WHERE stage_count."CourseCount">=2) AS "CurriculumSemester"
+  COALESCE(active_stage."CurriculumSemester",
+    public."StudentCurriculumSemester"(student."StudentID",placement."CurrentAcademicPeriodID"),
+    student."CurrentSemester") AS "CurriculumSemester"
 FROM qhdn_student_roster roster
 JOIN public."Users" account ON account."Email"=roster."Email"
 JOIN public."Students" student ON student."UserID"=account."UserID"
+LEFT JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=student."StudentID"
 LEFT JOIN LATERAL (
-  SELECT result."SemesterTaken",count(DISTINCT result."CourseID") AS "CourseCount"
-  FROM public."StudentCourseResults" result
-  JOIN public."Courses" course ON course."CourseID"=result."CourseID"
-  WHERE result."StudentID"=student."StudentID" AND result."SemesterTaken" BETWEEN 1 AND 9
-    AND result."Status" IN ('PASSED','RECOGNIZED','FAILED','IN_PROGRESS','WITHDRAWN')
-    AND upper(btrim(course."CourseCode"))<>'OJT202'
-  GROUP BY result."SemesterTaken"
-) stage_count ON true
-GROUP BY roster."StudentCode",student."StudentID",student."CurrentSemester";
+  SELECT max(stage_count."CurriculumSemester") FILTER (WHERE stage_count."CourseCount">2) AS "CurriculumSemester"
+  FROM (
+    SELECT active_course."CurriculumSemester",count(DISTINCT active_course."CourseID") AS "CourseCount"
+    FROM (
+      SELECT pc."RecommendedSemester" AS "CurriculumSemester",result."CourseID"
+      FROM public."StudentCourseResults" result
+      JOIN public."ProgramCourses" pc ON pc."ProgramID"=student."ProgramID" AND pc."CourseID"=result."CourseID" AND pc."EntryKind"='COURSE'
+      WHERE result."StudentID"=student."StudentID" AND result."Status"='IN_PROGRESS'
+      UNION
+      SELECT combo_course."Semester" AS "CurriculumSemester",result."CourseID"
+      FROM public."StudentCourseResults" result
+      JOIN public."StudentComboSelections" selection ON selection."StudentID"=student."StudentID"
+        AND selection."ProgramID"=student."ProgramID" AND selection."ConfirmedAt" IS NOT NULL
+      JOIN public."StudentComboCourseSelections" choice ON choice."SelectionID"=selection."SelectionID"
+      JOIN public."ComboCourses" combo_course ON combo_course."ComboCourseID"=choice."ComboCourseID"
+        AND combo_course."CourseID"=result."CourseID"
+      WHERE result."StudentID"=student."StudentID" AND result."Status"='IN_PROGRESS'
+    ) active_course
+    WHERE active_course."CurriculumSemester" BETWEEN 0 AND 9
+    GROUP BY active_course."CurriculumSemester"
+  ) stage_count
+) active_stage ON true
+;
 
 UPDATE public."Students" student
 SET "CurrentSemester"=stage."CurriculumSemester"
-FROM qhdn_transcript_curriculum_stage stage
+FROM qhdn_current_course_stage stage
 WHERE stage."StudentID"=student."StudentID"
   AND student."CurrentSemester" IS DISTINCT FROM stage."CurriculumSemester";
 
@@ -10511,8 +10533,8 @@ INSERT INTO public."AuditLogs" ("UserID","Action","EntityType","EntityID","Detai
 SELECT academic."UserID",'SEED_UPDATE_CURRICULUM_STAGE','Students',student."StudentID",
   jsonb_build_object('seedKey','CURRICULUM_STAGE:'||student."StudentCode",'studentCode',student."StudentCode",
     'before',stage."PreviousCurrentSemester",'after',stage."CurriculumSemester",
-    'rule','highest curriculum stage containing at least two distinct recorded courses')::text
-FROM qhdn_transcript_curriculum_stage stage
+    'rule','highest curriculum stage with more than two distinct IN_PROGRESS courses; otherwise mapped current period')::text
+FROM qhdn_current_course_stage stage
 JOIN public."Students" student ON student."StudentID"=stage."StudentID"
 JOIN public."Users" academic ON academic."Username"='academic01'
 WHERE stage."PreviousCurrentSemester" IS DISTINCT FROM stage."CurriculumSemester"
@@ -10524,7 +10546,7 @@ SELECT s."StudentCode", roster."FullName", roster."Email", roster."CohortCode",
        program."ProgramCode", roster."SeedScenario",roster."RecruitmentScenario",
        CASE WHEN roster."RecruitmentScenario" IS NOT NULL THEN 'FALL2026 / ROUND 1' END AS "AssignedOJTRound",
        placement_period."PeriodCode" AS "CurrentCalendarPeriod",
-       transcript."CurriculumSemester" AS "CurrentCurriculumSemester",
+       current_stage."CurriculumSemester" AS "CurrentCurriculumSemester",
        CASE
          WHEN roster."HasOJTPlacement" THEN 'COMPLETED_OJT_AND_ELIGIBLE_TRANSCRIPT'
          WHEN roster."Number" IN (13,14,17,18,21,22,81,82,83,84) THEN 'EXISTING_NOT_ELIGIBLE_NO_OJT'
@@ -10538,7 +10560,7 @@ JOIN public."Students" s ON s."UserID"=account."UserID"
 JOIN public."TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
 LEFT JOIN public."StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
 LEFT JOIN public."AcademicPeriods" placement_period ON placement_period."AcademicPeriodID"=placement."CurrentAcademicPeriodID"
-LEFT JOIN qhdn_transcript_curriculum_stage transcript ON transcript."StudentID"=s."StudentID"
+LEFT JOIN qhdn_current_course_stage current_stage ON current_stage."StudentID"=s."StudentID"
 ORDER BY s."StudentCode";
 
 -- BEGIN TASK SUBMISSION ATTACHMENTS

@@ -19,7 +19,7 @@ const template=nil(obj({id,...fields('code','name','status'),version:id,criteria
 const evaluation=nil(obj({id,templateId:nil(id),scoreDetails:{type:'object',nullable:true,additionalProperties:true},completionScore:num,attitudeScore:num,skillScore:num,overallScore:num,...fields('comments','status'),evaluatedAt:time,evaluatedBy:id}));
 const result=nil(obj({id,status:text,version:id,officialScore:num,outcome:nil(text),confirmedAt:time}));
 const coreStudent={id,studentCode:text,userId:id,...fields('fullName','email','phone','accountStatus','status','groupCode'),programId:nil(id),cohortId:nil(id),currentSemester:{type:'integer',minimum:0,maximum:9,nullable:true},
-  entryAcademicPeriodId:nil(id),currentAcademicPeriodId:nil(id),enrollmentYear:id,
+  entryAcademicPeriodId:nil(id),currentAcademicPeriodId:nil(id),actualSemester:{type:'integer',minimum:0,nullable:true,description:'Số kỳ SEMESTER kể từ sau kỳ nhập học; kỳ nhập học là mốc 0.'},enrollmentYear:id,
   courseSemesterTag:{type:'integer',minimum:0,maximum:9,nullable:true,description:'Kỳ lớn nhất của môn IN_PROGRESS trong khung chương trình; null khi không có môn đang học.'},
   latestOjtCheck:nil(obj({status:{type:'string',enum:['ELIGIBLE','NOT_ELIGIBLE','REVIEW_REQUIRED']},checkedAt:time,ojtSemesterId:id,isStale:{type:'boolean'}})),
   program:nil(obj({id,...fields('code','name','version','status','majorName','majorCode'),totalCredits:num,majorId:nil(id)})),
