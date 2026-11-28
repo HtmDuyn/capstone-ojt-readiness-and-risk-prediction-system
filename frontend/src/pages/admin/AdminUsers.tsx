@@ -94,7 +94,7 @@ const AdminUsers: React.FC = () => {
   }, [statusToast]);
   const loadUsers = async () => {
     setLoading(true); setError('');
-    try { const result = await getAccounts(); setUsers(result.data.map(mapAccount)); }
+    try { const result = await getAccounts(); setUsers(result.data.filter(account => account.role_code !== 'ADMIN').map(mapAccount)); }
     catch (e) { setError(e instanceof Error ? e.message : 'Không tải được tài khoản.'); }
     finally { setLoading(false); }
   };
@@ -395,9 +395,6 @@ const AdminUsers: React.FC = () => {
               Doanh nghiệp
             </option>
 
-            <option value="Quản trị viên">
-              Quản trị viên
-            </option>
           </select>
           <select
             aria-label="Lọc theo trạng thái"

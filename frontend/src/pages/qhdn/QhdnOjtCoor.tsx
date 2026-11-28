@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { UserPlus, Eye } from 'lucide-react';
+import { Users, UserPlus, Eye, CircleX, BadgeCheck, Send, Clock3, UserRound } from 'lucide-react';
 import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
 import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
@@ -17,6 +17,7 @@ type Student = {
   fullName: string;
   ojtSemesterId: number | null;
   semesterName: string | null;
+  semesterStatus: string | null;
   coordinationId?: number;
   registrationId?: number | null;
   registrationStatus?: string | null;
@@ -41,12 +42,18 @@ const cell = 'px-4 py-4 align-middle';
 const filterInput = workflowInput + ' h-11 min-w-0 truncate';
 const compactAction = 'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
 
+const semesterStatusLabels: Record<string, string> = { PLANNED: 'Sắp diễn ra', ACTIVE: 'Đang diễn ra', OPEN: 'Đang mở', CLOSED: 'Đã đóng', ARCHIVED: 'Đã lưu trữ', DRAFT: 'Bản nháp' };
+const statusIcons = { REJECTED: CircleX, ACCEPTED: BadgeCheck, APPLIED: Send, WAITING_RESPONSE: Clock3, NOT_APPLIED: UserRound };
+
 export default function QhdnOjtCoordination() {
   const [data, setData] = useState<Board | null>(null), [loading, setLoading] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [revision, setRevision] = useState(0);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState<PlacementStatus | 'ALL'>('ALL'), [busy, setBusy] = useState(false);
+  const [semesterFilter, setSemesterFilter] = useState('ALL');
+  const [semesterStatusFilter, setSemesterStatusFilter] = useState('ALL');
   const [followUpOnly, setFollowUpOnly] = useState(false);
   const [page, setPage] = useState(1), [limit, setLimit] = useState(10);
+  const [companyPage, setCompanyPage] = useState(1), [companyLimit, setCompanyLimit] = useState(10);
   const [task, setTask] = useState<{ students: Student[];bulk:boolean } | null>(null);
   const [detail, setDetail] = useState<Student | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -61,8 +68,8 @@ export default function QhdnOjtCoordination() {
   const taskBoard = data?.semesterBoards.find(board => board.ojtSemesterId === taskSemesterId);
   const taskCompanies = taskBoard ? summarizePlacementCompanies(taskBoard) : [];
 
-  useEffect(() => { setSelectedIds(new Set()); }, [search, filter, followUpOnly]);
-  useEffect(() => { setPage(1); }, [search, filter, followUpOnly, limit]);
+  useEffect(() => { setSelectedIds(new Set()); }, [search, filter, followUpOnly, semesterFilter, semesterStatusFilter]);
+  useEffect(() => { setPage(1); }, [search, filter, followUpOnly, semesterFilter, semesterStatusFilter, limit]);
   useEffect(() => {
     const selectable = new Set(data?.items.filter(canSelectForCoordination).map(student => student.id));
     setSelectedIds(previous => new Set([...previous].filter(id => selectable.has(id))));
@@ -138,13 +145,19 @@ export default function QhdnOjtCoordination() {
     } catch (e) { setError(errorMessage(e)); }
     finally { setBusy(false); }
   };
-  const students = (data?.items ?? []).filter(s => (!followUpOnly || s.needsFollowUp) &&
+  const semesters = [...new Map((data?.items ?? []).filter(student => student.ojtSemesterId !== null).map(student => [String(student.ojtSemesterId), { id: String(student.ojtSemesterId), name: student.semesterName ?? 'Kỳ OJT #' + student.ojtSemesterId, status: student.semesterStatus }])).values()];
+  const availableSemesters = semesters.filter(semester => semesterStatusFilter === 'ALL' || semester.status === semesterStatusFilter);
+  const semesterStudents = (data?.items ?? []).filter(student =>
+    (semesterFilter === 'ALL' || String(student.ojtSemesterId) === semesterFilter) &&
+    (semesterStatusFilter === 'ALL' || student.semesterStatus === semesterStatusFilter));
+  const students = semesterStudents.filter(s => (!followUpOnly || s.needsFollowUp) &&
     (filter === 'ALL' || placementStatus(s) === filter) &&
     `${s.studentCode} ${s.fullName}`.toLowerCase().includes(search.toLowerCase()),
   );
   const selectable = students.filter(canSelectForCoordination);
   const selected = selectable.filter(student => selectedIds.has(student.id));
   const paged = paginateItems(students, page, limit);
+  const pagedCompanies = paginateItems(companies, companyPage, companyLimit);
   const selectedSemesterId = selected[0]?.ojtSemesterId ?? null;
   const pageCandidateStudents = paged.items.filter(canSelectForCoordination);
   const pageSemesterId = selectedSemesterId ?? pageCandidateStudents[0]?.ojtSemesterId ?? null;
@@ -152,6 +165,7 @@ export default function QhdnOjtCoordination() {
   const pageSelectedCount = pageSelectable.filter(student => selectedIds.has(student.id)).length;
   const allSelected = pageSelectable.length > 0 && pageSelectedCount === pageSelectable.length;
   useEffect(() => { setPage(current => Math.min(current, paged.pages)); }, [paged.pages]);
+  useEffect(() => { setCompanyPage(current => Math.min(current, pagedCompanies.pages)); }, [pagedCompanies.pages]);
   const openCoordination = (students: Student[],bulk=false) => {
     setError(''); setBatchErrors([]); setCompleted(0);
     setTask({ students,bulk });
@@ -161,33 +175,47 @@ export default function QhdnOjtCoordination() {
     <PageBanner variant="qhdn" title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên có kết quả xét OJT hợp lệ đến doanh nghiệp; theo dõi phản hồi tiếp nhận và số lượng thực nhận." badge="Phòng QHDN" />
     {error && <Notice>{error}</Notice>}
     {message && <Notice>{message}</Notice>}
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-      {placementStatuses.map(status => <button key={status} disabled={busy} aria-pressed={filter === status}
-        className={'rounded-2xl border p-4 text-left transition ' + (filter === status ? placementStatusColors[status] : 'border-slate-200 bg-white hover:border-slate-300')}
-        onClick={() => setFilter(filter === status ? 'ALL' : status)}>
-        <p className="flex items-center gap-2 text-sm font-medium text-slate-600">
-          <span className={'h-2.5 w-2.5 shrink-0 rounded-full border ' + placementStatusColors[status]} />
-          {placementStatusLabels[status]}
-        </p>
-        <p className="mt-2 text-2xl font-bold tabular-nums text-slate-800">{data?.items.filter(s => placementStatus(s) === status).length ?? 0}</p>
-      </button>)}
+    <div className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] gap-3 overflow-x-auto pb-2" aria-label="Thống kê trạng thái điều phối">
+      {(['ALL', ...placementStatuses] as const).map(status => {
+        const Icon = status === 'ALL' ? Users : statusIcons[status];
+        const count = status === 'ALL' ? semesterStudents.length : semesterStudents.filter(student => placementStatus(student) === status).length;
+        return <div key={status} className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className={'flex size-10 items-center justify-center rounded-xl border ' + (status === 'ALL' ? 'border-orange-200 bg-orange-50 text-orange-700' : placementStatusColors[status])}><Icon size={20} aria-hidden="true" /></span>
+          </div>
+          <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums text-slate-900">{loading ? '—' : count}</p>
+          <p className="mt-1 min-h-10 text-sm font-medium leading-5 text-slate-600">{status === 'ALL' ? 'Tổng số sinh viên' : placementStatusLabels[status]}</p>
+        </div>;
+      })}
     </div>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4">
         <div className="min-w-0">
-          <Field label="Tìm sinh viên">
+          <div className="min-w-0">
             <input className={filterInput} placeholder="Tìm mã hoặc tên sinh viên…" aria-label="Tìm sinh viên" value={search} onChange={e => setSearch(e.target.value)} />
-          </Field>
+          </div>
         </div>
-        <Field label="Trạng thái">
+        <div className="min-w-0">
+          <select className={filterInput} aria-label="Lọc trạng thái kỳ" value={semesterStatusFilter} onChange={e => { setSemesterStatusFilter(e.target.value); setSemesterFilter('ALL'); }}>
+            <option value="ALL">Tất cả trạng thái kỳ</option>
+            {[...new Set(semesters.map(semester => semester.status).filter((status): status is string => !!status))].map(status => <option key={status} value={status}>{semesterStatusLabels[status] ?? status}</option>)}
+          </select>
+        </div>
+        <div className="min-w-0">
+          <select className={filterInput} aria-label="Lọc kỳ OJT" value={semesterFilter} onChange={e => setSemesterFilter(e.target.value)}>
+            <option value="ALL">Tất cả kỳ OJT</option>
+            {availableSemesters.map(semester => <option key={semester.id} value={semester.id}>{semester.name}</option>)}
+          </select>
+        </div>
+        <div className="min-w-0">
           <select className={filterInput} aria-label="Lọc trạng thái" value={filter} onChange={e => setFilter(e.target.value as PlacementStatus | 'ALL')}>
             <option value="ALL">Tất cả trạng thái</option>
             {placementStatuses.map(status => <option key={status} value={status}>{placementStatusLabels[status]}</option>)}
           </select>
-        </Field>
+        </div>
       </fieldset>
-      <p className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Danh sách gồm sinh viên đủ điều kiện ở tất cả kỳ OJT. Chọn sinh viên cùng kỳ OJT để điều phối hàng loạt.</p>
-      <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" disabled={busy} checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({data?.items.filter(s => s.needsFollowUp).length ?? 0})</label>
+      <p className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Danh sách và số liệu thống kê hiển thị theo kỳ OJT và trạng thái kỳ đã chọn. Chọn sinh viên cùng kỳ OJT để điều phối hàng loạt.</p>
+      <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" disabled={busy} checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({semesterStudents.filter(s => s.needsFollowUp).length})</label>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-orange-50/50 px-5 py-3">
         <p className="text-sm text-slate-600" aria-live="polite">Đã chọn <strong className="text-orange-700">{selected.length}</strong> sinh viên <span className="text-slate-500">· {selectable.length} hồ sơ có thể điều phối trong danh sách</span></p>
         <div className="flex flex-wrap gap-2">
@@ -250,8 +278,8 @@ export default function QhdnOjtCoordination() {
       <div className="p-5"><h2 className="font-bold text-slate-800">Chỉ tiêu và số lượng thực nhận</h2><p className="mt-1 text-sm text-slate-500">Số thực nhận tính sinh viên doanh nghiệp đã nhận hoặc đã có phân công, mỗi sinh viên một lần. Số này có thể thấp hơn, bằng hoặc vượt chỉ tiêu; chỉ tiêu ban đầu được giữ nguyên.</p></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">
         <thead className="bg-slate-50 text-xs text-slate-500"><tr>{['STT', 'Doanh nghiệp', 'Chỉ tiêu', 'Sinh viên thực nhận', 'Vượt chỉ tiêu'].map((label, index) => <th scope="col" key={label} className={'px-4 py-3 font-semibold ' + (index === 0 ? 'w-16 text-center' : index > 1 ? 'text-right' : '')}>{label}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-100">{companies.map((company, index) => <tr key={company.key}>
-          <td className={cell + ' text-center tabular-nums text-slate-500'}>{index + 1}</td>
+        <tbody className="divide-y divide-slate-100">{pagedCompanies.items.map((company, index) => <tr key={company.key}>
+          <td className={cell + ' text-center tabular-nums text-slate-500'}>{pagedCompanies.offset + index + 1}</td>
           <td className={cell + ' font-medium text-slate-700'}>{company.name}</td>
           <td className={cell + ' text-right tabular-nums'}>{company.capacity}</td>
           <td className={cell + ' text-right tabular-nums'}>{company.actualCount}</td>
@@ -259,6 +287,9 @@ export default function QhdnOjtCoordination() {
         </tr>)}</tbody>
       </table></div>
       {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu.':'Chưa có doanh nghiệp tiếp nhận trong các kỳ OJT này.'}</p>}
+      <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+        <Pager page={pagedCompanies.page} total={companies.length} limit={companyLimit} busy={loading} onChange={setCompanyPage} onLimitChange={setCompanyLimit} />
+      </div>
     </section>
     {detail?.ojtSemesterId && <StudentProfileModal key={detail.id + ':' + detail.ojtSemesterId} studentId={detail.id} ojtSemesterId={detail.ojtSemesterId} fullName={detail.fullName} onClose={() => setDetail(null)} />}
     {task && <WorkflowModal wide title={task.bulk ? `Điều phối hàng loạt ${task.students.length} sinh viên` : 'Điều phối sinh viên đến doanh nghiệp'} busy={busy} onClose={() => setTask(null)}>

@@ -395,8 +395,11 @@ export const academicReportingService = {
     const {academicPeriodId,...filters}=scope;
     void academicPeriodId;
     try{
-      return (await API.get('/retake-class-proposals',{params:{...filters,...(mode==='CALCULATED'?{semesterPeriodId:periodId}:{blockPeriodId:periodId}),page,limit:20},signal,timeout:30000})).data.data;
+      return (await API.get('/retake-class-proposals',{params:{...filters,...(mode==='CALCULATED'?{semesterPeriodId:periodId}:{blockPeriodId:periodId}),page,limit:20},signal,timeout:60000})).data.data;
     }catch(error){
+      if(signal?.aborted)throw error;
+      const code=(error as {code?:string}).code;
+      if(code==='ECONNABORTED'||code==='ETIMEDOUT')throw new Error('Tổng hợp nhu cầu mở lớp mất quá thời gian chờ. Vui lòng thử lại hoặc chọn một khóa sinh viên để thu hẹp dữ liệu.');
       const body=(error as {response?:{data?:{errorCode?:string}}}).response?.data;
       if(body?.errorCode==='BLOCK_OUTSIDE_PARENT_SEMESTER')throw new Error('Block 3 phải nằm trong thời gian của kỳ học đã chọn. Vui lòng kiểm tra lịch đã cấu hình.');
       if(body?.errorCode==='CALCULATED_BLOCK_CONFLICT')throw new Error('Học kỳ đã chọn không đủ thời gian cho Block 10 và Block 3. Vui lòng kiểm tra ngày của học kỳ.');

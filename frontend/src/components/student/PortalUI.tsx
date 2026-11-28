@@ -185,6 +185,7 @@ export function StudentCurrentAcademicPeriod({ currentSemester }: { currentSemes
 }
 
 export function StudentPage({
+  header,
   title,
   description,
   children,
@@ -192,6 +193,7 @@ export function StudentPage({
   showSemesterInBanner = false,
   compactTopSpacing = false,
 }: {
+  header?: ReactNode;
   title: string;
   description: string;
   children: ReactNode;
@@ -203,12 +205,12 @@ export function StudentPage({
   const portal = useStudentPortal();
   return (
     <div className={`${compactTopSpacing ? 'space-y-5' : 'space-y-6'} pb-12 max-w-[1400px] mx-auto font-outfit`}>
-      <StudentBanner
+      {header ?? <StudentBanner
         title={title}
         description={description}
         badge={null}
         extra={showSemesterInBanner ? <StudentAcademicPeriodSelect /> : undefined}
-      />
+      />}
       <ResourceState
         loading={portal.loading}
         refreshing={portal.refreshing}

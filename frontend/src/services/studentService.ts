@@ -498,7 +498,7 @@ export interface RiskAssessment {
     reasons:{code:string;message:string}[];limitations:string[];
     evidence:{earnedCredits:number|null;missingCredits:number|null;failedCourseCount:number;maxUnpassedCourses?:number|null;assessmentDeadline:string|null}};
   roadmap:{status:'READY'|'NOT_AVAILABLE'|'DATA_INCOMPLETE';targetSemester:number;objective:string;message:string;actions:string[];limitations:string[];
-    items:{courseId:number;courseCode:string|null;name:string|null;recommendedSemester:number;priority:number;action:string;stage:string;
+    items:{courseId:number;courseCode:string|null;name:string|null;requirementId?:number;credits?:number|null;recommendedSemester:number;priority:number;action:string;stage:string;
       canPlan:boolean;explanation:string;isAlternative:boolean;
       dependentCourses?:{courseId:number;courseCode:string|null;name:string|null;unlocksAfterPassing:boolean;mandatory:boolean}[];
       prerequisites:{satisfied:boolean;remainingRequired:number;courses:{courseId:number;courseCode:string|null;passed:boolean}[]}[];}[]};

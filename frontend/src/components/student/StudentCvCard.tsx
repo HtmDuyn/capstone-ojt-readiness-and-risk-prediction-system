@@ -5,6 +5,7 @@ import { buttonClass, dateText } from './PortalUI';
 import { FileText, CloudUpload, Download, LoaderCircle } from 'lucide-react';
 import type { CV } from '@/types/student/portal';
 import { CvExtractionCard } from './CvExtractionCard';
+import { StudentCvPreview } from './StudentCvPreview';
 
 export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: { cv?: CV | null; onUploaded?: (cv: CV) => void; embedded?: boolean } = {}) {
   const { profile, refresh } = useStudentPortal();
@@ -87,6 +88,7 @@ export function StudentCvCard({ cv: providedCv, onUploaded, embedded = false }: 
         </button>
       </form>
       </div>
+      {cv && profile && <StudentCvPreview key={`${profile.id}:${cv.id}`} studentId={profile.id} cv={cv} />}
       {error && (
         <p role="alert" className="text-sm text-red-700">
           {error}

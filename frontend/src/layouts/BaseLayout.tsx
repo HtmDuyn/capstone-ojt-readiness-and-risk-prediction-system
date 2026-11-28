@@ -31,8 +31,9 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
   const isEducation = user?.role === 'education';
   const isEnterprise = user?.role === 'enterprise';
   const isQhdn = user?.role === 'qhdn';
+  const isAdmin = user?.role === 'admin' || user?.roleCode === 'ADMIN';
   const hideHeaderTools = user?.role === 'enterprise' || user?.role === 'qhdn';
-  const showNotifications = !isEducation && !isEnterprise && user?.roleCode !== 'ADMIN' && user?.role !== 'admin';
+  const showNotifications = !isEducation && !isEnterprise && !isQhdn && user?.roleCode !== 'ADMIN' && user?.role !== 'admin';
   const RoleSidebar = isEducation ? EducationSidebar : Sidebar;
 
   const handleLogout = () => {
@@ -69,9 +70,12 @@ export const BaseLayout: React.FC<BaseLayoutProps> = ({
           {/* Header trên cùng */}
           <Header
             user={resolvedUserSummary}
-            profilePath={user?.role === 'admin' ? '/admin/profile' : undefined}
+            profilePath={
+              user?.role === 'admin' ? '/admin/profile' :
+              user?.role === 'qhdn' ? '/qhdn/profile' : undefined
+            }
             showNotifications={showNotifications}
-            showLanguage={!isEducation && !hideHeaderTools}
+            showLanguage={!isAdmin && !isEducation && !hideHeaderTools}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onLogout={handleLogout}
             showSearch={

@@ -122,7 +122,7 @@ export const EducationDashboard: React.FC = () => {
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
               >
                 <option value="">Tất cả khóa</option>
-                {cohorts.map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.cohortCode}</option>)}
+                {cohorts.map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.cohortCode || cohort.name}</option>)}
               </select>
             </div>
           </div>

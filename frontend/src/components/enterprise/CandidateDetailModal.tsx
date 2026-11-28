@@ -68,16 +68,20 @@ function SubmittedCv({ candidate }: { candidate: EnterpriseCandidateItem }) {
         </div>
       </div>
       {cv && <div className="flex flex-wrap gap-2">
-        <button type="button" className={workflowSecondary} aria-expanded={preview} onClick={() => setPreview(value => !value)}><Eye size={16} />{preview ? 'Ẩn CV' : 'Xem CV'}</button>
+        <button type="button" className={workflowSecondary} aria-haspopup="dialog" aria-expanded={preview} onClick={() => setPreview(true)}><Eye size={16} />Xem CV</button>
         <button type="button" className={workflowSecondary} disabled={downloading} onClick={download}>{downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}Tải CV</button>
       </div>}
     </div>
     {error && <div role="alert" className="space-y-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700"><p>{error}</p>{preview && <button type="button" onClick={() => setRevision(value => value + 1)} className="inline-flex items-center gap-2 font-semibold"><RefreshCw size={14} />Thử tải lại CV</button>}</div>}
-    {preview && loading && <p role="status" className="flex items-center gap-2 py-4 text-sm text-slate-600"><Loader2 size={16} className="animate-spin" />Đang tải CV…</p>}
-    {preview && url && <div className="space-y-2">
-      <iframe title={'CV ứng tuyển của ' + candidate.student.fullName} src={url} className="h-[55vh] min-h-72 w-full rounded-xl border border-slate-200 bg-white" />
-      <p className="text-xs text-slate-500">Nếu trình duyệt không hiển thị PDF, chọn “Tải CV” để mở file.</p>
-    </div>}
+    {preview && <WorkflowModal fullscreen title={'CV của ' + candidate.student.fullName} subtitle={cv?.fileName} onClose={() => setPreview(false)}
+      headerActions={<button type="button" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50" disabled={downloading} onClick={download}>{downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}Tải CV</button>}>
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {loading && <p role="status" className="flex items-center gap-2 py-4 text-sm text-slate-600"><Loader2 size={16} className="animate-spin" />Đang tải CV…</p>}
+        {error && <div role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700"><p>{error}</p><button type="button" onClick={() => setRevision(value => value + 1)} className="mt-2 inline-flex items-center gap-2 font-semibold"><RefreshCw size={14} />Thử tải lại CV</button></div>}
+        {url && <iframe title={'CV ứng tuyển của ' + candidate.student.fullName} src={`${url}#view=Fit&navpanes=0`} className="min-h-0 w-full flex-1 rounded-lg border border-slate-200 bg-white" />}
+        <p className="shrink-0 text-xs text-slate-500">Có thể phóng to và cuộn để đọc toàn bộ CV. Nếu trình duyệt không hiển thị PDF, chọn “Tải CV” để mở file.</p>
+      </div>
+    </WorkflowModal>}
   </section>;
 }
 
