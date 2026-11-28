@@ -115,7 +115,6 @@ export const STUDENT_NAV_ITEMS: StudentMenuItem[] = [
     label: 'Thông báo',
     path: '/student/notifications',
     icon: <NotificationBellIcon size={20} />,
-    hasBadge: true,
     badgeDot: true,
     banner: {
       title: 'Trung tâm thông báo sinh viên',
