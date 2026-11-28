@@ -140,7 +140,12 @@ export const EnterpriseInterns: React.FC = () => {
       if (!internshipResponse?.success || !internshipResponse.data) {
         throw new Error('Không thể tải danh sách thực tập sinh.');
       }
-      setRoster(internshipResponse.data.items);
+      const taskRoster = internshipResponse.data.items.filter(item =>
+        item.evaluation?.status !== 'SUBMITTED' && item.evaluationLocked !== true);
+      const rosterIds = new Set(taskRoster.map(item => String(item.id)));
+      setRoster(taskRoster);
+      setTableSelectedIds(previous => previous.filter(id => rosterIds.has(id)));
+      setModalSelectedInternIds(previous => previous.filter(id => rosterIds.has(id)));
       setTasks(taskItems.map(mapApiToTask));
     } catch (err: unknown) {
       if (controller.signal.aborted) return;
@@ -234,6 +239,9 @@ export const EnterpriseInterns: React.FC = () => {
 
   // Paginated interns
   const totalPages = Math.ceil(filteredInterns.length / pageSize) || 1;
+  useEffect(() => {
+    setCurrentPage(previous => Math.min(previous, totalPages));
+  }, [totalPages]);
   const paginatedInterns = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredInterns.slice(start, start + pageSize);

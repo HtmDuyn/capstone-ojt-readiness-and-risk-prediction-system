@@ -30,6 +30,7 @@ export function EnterpriseJobs() {
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [selectedWindowId, setSelectedWindowId] = useState<number>(-1);
+  const [periodStatusFilter, setPeriodStatusFilter] = useState<'' | RecruitmentWindow['periodStatus']>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [editor, setEditor] = useState<{ post: RecruitmentPost | null } | null>(null);
@@ -56,16 +57,26 @@ export function EnterpriseJobs() {
     const timer = setTimeout(() => setNow(Date.now()), delay);
     return () => clearTimeout(timer);
   }, [windows, posts, now]);
+  const periodFilteredWindows = useMemo(
+    () => windows.filter(window => !periodStatusFilter || window.periodStatus === periodStatusFilter),
+    [windows, periodStatusFilter],
+  );
+  const periodFilteredWindowIds = useMemo(
+    () => new Set(periodFilteredWindows.map(window => window.id)),
+    [periodFilteredWindows],
+  );
   const selectedWindow = windows.find(w => w.id === selectedWindowId);
-  const accepts = windowAcceptsPosts(selectedWindow, now);
   const creationWindows = windows.filter(windowAllowsPostCreation);
-  const canCreate = creationWindows.length > 0 && (!selectedWindow || windowAllowsPostCreation(selectedWindow));
+  const canCreate = creationWindows.length > 0
+    && (selectedWindow ? windowAllowsPostCreation(selectedWindow) : periodStatusFilter !== 'CLOSED');
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('vi');
-    return posts.filter(post => (selectedWindowId <= 0 || post.windowId === selectedWindowId) && (!status || post.status === status) && (!query || [post.title, post.content, post.periodCode,
+    return posts.filter(post => (selectedWindowId <= 0 || post.windowId === selectedWindowId)
+      && (!periodStatusFilter || periodFilteredWindowIds.has(post.windowId))
+      && (!status || post.status === status) && (!query || [post.title, post.content, post.periodCode,
       ...(post.positions ?? []).flatMap(p => [p.title, p.description, p.requirements, p.location])]
       .some(value => value?.toLocaleLowerCase('vi').includes(query))));
-  }, [posts, search, status, selectedWindowId]);
+  }, [posts, search, status, selectedWindowId, periodStatusFilter, periodFilteredWindowIds]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -114,27 +125,40 @@ export function EnterpriseJobs() {
     </div> : <div>
       <section aria-label="Đợt và hạn đăng tin" className="border-b border-slate-100 px-5 py-4 sm:px-7 sm:py-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 lg:max-w-md">
-            <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
-            {windows.length > 0 ? <select id="recruitment-window-view" value={selectedWindowId}
-              onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
-              <option value="0">Tất cả đợt đăng tin</option>
-              {windows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''} · {enterprisePeriodLabels[w.periodStatus]}</option>)}
-            </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:max-w-2xl">
+            <div>
+              <label htmlFor="recruitment-period-status" className="mb-1.5 block text-xs font-medium text-slate-500">Trạng thái đợt</label>
+              <select id="recruitment-period-status" value={periodStatusFilter}
+                onChange={e => {
+                  const value = e.target.value;
+                  setPeriodStatusFilter(value === 'ACTIVE' || value === 'CLOSED' ? value : '');
+                  setSelectedWindowId(0);
+                  setPage(1);
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+                <option value="">Tất cả trạng thái</option>
+                <option value="ACTIVE">{enterprisePeriodLabels.ACTIVE}</option>
+                <option value="CLOSED">{enterprisePeriodLabels.CLOSED}</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="recruitment-window-view" className="mb-1.5 block text-xs font-medium text-slate-500">Đợt đăng tin</label>
+              {windows.length > 0 ? <select id="recruitment-window-view" value={selectedWindowId}
+                onChange={e => { setSelectedWindowId(Number(e.target.value)); setPage(1); }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100">
+                <option value="0">Tất cả đợt đăng tin</option>
+                {periodFilteredWindows.map(w => <option key={w.id} value={w.id}>{w.name}{w.periodCode ? ` · ${w.periodCode}` : ''} · {enterprisePeriodLabels[w.periodStatus]}</option>)}
+              </select> : <p className="text-sm text-slate-500">QHDN chưa thiết lập đợt đăng tin.</p>}
+            </div>
           </div>
           {selectedWindow && <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <div><p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><Clock3 size={13} />Hạn doanh nghiệp đăng / công bố tin <strong className="text-sm font-semibold text-slate-800">{formatRecruitmentDate(selectedWindow.postingDeadlineAt ?? selectedWindow.endsAt)}</strong></p>
               <p className="mt-1 text-xs text-slate-400">Mở từ {formatRecruitmentDate(selectedWindow.startsAt)} · QHDN quản lý thời hạn</p>
             </div>
-            <p className={`inline-flex items-center gap-2 text-xs font-medium ${accepts ? 'text-emerald-700' : 'text-slate-500'}`}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current" />{accepts ? 'Đang nhận tin' : 'Hiện không nhận tin'}
-            </p>
           </div>}
         </div>
-        <p className="mt-3 text-xs text-slate-500">Tạo tin trong học kỳ đang diễn ra. Công bố tin trong Hạn 1 để sinh viên ứng tuyển ở Hạn 2.</p>
         {!creationWindows.length && <p className="mt-3 text-xs text-amber-800">Chưa có đợt đăng tin khả dụng trong học kỳ đang diễn ra.</p>}
-        {creationWindows.length > 0 && !canCreate && <p className="mt-3 text-xs text-amber-800">Chọn đợt đăng tin trong học kỳ đang diễn ra để tạo tin.</p>}
+        {periodStatusFilter !== 'CLOSED' && creationWindows.length > 0 && !canCreate && <p className="mt-3 text-xs text-amber-800">Chọn đợt đăng tin trong học kỳ đang diễn ra để tạo tin.</p>}
         {selectedWindow?.periodStatus === 'ACTIVE' && selectedWindow.editLockCode === 'RECRUITMENT_EDIT_LOCKED_BY_OJT_REGISTRATION' && <p role="status" className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-amber-800">
           <LockKeyhole size={14} className="shrink-0" />Sinh viên đang đăng ký hoặc xét tuyển: không thể công bố tin. Bạn vẫn có thể chỉnh sửa và lưu tin nháp.
         </p>}
@@ -165,8 +189,8 @@ export function EnterpriseJobs() {
 
       {!visible.length ? <div className="border-t border-slate-100 px-6 py-14 text-center">
         <BriefcaseBusiness size={30} className="mx-auto mb-3 text-slate-300" />
-        <h2 className="font-medium text-slate-700">{search || status ? 'Không có tin phù hợp' : 'Chưa có tin tuyển dụng'}</h2>
-        {search || status ? <p className="mt-1 text-sm text-slate-400">Thử đổi từ khóa hoặc trạng thái.</p> :
+        <h2 className="font-medium text-slate-700">{search || status || periodStatusFilter ? 'Không có tin phù hợp' : 'Chưa có tin tuyển dụng'}</h2>
+        {search || status || periodStatusFilter ? <p className="mt-1 text-sm text-slate-400">Thử đổi từ khóa hoặc trạng thái.</p> :
           canCreate && <p className="mt-1 text-sm text-slate-400">Tạo tin đầu tiên để bắt đầu tuyển thực tập sinh.</p>}
       </div> : <section aria-label="Danh sách tin tuyển dụng" className="grid grid-cols-1 gap-3 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {visible.map(post => <RecruitmentPostCard key={post.id} post={post} windows={windows} now={now} busy={actionBusy !== null}

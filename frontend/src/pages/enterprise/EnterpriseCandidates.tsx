@@ -179,7 +179,7 @@ export const EnterpriseCandidates: React.FC = () => {
   };
 
   const decisionLabel = (decision: string): string => {
-    const labels: Record<string, string> = { PENDING: 'Chờ duyệt', ACCEPTED: 'Đồng ý nhận', SUPERSEDED: 'Đã chuyển điều phối', REJECTED: 'Đã từ chối' };
+    const labels: Record<string, string> = { PENDING: 'Chờ duyệt', ACCEPTED: 'Đã nhận', SUPERSEDED: 'Đã chuyển điều phối', REJECTED: 'Đã từ chối' };
     return labels[decision] || decision;
   };
 
@@ -288,7 +288,7 @@ export const EnterpriseCandidates: React.FC = () => {
           >
             <option value="ALL">Tất cả trạng thái</option>
             <option value="PENDING">Chờ xét duyệt</option>
-            <option value="ACCEPTED">Đồng ý nhận</option>
+            <option value="ACCEPTED">Đã nhận</option>
             <option value="REJECTED">Đã từ chối</option>
           </select>
           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
@@ -390,7 +390,7 @@ export const EnterpriseCandidates: React.FC = () => {
 
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${decisionColor(c.decision)}`}>
-                        {c.receivedAt?'Đã thực nhận':decisionLabel(c.decision)}
+                        {decisionLabel(c.decision)}
                       </span>
                       {c.source?.startsWith('QHDN_')&&<p className="mt-1 text-[11px] text-slate-500">{c.source==='QHDN_APPLICATION'?'QHDN bổ sung ứng tuyển':'QHDN điều phối'}</p>}
                     </td>
@@ -485,7 +485,7 @@ export const EnterpriseCandidates: React.FC = () => {
         key={selectedCandidate.id}
         candidate={selectedCandidate}
         busy={actionLoading !== null || bulkLoading}
-        decisionLabel={selectedCandidate.receivedAt ? 'Đã thực nhận' : decisionLabel(selectedCandidate.decision)}
+        decisionLabel={decisionLabel(selectedCandidate.decision)}
         onClose={() => setSelectedCandidate(null)}
         onDecision={decision => handleDecision(selectedCandidate.id, decision)}
       />}

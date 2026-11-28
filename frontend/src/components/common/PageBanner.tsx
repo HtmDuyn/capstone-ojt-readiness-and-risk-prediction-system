@@ -64,8 +64,8 @@ export const PageBanner: React.FC<PageBannerProps> = ({
   const isQhdn = variant === 'qhdn';
   const isEducation = variant === 'education';
   const isDepartment = isQhdn || isEducation;
-  const renderedBreadcrumb = breadcrumb ?? (isDepartment ? (
-    <span className="qhdn-hero-eyebrow"><Sparkles size={13} /> {isEducation ? 'TRUNG TÂM QUẢN LÝ ĐÀO TẠO' : 'TRUNG TÂM ĐIỀU PHỐI OJT'}</span>
+  const renderedBreadcrumb = breadcrumb ?? (isEducation ? (
+    <span className="qhdn-hero-eyebrow"><Sparkles size={13} /> TRUNG TÂM QUẢN LÝ ĐÀO TẠO</span>
   ) : null);
 
   // Lấy cấu hình theo menuId hoặc tự xác định từ đường dẫn hiện tại.
