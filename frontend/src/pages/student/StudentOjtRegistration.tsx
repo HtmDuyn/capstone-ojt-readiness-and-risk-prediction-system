@@ -14,7 +14,12 @@ import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 
 type RegistrationWindow = {
   id: number; name: string; startsAt: string; endsAt: string; status: string;
-  canSubmit: boolean; blockingMessages: string[];
+  ojtSemesterId: number; recruitmentRoundId?: number | null;
+  semester?: { id: number; name: string; code?: string };
+  period?: { id: number; name: string };
+  isApplicationOpen: boolean;
+  applicationStatus: 'OPEN' | 'UPCOMING' | 'CLOSED';
+  canSubmit: boolean; blockingReasons: string[]; blockingMessages: string[];
 };
 type Application = {
   id: number; status: string; appliedAt: string; company: { name: string };
@@ -45,8 +50,8 @@ function indexCompanies(items: Opportunity[]) {
 }
 
 function RegistrationContent() {
-  const { profile, semesterId, revision, refreshing: profileRefreshing } = useStudentPortal();
-  const [windowChoice, setWindowChoice] = useState('all');
+  const { profile, semesterId, semesters, revision, refreshing: profileRefreshing } = useStudentPortal();
+  const [windowChoice, setWindowChoice] = useState('auto');
   const [search, setSearch] = useState('');
   const [companyPage, setCompanyPage] = useState(1);
   const [applicationPage, setApplicationPage] = useState(1);
@@ -57,22 +62,52 @@ function RegistrationContent() {
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'apply' | 'records'>('apply');
   const [recordsRequested, setRecordsRequested] = useState(false);
-  const scope = `${profile?.id}:${semesterId}:${revision}`;
+  const [submissionRefresh, setSubmissionRefresh] = useState(false);
+  const submissionRefreshStarted = useRef(false);
+  const scope = `${profile?.id}:${semesterId}:${profile?.recruitmentAssignment?.roundId ?? 'none'}:${revision}`;
   const windows = useStudentResource(profile ? 'ojt-windows:' + scope : null,
-    (signal) => allStudentPages<RegistrationWindow>('/ojt-registration-windows', signal), { snapshot: true });
+    (signal) => allStudentPages<RegistrationWindow>('/ojt-registration-windows?status=OPEN', signal), { snapshot: true });
   const applications = useStudentResource(recordsRequested && profile ? 'ojt-applications:' + scope + ':' + applicationPage : null,
     (signal) => studentGet<Page<Application>>('/job-applications' + studentQuery({ page: applicationPage, limit: 20 }), signal), { snapshot: true });
-  const chosenWindow = windows.data?.find((item) => String(item.id) === windowChoice);
-  const opportunities = useStudentResource<OpportunityResults>(profile ? 'ojt-opportunities:' + scope + ':' + (chosenWindow?.id ?? 'all') : null,
+  const assignedWindow = windows.data?.find(item => item.id === profile?.recruitmentAssignment?.registrationWindowId);
+  const automaticWindow = assignedWindow ?? windows.data?.find(item => item.canSubmit)
+    ?? windows.data?.find(item => item.isApplicationOpen)
+    ?? windows.data?.find(item => item.applicationStatus === 'UPCOMING');
+  const chosenWindow = windowChoice === 'auto' ? automaticWindow : windows.data?.find(item => String(item.id) === windowChoice);
+  const windowAccessKey = (windows.data ?? []).map(item => `${item.id}:${item.applicationStatus}:${item.canSubmit}:${item.blockingReasons?.join(',')}`).join(';');
+  const opportunities = useStudentResource<OpportunityResults>(profile && !windows.loading && !windows.error ? 'ojt-opportunities:' + scope + ':' + (chosenWindow?.id ?? 'all') + ':' + windowAccessKey : null,
     async (signal, publish) => {
-      const items: Opportunity[] = [];
-      for (let page = 1; ; page++) {
-        const result = await studentGet<OpportunityResults>('/students/me/opportunities' + studentQuery({ windowId: chosenWindow?.id, page, limit: 100 }), signal);
-        items.push(...result.items);
-        if (items.length >= result.total) return { ...result, items };
-        if (!result.items.length) throw new ApiError('Chưa tải đủ danh sách vị trí tuyển dụng. Vui lòng thử lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
-        publish({ ...result, items: [...items] });
+      const loadAll = async (windowId?: number) => {
+        const items: Opportunity[] = []; let result: OpportunityResults;
+        for (let page = 1; ; page++) {
+          result = await studentGet<OpportunityResults>('/students/me/opportunities' + studentQuery({ windowId, page, limit: 100 }), signal);
+          items.push(...result.items);
+          if (items.length >= result.total) return { ...result, items };
+          if (!result.items.length) throw new ApiError('Chưa tải đủ danh sách vị trí tuyển dụng. Vui lòng thử lại.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
+        }
+      };
+      if (chosenWindow) {
+        const selected = await loadAll(chosenWindow.id);
+        return {...selected, items:selected.items.map(item=>({...item,applicationWindowId:chosenWindow.id}))};
       }
+      const catalog = await loadAll();
+      const candidates = (windows.data ?? []).filter(item => item.status === 'OPEN' || item.canSubmit);
+      const qualified = await Promise.all(candidates.map(async window => ({window, data: await loadAll(window.id)})));
+      const qualifiedByPosition = new Map<string, Opportunity>();
+      for (const {window, data} of qualified) for (const item of data.items) {
+        const key = `${item.postId}:${item.id}`;
+        if (!qualifiedByPosition.get(key)?.canApply)
+          qualifiedByPosition.set(key, {...item, applicationWindowId: item.canApply ? window.id : null});
+      }
+      return {...catalog, items: catalog.items.map(item => {
+        const checked = qualifiedByPosition.get(`${item.postId}:${item.id}`);
+        if (checked) return {...item, applicationWindowId: checked.applicationWindowId, canApply: checked.canApply, blockers: checked.blockers};
+        const related = (windows.data ?? []).find(window => window.ojtSemesterId === item.ojtSemesterId
+          && (!window.recruitmentRoundId || window.recruitmentRoundId === item.post.windowId));
+        return {...item, applicationWindowId: null, canApply: false,
+          blockers: [...(related?.blockingReasons?.length ? related.blockingReasons : ['OJT_REGISTRATION_WINDOW_REQUIRED']),
+            ...(item.remainingSlots <= 0 ? ['POSITION_FULL'] : [])]};
+      })};
     }, { snapshot: true });
   const {byId, groups, companies} = useMemo(() => indexCompanies(opportunities.data?.items ?? []), [opportunities.data?.items]);
   const query = search.trim().toLocaleLowerCase();
@@ -80,7 +115,18 @@ function RegistrationContent() {
   const currentCompanyPage = Math.min(companyPage, Math.max(1, Math.ceil(filteredCompanies.length / 20)));
   const applicationItems = applications.data?.items ?? [];
   const cv = savedCv ?? profile?.cv ?? null;
-  const canApply = !!chosenWindow && !profileRefreshing && !windows.pending && !opportunities.pending && !windows.error && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
+  const canApply = !profileRefreshing && !submissionRefresh && !windows.loading && !windows.error && !opportunities.loading && !opportunities.error && !!opportunities.data?.items.some((item) => item.canApply);
+  const displayedSemester = chosenWindow?.semester?.name || chosenWindow?.period?.name
+    || semesters.find(item => item.id === chosenWindow?.ojtSemesterId)?.name;
+  useEffect(() => {
+    if (!submissionRefresh) return;
+    if (windows.pending || opportunities.pending) submissionRefreshStarted.current = true;
+    else if (submissionRefreshStarted.current) {
+      submissionRefreshStarted.current = false;
+      setSubmissionRefresh(false);
+    }
+  }, [submissionRefresh, windows.pending, opportunities.pending]);
+  const applicationBlockers = [...new Set((opportunities.data?.items ?? []).flatMap(item => item.blockers))];
   const refreshRecruitment = () => { windows.reload(); opportunities.reload(); applications.reload(); };
   const refreshRef = useRef(refreshRecruitment);
   const pauseRefresh = useRef(false);
@@ -103,20 +149,28 @@ function RegistrationContent() {
         </div>
         <div role="tabpanel" id="apply-panel" aria-labelledby="apply-tab" hidden={activeTab !== 'apply'} className="space-y-4 pt-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="min-w-0 space-y-2 text-sm"><p className="font-medium text-slate-600">Kỳ OJT của bạn</p><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800">{semesterId ? 'Theo đợt OJT được nhà trường liên kết với hồ sơ' : 'Chưa được liên kết đợt OJT'}</p></div>
+          <div className="min-w-0 space-y-2 text-sm"><p className="font-medium text-slate-600">Kỳ OJT</p><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-800">{windows.loading ? 'Đang kiểm tra kỳ OJT…' : displayedSemester || (chosenWindow ? 'Chưa có thông tin học kỳ' : windowChoice === 'all' ? 'Tất cả kỳ OJT đang tuyển' : 'Chưa có đợt đang nhận hồ sơ')}</p></div>
           <label className="block min-w-0 space-y-2 text-sm font-medium text-slate-600">Đợt đăng ký
             <select aria-label="Chọn đợt đăng ký" className={inputClass} value={chosenWindow?.id ?? 'all'} disabled={windows.loading} onChange={(event) => { setWindowChoice(event.target.value); setCompanyPage(1); setSearch(''); }}>
               <option value="all">Tất cả tin tuyển dụng đang công bố</option>
-              {windows.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {statusText(item.status)}</option>)}
+              {windows.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.isApplicationOpen ? 'Đang nhận hồ sơ' : item.applicationStatus === 'UPCOMING' ? 'Chưa đến hạn' : 'Đã hết hạn'}</option>)}
             </select>
           </label>
         </div>
         <ResourceState loading={windows.loading} refreshing={windows.refreshing} error={windows.error} retry={windows.reload} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {chosenWindow && <p className="text-sm text-slate-600">Nhận hồ sơ: {dateText(chosenWindow.startsAt)} – {dateText(chosenWindow.endsAt)}</p>}
-          <button type="button" onClick={() => openApplication()} disabled={!canApply} title={!chosenWindow ? 'Chọn đợt đăng ký OJT của bạn để ứng tuyển' : undefined} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
+          {chosenWindow && <div className="space-y-1 text-sm text-slate-600">
+            <p className={`font-semibold ${chosenWindow.isApplicationOpen ? 'text-emerald-700' : 'text-amber-800'}`}>{chosenWindow.isApplicationOpen ? 'Đợt đang nhận hồ sơ' : chosenWindow.applicationStatus === 'UPCOMING' ? 'Đợt chưa đến hạn nhận hồ sơ' : 'Đợt đã hết hạn nhận hồ sơ'}</p>
+            <p>Bắt đầu: <strong className="text-blue-700">{dateText(chosenWindow.startsAt)}</strong></p>
+            <p>Hạn nộp: <strong className="text-orange-700">{dateText(chosenWindow.endsAt)}</strong></p>
+          </div>}
+          <button type="button" onClick={() => openApplication()} disabled={!canApply} title={!canApply ? 'Chỉ vị trí thuộc đợt OJT đủ điều kiện mới nhận đơn' : undefined} className={buttonClass + ' inline-flex shrink-0 items-center justify-center gap-2 py-3 sm:ml-auto'}><Send size={17} />Nộp đơn đăng ký OJT</button>
         </div>
-        {!chosenWindow && <p role="status" className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">Bạn đang xem các tin tuyển dụng đã công bố và còn hạn. {windows.data?.length ? 'Chọn đợt đăng ký phù hợp để kiểm tra điều kiện và ứng tuyển.' : 'Bạn có thể xem tin; chức năng ứng tuyển sẽ mở khi nhà trường xếp bạn vào đợt OJT phù hợp.'}</p>}
+        {canApply && <p role="status" className="text-sm font-medium text-emerald-700">Bạn đủ điều kiện nộp đơn ứng tuyển trong {chosenWindow?.name || 'các đợt đang nhận hồ sơ'}.</p>}
+        {!windows.pending && !windows.error && !opportunities.pending && !opportunities.error && !canApply && applicationBlockers.length > 0 &&
+          <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">{explainOjtBlockers(applicationBlockers)}</p>}
+        {!chosenWindow && <p role="status" className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">Danh sách gồm tin tuyển dụng thuộc tất cả kỳ đang có. Bạn có thể nộp đơn cho vị trí có nút ứng tuyển được bật khi đủ điều kiện.</p>}
+        {!opportunities.pending && !opportunities.error && <p className="text-sm leading-relaxed text-slate-500">Mỗi lần chỉ được nộp một hồ sơ. Khi doanh nghiệp từ chối, bạn được chọn vị trí khác, kể cả trong cùng tin và cùng doanh nghiệp nếu còn hạn. Không được nộp lại đúng vị trí đã ứng tuyển trong tin đó. Sinh viên đã có điểm hoặc đã pass OJT không được nộp mới.</p>}
         {chosenWindow && <StudentJobMatches key={`${scope}:${chosenWindow.id}:${cv?.id??'no-cv'}`} windowId={chosenWindow.id} cvFileId={cv?.id??null} opportunities={opportunities.data?.items??[]} onApply={openApplication}/>}
       <div className="border-t border-slate-200 pt-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -184,7 +238,7 @@ function RegistrationContent() {
           </article>)}
         </div>
       </StudentDialog>}
-      {applying && profile && chosenWindow && <OjtApplicationDialog profile={profile} windowId={chosenWindow.id} companies={companies} opportunities={opportunities.data?.items ?? []} initialPosition={initialPosition} cv={cv} onUploaded={setSavedCv} onClose={() => setApplying(false)} onSubmitted={() => { setApplying(false); setMessage('Đã gửi đơn đăng ký OJT. Bạn có thể theo dõi phản hồi tại mục Hồ sơ đã nộp.'); refreshRecruitment(); }} />}
+      {applying && profile && <OjtApplicationDialog profile={profile} companies={companies} opportunities={opportunities.data?.items ?? []} initialPosition={initialPosition} cv={cv} onUploaded={setSavedCv} onClose={() => setApplying(false)} onSubmitted={() => { setSubmissionRefresh(true); setApplying(false); setMessage('Đã gửi đơn đăng ký OJT. Bạn có thể theo dõi phản hồi tại mục Hồ sơ đã nộp.'); refreshRecruitment(); }} />}
     </div>
   );
 }

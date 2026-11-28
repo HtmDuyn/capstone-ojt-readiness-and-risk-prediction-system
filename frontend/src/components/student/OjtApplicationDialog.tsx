@@ -6,8 +6,8 @@ import { StudentDialog } from './StudentDialog';
 import { buttonClass, inputClass } from './PortalUI';
 import { explainOjtBlockers, ojtError, type Opportunity, type PartnerCompany } from './ojt';
 
-export function OjtApplicationDialog({ profile, windowId, companies, opportunities, initialPosition, cv, onUploaded, onSubmitted, onClose }: {
-  profile: Pick<Profile, 'phone' | 'email' | 'fullName' | 'studentCode'>; windowId: number; companies: PartnerCompany[]; opportunities: Opportunity[];
+export function OjtApplicationDialog({ profile, companies, opportunities, initialPosition, cv, onUploaded, onSubmitted, onClose }: {
+  profile: Pick<Profile, 'phone' | 'email' | 'fullName' | 'studentCode'>; companies: PartnerCompany[]; opportunities: Opportunity[];
   initialPosition?: Opportunity; cv: CV | null; onUploaded: (cv: CV) => void;
   onSubmitted: () => void; onClose: () => void;
 }) {
@@ -25,13 +25,13 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
   const selected = positions.find((item) => `${item.postId}:${item.id}` === positionKey);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (lock.current || !selected?.canApply) return;
+    if (lock.current || !selected?.canApply || !selected.applicationWindowId) return;
     if (!file && !cv) { setError('Vui lòng tải CV PDF hoặc lưu CV ở mục CV của tôi trước khi nộp đơn.'); return; }
     lock.current = true; setBusy(true); setError('');
     try {
       if (file) { onUploaded(await uploadStudentCv(file)); setFile(null); }
       await studentPost('/job-applications', {
-        windowId, postId: selected.postId, positionId: selected.id,
+        windowId: selected.applicationWindowId, postId: selected.postId, positionId: selected.id,
         coverLetter: coverLetter.trim() || null,
         certificates,
         application: { contactPhone: phone.trim(), contactEmail: email.trim() },
@@ -91,7 +91,7 @@ export function OjtApplicationDialog({ profile, windowId, companies, opportuniti
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
           <button type="button" disabled={busy} onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold">Hủy</button>
-          <button type="submit" disabled={busy || !selected?.canApply} className={buttonClass + ' inline-flex items-center gap-2'}><Send size={16} />{busy ? 'Đang gửi hồ sơ...' : 'Gửi đơn đăng ký'}</button>
+          <button type="submit" disabled={busy || !selected?.canApply || !selected.applicationWindowId} className={buttonClass + ' inline-flex items-center gap-2'}><Send size={16} />{busy ? 'Đang gửi hồ sơ...' : 'Gửi đơn đăng ký'}</button>
         </div>
       </form>
     </StudentDialog>

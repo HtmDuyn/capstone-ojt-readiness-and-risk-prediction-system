@@ -125,6 +125,8 @@ export interface Profile {
   academicProgress: AcademicProgress;
   ojtSemesterId: number | null;
   officialEligibility: Eligibility | null;
+  recruitmentAssignment?: { ojtSemesterId: number; semesterName: string; roundId: number; roundName: string;
+    registrationWindowId: number; startsAt: string; endsAt: string; status: string } | null;
   admissionEligibility?: AdmissionEligibility | null;
   officialDecision: string;
   courseResults: Page<CourseResult>;
@@ -155,6 +157,8 @@ export interface Window {
   effectiveEndsAt?: string;
   status: string;
   canSubmit?: boolean;
+  isApplicationOpen?: boolean;
+  applicationStatus?: 'OPEN' | 'UPCOMING' | 'CLOSED';
   blockingReasons?: string[];
   blockingMessages?: string[];
   registration?: { id: number; status: string } | null;

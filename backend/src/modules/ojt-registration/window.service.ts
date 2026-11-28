@@ -1,3 +1,4 @@
+import { recruitmentAccessSql } from '../eligibility/recruitment-roster.repository';
 import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction,audit } from '../academic/academic.repository';
@@ -56,7 +57,7 @@ async function changeWindow(id:number,action:'open'|'close',body:unknown,actor:n
  for(const [key,column] of [['studentIds','s."StudentID"'],['programIds','s."ProgramID"'],['majorIds','s."SpecializationID"'],['cohortIds','p."CohortID"'],['groupCodes','p."GroupCode"']])if(before.Scope[key]){
   args.push(before.Scope[key]);filters.push((key==='majorIds'?'t."SpecializationID"':column)+'=ANY($'+args.length+'::'+(key==='groupCodes'?'text':'int')+'[])');
  }
- if(!(await c.query('SELECT 1 FROM "OJTRecruitmentAccess" h JOIN "Students" s ON s."StudentID"=h."StudentID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" WHERE '+filters.join(' AND ')+' LIMIT 1',args)).rowCount)throw invalid('Không có sinh viên đủ điều kiện trong phạm vi đợt.',409,'HANDOFF_ROSTER_EMPTY');
+ if(!(await c.query(`SELECT 1 FROM (${recruitmentAccessSql}) h JOIN "Students" s ON s."StudentID"=h."StudentID" LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID" LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID" WHERE `+filters.join(' AND ')+' LIMIT 1',args)).rowCount)throw invalid('Không có sinh viên đủ điều kiện trong phạm vi đợt.',409,'HANDOFF_ROSTER_EMPTY');
  await validateScope(c,before.Scope);if(new Date(before.EndsAt)<=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now)throw invalid('Extend the deadline before opening an expired window.',409,'REGISTRATION_WINDOW_EXPIRED');}
  const after=(await c.query(`UPDATE "OJTRegistrationWindows" SET "Status"=$2,"${action==='open'?'OpenedBy':'ClosedBy'}"=$3,"${action==='open'?'OpenedAt':'ClosedAt'}"=now(),"UpdatedAt"=now() WHERE "WindowID"=$1 RETURNING *`,[id,status,actor])).rows[0];await audit(c,actor,'OJTRegistrationWindows',id,action==='open'?'OPEN':'CLOSE',before,after,reason);return {...windowApi(await windowRecord(c,after.WindowID)),replayed:false};}
 

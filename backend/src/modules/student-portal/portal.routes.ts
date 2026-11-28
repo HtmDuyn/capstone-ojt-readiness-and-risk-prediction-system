@@ -11,6 +11,9 @@ import { matchStudentJobs } from './job-matching.service';
 import { taskSubmissions, submitTask } from './task.service';
 import { receiveTaskSubmission } from './task-attachment.service';
 import { studyPeriods, studyOverview } from './study-period.service';
+import { studentRecruitmentAssignment } from '../students/recruitment-assignment.service';
+import { readTransaction } from '../qhdn/read.repository';
+import { ownStudent } from './shared';
 
 const router = Router();
 const own = [authenticate, authorizeRoles('STUDENT')];
@@ -19,6 +22,10 @@ const handle = (work: (req: any) => Promise<unknown>, status = 200): RequestHand
   try { res.status(status).json({success: true, data: await work(req)}); } catch (error) { next(error); }
 };
 // These routes precede /students/:id; "me" is resolved from the authenticated account.
+router.get('/students/me/recruitment-assignment', ...read, handle(r => {
+  if(Object.keys(r.query).length)throw invalid('This endpoint does not accept query parameters.');
+  return readTransaction(async c=>studentRecruitmentAssignment(c,(await ownStudent(c,r.user)).StudentID));
+}));
 router.get('/students/me/study-periods', ...read, handle(r => studyPeriods(r.query, r.user)));
 router.get('/students/me/study-overview', ...read, handle(r => studyOverview(r.query, r.user)));
 router.post('/students/me/cv/analyses', ...own, requireJsonBody,
