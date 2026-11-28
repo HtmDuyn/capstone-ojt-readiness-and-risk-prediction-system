@@ -1,3 +1,4 @@
+import { recruitmentAccessSql } from '../eligibility/recruitment-roster.repository';
 import { enrichListRows } from '../../shared/list-context';
 import type { PoolClient } from 'pg';
 import { academicTransaction, audit } from '../academic/academic.repository';
@@ -7,14 +8,13 @@ import { registrationRecord, registrationApi, event } from '../ojt-registration/
 import { currentCV, cvMetadataSql } from './cv.service';
 import { validateCertificateLinks } from './certificate.service';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
-import { requireStudentAdmission, studentAdmission } from '../student-portal/admission.service';
-import { assertOjtPathway } from '../academic/workflow-policy';
 import { recordOjt202InProgress } from '../academic/ojt-course-enrollment';
 import { invalid, inputObject, positiveId, optionalText, pagination, enumValue } from './student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { assertPostPhase } from '../recruitment/round-policy';
 import { requireLifecycleSchema } from '../recruitment/lifecycle.service';
 import { studentOpportunitySql } from './student-opportunity.repository';
+import { applicationAcademicEligibility, applicationProgressBlockers, applicationRoundBlockers, throwApplicationBlocker } from './ojt-application-policy';
 
 export async function ownStudent(c:PoolClient,actor:Actor) {
   if(actor.roleCode!=='STUDENT')throw invalid('Chức năng dành cho sinh viên.',403,'FORBIDDEN');
@@ -30,7 +30,7 @@ const applicationSelect=`SELECT a."ApplicationID" AS id,a."RegistrationID" AS "r
  CASE WHEN cv."CVFileID" IS NULL THEN NULL ELSE ${cvMetadataSql('cv')} END AS cv,
  a."CertificateLinks" AS certificates,
  a."ApplicationSnapshot" AS "applicationSnapshot",
- r."Status" AS "registrationStatus",EXISTS(SELECT 1 FROM "OJTRecruitmentAccess" h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AS "handedOff",
+ r."Status" AS "registrationStatus",EXISTS(SELECT 1 FROM (${recruitmentAccessSql}) h WHERE h."StudentID"=r."StudentID" AND h."OJTSemesterID"=r."OJTSemesterID") AS "handedOff",
  (SELECT jsonb_build_object('id',co."CoordinationID",'decision',co."Decision",'rejectReason',co."RejectReason",'coordinatedAt',co."CoordinatedAt",'assignmentId',ass."AssignmentID",'assignmentStatus',ass."Status") FROM "StudentEnterpriseCoordination" co LEFT JOIN "InternshipAssignments" ass ON ass."CoordinationID"=co."CoordinationID" WHERE co."ApplicationID"=a."ApplicationID" ORDER BY co."CoordinationID" DESC LIMIT 1) AS coordination
  FROM "JobApplications" a JOIN "OJTRegistrations" r ON r."RegistrationID"=a."RegistrationID" JOIN "Students" s ON s."StudentID"=a."StudentID" JOIN "Users" u ON u."UserID"=s."UserID" JOIN "InternshipPositions" p ON p."PositionID"=a."PositionID" JOIN "Enterprises" e ON e."EnterpriseID"=a."EnterpriseID" JOIN "RecruitmentPosts" post ON post."PostID"=a."PostID" LEFT JOIN "StudentCVFiles" cv ON cv."CVFileID"=a."CVFileID"`;
 
@@ -53,22 +53,18 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       note:optionalText(form.note,'note',2000),
     };
     if(applicationForm.contactEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicationForm.contactEmail))throw invalid('contactEmail is invalid.');
-    const selectedWindowId=windowId??undefined;
-    const w=selectedWindowId
-      ? (await c.query('SELECT * FROM "OJTRegistrationWindows" WHERE "WindowID"=$1 FOR UPDATE',[selectedWindowId])).rows[0]
-      : null;
-    if(selectedWindowId&&!w)throw invalid('Registration window not found.',404,'REGISTRATION_WINDOW_NOT_FOUND');
-    let r:Row|null=null;
     const requestedRegistration=requestedRegistrationId
       ? await registrationRecord(c,requestedRegistrationId)
       : null;
     if(requestedRegistration&&requestedRegistration.StudentID!==s.StudentID)throw invalid('Chỉ được ứng tuyển bằng hồ sơ của mình.',403,'FORBIDDEN');
+    const selectedWindowId=windowId??requestedRegistration?.WindowID;
+    if(!selectedWindowId)throw invalid('Chọn đợt đăng ký OJT trước khi nộp hồ sơ.',400,'OJT_REGISTRATION_WINDOW_REQUIRED');
+    const w=(await c.query('SELECT * FROM "OJTRegistrationWindows" WHERE "WindowID"=$1 FOR UPDATE',[selectedWindowId])).rows[0];
+    if(!w)throw invalid('Registration window not found.',404,'REGISTRATION_WINDOW_NOT_FOUND');
+    let r:Row|null=null;
 
     const semesterId=w?.OJTSemesterID??requestedRegistration?.OJTSemesterID;
     if(!semesterId)throw invalid('OJT semester is required.',400,'OJT_SEMESTER_REQUIRED');
-    if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED'
-      UNION ALL SELECT 1 FROM "InternshipAssignments" ia JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE ia."StudentID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(ia."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') LIMIT 1`,[s.StudentID,semesterId])).rowCount)
-      throw invalid('Sinh viên đã xác nhận nơi thực tập trong kỳ, không được ứng tuyển mới.',409,'STUDENT_ALREADY_CONFIRMED');
     if(w){
       const now=(await c.query('SELECT clock_timestamp() AS now')).rows[0].now;
       if(w.Status!=='OPEN'||now<new Date(w.StartsAt)||now>=new Date(w.EndsAt))throw invalid('Đợt đăng ký sinh viên đã đóng hoặc ngoài thời hạn.',409,'OJT_REGISTRATION_WINDOW_UNAVAILABLE');
@@ -99,22 +95,28 @@ export async function applyToPosition(body:unknown,actor:Actor) {
     if(r&&!['SUBMITTED','APPROVED','HANDED_OFF','REJECTED'].includes(r.Status))throw invalid('Hồ sơ đăng ký OJT không hợp lệ.',409,'REGISTRATION_NOT_ACTIVE');
     const latestCoordination=r?(await c.query(`SELECT * FROM "StudentEnterpriseCoordination"
       WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1 FOR UPDATE`,[r.RegistrationID])).rows[0]??null:null;
-    if(latestCoordination&&latestCoordination.Decision!=='REJECTED'){
-      const currentApplication=latestCoordination.PositionID===positionId&&latestCoordination.ApplicationID
+    const academic=await applicationAcademicEligibility(c,s.StudentID,semesterId,true);
+    if(academic.blockers.length)throwApplicationBlocker(academic.blockers[0]);
+    const progress=await applicationProgressBlockers(c,s.StudentID,semesterId);
+    if(progress.length){
+      const currentApplication=progress[0]==='APPLICATION_ALREADY_IN_PROCESS'&&latestCoordination?.Decision!=='REJECTED'&&latestCoordination?.PositionID===positionId&&latestCoordination?.ApplicationID
         ? (await c.query(applicationSelect+' WHERE a."ApplicationID"=$1',[latestCoordination.ApplicationID])).rows[0]
         : null;
       const currentForm=r?.Application??{};
-      if(currentApplication?.coverLetter===letter&&(!w||r?.WindowID===w.WindowID)
+      if(currentApplication?.postId===postId&&currentApplication?.coverLetter===letter&&(!w||r?.WindowID===w.WindowID)
         &&JSON.stringify(currentApplication.certificates??[])===JSON.stringify(certificates)
         &&currentForm.contactPhone===applicationForm.contactPhone
         &&currentForm.contactEmail===applicationForm.contactEmail
         &&currentForm.note===applicationForm.note)return {...currentApplication,replayed:true};
-      throw invalid('Đơn đăng ký đang được doanh nghiệp xử lý hoặc đã được tiếp nhận.',409,'APPLICATION_ALREADY_IN_PROCESS');
+      throwApplicationBlocker(progress[0]);
     }
-    const admission = await requireStudentAdmission(c,s.StudentID,semesterId);
+    const previousPositionApplication=r?(await c.query(`SELECT "ApplicationID" FROM "JobApplications"
+      WHERE "RegistrationID"=$1 AND "PostID"=$2 AND "PositionID"=$3 LIMIT 1`,[r.RegistrationID,postId,positionId])).rows[0]:null;
+    if(previousPositionApplication)throwApplicationBlocker('APPLICATION_POSITION_ALREADY_SUBMITTED');
+    const admission = academic.admission!;
     const cv=await currentCV(c,s.StudentID);
     if(!cv)throw invalid('Upload a PDF CV before applying.',409,'CV_REQUIRED');
-    const pathway={...await assertOjtPathway(c,s.StudentID,semesterId),admissionSource:admission.source};
+    const pathway={...academic.pathway,admissionSource:admission.source};
     await recordOjt202InProgress(c,s.StudentID,semesterId,actor.userId);
     if(!r){
       const row=(await c.query(`INSERT INTO "OJTRegistrations"
@@ -136,10 +138,8 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       }
     }
     if((await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[r.RegistrationID])).rowCount)throw invalid('Đã có phân công thực tập.',409,'ASSIGNMENT_EXISTS');
-    const existingApplication=(await c.query(`SELECT * FROM "JobApplications" WHERE "RegistrationID"=$1 AND "PostID"=$2 AND "PositionID"=$3 ORDER BY "ApplicationID" DESC LIMIT 1 FOR UPDATE`,[r.RegistrationID,postId,positionId])).rows[0]??null;
     const eligibility=admission;
     let applicationId:number;
-    if(existingApplication)throw invalid('Đã có hồ sơ ở vị trí này trong đợt. Hồ sơ cũ được giữ nguyên; ứng tuyển mới ở đợt bổ sung.',409,'APPLICATION_ROUND_ALREADY_SUBMITTED');
     {
       applicationId=(await c.query(`INSERT INTO "JobApplications" ("RegistrationID","StudentID","OJTSemesterID","PostID","PositionID","EnterpriseID","CVFileID","OfficialCheckID","CoverLetter")
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING "ApplicationID"`,
@@ -152,7 +152,7 @@ export async function applyToPosition(body:unknown,actor:Actor) {
       VALUES ($1,$2,$3,$4,'PENDING',$5,$6,$7) RETURNING "CoordinationID"`,
     [r.RegistrationID,p.EnterpriseID,positionId,actor.userId,applicationId,semesterId,latestCoordination?.CoordinationID??null])).rows[0];
     const out=(await c.query(applicationSelect+' WHERE a."ApplicationID"=$1',[applicationId])).rows[0];
-    await audit(c,actor.userId,'JobApplications',applicationId,existingApplication?'RESUBMIT':'APPLY',existingApplication,out);
+    await audit(c,actor.userId,'JobApplications',applicationId,'APPLY',null,out);
     await audit(c,actor.userId,'StudentEnterpriseCoordination',coordination.CoordinationID,'DIRECT_APPLICATION',null,{
       id:coordination.CoordinationID,registrationId:r.RegistrationID,applicationId,enterpriseId:p.EnterpriseID,positionId,decision:'PENDING',
     });
@@ -186,7 +186,7 @@ export async function studentOpportunities(params:Row,actor:Actor,existingClient
       const total=(await c.query(`SELECT count(*)::int AS n FROM (${studentOpportunitySql}) x`,args)).rows[0].n;
       const rows=(await c.query(studentOpportunitySql+' ORDER BY post."PublishedAt" DESC NULLS LAST,post."PostID" DESC,p."PositionID" LIMIT $4 OFFSET $5',[...args,p.limit,p.offset])).rows;
       const blockers=['REGISTRATION_WINDOW_REQUIRED'];
-      const items=rows.map(pos=>({...pos,remainingSlots:Number(pos.remainingSlots),canApply:false,blockers:[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])]}));
+      const items=rows.map(pos=>({...pos,remainingSlots:Number(pos.remainingSlots),canApply:false,blockers:[...blockers,...(pos.applicationId!=null?['APPLICATION_POSITION_ALREADY_SUBMITTED']:[]),...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])]}));
       return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:null,windowId:null,ojtSemesterId:null,
         officialEligibility:null,admissionEligibility:null,canApply:false,blockers};
     }
@@ -194,29 +194,25 @@ export async function studentOpportunities(params:Row,actor:Actor,existingClient
     if(!w)throw invalid('Registration window not found.',404,'REGISTRATION_WINDOW_NOT_FOUND');
     const semesterId=w.OJTSemesterID;
     const official=await officialEligibilityWithClient(c,s.StudentID,semesterId,{lockSource:false});
-    const admission=await studentAdmission(c,s.StudentID,semesterId,{official});
+    const academic=await applicationAcademicEligibility(c,s.StudentID,semesterId);
+    const admission=academic.admission;
     const r=(await c.query(`SELECT * FROM "OJTRegistrations" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2`,[s.StudentID,semesterId])).rows[0]??null;
     const studentScope=(await c.query(`SELECT t."SpecializationID",p."CohortID",p."GroupCode"
       FROM "Students" s LEFT JOIN "TrainingPrograms" t ON t."ProgramID"=s."ProgramID"
       LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
       WHERE s."StudentID"=$1`,[s.StudentID])).rows[0];
-    const blockers:string[]=[];
-    if(!admission)blockers.push('ELIGIBLE_HANDOFF_REQUIRED');
-    if(admission&&(admission.status!=='ELIGIBLE'||admission.isStale))blockers.push(admission.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
+    const blockers:string[]=[...academic.blockers];
     if(r&&r.ProgramID!==s.ProgramID)blockers.push('REGISTRATION_PROGRAM_CHANGED');
     if(w.Status!=='OPEN'||w.Now<new Date(w.StartsAt)||w.Now>=new Date(w.EndsAt))blockers.push('OJT_REGISTRATION_WINDOW_UNAVAILABLE');
     for(const [key,value] of [['programIds',s.ProgramID],['majorIds',studentScope.SpecializationID],['cohortIds',studentScope.CohortID],['groupCodes',studentScope.GroupCode],['studentIds',s.StudentID]] as const){
       if(w.Scope?.[key]&&!w.Scope[key].includes(value))blockers.push('REGISTRATION_OUT_OF_SCOPE');
     }
-    const latestCoordination=r?(await c.query(`SELECT "Decision" FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 ORDER BY "CoordinationID" DESC LIMIT 1`,[r.RegistrationID])).rows[0]:null;
-    if(latestCoordination&&latestCoordination.Decision!=='REJECTED')blockers.push('APPLICATION_ALREADY_IN_PROCESS');
-    const hasAssignment=r&&(await c.query(`SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co ON co."CoordinationID"=a."CoordinationID" WHERE co."RegistrationID"=$1 AND COALESCE(UPPER(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')`,[r.RegistrationID])).rowCount;
-    if(hasAssignment)blockers.push('ASSIGNMENT_EXISTS');
-    if((await c.query(`SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED' LIMIT 1`,[s.StudentID,semesterId])).rowCount)blockers.push('STUDENT_ALREADY_CONFIRMED');
+    blockers.push(...await applicationProgressBlockers(c,s.StudentID,semesterId));
+    blockers.push(...await applicationRoundBlockers(c,w.RecruitmentRoundID));
     const sql=studentOpportunitySql;
     const total=(await c.query(`SELECT count(*)::int AS n FROM (${sql}) x`,[semesterId,s.StudentID,w.RecruitmentRoundID??null])).rows[0].n;
     const rows=(await c.query(sql+' ORDER BY p."PositionID",post."PostID" LIMIT $4 OFFSET $5',[semesterId,s.StudentID,w.RecruitmentRoundID??null,p.limit,p.offset])).rows;
-    const items=rows.map(pos=>{const reasons=[...blockers,...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])];return {...pos,remainingSlots:Number(pos.remainingSlots),canApply:!reasons.length,blockers:reasons};});
-    return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:r?.RegistrationID??null,windowId,ojtSemesterId:semesterId,officialEligibility:official,admissionEligibility:admission,canApply:!blockers.length,blockers};
+    const items=rows.map(pos=>{const reasons=[...blockers,...(pos.applicationId!=null?['APPLICATION_POSITION_ALREADY_SUBMITTED']:[]),...(Number(pos.remainingSlots)<=0?['POSITION_FULL']:[])];return {...pos,remainingSlots:Number(pos.remainingSlots),canApply:!reasons.length,blockers:reasons};});
+    return {items:await enrichListRows(c,items),total,page:p.page,limit:p.limit,registrationId:r?.RegistrationID??null,windowId,ojtSemesterId:semesterId,officialEligibility:official,admissionEligibility:admission,canApply:!blockers.length&&items.some(item=>item.canApply),blockers};
   },existingClient);
 }

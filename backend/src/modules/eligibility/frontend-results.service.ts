@@ -1,3 +1,4 @@
+import { recruitmentRosterSql } from './recruitment-roster.repository';
 import type { PoolClient } from 'pg';
 import { latestEffectiveOjtCondition } from './ojt-policy.service';
 import { createHash } from 'node:crypto';
@@ -75,7 +76,7 @@ async function recruitmentRosterSummary(client: PoolClient, batchId: number) {
   const row = (await client.query(`SELECT count(*)::int AS "eligibleCount",
     count(*) FILTER (WHERE "RoundID" IS NOT NULL)::int AS "assignedCount",
     count(*) FILTER (WHERE "RoundID" IS NULL)::int AS "waitingCount"
-    FROM "OJTRecruitmentRoster" WHERE "BatchID"=$1`, [batchId])).rows[0];
+    FROM (${recruitmentRosterSql}) derived_roster WHERE "BatchID"=$1`, [batchId])).rows[0];
   return row;
 }
 

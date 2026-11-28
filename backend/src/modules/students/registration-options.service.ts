@@ -1,10 +1,11 @@
+import { recruitmentRosterSql } from '../eligibility/recruitment-roster.repository';
 import type { PoolClient } from 'pg';
 import { readTransaction } from '../qhdn/read.repository';
 import { invalid, pagination, positiveId, enumValue } from './student.validation';
 import { combos } from '../curriculum/curriculum.repository';
 import { purpose } from '../combo-registration/combo.validation';
 import { activeChoice } from '../combo-registration/combo.repository';
-import { studentAdmission } from '../student-portal/admission.service';
+import { applicationAcademicEligibility, applicationProgressBlockers, applicationRoundBlockers, applicationBlockerMessages } from './ojt-application-policy';
 import { calculatedEligibilitySql, latestOjt202PassedSql } from '../eligibility/frontend-results.service';
 import { assertRosterContext } from '../combo-registration/selection.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
@@ -52,7 +53,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
     }else{
       from='FROM "OJTRegistrationWindows" w';
       // Bind the authenticated student, never a studentId supplied by the caller.
-      where.push(`(EXISTS (SELECT 1 FROM "OJTRecruitmentRoster" roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID"))
+      where.push(`(EXISTS (SELECT 1 FROM (${recruitmentRosterSql}) roster WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=w."OJTSemesterID" AND roster."RoundID" IS NOT NULL AND (w."RecruitmentRoundID" IS NULL OR roster."RoundID"=w."RecruitmentRoundID"))
         OR EXISTS (SELECT 1 FROM ojt_history."StudentEligibilityItems" h WHERE h."StudentID"=$1 AND h."OJTSemesterID"=w."OJTSemesterID")
         OR EXISTS (SELECT 1 FROM "Students" eligible_student
           JOIN "Users" eligible_user ON eligible_user."UserID"=eligible_student."UserID"
@@ -97,17 +98,20 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
       });
       if(contextIssue)reasons.push(contextIssue);
       if(kind==='combo'&&!options.length)reasons.push('COMBO_OPTIONS_UNAVAILABLE');
-      const admission=kind==='ojt'?await studentAdmission(c,s.StudentID,w.OJTSemesterID):null;
+      const academic=kind==='ojt'?await applicationAcademicEligibility(c,s.StudentID,w.OJTSemesterID):null;
+      const admission=academic?.admission??null;
       if(kind==='ojt')pathway={admissionSource:admission?.source??null};
-      if(kind==='ojt'&&(!admission||admission.status!=='ELIGIBLE'||admission.isStale))reasons.push(
-        admission?.isStale?'ELIGIBILITY_HANDOFF_STALE':'CONFIRMED_ELIGIBILITY_REQUIRED');
-      if(kind==='ojt'&&w.registration&&['PENDING','ACCEPTED','ACCEPT','APPROVED'].includes(w.registration.latestDecision))reasons.push('REGISTRATION_ALREADY_EXISTS');
+      const roundBlockers=kind==='ojt'?await applicationRoundBlockers(c,w.RecruitmentRoundID):[];
+      const isApplicationOpen=w.Status==='OPEN'&&now>=new Date(w.StartsAt)&&now<new Date(end)&&roundBlockers.length===0;
+      if(academic)reasons.push(...academic.blockers,...await applicationProgressBlockers(c,s.StudentID,w.OJTSemesterID),...roundBlockers);
       items.push({id:w.WindowID,name:w.Name,academicPeriodId:w.AcademicPeriodID,ojtSemesterId:w.OJTSemesterID,
         period:w.period,semester:w.semester,startsAt:w.StartsAt,endsAt:w.EndsAt,effectiveEndsAt:end,status:w.Status,
-        canSubmit:reasons.length===0,blockingReasons:reasons,blockingMessages:reasons.map(code=>blockerLabels[code]??'Lộ trình hoặc cấu hình đợt đăng ký chưa phù hợp.'),
+        canSubmit:reasons.length===0,blockingReasons:reasons,blockingMessages:reasons.map(code=>applicationBlockerMessages[code]??blockerLabels[code]??'Lộ trình hoặc cấu hình đợt đăng ký chưa phù hợp.'),
         ...(kind==='combo'?{phase:w.Phase,initialWindowId:w.InitialWindowID,selection:w.selection,confirmedSelection:confirmed,
           reasonRequiredOnChange:!!(w.selection||confirmed),availableCombos:w.RosterProgramID===s.ProgramID?options:[]}:
-          {requiredRelativeSemester:w.RequiredRelativeSemester,recruitmentRoundId:w.RecruitmentRoundID??null,pathway,registration:w.registration,admissionEligibility:admission})});
+          {requiredRelativeSemester:w.RequiredRelativeSemester,recruitmentRoundId:w.RecruitmentRoundID??null,
+            isApplicationOpen,applicationStatus:isApplicationOpen?'OPEN':w.Status==='OPEN'&&now<new Date(w.StartsAt)?'UPCOMING':'CLOSED',
+            pathway,registration:w.registration,admissionEligibility:admission})});
     }
     return {studentId:s.StudentID,student:{id:s.StudentID,studentCode:s.StudentCode,fullName:s.FullName,email:s.Email,phone:s.Phone},items,total,page:page.page,limit:page.limit};
   },existingClient);

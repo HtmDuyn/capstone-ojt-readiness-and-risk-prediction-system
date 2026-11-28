@@ -1,3 +1,4 @@
+import { recruitmentAccessSql } from '../eligibility/recruitment-roster.repository';
 import { enrichListRows } from '../../shared/list-context';
 import { officialEvaluationRelation } from '../ojt-results/official-evaluation';
 import type { PoolClient } from 'pg';
@@ -179,7 +180,7 @@ export async function dashboard(params:Row,actor:Actor){
   ), handed_off AS (
    SELECT r."RegistrationID",lc."CoordinationID",lc."Decision",a."AssignmentID",
     CASE WHEN UPPER(lc."Decision") IN ('ACCEPTED','ACCEPT','APPROVED') THEN 'ACCEPTED' WHEN UPPER(lc."Decision") IN ('REJECTED','REJECT') THEN 'REJECTED' ELSE 'PENDING' END AS decision
-   FROM "OJTRecruitmentAccess" h LEFT JOIN "OJTRegistrations" r ON r."StudentID"=h."StudentID" AND r."OJTSemesterID"=h."OJTSemesterID"
+   FROM (${recruitmentAccessSql}) h LEFT JOIN "OJTRegistrations" r ON r."StudentID"=h."StudentID" AND r."OJTSemesterID"=h."OJTSemesterID"
    LEFT JOIN latest_coordination lc ON lc."RegistrationID"=r."RegistrationID"
    LEFT JOIN latest_assignment a ON a."RegistrationID"=r."RegistrationID"
    WHERE ($1::int IS NULL OR h."OJTSemesterID"=$1) AND ($2::int IS NULL OR COALESCE(a."EnterpriseID",lc."EnterpriseID")=$2)

@@ -1,3 +1,4 @@
+import { recruitmentRoundForStudentSql } from '../eligibility/recruitment-roster.repository';
 import { readTransaction } from './read.repository';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
@@ -59,26 +60,7 @@ export async function eligibleStudents(params: Row, actor: Actor) {
       LEFT JOIN "TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
       LEFT JOIN "StudentAcademicPlacements" placement ON placement."StudentID"=s."StudentID"
       LEFT JOIN "Cohorts" cohort ON cohort."CohortID"=placement."CohortID"
-      LEFT JOIN LATERAL (
-        SELECT o."OJTSemesterID"
-        FROM "RecruitmentWindows" open_window
-        JOIN "OJTSemesters" o ON o."OJTSemesterID"=open_window."OJTSemesterID"
-        WHERE o."Status" NOT IN ('CLOSED','ARCHIVED')
-          AND open_window."Status"='OPEN' AND open_window."ResultsFinalizedAt" IS NULL
-          AND COALESCE(open_window."ApplicationStartsAt",open_window."StartsAt")<=statement_timestamp()
-          AND open_window."EndsAt">statement_timestamp()
-          AND COALESCE(open_window."ApplicationEndsAt",open_window."EndsAt")>statement_timestamp()
-          AND EXISTS (
-            SELECT 1 FROM "ProgramCourses" pc
-            JOIN "Courses" course USING ("CourseID")
-            JOIN "TrainingPrograms" curriculum USING ("ProgramID")
-            WHERE pc."ProgramID"=s."ProgramID" AND curriculum."Status"='PUBLISHED'
-              AND upper(btrim(course."CourseCode"))='OJT202'
-              AND pc."EntryKind"='COURSE' AND pc."RecommendedSemester"=6
-          )
-        ORDER BY COALESCE(open_window."ApplicationStartsAt",open_window."StartsAt"),open_window."WindowID"
-        LIMIT 1
-      ) open_target ON true
+      LEFT JOIN LATERAL (${recruitmentRoundForStudentSql}) open_target ON true
       LEFT JOIN "OJTSemesters" target ON target."OJTSemesterID"=COALESCE(
         open_target."OJTSemesterID",
         (SELECT default_term."OJTSemesterID" FROM "OJTSemesters" default_term

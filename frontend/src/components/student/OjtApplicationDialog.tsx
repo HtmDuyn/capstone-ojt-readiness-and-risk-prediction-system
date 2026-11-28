@@ -91,7 +91,7 @@ export function OjtApplicationDialog({ profile, companies, opportunities, initia
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
           <button type="button" disabled={busy} onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold">Hủy</button>
-          <button type="submit" disabled={busy || !selected?.canApply} className={buttonClass + ' inline-flex items-center gap-2'}><Send size={16} />{busy ? 'Đang gửi hồ sơ...' : 'Gửi đơn đăng ký'}</button>
+          <button type="submit" disabled={busy || !selected?.canApply || !selected.applicationWindowId} className={buttonClass + ' inline-flex items-center gap-2'}><Send size={16} />{busy ? 'Đang gửi hồ sơ...' : 'Gửi đơn đăng ký'}</button>
         </div>
       </form>
     </StudentDialog>

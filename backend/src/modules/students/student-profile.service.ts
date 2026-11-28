@@ -9,6 +9,7 @@ import { enrichListRows } from '../../shared/list-context';
 import { invalid, pagination, positiveId, enumValue } from './student.validation';
 import type { Actor } from '../ojt-registration/window.service';
 import type { AssessmentReadContext } from '../student-portal/assessment-read-context';
+import { studentRecruitmentAssignment } from './recruitment-assignment.service';
 
 type Row = Record<string, any>;
 export async function studentProfile(id:number,params:Row,actor:Actor,existingClient?:PoolClient,assessment?:AssessmentReadContext) {
@@ -80,10 +81,10 @@ export async function studentProfile(id:number,params:Row,actor:Actor,existingCl
     if (!selected && ojtPage.offset===0) registrationSemester=registrations[0]?.ojtSemesterId ?? null;
     output.ojtRegistrations={items:registrations,total:totalOjt,page:ojtPage.page,limit:ojtPage.limit};
     }
-    // The selected semester is independent of historical-registration pagination.
-    // Before registration exists, use the next OJT period after the student's current placement;
-    // delayed students are not forced back to their cohort's sixth semester.
-    const semesterId=selected??(registrationSemester !== undefined ? registrationSemester : (await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID)??
+    const recruitmentAssignment=await studentRecruitmentAssignment(c,id);
+    output.recruitmentAssignment=recruitmentAssignment;
+    // Prefer the QHDN assignment; an explicit historical filter still takes precedence.
+    const semesterId=selected??recruitmentAssignment?.ojtSemesterId??(registrationSemester !== undefined ? registrationSemester : (await c.query(`SELECT "OJTSemesterID" FROM "OJTRegistrations" WHERE "StudentID"=$1 ORDER BY "RegistrationID" DESC LIMIT 1`,[id])).rows[0]?.OJTSemesterID)??
       (await c.query(`SELECT "OJTSemesterID" FROM "OJTSemesters"
        WHERE "AcademicPeriodID"="DefaultOJTAcademicPeriod"($1) LIMIT 1`,[id])).rows[0]?.OJTSemesterID??null;
     output.ojtSemesterId=semesterId;

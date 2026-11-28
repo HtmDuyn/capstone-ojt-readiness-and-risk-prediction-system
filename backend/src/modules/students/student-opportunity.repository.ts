@@ -11,7 +11,7 @@ export const studentOpportunitySql = `SELECT
     'content',post."Content",'benefits',post."Benefits",'applicationInstructions',post."ApplicationInstructions") AS post,
   (SELECT app."ApplicationID" FROM "JobApplications" app
     JOIN "OJTRegistrations" reg ON reg."RegistrationID"=app."RegistrationID"
-    WHERE reg."StudentID"=$2 AND app."PositionID"=p."PositionID" AND app."PostID"=post."PostID"
+    WHERE reg."StudentID"=$2 AND app."PostID"=post."PostID" AND app."PositionID"=p."PositionID"
     ORDER BY app."ApplicationID" DESC LIMIT 1) AS "applicationId"
   FROM "InternshipPositions" p
   JOIN "Enterprises" e ON e."EnterpriseID"=p."EnterpriseID"

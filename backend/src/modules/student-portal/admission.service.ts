@@ -1,3 +1,4 @@
+import { recruitmentRosterSql } from '../eligibility/recruitment-roster.repository';
 import type { PoolClient } from 'pg';
 import { calculatedEligibilitySql, latestOjt202PassedSql } from '../eligibility/frontend-results.service';
 import { officialEligibilityWithClient } from '../eligibility/eligibility.service';
@@ -24,7 +25,7 @@ export async function studentAdmission(client: PoolClient, studentId: number, se
     FROM "Students" s WHERE s."StudentID"=$1 AND s."DeletedAt" IS NULL`, [studentId])).rows[0]?.passed) return null;
 
   const direct = (await client.query(`SELECT ${calculatedEligibilitySql('s')} AS result, roster."BatchID", roster."RoundID"
-    FROM "OJTRecruitmentRoster" roster JOIN "Students" s USING ("StudentID")
+    FROM (${recruitmentRosterSql}) roster JOIN "Students" s USING ("StudentID")
     WHERE roster."StudentID"=$1 AND roster."OJTSemesterID"=$2`, [studentId, semesterId])).rows[0];
   if (direct) {
     const { result } = direct;

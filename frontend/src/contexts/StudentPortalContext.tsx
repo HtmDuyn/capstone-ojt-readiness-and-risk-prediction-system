@@ -3,6 +3,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -13,7 +15,9 @@ import {
   allStudentPages,
   getOwnStudentIdentity,
   getStudyPeriods,
+  studentGet,
 } from '@/services/studentService';
+import { subscribeVisibleRefresh } from '@/utils/shared/visibleRefresh';
 import type {
   Named,
   StudentIdentityProfile,
@@ -64,6 +68,21 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const assignedRecruitment = useStudentResource<StudentIdentityProfile['recruitmentAssignment']>(
+    profile ? `student-recruitment-assignment:${profile.id}:${revision}` : null,
+    signal => studentGet('/students/me/recruitment-assignment', signal), { snapshot: true },
+  );
+  const recruitmentAssignment = profile && !assignedRecruitment.pending && !assignedRecruitment.error
+    ? assignedRecruitment.data : assignedRecruitment.data ?? profile?.recruitmentAssignment ?? null;
+  const currentProfile = useMemo(() => profile ? { ...profile, recruitmentAssignment,
+    ojtSemesterId: recruitmentAssignment?.ojtSemesterId ?? profile.ojtSemesterId } : null, [profile, recruitmentAssignment]);
+  const assignmentRefreshRef = useRef(assignedRecruitment.reload);
+  const canRefreshAssignment = useRef(false);
+  assignmentRefreshRef.current = assignedRecruitment.reload;
+  canRefreshAssignment.current = !!profile && !assignedRecruitment.pending;
+  useEffect(() => subscribeVisibleRefresh(() => assignmentRefreshRef.current(), {
+    interval: 60_000, canRefresh: () => canRefreshAssignment.current,
+  }), [profile?.id]);
   const studyCatalog = useStudentResource(
     profile && !loading ? `study-periods:${profile.id}:${revision}` : null,
     signal => getStudyPeriods(signal), { snapshot: true },
@@ -171,21 +190,23 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   }, [token, user?.id, user?.email, logout, revision]);
 
   // The internship target is owned by the student, not a user-selectable study filter.
-  const semesterId = profile?.ojtSemesterId ?? registrations[0]?.ojtSemesterId ?? null;
+  const semesterId = recruitmentAssignment?.ojtSemesterId ?? profile?.ojtSemesterId ?? registrations[0]?.ojtSemesterId ?? null;
   // Read-only metadata for the internship screens; there is no OJT filter action.
   const semesters: Named[] = semesterId ? [{ id: semesterId,
-    name: windows.find(window => window.ojtSemesterId === semesterId)?.semester?.name
+    name: (recruitmentAssignment?.ojtSemesterId === semesterId ? recruitmentAssignment.semesterName : undefined)
+      ?? windows.find(window => window.ojtSemesterId === semesterId)?.semester?.name
       ?? registrations.find(registration => registration.ojtSemesterId === semesterId)?.semester?.name
       ?? `Đợt OJT #${semesterId}` }] : [];
 
   return (
     <Context.Provider
       value={{
-        profile,
+        profile: currentProfile,
         loading,
         refreshing,
         error,
-        warnings: [...warnings, ...(studyCatalog.error ? ['Học kỳ theo dõi: ' + studyCatalog.error] : [])],
+        warnings: [...warnings, ...(studyCatalog.error ? ['Học kỳ theo dõi: ' + studyCatalog.error] : []),
+          ...(assignedRecruitment.error ? ['Đợt OJT được gán: ' + assignedRecruitment.error] : [])],
         registrationWindows: profile ? windows : [],
         windowsLoading,
         semesterId,
