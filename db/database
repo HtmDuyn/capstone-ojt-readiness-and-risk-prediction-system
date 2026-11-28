@@ -8636,6 +8636,8 @@ WHERE coordinator."Username"='ojt.coord01'
   AND NOT EXISTS (SELECT 1 FROM public."OJTActualReceipts" existing
     WHERE existing."StudentID"=success."StudentID" AND existing."OJTSemesterID"=success."OJTSemesterID");
 
+-- Finalize only ended, closed historical seed rounds. Current and future rounds
+-- keep ResultsFinalizedAt/ResultsFinalizedBy/ResultsSummary NULL until QHDN finalizes them.
 WITH round_summary AS (
   SELECT round_row."WindowID",
     count(application."ApplicationID")::int AS total,
@@ -8644,9 +8646,15 @@ WITH round_summary AS (
     count(application."ApplicationID") FILTER (WHERE application."Status"='WITHDRAWN')::int AS withdrawn,
     count(application."ApplicationID") FILTER (WHERE application."Status" NOT IN ('ACCEPTED','REJECTED','WITHDRAWN'))::int AS pending
   FROM public."RecruitmentWindows" round_row
+  JOIN qhdn_seed_recruitment_schedule schedule
+    ON schedule."OJTSemesterID"=round_row."OJTSemesterID"
+   AND schedule."ResultsEndsAt"=round_row."ResultsEndsAt"
   LEFT JOIN public."RecruitmentPosts" post ON post."WindowID"=round_row."WindowID"
   LEFT JOIN public."JobApplications" application ON application."PostID"=post."PostID"
   WHERE round_row."CampaignID" IS NOT NULL
+    AND round_row."Status"='CLOSED'
+    AND round_row."EndsAt"<=clock_timestamp()
+    AND round_row."ResultsEndsAt"<=clock_timestamp()
   GROUP BY round_row."WindowID"
 )
 UPDATE public."RecruitmentWindows" round_row
