@@ -107,7 +107,7 @@ export async function studentWindows(kind:'ojt'|'combo',params:Row,actor:Actor,e
         canSubmit:reasons.length===0,blockingReasons:reasons,blockingMessages:reasons.map(code=>blockerLabels[code]??'Lộ trình hoặc cấu hình đợt đăng ký chưa phù hợp.'),
         ...(kind==='combo'?{phase:w.Phase,initialWindowId:w.InitialWindowID,selection:w.selection,confirmedSelection:confirmed,
           reasonRequiredOnChange:!!(w.selection||confirmed),availableCombos:w.RosterProgramID===s.ProgramID?options:[]}:
-          {requiredRelativeSemester:w.RequiredRelativeSemester,pathway,registration:w.registration,admissionEligibility:admission})});
+          {requiredRelativeSemester:w.RequiredRelativeSemester,recruitmentRoundId:w.RecruitmentRoundID??null,pathway,registration:w.registration,admissionEligibility:admission})});
     }
     return {studentId:s.StudentID,student:{id:s.StudentID,studentCode:s.StudentCode,fullName:s.FullName,email:s.Email,phone:s.Phone},items,total,page:page.page,limit:page.limit};
   },existingClient);

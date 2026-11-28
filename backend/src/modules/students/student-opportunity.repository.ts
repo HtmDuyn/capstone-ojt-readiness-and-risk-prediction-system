@@ -7,7 +7,7 @@ export const studentOpportunitySql = `SELECT
   p."Requirements" AS requirements,p."Location" AS location,p."WorkMode" AS "workMode",p."Capacity" AS capacity,
   GREATEST(0,p."Capacity"-public."RecruitmentOccupiedSlots"(p."PositionID")) AS "remainingSlots",
   jsonb_build_object('id',e."EnterpriseID",'name',e."Name",'address',e."Address") AS company,
-  jsonb_build_object('id',post."PostID",'title',post."Title",'deadlineAt',post."DeadlineAt",
+  jsonb_build_object('id',post."PostID",'windowId',post."WindowID",'title',post."Title",'deadlineAt',post."DeadlineAt",
     'content',post."Content",'benefits',post."Benefits",'applicationInstructions',post."ApplicationInstructions") AS post,
   (SELECT app."ApplicationID" FROM "JobApplications" app
     JOIN "OJTRegistrations" reg ON reg."RegistrationID"=app."RegistrationID"

@@ -6,13 +6,15 @@ export type PartnerCompany = {
   contactEmail?: string | null; contactPhone?: string | null;
 };
 export type Opportunity = {
-  id: number; postId: number; title: string; description?: string | null;
+  id: number; postId: number; ojtSemesterId?: number; title: string; description?: string | null;
   requirements?: string | null; location?: string | null; workMode?: string | null;
   remainingSlots: number; canApply: boolean; blockers: string[]; company: PartnerCompany;
-  post: { title: string; deadlineAt?: string | null; content?: string | null; benefits?: string | null; applicationInstructions?: string | null };
+  applicationWindowId?: number | null;
+  post: { id?: number; windowId?: number; title: string; deadlineAt?: string | null; content?: string | null; benefits?: string | null; applicationInstructions?: string | null };
 };
 const blockers: Record<string, string> = {
 
+  OJT_REGISTRATION_WINDOW_REQUIRED: 'Chưa có đợt OJT đang mở phù hợp với kỳ tuyển dụng này.',
   ELIGIBLE_HANDOFF_REQUIRED: 'Chưa có kết quả đủ điều kiện OJT.',
   CONFIRMED_ELIGIBILITY_REQUIRED: 'Chưa có kết quả đủ điều kiện OJT hiện hành. Liên hệ Phòng Đào tạo để kiểm tra.',
   ELIGIBILITY_CHECK_STALE: 'Kết quả xét điều kiện cần được cập nhật.',
