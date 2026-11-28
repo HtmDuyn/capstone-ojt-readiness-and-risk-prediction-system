@@ -5712,7 +5712,7 @@ INSERT INTO public."TrainingPrograms" ("ProgramID","ProgramCode","ProgramName","
 ('27','BIT_IS_K20B','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('28','BIT_IS_K20C','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('29','BIT_IS_K20D','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
-('30','BIT_IS_K20D-21A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
+('30','BIT_IS_K20D-21A_K22A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Hệ thống thông tin','145.00','4','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('31','BIT_SE_K18D_19A','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('32','BIT_SE_K19B','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
 ('33','BIT_SE_K19C','Chương trình cử nhân ngành Công nghệ thông tin, chuyên ngành Kỹ thuật phần mềm','145.00','1','SEED-2026','2026','PUBLISHED','false','false','2','2',CURRENT_TIMESTAMP),
@@ -7443,7 +7443,7 @@ JOIN public."TrainingPrograms" program ON program."Status"='PUBLISHED' AND progr
   WHEN 'IA' THEN CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_IA_K18D-19A' WHEN 'K19' THEN 'BIT_IA_K19D-20A'
     WHEN 'K20' THEN 'BIT_IA_K20D-21A' ELSE 'BIT_IA_K21D-22A' END
   WHEN 'IS' THEN CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_IS_K18D_19A' WHEN 'K19' THEN 'BIT_IS_K19D_K20A'
-    WHEN 'K20' THEN 'BIT_IS_K20D-21A' WHEN 'K21' THEN 'BIT_IS_K20D-21A' ELSE 'BIT_SE-2026_K21D_K22A' END
+    WHEN 'K20' THEN 'BIT_IS_K20D-21A_K22A' WHEN 'K21' THEN 'BIT_IS_K20D-21A_K22A' ELSE 'BIT_SE-2026_K21D_K22A' END
   ELSE CASE assignment."CohortCode" WHEN 'K18' THEN 'BIT_SE_K18D_19A' WHEN 'K19' THEN 'BIT_SE_K19D_K20A'
     WHEN 'K20' THEN 'BIT_SE_K20D_K21A' ELSE 'BIT_SE-2026_K21D_K22A' END
 END
@@ -7478,7 +7478,7 @@ FROM (VALUES
 ) AS sample("Number","MajorCode","FullName","Phone","RecruitmentScenario")
 JOIN public."TrainingPrograms" program ON program."Status"='PUBLISHED'
   AND program."ProgramCode"=CASE sample."MajorCode"
-    WHEN 'IS' THEN 'BIT_IS_K20D-21A' ELSE 'BIT_SE_K20D_K21A' END
+  WHEN 'IS' THEN 'BIT_IS_K20D-21A_K22A' ELSE 'BIT_SE_K20D_K21A' END
 CROSS JOIN LATERAL (SELECT sample."MajorCode"||'20'||(1600+sample."Number")::text AS "StudentCode") identity
 WHERE NOT EXISTS (SELECT 1 FROM qhdn_student_roster existing WHERE existing."StudentCode"=identity."StudentCode");
 
@@ -7685,6 +7685,43 @@ ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCod
   "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
   "ActualSemester"=EXCLUDED."ActualSemester",
   "UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
+
+-- Three K22 Information Systems students. K22 follows the existing calendar:
+-- stage 0 / entry = Spring 2026, stage 1 = Summer 2026, stage 2 = Fall 2026.
+-- The closest available IS curriculum (K20D-21A) is extended to K22 above.
+INSERT INTO public."Users" ("Username","PasswordHash","Email","Phone","FullName","RoleID","Status","MustChangePassword","AuthVersion")
+SELECT lower(seed."StudentCode"),'$2b$12$/kDukioJZ/1pVcQI1F/QZ.FHl1qSrmv9s.W.6ouvsA4VuwtMsg2Ti',
+  lower(seed."StudentCode")||'@fpt.edu.vn',seed."Phone",seed."FullName",role."RoleID",'ACTIVE',false,0
+FROM (VALUES
+  ('IS221621','Nguyễn Minh Khôi','0902000621'),
+  ('IS221622','Trần Gia Bảo','0902000622'),
+  ('IS221623','Lê Hoàng Yến','0902000623')
+) AS seed("StudentCode","FullName","Phone")
+CROSS JOIN public."Roles" role
+WHERE role."RoleCode"='STUDENT'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."Students" ("UserID","StudentCode","ProgramID","EnrollmentYear","CurrentSemester","Status","CohortCode")
+SELECT account."UserID",seed."StudentCode",program."ProgramID",2026,2,'ACTIVE','K22'
+FROM (VALUES ('IS221621'),('IS221622'),('IS221623')) AS seed("StudentCode")
+JOIN public."Users" account ON account."Username"=lower(seed."StudentCode")
+JOIN public."TrainingPrograms" program ON program."ProgramCode"='BIT_IS_K20D-21A_K22A'
+WHERE NOT EXISTS (SELECT 1 FROM public."Students" existing WHERE existing."StudentCode"=seed."StudentCode")
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public."StudentAcademicPlacements"
+  ("StudentID","CohortID","GroupCode","EntryAcademicPeriodID","CurrentAcademicPeriodID","ActualSemester","UpdatedBy")
+SELECT student."StudentID",cohort."CohortID",'B',entry."AcademicPeriodID",current_period."AcademicPeriodID",2,academic."UserID"
+FROM (VALUES ('IS221621'),('IS221622'),('IS221623')) AS seed("StudentCode")
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Cohorts" cohort ON cohort."CohortCode"='K22'
+JOIN public."AcademicPeriods" entry ON entry."PeriodCode"='SPRING2026'
+JOIN public."AcademicPeriods" current_period ON current_period."PeriodCode"='FALL2026'
+CROSS JOIN public."Users" academic
+WHERE academic."Username"='academic01'
+ON CONFLICT ("StudentID") DO UPDATE SET "CohortID"=EXCLUDED."CohortID","GroupCode"=EXCLUDED."GroupCode",
+  "EntryAcademicPeriodID"=EXCLUDED."EntryAcademicPeriodID","CurrentAcademicPeriodID"=EXCLUDED."CurrentAcademicPeriodID",
+  "ActualSemester"=EXCLUDED."ActualSemester","UpdatedBy"=EXCLUDED."UpdatedBy","UpdatedAt"=now();
 
 -- Convert source prerequisite prose when it is a list of exact course codes:
 -- commas mean every clause is required; OR means one course in that clause.
@@ -8516,6 +8553,57 @@ INSERT INTO public."StudentCourseResults" ("ResultID","StudentID","CourseID","Se
   (701,4,263,0,1,8.00,'B','PASSED',1,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
   (702,5,259,0,1,8.00,'B','PASSED',1,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL),
   (703,6,260,0,1,8.00,'B','PASSED',1,1,3.00,'QHDN_HANDOFF_2026',2,'2026-11-28T09:31:51.455Z'::timestamptz,'2026-11-28T09:31:51.455Z'::timestamptz,NULL);
+SELECT setval(pg_get_serial_sequence('public."StudentCourseResults"','ResultID'),GREATEST(COALESCE((SELECT max("ResultID") FROM public."StudentCourseResults"),1),1),true);
+
+-- K22 IS history: five curriculum stage-1 courses in Summer 2026 and five
+-- stage-2 courses in Fall 2026 for each student. Fall courses are in progress.
+INSERT INTO public."StudentCourseResults"
+  ("ResultID","StudentID","CourseID","SemesterTaken","AcademicYearID","Score","Grade","Status","AcademicPeriodID","AttemptNumber","GradePoints","SourceReference","RecordedBy","OJTResultID")
+OVERRIDING SYSTEM VALUE
+SELECT seed."ResultID",student."StudentID",course."CourseID",seed."SemesterTaken",period."AcademicYearID",
+  seed."Score",seed."Grade",seed."Status",period."AcademicPeriodID",1,seed."GradePoints",
+  'K22_IS_TRANSCRIPT_2026',academic."UserID",NULL
+FROM (VALUES
+  (704,'IS221621',1,'CEA201','PASSED',8.00,'B',3.00),
+  (705,'IS221621',1,'CSI106','PASSED',8.00,'B',3.00),
+  (706,'IS221621',1,'MAE101','PASSED',8.00,'B',3.00),
+  (707,'IS221621',1,'PRF192','PASSED',8.00,'B',3.00),
+  (708,'IS221621',1,'SSA101','PASSED',8.00,'B',3.00),
+  (709,'IS221621',2,'JPD113','IN_PROGRESS',NULL,NULL,NULL),
+  (710,'IS221621',2,'MAD101','IN_PROGRESS',NULL,NULL,NULL),
+  (711,'IS221621',2,'NWC204','IN_PROGRESS',NULL,NULL,NULL),
+  (712,'IS221621',2,'OSG202','IN_PROGRESS',NULL,NULL,NULL),
+  (713,'IS221621',2,'PRO192','IN_PROGRESS',NULL,NULL,NULL),
+  (714,'IS221622',1,'CEA201','PASSED',8.00,'B',3.00),
+  (715,'IS221622',1,'CSI106','PASSED',8.00,'B',3.00),
+  (716,'IS221622',1,'MAE101','PASSED',8.00,'B',3.00),
+  (717,'IS221622',1,'PRF192','PASSED',8.00,'B',3.00),
+  (718,'IS221622',1,'SSA101','PASSED',8.00,'B',3.00),
+  (719,'IS221622',2,'JPD113','IN_PROGRESS',NULL,NULL,NULL),
+  (720,'IS221622',2,'MAD101','IN_PROGRESS',NULL,NULL,NULL),
+  (721,'IS221622',2,'NWC204','IN_PROGRESS',NULL,NULL,NULL),
+  (722,'IS221622',2,'OSG202','IN_PROGRESS',NULL,NULL,NULL),
+  (723,'IS221622',2,'PRO192','IN_PROGRESS',NULL,NULL,NULL),
+  (724,'IS221623',1,'CEA201','PASSED',8.00,'B',3.00),
+  (725,'IS221623',1,'CSI106','PASSED',8.00,'B',3.00),
+  (726,'IS221623',1,'MAE101','PASSED',8.00,'B',3.00),
+  (727,'IS221623',1,'PRF192','PASSED',8.00,'B',3.00),
+  (728,'IS221623',1,'SSA101','PASSED',8.00,'B',3.00),
+  (729,'IS221623',2,'JPD113','IN_PROGRESS',NULL,NULL,NULL),
+  (730,'IS221623',2,'MAD101','IN_PROGRESS',NULL,NULL,NULL),
+  (731,'IS221623',2,'NWC204','IN_PROGRESS',NULL,NULL,NULL),
+  (732,'IS221623',2,'OSG202','IN_PROGRESS',NULL,NULL,NULL),
+  (733,'IS221623',2,'PRO192','IN_PROGRESS',NULL,NULL,NULL)
+) AS seed("ResultID","StudentCode","SemesterTaken","CourseCode","Status","Score","Grade","GradePoints")
+JOIN public."Students" student ON student."StudentCode"=seed."StudentCode"
+JOIN public."Courses" course ON course."CourseCode"=seed."CourseCode"
+JOIN public."ProgramCourses" program_course ON program_course."ProgramID"=student."ProgramID"
+  AND program_course."CourseID"=course."CourseID" AND program_course."RecommendedSemester"=seed."SemesterTaken"
+  AND program_course."EntryKind"='COURSE'
+JOIN public."AcademicPeriods" period ON period."PeriodCode"=CASE seed."SemesterTaken" WHEN 1 THEN 'SUMMER2026' ELSE 'FALL2026' END
+CROSS JOIN public."Users" academic
+WHERE academic."Username"='academic01'
+ON CONFLICT ("ResultID") DO NOTHING;
 SELECT setval(pg_get_serial_sequence('public."StudentCourseResults"','ResultID'),GREATEST(COALESCE((SELECT max("ResultID") FROM public."StudentCourseResults"),1),1),true);
 
 -- Only the six completed-OJT samples receive historic approved registrations; no future application is fabricated.
