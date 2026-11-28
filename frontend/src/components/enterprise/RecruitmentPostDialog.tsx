@@ -16,7 +16,7 @@ interface FormValidationErrors {
   positions: Record<string, Partial<Record<PositionField, string>>>;
   positiveCapacity?: string;
 }
-const newPosition = (): PositionDraft => ({ key: crypto.randomUUID(), title: '', description: '', requirements: '', capacity: '1', minimum: 0, location: '', workMode: '' });
+const newPosition = (): PositionDraft => ({ key: crypto.randomUUID(), title: 'Thực tập sinh Backend', description: 'Tham gia phát triển API, tối ưu cơ sở dữ liệu và phối hợp với nhóm frontend để hoàn thiện sản phẩm.', requirements: 'Sinh viên ngành Công nghệ thông tin; biết cơ bản về Node.js, SQL và Git; chủ động học hỏi, làm việc nhóm tốt.', capacity: '1', minimum: 0, location: 'TP. Hồ Chí Minh', workMode: '' });
 const fieldClass = (invalid = false) => `w-full rounded-xl border ${invalid ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-100' : 'border-slate-200 focus:border-orange-500 focus:ring-orange-100'} bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 disabled:bg-slate-50`;
 const errorClass = 'mt-1 text-xs text-rose-600';
 
@@ -67,10 +67,10 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
   const feedback = useRecruitmentFeedback();
   const previousFocus = useRef<HTMLElement | null>(null);
   const [windowId, setWindowId] = useState(post?.windowId ?? initialWindowId ?? windows.find(w => windowAcceptsPosts(w, now))?.id ?? windows[0]?.id ?? 0);
-  const [title, setTitle] = useState(post?.title ?? '');
-  const [content, setContent] = useState(post?.content ?? '');
-  const [benefits, setBenefits] = useState(post?.benefits ?? '');
-  const [instructions, setInstructions] = useState(post?.applicationInstructions ?? '');
+  const [title, setTitle] = useState(post?.title ?? 'Tuyển thực tập sinh Backend');
+  const [content, setContent] = useState(post?.content ?? 'Chúng tôi đang tìm kiếm thực tập sinh Backend tham gia phát triển và duy trì các dịch vụ web. Bạn sẽ được hướng dẫn bởi đội ngũ kỹ sư, tham gia dự án thực tế và rèn luyện quy trình làm việc chuyên nghiệp.');
+  const [benefits, setBenefits] = useState(post?.benefits ?? 'Được mentor hướng dẫn; hỗ trợ xác nhận thực tập; cơ hội trở thành nhân viên chính thức.');
+  const [instructions, setInstructions] = useState(post?.applicationInstructions ?? 'Gửi CV kèm liên kết GitHub hoặc sản phẩm đã thực hiện. Ứng viên phù hợp sẽ được mời phỏng vấn trực tuyến.');
   const [positions, setPositions] = useState<PositionDraft[]>(post?.positions?.length
     ? post.positions.map(p => ({ key: String(p.id), id: p.id, title: p.title, description: p.description ?? '', requirements: p.requirements ?? '',
       capacity: String(p.capacity), minimum: Math.max(0, p.capacity - p.remainingSlots), location: p.location ?? '', workMode: p.workMode ?? '' }))
@@ -171,7 +171,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
         <section className="space-y-4">
           <h3 className="font-semibold text-slate-900">1. Thông tin chung</h3>
           <div><label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor={inputId('title')}>Tiêu đề tin <span className="text-rose-600">*</span></label>
-            <input id={inputId('title')} className={fieldClass(!!validationErrors.title)} aria-invalid={!!validationErrors.title} aria-describedby={validationErrors.title ? inputId('title-error') : undefined} value={title} onChange={e => setTitle(e.target.value)} required maxLength={500} placeholder="VD: Tuyển thực tập sinh Backend và Frontend" autoFocus />
+            <input id={inputId('title')} className={fieldClass(!!validationErrors.title)} aria-invalid={!!validationErrors.title} aria-describedby={validationErrors.title ? inputId('title-error') : undefined} value={title} onChange={e => setTitle(e.target.value)} required maxLength={500} placeholder="Tiêu đề tin tuyển dụng" autoFocus />
             {validationErrors.title && <p id={inputId('title-error')} role="alert" className={errorClass}>{validationErrors.title}</p>}</div>
           <div><label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor={inputId('content')}>Nội dung tuyển dụng <span className="text-rose-600">*</span></label>
             <textarea id={inputId('content')} className={fieldClass(!!validationErrors.content)} aria-invalid={!!validationErrors.content} aria-describedby={validationErrors.content ? inputId('content-error') : undefined} rows={4} value={content} onChange={e => setContent(e.target.value)} required maxLength={30000} placeholder="Giới thiệu công việc, môi trường thực tập và thông tin dành cho ứng viên..." />

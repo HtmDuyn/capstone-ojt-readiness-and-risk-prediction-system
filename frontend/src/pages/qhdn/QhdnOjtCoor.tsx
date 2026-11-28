@@ -277,13 +277,13 @@ export default function QhdnOjtCoordination() {
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="p-5"><h2 className="font-bold text-slate-800">Chỉ tiêu và số lượng thực nhận</h2><p className="mt-1 text-sm text-slate-500">Số thực nhận tính sinh viên doanh nghiệp đã nhận hoặc đã có phân công, mỗi sinh viên một lần. Số này có thể thấp hơn, bằng hoặc vượt chỉ tiêu; chỉ tiêu ban đầu được giữ nguyên.</p></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="bg-slate-50 text-xs text-slate-500"><tr>{['STT', 'Doanh nghiệp', 'Chỉ tiêu', 'Sinh viên thực nhận', 'Vượt chỉ tiêu'].map((label, index) => <th scope="col" key={label} className={'px-4 py-3 font-semibold ' + (index === 0 ? 'w-16 text-center' : index > 1 ? 'text-right' : '')}>{label}</th>)}</tr></thead>
+        <thead className="bg-slate-50 text-xs text-slate-500"><tr>{['STT', 'Doanh nghiệp', 'Chỉ tiêu', 'Sinh viên thực nhận', 'Vượt chỉ tiêu'].map((label, index) => <th scope="col" key={label} className={'px-4 py-3 font-semibold ' + (index === 0 ? 'w-16 text-center' : index > 1 ? 'text-center' : '')}>{label}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{pagedCompanies.items.map((company, index) => <tr key={company.key}>
           <td className={cell + ' text-center tabular-nums text-slate-500'}>{pagedCompanies.offset + index + 1}</td>
           <td className={cell + ' font-medium text-slate-700'}>{company.name}</td>
-          <td className={cell + ' text-right tabular-nums'}>{company.capacity}</td>
-          <td className={cell + ' text-right tabular-nums'}>{company.actualCount}</td>
-          <td className={cell + ' text-right tabular-nums'}>{Math.max(0, company.actualCount - company.capacity)}</td>
+          <td className={cell + ' text-center tabular-nums'}>{company.capacity}</td>
+          <td className={cell + ' text-center tabular-nums'}>{company.actualCount}</td>
+          <td className={cell + ' text-center tabular-nums'}>{Math.max(0, company.actualCount - company.capacity)}</td>
         </tr>)}</tbody>
       </table></div>
       {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu.':'Chưa có doanh nghiệp tiếp nhận trong các kỳ OJT này.'}</p>}

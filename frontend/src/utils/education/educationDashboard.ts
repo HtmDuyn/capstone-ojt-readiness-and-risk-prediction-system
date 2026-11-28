@@ -166,6 +166,9 @@ export const parseAcademicPeriods = (value: unknown): AcademicPeriod[] => {
         code: readString(item, ["periodCode", "code"]) || "",
         name:
           readString(item, ["name", "periodName", "periodCode"]) || "Kỳ học",
+        kind: (readString(item, ["kind"])?.toUpperCase() as AcademicPeriod["kind"]) ?? null,
+        status: (readString(item, ["status"])?.toUpperCase() as AcademicPeriod["status"]) ?? null,
+        startDate: readString(item, ["startDate"]),
         ojtSemesterId: readString(item, [
           "ojtSemesterId",
           "ojtSemester.id",

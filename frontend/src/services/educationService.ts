@@ -374,8 +374,8 @@ const searchOjtSemesters = async (
 // ======================================================
 
 export const academicService = {
-  getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number;effectiveFrom:string;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
-  saveOjtGradingCriteria: async (payload:{ojtSemesterId:number;name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
+  getOjtGradingCriteria: async () => apiData<{items: Array<{id:number;ojtSemesterId:number|null;effectiveFrom:string|null;effectiveAt:string|null;name:string;criteria:Array<{key:string;label:string;weight:number}>;version:number}>;semesters:Array<{id:number;code:string;name:string;startDate:string;endDate:string;status:string}>;currentOjtSemesterId:number|null}>(await getJson('/ojt-grading-criteria')),
+  saveOjtGradingCriteria: async (payload:{name:string;criteria:Array<{key:string;label:string;weight:number}>;reason:string}) => apiData((await API.put('/ojt-grading-criteria',payload)).data),
   getCalendar: async (id: number, signal?: AbortSignal) => apiData<AcademicCalendar>(await getJson(`/academic-years/${id}/calendar`, {}, signal)),
   updateCalendar: async (id: number, semesters: SemesterDates[], revision: string, blocks?: SemesterDates[], block10?: SemesterDates[]) =>
     apiData<AcademicCalendar>((await API.put(`/academic-years/${id}/calendar`, { semesters, revision, blocks, block10 })).data),
@@ -749,16 +749,17 @@ export const educationOverviewService = {
         id: number;
         accountStatus: string;
         cohortId: number | null;
+        program?: { majorId?: number | null } | null;
         currentAcademicPeriodId?: number | null;
         cohort?: { id: number; name: string; code: string } | null;
         calculatedEligibility?: SavedOjtEligibility | null;
       };
       const students = (await getAllItems<OverviewStudent>('/students', {
-        status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
+        status: 'ACTIVE', ...(scope.majorId ? { majorId: scope.majorId } : {}),
       }, signal)).filter(student => student.accountStatus === 'ACTIVE');
-      const scopedStudents = scope.academicPeriodId
-        ? students.filter(student => String(student.currentAcademicPeriodId) === String(scope.academicPeriodId))
-        : students;
+      const scopedStudents = students.filter(student =>
+        (!scope.academicPeriodId || String(student.currentAcademicPeriodId) === String(scope.academicPeriodId))
+        && (!scope.majorId || String(student.program?.majorId) === String(scope.majorId)));
       signal?.throwIfAborted();
       const rows = scopedStudents.map(student => {
         const saved = student.calculatedEligibility;

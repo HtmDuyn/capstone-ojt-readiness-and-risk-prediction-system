@@ -12,6 +12,9 @@ export interface AcademicPeriod {
   academicYearId: string | null;
   code: string;
   name: string;
+  kind: 'SEMESTER' | 'BLOCK3' | null;
+  status: 'PLANNED' | 'ACTIVE' | 'CLOSED' | 'ARCHIVED' | null;
+  startDate: string | null;
   ojtSemesterId: string | null;
   assessmentDeadline: string | null;
 }
