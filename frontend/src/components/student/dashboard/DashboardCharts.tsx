@@ -28,19 +28,19 @@ export function RiskLevelChart({ level }: { level: RiskLevel }) {
         </PieChart>
       </ChartContainer>
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-3 text-center">
-        <p className="text-xs text-slate-500">Mức cảnh báo OJT</p>
-        <p className="mt-1 text-base font-bold text-slate-900">{active?.label ?? 'Chưa đủ dữ liệu'}</p>
+        <p className="text-xs text-slate-500">Hiện tại</p>
+        <p className="mt-1 text-base font-bold" style={{ color: active?.color ?? '#64748b' }}>{active?.label ?? 'Chưa đủ dữ liệu'}</p>
       </div>
     </div>
     <div aria-hidden="true" className="mt-1 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-600">
-      {riskBands.map(band => <span key={band.level} className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ backgroundColor: band.color }} />{band.label}</span>)}
+      {riskBands.map(band => <span key={band.level} className={'inline-flex items-center gap-1.5 ' + (band.level === level ? 'font-semibold text-slate-900' : '')}><span className="size-2 rounded-full" style={{ backgroundColor: band.color }} />{band.label}</span>)}
     </div>
   </div>;
 }
 
 export function CreditProgressChart({ percent }: { percent: number | null }) {
   const value = percent !== null && Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : null;
-  return <DonutChart className="mx-auto mt-4 size-40" segments={value === null ? [] : [
+  return <DonutChart className="mx-auto size-36" segments={value === null ? [] : [
     { label: 'Đã tích lũy', value, color: '#2563eb' },
     { label: 'Còn lại', value: 100 - value, color: '#e2e8f0' },
   ]} label={value === null ? 'Chưa đủ dữ liệu tiến độ tín chỉ' : 'Đã hoàn thành ' + value + '% chương trình đào tạo'}>

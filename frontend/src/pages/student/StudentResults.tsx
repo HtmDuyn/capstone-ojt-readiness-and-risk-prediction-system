@@ -30,9 +30,9 @@ function ResultsContent() {
     signal => getStudentOjtCertificates(semesterId!, signal));
   return (
     <>
-      <div className="min-w-0 space-y-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <div className="w-full min-w-0 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <section aria-labelledby="published-results-heading" className="space-y-4">
-        <h2 id="published-results-heading" className="border-b border-slate-200 pb-3 text-lg font-semibold text-slate-900">Kết quả đã công bố</h2>
+        <h2 id="published-results-heading" className="border-b border-slate-100 pb-3 text-lg font-semibold text-slate-900">Kết quả OJT đã công bố</h2>
         <ResourceState
           loading={list.loading}
           error={list.error}
@@ -54,8 +54,7 @@ function ResultsContent() {
           </>
       </section>
       <section aria-labelledby="ojt-certificates-heading" className="space-y-3 border-t border-slate-200 pt-5">
-        <h2 id="ojt-certificates-heading" className="text-lg font-semibold text-slate-900">Chứng chỉ</h2>
-        <p className="text-sm text-slate-600">Chứng chỉ hoàn thành OJT</p>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="ojt-certificates-heading" className="flex items-center gap-2 text-base font-semibold text-slate-900"><FileCheck2 size={19} className="text-blue-600" aria-hidden="true" />Chứng chỉ hoàn thành OJT</h2>{!certificates.loading && !certificates.error && <span className={'rounded-md px-2.5 py-1 text-xs font-medium ' + (certificates.data?.length ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>{certificates.data?.length ? 'Đã có chứng chỉ' : 'Chưa có chứng chỉ'}</span>}</div>
         <ResourceState loading={certificates.loading} error={certificates.error} retry={certificates.reload}/>
         {certificateDownloadError&&<p role="alert" className="text-sm text-rose-700">{certificateDownloadError}</p>}
         {!!certificates.data?.length&&<ul className="divide-y divide-slate-100">{certificates.data.map(certificate=><li key={certificate.id} className="flex flex-wrap items-center justify-between gap-3 py-3">

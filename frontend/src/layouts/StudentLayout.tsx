@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/shared/useAuth';
 import { StudentPortalProvider, useStudentPortal } from '@/contexts/StudentPortalContext';
@@ -7,19 +7,34 @@ import { Footer } from '@/components/common/Footer';
 import { StudentHeader } from '@/components/student/StudentHeader';
 import { STUDENT_NAV_ITEMS } from '@/config/menus/studentMenu';
 import { FirstPasswordChangePage } from '@/pages/auth/FirstPasswordChangePage';
+import { useStudentResource } from '@/hooks/student/useStudentResource';
+import { getStudentNotifications } from '@/services/studentService';
 
 function StudentShell() {
   const { user, logout } = useAuth();
   const portal = useStudentPortal();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const notificationBadge = useStudentResource(
+    portal.profile && !portal.loading && !portal.mustChangePassword
+      ? `notification-badge:${portal.profile.id}:${portal.revision}` : null,
+    signal => getStudentNotifications(1, signal, undefined, 1),
+  );
+  const { setUnreadCount } = portal;
+  useEffect(() => {
+    if (notificationBadge.data) {
+      setUnreadCount(previous => previous ?? notificationBadge.data!.unreadCount);
+    }
+  }, [notificationBadge.data, setUnreadCount]);
+  const navItems = STUDENT_NAV_ITEMS.map(item => item.id === 'notifications'
+    ? { ...item, hasBadge: (portal.unreadCount ?? 0) > 0 } : item);
   if (portal.mustChangePassword) return <FirstPasswordChangePage />;
   if (portal.loading && !portal.profile) return null;
   const profile = portal.profile;
   const handleLogout = () => { logout(); navigate('/login'); };
   return <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#f7f9ff] text-slate-800 antialiased selection:bg-orange-500 selection:text-white">
     <div className="app-background" aria-hidden="true" />
-    <Sidebar navItems={STUDENT_NAV_ITEMS} title="FPT University" subtitle="Cổng Sinh viên" homePath="/student/dashboard"
+    <Sidebar navItems={navItems} title="FPT University" subtitle="Cổng Sinh viên" homePath="/student/dashboard"
       isOpenMobile={menuOpen} onCloseMobile={() => setMenuOpen(false)} onLogout={handleLogout} />
     <div className="relative z-10 flex min-h-screen flex-1 flex-col transition-all duration-300 lg:pl-[76px] lg:peer-hover:pl-[260px]">
       <StudentHeader user={{
