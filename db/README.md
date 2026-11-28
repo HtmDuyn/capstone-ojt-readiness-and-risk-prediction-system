@@ -17,10 +17,16 @@ Runner dùng kết nối PostgreSQL trực tiếp trong `backend/.env`, nên kh�
 - `DATABASE_URL` hoặc `SUPABASE_DATABASE_URL`; hoặc
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` và `DB_SSL=true`.
 
-Trong PowerShell, chạy từ thư mục gốc:
+Trong PowerShell, chạy từ thư mục gốc repository:
 
 ```powershell
-npm --prefix backend run db:backend:reset -- --confirm-reset
+npm --prefix ..\backend run db:backend:reset -- --confirm-reset
+```
+
+Nếu terminal đang ở trong thư mục `db`, dùng đường dẫn tương đối lên một cấp:
+
+```powershell
+npm --prefix ..\backend run db:backend:reset -- --confirm-reset
 ```
 
 Lệnh yêu cầu `--confirm-reset` vì nó xóa dữ liệu trong các bảng ứng dụng rồi nạp lại seed. Runner kiểm tra host có phải Supabase trước khi chạy. Script SQL chạy trong transaction; nếu lỗi trước khi commit, thay đổi của lần chạy đó sẽ rollback.
