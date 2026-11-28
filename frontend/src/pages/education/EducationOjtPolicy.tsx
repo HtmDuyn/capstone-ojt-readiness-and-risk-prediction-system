@@ -14,7 +14,7 @@ export default function EducationOjtPolicy() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
-  const refresh = React.useCallback(async () => { setLoading(true); try { const loaded = await loadOjtConditions(); setConditions(loaded); const current = latestEffectiveOjtRule(loaded); if (current) { setCredits(String(current.minCredits)); setDocument(current.issuingDocument); } setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'Không tải được danh sách điều kiện.'); } finally { setLoading(false); } }, []);
+  const refresh = React.useCallback(async () => { setLoading(true); try { const loaded = await loadOjtConditions(); setConditions(loaded); const current = latestEffectiveOjtRule(loaded); if (current) { setCredits(String(current.minCredits)); setDocument(current.issuingDocument); } else { setCredits('70'); setDocument('Quy định điều kiện tích lũy tín chỉ trước khi sinh viên tham gia thực tập OJT.'); } setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'Không tải được danh sách điều kiện.'); } finally { setLoading(false); } }, []);
   React.useEffect(() => { void refresh(); }, [refresh]);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;

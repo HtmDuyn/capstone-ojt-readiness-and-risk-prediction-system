@@ -3,6 +3,7 @@ import { academicService } from '@/services/educationService';
 import { getAllItems } from '@/services/educationService';
 import type { AcademicCalendar, AcademicPeriod, AcademicYear, SemesterDates } from '@/types/education/academic.types';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 const errorText = (error: unknown) => friendlyErrorMessage(error, 'Không thực hiện được yêu cầu. Vui lòng thử lại.');
 export function useEducationAcademicCalendar() {
@@ -18,6 +19,7 @@ export function useEducationAcademicCalendar() {
   const [calendarError, setCalendarError] = useState('');
   const [notice, setNotice] = useState('');
   const [refresh, setRefresh] = useState(0);
+  useEducationCacheRefresh(['/academic-years:','/academic-periods:'],()=>setRefresh(value=>value+1));
   const locked = useRef(false);
   useEffect(() => {
     const c = new AbortController();

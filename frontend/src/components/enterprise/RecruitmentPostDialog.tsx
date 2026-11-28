@@ -16,7 +16,15 @@ interface FormValidationErrors {
   positions: Record<string, Partial<Record<PositionField, string>>>;
   positiveCapacity?: string;
 }
-const newPosition = (): PositionDraft => ({ key: crypto.randomUUID(), title: 'Thực tập sinh Backend', description: 'Tham gia phát triển API, tối ưu cơ sở dữ liệu và phối hợp với nhóm frontend để hoàn thiện sản phẩm.', requirements: 'Sinh viên ngành Công nghệ thông tin; biết cơ bản về Node.js, SQL và Git; chủ động học hỏi, làm việc nhóm tốt.', capacity: '1', minimum: 0, location: 'TP. Hồ Chí Minh', workMode: '' });
+const newPosition = (index = 1): PositionDraft => {
+  const samples = [
+    { title: 'Thực tập sinh Backend', description: 'Tham gia phát triển API, tối ưu cơ sở dữ liệu và phối hợp với nhóm frontend để hoàn thiện sản phẩm.', requirements: 'Sinh viên ngành Công nghệ thông tin; biết cơ bản về Node.js, SQL và Git; chủ động học hỏi, làm việc nhóm tốt.' },
+    { title: 'Thực tập sinh Frontend', description: 'Phát triển giao diện web bằng React, kết nối API và phối hợp với thiết kế để hoàn thiện trải nghiệm người dùng.', requirements: 'Nắm kiến thức HTML, CSS, JavaScript và React cơ bản; biết sử dụng Git và có tinh thần học hỏi.' },
+    { title: 'Thực tập sinh Kiểm thử phần mềm', description: 'Viết và thực hiện test case, ghi nhận lỗi, phối hợp với nhóm phát triển để kiểm tra các bản sửa lỗi.', requirements: 'Có tư duy logic, cẩn thận; hiểu quy trình kiểm thử phần mềm và biết SQL cơ bản là lợi thế.' },
+  ];
+  const sample = samples[(index - 1) % samples.length];
+  return { key: crypto.randomUUID(), ...sample, capacity: '1', minimum: 0, location: 'TP. Hồ Chí Minh', workMode: '' };
+};
 const fieldClass = (invalid = false) => `w-full rounded-xl border ${invalid ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-100' : 'border-slate-200 focus:border-orange-500 focus:ring-orange-100'} bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 disabled:bg-slate-50`;
 const errorClass = 'mt-1 text-xs text-rose-600';
 
@@ -212,7 +220,7 @@ export function RecruitmentPostDialog({ windows, initialWindowId, post, now, onC
             </div>
             {p.id && <p className="text-xs text-slate-500">Vị trí đã lưu được giữ lại cùng lịch sử ứng tuyển. Có thể đặt chỉ tiêu bằng 0 nếu chưa nhận sinh viên.</p>}
           </section>)}
-          <button type="button" disabled={positions.length >= 50} onClick={() => setPositions(current => [...current, newPosition()])} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-orange-300 px-4 py-3 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-40"><Plus size={17} />Thêm vị trí tuyển dụng</button>
+          <button type="button" disabled={positions.length >= 50} onClick={() => setPositions(current => [...current, newPosition(current.length + 1)])} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-orange-300 px-4 py-3 text-sm font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-40"><Plus size={17} />Thêm vị trí tuyển dụng</button>
         </section>
       </fieldset>
       </div>

@@ -26,7 +26,7 @@ function NotificationsContent() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const lock = useRef(false);
-  const key = profile!.id + ':' + revision + ':' + page + ':' + onlyUnread;
+  const key = 'student-notifications:' + profile!.id + ':' + revision + ':' + page + ':' + onlyUnread;
   const resource = useStudentResource(key, (signal) =>
     getStudentNotifications(page, signal, onlyUnread ? true : undefined),
   );

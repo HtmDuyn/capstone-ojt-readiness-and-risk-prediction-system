@@ -10,6 +10,7 @@ import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { applyEvaluationScore, evaluationAverage, parseEvaluationScore, taskScoreSuggestion,
   type EvaluationScores } from '@/utils/enterprise/enterpriseEvaluation';
+import { useEnterpriseCacheRefresh } from '@/hooks/enterprise/useEnterpriseCacheRefresh';
 
 interface EvaluationRow extends EvaluationScores {
   id: number;
@@ -106,6 +107,8 @@ export function EnterpriseEvaluation() {
   const savingRef = useRef(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const limit = 20;
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useEnterpriseCacheRefresh(['/enterprise/internships:', '/internship-tasks:'],()=>setCacheRevision(value=>value+1),300);
 
   const fetchRows = useCallback(async (background = false) => {
     if (profileLoading || savingRef.current || (background && requestRef.current)) return;
@@ -142,7 +145,7 @@ export function EnterpriseEvaluation() {
       if (requestRef.current === controller) requestRef.current = null;
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [companyId, profileLoading]);
+  }, [companyId, profileLoading,cacheRevision]);
 
   useEffect(() => {
     let mounted = true;
@@ -182,7 +185,11 @@ export function EnterpriseEvaluation() {
 
   const openEditor = (row: EvaluationRow) => {
     if (busy || row.locked) return;
-    setEditor({ id: row.id, comments: row.comments, scoreDetails:{...row.scoreDetails} });
+    const scoreDetails = { ...row.scoreDetails };
+    for (const criterion of row.criteria) {
+      if (!scoreDetails[criterion.key]?.trim()) scoreDetails[criterion.key] = String(criterion.key === 'completionScore' ? row.suggestion ?? 8 : 8.5);
+    }
+    setEditor({ id: row.id, comments: row.comments || 'Hoàn thành công việc đúng tiến độ, chủ động trao đổi khi gặp vướng mắc và phối hợp tốt với các thành viên trong nhóm.', scoreDetails });
     setEditorError('');
   };
   const toggle = (id: number) => setSelected(current => {

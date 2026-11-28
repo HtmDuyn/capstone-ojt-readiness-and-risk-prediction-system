@@ -8,6 +8,9 @@ import type { RetakeClassReport } from '@/types/education/reporting.types';
 import { downloadCourseDemand } from '@/utils/shared/downloadFile';
 import { getErrorMessage, isCanceledRequest, parseAcademicPeriods, parseAcademicYears, parseCohortProgress, parsePeriodStatistics, readNumber, toApiId } from '@/utils/education/educationDashboard';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { cleanQuery } from '@/services/educationService';
+import { educationReadKey } from '@/utils/education/educationReadCache';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 /* =========================================================
    API PATHS
@@ -68,6 +71,7 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
 
 
   const [refreshKey, setRefreshKey] = useState(0);
+  useEducationCacheRefresh(['/academic-years:','/academic-periods:','/majors:','/retake-class-proposals:'],()=>{clearSharedReads();setRefreshKey(value=>value+1);});
 
   /* =====================================================
      LOAD FILTERS
@@ -197,6 +201,20 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
     });
     return () => controller.abort();
   }, [overviewParams, refreshKey]);
+
+  useEffect(()=>{
+    const expectedKey=educationReadKey('/students/overview',cleanQuery(overviewParams));
+    const controller=new AbortController();
+    const refreshCachedOverview=(event:Event)=>{
+      const key=(event as CustomEvent<{key?:string}>).detail?.key;
+      if(key!==expectedKey)return;
+      void educationOverviewService.load(overviewParams,controller.signal).then(data=>{
+        if(!controller.signal.aborted){setStudentTotal(data.summary.total);setDashboardData(data);setDashboardWarning(data.warning);setDashboardError('');}
+      }).catch(error=>{if(!controller.signal.aborted)setDashboardError(getErrorMessage(error));});
+    };
+    window.addEventListener('education:read-cache-updated',refreshCachedOverview);
+    return()=>{controller.abort();window.removeEventListener('education:read-cache-updated',refreshCachedOverview);};
+  },[overviewParams]);
 
   useEffect(() => {
     if (!loadCourseDemand) return;

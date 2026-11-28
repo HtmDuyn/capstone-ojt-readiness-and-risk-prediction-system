@@ -43,7 +43,12 @@ export function assessAcademicWarning(input:Input) {
     level='LOW';reason('ON_TRACK_FOR_CURRENT_STAGE','Tiến độ các kỳ đã hoàn thành phù hợp với lộ trình; chưa đạt ngưỡng tín chỉ OJT ở giai đoạn này không tự tạo mức cao.');
   }
   if(input.available&&input.status!=='ELIGIBLE'){
-    if(input.missingCredits!==null&&input.missingCredits>0)reason('CREDIT_SHORTFALL',`Còn thiếu ${input.missingCredits} tín chỉ so với ngưỡng OJT.`);
+    if(input.missingCredits!==null&&input.missingCredits>0){
+      const message=input.missingCredits<=3
+        ? `Bạn chỉ còn thiếu ${input.missingCredits} tín chỉ để đạt ngưỡng OJT — thường chỉ cần hoàn thành thêm một môn được tính tín chỉ OJT. Khi điểm môn học được cập nhật, bạn có thể được xét lại điều kiện.`
+        : `Còn thiếu ${input.missingCredits} tín chỉ so với ngưỡng OJT.`;
+      reason('CREDIT_SHORTFALL',message);
+    }
     if(input.maxDebt!==null&&input.debt>input.maxDebt)reason('EXCESS_DEBT',`Có ${input.debt} môn nợ, vượt giới hạn ${input.maxDebt} môn.`);
     if(input.blockingCourses?.length)actions.push('Ưu tiên học lại các môn tiên quyết đang chặn môn theo lộ trình.');
     if(level==='HIGH')actions.push('Trao đổi sớm với phòng đào tạo/cố vấn để lập kế hoạch bổ sung và kiểm tra hạn xét.');

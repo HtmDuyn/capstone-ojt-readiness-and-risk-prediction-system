@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Notice, Pager, errorMessage } from './QhdnUi';
-import API from '@/services/apiService';
+import { getEligibleStudentsPage } from '@/services/qhdnService';
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 
 type AcademicHistory = { resultId: number; courseCode: string; courseName: string; semesterTaken: number; periodName: string | null; score: number | null; grade: string | null; status: string };
 type Student = { id: number; studentCode: string; fullName: string; programName: string | null; semesterName: string | null; academicHistory: AcademicHistory[] };
@@ -9,24 +10,20 @@ export function EligibleOjtRoster({ refreshKey }: { refreshKey: number }) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: Student[]; total: number } | null>(null);
   const [error, setError] = useState('');
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useQhdnCacheRefresh(['/qhdn/eligible-students:'],()=>setCacheRevision(value=>value+1),300);
   const limit = 10;
   useEffect(() => {
     setData(null);
     setError('');
     const controller = new AbortController();
-    API.get<{ data: { items: Student[]; total: number } }>('/qhdn/eligible-students', {
-      params: {
-        page,
-        limit,
-      },
-      signal: controller.signal,
-    }).then(response => {
-      if (!controller.signal.aborted) setData(response.data.data);
+    getEligibleStudentsPage<{ items:Student[];total:number }>({page,limit},controller.signal).then(result => {
+      if (!controller.signal.aborted) setData(result);
     }).catch(cause => {
       if (!controller.signal.aborted) setError(errorMessage(cause));
     });
     return () => controller.abort();
-  }, [refreshKey, page]);
+  }, [refreshKey, page,cacheRevision]);
 
   return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
     <div><h2 className="font-semibold text-slate-900">Danh sách sinh viên đủ điều kiện OJT</h2><p className="mt-1 text-xs text-slate-500">Hiển thị sinh viên có kết quả đủ điều kiện, chưa đạt OJT202 ở lần học mới nhất; không phụ thuộc việc đã gán đợt tuyển dụng.</p></div>

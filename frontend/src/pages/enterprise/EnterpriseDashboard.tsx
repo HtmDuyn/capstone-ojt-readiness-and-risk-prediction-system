@@ -29,6 +29,7 @@ import { RecruitmentSlotsChart } from '@/components/enterprise/RecruitmentSlotsC
 import { EnterpriseTaskProgress } from '@/components/enterprise/EnterpriseTaskProgress';
 import { Link } from 'react-router-dom';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
+import { useEnterpriseCacheRefresh } from '@/hooks/enterprise/useEnterpriseCacheRefresh';
 
 interface EnterpriseDashboardStats {
   totalRecruitmentPosts: number;
@@ -77,6 +78,8 @@ export const EnterpriseDashboard: React.FC = () => {
   const reducedMotion = useReducedMotion();
   const candidateGradientId = `enterprise-status-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const statsRequest = useRef<AbortController | null>(null);
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useEnterpriseCacheRefresh(['/enterprise/dashboard/candidates:', '/enterprise/dashboard/tasks:', '/enterprise/recruitment/posts:'],()=>setCacheRevision(value=>value+1),300);
 
   // Tải thống kê bằng hai request song song để dashboard xuất hiện nhanh hơn.
   useEffect(() => {
@@ -142,7 +145,7 @@ export const EnterpriseDashboard: React.FC = () => {
       controller.abort();
       if (statsRequest.current === controller) statsRequest.current = null;
     };
-  }, [companyId, loading, profileError, summary]);
+  }, [companyId, loading, profileError, summary,cacheRevision]);
 
   useEffect(() => {
     // Chờ companyId sẵn có mới gọi API tasks
@@ -165,7 +168,7 @@ export const EnterpriseDashboard: React.FC = () => {
 
     void loadTaskProgress();
     return () => controller.abort();
-  }, [companyId]);
+  }, [companyId,cacheRevision]);
 
   const companyName = profile?.name || 'Doanh nghiệp Đối tác';
   const candidateStages = useMemo<CandidateStage[]>(() => [

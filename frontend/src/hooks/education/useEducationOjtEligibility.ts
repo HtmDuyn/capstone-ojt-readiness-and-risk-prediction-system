@@ -9,7 +9,8 @@ import {
 import { educationOjtDisplayStatus, type OjtDisplayStatus } from '@/utils/education/educationOjtReason';
 import { ojtSourceEndpoints, partitionOjtLoad, type OjtLoadIssue, type OjtSourceKey } from '@/utils/education/ojtEligibilityLoad';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
-import { sharedRead } from '@/utils/shared/sharedRead';
+import { clearSharedReads, sharedRead } from '@/utils/shared/sharedRead';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 type Target = { student: ImportedStudent; reason: string };
 export const OJT_ELIGIBILITY_PAGE_SIZE = 20;
@@ -31,6 +32,8 @@ export function useEducationOjtEligibility() {
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('ALL');
   const [page, setPage] = React.useState(1);
+  const [cacheRevision,setCacheRevision]=React.useState(0);
+  useEducationCacheRefresh(['/students:','/ojt-eligibility-results:','/ojt-conditions:'],()=>{clearSharedReads();setCacheRevision(value=>value+1);},300);
   const running = React.useRef(false);
   const loadController = React.useRef<AbortController | null>(null);
   const sourceKeys = React.useMemo(() => Object.keys(ojtSourceEndpoints) as OjtSourceKey[], []);
@@ -76,7 +79,7 @@ export function useEducationOjtEligibility() {
       if (!controller.signal.aborted) setError(friendlyErrorMessage(loadError, 'Không tải được dữ liệu xét OJT. Vui lòng thử lại.'));
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [applySource, loadSource, sourceKeys]);
+  }, [applySource, loadSource, sourceKeys,cacheRevision]);
 
   async function retryFailedSources() {
     const keys = sourceKeys.filter(key => sourceErrors[key]);

@@ -4,8 +4,11 @@ import type { AcademicYear } from '@/types/education/academic.types';
 import type { CurriculumSummary } from '@/types/education/curriculum.types';
 import type { ReportPeriod } from '@/types/education/reporting.types';
 import { useEffect, useState } from 'react';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 export function useEducationCatalogs(revision = 0) {
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useEducationCacheRefresh(['/academic-years:','/academic-periods:','/curricula:'],()=>setCacheRevision(value=>value+1));
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [periods, setPeriods] = useState<ReportPeriod[]>([]);
   const [programs, setPrograms] = useState<CurriculumSummary[]>([]);
@@ -28,6 +31,6 @@ export function useEducationCatalogs(revision = 0) {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [revision]);
+  }, [revision,cacheRevision]);
   return { years, periods, programs, loading, error };
 }

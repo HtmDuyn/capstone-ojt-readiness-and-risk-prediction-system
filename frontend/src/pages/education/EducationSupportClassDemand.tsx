@@ -3,12 +3,14 @@ import { PageBanner } from '@/components/common/PageBanner';
 import { RetakeClassProposals } from '@/components/education/RetakeClassProposals';
 import { academicReportingService as reports } from '@/services/educationService';
 import type { ReportPeriod } from '@/types/education/reporting.types';
+import { useEducationCacheRefresh } from '@/hooks/education/useEducationCacheRefresh';
 
 export default function EducationSupportClassDemand() {
   const [periods, setPeriods] = useState<ReportPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  useEducationCacheRefresh(['/academic-periods:'],()=>setAttempt(value=>value+1));
 
   useEffect(() => {
     const controller = new AbortController();

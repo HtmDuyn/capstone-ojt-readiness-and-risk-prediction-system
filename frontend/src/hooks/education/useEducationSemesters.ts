@@ -2,12 +2,14 @@ import { academicService } from '@/services/educationService';
 import type { OjtSemester } from '@/types/education/academic.types';
 import { useEffect, useState } from 'react';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 export function useEducationSemesters() {
   const [semesters, setSemesters] = useState<OjtSemester[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  useEducationCacheRefresh(['/academic-periods:'],()=>setRevision(value=>value+1));
   useEffect(() => {
     let active = true;
     setLoading(true); setError('');

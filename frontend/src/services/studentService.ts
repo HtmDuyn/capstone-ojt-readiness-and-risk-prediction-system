@@ -116,9 +116,10 @@ export const studentQuery = (
 export async function studentGet<T>(
   path: string,
   signal?: AbortSignal,
+  timeout?: number,
 ): Promise<T> {
   return studentReads.read(localStorage.getItem('ojt_auth_token'), path, async sharedSignal => {
-    const response = await apiRequest<{ data: T }>(path, { signal: sharedSignal });
+    const response = await apiRequest<{ data: T }>(path, { signal: sharedSignal, timeout });
     if (!Object.prototype.hasOwnProperty.call(response, 'data'))
       throw new ApiError('Chưa thể tải đầy đủ dữ liệu. Vui lòng thử lại sau.', 502, 'STUDENT_API_CONTRACT_MISMATCH');
     return response.data;
@@ -464,7 +465,7 @@ export interface CvAnalysis {id:number;cvFileId:number;status:'PROCESSING'|'NEED
 export interface MatchingProfile {cv:{id:number}|null;status:string;analysis:CvAnalysis|null;usableForMatching:boolean;
   officialAcademic:{programCode:string|null;major:string|null;gpa:number|null;gpaScale:number|null};discrepancies:string[];message:string;}
 export const cvAnalysisApi={
- get:async(signal:AbortSignal)=>(await apiRequest<{data:MatchingProfile}>('/students/me/matching-profile',{signal})).data,
+ get:async(signal:AbortSignal)=>studentGet<MatchingProfile>('/students/me/matching-profile',signal),
  analyze:async(cvFileId:number,signal:AbortSignal)=>(await apiRequest<{data:{analysis:CvAnalysis;replayed:boolean;reviewMessage?:string|null}}>('/students/me/cv/analyses',{
   method:'POST',data:{cvFileId,consent:true},signal,timeout:90000,
  })).data,
@@ -504,5 +505,5 @@ export interface RiskAssessment {
       prerequisites:{satisfied:boolean;remainingRequired:number;courses:{courseId:number;courseCode:string|null;passed:boolean}[]}[];}[]};
 }
 export async function getOjtRiskAssessment(signal:AbortSignal):Promise<RiskAssessment>{
-  return (await apiRequest<{data:RiskAssessment}>('/students/me/ojt-risk-assessment',{signal,timeout:0})).data;
+  return studentGet<RiskAssessment>('/students/me/ojt-risk-assessment',signal,0);
 }

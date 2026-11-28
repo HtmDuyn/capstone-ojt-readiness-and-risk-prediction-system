@@ -7,11 +7,18 @@ import { RecruitmentSemesterNotice } from '@/components/qhdn/RecruitmentConfirma
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
 import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 import { closeRegistrationWindow, listRegistrationWindows, openRegistrationWindow, updateRegistrationWindow } from '@/services/qhdnService';
 import { loadAllPages } from '@/utils/shared/loadAllPages';
 import type { RegistrationWindowItem } from '@/types/qhdn/qhdnTypes';
 
 const localDate = (value: string) => new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+const localDateTimeInput = (value: string) => {
+  const date = new Date(value);
+  date.setDate(date.getDate() + 7);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+};
 const windowLabels: Record<string, string> = { OPEN: 'Đang mở', DRAFT: 'Bản nháp', CLOSED: 'Đã đóng' };
 const cell = 'px-4 py-4 align-middle';
 const openPeriodMessage = 'Chỉ mở đợt đăng ký OJT trong học kỳ đang diễn ra.';
@@ -22,6 +29,7 @@ export default function QhdnRegistrationWindows() {
   const [windows, setWindows] = useState<RegistrationWindowItem[]>([]);
   const [loading, setLoading] = useState(false), [error, setError] = useState('');
   const [revision, setRevision] = useState(0), [page, setPage] = useState(1);
+  useQhdnCacheRefresh(['/ojt-registration-windows:', '/recruitment/windows:'], () => setRevision(value => value + 1), 300);
   const [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [taskError, setTaskError] = useState('');
   const [task, setTask] = useState<{ kind: 'extend' | 'toggle'; window: RegistrationWindowItem } | null>(null);
   const refresh = () => setRevision(value => value + 1);
@@ -107,7 +115,7 @@ export default function QhdnRegistrationWindows() {
       <form onSubmit={submit} className="space-y-4">
         {taskError && <Notice>{taskError}</Notice>}
         {task.kind==='toggle'&&task.window.status!=='OPEN'&&<RecruitmentSemesterNotice semesterName={semester.selectedPeriod?.name} />}
-        {task.kind === 'extend' ? <Field label={'Hạn mới (sau ' + localDate(task.window.endsAt) + ')'}><input name="endsAt" type="datetime-local" className={workflowInput} required /></Field> :
+        {task.kind === 'extend' ? <Field label={'Hạn mới (sau ' + localDate(task.window.endsAt) + ')'}><input name="endsAt" type="datetime-local" defaultValue={localDateTimeInput(task.window.endsAt)} min={localDateTimeInput(task.window.endsAt)} className={workflowInput} required /></Field> :
           <Notice>{task.window.status === 'OPEN' ? 'Sinh viên sẽ ngừng nộp hồ sơ trong đợt này.' : 'Đợt cần còn hạn và có sinh viên đủ điều kiện trong phạm vi.'}</Notice>}
         <Field label="Lý do"><textarea name="reason" defaultValue={task.kind === 'extend' ? 'Điều chỉnh thời hạn để sinh viên có thêm thời gian hoàn thiện và nộp hồ sơ.' : task.window.status === 'OPEN' ? 'Tạm dừng tiếp nhận hồ sơ theo kế hoạch tuyển dụng của học kỳ.' : 'Mở lại đợt đăng ký theo kế hoạch tiếp nhận của học kỳ.'} className={workflowInput} required maxLength={2000} rows={3} /></Field>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">

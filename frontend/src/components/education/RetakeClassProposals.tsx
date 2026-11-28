@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BookOpen, Info, Layers3, RefreshCw, UsersRound } from 'lucide-react';
 import { academicReportingService as reports } from '@/services/educationService';
 import type { ReportPeriod, RetakeClassReport } from '@/types/education/reporting.types';
+import { useEducationCacheRefresh } from '@/hooks/education/useEducationCacheRefresh';
 
 type Props = { periods: ReportPeriod[]; catalogLoading: boolean };
 
@@ -13,6 +14,7 @@ export function RetakeClassProposals({ periods, catalogLoading }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
+  useEducationCacheRefresh(['/retake-class-proposals:'],()=>setRetry(value=>value+1),300);
 
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
   const upcomingSemesters = periods

@@ -2,7 +2,7 @@ import { AcademicBlockDates } from './AcademicBlockDates';
 import { useState } from 'react';
 import { Save } from 'lucide-react';
 import type { AcademicCalendar, SemesterDates } from '@/types/education/academic.types';
-import { blockDateError, calendarErrors, semesterDraft, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
+import { blockDateError, calendarErrors, semesterDraft, suggestedBlockDates, TERM_COLOR, TERM_LABEL } from '@/utils/education/academicCalendar';
 
 export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
   calendar: AcademicCalendar; busy: boolean; onSave: (rows: SemesterDates[], blocks: SemesterDates[], block10: SemesterDates[]) => Promise<boolean>; onCancel: () => void;
@@ -17,9 +17,17 @@ export function AcademicCalendarEditor({ calendar, busy, onSave, onCancel }: {
     const parent = calendar.semesters.find(semester => semester.periodCode.startsWith(term));
     return { term, startDate: parent?.block10StartDate ?? '', endDate: parent?.block10EndDate ?? '' };
   });
-  const [block10, setBlock10] = useState(initialBlock10);
+  const [block10, setBlock10] = useState(() => initialBlock10.map((block, index) => {
+    if (block.startDate && block.endDate) return block;
+    const suggestion = suggestedBlockDates(initialRows[index]).block10;
+    return { term: block.term, startDate: block.startDate || suggestion.startDate, endDate: block.endDate || suggestion.endDate };
+  }));
   const [rows, setRows] = useState(initialRows);
-  const [blocks, setBlocks] = useState(initialBlocks);
+  const [blocks, setBlocks] = useState(() => initialBlocks.map((block, index) => {
+    if (block.startDate && block.endDate) return block;
+    const suggestion = suggestedBlockDates(initialRows[index]).block3;
+    return { term: block.term, startDate: block.startDate || suggestion.startDate, endDate: block.endDate || suggestion.endDate };
+  }));
   const year = Number(calendar.year.yearCode.slice(0, 4));
   const errors = calendarErrors(year, rows);
   for (const [index, parent] of rows.entries()) {

@@ -12,7 +12,7 @@ export function TaskSubmissionsDialog({ taskId, name, initialContent = '', load,
   submit?: (content: string, attachment?: File) => Promise<unknown>; onClose: () => void; onSubmitted?: () => void;
 }) {
   const [historyRevision, setHistoryRevision] = useState(0);
-  const [content, setContent] = useState(initialContent);
+  const [content, setContent] = useState(initialContent || `Đã hoàn thành các hạng mục chính của nhiệm vụ “${name}”. Em đã kiểm tra lại kết quả, xử lý các lỗi phát sinh và cập nhật tài liệu hướng dẫn để người phụ trách có thể rà soát.`);
   const [attachment, setAttachment] = useState<File>();
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);

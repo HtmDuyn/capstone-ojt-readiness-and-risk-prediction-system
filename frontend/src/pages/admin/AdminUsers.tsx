@@ -184,7 +184,7 @@ const AdminUsers: React.FC = () => {
      ========================================================= */
 
   const handleOpenAddModal = () => {
-    setAddForm({ ...EMPTY_FORM });
+    setAddForm({ name: 'Nguyễn Minh Châu', email: 'minh.chau@minhphat.vn', phone: '0903456789', role: 'Phòng Quan hệ Doanh nghiệp', status: 'Hoạt động' });
     setNotice(''); setAddError(''); setIsAddModalOpen(true);
   };
 

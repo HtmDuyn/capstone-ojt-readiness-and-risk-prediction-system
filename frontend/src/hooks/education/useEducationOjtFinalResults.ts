@@ -4,6 +4,7 @@ import { useEducationSemesters } from '@/hooks/education/useEducationSemesters';
 import type { Page } from '@/types/education/api.types';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import React from "react";
+import { useEducationCacheRefresh } from './useEducationCacheRefresh';
 
 export function useEducationOjtFinalResults() {
   const [data, setData] = React.useState<Page<Result> | null>(null),
@@ -17,6 +18,8 @@ export function useEducationOjtFinalResults() {
     [page, setPage] = React.useState(1);
   const [loading, setLoading] = React.useState(false),
     [error, setError] = React.useState("");
+  const [cacheRevision,setCacheRevision]=React.useState(0);
+  useEducationCacheRefresh(['/ojt-results:'],()=>setCacheRevision(value=>value+1));
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -26,7 +29,7 @@ export function useEducationOjtFinalResults() {
       .then(result => { if (!controller.signal.aborted) setAllTotal(result.total); })
       .catch(() => { if (!controller.signal.aborted) setTotalError('Không tải được tổng số kết quả OJT. Vui lòng thử lại sau.'); });
     return () => controller.abort();
-  }, []);
+  }, [cacheRevision]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -46,6 +49,6 @@ export function useEducationOjtFinalResults() {
       });
   
   return () => controller.abort();
-  }, [page, search, status, semesterId]);
+  }, [page, search, status, semesterId,cacheRevision]);
   return { data, allTotal, totalError, selected, setSelected, semesterId, setSemesterId, search, setSearch, status, setStatus, page, setPage, loading, error, setError, semesters, semesterError };
 }

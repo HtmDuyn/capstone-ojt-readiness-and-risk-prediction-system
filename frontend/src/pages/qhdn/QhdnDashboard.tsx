@@ -39,10 +39,13 @@ import type {
   CoordinationItem,
   CompanyListItem,
 } from "@/types/qhdn/qhdnTypes";
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 
 export const QhdnDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [loadError, setLoadError] = useState("");
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useQhdnCacheRefresh(['/qhdn/placements/summary:','/qhdn/dashboard/summary:','/companies:','/ojt-coordinations:'],()=>setCacheRevision(value=>value+1),300);
 
   const catalog = useQhdnAcademicPeriods("", false, true);
   const selectedSemesterId = catalog.ojtSemesterId;
@@ -128,7 +131,7 @@ export const QhdnDashboard: React.FC = () => {
       controller.abort();
       if (dashboardRequest.current === controller) dashboardRequest.current = null;
     };
-  }, [selectedSemesterId]);
+  }, [selectedSemesterId,cacheRevision]);
 
   // The company catalog is independent of the selected OJT semester.
   useEffect(() => {
@@ -142,7 +145,7 @@ export const QhdnDashboard: React.FC = () => {
         .finally(() => { if (!controller.signal.aborted) setCompaniesLoading(false); });
     });
     return () => controller.abort();
-  }, []);
+  }, [cacheRevision]);
 
   useEffect(() => {
     setRejectedCoordinations([]);
@@ -170,7 +173,7 @@ export const QhdnDashboard: React.FC = () => {
       if (!controller.signal.aborted) setCoordinationsLoading(false);
     });
     return () => controller.abort();
-  }, [selectedSemesterId, loadCoordinations]);
+  }, [selectedSemesterId, loadCoordinations,cacheRevision]);
 
   // Tính toán Quota của từng doanh nghiệp từ vị trí tuyển dụng
   const enterpriseQuotaList = useMemo(() => {

@@ -5,6 +5,7 @@ import { getAllItems } from "@/services/educationService";
 import type { CurriculumDetail, CurriculumSummary, Major } from '@/types/education/curriculum.types';
 import { BookOpen, GraduationCap, Layers3, LibraryBig, ListChecks } from 'lucide-react';
 import React from "react";
+import { useEducationCacheRefresh } from '@/hooks/education/useEducationCacheRefresh';
 const EducationCurriculumPlan: React.FC = () => {
   const [majors, setMajors] = React.useState<Major[]>([]),
     [programs, setPrograms] = React.useState<CurriculumSummary[]>([]),
@@ -14,6 +15,7 @@ const EducationCurriculumPlan: React.FC = () => {
     [error, setError] = React.useState(""),
     [loading, setLoading] = React.useState(false),
     [refresh, setRefresh] = React.useState(0);
+  useEducationCacheRefresh(['/majors:','/curricula:',`/curricula/${programId}:`],()=>setRefresh(value=>value+1));
   const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
   const defaultsApplied = React.useRef(false);
   React.useEffect(() => {

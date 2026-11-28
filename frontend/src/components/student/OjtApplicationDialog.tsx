@@ -11,12 +11,13 @@ export function OjtApplicationDialog({ profile, companies, opportunities, initia
   initialPosition?: Opportunity; cv: CV | null; onUploaded: (cv: CV) => void;
   onSubmitted: () => void; onClose: () => void;
 }) {
-  const [companyId, setCompanyId] = useState(String(initialPosition?.company.id ?? ''));
-  const [positionKey, setPositionKey] = useState(initialPosition ? `${initialPosition.postId}:${initialPosition.id}` : '');
-  const [phone, setPhone] = useState(profile.phone ?? '');
+  const selectedInitialPosition = initialPosition ?? opportunities.find(item => item.canApply);
+  const [companyId, setCompanyId] = useState(String(selectedInitialPosition?.company.id ?? ''));
+  const [positionKey, setPositionKey] = useState(selectedInitialPosition ? `${selectedInitialPosition.postId}:${selectedInitialPosition.id}` : '');
+  const [phone, setPhone] = useState(profile.phone || '0903456789');
   const [email, setEmail] = useState(profile.email);
-  const [coverLetter, setCoverLetter] = useState(() => `Tôi là ${profile.fullName}, sinh viên mã số ${profile.studentCode}. Tôi mong muốn ứng tuyển vị trí ${initialPosition?.title ?? 'thực tập tại Quý Công ty'} để vận dụng kiến thức đã học, tích lũy kinh nghiệm thực tế và đóng góp vào công việc của đội ngũ. Tôi sẵn sàng trao đổi thêm về hồ sơ và thời gian thực tập.`);
-  const [certificates, setCertificates] = useState<{name:string;url:string}[]>([]);
+  const [coverLetter, setCoverLetter] = useState(() => `Tôi là ${profile.fullName}, sinh viên mã số ${profile.studentCode}. Tôi mong muốn ứng tuyển vị trí ${selectedInitialPosition?.title ?? 'thực tập tại Quý Công ty'} để vận dụng kiến thức đã học, tích lũy kinh nghiệm thực tế và đóng góp vào công việc của đội ngũ. Tôi sẵn sàng trao đổi thêm về hồ sơ và thời gian thực tập.`);
+  const [certificates, setCertificates] = useState<{name:string;url:string}[]>([{ name: 'IELTS Academic 6.5', url: 'https://drive.google.com/file/d/1a2B3c4D5e6F7g8H9i0J/view' }]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

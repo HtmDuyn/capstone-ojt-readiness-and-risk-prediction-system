@@ -5,6 +5,8 @@ import { loadAllPages } from "@/utils/shared/loadAllPages";
 import { sharedRead } from "@/utils/shared/sharedRead";
 import { academicYears, linkedOjtSemesterId, preferredAcademicPeriod } from "@/utils/qhdn/qhdnAcademicPeriods";
 import type { AcademicPeriodItem } from "@/types/qhdn/qhdnTypes";
+import { clearSharedReads } from '@/utils/shared/sharedRead';
+import { useQhdnCacheRefresh } from './useQhdnCacheRefresh';
 
 export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, semestersOnly = false) {
   const [catalog, setCatalog] = useState<AcademicPeriodItem[]>([]);
@@ -13,12 +15,13 @@ export function useQhdnAcademicPeriods(initialOjtId = "", allowAll = false, seme
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  useQhdnCacheRefresh(['/academic-periods:'],()=>{clearSharedReads();setRevision(value=>value+1);});
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    sharedRead('catalog:qhdn-periods', () => loadAllPages(page => getAcademicPeriods({ page, limit: 100 })), controller.signal, 5 * 60_000)
+    sharedRead('catalog:qhdn-periods', () => loadAllPages(page => getAcademicPeriods({ page, limit: 100 },controller.signal)), controller.signal, 5 * 60_000)
       .then((items) => { if (!controller.signal.aborted) setCatalog(items); })
       .catch((e) => { if (!controller.signal.aborted) setError(errorMessage(e)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });

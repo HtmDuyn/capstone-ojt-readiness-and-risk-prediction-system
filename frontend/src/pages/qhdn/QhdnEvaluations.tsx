@@ -9,6 +9,7 @@ import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, wo
 import { errorMessage, Field, Notice, Pager, Table, usePaged } from '@/components/qhdn/QhdnUi';
 import type { ReportType } from '@/types/qhdn/workflowTypes';
 import { linkedOjtSemesterId, preferredAcademicPeriod } from '@/utils/qhdn/qhdnAcademicPeriods';
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 
 const reports:Record<ReportType,{label:string;description:string}>={
  acceptance:{label:'Tiếp nhận sinh viên',description:'Tổng hợp tình hình tiếp nhận và quyết định của doanh nghiệp trong kỳ OJT.'},
@@ -39,6 +40,7 @@ export default function QhdnEnterpriseEvaluations(){
  const [publishBusy,setPublishBusy]=useState(false);
  const [limit,setLimit]=useState(10);
  const results=usePaged((page,signal)=>listOjtResults({ojtSemesterId:Number(semesterId),page,limit},signal).then(r=>r.data),`${semesterId}:${limit}`,!!semesterId&&tab==='results');
+ useQhdnCacheRefresh(['/ojt-results:'],results.reload,300);
  useEffect(()=>{setMessage('');setError('');},[periodSelection.periodId,type,tab,periodStatusFilter]);
  const run=async(work:()=>Promise<unknown>,success:string)=>{
   if(busy||publishBusy||!semesterId)return;

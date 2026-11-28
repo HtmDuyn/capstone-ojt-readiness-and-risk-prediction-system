@@ -8,6 +8,7 @@ import { useEnterprise } from '@/contexts/EnterpriseContext';
 import { WorkflowModal,workflowPrimary,workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { enterprisePeriodLabels, formatRecruitmentDateTime } from '@/utils/enterprise/recruitment';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
+import { useEnterpriseCacheRefresh } from '@/hooks/enterprise/useEnterpriseCacheRefresh';
 
 const candidateFilterInput = 'h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:bg-slate-50 disabled:text-slate-400';
 const candidateFilterLabel = 'mb-1.5 block text-xs font-semibold text-slate-600';
@@ -38,6 +39,8 @@ export const EnterpriseCandidates: React.FC = () => {
   const [acceptanceMode,setAcceptanceMode]=useState<'single'|'bulk'>('bulk');
   const [bulkLoading,setBulkLoading]=useState(false),[allowOverCapacity,setAllowOverCapacity]=useState(false);
   const [singleLoadingId,setSingleLoadingId]=useState<number|null>(null);
+  const [cacheRevision,setCacheRevision]=useState(0);
+  useEnterpriseCacheRefresh(['/enterprise/candidate-periods:', '/enterprise/candidates:'],()=>setCacheRevision(value=>value+1),300);
   const [acceptanceBusy,setAcceptanceBusy]=useState(false);
   const [acceptanceError,setAcceptanceError]=useState('');
   const eligible=(candidate:EnterpriseCandidateItem)=>candidate.decision==='PENDING'&&candidate.isLatestCoordination&&candidate.canRespond!==false;
@@ -112,7 +115,7 @@ export const EnterpriseCandidates: React.FC = () => {
         if (!controller.signal.aborted) setPeriodsLoading(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [cacheRevision]);
 
   const candidatesRequest = useRef<AbortController | null>(null);
   const fetchCandidates = useCallback(async () => {
@@ -145,7 +148,7 @@ export const EnterpriseCandidates: React.FC = () => {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [periodsLoading,availablePeriods,page,selectedYearId,filterStatus,debouncedSearchTerm,selectedRoundId]);
+  }, [periodsLoading,availablePeriods,page,selectedYearId,filterStatus,debouncedSearchTerm,selectedRoundId,cacheRevision]);
 
   useEffect(() => {
     let active = true;

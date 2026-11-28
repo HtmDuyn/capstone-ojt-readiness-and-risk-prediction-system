@@ -8,6 +8,8 @@ import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from
 import { Field, Notice, errorMessage } from './QhdnUi';
 import { RecruitmentDateInput } from './RecruitmentDateInput';
 import { RecruitmentConfirmationContent } from './RecruitmentConfirmation';
+import { qhdnRead, qhdnReadKey } from '@/utils/qhdn/qhdnReadCache';
+import { useQhdnCacheRefresh } from '@/hooks/qhdn/useQhdnCacheRefresh';
 import { emptySchedule, formatScheduleDate as formatDateTime, newRecruitmentSchedule, updateScheduleDraft, recruitmentScheduleAccess, scheduleFields, validateRecruitmentSchedule, type ScheduleDraft, type ScheduleErrors, type ScheduleField } from '@/utils/qhdn/qhdnRecruitmentSchedule';
 
 type Round=Partial<PhaseSchedule>&{canEditSchedule?:boolean;canDelete?:boolean;editableScheduleFields?:string[];canPost?:boolean;canApply?:boolean;canRespond?:boolean;id:number;name:string;campaignId?:number;campaignName?:string;roundNumber?:number;status:string;currentPhase:string;startsAt:string;endsAt:string;resultsFinalizedAt?:string;pendingCount:number;canOpen:boolean;openBlockedReason?:string;canFinalize:boolean;resultsSummary?:{total:number;accepted:number;rejected:number;withdrawn:number;pending?:number}};
@@ -24,6 +26,7 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
  const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false);
  const [loadError,setLoadError]=useState(''),[roundsLoaded,setRoundsLoaded]=useState(false);
  const [creating,setCreating]=useState(false),[revision,setRevision]=useState(0),[migrationRequired,setMigrationRequired]=useState(false);
+ useQhdnCacheRefresh(['/recruitment/windows:'],()=>setRevision(value=>value+1),300);
  const [extending,setExtending]=useState<Round|null>(null);
  const [editing,setEditing]=useState<Round|null>(null);
  const [draft,setDraft]=useState<ScheduleDraft>({...emptySchedule});
@@ -101,8 +104,8 @@ export function RecruitmentRounds({selection:catalog,createRequest=0,refreshKey=
   
   if(!catalog.selectedPeriod)return;
   let active=true;setLoading(true);setRoundsLoaded(false);setLoadError('');
-  API.get('/recruitment/windows',{params:{academicPeriodId:catalog.selectedPeriod.id}})
-   .then(r=>{if(active){setItems(r.data.data.items.map((item:Round)=>({...item,...recruitmentScheduleAccess(item,!['CLOSED','ARCHIVED'].includes(catalog.selectedPeriod?.status??''))})));setCampaigns(r.data.data.campaigns??[]);setMigrationRequired(false);setRoundsLoaded(true);}})
+  qhdnRead(qhdnReadKey('/recruitment/windows',{academicPeriodId:catalog.selectedPeriod.id}),async requestSignal=>(await API.get('/recruitment/windows',{params:{academicPeriodId:catalog.selectedPeriod!.id},signal:requestSignal})).data)
+   .then((response:any)=>{if(active){setItems(response.data.items.map((item:Round)=>({...item,...recruitmentScheduleAccess(item,!['CLOSED','ARCHIVED'].includes(catalog.selectedPeriod?.status??''))})));setCampaigns(response.data.campaigns??[]);setMigrationRequired(false);setRoundsLoaded(true);}})
    .catch(e=>{if(active){setLoadError(errorMessage(e));setMigrationRequired(e?.response?.status===503);}}).finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;};
  },[catalog.selectedPeriod?.id,catalog.selectedPeriod?.status,revision,refreshKey]);

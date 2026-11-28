@@ -60,6 +60,25 @@ export function useStudentResource<T>(
       });
     return () => controller.abort();
   }, [key, token, retry, snapshot]);
+  useEffect(() => {
+    if(!key)return;
+    const apiPrefixes=key.startsWith('dashboard-summary:')||key.startsWith('current-study-overview:')||key.startsWith('study-overview:')
+      ? ['/students/me/study-overview','/students/me/dashboard']
+      : key.startsWith('dashboard-notifications:')||key.startsWith('student-notifications:')||key.startsWith('student-notification-total:')
+        ? ['/students/me/notifications']
+        : key.startsWith('curriculum:') ? [`/students/${key.split(':')[1]}?`]
+          : key.startsWith('ojt-windows:') ? ['/ojt-registration-windows']
+            : key.startsWith('ojt-applications:') ? ['/job-applications']
+              : key.startsWith('ojt-opportunities:') ? ['/students/me/opportunities']
+                : key.startsWith('assigned-tasks:') ? ['/students/me/tasks']
+                  : key.startsWith('ojt-results:') ? ['/students/me/internships']
+                    : key.startsWith('ojt-certificates:') ? ['/students/me/ojt-certificates'] : [];
+    if(!apiPrefixes.length)return;
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const onUpdate=(event:Event)=>{const apiKey=(event as CustomEvent<{key?:string}>).detail?.key;if(!apiKey||!apiPrefixes.some(prefix=>apiKey.startsWith(prefix)))return;if(timer)clearTimeout(timer);timer=setTimeout(()=>setRetry(value=>value+1),180);};
+    window.addEventListener('student:read-cache-updated',onUpdate);
+    return()=>{if(timer)clearTimeout(timer);window.removeEventListener('student:read-cache-updated',onUpdate);};
+  },[key]);
   const current = state.key === key && state.token === token
     ? { ...state, data: state.data === null && state.loading && cached ? cached.data : state.data }
     : { data: cached ? cached.data : null, loading: key !== null, error: '' };

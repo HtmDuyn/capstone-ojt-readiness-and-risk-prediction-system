@@ -9,6 +9,7 @@ import { RecruitmentPostCard } from '@/components/enterprise/RecruitmentPostCard
 import { enterprisePeriodLabels, formatRecruitmentDateTime, loadRecruitmentData, postDeleteLockReason, postEditLockReason, postPublishLockReason, recruitmentError, recruitmentStatusLabels, recruitmentTotals, windowAcceptsPosts, windowAllowsPostCreation } from '@/utils/enterprise/recruitment';
 import { enterpriseService, type RecruitmentPost, type RecruitmentWindow } from '@/services/enterpriseService';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
+import { useEnterpriseCacheRefresh } from '@/hooks/enterprise/useEnterpriseCacheRefresh';
 
 const PAGE_SIZE = 6;
 const currentStatuses = ['DRAFT', 'PUBLISHED', 'CLOSED'] as const;
@@ -28,6 +29,7 @@ export function EnterpriseJobs() {
   const [error, setError] = useState('');
   const feedback = useRecruitmentFeedback();
   const [revision, setRevision] = useState(0);
+  useEnterpriseCacheRefresh(['/enterprise/recruitment/posts:', '/enterprise/recruitment/windows:'], () => setRevision(value => value + 1), 300);
   const [now, setNow] = useState(Date.now());
   const [selectedWindowId, setSelectedWindowId] = useState<number>(-1);
   const [periodStatusFilter, setPeriodStatusFilter] = useState<'' | RecruitmentWindow['periodStatus']>('');
