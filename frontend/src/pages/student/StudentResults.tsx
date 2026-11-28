@@ -30,7 +30,7 @@ function ResultsContent() {
     signal => getStudentOjtCertificates(semesterId!, signal));
   return (
     <>
-      <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <div className="w-full min-w-0 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <section aria-labelledby="published-results-heading" className="space-y-4">
         <h2 id="published-results-heading" className="border-b border-slate-100 pb-3 text-lg font-semibold text-slate-900">Kết quả OJT đã công bố</h2>
         <ResourceState

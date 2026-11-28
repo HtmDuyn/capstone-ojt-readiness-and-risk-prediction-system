@@ -1,16 +1,25 @@
 import { useId, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Info, LockKeyhole, Route, Sparkles } from 'lucide-react';
 import type { RiskAssessment } from '@/services/studentService';
+import type { AcademicProgress } from '@/types/student/portal';
 import { focusClass } from './risk-ui';
 
-export function LearningRoadmap({ roadmap, embedded = false, timeline = false }: {
+export function LearningRoadmap({ roadmap, embedded = false, timeline = false, academicProgress }: {
   roadmap: RiskAssessment['roadmap'];
   embedded?: boolean;
   timeline?: boolean;
+  academicProgress?: AcademicProgress;
 }) {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
-  const ordered = timeline ? [...roadmap.items].sort((a, b) => a.priority - b.priority) : roadmap.items;
+  const ordered = roadmap.items.map(course => {
+    const requirement = academicProgress?.requirements.find(item => course.requirementId != null
+      ? item.id === course.requirementId
+      : item.courseId === course.courseId || item.matchedCourseId === course.courseId || item.choices.includes(course.courseId));
+    const countsForOjt = requirement?.excludedFromOjtCredits === false && requirement.credits != null && requirement.credits > 0;
+    return { course, requirement, countsForOjt };
+  }).sort((a, b) => Number(b.countsForOjt) - Number(a.countsForOjt)
+    || (timeline ? a.course.priority - b.course.priority : 0));
   const visible = expanded ? ordered : ordered.slice(0, 4);
 
   return <section aria-label="Lộ trình học tập đề xuất" className="min-w-0">
@@ -33,24 +42,26 @@ export function LearningRoadmap({ roadmap, embedded = false, timeline = false }:
       <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" aria-hidden="true" />
       <p>Chưa có môn cần bổ sung. Tiếp tục hoàn thành các môn đang học và theo dõi kết quả xét OJT.</p>
     </div> : <div className={timeline ? 'mt-4' : 'mt-4 sm:pl-7'}>
-      <p className="text-sm leading-relaxed text-slate-600">Bạn nên hoàn thành các môn sau theo thứ tự ưu tiên:</p>
+      <p className="text-sm leading-relaxed text-slate-600">Các môn được tính tín chỉ xét OJT được hiển thị trước:</p>
       <ol id={listId} className={timeline ? 'mt-4 space-y-3' : 'mt-3 list-decimal space-y-3.5 pl-5 marker:font-semibold marker:text-slate-400'}>
-        {visible.map((course, index) => {
+        {visible.map(({ course, requirement, countsForOjt }, index) => {
           const missing = course.prerequisites.filter(group => !group.satisfied);
-          return <li key={course.courseId} value={course.priority} className={timeline ? 'relative min-w-0 pl-10 sm:pl-12' : 'min-w-0 pl-1'}>
+          return <li key={course.courseId} value={index + 1} className={timeline ? 'relative min-w-0 pl-10 sm:pl-12' : 'min-w-0 pl-1'}>
             {timeline && <><span aria-hidden="true" className="absolute left-0 top-4 grid size-7 place-items-center rounded-full border border-blue-200 bg-blue-50 text-xs font-semibold tabular-nums text-blue-700">{index + 1}</span>{index < visible.length - 1 && <span aria-hidden="true" className="absolute bottom-[-28px] left-[13px] top-11 w-px bg-slate-200" />}</>}
-            <div className={timeline ? 'rounded-xl border border-slate-200 bg-white px-4 py-3' : ''}>
+            <div className={timeline ? `rounded-xl border px-4 py-3 ${countsForOjt ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white'}` : countsForOjt ? 'rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2' : ''}>
             <div className={timeline ? 'flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4' : ''}>
             <div className="min-w-0 flex-1">
             <p className="break-words text-sm leading-7 text-slate-600">
               <strong className="font-semibold text-slate-900">{course.action === 'RETAKE' ? 'Học lại' : 'Học mới'} {course.courseCode ?? course.name ?? 'môn trong chương trình'}</strong>
               {course.courseCode && course.name && <> — {course.name}</>}
             </p>
+            {countsForOjt && <p className="my-1 inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs font-semibold text-emerald-700"><CheckCircle2 size={14} aria-hidden="true" />Tính {requirement?.credits} tín chỉ xét OJT khi đạt</p>}
+            {requirement?.excludedFromOjtCredits === true && <p className="my-1 text-xs text-slate-500">Không tính vào tín chỉ xét OJT</p>}
             {timeline && <p className="mt-1 text-sm leading-6 text-slate-600">{course.explanation}</p>}
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-6">
               <span className={`inline-flex items-center gap-1.5 ${course.canPlan ? 'text-emerald-700' : 'text-amber-700'}`}>
                 {course.canPlan ? <CheckCircle2 size={12} aria-hidden="true" /> : <LockKeyhole size={12} aria-hidden="true" />}
-                {course.canPlan ? 'Có thể ưu tiên' : 'Hoàn thành tiên quyết trước khi lên kế hoạch'}
+                {course.canPlan ? 'Có thể lên kế hoạch học' : 'Hoàn thành tiên quyết trước khi lên kế hoạch'}
               </span>
               {!!course.dependentCourses?.length && <span className="text-slate-500">Liên quan tiên quyết của {course.dependentCourses.map(c => c.courseCode ?? c.name ?? 'môn trong chương trình').join(', ')}.</span>}
             </div>
@@ -59,7 +70,6 @@ export function LearningRoadmap({ roadmap, embedded = false, timeline = false }:
             </p>)}
             {course.isAlternative && <p className="mt-1 text-xs leading-6 text-slate-500">Đây là một phương án trong nhóm lựa chọn, không cần học tất cả phương án.</p>}
             </div>
-            {timeline && <span className="shrink-0 self-start rounded-md border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">Ưu tiên {course.priority}</span>}
             </div></div>
           </li>;
         })}
@@ -68,7 +78,7 @@ export function LearningRoadmap({ roadmap, embedded = false, timeline = false }:
         {expanded ? 'Thu gọn lộ trình' : `Xem thêm ${roadmap.items.length - 4} môn`}
         <ChevronDown size={15} className={expanded ? 'rotate-180' : ''} aria-hidden="true" />
       </button>}
-      <p className="mt-4 text-xs leading-relaxed text-slate-400">Chỉ gồm môn đến hết kỳ {roadmap.targetSemester}, không bao gồm OJT202. {timeline ? 'Thứ tự ưu tiên không mặc định là quan hệ tiên quyết hoặc thứ tự đăng ký bắt buộc; cần kiểm tra điều kiện từng môn và lịch mở lớp trước khi đăng ký.' : 'Thứ tự ưu tiên không phải lịch đăng ký môn; cần kiểm tra lịch mở lớp trước khi đăng ký.'}</p>
+      <p className="mt-4 text-xs leading-relaxed text-slate-400">Chỉ gồm môn đến hết kỳ {roadmap.targetSemester}, không bao gồm OJT202. Thứ tự hiển thị không mặc định là quan hệ tiên quyết hoặc thứ tự đăng ký bắt buộc; cần kiểm tra điều kiện từng môn và lịch mở lớp trước khi đăng ký.</p>
     </div>}
     {!embedded && <RoadmapNotes roadmap={roadmap} />}
   </section>;

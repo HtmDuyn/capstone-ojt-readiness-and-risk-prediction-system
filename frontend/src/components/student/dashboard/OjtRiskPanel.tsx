@@ -51,7 +51,7 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
           <RiskInsights data={data} embedded />
         </div>
         <div className="mt-5 border-t border-slate-200 pt-5">
-          <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} embedded />
+          <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} academicProgress={currentAcademic?.academicProgress} embedded />
           <RoadmapNotes roadmap={data.roadmap} />
         </div>
       </section>
@@ -60,7 +60,7 @@ export function OjtRiskPanel({showRefreshAction=true,compactTop=false,compactLay
       <RiskOverview data={data} refreshing={loading} onRefresh={refresh} showRefreshAction={showRefreshAction}/>
       <AcademicMetrics data={data} academicProgress={currentAcademic?.academicProgress}/>
       <RiskInsights data={data}/>
-      <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap}/>
+      <LearningRoadmap key={`${user?.id??''}:${data.risk.computedAt}`} roadmap={data.roadmap} academicProgress={currentAcademic?.academicProgress}/>
       <RecommendationSummary data={data}/>
     </>:<EmptyAssessment />}
   </section>;

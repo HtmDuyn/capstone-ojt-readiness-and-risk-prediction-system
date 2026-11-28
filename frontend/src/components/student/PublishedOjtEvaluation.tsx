@@ -34,7 +34,7 @@ export function PublishedOjtEvaluation({ result }: { result: OjtResult }) {
     </header>
 
     <div className="grid gap-5 border-t border-slate-100 pt-5 md:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] md:gap-6">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4 md:flex-col md:items-start md:justify-center md:border-b-0 md:border-r md:pb-0 md:pr-6">
+      <div className="flex flex-col items-center justify-center gap-3 border-b border-slate-100 pb-4 text-center md:border-b-0 md:border-r md:pb-0 md:pr-6">
         <p className="text-sm font-medium text-slate-600">Điểm tổng OJT</p>
         <p className="flex items-baseline gap-1.5"><strong className="text-5xl font-bold tracking-tight tabular-nums sm:text-6xl" style={{ color: scoreColor(result.overallScore) }}>{scoreText(result.overallScore)}</strong><span className="text-base text-slate-400">/10</span></p>
       </div>
