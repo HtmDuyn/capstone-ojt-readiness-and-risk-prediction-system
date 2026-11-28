@@ -12,7 +12,7 @@ import { coordinationSlotsSql,coordinationCompanies } from './placement-slots';
 
 export async function requirePlacementSchema(c:PoolClient){
  const ready=(await c.query(`SELECT to_regclass('public."OJTActualReceipts"') IS NOT NULL AS ready`)).rows[0].ready;
- if(!ready)throw invalid('Database chưa đồng bộ schema OJT placement. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'PLACEMENT_MIGRATION_REQUIRED');
+ if(!ready)throw invalid('Database chưa đồng bộ schema OJT placement. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'PLACEMENT_MIGRATION_REQUIRED');
 }
 export async function placementContext(c:PoolClient,semesterId:number){
  return (await c.query(`SELECT count(*)::int AS "roundCount",max("EndsAt") AS "lastEndAt",
@@ -68,7 +68,7 @@ export async function supplementPlacement(body:unknown,actor:Actor){
   await requirePlacementSchema(c);
   const s=(await c.query(`SELECT s.* FROM "Students" s JOIN "Users" u USING("UserID") WHERE s."StudentID"=$1 AND s."Status"='ACTIVE' AND u."Status"='ACTIVE' AND s."DeletedAt" IS NULL FOR UPDATE OF s`,[studentId])).rows[0];
   if(!s)throw invalid('Sinh viên không còn hoạt động.',409);
-  await requireStudentAdmission(c,studentId,semesterId);await assertOjtPathway(c,studentId,semesterId);await recordOjt202InProgress(c,studentId,semesterId,actor.userId);
+  const admission=await requireStudentAdmission(c,studentId,semesterId);await assertOjtPathway(c,studentId,semesterId);await recordOjt202InProgress(c,studentId,semesterId,actor.userId);
   if((await c.query(`SELECT 1 FROM "OJTActualReceipts" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2 UNION ALL
     SELECT 1 FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" co USING("CoordinationID") WHERE a."StudentID"=$1 AND co."OJTSemesterID"=$2 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED')
     UNION ALL SELECT 1 FROM "StudentEnterpriseCoordination" co JOIN "OJTRegistrations" reg USING("RegistrationID") WHERE reg."StudentID"=$1 AND co."OJTSemesterID"=$2 AND co."Decision"='ACCEPTED'`,[studentId,semesterId])).rowCount)throw invalid('Sinh viên đã có nơi thực tập trong kỳ này.',409,'ASSIGNMENT_EXISTS');
@@ -80,7 +80,8 @@ export async function supplementPlacement(body:unknown,actor:Actor){
    if((companyId!==null?previous.EnterpriseID===companyId:previous.PositionID===positionId)&&previous.Source===source&&previous.CoordinationReason===reason)return {...previous,replayed:true};
    throw invalid('Sinh viên đang chờ doanh nghiệp phản hồi điều phối trước.',409,'COORDINATION_PENDING');
   }
-  const availability=coordinationAvailability({decision:previous?.Decision,source:previous?.Source},await placementContext(c,semesterId));
+  const availability=coordinationAvailability({decision:previous?.Decision,source:previous?.Source,
+   isFreshEligible:source==='QHDN_COORDINATION'&&admission.source==='SAVED_ELIGIBILITY'&&admission.status==='ELIGIBLE'&&!admission.isStale},await placementContext(c,semesterId));
   if(!availability.canCoordinate)throw invalid(availability.coordinationBlockedReason!,409,'COORDINATION_NOT_READY');
   if(companyId!==null){
    const available=(await c.query(`SELECT p."PositionID" AS id FROM "InternshipPositions" p JOIN "Enterprises" e USING("EnterpriseID")

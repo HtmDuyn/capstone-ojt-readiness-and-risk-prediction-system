@@ -12,14 +12,14 @@ const allowed = file => file.startsWith('backend/src/modules/student-portal/') |
   'backend/src/modules/auth/auth.controller.ts', 'backend/src/modules/students/job-application.service.ts',
   'backend/src/modules/students/registration-options.service.ts', 'backend/src/modules/ojt-registration/registration.service.ts',
   'backend/src/config/swagger.ts', 'backend/src/config/swagger-role-groups.ts',
-  'db/backend',
+  'db/database',
 ].includes(file);
 for (const file of changedFiles) assert.ok(allowed(file), 'Out-of-scope change: ' + file);
 const head = file => execFileSync('git', ['show','HEAD:' + file], { cwd: repo, encoding: 'utf8' }).replace(/\r\n/g,'\n');
 const current = file => fs.readFileSync(path.join(repo, file), 'utf8').replace(/\r\n/g,'\n');
-const databaseFile = current('db/backend');
+const databaseFile = current('db/database');
 assert.equal(databaseFile.replace(/\n-- BEGIN STUDENT DATABASE AUDIT \(READ ONLY\)[\s\S]*?-- END STUDENT DATABASE AUDIT \(READ ONLY\)\n/, ''),
-  head('db/backend'), 'Existing database schema, routines and seed data must stay unchanged');
+  head('db/database'), 'Existing database schema, routines and seed data must stay unchanged');
 const registrationFile = 'backend/src/modules/ojt-registration/registration.service.ts';
 assert.equal(current(registrationFile)
   .replace("import { requireStudentAdmission } from '../student-portal/admission.service';\n", '')

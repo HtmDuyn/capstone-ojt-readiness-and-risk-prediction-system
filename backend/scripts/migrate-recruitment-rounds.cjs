@@ -5,7 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true })
 const { pool } = require('../dist/config/database');
 async function main() {
   if (!pool) throw new Error('Database is not configured.');
-  const source = fs.readFileSync(path.join(__dirname, '../../db/backend'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../../db/database'), 'utf8');
   const start = '-- BEGIN RECRUITMENT MULTI ROUND V1';
   const end = '-- END RECRUITMENT MULTI ROUND V1';
   if (source.split(start).length !== 2 || source.split(end).length !== 2) throw new Error('Expected one recruitment policy block.');

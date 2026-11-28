@@ -58,7 +58,7 @@ export async function bulkAcceptance(body:unknown,actor:Actor,commit=false){
   if(token!==result.confirmationToken)throw invalid('Chỉ tiêu hoặc số sinh viên đã nhận đã thay đổi. Hãy kiểm tra và xác nhận lại.',409,'BULK_ACCEPTANCE_CHANGED');
   if(result.overCapacity&&!b.allowOverCapacity)throw invalid('Cần xác nhận đồng ý nhận vượt chỉ tiêu.',409,'BULK_OVER_CAPACITY_CONFIRMATION_REQUIRED');
   if(!(await c.query(`SELECT EXISTS(SELECT 1 FROM "SchemaMigrations" WHERE "Version"='20261116_enterprise_bulk_acceptance') AS ready`)).rows[0].ready)
-   throw invalid('Database chưa đồng bộ schema nhận OJT hàng loạt. Script chuẩn nằm tại db/backend; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'BULK_ACCEPTANCE_MIGRATION_REQUIRED');
+   throw invalid('Database chưa đồng bộ schema nhận OJT hàng loạt. Script chuẩn nằm tại db/database; chạy script sẽ khởi tạo lại các bảng ứng dụng.',503,'BULK_ACCEPTANCE_MIGRATION_REQUIRED');
   await c.query(`SELECT set_config('app.enterprise_bulk_company_id',$1,true)`,[String(companyId)]);
   for(const candidateId of candidateIds)await decision(candidateId,{decision:'ACCEPTED',reason},actor,c,true);
   const response={...result,acceptedCount:candidateIds.length};

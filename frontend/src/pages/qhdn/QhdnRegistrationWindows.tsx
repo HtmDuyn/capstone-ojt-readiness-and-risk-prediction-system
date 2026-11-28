@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import { PageBanner } from '@/components/common/PageBanner';
-import { EligibleOjtRoster } from '@/components/qhdn/EligibleOjtRoster';
 import { RecruitmentRounds } from '@/components/qhdn/RecruitmentRounds';
 import { RecruitmentSemesterNotice } from '@/components/qhdn/RecruitmentConfirmation';
 import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
@@ -79,7 +78,6 @@ export default function QhdnRegistrationWindows() {
     {semester.error && <Notice>{semester.error}</Notice>}
     {message && <Notice>{message}</Notice>}
     <RecruitmentRounds key={semester.periodId} selection={semester} refreshKey={revision} onChanged={refresh} />
-    <EligibleOjtRoster refreshKey={revision} />
     <details className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <summary className="cursor-pointer p-5 font-semibold text-slate-700">Các đợt đăng ký cũ <span className="ml-2 rounded-md bg-slate-100 px-2 py-1 text-xs tabular-nums text-slate-500">{windows.length}</span></summary>
       <div className="space-y-4 border-t border-slate-100 p-5">

@@ -1,24 +1,25 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { UserPlus, Eye } from 'lucide-react';
 import API from '@/services/apiService';
 import { PageBanner } from '@/components/common/PageBanner';
-import { useQhdnAcademicPeriods } from '@/hooks/qhdn/useQhdnAcademicPeriods';
-import { AcademicPeriodFilter, WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
+import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from '@/components/qhdn/StudentWorkflowUi';
 import { Field, Notice, Pager, errorMessage } from '@/components/qhdn/QhdnUi';
 import { StudentProfileModal } from '@/components/qhdn/StudentProfileModal';
 import { placementStatus, placementStatuses, placementStatusLabels, placementStatusColors, type PlacementStatus } from '@/utils/qhdn/qhdnPlacement';
 import { canSelectForCoordination, coordinateBatch } from '@/utils/qhdn/qhdnCoordination';
 import { summarizePlacementCompanies } from '@/utils/qhdn/qhdnCompanySummary';
 import { paginateItems, selectPage } from '@/utils/qhdn/qhdnPagination';
+import { loadAllPages } from '@/utils/shared/loadAllPages';
 
 type Student = {
   id: number;
   studentCode: string;
   fullName: string;
+  ojtSemesterId: number | null;
+  semesterName: string | null;
   coordinationId?: number;
-  registrationId?: number;
-  registrationStatus?: string;
+  registrationId?: number | null;
+  registrationStatus?: string | null;
   decision?: string;
   source?: string;
   companyName?: string;
@@ -34,13 +35,13 @@ type Student = {
 };
 type Position = { id: number; title: string;companyId?:number; companyName: string; capacity: number | null; actualCount: number };
 type Company = { id:number;name:string;availableSlots:number;capacity:number;actualCount:number };
-type Board = { canCoordinate: boolean; context: { roundCount: number; unfinished: number }; companies:Company[];positions: Position[]; items: Student[] };
+type SemesterBoard = { ojtSemesterId: number; canCoordinate: boolean; context: { roundCount: number; unfinished: number }; companies:Company[];positions: Position[]; items: Student[] };
+type Board = { items: Student[]; semesterBoards: SemesterBoard[]; total: number; limit: number; page: number };
 const cell = 'px-4 py-4 align-middle';
 const filterInput = workflowInput + ' h-11 min-w-0 truncate';
 const compactAction = 'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
 
 export default function QhdnOjtCoordination() {
-  const [url] = useSearchParams(), semester = useQhdnAcademicPeriods(url.get('semester') || '', false, true);
   const [data, setData] = useState<Board | null>(null), [loading, setLoading] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [revision, setRevision] = useState(0);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState<PlacementStatus | 'ALL'>('ALL'), [busy, setBusy] = useState(false);
@@ -52,10 +53,16 @@ export default function QhdnOjtCoordination() {
   const [batchErrors, setBatchErrors] = useState<string[]>([]);
   const [completed, setCompleted] = useState(0);
   const request = useRef<AbortController | null>(null);
-  const companies=useMemo(()=>data?summarizePlacementCompanies(data):[],[data]);
+  const companies=useMemo(()=>data?data.semesterBoards.flatMap(board=>{
+    const label=data.items.find(student=>student.ojtSemesterId===board.ojtSemesterId)?.semesterName??`Kỳ OJT #${board.ojtSemesterId}`;
+    return summarizePlacementCompanies(board).map(company=>({...company,key:`${board.ojtSemesterId}:${company.key}`,name:`${company.name} · ${label}`}));
+  }):[],[data]);
+  const taskSemesterId = task?.students[0]?.ojtSemesterId ?? null;
+  const taskBoard = data?.semesterBoards.find(board => board.ojtSemesterId === taskSemesterId);
+  const taskCompanies = taskBoard ? summarizePlacementCompanies(taskBoard) : [];
 
-  useEffect(() => { setSelectedIds(new Set()); }, [semester.semesterId, search, filter, followUpOnly]);
-  useEffect(() => { setPage(1); }, [semester.semesterId, semester.periodId, semester.yearId, search, filter, followUpOnly, limit]);
+  useEffect(() => { setSelectedIds(new Set()); }, [search, filter, followUpOnly]);
+  useEffect(() => { setPage(1); }, [search, filter, followUpOnly, limit]);
   useEffect(() => {
     const selectable = new Set(data?.items.filter(canSelectForCoordination).map(student => student.id));
     setSelectedIds(previous => new Set([...previous].filter(id => selectable.has(id))));
@@ -65,25 +72,37 @@ export default function QhdnOjtCoordination() {
     setData(null);
     setDetail(null);
     setTask(null);
-    setLoading(!!semester.semesterId);
-  }, [semester.semesterId]);
+    setLoading(true);
+  }, []);
   useEffect(() => {
     setError('');
-    if (!semester.semesterId) { setLoading(false); return; }
     const controller = new AbortController();
     request.current = controller;
     if (!data) setLoading(true);
     Promise.resolve().then(() => {
       controller.signal.throwIfAborted();
-      return API.get('/qhdn/placements', { params: { ojtSemesterId: semester.semesterId }, signal: controller.signal });
-    }).then(r => { if (!controller.signal.aborted) setData(r.data.data); })
+      let firstPage: Board | null = null;
+      const semesterBoards = new Map<number, SemesterBoard>();
+      return loadAllPages(async page => {
+        const response = await API.get<{ data: Board & { total: number; limit: number } }>('/qhdn/eligible-students', {
+          params: { page, limit: 100 }, signal: controller.signal,
+        });
+        const result = response.data.data;
+        if (page === 1) firstPage = result;
+        for (const board of result.semesterBoards ?? []) semesterBoards.set(board.ojtSemesterId, board);
+        return result;
+      }, controller.signal).then(items => {
+        if (!firstPage) throw new Error('Không tải được danh sách sinh viên đủ điều kiện.');
+        return { ...(firstPage as Board), items, semesterBoards: [...semesterBoards.values()] };
+      });
+    }).then(result => { if (!controller.signal.aborted) setData(result); })
       .catch(e => { if (!controller.signal.aborted) setError(errorMessage(e)); })
       .finally(() => {
         if (request.current === controller) request.current = null;
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [semester.semesterId, revision]);
+  }, [revision]);
 
   const refresh = () => setRevision(v => v + 1);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -96,13 +115,15 @@ export default function QhdnOjtCoordination() {
     setCompleted(0);
     const form = new FormData(e.currentTarget);
     try {
+        if (task.students.some(student => !student.ojtSemesterId || student.ojtSemesterId !== task.students[0].ojtSemesterId))
+          throw new Error('Chỉ điều phối các sinh viên có cùng kỳ OJT.');
         const companyId=Number(form.get('companyId'));
         if(task.bulk){
-          const company=companies.find(item=>item.id===companyId);
+          const company=taskCompanies.find(item=>item.id===companyId);
           if(!company)throw new Error('Chọn doanh nghiệp tiếp nhận hồ sơ.');
         }
         const result = await coordinateBatch(task.students, student => API.post('/qhdn/placements', {
-          studentId: student.id, ojtSemesterId: Number(semester.semesterId),
+          studentId: student.id, ojtSemesterId: Number(student.ojtSemesterId),
           ...(task.bulk?{companyId}:{positionId:Number(form.get('positionId'))}), source: form.get('source'), reason: form.get('reason'),
         }), setCompleted);
         setSelectedIds(previous => new Set([...previous].filter(id => !result.succeeded.some(student => student.id === id))));
@@ -124,7 +145,10 @@ export default function QhdnOjtCoordination() {
   const selectable = students.filter(canSelectForCoordination);
   const selected = selectable.filter(student => selectedIds.has(student.id));
   const paged = paginateItems(students, page, limit);
-  const pageSelectable = paged.items.filter(canSelectForCoordination);
+  const selectedSemesterId = selected[0]?.ojtSemesterId ?? null;
+  const pageCandidateStudents = paged.items.filter(canSelectForCoordination);
+  const pageSemesterId = selectedSemesterId ?? pageCandidateStudents[0]?.ojtSemesterId ?? null;
+  const pageSelectable = pageCandidateStudents.filter(student => student.ojtSemesterId === pageSemesterId);
   const pageSelectedCount = pageSelectable.filter(student => selectedIds.has(student.id)).length;
   const allSelected = pageSelectable.length > 0 && pageSelectedCount === pageSelectable.length;
   useEffect(() => { setPage(current => Math.min(current, paged.pages)); }, [paged.pages]);
@@ -134,8 +158,8 @@ export default function QhdnOjtCoordination() {
   };
 
   return <div className="space-y-5 pb-10">
-    <PageBanner variant="qhdn" title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên bị doanh nghiệp từ chối hoặc chưa ứng tuyển khi đã hết hạn đăng ký, kể cả doanh nghiệp đã đủ chỉ tiêu." badge="Phòng QHDN" />
-    {(error || semester.error) && <Notice>{error || semester.error}</Notice>}
+    <PageBanner variant="qhdn" title="Điều phối sinh viên và quản lý thực nhận" description="Điều phối sinh viên có kết quả xét OJT hợp lệ đến doanh nghiệp; theo dõi phản hồi tiếp nhận và số lượng thực nhận." badge="Phòng QHDN" />
+    {error && <Notice>{error}</Notice>}
     {message && <Notice>{message}</Notice>}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
       {placementStatuses.map(status => <button key={status} disabled={busy} aria-pressed={filter === status}
@@ -149,13 +173,12 @@ export default function QhdnOjtCoordination() {
       </button>)}
     </div>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.75fr)_minmax(0,1.5fr)_minmax(0,1fr)]">
-        <div className="min-w-0 sm:col-span-2 xl:col-span-1">
+      <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 items-end gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
           <Field label="Tìm sinh viên">
             <input className={filterInput} placeholder="Tìm mã hoặc tên sinh viên…" aria-label="Tìm sinh viên" value={search} onChange={e => setSearch(e.target.value)} />
           </Field>
         </div>
-        <AcademicPeriodFilter selection={semester} layout="grid" controlClassName={filterInput} />
         <Field label="Trạng thái">
           <select className={filterInput} aria-label="Lọc trạng thái" value={filter} onChange={e => setFilter(e.target.value as PlacementStatus | 'ALL')}>
             <option value="ALL">Tất cả trạng thái</option>
@@ -163,6 +186,7 @@ export default function QhdnOjtCoordination() {
           </select>
         </Field>
       </fieldset>
+      <p className="border-b border-slate-100 px-5 py-3 text-xs text-slate-500">Danh sách gồm sinh viên đủ điều kiện ở tất cả kỳ OJT. Chọn sinh viên cùng kỳ OJT để điều phối hàng loạt.</p>
       <label className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 text-sm text-slate-600"><input type="checkbox" disabled={busy} checked={followUpOnly} onChange={e => setFollowUpOnly(e.target.checked)} />Chỉ hồ sơ doanh nghiệp quá hạn phản hồi ({data?.items.filter(s => s.needsFollowUp).length ?? 0})</label>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-orange-50/50 px-5 py-3">
         <p className="text-sm text-slate-600" aria-live="polite">Đã chọn <strong className="text-orange-700">{selected.length}</strong> sinh viên <span className="text-slate-500">· {selectable.length} hồ sơ có thể điều phối trong danh sách</span></p>
@@ -172,7 +196,7 @@ export default function QhdnOjtCoordination() {
         </div>
       </div>
       {loading ? <p className="p-8 text-center text-slate-500">Đang tải danh sách…</p> : !students.length ?
-        <p className="p-8 text-center text-slate-500">Không có sinh viên phù hợp trong danh sách bàn giao.</p> :
+        <p className="p-8 text-center text-slate-500">Không có sinh viên đủ điều kiện phù hợp.</p> :
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
             <colgroup><col className="w-12" /><col className="w-16" /><col className="w-[26%]" /><col /><col className="w-[220px]" /><col className="w-[192px]" /></colgroup>
@@ -189,10 +213,10 @@ export default function QhdnOjtCoordination() {
                 const canCoordinate = canSelectForCoordination(student);
                 return <tr key={student.id} className={selectedIds.has(student.id) ? 'bg-orange-50/60 hover:bg-orange-50' : 'hover:bg-slate-50/60'}>
                   <td className="px-4 py-4 text-center"><input type="checkbox" className="size-4 accent-orange-600" aria-label={'Chọn điều phối ' + student.fullName + ' ' + student.studentCode}
-                    title={canCoordinate ? 'Chọn sinh viên để điều phối' : student.coordinationBlockedReason || 'Sinh viên chưa thể điều phối'} disabled={!canCoordinate || busy} checked={selectedIds.has(student.id)}
-                    onChange={e => { const checked = e.target.checked; setSelectedIds(previous => { const next = new Set(previous); if (checked) next.add(student.id); else next.delete(student.id); return next; }); }} /></td>
+                    title={canCoordinate ? 'Chọn sinh viên để điều phối' : student.coordinationBlockedReason || 'Sinh viên chưa thể điều phối'} disabled={!canCoordinate || busy || (selectedSemesterId !== null && student.ojtSemesterId !== selectedSemesterId)} checked={selectedIds.has(student.id)}
+                    onChange={e => { const checked = e.target.checked; setSelectedIds(previous => { const next = new Set(previous); if (checked) { for (const id of [...next]) { const existing = data?.items.find(item => item.id === id); if (existing?.ojtSemesterId !== student.ojtSemesterId) next.delete(id); } next.add(student.id); } else next.delete(student.id); return next; }); }} /></td>
                   <td className={cell + ' text-center tabular-nums text-slate-500'}>{paged.offset + index + 1}</td>
-                  <td className={cell}><p className="font-semibold text-slate-800">{student.fullName}</p><p className="mt-1 text-xs text-slate-500">{student.studentCode}</p></td>
+                  <td className={cell}><p className="font-semibold text-slate-800">{student.fullName}</p><p className="mt-1 text-xs text-slate-500">{student.studentCode}</p><p className="mt-1 text-xs text-orange-700">{student.semesterName ?? 'Chưa xác định kỳ OJT'}</p></td>
                   <td className={cell}><p className="break-words text-slate-700">{student.companyName || 'Chưa có doanh nghiệp'}</p><p className="mt-1 break-words text-xs text-slate-500">{student.positionTitle}</p></td>
                   <td className={cell}>
                     <span className={'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ' + placementStatusColors[status]}>
@@ -208,7 +232,8 @@ export default function QhdnOjtCoordination() {
                         aria-label={'Điều phối ' + student.fullName} title={student.coordinationBlockedReason || 'Điều phối sinh viên đến doanh nghiệp'}
                         onClick={() => openCoordination([student])}><UserPlus size={14} />Điều phối</button>}
                     <button type="button" aria-label={'Xem hồ sơ ' + student.fullName} title="Xem hồ sơ sinh viên và CV"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                      disabled={!student.ojtSemesterId}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => setDetail(student)}><Eye size={16} /></button>
                     </div>
                   </td>
@@ -233,9 +258,9 @@ export default function QhdnOjtCoordination() {
           <td className={cell + ' text-right tabular-nums'}>{Math.max(0, company.actualCount - company.capacity)}</td>
         </tr>)}</tbody>
       </table></div>
-      {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu.':'Chưa có doanh nghiệp tiếp nhận trong học kỳ này.'}</p>}
+      {!companies.length && <p className="p-6 text-center text-sm text-slate-500">{loading?'Đang tải chỉ tiêu và số lượng thực nhận…':error?'Không tải được dữ liệu.':'Chưa có doanh nghiệp tiếp nhận trong các kỳ OJT này.'}</p>}
     </section>
-    {detail && <StudentProfileModal key={detail.id + ':' + semester.semesterId} studentId={detail.id} ojtSemesterId={Number(semester.semesterId)} fullName={detail.fullName} onClose={() => setDetail(null)} />}
+    {detail?.ojtSemesterId && <StudentProfileModal key={detail.id + ':' + detail.ojtSemesterId} studentId={detail.id} ojtSemesterId={detail.ojtSemesterId} fullName={detail.fullName} onClose={() => setDetail(null)} />}
     {task && <WorkflowModal wide title={task.bulk ? `Điều phối hàng loạt ${task.students.length} sinh viên` : 'Điều phối sinh viên đến doanh nghiệp'} busy={busy} onClose={() => setTask(null)}>
       <form onSubmit={submit} className="space-y-4">
         {error && <Notice>{error}</Notice>}
@@ -247,12 +272,12 @@ export default function QhdnOjtCoordination() {
           {task.bulk?<>
             <p className="text-sm text-slate-500">Doanh nghiệp và lý do được áp dụng cho tất cả sinh viên đã chọn. Có thể điều phối vượt chỉ tiêu; số thực nhận cập nhật khi doanh nghiệp đồng ý nhận.</p>
             <input type="hidden" name="source" value="QHDN_COORDINATION"/>
-            <Field label="Danh sách tiếp nhận hồ sơ"><select name="companyId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp tiếp nhận</option>{companies.map(company=><option key={company.key} value={company.id??''} disabled={!company.id}>{company.name} · Còn {company.availableSlots} slot</option>)}</select></Field>
-            {!companies.length&&<p className="text-sm text-amber-700">Chưa có doanh nghiệp tiếp nhận trong học kỳ này.</p>}
-            {companies.length>0&&!companies.some(company=>company.id)&&<p className="text-sm text-amber-700">Chưa thể xác định doanh nghiệp tiếp nhận. Vui lòng liên hệ quản trị viên.</p>}
+            <Field label={'Danh sách tiếp nhận hồ sơ · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="companyId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp tiếp nhận</option>{taskCompanies.map(company=><option key={company.key} value={company.id??''} disabled={!company.id}>{company.name} · Còn {company.availableSlots} slot</option>)}</select></Field>
+            {!taskCompanies.length&&<p className="text-sm text-amber-700">Chưa có doanh nghiệp tiếp nhận cho kỳ OJT này.</p>}
+            {taskCompanies.length>0&&!taskCompanies.some(company=>company.id)&&<p className="text-sm text-amber-700">Chưa thể xác định doanh nghiệp tiếp nhận. Vui lòng liên hệ quản trị viên.</p>}
           </>:<>
             <input type="hidden" name="source" value="QHDN_COORDINATION"/>
-            <Field label="Doanh nghiệp và vị trí"><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{data?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>
+            <Field label={'Doanh nghiệp và vị trí · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{taskBoard?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>
           </>}
         </>
         <Field label="Lý do điều phối"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>

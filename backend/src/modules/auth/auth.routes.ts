@@ -95,7 +95,7 @@ router.post('/change-password', authenticate, requireJsonBody, async (req, res, 
  *             enterprise01:
  *               summary: Enterprise
  *               value:
- *                 email: hr@techviet.example
+ *                 email: hr@techviet.vn
  *                 password: Enterprise@123
  *     responses:
  *       200:

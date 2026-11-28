@@ -45,7 +45,7 @@ The system supports five main user groups:
 
 Tại trang đăng nhập, chọn **Quên mật khẩu?**, nhập email tài khoản và dùng mã 6 chữ số trong email để đặt mật khẩu mới. Mã có hiệu lực trong 10 phút và chỉ dùng được một lần.
 
-Script SQL duy nhất cho toàn hệ thống là [db/backend](db/backend), gồm schema, hàm, trigger cần thiết, dữ liệu nền và luồng OJT hiện tại. Chạy từ thư mục gốc bằng `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/backend`. Script dựng lại các bảng ứng dụng, nên chỉ chạy trên DB mới hoặc DB có thể xóa dữ liệu. Cấu hình `SMTP_HOST`, `SMTP_FROM`, `FRONTEND_LOGIN_URL`, và `EMAIL_OUTBOX_KEY` (64 ký tự hex). Thiết lập `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, và `SMTP_PASSWORD` theo máy chủ thư. Backend cần bật tiến trình gửi email (`PROVISIONING_JOBS_ENABLED` mặc định bật).
+Script SQL duy nhất cho toàn hệ thống là [db/database](db/database), gồm schema, hàm, trigger cần thiết, dữ liệu nền và luồng OJT hiện tại. Chạy từ thư mục gốc bằng `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/database`. Script dựng lại các bảng ứng dụng, nên chỉ chạy trên DB mới hoặc DB có thể xóa dữ liệu. Cấu hình `SMTP_HOST`, `SMTP_FROM`, `FRONTEND_LOGIN_URL`, và `EMAIL_OUTBOX_KEY` (64 ký tự hex). Thiết lập `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, và `SMTP_PASSWORD` theo máy chủ thư. Backend cần bật tiến trình gửi email (`PROVISIONING_JOBS_ENABLED` mặc định bật).
 
 ## Student
 

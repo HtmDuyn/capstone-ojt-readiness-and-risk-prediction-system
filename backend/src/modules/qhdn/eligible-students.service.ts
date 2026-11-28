@@ -2,6 +2,8 @@ import { readTransaction } from './read.repository';
 import { invalid, pagination, positiveId, requiredText, enumValue } from '../students/student.validation';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { calculatedEligibilitySql } from '../eligibility/frontend-results.service';
+import { placementBoard } from './placement.service';
+import { coordinationAvailability } from './placement.policy';
 
 export async function eligibleStudents(params: Row, actor: Actor) {
   if (!['ADMIN', 'OJT_COORD'].includes(actor.roleCode))
@@ -41,7 +43,7 @@ export async function eligibleStudents(params: Row, actor: Actor) {
     args.push('%' + requiredText(params.search, 'search', 100) + '%');
     where.push(`(s."StudentCode" ILIKE $${args.length} OR u."FullName" ILIKE $${args.length} OR u."Email" ILIKE $${args.length})`);
   }
-  return readTransaction(async client => {
+  const roster = await readTransaction(async client => {
     const from = `FROM "Students" s
       JOIN "Users" u ON u."UserID"=s."UserID"
       JOIN "StudentOJTCalculatedResults" saved ON saved."StudentID"=s."StudentID"
@@ -110,4 +112,46 @@ export async function eligibleStudents(params: Row, actor: Actor) {
     return { ojtSemesterId: params.ojtSemesterId === undefined ? null : Number(params.ojtSemesterId),
       items,total,page:page.page,limit:page.limit };
   });
+  // Attach placement context per student OJT semester. The coordination screen
+  // displays the full eligible roster, which can span more than one semester.
+  const semesterIds = params.ojtSemesterId === undefined
+    ? [...new Set(roster.items.map(student => student.ojtSemesterId).filter((id): id is number => id !== null))]
+    : [positiveId(params.ojtSemesterId, 'ojtSemesterId')];
+  const boards: (Awaited<ReturnType<typeof placementBoard>> & { ojtSemesterId: number })[] = [];
+  for (const semesterId of semesterIds) {
+    boards.push({ ...await placementBoard({ ojtSemesterId: semesterId }, actor), ojtSemesterId: semesterId });
+  }
+  const boardBySemester = new Map(boards.map(board => [board.ojtSemesterId, board]));
+  const items = roster.items.map(student => {
+    const semesterBoard = student.ojtSemesterId === null ? undefined : boardBySemester.get(student.ojtSemesterId);
+    const placement = semesterBoard?.items.find(item => item.id === student.id);
+    const availability = coordinationAvailability({
+      decision: placement?.decision ?? null,
+      source: placement?.source ?? null,
+      receivedAt: placement?.receivedAt ?? null,
+      hasAssignment: placement?.hasAssignment ?? false,
+      hasConfirmedPlace: placement?.hasConfirmedPlace ?? false,
+      isActive: true,
+      isFreshEligible: semesterBoard !== undefined,
+    }, semesterBoard?.context ?? { roundCount: 0, unfinished: 1, applicationDeadlinePassed: false });
+    return {
+      ...placement,
+      ...student,
+      registrationId: student.registrationId ?? placement?.registrationId ?? null,
+      registrationStatus: student.registrationStatus ?? placement?.registrationStatus ?? 'NOT_REGISTERED',
+      hasAssignment: placement?.hasAssignment ?? false,
+      needsFollowUp: placement?.needsFollowUp ?? false,
+      canCoordinate: availability.canCoordinate,
+      coordinationBlockedReason: student.ojtSemesterId === null
+        ? 'Chưa xác định được kỳ OJT cho sinh viên.'
+        : availability.coordinationBlockedReason,
+    };
+  });
+  const board = params.ojtSemesterId === undefined ? undefined : boardBySemester.get(Number(params.ojtSemesterId));
+  return {
+    ...(board ?? {}),
+    ...roster,
+    items,
+    semesterBoards: boards,
+  };
 }

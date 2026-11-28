@@ -50,12 +50,11 @@ const EducationOjtConditions: React.FC = () => {
     ['Gặp lỗi', statusCounts.ERROR], ['Cần xét lại', statusCounts.STALE], ['Không hoạt động', statusCounts.INACTIVE],
   ] as const;
   const visibleOtherStatuses = otherStatuses.filter(([, count]) => count > 0);
-  const eligibleCount = targets.filter(({ student }) => savedResults[student.id]?.status === 'ELIGIBLE').length;
   return <div className="space-y-4">
     <PageBanner variant="education" title="Xét điều kiện đi OJT" description="Xét sinh viên cần xét từ tín chỉ tích lũy và bảng điểm, không cần chọn năm học hoặc kỳ OJT." badge="Phòng Đào tạo" />
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600"><ShieldCheck size={21} /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quy định hiện hành</p><h2 className="mt-0.5 font-bold text-slate-900">{rule ? `${rule.minCredits} tín chỉ · phiên bản ${rule.version}` : 'Chưa có điều kiện OJT đến ngày áp dụng'}</h2></div></div>
+        <div className="flex min-w-0 items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600"><ShieldCheck size={21} /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quy định hiện hành</p><h2 className="mt-0.5 font-bold text-slate-900">{rule ? `${rule.minCredits} tín chỉ · phiên bản ${rule.version}` : 'Chưa có điều kiện OJT đến ngày áp dụng. Mặc định xét theo mức 70 tín chỉ'}</h2></div></div>
         <Link to="/education/ojt-policy" className="inline-flex min-h-10 items-center rounded-lg border border-orange-200 px-3.5 text-sm font-semibold text-orange-700 transition hover:bg-orange-50">Quản lý điều kiện</Link>
       </div>
       <div className="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
@@ -71,7 +70,6 @@ const EducationOjtConditions: React.FC = () => {
           <CheckCircle2 size={18} />{busy ? 'Đang xét...' : 'Xét toàn bộ'}
         </button>
       </div>
-      {!loading && targets.length > 0 && <p className="text-xs text-slate-500">Hệ thống có thể chưa phát hiện mọi thay đổi cấu hình học vụ; PĐT có thể xét lại sau đối soát khi đã bổ sung dữ liệu.</p>}
       {loading && <p role="status" className="text-sm text-slate-500">Đang tải danh sách sinh viên...</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {failedSources.length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p className="font-medium">Chưa tải được một số dữ liệu. Dữ liệu đã tải thành công vẫn được giữ nguyên{dataLoaded ? '.' : '; hiện chưa thể xét.'}</p><ul className="mt-2 space-y-1">{failedSources.map(([key, issue]) => <li key={key}>• {ojtSourceLabels[key]}: {issue.message}</li>)}</ul><button type="button" disabled={retrying || busy} onClick={() => void retryFailedSources()} className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 font-medium hover:bg-red-100 disabled:opacity-50">{retrying ? 'Đang thử tải lại…' : 'Thử tải lại dữ liệu'}</button></div>}
@@ -79,10 +77,9 @@ const EducationOjtConditions: React.FC = () => {
       {creditFailures.length > 0 && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Chưa tải được tín chỉ học tập của {creditFailures.length} sinh viên từ hồ sơ. <button type="button" disabled={loadingCredits} onClick={retryCreditFailures} className="ml-2 underline disabled:opacity-50">Thử tải lại</button></div>}
       {showNotice && <p role="status" className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">{notice}</p>}
     </section>
-    <div className="space-y-2"><div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{[
+    <div className="space-y-2"><div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">{[
       ['Cần xét', targets.length, 'text-slate-900'], ['Đủ điều kiện', statusCounts.ELIGIBLE, 'text-emerald-700'],
-      ['Chưa đủ điều kiện', statusCounts.NOT_ELIGIBLE, 'text-rose-700'], ['Cần đối soát', statusCounts.REVIEW_REQUIRED, 'text-amber-700'], ['Chưa xét', statusCounts.PENDING, 'text-slate-700'],
-      ['Đủ điều kiện đã lưu', eligibleCount, 'text-teal-700'],
+      ['Chưa đủ điều kiện', statusCounts.NOT_ELIGIBLE, 'text-rose-700'], ['Chưa xét', statusCounts.PENDING, 'text-slate-700'],
     ].map(([label, count, color]) => <div key={label} className="flex min-h-24 flex-col justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><p className="text-xs leading-4 text-slate-500">{label}</p><p className={`mt-1 text-2xl font-bold leading-7 tabular-nums ${color}`}>{loading || !sourceLoaded.students || (label !== 'Cần xét' && !sourceLoaded.results) ? '—' : count}</p></div>)}</div>
       {!loading && visibleOtherStatuses.length > 0 && <p className="text-xs text-slate-600">Trạng thái cần lưu ý: {visibleOtherStatuses.map(([label, count]) => `${label} ${count}`).join(' · ')}.</p>}
     </div>
