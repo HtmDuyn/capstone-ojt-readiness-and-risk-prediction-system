@@ -6,7 +6,7 @@ import { invalid, inputObject, positiveId, requiredText, enumValue } from '../st
 import { requireStudentAdmission } from '../student-portal/admission.service';
 import { assertOjtPathway } from '../academic/workflow-policy';
 import { recordOjt202InProgress } from '../academic/ojt-course-enrollment';
-import { staff, record, refreshSlots } from './catalog.service';
+import { staff, record } from './catalog.service';
 import type { Actor, Row } from '../ojt-registration/window.service';
 import { coordinationAvailability } from './placement.policy';
 import { coordinationSlotsSql,coordinationCompanies } from './placement-slots';
@@ -102,30 +102,6 @@ export async function supplementPlacement(body:unknown,actor:Actor){
   const row=(await c.query(`INSERT INTO "StudentEnterpriseCoordination" ("RegistrationID","OJTSemesterID","EnterpriseID","PositionID","CoordinatedBy","Decision","PreviousCoordinationID","Source","CoordinationReason")
    VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8) RETURNING *`,[r.RegistrationID,semesterId,p.EnterpriseID,positionId,actor.userId,previous?.CoordinationID??null,source,reason])).rows[0];
   await audit(c,actor.userId,'StudentEnterpriseCoordination',row.CoordinationID,'QHDN_SUPPLEMENT',null,row,reason);
-  return row;
- });
-}
-export async function recordActualReceipt(id:number,body:unknown,actor:Actor){
- staff(actor);const b=inputObject(body,['reason']),reason=requiredText(b.reason,'reason',2000);
- return academicTransaction(async c=>{
-  await requirePlacementSchema(c);
-  const co=await record(c,'coordinations',id),r=(await c.query('SELECT * FROM "OJTRegistrations" WHERE "RegistrationID"=$1 FOR UPDATE',[co.RegistrationID])).rows[0];
-  const prior=(await c.query('SELECT * FROM "OJTActualReceipts" WHERE "StudentID"=$1 AND "OJTSemesterID"=$2',[r.StudentID,r.OJTSemesterID])).rows[0];
-  if(prior){if(prior.CoordinationID===id)return {...prior,replayed:true};throw invalid('Sinh viên đã được ghi nhận thực nhận trong kỳ này.',409,'ACTUAL_RECEIPT_EXISTS');}
-  if(co.Decision!=='ACCEPTED')throw invalid('Chỉ ghi nhận thực nhận sau khi doanh nghiệp đồng ý nhận.',409,'ENTERPRISE_ACCEPTANCE_REQUIRED');
-  if((await c.query('SELECT 1 FROM "StudentEnterpriseCoordination" WHERE "RegistrationID"=$1 AND "CoordinationID">$2',[r.RegistrationID,id])).rowCount)throw invalid('Chỉ ghi nhận kết quả điều phối mới nhất.',409);
-  await requireStudentAdmission(c,r.StudentID,r.OJTSemesterID);
-  const p=await record(c,'positions',co.PositionID),company=await record(c,'companies',co.EnterpriseID);
-  if(company.Status!=='ACTIVE'||p.DeletedAt||p.ArchivedAt)throw invalid('Doanh nghiệp hoặc vị trí không còn khả dụng.',409);
-  let assignment=(await c.query(`SELECT a.* FROM "InternshipAssignments" a JOIN "StudentEnterpriseCoordination" old USING("CoordinationID")
-   WHERE a."StudentID"=$1 AND old."OJTSemesterID"=$2 AND COALESCE(upper(a."Status"),'ASSIGNED') NOT IN ('CANCELLED','CANCELED') FOR UPDATE OF a`,[r.StudentID,r.OJTSemesterID])).rows[0];
-  if(assignment&&assignment.CoordinationID!==id)throw invalid('Sinh viên đã có phân công khác trong kỳ này.',409,'ASSIGNMENT_EXISTS');
-  if(!assignment)assignment=(await c.query(`INSERT INTO "InternshipAssignments" ("CoordinationID","StudentID","EnterpriseID","PositionID","StartDate","EndDate","Status")
-   SELECT $1,$2,$3,$4,"StartDate","EndDate",'ASSIGNED' FROM "OJTSemesters" WHERE "OJTSemesterID"=$5 RETURNING *`,[id,r.StudentID,co.EnterpriseID,co.PositionID,r.OJTSemesterID])).rows[0];
-  const count=(await c.query(`SELECT count(*)::int AS n FROM "OJTActualReceipts" receipt JOIN "StudentEnterpriseCoordination" c USING("CoordinationID") WHERE c."PositionID"=$1`,[p.PositionID])).rows[0].n;
-  const row=(await c.query(`INSERT INTO "OJTActualReceipts" ("StudentID","OJTSemesterID","CoordinationID","AssignmentID","ReceivedBy","Reason","OriginalCapacity","ExceededCapacity")
-   VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,[r.StudentID,r.OJTSemesterID,id,assignment.AssignmentID,actor.userId,reason,p.Capacity,count>=Number(p.Capacity??0)])).rows[0];
-  await refreshSlots(c,p.PositionID);await audit(c,actor.userId,'OJTActualReceipts',id,'CONFIRM_ACTUAL_RECEIPT',null,row,reason);
   return row;
  });
 }

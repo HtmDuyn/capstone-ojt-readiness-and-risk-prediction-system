@@ -15,7 +15,7 @@ export function OjtApplicationDialog({ profile, companies, opportunities, initia
   const [positionKey, setPositionKey] = useState(initialPosition ? `${initialPosition.postId}:${initialPosition.id}` : '');
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [email, setEmail] = useState(profile.email);
-  const [coverLetter, setCoverLetter] = useState('');
+  const [coverLetter, setCoverLetter] = useState(() => `Tôi là ${profile.fullName}, sinh viên mã số ${profile.studentCode}. Tôi mong muốn ứng tuyển vị trí ${initialPosition?.title ?? 'thực tập tại Quý Công ty'} để vận dụng kiến thức đã học, tích lũy kinh nghiệm thực tế và đóng góp vào công việc của đội ngũ. Tôi sẵn sàng trao đổi thêm về hồ sơ và thời gian thực tập.`);
   const [certificates, setCertificates] = useState<{name:string;url:string}[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,7 +66,7 @@ export function OjtApplicationDialog({ profile, companies, opportunities, initia
           </div>
           <label className="block space-y-2 text-sm font-medium">
             <span>Thư ứng tuyển <span className="font-normal text-slate-500">(không bắt buộc)</span></span>
-            <textarea rows={5} maxLength={5000} value={coverLetter} onChange={event=>setCoverLetter(event.target.value)} className={inputClass+' resize-y leading-relaxed'} placeholder="Giới thiệu ngắn gọn về bản thân, lý do bạn muốn ứng tuyển và những kỹ năng, kinh nghiệm phù hợp với vị trí." />
+            <textarea rows={5} maxLength={5000} value={coverLetter} onChange={event=>setCoverLetter(event.target.value)} className={inputClass+' resize-y leading-relaxed'} placeholder="Thư ứng tuyển" />
             <span className="flex justify-between gap-3 text-xs font-normal text-slate-500"><span>Nội dung này sẽ được gửi cùng hồ sơ đến doanh nghiệp.</span><span className="shrink-0">{coverLetter.length}/5.000</span></span>
           </label>
           <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
@@ -81,8 +81,8 @@ export function OjtApplicationDialog({ profile, companies, opportunities, initia
             <p className="text-sm font-medium">Chứng chỉ bổ sung <span className="font-normal text-slate-500">(không bắt buộc)</span></p>
             <p className="text-xs text-slate-500">Thêm tên chứng chỉ và đường dẫn xem chứng chỉ, tối đa 5 mục. Hãy cấp quyền xem đường dẫn cho người nhận hồ sơ.</p>
             {certificates.map((item,index)=><div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
-              <label className="space-y-1 text-sm">Tên chứng chỉ<input required maxLength={200} value={item.name} placeholder="Ví dụ: Chứng chỉ tiếng Anh IELTS" className={inputClass} onChange={e=>setCertificates(current=>current.map((row,i)=>i===index?{...row,name:e.target.value}:row))} /></label>
-              <label className="space-y-1 text-sm">Đường dẫn<input required type="url" pattern="https?://.+" maxLength={2000} value={item.url} placeholder="https://drive.google.com/..." className={inputClass} onChange={e=>setCertificates(current=>current.map((row,i)=>i===index?{...row,url:e.target.value}:row))} /></label>
+              <label className="space-y-1 text-sm">Tên chứng chỉ<input required maxLength={200} value={item.name} placeholder="Tên chứng chỉ đã đạt" className={inputClass} onChange={e=>setCertificates(current=>current.map((row,i)=>i===index?{...row,name:e.target.value}:row))} /></label>
+              <label className="space-y-1 text-sm">Đường dẫn<input required type="url" pattern="https?://.+" maxLength={2000} value={item.url} placeholder="Liên kết đến chứng chỉ" className={inputClass} onChange={e=>setCertificates(current=>current.map((row,i)=>i===index?{...row,url:e.target.value}:row))} /></label>
               <button type="button" onClick={()=>setCertificates(current=>current.filter((_,i)=>i!==index))} className="self-end rounded-xl px-3 py-3 text-sm text-red-600" aria-label={`Bỏ chứng chỉ ${index+1}`}>Bỏ</button>
             </div>)}
             <button type="button" disabled={certificates.length>=5} onClick={()=>setCertificates(current=>[...current,{name:'',url:''}])} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium disabled:opacity-50">+ Thêm chứng chỉ</button>

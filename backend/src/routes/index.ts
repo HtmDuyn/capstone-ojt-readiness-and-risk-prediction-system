@@ -1,6 +1,5 @@
 import qhdnRoutes from '../modules/qhdn/qhdn.routes';
 import recruitmentRoutes from '../modules/recruitment/recruitment.routes';
-import jobExtractionRoutes from '../modules/recruitment/job-extraction.routes';
 import enterpriseRoutes from '../modules/enterprise/enterprise.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import resultRoutes from '../modules/ojt-results/result.routes';
@@ -30,7 +29,6 @@ router.use(adminRoutes);
 router.use(academicRoutes);
 router.use(qhdnRoutes);
 router.use('/recruitment', recruitmentRoutes);
-router.use('/recruitment-extractions', jobExtractionRoutes);
 router.use('/enterprise', enterpriseRoutes);
 router.use(resultRoutes);
 router.use(certificateRoutes);

@@ -1,6 +1,5 @@
 import { describeAcademicRest } from './swagger-academic-rest';
 import { describeCvExtraction } from '../modules/student-portal/cv-extraction.openapi';
-import { describeJobExtraction } from '../modules/recruitment/job-extraction.openapi';
 import { describeJobMatching } from '../modules/student-portal/job-matching.openapi';
 import { addStudentTaskOperations, describeStudentTaskResponses } from '../modules/student-portal/task.openapi';
 import { describeOjtEligibilityResults } from '../modules/eligibility/frontend-results.openapi';
@@ -399,7 +398,7 @@ describeListBaseFields(describedSpec);
 describeHandoffWorkflow(describedSpec);
 describeAcademicContracts(describedSpec);
 addStudentTaskOperations(describedSpec);
-export const swaggerSpec = describeOjtCertificates(describeJobMatching(describeJobExtraction(describeCvExtraction(describeStudentTaskResponses(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec))))))))));
+export const swaggerSpec = describeOjtCertificates(describeJobMatching(describeCvExtraction(describeStudentTaskResponses(describeAcademicOperationContracts(describeStudentRest(describeRestOperations(describeAcademicRest(groupSwaggerByRole(describedSpec)))))))));
 
 // Keep retired endpoints out of the published OpenAPI document even when
 // legacy module annotations still describe their historical behavior.

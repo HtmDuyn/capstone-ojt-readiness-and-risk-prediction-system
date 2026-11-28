@@ -2,19 +2,19 @@ import React from 'react';
 import { Plus, FileCheck2, CalendarDays, FileText, ShieldCheck } from 'lucide-react';
 import { displayTaskTime, vietnamTaskMinute } from '@/utils/shared/taskTime';
 import { PageBanner } from '@/components/common/PageBanner';
-import { createOjtCondition, loadOjtConditions, type CurrentOjtRule } from '@/services/educationService';
+import { createOjtCondition, latestEffectiveOjtRule, loadOjtConditions, type CurrentOjtRule } from '@/services/educationService';
 
 export default function EducationOjtPolicy() {
   const [conditions, setConditions] = React.useState<CurrentOjtRule[]>([]);
   const [credits, setCredits] = React.useState('');
   const [document, setDocument] = React.useState('');
-  const [effectiveFrom, setEffectiveFrom] = React.useState('');
+  const [effectiveFrom, setEffectiveFrom] = React.useState(() => vietnamTaskMinute(new Date(Date.now() + 86_400_000)).slice(0, 10));
   const earliestDate = vietnamTaskMinute(new Date(Date.now() + 86_400_000)).slice(0, 10);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
-  const refresh = React.useCallback(async () => { setLoading(true); try { setConditions(await loadOjtConditions()); setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'Không tải được danh sách điều kiện.'); } finally { setLoading(false); } }, []);
+  const refresh = React.useCallback(async () => { setLoading(true); try { const loaded = await loadOjtConditions(); setConditions(loaded); const current = latestEffectiveOjtRule(loaded); if (current) { setCredits(String(current.minCredits)); setDocument(current.issuingDocument); } setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'Không tải được danh sách điều kiện.'); } finally { setLoading(false); } }, []);
   React.useEffect(() => { void refresh(); }, [refresh]);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;
@@ -26,7 +26,7 @@ export default function EducationOjtPolicy() {
       return;
     }
     setBusy(true); setError(''); setNotice('');
-    try { const created = await createOjtCondition(minCredits, document.trim(), effectiveFrom); setConditions(previous => [created, ...previous]); setCredits(''); setDocument(''); setEffectiveFrom(''); setNotice(`Đã thêm điều kiện phiên bản ${created.version}. Nhật ký thao tác đã được lưu.`); }
+    try { const created = await createOjtCondition(minCredits, document.trim(), effectiveFrom); setConditions(previous => [created, ...previous]); setCredits(String(created.minCredits)); setDocument(created.issuingDocument); setEffectiveFrom(vietnamTaskMinute(new Date(Date.now() + 86_400_000)).slice(0, 10)); setNotice(`Đã thêm điều kiện phiên bản ${created.version}. Nhật ký thao tác đã được lưu.`); }
     catch (e) { setError(e instanceof Error ? e.message : 'Không thêm được điều kiện xét OJT.'); }
     finally { setBusy(false); }
   }
@@ -40,7 +40,7 @@ export default function EducationOjtPolicy() {
       <form onSubmit={submit} className="grid gap-x-6 gap-y-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         <div className="grid content-start gap-5">
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">Ngưỡng tín chỉ
-            <div className="relative"><input type="number" min="0" max="9999.99" step="0.01" required value={credits} onChange={event => setCredits(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-20 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Ví dụ: 70"/><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-normal text-slate-400">tín chỉ</span></div>
+            <div className="relative"><input type="number" min="0" max="9999.99" step="0.01" required value={credits} onChange={event => setCredits(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-20 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Ngưỡng tín chỉ theo quy chế hiện hành"/><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-normal text-slate-400">tín chỉ</span></div>
           </label>
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700"><span className="inline-flex items-center gap-2"><CalendarDays size={15} className="text-slate-400"/>Ngày bắt đầu áp dụng</span>
             <input type="date" required min={earliestDate} value={effectiveFrom} onChange={event => setEffectiveFrom(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100" />
@@ -48,7 +48,7 @@ export default function EducationOjtPolicy() {
           </label>
         </div>
         <label className="grid content-start gap-1.5 text-sm font-semibold text-slate-700"><span className="inline-flex items-center gap-2"><FileText size={15} className="text-slate-400"/>Văn bản ban hành</span>
-          <textarea required maxLength={10000} rows={6} value={document} onChange={event => setDocument(event.target.value)} className="min-h-36 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal leading-6 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Nhập số hiệu, nội dung hoặc trích yếu văn bản ban hành" />
+          <textarea required maxLength={10000} rows={6} value={document} onChange={event => setDocument(event.target.value)} className="min-h-36 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal leading-6 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100" placeholder="Văn bản hiện hành về điều kiện thực tập OJT" />
           <span className="text-xs font-normal text-slate-500">Có thể nhập số hiệu và trích yếu để tiện tra cứu.</span>
         </label>
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between lg:col-span-2">

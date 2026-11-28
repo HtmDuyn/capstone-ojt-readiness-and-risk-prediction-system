@@ -311,7 +311,7 @@ export default function QhdnOjtCoordination() {
             <Field label={'Doanh nghiệp và vị trí · ' + (task.students[0].semesterName ?? 'Kỳ OJT')}><select name="positionId" className={workflowInput} required defaultValue=""><option value="" disabled>Chọn doanh nghiệp / vị trí</option>{taskBoard?.positions.map(position => <option key={position.id} value={position.id}>{position.companyName} — {position.title} · Chỉ tiêu {position.capacity ?? 0}, thực nhận {position.actualCount}</option>)}</select></Field>
           </>}
         </>
-        <Field label="Lý do điều phối"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>
+        <Field label="Lý do điều phối"><textarea name="reason" defaultValue="Điều phối sinh viên theo nguyện vọng đăng ký và vị trí phù hợp với chuyên ngành đào tạo." className={workflowInput} required maxLength={2000} rows={3} /></Field>
         </fieldset>
         <div className="flex justify-end gap-3"><button type="button" className={workflowSecondary} disabled={busy} onClick={() => setTask(null)}>Đóng</button><button className={workflowPrimary} disabled={busy}>{busy ? `Đang điều phối ${completed}/${task.students.length}…` : `Xác nhận điều phối (${task.students.length})`}</button></div>
       </form>

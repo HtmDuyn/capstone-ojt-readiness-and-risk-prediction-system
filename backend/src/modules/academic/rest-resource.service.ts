@@ -5,8 +5,6 @@ import { enrichListRows } from '../../shared/list-context';
 import { saveRule,publishRule } from '../eligibility/eligibility.service';
 import { notifyAlerts } from '../academic-reporting/notification.service';
 import { createAdvisoryRun,advisoryRuns } from '../student-portal/advisory.service';
-import { semesterStudents,handoffHistory } from '../ojt-registration/handoff.service';
-import { list as ojtResults } from '../ojt-results/result.service';
 import type { Actor,Row } from '../student-portal/shared';
 
 const assessment=(r:Row)=>({...r,id:r.OJTSemesterID,ojtSemesterId:r.OJTSemesterID,blockPeriodId:r.BlockPeriodID,
@@ -67,17 +65,6 @@ export async function semesters(params:Row,id?:number){
     return {items:await enrichListRows(c,rows),total,page:p.page,limit:p.limit};
   });
   return id?data.items[0]:data;
-}
-export async function semesterDossier(id:number,params:Row,actor:Actor){
-  pagination(params,[]);
-  const data=await semesters({},id);
-  const gradeMappings=await academicTransaction(async c=>{
-    const rows=(await c.query(`SELECT m.*,m."ProgramID" AS "programId",m."OJTSemesterID" AS "ojtSemesterId",
-      m."CourseID" AS "courseId",m."AcademicPeriodID" AS "academicPeriodId",m."ConfirmedBy" AS "confirmedBy"
-      FROM "ProgramOJTGradeMappings" m WHERE m."OJTSemesterID"=$1 ORDER BY m."ProgramID"`,[id])).rows;
-    return enrichListRows(c,rows);
-  });
-  return {...data,gradeMappings,students:await semesterStudents(id,params,actor),handoffs:await handoffHistory(id,params),results:await ojtResults(params,id)};
 }
 export async function createNotification(body:unknown,actor:Actor){
   if(!body||typeof body!=='object'||Array.isArray(body))throw invalid('Provide a JSON object.');

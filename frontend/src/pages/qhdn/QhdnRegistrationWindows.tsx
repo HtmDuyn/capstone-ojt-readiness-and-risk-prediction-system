@@ -109,7 +109,7 @@ export default function QhdnRegistrationWindows() {
         {task.kind==='toggle'&&task.window.status!=='OPEN'&&<RecruitmentSemesterNotice semesterName={semester.selectedPeriod?.name} />}
         {task.kind === 'extend' ? <Field label={'Hạn mới (sau ' + localDate(task.window.endsAt) + ')'}><input name="endsAt" type="datetime-local" className={workflowInput} required /></Field> :
           <Notice>{task.window.status === 'OPEN' ? 'Sinh viên sẽ ngừng nộp hồ sơ trong đợt này.' : 'Đợt cần còn hạn và có sinh viên đủ điều kiện trong phạm vi.'}</Notice>}
-        <Field label="Lý do"><textarea name="reason" className={workflowInput} required maxLength={2000} rows={3} /></Field>
+        <Field label="Lý do"><textarea name="reason" defaultValue={task.kind === 'extend' ? 'Điều chỉnh thời hạn để sinh viên có thêm thời gian hoàn thiện và nộp hồ sơ.' : task.window.status === 'OPEN' ? 'Tạm dừng tiếp nhận hồ sơ theo kế hoạch tuyển dụng của học kỳ.' : 'Mở lại đợt đăng ký theo kế hoạch tiếp nhận của học kỳ.'} className={workflowInput} required maxLength={2000} rows={3} /></Field>
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
           <button type="button" className={workflowSecondary} disabled={busy} onClick={() => setTask(null)}>Hủy</button>
           <button className={workflowPrimary} disabled={busy || !semester.semesterId || (task.kind === 'toggle' && cannotOpen(task.window))}><CheckCircle2 size={16} />{busy ? 'Đang xử lý…' : 'Xác nhận'}</button>
