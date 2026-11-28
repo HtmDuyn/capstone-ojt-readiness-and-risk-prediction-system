@@ -2,7 +2,6 @@ services:
   - type: cron
     name: ojt-assess-due
     runtime: node
-    rootDir: backend
     # Midnight in Vietnam (UTC+7).
     schedule: "0 17 * * *"
     buildCommand: npm ci --include=dev && npm run build

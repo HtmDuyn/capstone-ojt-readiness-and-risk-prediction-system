@@ -22,7 +22,6 @@ function NotificationsContent() {
   const [page, setPage] = useState(1);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<StudentNotification | null>(null);
   const [readIds, setReadIds] = useState(() => new Set<number>());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +31,6 @@ function NotificationsContent() {
     getStudentNotifications(page, signal, onlyUnread ? true : undefined),
   );
   useEffect(() => {
-    setSelected(null);
     setReadIds(new Set());
   }, [key]);
   useEffect(() => {
@@ -53,9 +51,6 @@ function NotificationsContent() {
         const response = await markStudentNotificationRead(String(item.id));
         setReadIds(previous => new Set(previous).add(item.id));
         setUnreadCount(response.data.unreadCount);
-        setSelected((previous) =>
-          previous?.id === item.id ? { ...previous, isRead: true } : previous,
-        );
       }
       resource.reload();
     } catch (err) {
@@ -136,14 +131,13 @@ function NotificationsContent() {
             type="button"
             className="text-left flex-1 space-y-2"
             onClick={() => {
-              setSelected(item);
               if (!isRead(item)) void markRead([item]);
             }}
           >
             <h3 className={isRead(item) ? 'font-medium' : 'font-bold'}>
               {item.title}
             </h3>
-            <p className="line-clamp-2 text-sm text-slate-600">
+            <p className="whitespace-pre-wrap break-words text-sm text-slate-600">
               {item.content}
             </p>
             <p className="text-xs text-slate-500">{dateText(item.sentAt)}</p>
@@ -168,34 +162,6 @@ function NotificationsContent() {
           onChange={setPage}
           disabled={saving}
         />
-      )}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label="Chi tiết thông báo"
-            className="w-full max-w-xl rounded-3xl bg-white p-6 space-y-4 max-h-[85vh] overflow-y-auto"
-          >
-            <h2 className="text-xl font-bold">{selected.title}</h2>
-            <p className="text-xs text-slate-500">
-              {dateText(selected.sentAt)}
-            </p>
-            <p className="text-sm whitespace-pre-wrap">{selected.content}</p>
-            {error && (
-              <p role="alert" className="text-red-700">
-                {error}
-              </p>
-            )}
-            <button
-              type="button"
-              className={buttonClass}
-              onClick={() => setSelected(null)}
-            >
-              Đóng
-            </button>
-          </section>
-        </div>
       )}
     </Card>
   );

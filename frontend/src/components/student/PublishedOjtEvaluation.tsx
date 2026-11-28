@@ -26,8 +26,7 @@ export function PublishedOjtEvaluation({ result }: { result: OjtResult }) {
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500"><Building2 size={20} aria-hidden="true"/></span>
         <div className="min-w-0">
           <h3 className="break-words text-base font-semibold text-slate-900">{result.enterpriseName}</h3>
-          <p className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs leading-relaxed text-slate-500"><span className="font-medium text-slate-600">{result.semesterCode}</span><span aria-hidden="true">·</span><span>QHDN công bố: {dateText(result.publishedAt)}</span></p>
-          <p className="mt-1 text-xs text-slate-500">Mã hồ sơ: #{result.id}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">QHDN công bố: {dateText(result.publishedAt)}</p>
         </div>
       </div>
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"><CheckCircle2 size={13} aria-hidden="true"/>Đã công bố</span>
