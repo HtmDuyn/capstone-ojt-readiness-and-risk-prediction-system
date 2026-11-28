@@ -29,6 +29,7 @@ import { EnterpriseIntern, InternTask } from '@/types/enterprise/enterpriseTypes
 import { loadAllPages } from '@/utils/enterprise/recruitment';
 import { friendlyErrorMessage } from '@/utils/shared/friendlyError';
 import { useEnterprise } from '@/contexts/EnterpriseContext';
+import { EnterpriseTaskSubmissionDetails } from '@/components/enterprise/EnterpriseTaskSubmissionDetails';
 
 // Adapter: map API data to existing UI's expected format
 const mapApiToIntern = (item: EnterpriseInternshipItem, total: number, completed: number): EnterpriseIntern => ({
@@ -1426,6 +1427,7 @@ export const EnterpriseInterns: React.FC = () => {
                           </div>
                           {task.createdAt && <span>Ngày giao: {displayTaskTime(task.createdAt)}</span>}
                         </div>
+                        <EnterpriseTaskSubmissionDetails taskId={Number(task.id)} />
                       </div>
                     ))}
                   </div>
