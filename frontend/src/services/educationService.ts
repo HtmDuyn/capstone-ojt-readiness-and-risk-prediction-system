@@ -749,16 +749,17 @@ export const educationOverviewService = {
         id: number;
         accountStatus: string;
         cohortId: number | null;
+        program?: { majorId?: number | null } | null;
         currentAcademicPeriodId?: number | null;
         cohort?: { id: number; name: string; code: string } | null;
         calculatedEligibility?: SavedOjtEligibility | null;
       };
       const students = (await getAllItems<OverviewStudent>('/students', {
-        status: 'ACTIVE', ...(scope.cohortId ? { cohortId: scope.cohortId } : {}),
+        status: 'ACTIVE', ...(scope.majorId ? { majorId: scope.majorId } : {}),
       }, signal)).filter(student => student.accountStatus === 'ACTIVE');
-      const scopedStudents = scope.academicPeriodId
-        ? students.filter(student => String(student.currentAcademicPeriodId) === String(scope.academicPeriodId))
-        : students;
+      const scopedStudents = students.filter(student =>
+        (!scope.academicPeriodId || String(student.currentAcademicPeriodId) === String(scope.academicPeriodId))
+        && (!scope.majorId || String(student.program?.majorId) === String(scope.majorId)));
       signal?.throwIfAborted();
       const rows = scopedStudents.map(student => {
         const saved = student.calculatedEligibility;

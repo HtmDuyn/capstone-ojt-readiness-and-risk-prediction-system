@@ -202,8 +202,8 @@ export const EnterpriseInterns: React.FC = () => {
     deadline: string;
     assignedBy: string;
   }>({
-    title: '',
-    description: '',
+    title: 'Xây dựng API quản lý lịch thực tập',
+    description: 'Thiết kế và triển khai các API tạo, cập nhật, xem lịch thực tập. Kiểm tra dữ liệu đầu vào, xử lý lỗi phù hợp và viết unit test cho các luồng chính. Hoàn tất bằng cách gửi pull request kèm hướng dẫn chạy và kết quả kiểm thử.',
     deadline: '',
     assignedBy: 'Nguyễn Anh Tuấn (Tech Lead)',
   });
@@ -545,8 +545,8 @@ export const EnterpriseInterns: React.FC = () => {
     // Close and reset
     setShowAddTaskModal(false);
     setNewTask({
-      title: '',
-      description: '',
+      title: 'Xây dựng API quản lý lịch thực tập',
+      description: 'Thiết kế và triển khai các API tạo, cập nhật, xem lịch thực tập. Kiểm tra dữ liệu đầu vào, xử lý lỗi phù hợp và viết unit test cho các luồng chính. Hoàn tất bằng cách gửi pull request kèm hướng dẫn chạy và kết quả kiểm thử.',
       deadline: '',
       assignedBy: 'Nguyễn Anh Tuấn (Tech Lead)',
     });
@@ -970,7 +970,7 @@ export const EnterpriseInterns: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Ví dụ: Xây dựng Module Xử lý Thanh toán VNPAY / Viết Unit Test Auth Context"
+                    placeholder="Tên nhiệm vụ cần hoàn thành"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-slate-400"
                     value={newTask.title}
                     onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
@@ -984,7 +984,7 @@ export const EnterpriseInterns: React.FC = () => {
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Mô tả các yêu cầu kỹ thuật, tài liệu tham khảo, tiêu chuẩn nghiệm thu và kết quả đầu ra..."
+                    placeholder="Mô tả yêu cầu và kết quả cần bàn giao"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-slate-400"
                     value={newTask.description}
                     onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}

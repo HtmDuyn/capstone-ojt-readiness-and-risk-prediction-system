@@ -2,7 +2,6 @@ import { EmptyState, ErrorNotice, MetricCard, SectionTitle } from '@/components/
 import { CohortResultsChart } from '@/components/education/CohortResultsChart';
 import { OjtResultDonut } from '@/components/education/OjtResultDonut';
 import { PageBanner } from '@/components/common/PageBanner';
-import { courseDemandOverview } from '@/utils/education/courseDemandOverview';
 import { useEducationDashboard } from '@/hooks/education/useEducationDashboard';
 import { useNearViewport } from '@/hooks/shared/useNearViewport';
 import { formatDate, formatNumber, formatPercent } from '@/utils/education/educationDashboard';
@@ -13,14 +12,13 @@ import { Link } from 'react-router-dom';
 export const EducationDashboard: React.FC = () => {
   const { ref: demandSection, reached: loadCourseDemand } = useNearViewport<HTMLElement>();
 
-  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, filtersError, dashboardError, courseDemandError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, assessedStudents, periodStatistics, courseDemands, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
+  const { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, majors, selectedMajor, setSelectedMajor, exporting, exportError, filtersLoading, dashboardLoading, supportProposalLoading, supportProposalError, supportProposalData, supportPeriod, dashboardWarning, filtersError, dashboardError, filteredPeriods, totalStudents, eligibleStudents, ineligibleStudents, assessedStudents, periodStatistics, handleYearChange, handleExport } = useEducationDashboard(loadCourseDemand);
   const cohortResults = periodStatistics.filter(period => period.label !== 'Chưa phân khóa' && period.eligible + period.ineligible > 0);
   const ojtGroups = [
     { label: 'Đủ điều kiện', count: eligibleStudents ?? 0, color: '#22c55e', dotClass: 'bg-green-500' },
     { label: 'Chưa đủ điều kiện', count: ineligibleStudents ?? 0, color: '#f87171', dotClass: 'bg-red-400' },
   ];
-  const demandOverview = courseDemandOverview(courseDemands);
-  const hasCourseDemandScope = Boolean(selectedPeriod && selectedOjtSemesterId);
+  const supportItems = supportProposalData?.items ?? [];
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6">
       <PageBanner
@@ -108,21 +106,21 @@ export const EducationDashboard: React.FC = () => {
 
             <div>
               <label
-                htmlFor="dashboard-cohort"
+                htmlFor="dashboard-major"
                 className="mb-2 block text-xs font-semibold text-slate-600"
               >
-                Khóa
+                Chuyên ngành
               </label>
 
               <select
-                id="dashboard-cohort"
-                value={selectedCohort}
-                onChange={event => setSelectedCohort(event.target.value)}
+                id="dashboard-major"
+                value={selectedMajor}
+                onChange={event => setSelectedMajor(event.target.value)}
                 disabled={filtersLoading}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
               >
-                <option value="">Tất cả khóa</option>
-                {cohorts.map(cohort => <option key={cohort.id} value={cohort.id}>{cohort.cohortCode || cohort.name}</option>)}
+                <option value="">Tất cả chuyên ngành</option>
+                {majors.map(major => <option key={major.id} value={major.id}>{major.name}</option>)}
               </select>
             </div>
           </div>
@@ -282,13 +280,13 @@ export const EducationDashboard: React.FC = () => {
 
           <div className="grid gap-3 sm:grid-cols-3">
             {([
-              ['Học phần có nhu cầu', hasCourseDemandScope ? demandOverview.courseCount : null, 'Học phần duy nhất từ nhu cầu học, không riêng học lại'],
-              ['Lượt nhu cầu học', hasCourseDemandScope ? demandOverview.demandCount : null, 'Cặp sinh viên – học phần duy nhất trong phạm vi đang xem'],
-              ['Lớp hỗ trợ đề xuất', null, 'Cần chọn kỳ học/Block 3 tại trang nhu cầu lớp hỗ trợ'],
+              ['Môn cần hỗ trợ', supportProposalData?.summary.courseCount ?? null, supportPeriod ? `Nhu cầu cho ${supportPeriod.code}` : 'Chưa có học kỳ sắp tới trong năm học đang chọn'],
+              ['Lượt sinh viên có nhu cầu', supportProposalData?.summary.demandStudentCount ?? null, 'Tổng lượt theo môn; một sinh viên có thể có nhiều môn'],
+              ['Lớp hỗ trợ đề xuất', supportProposalData?.summary.proposedClassCount ?? null, '1 lớp đến 35 sinh viên; trên 35 đề xuất 2 lớp'],
             ] as const).map(([label, value, description], index) => <div key={label} className="flex min-h-32 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <span className={`mb-3 h-1 w-10 rounded-full ${['bg-orange-400', 'bg-blue-400', 'bg-emerald-400'][index]}`} aria-hidden="true" />
               <p className="text-sm font-semibold text-slate-700">{label}</p>
-              <p className="mt-2 text-3xl font-extrabold leading-none text-slate-900">{courseDemandLoading ? 'Đang tải…' : formatNumber(courseDemandError ? null : value)}</p>
+              <p className="mt-2 text-3xl font-extrabold leading-none text-slate-900">{supportProposalLoading ? 'Đang tải…' : formatNumber(supportProposalError ? null : value)}</p>
               <p className="mt-auto pt-2 text-xs leading-5 text-slate-500">{description}</p>
             </div>)}
           </div>
@@ -296,46 +294,43 @@ export const EducationDashboard: React.FC = () => {
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="text-base font-bold text-slate-800">Top 5 học phần có nhu cầu cao nhất</h3>
 
-              {courseDemandError && (
+              {supportProposalError && (
                 <div className="mt-4">
-                  <ErrorNotice message={courseDemandError} />
+                  <ErrorNotice message={supportProposalError} />
                 </div>
               )}
 
-              {courseDemands.length === 0 ? (
+              {supportItems.length === 0 ? (
                 <EmptyState
-                  loading={courseDemandLoading}
-                  title={hasCourseDemandScope ? 'Chưa có thống kê nhu cầu học phần' : 'Chọn kỳ học để xem nhu cầu học phần'}
-                  description={hasCourseDemandScope
-                    ? 'Chưa có dữ liệu học phần phù hợp để hiển thị.'
-                    : selectedPeriod
-                      ? 'Kỳ học đã chọn chưa được liên kết với kỳ OJT. Hãy chọn kỳ học có kỳ OJT tương ứng.'
-                      : 'Báo cáo nhu cầu cần một kỳ học cụ thể. Chọn kỳ ở bộ lọc phía trên để tải dữ liệu.'}
+                  loading={supportProposalLoading}
+                  title={supportPeriod ? 'Chưa có môn cần hỗ trợ' : 'Chưa có học kỳ sắp tới'}
+                  description={supportPeriod
+                    ? 'Chưa có sinh viên rớt môn cần học lại hoặc còn môn kỳ 5 chưa học trong phạm vi này.'
+                    : 'Chọn năm học có học kỳ dự kiến để xem nhu cầu lớp hỗ trợ.'}
                 />
               ) : (
                 <div className="mt-3 max-w-full overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[850px] table-fixed text-left text-sm">
+                  <table className="w-full min-w-[760px] table-fixed text-left text-sm">
                     <thead className="bg-slate-100 text-xs font-semibold text-slate-700"><tr>
                       <th scope="col" className="w-14 px-3 py-2 text-center">STT</th>
-                      <th scope="col" className="w-28 px-3 py-2">Mã môn học</th>
-                      <th scope="col" className="w-[34%] px-3 py-2">Tên môn học</th>
-                      <th scope="col" className="w-36 px-3 py-2">Kỳ học</th>
-                      <th scope="col" className="w-36 px-3 py-2">Kỳ OJT</th>
-                      <th scope="col" className="w-28 px-3 py-2 text-right">Số sinh viên</th>
+                      <th scope="col" className="w-32 px-3 py-2">Mã môn</th>
+                      <th scope="col" className="px-3 py-2">Tên môn</th>
+                      <th scope="col" className="w-40 px-3 py-2 text-center">SV có nhu cầu</th>
+                      <th scope="col" className="w-36 px-3 py-2 text-center">Lớp đề xuất</th>
                     </tr></thead>
                     <tbody className="divide-y divide-slate-200">
-                      {demandOverview.top.map((course, index) => <tr key={course.id} className="align-top transition-colors hover:bg-orange-50/60">
+                      {supportItems.slice(0, 5).map((course, index) => <tr key={course.courseId} className="align-top transition-colors hover:bg-orange-50/60">
                         <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
-                        <td className="px-3 py-2 font-bold text-slate-800">{course.code}</td>
-                        <td className="break-words px-3 py-2 text-slate-700" title={course.name}>{course.name}</td>
-                        <td className="break-words px-3 py-2 text-slate-600">{course.periodName ?? '—'}</td>
-                        <td className="break-words px-3 py-2 text-slate-600">{course.ojtSemesterName ?? '—'}</td>
-                        <td className="px-3 py-2 text-right font-bold tabular-nums text-orange-600">{formatNumber(course.count)}</td>
+                        <td className="px-3 py-2 font-bold text-slate-800">{course.courseCode}</td>
+                        <td className="break-words px-3 py-2 text-slate-700" title={course.courseName}>{course.courseName}</td>
+                        <td className="px-3 py-2 text-center font-bold tabular-nums text-orange-600">{formatNumber(course.demandStudentCount)}</td>
+                        <td className="px-3 py-2 text-center font-bold tabular-nums text-blue-700">{course.proposedClassCount}</td>
                       </tr>)}
                     </tbody>
                   </table>
                 </div>
               )}
+              {supportPeriod && <p className="mt-3 text-xs text-slate-500">Kỳ đề xuất: <strong>{supportPeriod.code}</strong> · {supportProposalData?.computedAt ? `Cập nhật ${formatDate(supportProposalData.computedAt)}` : ''}</p>}
           </div>
         </section>
 

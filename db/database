@@ -103,6 +103,8 @@ DECLARE table_name text;
     'RecruitmentPostPositions',
     'RecruitmentPosts',
     'RecruitmentWindows',
+    'RetakeClassProposalSnapshotCourses',
+    'RetakeClassProposalSnapshots',
     'Roles',
     'SchemaMigrations',
     'Specializations',
@@ -1497,6 +1499,105 @@ CREATE TABLE public."Users" (
   CONSTRAINT "Users_Username_key" UNIQUE ("Username"),
   CONSTRAINT "Users_pkey" PRIMARY KEY ("UserID")
 );
+CREATE TABLE public."RetakeClassProposalSnapshots" (
+  "SnapshotID" bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  "AcademicPeriodID" integer NOT NULL,
+  "SpecializationID" integer,
+  "Status" character varying(10) DEFAULT 'CURRENT'::character varying NOT NULL,
+  "SourceFingerprint" character varying(128) NOT NULL,
+  "ExcludedStudentCount" integer DEFAULT 0 NOT NULL,
+  "UnresolvedAlternativeStudentCount" integer DEFAULT 0 NOT NULL,
+  "ComputedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  "InvalidatedAt" timestamp with time zone,
+  CONSTRAINT "RetakeClassProposalSnapshots_pkey" PRIMARY KEY ("SnapshotID"),
+  CONSTRAINT "RetakeClassProposalSnapshots_Status_check" CHECK ("Status" IN ('CURRENT', 'STALE')),
+  CONSTRAINT "RetakeClassProposalSnapshots_Counts_check" CHECK ("ExcludedStudentCount" >= 0 AND "UnresolvedAlternativeStudentCount" >= 0),
+  CONSTRAINT "RetakeClassProposalSnapshots_Validity_check" CHECK ((("Status" = 'CURRENT' AND "InvalidatedAt" IS NULL) OR ("Status" = 'STALE' AND "InvalidatedAt" IS NOT NULL))),
+  CONSTRAINT "RetakeClassProposalSnapshots_Period_fkey" FOREIGN KEY ("AcademicPeriodID") REFERENCES public."AcademicPeriods"("AcademicPeriodID") ON DELETE RESTRICT,
+  CONSTRAINT "RetakeClassProposalSnapshots_Major_fkey" FOREIGN KEY ("SpecializationID") REFERENCES public."Specializations"("SpecializationID") ON DELETE RESTRICT
+);
+CREATE TABLE public."RetakeClassProposalSnapshotCourses" (
+  "SnapshotCourseID" bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  "SnapshotID" bigint NOT NULL,
+  "CourseID" integer NOT NULL,
+  "DemandStudentCount" integer NOT NULL,
+  "ProposedClassCount" smallint NOT NULL,
+  CONSTRAINT "RetakeClassProposalSnapshotCourses_pkey" PRIMARY KEY ("SnapshotCourseID"),
+  CONSTRAINT "RetakeClassProposalSnapshotCourses_Counts_check" CHECK (("DemandStudentCount" > 0 AND "ProposedClassCount" = CASE WHEN "DemandStudentCount" <= 35 THEN 1 ELSE 2 END)),
+  CONSTRAINT "RetakeClassProposalSnapshotCourses_SnapshotCourse_key" UNIQUE ("SnapshotID", "CourseID"),
+  CONSTRAINT "RetakeClassProposalSnapshotCourses_Snapshot_fkey" FOREIGN KEY ("SnapshotID") REFERENCES public."RetakeClassProposalSnapshots"("SnapshotID") ON DELETE CASCADE,
+  CONSTRAINT "RetakeClassProposalSnapshotCourses_Course_fkey" FOREIGN KEY ("CourseID") REFERENCES public."Courses"("CourseID") ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX "UQ_RetakeClassProposalSnapshots_CurrentScope"
+  ON public."RetakeClassProposalSnapshots" USING btree ("AcademicPeriodID", COALESCE("SpecializationID", 0))
+  WHERE ("Status" = 'CURRENT'::character varying);
+CREATE INDEX "IX_RetakeClassProposalSnapshots_ScopeHistory"
+  ON public."RetakeClassProposalSnapshots" USING btree ("AcademicPeriodID", "SpecializationID", "ComputedAt" DESC);
+CREATE INDEX "IX_RetakeClassProposalSnapshotCourses_Course"
+  ON public."RetakeClassProposalSnapshotCourses" USING btree ("CourseID", "SnapshotID");
+COMMENT ON TABLE public."RetakeClassProposalSnapshots" IS 'Cached proposal calculation for an academic period and optional specialization; academic changes mark the current snapshot STALE.';
+COMMENT ON TABLE public."RetakeClassProposalSnapshotCourses" IS 'Per-course student demand and proposed class count captured by a proposal snapshot.';
+CREATE OR REPLACE FUNCTION public.invalidate_retake_class_proposal_snapshots() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext('retake-class-proposal-snapshots'));
+  UPDATE public."RetakeClassProposalSnapshots"
+    SET "Status"='STALE',"InvalidatedAt"=CURRENT_TIMESTAMP
+    WHERE "Status"='CURRENT';
+  RETURN NULL;
+END;
+$$;
+CREATE TRIGGER "TR_RetakeProposalInvalidate_StudentCourseResults"
+  AFTER INSERT OR UPDATE OR DELETE ON public."StudentCourseResults"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ProgramCourses"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ProgramCourses"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ProgramCourseEquivalences"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ProgramCourseEquivalences"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_StudentAcademicPlacements"
+  AFTER INSERT OR UPDATE OR DELETE ON public."StudentAcademicPlacements"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_Students"
+  AFTER INSERT OR UPDATE OR DELETE ON public."Students"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_TrainingPrograms"
+  AFTER INSERT OR UPDATE OR DELETE ON public."TrainingPrograms"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ProgramCombos"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ProgramCombos"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ComboCourses"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ComboCourses"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ComboCourseChoiceGroups"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ComboCourseChoiceGroups"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ComboCourseChoiceMembers"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ComboCourseChoiceMembers"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_StudentComboSelections"
+  AFTER INSERT OR UPDATE OR DELETE ON public."StudentComboSelections"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_StudentComboCourseSelections"
+  AFTER INSERT OR UPDATE OR DELETE ON public."StudentComboCourseSelections"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_ProgramSlotOptions"
+  AFTER INSERT OR UPDATE OR DELETE ON public."ProgramSlotOptions"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_AcademicGradingPolicies"
+  AFTER INSERT OR UPDATE OR DELETE ON public."AcademicGradingPolicies"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_Courses"
+  AFTER INSERT OR UPDATE OR DELETE ON public."Courses"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_AcademicPeriods"
+  AFTER INSERT OR UPDATE OR DELETE ON public."AcademicPeriods"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
+CREATE TRIGGER "TR_RetakeProposalInvalidate_Users"
+  AFTER INSERT OR UPDATE OR DELETE ON public."Users"
+  FOR EACH STATEMENT EXECUTE FUNCTION public.invalidate_retake_class_proposal_snapshots();
 ALTER SEQUENCE public."EligibilityCheckRuns_RunID_seq" OWNED BY public."EligibilityCheckRuns"."RunID";
 ALTER SEQUENCE public."EligibilityChecks_CheckID_seq" OWNED BY public."EligibilityChecks"."CheckID";
 ALTER SEQUENCE public."OJTRuleSets_RuleSetID_seq" OWNED BY public."OJTRuleSets"."RuleSetID";
@@ -8650,6 +8751,80 @@ WHERE NOT EXISTS (SELECT 1 FROM public."Notifications" existing
   WHERE existing."UserID"=student_user."UserID" AND existing."RelatedEntityType"='OJT_RESULT_PUBLISHED'
     AND existing."RelatedEntityID"=evaluation."EvaluationID");
 
+-- Fall 2026 TechViet placements: IS191621 has a submitted enterprise evaluation;
+-- IS201703 has only been assigned a task and is still waiting for evaluation.
+INSERT INTO public."InternshipAssignments"
+  ("CoordinationID","StudentID","EnterpriseID","PositionID","EnterpriseSupervisorName","StartDate","EndDate","Status","AcademicSupervisorID")
+SELECT co."CoordinationID",student."StudentID",co."EnterpriseID",co."PositionID",'TechViet HR',term."StartDate",term."EndDate",'ACTIVE',academic."UserID"
+FROM public."Students" student
+JOIN public."OJTRegistrations" registration ON registration."StudentID"=student."StudentID" AND registration."OJTSemesterID"=15
+JOIN public."StudentEnterpriseCoordination" co ON co."RegistrationID"=registration."RegistrationID" AND co."Decision"='ACCEPTED'
+JOIN public."OJTSemesters" term ON term."OJTSemesterID"=co."OJTSemesterID"
+CROSS JOIN public."Users" academic
+WHERE student."StudentCode" IN ('IS191621','IS201703') AND academic."Username"='academic01'
+  AND NOT EXISTS (SELECT 1 FROM public."InternshipAssignments" existing WHERE existing."CoordinationID"=co."CoordinationID");
+
+INSERT INTO public."InternshipTasks"
+  ("AssignmentID","TaskName","Description","AssignedDate","DueDate","Status","AssignedAt","DueAt")
+SELECT assignment."AssignmentID",'Hoàn thiện chức năng và báo cáo OJT',
+  'Hoàn thiện phần việc được giao, kiểm tra kết quả và nộp báo cáo tổng kết cho doanh nghiệp.',
+  CASE WHEN student."StudentCode"='IS201703' THEN DATE '2026-11-28' ELSE DATE '2026-11-01' END,
+  CASE WHEN student."StudentCode"='IS201703' THEN DATE '2026-12-15' ELSE DATE '2026-11-20' END,
+  CASE WHEN student."StudentCode"='IS201703' THEN 'TODO' ELSE 'DONE' END,
+  CASE WHEN student."StudentCode"='IS201703' THEN TIMESTAMP '2026-11-28 09:00:00' ELSE TIMESTAMP '2026-11-01 09:00:00' END,
+  CASE WHEN student."StudentCode"='IS201703' THEN TIMESTAMP '2026-12-15 17:00:00' ELSE TIMESTAMP '2026-11-20 17:00:00' END
+FROM public."InternshipAssignments" assignment
+JOIN public."Students" student ON student."StudentID"=assignment."StudentID"
+JOIN public."StudentEnterpriseCoordination" co ON co."CoordinationID"=assignment."CoordinationID"
+WHERE student."StudentCode" IN ('IS191621','IS201703') AND co."OJTSemesterID"=15
+  AND NOT EXISTS (SELECT 1 FROM public."InternshipTasks" existing WHERE existing."AssignmentID"=assignment."AssignmentID"
+    AND existing."TaskName"='Hoàn thiện chức năng và báo cáo OJT');
+
+INSERT INTO public."TaskProgressUpdates" ("TaskID","UpdatedByStudentID","UpdateDate","ProgressDescription","PercentComplete")
+SELECT task."TaskID",assignment."StudentID",TIMESTAMP '2026-11-20 16:00:00',
+  'Đã hoàn thành phần việc được giao và nộp báo cáo, minh chứng cho doanh nghiệp.',100
+FROM public."InternshipTasks" task
+JOIN public."InternshipAssignments" assignment ON assignment."AssignmentID"=task."AssignmentID"
+JOIN public."Students" student ON student."StudentID"=assignment."StudentID"
+JOIN public."StudentEnterpriseCoordination" co ON co."CoordinationID"=assignment."CoordinationID"
+WHERE student."StudentCode"='IS191621' AND co."OJTSemesterID"=15
+  AND task."TaskName"='Hoàn thiện chức năng và báo cáo OJT'
+  AND NOT EXISTS (SELECT 1 FROM public."TaskProgressUpdates" existing WHERE existing."TaskID"=task."TaskID"
+    AND existing."UpdatedByStudentID"=assignment."StudentID");
+
+INSERT INTO public."InternshipEvaluations"
+  ("AssignmentID","EvaluatedBy","EvaluatedAt","CompletionScore","AttitudeScore","SkillScore","OverallScore","Comments","Status","TemplateID","ScoreDetails")
+SELECT assignment."AssignmentID",enterprise_user."UserID",TIMESTAMP '2026-11-25 15:00:00',
+  8.50,8.50,8.50,8.50,'Doanh nghiệp đã chấm điểm: hoàn thành nhiệm vụ, đáp ứng yêu cầu chuyên môn và có thái độ hợp tác tốt.',
+  'SUBMITTED',criteria."TemplateID",
+  jsonb_build_object('completionScore',8.50,'skillScore',8.50,'attitudeScore',8.50)
+FROM public."InternshipAssignments" assignment
+JOIN public."Students" student ON student."StudentID"=assignment."StudentID"
+JOIN public."StudentEnterpriseCoordination" co ON co."CoordinationID"=assignment."CoordinationID"
+JOIN public."OJTSemesters" term ON term."OJTSemesterID"=co."OJTSemesterID"
+JOIN public."EnterpriseUsers" membership ON membership."EnterpriseID"=assignment."EnterpriseID"
+JOIN public."Users" enterprise_user ON enterprise_user."UserID"=membership."UserID" AND enterprise_user."Username"='enterprise01'
+CROSS JOIN LATERAL (
+  SELECT template."TemplateID"
+  FROM public."AssessmentTemplates" template
+  LEFT JOIN public."OJTSemesters" source_term ON source_term."OJTSemesterID"=template."OJTSemesterID"
+  WHERE template."Status"='PUBLISHED'
+    AND ((template."OJTSemesterID" IS NULL AND template."PublishedAt"<=TIMESTAMP '2026-11-25 15:00:00')
+      OR (template."OJTSemesterID" IS NOT NULL
+        AND COALESCE(template."EffectiveFrom",source_term."StartDate")<=term."StartDate"
+        AND NOT EXISTS (SELECT 1 FROM public."AssessmentTemplates" global_template
+          WHERE global_template."OJTSemesterID" IS NULL AND global_template."Status"='PUBLISHED'
+            AND global_template."PublishedAt"<=TIMESTAMP '2026-11-25 15:00:00')))
+  ORDER BY (template."OJTSemesterID" IS NULL) DESC,
+    COALESCE(template."EffectiveFrom",source_term."StartDate",template."PublishedAt"::date) DESC,
+    template."Version" DESC,template."TemplateID" DESC
+  LIMIT 1
+) criteria
+WHERE student."StudentCode"='IS191621' AND co."OJTSemesterID"=15
+  AND NOT EXISTS (SELECT 1 FROM public."InternshipEvaluations" existing WHERE existing."AssignmentID"=assignment."AssignmentID");
+
+-- Intentionally do not create OJT_RESULT_PUBLISHED notifications here; QHDN must publish these scores.
+
 INSERT INTO public."OJTActualReceipts" ("StudentID","OJTSemesterID","CoordinationID","AssignmentID","ReceivedBy","Reason","OriginalCapacity","ExceededCapacity","ReceivedAt")
 SELECT success."StudentID",success."OJTSemesterID",coordination."CoordinationID",assignment."AssignmentID",
   coordinator."UserID",'Sinh viên đã bắt đầu thực tập tại doanh nghiệp trong kỳ OJT này.',job_position."Capacity",false,
@@ -8881,7 +9056,7 @@ END $verify_qhdn_seed_students$;
 -- business key so these records remain valid if identity IDs differ by database.
 WITH fall_applicants("StudentCode","ApplicationStatus","Decision","Reason") AS (
   VALUES
-    ('IS191621','SUBMITTED','PENDING',NULL::text),
+    ('IS191621','ACCEPTED','ACCEPTED',NULL::text),
     ('SE191622','SUBMITTED','PENDING',NULL::text),
     ('IS201641','SUBMITTED','PENDING',NULL::text),
     ('SE201642','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.')
@@ -8912,7 +9087,7 @@ ON CONFLICT ("StudentID","OJTSemesterID") DO UPDATE SET
 
 WITH fall_applicants("StudentCode","ApplicationStatus","Decision","Reason") AS (
   VALUES
-    ('IS191621','SUBMITTED','PENDING',NULL::text),
+    ('IS191621','ACCEPTED','ACCEPTED',NULL::text),
     ('SE191622','SUBMITTED','PENDING',NULL::text),
     ('IS201641','SUBMITTED','PENDING',NULL::text),
     ('SE201642','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.')
@@ -8956,7 +9131,7 @@ ON CONFLICT ("RegistrationID","PostID","PositionID") DO UPDATE SET
 
 WITH fall_applicants("StudentCode","ApplicationStatus","Decision","Reason") AS (
   VALUES
-    ('IS191621','SUBMITTED','PENDING',NULL::text),
+    ('IS191621','ACCEPTED','ACCEPTED',NULL::text),
     ('SE191622','SUBMITTED','PENDING',NULL::text),
     ('IS201641','SUBMITTED','PENDING',NULL::text),
     ('SE201642','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.')
@@ -8966,7 +9141,7 @@ INSERT INTO public."StudentEnterpriseCoordination"
    "RejectReason","ApplicationID","OJTSemesterID","Source","CoordinationReason")
 SELECT application."RegistrationID",application."EnterpriseID",application."PositionID",
   student_user."UserID",TIMESTAMP '2026-11-27 10:05:00',applicant."Decision",
-  CASE WHEN applicant."Decision"='REJECTED' THEN TIMESTAMP '2026-11-27 10:10:00' END,
+  CASE WHEN applicant."Decision" IN ('REJECTED','ACCEPTED') THEN TIMESTAMP '2026-11-27 10:10:00' END,
   applicant."Reason",application."ApplicationID",application."OJTSemesterID",'STUDENT_APPLICATION',NULL
 FROM fall_applicants applicant
 JOIN public."Students" student ON student."StudentCode"=applicant."StudentCode"
@@ -9066,7 +9241,7 @@ WITH seeded_applicants("StudentCode","RecruitmentCode","ApplicationStatus","Deci
   VALUES
     ('IS201701','SEED-JOB-FALL2026-TECHVIET-02','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.'),
     ('IS201702','SEED-JOB-FALL2026-TECHVIET-03','ACCEPTED','ACCEPTED',NULL::text),
-    ('IS201703','SEED-JOB-FALL2026-TECHVIET-04','SUBMITTED','PENDING',NULL::text),
+    ('IS201703','SEED-JOB-FALL2026-TECHVIET-04','ACCEPTED','ACCEPTED',NULL::text),
     ('IS201704','SEED-JOB-FALL2026-GREENBYTE','REVIEWING','PENDING',NULL::text),
     ('SE201706','SEED-JOB-FALL2026-TECHVIET-02','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.'),
     ('SE201707','SEED-JOB-FALL2026-TECHVIET-03','ACCEPTED','ACCEPTED',NULL::text),
@@ -9115,7 +9290,7 @@ WITH seeded_applicants("StudentCode","ApplicationStatus","Decision","Reason") AS
   VALUES
     ('IS201701','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.'),
     ('IS201702','ACCEPTED','ACCEPTED',NULL::text),
-    ('IS201703','SUBMITTED','PENDING',NULL::text),
+    ('IS201703','ACCEPTED','ACCEPTED',NULL::text),
     ('IS201704','REVIEWING','PENDING',NULL::text),
     ('SE201706','REJECTED','REJECTED','Hồ sơ chưa phù hợp với yêu cầu vị trí thực tập.'),
     ('SE201707','ACCEPTED','ACCEPTED',NULL::text),
@@ -9147,7 +9322,7 @@ SELECT application."ApplicationID",
 FROM public."JobApplications" application
 JOIN public."Students" student ON student."StudentID"=application."StudentID"
 JOIN public."Users" enterprise_user ON enterprise_user."UserID"=application."ReviewedBy"
-WHERE student."StudentCode" IN ('IS201701','IS201702','IS201704','SE201706','SE201707','SE201709')
+WHERE student."StudentCode" IN ('IS191621','IS201701','IS201702','IS201703','IS201704','SE201706','SE201707','SE201709')
   AND application."Status" IN ('REJECTED','ACCEPTED','REVIEWING')
   AND NOT EXISTS (SELECT 1 FROM public."ApplicationEvents" old WHERE old."ApplicationID"=application."ApplicationID"
     AND old."Action"=CASE application."Status" WHEN 'REJECTED' THEN 'ENTERPRISE_REJECTED'

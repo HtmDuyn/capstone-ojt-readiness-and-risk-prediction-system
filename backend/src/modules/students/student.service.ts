@@ -29,7 +29,7 @@ export async function student(id: number) {
   return row;
 }
 export async function listStudents(params: Record<string,unknown>, exporting=false):Promise<{total:number;items:Record<string,any>[];page:number;limit:number}> {
-  const p = pagination(params,['search','status','programId','cohortId','groupCode','enrollmentYear','currentSemester','importedOnly','importBatchId']);
+  const p = pagination(params,['search','status','programId','majorId','cohortId','groupCode','enrollmentYear','currentSemester','importedOnly','importBatchId']);
   const args: unknown[] = [], conditions: string[] = ['s."DeletedAt" IS NULL'];
   const add = (sql: string,v: unknown) => { args.push(v); conditions.push(sql.replace('?',`$${args.length}`)); };
   const importedOnly = params.importedOnly === undefined ? false : enumValue(params.importedOnly, ['true','false'], 'importedOnly') === 'true';
@@ -50,7 +50,7 @@ export async function listStudents(params: Record<string,unknown>, exporting=fal
     if ((typeof value !== 'number' && typeof value !== 'string') || !/^[0-9]$/.test(String(value))) throw invalid('currentSemester must be an integer between 0 and 9.');
     add('s."CurrentSemester"=?',Number(value));
   }
-  for (const [key,col] of Object.entries({programId:'s."ProgramID"',cohortId:'p."CohortID"',enrollmentYear:'s."EnrollmentYear"'})) if (params[key] !== undefined) add(`${col}=?`,positiveId(params[key],key));
+  for (const [key,col] of Object.entries({programId:'s."ProgramID"',majorId:'tp."SpecializationID"',cohortId:'p."CohortID"',enrollmentYear:'s."EnrollmentYear"'})) if (params[key] !== undefined) add(`${col}=?`,positiveId(params[key],key));
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
   const row = (await query(`WITH filtered AS (${studentSelect}${where}), paged AS (SELECT * FROM filtered ORDER BY id LIMIT $${args.length+1} OFFSET $${args.length+2}) SELECT (SELECT count(*)::int FROM filtered) AS total,COALESCE(jsonb_agg(to_jsonb(paged) ORDER BY id) FILTER (WHERE id IS NOT NULL),'[]'::jsonb) AS items FROM paged`,[...args,exporting?10001:p.limit,exporting?0:p.offset])).rows[0];
   if(exporting&&row.total>10000)throw invalid('Narrow export to at most 10000 students.',422,'EXPORT_TOO_LARGE');

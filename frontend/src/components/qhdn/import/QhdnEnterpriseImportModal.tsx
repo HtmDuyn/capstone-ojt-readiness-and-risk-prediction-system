@@ -7,11 +7,12 @@ import { WorkflowModal, workflowInput, workflowPrimary, workflowSecondary } from
 import type { AcademicPeriodItem, EnterpriseImportRow, EnterpriseImportPayload, ImportPreviewResponse, ImportCommitResponse } from '@/types/qhdn/qhdnTypes';
 import type { RecruitmentWindow } from '@/types/qhdn/workflowTypes';
 import { emailDeliveryMessage } from '@/utils/shared/emailDelivery';
+const sampleRow = (): EnterpriseImportRow => ({ name: 'Công ty TNHH Giải pháp Phần mềm Minh Phát', fullName: 'Nguyễn Anh Tuấn', email: 'anh.tuan@minhphat.vn' });
 const emptyRow = (): EnterpriseImportRow => ({ name: '', fullName: '', email: '' });
 export function QhdnEnterpriseImportModal({ isOpen, onClose, onImported, mode = 'manual' }: {
  isOpen:boolean;onClose:()=>void;onImported:(result:ImportCommitResponse)=>void;mode?:'manual'|'file';periods?:AcademicPeriodItem[];periodsLoading?:boolean;initialAcademicPeriodId?:number;initialWindow?:RecruitmentWindow|null;
 }) {
- const [rows,setRows]=useState<EnterpriseImportRow[]>(mode === 'file' ? [] : [emptyRow()]);
+ const [rows,setRows]=useState<EnterpriseImportRow[]>(mode === 'file' ? [] : [sampleRow()]);
  const [fileName,setFileName]=useState(''),[page,setPage]=useState(1);
  const [payload,setPayload]=useState<EnterpriseImportPayload|null>(null),[preview,setPreview]=useState<ImportPreviewResponse|null>(null),[result,setResult]=useState<ImportCommitResponse|null>(null);
  const [confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');

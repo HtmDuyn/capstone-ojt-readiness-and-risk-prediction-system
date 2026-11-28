@@ -22,7 +22,7 @@ const quickAccounts = [
   { role: "Phòng Đào tạo", email: "academic@ojtrpa.edu.vn", password: "Academic@123" },
   { role: "Phòng QHDN", email: "ojt.coord@ojtrpa.edu.vn", password: "Ojt@123" },
   { role: "Doanh nghiệp", email: "hr@techviet.vn", password: "Enterprise@123" },
-  { role: "Sinh viên Minh", email: "minhnhis181601@fpt.edu.vn", password: "Student@123" },
+  { role: "Sinh viên - Chưa apply", email: "linhdtis201644@fpt.edu.vn", password: "Student@123" },
   { role: "Sinh viên Anh", email: "anhltnse181602@fpt.edu.vn", password: "Student@123" },
 ];
 

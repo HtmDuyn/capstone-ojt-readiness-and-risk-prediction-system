@@ -24,8 +24,9 @@ function counts(rows: Array<{ category: string }>) {
 
 export async function studentOverview(params: Record<string, unknown>) {
   for (const key of Object.keys(params)) {
-    if (key !== 'cohortId' && key !== 'academicPeriodId') throw invalid(`Unknown query parameter: ${key}.`);
+    if (key !== 'majorId' && key !== 'cohortId' && key !== 'academicPeriodId') throw invalid(`Unknown query parameter: ${key}.`);
   }
+  const majorId = params.majorId === undefined ? null : positiveId(params.majorId, 'majorId');
   const cohortId = params.cohortId === undefined ? null : positiveId(params.cohortId, 'cohortId');
   const academicPeriodId = params.academicPeriodId === undefined ? null : positiveId(params.academicPeriodId, 'academicPeriodId');
   const result = await query<OverviewRow>(
@@ -33,13 +34,15 @@ export async function studentOverview(params: Record<string, unknown>) {
       ${calculatedEligibilitySql('s')} AS "calculatedEligibility"
      FROM "Students" s
      JOIN "Users" u ON u."UserID"=s."UserID"
+     LEFT JOIN "TrainingPrograms" program ON program."ProgramID"=s."ProgramID"
      LEFT JOIN "StudentAcademicPlacements" p ON p."StudentID"=s."StudentID"
      LEFT JOIN "Cohorts" c ON c."CohortID"=p."CohortID"
      WHERE s."DeletedAt" IS NULL AND s."Status"='ACTIVE' AND u."Status"='ACTIVE'
-       AND ($1::int IS NULL OR p."CohortID"=$1)
-       AND ($2::int IS NULL OR p."CurrentAcademicPeriodID"=$2)
+       AND ($1::int IS NULL OR program."SpecializationID"=$1)
+       AND ($2::int IS NULL OR p."CohortID"=$2)
+       AND ($3::int IS NULL OR p."CurrentAcademicPeriodID"=$3)
      ORDER BY s."StudentID"`,
-    [cohortId, academicPeriodId],
+    [majorId, cohortId, academicPeriodId],
   );
 
   const rows = result.rows.map(row => {

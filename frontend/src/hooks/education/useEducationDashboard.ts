@@ -3,10 +3,11 @@ import { educationOverviewService } from '@/services/educationService';
 import { academicReportingService } from '@/services/educationService';
 import { getAllItems, getJson } from '@/services/educationService';
 import type { AcademicPeriod, AcademicYear, QueryParams } from '@/types/education/dashboard.types';
-import type { Cohort } from '@/types/education/reporting.types';
+import type { Major } from '@/types/education/curriculum.types';
+import type { RetakeClassReport } from '@/types/education/reporting.types';
 import { downloadCourseDemand } from '@/utils/shared/downloadFile';
-import { getErrorMessage, isCanceledRequest, parseAcademicPeriods, parseAcademicYears, parseCohortProgress, parseCourseDemand, parsePeriodStatistics, readNumber, toApiId } from '@/utils/education/educationDashboard';
-import React, { useEffect, useMemo, useState } from 'react';
+import { getErrorMessage, isCanceledRequest, parseAcademicPeriods, parseAcademicYears, parseCohortProgress, parsePeriodStatistics, readNumber, toApiId } from '@/utils/education/educationDashboard';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 /* =========================================================
    API PATHS
@@ -15,7 +16,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 const API_PATHS = {
   years: "/academic-years",
   periods: "/academic-periods",
-  courseDemand: "/course-demands",
 } as const;
 
 /* =========================================================
@@ -31,12 +31,13 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
   const [academicPeriods, setAcademicPeriods] = useState<AcademicPeriod[]>([]);
 
   const [selectedYear, setSelectedYear] = useState("");
+  const defaultYearInitialized = useRef(false);
 
   const [selectedPeriod, setSelectedPeriod] = useState("");
 
-  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [majors, setMajors] = useState<Major[]>([]);
 
-  const [selectedCohort, setSelectedCohort] = useState('');
+  const [selectedMajor, setSelectedMajor] = useState('');
 
   const [exporting, setExporting] = useState(false);
 
@@ -47,9 +48,8 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
   const [dashboardData, setDashboardData] = useState<unknown>(null);
   const [studentTotal, setStudentTotal] = useState<number | null>(null);
   const [dashboardWarning, setDashboardWarning] = useState("");
-  const [courseDemandLoading, setCourseDemandLoading] = useState(true);
-
-  const [courseDemandData, setCourseDemandData] = useState<unknown>(null);
+  const [supportProposalLoading, setSupportProposalLoading] = useState(true);
+  const [supportProposalData, setSupportProposalData] = useState<RetakeClassReport | null>(null);
 
   /* ---------------- LOADING ---------------- */
 
@@ -64,7 +64,7 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
 
   const [dashboardError, setDashboardError] = useState("");
 
-  const [courseDemandError, setCourseDemandError] = useState("");
+  const [supportProposalError, setSupportProposalError] = useState("");
 
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -88,7 +88,7 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
       const results = await Promise.allSettled([
         sharedRead('catalog:years', () => getAllItems(API_PATHS.years), controller.signal, 5 * 60_000),
         sharedRead('catalog:periods', () => getAllItems(API_PATHS.periods), controller.signal, 5 * 60_000),
-        sharedRead('catalog:cohorts', () => academicReportingService.cohorts(), controller.signal, 5 * 60_000),
+        sharedRead('catalog:majors', () => getAllItems<Major>('/majors'), controller.signal, 5 * 60_000),
       ]);
 
       if (controller.signal.aborted) return;
@@ -96,7 +96,12 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
       const errors: string[] = [];
 
       if (results[0].status === "fulfilled") {
-        setAcademicYears(parseAcademicYears(results[0].value));
+        const years = parseAcademicYears(results[0].value);
+        setAcademicYears(years);
+        if (!defaultYearInitialized.current) {
+          setSelectedYear(years.find(year => year.code === '2026-2027')?.id ?? '');
+          defaultYearInitialized.current = true;
+        }
       } else {
         setAcademicYears([]);
         errors.push(`Năm học: ${getErrorMessage(results[0].reason)}`);
@@ -109,8 +114,8 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
         errors.push(`Kỳ học: ${getErrorMessage(results[1].reason)}`);
       }
 
-      if (results[2].status === 'fulfilled') setCohorts(results[2].value);
-      else { setCohorts([]); errors.push(`Khóa: ${getErrorMessage(results[2].reason)}`); }
+      if (results[2].status === 'fulfilled') setMajors(results[2].value);
+      else { setMajors([]); errors.push(`Chuyên ngành: ${getErrorMessage(results[2].reason)}`); }
       setFiltersError(errors.join(" | "));
       setFiltersLoading(false);
     };
@@ -139,6 +144,15 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
   }, [academicPeriods, selectedPeriod]);
 
   const selectedOjtSemesterId = selectedPeriodInfo?.ojtSemesterId ?? null;
+  const supportPeriod = useMemo(() => {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const isUpcoming = (period: AcademicPeriod) => period.kind === 'SEMESTER'
+      && period.status === 'PLANNED' && Boolean(period.startDate && period.startDate.slice(0, 10) > today);
+    const selected = academicPeriods.find(period => period.id === selectedPeriod);
+    return (selected && isUpcoming(selected) ? selected : null)
+      ?? filteredPeriods.filter(isUpcoming).sort((a, b) => (a.startDate ?? '').localeCompare(b.startDate ?? '') || a.id.localeCompare(b.id))[0]
+      ?? null;
+  }, [academicPeriods, filteredPeriods, selectedPeriod]);
 
   const dashboardParams = useMemo<QueryParams>(() => {
     const params: QueryParams = {};
@@ -147,16 +161,16 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
     if (selectedOjtSemesterId) {
       params.ojtSemesterId = toApiId(selectedOjtSemesterId);
     }
-    if (selectedCohort) params.cohortId = toApiId(selectedCohort);
+    if (selectedMajor) params.majorId = toApiId(selectedMajor);
 
     return params;
-  }, [selectedOjtSemesterId, selectedPeriod, selectedCohort]);
+  }, [selectedOjtSemesterId, selectedPeriod, selectedMajor]);
 
   // Scope the overview roster by its current academic placement when a period is selected.
   const overviewParams = useMemo<QueryParams>(() => ({
     ...(selectedPeriod ? { academicPeriodId: toApiId(selectedPeriod) } : {}),
-    ...(selectedCohort ? { cohortId: toApiId(selectedCohort) } : {}),
-  }), [selectedPeriod, selectedCohort]);
+    ...(selectedMajor ? { majorId: toApiId(selectedMajor) } : {}),
+  }), [selectedPeriod, selectedMajor]);
 
   /* =====================================================
      LOAD DASHBOARD AND COURSE DEMAND
@@ -186,21 +200,20 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
 
   useEffect(() => {
     if (!loadCourseDemand) return;
-    if (!selectedPeriod || !selectedOjtSemesterId) {
-      setCourseDemandData(null);
-      setCourseDemandError('');
-      setCourseDemandLoading(false);
+    if (!supportPeriod) {
+      setSupportProposalData(null);
+      setSupportProposalError('');
+      setSupportProposalLoading(false);
       return;
     }
     const controller = new AbortController();
-    setCourseDemandLoading(true); setCourseDemandError(''); setCourseDemandData(null);
-    sharedRead(`demand:${JSON.stringify({ ...dashboardParams, excludeNonOjtCreditCourses: true })}`, () =>
-      getAllItems(API_PATHS.courseDemand, { ...dashboardParams, excludeNonOjtCreditCourses: 'true' }, controller.signal, 60_000), controller.signal)
-      .then(data => { if (!controller.signal.aborted) setCourseDemandData(data); })
-      .catch(error => { if (!controller.signal.aborted && !isCanceledRequest(error)) setCourseDemandError(`Không tải được nhu cầu học phần: ${getErrorMessage(error)}`); })
-      .finally(() => { if (!controller.signal.aborted) setCourseDemandLoading(false); });
+    setSupportProposalLoading(true); setSupportProposalError(''); setSupportProposalData(null);
+    academicReportingService.retakeClassProposals(Number(supportPeriod.id), selectedMajor ? { majorId: Number(selectedMajor) } : {}, 1, controller.signal, 'CALCULATED')
+      .then(data => { if (!controller.signal.aborted) setSupportProposalData(data); })
+      .catch(error => { if (!controller.signal.aborted && !isCanceledRequest(error)) setSupportProposalError(getErrorMessage(error)); })
+      .finally(() => { if (!controller.signal.aborted) setSupportProposalLoading(false); });
     return () => controller.abort();
-  }, [dashboardParams, refreshKey, loadCourseDemand, selectedPeriod, selectedOjtSemesterId]);
+  }, [refreshKey, loadCourseDemand, selectedMajor, supportPeriod]);
 
   /* =====================================================
      STATISTICS FROM BACKEND
@@ -275,12 +288,6 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
     [dashboardData],
   );
 
-  const courseDemands = useMemo(
-    () => parseCourseDemand(courseDemandData),
-    [courseDemandData],
-  );
-
-
   const maxPeriodStudents = Math.max(
     1,
     ...periodStatistics.map((item) => item.eligible + item.ineligible),
@@ -313,10 +320,10 @@ export function useEducationDashboard(loadCourseDemand: boolean) {
       downloadCourseDemand(await academicReportingService.exportCourseDemand({
         ...(selectedPeriod ? { academicPeriodId: Number(selectedPeriod) } : {}),
         ...(selectedOjtSemesterId ? { ojtSemesterId: Number(selectedOjtSemesterId) } : {}),
-        ...(selectedCohort ? { cohortId: Number(selectedCohort) } : {}),
+        ...(selectedMajor ? { majorId: Number(selectedMajor) } : {}),
       }, false, true));
     } catch (error) { setExportError(getErrorMessage(error)); }
     finally { setExporting(false); }
   };
-  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, cohorts, selectedCohort, setSelectedCohort, exporting, exportError, filtersLoading, dashboardLoading, courseDemandLoading, dashboardWarning, filtersError, dashboardError, courseDemandError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, courseDemands, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
+  return { academicYears, selectedYear, selectedPeriod, setSelectedPeriod, majors, selectedMajor, setSelectedMajor, exporting, exportError, filtersLoading, dashboardLoading, supportProposalLoading, supportProposalError, supportProposalData, supportPeriod, dashboardWarning, filtersError, dashboardError, filteredPeriods, selectedOjtSemesterId, totalStudents, eligibleStudents, ineligibleStudents, reviewRequiredStudents, assessedStudents, eligiblePercent, ineligiblePercent, periodStatistics, cohortProgress, maxPeriodStudents, insufficientDataStudents, awaitingConfirmationStudents, handleRefresh, handleYearChange, handleExport };
 }
