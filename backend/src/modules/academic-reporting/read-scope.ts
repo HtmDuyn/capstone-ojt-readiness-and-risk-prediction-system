@@ -2,9 +2,10 @@ import type { PoolClient } from 'pg';
 import { enrichListRows } from '../../shared/list-context';
 import { invalid } from '../students/student.validation';
 import { filters, report, type Row } from './report.repository';
+import { cachedReportReader } from './report-read-cache';
 
 // Reads may span every OJT semester. Notification writes still require an explicit scope.
-export async function readReports(client:PoolClient, params:Row, extra:string[] = [],lockSource=true) {
+export async function readReports(client:PoolClient, params:Row, extra:string[] = [],lockSource=true, cacheSource=false) {
   const requested = filters(params, extra, false);
   const semesters = (await client.query(`SELECT o."OJTSemesterID" AS "ojtSemesterId",
     COALESCE(w."BlockPeriodID",ad."AcademicPeriodID",rw."AcademicPeriodID",o."AcademicPeriodID") AS "academicPeriodId",
@@ -20,6 +21,7 @@ export async function readReports(client:PoolClient, params:Row, extra:string[] 
     academicPeriodId:requested.academicPeriodId ?? row.academicPeriodId ?? null,
     assessmentDeadline:requested.assessmentDeadline ?? row.assessmentDeadline ?? null}));
   const data:Row[] = [];
-  for (const scope of scopes) data.push(await report(client,scope,undefined,lockSource));
+  const reader = cacheSource && !lockSource ? cachedReportReader(client) : client;
+  for (const scope of scopes) data.push(await report(reader,scope,undefined,lockSource));
   return { requested, scopes:await enrichListRows(client,scopes), data };
 }

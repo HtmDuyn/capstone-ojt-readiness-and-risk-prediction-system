@@ -40,7 +40,7 @@ export async function retakeClassProposals(params:Row){
       throw invalid('Block 3 must be within its parent semester.',409,'BLOCK_OUTSIDE_PARENT_SEMESTER');
     if(new Date(block.EndDate).getTime()+86400000<=Date.now())throw invalid('Select a Block 3 that has not ended.',409,'BLOCK_ALREADY_ENDED');
     if(courseId&&!(await c.query('SELECT 1 FROM "Courses" WHERE "CourseID"=$1',[courseId])).rowCount)throw invalid('Course not found.',404);
-    const {requested,data}=await readReports(c,{...params,academicPeriodId:periodId},['blockPeriodId','semesterPeriodId','courseId'],false);
+    const {requested,data}=await readReports(c,{...params,academicPeriodId:periodId},['blockPeriodId','semesterPeriodId','courseId'],false,true);
     const demand=collectRetakeDemand(data);
     const items=demand.items.filter(r=>r.proposedClassCount>0&&(!courseId||r.courseId===courseId));
     return {scope:requested,calendarPreview,block:{id:preview?null:periodId,source:preview?'CALCULATED':'CONFIGURED',periodCode:block.PeriodCode,name:block.Name,parentPeriodId:block.ParentPeriodID,
