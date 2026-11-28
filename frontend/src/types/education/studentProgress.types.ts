@@ -4,7 +4,7 @@ export type SubjectStatus =
   "Passed" | "Not Passed" | "Not Started" | "In Progress" | "Chưa xác định";
 
 export type OjtEligibilityStatus =
-  "Đủ điều kiện" | "Chưa đủ điều kiện" | "Chưa có kết quả" | "Cần đối soát" | "Cần xét lại";
+  "Đủ điều kiện" | "Chưa đủ điều kiện" | "Chưa có kết quả" | "Chưa đủ dữ liệu" | "Cần xét lại";
 
 export interface StudentSubject {
   id: string;

@@ -16,7 +16,7 @@ export function OjtResultDonut({ groups }: { groups: OjtResultGroup[] }) {
       segments={groups.map(group => ({ label: group.label, value: group.count, color: group.color }))}
       label={'Kết quả xét điều kiện OJT: ' + groups.map(group => group.label + ': ' + group.count + ' sinh viên').join(', ')} unit="sinh viên">
       <span className="text-2xl font-extrabold text-slate-800">{total.toLocaleString('vi-VN')}</span>
-      <span className="text-[11px] text-slate-500">sinh viên đã xét</span>
+      <span className="text-[11px] text-slate-500">sinh viên có kết luận</span>
     </DonutChart>
     <div className="w-full max-w-56 space-y-3">
       {groups.map(group => <div key={group.label} className="flex items-start gap-2.5 text-xs">

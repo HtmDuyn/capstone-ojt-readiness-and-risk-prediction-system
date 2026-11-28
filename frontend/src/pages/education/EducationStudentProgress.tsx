@@ -73,7 +73,7 @@ const OJT_ELIGIBILITY_STYLES: Record<OjtEligibilityStatus, string> = {
   "Chưa đủ điều kiện": "border-red-200 bg-red-50 text-red-700",
 
   "Chưa có kết quả": "border-slate-200 bg-slate-50 text-slate-500",
-  "Cần đối soát": "border-amber-200 bg-amber-50 text-amber-700",
+  "Chưa đủ dữ liệu": "border-amber-200 bg-amber-50 text-amber-700",
   "Cần xét lại": "border-amber-200 bg-amber-50 text-amber-700",
 };
 

@@ -9,7 +9,7 @@ type Target = { student: ImportedStudent; reason: string };
 type SortContext = { results: Record<number, LocalOjtResult>; failures: Record<number, string>; statuses: Record<number, OjtDisplayStatus>; academicCredits?: Record<number, number | null> };
 const collator = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
 const statusLabels: Record<OjtDisplayStatus, string> = {
-  ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Chưa đủ điều kiện', REVIEW_REQUIRED: 'Cần đối soát',
+  ELIGIBLE: 'Đủ điều kiện', NOT_ELIGIBLE: 'Chưa đủ điều kiện', REVIEW_REQUIRED: 'Chưa đủ dữ liệu',
   PENDING: 'Chưa xét', ERROR: 'Gặp lỗi', STALE: 'Cần xét lại', INACTIVE: 'Không hoạt động',
 };
 export { statusLabels as ojtDisplayStatusLabels };

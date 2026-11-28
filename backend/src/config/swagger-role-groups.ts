@@ -18,7 +18,11 @@ const accessGroups: { roles: RoleCode[]; operations: string[] }[] = [
   {roles:["ADMIN","ACADEMIC"],operations:["POST /api/academic/academic-summary-notifications","POST /api/academic/eligibility-notifications","GET /api/academic-periods/{id}/ojt-advisory-schedule","PUT /api/academic-periods/{id}/ojt-advisory-schedule","GET /api/academic/advisory-runs","GET /api/academic/advisory-runs/{id}"]},
   {roles:["STUDENT"],operations:["GET /api/students/me/academic-summary","GET /api/students/me/supplementary-course-options","GET /api/students/me/curriculum","GET /api/students/me/notifications","PATCH /api/students/me/notifications/{id}","GET /api/students/me/assignments/current","GET /api/students/me/ojt-results","GET /api/students/me/ojt-results/{id}","GET /api/students/me/dashboard","GET /api/students/me/roadmap-recommendations"]},
   {roles:['ENTERPRISE'],operations:['POST /api/enterprise/tasks/bulk']},
-  {roles:['ADMIN','OJT_COORD','ENTERPRISE','STUDENT'],operations:['GET /api/internship-tasks']},
+  {roles:['ADMIN','OJT_COORD','ENTERPRISE','STUDENT'],operations:[
+    'GET /api/internship-tasks',
+    'GET /api/internship-tasks/{id}/submissions',
+    'GET /api/task-submissions/{id}/file',
+  ]},
   {roles:['STUDENT'],operations:['POST /api/students/me/cv','POST /api/job-applications','GET /api/students/me/opportunities']},
   {roles:['ADMIN','OJT_COORD','STUDENT'],operations:['GET /api/job-applications']},
   { roles: ["ADMIN","ACADEMIC"], operations: [

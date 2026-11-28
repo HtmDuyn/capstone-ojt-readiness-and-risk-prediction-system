@@ -2,12 +2,11 @@ import React from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Eye, GraduationCap, RefreshCw, Search, Users, X } from 'lucide-react';
 import type { StudentProgress } from '@/types/education/studentProgress.types';
 
-const initialFilters = { search: '', curriculum: '', term: '', eligibility: '' };
+const initialFilters = { search: '', eligibility: '' };
 type Filters = typeof initialFilters;
 type FilterKey = keyof Filters;
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
-const unique = (values: string[]) => [...new Set(values.filter(v => v && v !== '—'))].sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
-const filterLabels: Record<FilterKey, string> = { search: 'Từ khóa', curriculum: 'Mã khung chương trình', term: 'Học kỳ', eligibility: 'Kết quả xét OJT' };
+const filterLabels: Record<FilterKey, string> = { search: 'Từ khóa', eligibility: 'Kết quả xét OJT' };
 type SortKey = 'name' | 'code' | 'curriculum' | 'semester' | 'gpa' | 'credits' | 'failed' | 'eligibility';
 type SortSelection = { key: SortKey; direction: 'asc' | 'desc' };
 const sortableColumns: { title: string; key?: SortKey }[] = [
@@ -26,7 +25,7 @@ const eligibilityOrder: Record<StudentProgress['eligibilityStatus'], number> = {
   'Đủ điều kiện': 0,
   'Chưa đủ điều kiện': 1,
   'Cần xét lại': 2,
-  'Cần đối soát': 3,
+  'Chưa đủ dữ liệu': 3,
   'Chưa có kết quả': 4,
 };
 
@@ -39,22 +38,16 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
   const [sort, setSort] = React.useState<SortSelection | null>(null);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(20);
-  const change = (key: FilterKey, value: string) => setFilters(previous => {
-    const next = { ...previous, [key]: value };
-    if (key === 'curriculum') Object.assign(next, { term: '' });
-    return next;
-  });
+  const change = (key: FilterKey, value: string) => setFilters(previous => ({ ...previous, [key]: value }));
   const changeSort = (key: SortKey) => setSort(previous => {
     if (previous?.key !== key) return { key, direction: 'asc' };
     return previous.direction === 'asc' ? { key, direction: 'desc' } : null;
   });
-  const scope = React.useMemo(() => students.filter(s => !filters.curriculum || s.curriculumCode === filters.curriculum), [students, filters.curriculum]);
   const filtered = React.useMemo(() => {
     const keywords = normalize(filters.search).split(/\s+/).filter(Boolean);
-    const result = scope.filter(s => {
+    const result = students.filter(s => {
       const haystack = normalize(`${s.studentCode} ${s.fullName}`);
       return keywords.every(word => haystack.includes(word))
-        && (!filters.term || s.currentTerm === filters.term)
         && (!filters.eligibility || s.eligibilityStatus === filters.eligibility);
     });
     return result.sort((a, b) => {
@@ -86,7 +79,7 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
         : String(left).localeCompare(String(right), 'vi', { numeric: true });
       return (sort.direction === 'asc' ? comparison : -comparison) || byCode;
     });
-  }, [scope, filters, sort]);
+  }, [students, filters, sort]);
   React.useEffect(() => { setPage(1); }, [filters, sort, pageSize]);
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pages);
@@ -125,14 +118,14 @@ export function StudentProgressList({ students, loading, error, warning, onSelec
         <button aria-label="Tải lại sinh viên" disabled={loading} onClick={onReload} className="ml-auto rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-orange-50 disabled:opacity-50"><RefreshCw size={17} className={loading ? 'animate-spin' : ''} /></button>
       </div>
       <div aria-label="Bộ lọc sinh viên" className="space-y-3 px-5 py-4">
-      <div className="relative w-full"><Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="flex flex-col gap-3 md:flex-row md:items-end">
+      <div className="relative w-full md:max-w-[420px]"><Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input aria-label="Tìm theo mã sinh viên hoặc họ tên" value={filters.search} onChange={e => change('search', e.target.value)} placeholder="Tìm mã sinh viên hoặc họ tên, có thể nhập không dấu..." className="h-[42px] w-full rounded-lg border border-slate-300 bg-white pl-11 pr-10 text-sm text-slate-800 placeholder:text-slate-500 outline-none transition-colors hover:border-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100" />
           {filters.search && <button aria-label="Xóa từ khóa" onClick={() => change('search', '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><X size={16} /></button>}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {select('curriculum', 'Mã khung chương trình', options(unique(students.map(s => s.curriculumCode))))}
-        {select('term', 'Học kỳ', options(unique(scope.map(s => s.currentTerm))))}
-        {select('eligibility', 'Kết quả xét OJT', options(['Đủ điều kiện', 'Chưa đủ điều kiện', 'Chưa có kết quả', 'Cần đối soát', 'Cần xét lại']))}
+      <div className="w-full md:w-[280px]">
+        {select('eligibility', 'Kết quả xét OJT', options(['Đủ điều kiện', 'Chưa đủ điều kiện', 'Chưa có kết quả', 'Chưa đủ dữ liệu', 'Cần xét lại']))}
+      </div>
       </div>
       {active.length > 0 && <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">{active.map(([key, value]) => <button key={key} onClick={() => change(key, '')} aria-label={`Bỏ lọc ${filterLabels[key]}`} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs text-orange-800"><span className="truncate">{filterLabels[key]}: {value}</span><X size={13} className="shrink-0" /></button>)}</div>}
       <div className="flex justify-end">

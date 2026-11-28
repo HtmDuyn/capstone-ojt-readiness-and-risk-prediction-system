@@ -6,6 +6,9 @@ export type OjtFinalResult = {
   fullName: string;
   enterpriseName: string;
   semesterCode: string;
+  academicPeriodCode?: string | null;
+  academicPeriodName?: string | null;
+  academicYearCode?: string | null;
   status: string;
   officialScore: number | null;
   completionScore: number | null;
