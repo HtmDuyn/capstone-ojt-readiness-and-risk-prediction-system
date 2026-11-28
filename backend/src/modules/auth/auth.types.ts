@@ -14,6 +14,10 @@ export interface AuthUserRecord {
   id: number;
   username: string;
   email: string;
+  phone: string | null;
+  created_at: Date;
+  updated_at: Date;
+  last_login_at: Date | null;
   full_name: string;
   status: string;
   password_hash: string;

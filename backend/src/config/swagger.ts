@@ -245,6 +245,10 @@ const options: swaggerJSDoc.Options =
 
             properties: {
               mustChangePassword: { type: "boolean", example: false },
+              phone: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              lastLoginAt: { type: "string", format: "date-time", nullable: true },
               id: {
                 type:
                   "integer",
